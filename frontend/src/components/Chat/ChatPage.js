@@ -1808,15 +1808,15 @@ const ChatPage = ({ onLogin }) => {
             if (payload.type === 'failed' || payload.type === 'error') {
                 completed = true;
                 try { socket.close(); } catch (_) {}
-                reject(new Error(payload.error_message || payload.error || 'Instant stream failed'));
+                reject(new Error(payload.error_message || payload.error || 'Live response stream failed'));
             }
         };
         socket.onerror = () => {
-            if (!completed) reject(new Error('Instant WebSocket connection failed'));
+            if (!completed) reject(new Error('Live connection failed'));
         };
         socket.onclose = () => {
             window.clearTimeout(connectionTimer);
-            if (!completed) reject(new Error('Instant WebSocket closed before completion'));
+            if (!completed) reject(new Error('Live connection closed before the answer completed'));
         };
     });
 
@@ -3202,12 +3202,12 @@ const ChatPage = ({ onLogin }) => {
                         {instantChatEnabled && isInstantAnalysis && !isPartnershipMode && !isMundaneMode && (
                             <section
                                 className={`chat-header-instant ${instantBilling.active ? 'chat-header-instant--live' : 'chat-header-instant--ready'} ${instantBilling.state?.low_balance ? 'chat-header-instant--low' : ''}`}
-                                aria-label="Instant consultation controls"
+                                aria-label="Live consultation controls"
                             >
                                 <div className="chat-header-instant__identity">
                                     <span className="chat-header-instant__icon" aria-hidden="true">⚡</span>
                                     <span>
-                                        <strong>{instantBilling.active ? 'Instant consultation live' : 'Instant consultation'}</strong>
+                                        <strong>{instantBilling.active ? 'Live consultation active' : 'Live consultation'}</strong>
                                         <small>
                                             {instantBilling.active
                                                 ? `First minute ${instantBilling.state?.first_minute_cost ?? instantChatFirstMinuteCost} · then ${instantBilling.state?.following_minute_cost ?? instantChatPerMinuteCost} credits/min`
@@ -3234,7 +3234,7 @@ const ChatPage = ({ onLogin }) => {
                                                 End
                                             </button>
                                             <button type="button" className="chat-header-instant__mode" onClick={requestExitInstantMode}>
-                                                Exit Instant
+                                                Exit Live
                                             </button>
                                         </div>
                                     </>
@@ -3242,7 +3242,7 @@ const ChatPage = ({ onLogin }) => {
                                     <div className="chat-header-instant__actions">
                                         {isInstantAnalysis && (
                                             <button type="button" className="chat-header-instant__mode" onClick={requestExitInstantMode}>
-                                                Exit Instant
+                                                Exit Live
                                             </button>
                                         )}
                                         <button
@@ -3474,8 +3474,8 @@ const ChatPage = ({ onLogin }) => {
             {showInstantEndConfirm && (
                 <div className="instant-end-dialog" role="dialog" aria-modal="true" aria-labelledby="instant-end-title">
                     <div className="instant-end-dialog__card">
-                        <span className="instant-end-dialog__eyebrow">Instant consultation</span>
-                        <h2 id="instant-end-title">{exitInstantAfterEnd ? 'Exit Instant mode?' : 'End this consultation?'}</h2>
+                        <span className="instant-end-dialog__eyebrow">Live consultation</span>
+                        <h2 id="instant-end-title">{exitInstantAfterEnd ? 'Exit Live mode?' : 'End this consultation?'}</h2>
                         <p>{exitInstantAfterEnd
                             ? 'This ends the live timer and returns you to Standard chat. Your conversation stays here.'
                             : 'This ends the live timer. Starting again begins and bills a new minute, so you cannot pause between replies.'}</p>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -41,6 +41,11 @@ export default function PodcastHistoryScreen({ navigation }) {
   const [durationMillis, setDurationMillis] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [selectedEntry, setSelectedEntry] = useState(null);
+  const [podcastViewMode, setPodcastViewMode] = useState('listen');
+  const [visualManifest, setVisualManifest] = useState(null);
+  const [visualLoading, setVisualLoading] = useState(false);
+  const [visualError, setVisualError] = useState('');
+  const visualRequestKeyRef = useRef('');
 
   const loadHistory = useCallback(async () => {
     try {
@@ -67,6 +72,11 @@ export default function PodcastHistoryScreen({ navigation }) {
     setPlayingMessageId(null);
     setShowPlayer(false);
     setSelectedEntry(null);
+    setPodcastViewMode('listen');
+    setVisualManifest(null);
+    setVisualLoading(false);
+    setVisualError('');
+    visualRequestKeyRef.current = '';
   };
 
   const playFromStream = async (entry) => {
@@ -82,6 +92,11 @@ export default function PodcastHistoryScreen({ navigation }) {
     setPlayerMode('playing');
     setPositionMillis(0);
     setDurationMillis(0);
+    setPodcastViewMode('listen');
+    setVisualManifest(null);
+    setVisualLoading(false);
+    setVisualError('');
+    visualRequestKeyRef.current = '';
     getTextToSpeech().playPodcastFromStream(streamUrl, token, {
       onStart: () => { setPlayingMessageId(entry.message_id); setPlayerMode('playing'); getTextToSpeech().setPodcastRate(playbackRate); },
       onProgress: (position, duration) => { setPositionMillis(position); setDurationMillis(duration); },
@@ -91,6 +106,43 @@ export default function PodcastHistoryScreen({ navigation }) {
       onStop: stopPlaying,
       onError: () => { stopPlaying(); Alert.alert(t('historyUi.common.error'), t('historyUi.podcast.playError')); },
     });
+  };
+
+  const handleViewModeChange = async (nextMode) => {
+    const mode = nextMode === 'watch' ? 'watch' : 'listen';
+    setPodcastViewMode(mode);
+    if (mode !== 'watch') return;
+    const entry = selectedEntry;
+    if (!entry?.message_id) {
+      setVisualError(t('podcast.visualUnavailableBody', 'You can continue listening to the podcast.'));
+      return;
+    }
+    const lang = String(entry.lang || 'en').toLowerCase().startsWith('hi') ? 'hi' : 'en';
+    const requestKey = `${entry.message_id}:${lang}`;
+    if (visualRequestKeyRef.current === requestKey && visualManifest) return;
+    visualRequestKeyRef.current = requestKey;
+    setVisualLoading(true);
+    setVisualError('');
+    try {
+      const response = await chatAPI.getPodcastVisuals(entry.message_id, lang, entry.birth_chart_id || null);
+      const manifest = response?.data?.manifest;
+      if (!manifest || !Array.isArray(manifest.scenes) || !manifest.scenes.length) {
+        throw new Error('Visual podcast manifest was empty');
+      }
+      if (visualRequestKeyRef.current === requestKey) setVisualManifest(manifest);
+    } catch (error) {
+      if (visualRequestKeyRef.current === requestKey) {
+        visualRequestKeyRef.current = '';
+        setVisualError(
+          error?.response?.data?.detail
+          || t('podcast.visualUnavailableBody', 'You can continue listening to the podcast.'),
+        );
+      }
+    } finally {
+      if (visualRequestKeyRef.current === requestKey || !visualRequestKeyRef.current) {
+        setVisualLoading(false);
+      }
+    }
   };
 
   const sharePodcast = async (entry) => {
@@ -265,6 +317,11 @@ export default function PodcastHistoryScreen({ navigation }) {
           onShare={() => selectedEntry && sharePodcast(selectedEntry)}
           playbackRate={playbackRate}
           onSpeedChange={(rate) => { setPlaybackRate(rate); getTextToSpeech().setPodcastRate(rate); }}
+          viewMode={podcastViewMode}
+          onViewModeChange={handleViewModeChange}
+          visualManifest={visualManifest}
+          isVisualLoading={visualLoading}
+          visualError={visualError}
         />
         </View>
       </SafeAreaView>

@@ -35,6 +35,12 @@ from .wealth_graph_runtime import (
     is_wealth_category,
     resolve_wealth_graph_inputs,
 )
+from .education_graph_runtime import (
+    build_education_graph_route,
+    compare_education_graph_policy,
+    is_education_category,
+    resolve_education_graph_inputs,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -123,7 +129,7 @@ def resolve_live_graph_policy(
     ).strip().lower()
     prefer_wealth_graph = wealth_subtype in {
         "source", "savings_instability", "multiple_income", "debt_repayment",
-        "loan_support", "investing_vs_trading", "investment_risk",
+        "loan_support", "loan_decision", "investing_vs_trading", "investment_risk",
         "loss_vulnerability", "windfall",
     }
     # ``income`` is shared vocabulary with the Career salary route. A typed
@@ -148,6 +154,10 @@ def resolve_live_graph_policy(
     elif is_wealth_category(category):
         domain, resolver, comparator, reviewer = (
             "wealth", resolve_wealth_graph_inputs, compare_wealth_graph_policy, build_wealth_graph_route,
+        )
+    elif is_education_category(category):
+        domain, resolver, comparator, reviewer = (
+            "education", resolve_education_graph_inputs, compare_education_graph_policy, build_education_graph_route,
         )
     else:
         return None
@@ -214,8 +224,11 @@ def apply_live_graph_policy(
         policy.get("domain") == "wealth"
         and policy.get("runtime_key") in {
             "wealth_timing", "income_timing", "debt_repayment",
-            "loan_support", "investment_timing", "inheritance_timing",
+            "loan_support", "loan_decision", "investment_timing", "inheritance_timing",
         }
+    ) or bool(
+        policy.get("domain") == "education"
+        and str(policy.get("runtime_key") or "").endswith("_timing")
     )
     love_arranged_route = bool(
         policy.get("domain") == "marriage"
@@ -252,6 +265,10 @@ def apply_live_graph_policy(
             policy.get("domain") == "wealth"
             and policy.get("runtime_key") == "investing_vs_trading"
         )
+        and not (
+            policy.get("domain") == "education"
+            and policy.get("runtime_key") in {"course_comparison", "education_vs_work"}
+        )
     )
     verdict_missing = {
         str(value) for value in (result.get("verdict") or {}).get("missing_required_capabilities") or []
@@ -264,6 +281,70 @@ def apply_live_graph_policy(
             "evidence limitation and general preventive guidance only."
         )
         answer_spec["limitation_instruction"] = compact_policy["instruction"]
+    if bool(policy.get("live")) and policy.get("domain") == "education":
+        runtime_key = str(policy.get("runtime_key") or "education")
+        normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
+        foundation = normalized.get("education_foundation") if isinstance(normalized.get("education_foundation"), Mapping) else {}
+        static_route = not runtime_key.endswith("_timing")
+        education_rules = {
+            "runtime_key": runtime_key,
+            "static_route": static_route,
+            "primary_evidence": "evidence.education_foundation",
+            "route_synthesis": foundation.get("route_synthesis") or {},
+            "higher_education_synthesis": (
+                foundation.get("higher_education_synthesis") or {}
+                if runtime_key in {"higher_education", "higher_education_timing"}
+                else {}
+            ),
+            "route_specific_syntheses": {
+                key: foundation.get(key) or {}
+                for key in (
+                    "overall_synthesis", "learning_style_synthesis", "subject_synthesis",
+                    "target_assessment", "option_synthesis", "exam_synthesis",
+                    "admission_synthesis", "scholarship_synthesis", "research_synthesis",
+                    "foreign_study_synthesis", "obstacle_synthesis", "resume_synthesis",
+                    "education_vs_work_synthesis", "remedy_synthesis",
+                )
+            },
+            "required_order": [
+                "answer the exact education/exam/research question",
+                "state the D1 promise",
+                "state how D24 confirms or qualifies it using at least one supplied D24 planet/house/lord condition",
+                "apply the route-specific house chain and significators",
+                "give one grounded practical implication",
+            ],
+            "forbidden_moves": [
+                "Never decide from one house, lord or planet.",
+                "Never treat D24 availability as a positive confirmation by itself.",
+                "Never say D1 or D24 confirms/supports without naming at least one actual supplied condition from route_synthesis; if no condition survived, state that limitation.",
+                "Never guarantee an exam result, admission, scholarship, course outcome, research completion or foreign study.",
+                "Never label intelligence or cognitive worth.",
+                "Never convert foreign-study evidence into settlement or immigration evidence.",
+                "Never use D9 outside research qualification. Use D10 only for education-versus-work or research-career conversion.",
+                "Never mention timing in a static route or a date absent from calculated timing_windows.",
+                "Never use H4 to decide postgraduate or higher-education promise; H9 is primary, H5 qualifies academic depth, H11 realizes the outcome, and D24 must be interpreted rather than merely named.",
+                "Never recommend a subject, profession or creative/analytical field in a higher-education capacity answer unless the user separately asks field fit.",
+            ],
+        }
+        compact_policy["education_answer_rules"] = education_rules
+        answer_spec["education_answer_rules"] = education_rules
+        compact_policy["instruction"] = (
+            "Use the calculated Education foundation as the sole answer-bearing source. Synthesize D1 and D24; "
+            "then apply route_synthesis and its named route-specific ledger. A chart being calculated is not itself "
+            "a supportive result. Do not replace a pressured or not-established verdict with generic optimism."
+        )
+        if runtime_key in {"higher_education", "higher_education_timing"}:
+            compact_policy["instruction"] += (
+                " For postgraduate education, higher_education_synthesis is controlling: begin with H9, then H5 "
+                "and H11, and use actual D24 house-lord conditions. H4 is explicitly excluded. Do not turn this "
+                "capacity question into a subject or profession recommendation."
+            )
+        if missing and not timing_missing:
+            compact_policy["claim_permission"] = "qualified_education_only"
+            compact_policy["instruction"] += (
+                " Some required static factors are unavailable; identify the missing layer and limit only the claim "
+                "that depends on it rather than replacing the whole answer with a generic refusal."
+            )
     if bool(policy.get("live")) and wealth_route:
         runtime_key = str(policy.get("runtime_key") or "")
         normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
@@ -285,6 +366,7 @@ def apply_live_graph_policy(
             "debt_diagnosis": "persistent debt mechanism",
             "debt_repayment": "debt-repayment timing",
             "loan_support": "loan-support timing and conditions",
+            "loan_decision": "whether new borrowing is advisable for the stated productive purpose and horizon",
             "investing_vs_trading": "long-term investing versus active trading suitability",
             "investment": "investment and speculation suitability",
             "investment_timing": "investment-support timing",
@@ -297,7 +379,7 @@ def apply_live_graph_policy(
         }.get(runtime_key, "the requested financial timing or decision")
         is_static_wealth = runtime_key not in {
             "wealth_timing", "income_timing", "debt_repayment",
-            "loan_support", "investment_timing", "inheritance_timing",
+            "loan_support", "loan_decision", "investment_timing", "inheritance_timing",
         }
         investment_family = runtime_key in {
             "investment", "investing_vs_trading", "investment_timing",
@@ -332,6 +414,11 @@ def apply_live_graph_policy(
             "wealth_growth_timing_synthesis": (
                 dict(wealth_foundation.get("wealth_growth_timing_synthesis"))
                 if runtime_key == "wealth_timing" and isinstance(wealth_foundation.get("wealth_growth_timing_synthesis"), Mapping)
+                else {}
+            ),
+            "loan_decision_synthesis": (
+                dict(wealth_foundation.get("loan_decision_synthesis"))
+                if runtime_key == "loan_decision" and isinstance(wealth_foundation.get("loan_decision_synthesis"), Mapping)
                 else {}
             ),
             "required_answer_order": [
@@ -518,6 +605,92 @@ def apply_live_graph_policy(
                 compact_policy["instruction"] = (
                     "No route-adjudicated debt-repayment window is available. Do not turn debt-house activity or the "
                     "current date into repayment timing. Explain that a reliable window was not established."
+                )
+        if runtime_key == "loan_decision":
+            loan_synthesis = (
+                dict(wealth_foundation.get("loan_decision_synthesis"))
+                if isinstance(wealth_foundation.get("loan_decision_synthesis"), Mapping)
+                else {}
+            )
+            scope = query_plan.get("time_scope") if isinstance(query_plan.get("time_scope"), Mapping) else {}
+            scope_start = str(scope.get("as_of") or "")[:10]
+            scope_end = str(scope.get("horizon_end") or "")[:10]
+            decision_windows = []
+            for raw_row in list(loan_synthesis.get("decision_windows") or []):
+                if not isinstance(raw_row, Mapping):
+                    continue
+                row = dict(raw_row)
+                row_start = str(row.get("start") or "")[:10]
+                row_end = str(row.get("end") or "")[:10]
+                if scope_start and row_end and row_end < scope_start:
+                    continue
+                if scope_end and row_start and row_start > scope_end:
+                    continue
+                if scope_start and row_start and row_start < scope_start:
+                    row["start"] = scope_start
+                if scope_end and row_end and row_end > scope_end:
+                    row["end"] = scope_end
+                bounded_peaks = []
+                for raw_peak in list(row.get("peak_windows") or []):
+                    if not isinstance(raw_peak, Mapping):
+                        continue
+                    peak = dict(raw_peak)
+                    peak_start = str(peak.get("start") or "")[:10]
+                    peak_end = str(peak.get("end") or "")[:10]
+                    if scope_start and peak_end and peak_end < scope_start:
+                        continue
+                    if scope_end and peak_start and peak_start > scope_end:
+                        continue
+                    if scope_start and peak_start and peak_start < scope_start:
+                        peak["start"] = scope_start
+                    if scope_end and peak_end and peak_end > scope_end:
+                        peak["end"] = scope_end
+                    bounded_peaks.append(peak)
+                row["peak_windows"] = bounded_peaks
+                decision_windows.append(row)
+            decision_windows.sort(key=lambda row: str(row.get("start") or ""))
+            supportive_windows = [
+                row for row in decision_windows if int(row.get("tier") or 0) >= 2
+            ]
+            loan_synthesis["requested_horizon_windows"] = decision_windows
+            loan_synthesis["supportive_horizon_windows"] = supportive_windows
+            loan_synthesis["horizon_verdict"] = (
+                "conditional_support_only_not_a_borrowing_recommendation"
+                if supportive_windows
+                else "not_a_clean_astrological_green_light_for_new_expansion_debt"
+            )
+            compact_policy["loan_decision_synthesis"] = loan_synthesis
+            wealth_answer_rules["loan_decision_synthesis"] = loan_synthesis
+            wealth_answer_rules["forbidden_moves"].extend([
+                "Do not treat loan availability, house 6/8 activation or possible approval as evidence that taking the loan is advisable.",
+                "Do not call the decision supported unless repayment resources 2/11 and business conversion 7/10/11 are confirmed in the same KP-dasha-transit chain.",
+                "Do not turn general business or gain potential into approval of new leverage during the requested horizon.",
+                "Do not recommend borrowing from astrology alone; explicitly require conventional cash-flow, borrowing-cost and downside review.",
+            ])
+            compact_policy["financial_safety_rules"]["forbidden_moves"].append(
+                "Do not recommend taking, increasing or refinancing debt from astrology alone."
+            )
+            verdict = dict(result.get("verdict") or {})
+            verdict["direction"] = loan_synthesis["horizon_verdict"]
+            verdict["ranked_windows"] = decision_windows
+            verdict["rationale"] = {
+                "source": "wealth_foundation.loan_decision_synthesis",
+                "d2_retention": loan_synthesis.get("d2_retention"),
+                "business_expansion_foundation": loan_synthesis.get("business_expansion_foundation"),
+                "decision_rule": loan_synthesis.get("decision_rule"),
+                "claim_rule": loan_synthesis.get("claim_rule"),
+            }
+            result["verdict"] = verdict
+            event_rules = dict(answer_spec.get("event_rules") or {})
+            event_rules["allowed_timing_windows"] = decision_windows
+            event_rules["required_material_windows"] = decision_windows
+            event_rules["window_answer_rule"] = loan_synthesis.get("claim_rule")
+            answer_spec["event_rules"] = event_rules
+            if not decision_windows and not timing_missing:
+                compact_policy["claim_permission"] = "no_loan_decision_horizon_evidence"
+                compact_policy["instruction"] = (
+                    "No route-adjudicated evidence covers the requested loan-decision horizon. Do not substitute a "
+                    "static debt pattern, generic business promise or current dasha for a proceed/avoid verdict."
                 )
         if time_bound_mode:
             # Every required Wealth factor belongs to the timing chain. Missing
@@ -1582,6 +1755,93 @@ def enforce_live_graph_answer(
                     "These are broad astrological support periods, not guaranteed gains or exact transaction dates. "
                     "Are you looking for growth through career income, business, or investments?"
                 ).strip()
+    if policy.get("domain") == "wealth" and policy.get("runtime_key") == "loan_decision":
+        loan_synthesis = (
+            policy.get("loan_decision_synthesis")
+            if isinstance(policy.get("loan_decision_synthesis"), Mapping)
+            else {}
+        )
+        decision_windows = [
+            dict(row) for row in list(loan_synthesis.get("requested_horizon_windows") or [])
+            if isinstance(row, Mapping) and (row.get("start") or row.get("end"))
+        ]
+        if policy.get("claim_permission") == "no_loan_decision_horizon_evidence" or not decision_windows:
+            if str(language or "").lower().startswith("hi"):
+                return (
+                    "अनुरोधित अवधि के लिए ऋण-निर्णय का पूरा गणितीय साक्ष्य उपलब्ध नहीं है। केवल जन्मकुंडली की "
+                    "ऋण-प्रवृत्ति या सामान्य व्यवसाय-योग से नया ऋण लेने की सलाह देना उचित नहीं होगा।"
+                )
+            return (
+                "I can’t make a reliable chart-based loan decision for the requested period because the complete "
+                "borrowing, repayment, business-conversion and timing chain is unavailable. A static debt tendency "
+                "alone is not enough to recommend new borrowing."
+            )
+        if str(language or "").lower().startswith("en"):
+            def format_loan_date(value: Any) -> str:
+                try:
+                    return datetime.strptime(str(value)[:10], "%Y-%m-%d").strftime("%d %B %Y").lstrip("0")
+                except (TypeError, ValueError):
+                    return str(value or "")
+
+            supportive_windows = [
+                row for row in decision_windows if int(row.get("tier") or 0) >= 2
+            ]
+            horizon_start = format_loan_date(decision_windows[0].get("start"))
+            horizon_end = format_loan_date(decision_windows[-1].get("end"))
+            if supportive_windows:
+                opening = (
+                    f"From an astrological perspective, the loan decision is only conditionally supported between "
+                    f"{horizon_start} and {horizon_end}—this is not a blanket recommendation to borrow."
+                )
+            else:
+                opening = (
+                    f"From an astrological perspective, I would lean against taking a new business-expansion loan "
+                    f"between {horizon_start} and {horizon_end}; the requested period is not a clean green light for new leverage."
+                )
+            phase_sentences: list[str] = []
+            for row in decision_windows[:3]:
+                active_debt = list(row.get("debt_access_houses") or [])
+                resources = list(row.get("resource_houses") or [])
+                business = list(row.get("business_conversion_houses") or [])
+                pressure = list(row.get("pressure_houses") or [])
+                details = []
+                if active_debt:
+                    details.append(f"debt-access houses {', '.join(str(value) for value in active_debt)}")
+                if resources:
+                    details.append(f"resource houses {', '.join(str(value) for value in resources)}")
+                if business:
+                    details.append(f"business-conversion houses {', '.join(str(value) for value in business)}")
+                if pressure:
+                    details.append(f"pressure houses {', '.join(str(value) for value in pressure)}")
+                phase_sentences.append(
+                    f"From {format_loan_date(row.get('start'))} to {format_loan_date(row.get('end'))}, "
+                    f"the {row.get('chain')} phase emphasizes {', '.join(details) or 'incomplete financial factors'}; "
+                    f"its calculated verdict is {str(row.get('classification') or '').replace('_', ' ')}."
+                )
+            if supportive_windows:
+                conversion_sentence = (
+                    "The supportive phase connects borrowing access with repayment resources and business conversion, "
+                    "but the real decision still depends on whether projected cash flow can service the debt under a downside case."
+                )
+            else:
+                conversion_sentence = (
+                    "The key weakness is conversion: debt/liability activity is present, but houses 7, 10 and 11 do not "
+                    "come together strongly enough with KP and transit confirmation to show that borrowed money converts "
+                    "cleanly into business cash flow and repayment capacity during this horizon."
+                )
+            retention_sentence = (
+                "D2 also shows mixed accumulation capacity with retention pressure, increasing the risk that new capital is absorbed by outflow before it compounds."
+                if loan_synthesis.get("d2_retention") == "mixed_capacity_with_retention_pressure"
+                else "D2 does not remove the need to test repayment capacity independently."
+            )
+            return " ".join([
+                opening,
+                *phase_sentences,
+                conversion_sentence,
+                retention_sentence,
+                "Astrology cannot establish affordability or replace underwriting. Before taking any loan, verify debt-service coverage, total borrowing cost and a downside revenue scenario with a qualified financial professional.",
+                "Would you like me to calculate the next period in which borrowing support and business conversion align more cleanly?",
+            ])
     if policy.get("domain") == "wealth" and policy.get("runtime_key") == "debt_repayment":
         debt_synthesis = (
             policy.get("debt_repayment_synthesis")

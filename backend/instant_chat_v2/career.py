@@ -143,6 +143,28 @@ CAREER_RELATIONSHIP_SUBTYPES = frozenset({
 })
 CAREER_TIMING_MODES = frozenset({"timing_window", "event_prediction"})
 
+CAREER_TARGET_TRAITS = frozenset({
+    "knowledge_advisory", "analytical_research", "communication_content",
+    "technical_systems", "creative_aesthetic", "care_healing",
+    "commercial_trade", "operations_execution", "leadership_authority",
+    "client_service", "spiritual_esoteric", "physical_competitive",
+})
+
+_TARGET_TRAIT_PLANETS: Dict[str, Tuple[str, ...]] = {
+    "knowledge_advisory": ("Jupiter", "Mercury", "Sun"),
+    "analytical_research": ("Mercury", "Ketu", "Rahu", "Saturn"),
+    "communication_content": ("Mercury", "Moon", "Venus", "Rahu"),
+    "technical_systems": ("Mars", "Mercury", "Saturn", "Rahu"),
+    "creative_aesthetic": ("Venus", "Moon", "Mercury"),
+    "care_healing": ("Moon", "Jupiter", "Ketu", "Sun"),
+    "commercial_trade": ("Mercury", "Venus", "Rahu", "Jupiter"),
+    "operations_execution": ("Mars", "Saturn", "Sun", "Mercury"),
+    "leadership_authority": ("Sun", "Mars", "Jupiter", "Saturn"),
+    "client_service": ("Venus", "Mercury", "Moon", "Jupiter"),
+    "spiritual_esoteric": ("Ketu", "Jupiter", "Rahu", "Moon"),
+    "physical_competitive": ("Mars", "Sun", "Saturn"),
+}
+
 
 _SIGN_LORDS = ["Mars", "Venus", "Mercury", "Moon", "Sun", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Saturn", "Jupiter"]
 
@@ -673,6 +695,120 @@ def career_question_family(answer_mode: Any, subtype: Any) -> str:
     return "profile"
 
 
+def normalize_career_target_traits(values: Any) -> List[str]:
+    """Keep only the router's language-independent, auditable target traits."""
+    rows = values if isinstance(values, (list, tuple, set)) else []
+    normalized: List[str] = []
+    for value in rows:
+        key = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+        if key in CAREER_TARGET_TRAITS and key not in normalized:
+            normalized.append(key)
+    return normalized[:4]
+
+
+def build_career_target_assessment(
+    vocation_synthesis: Any,
+    *,
+    target: Any,
+    target_traits: Any,
+    target_structure: Any = "unspecified",
+) -> Dict[str, Any]:
+    """Compare any user-named field with calculated vocation and work-structure evidence.
+
+    The router supplies semantic traits; this function only scores those traits
+    against planets already established across D1/D10/Jaimini. It does not keep
+    a hard-coded list of professions and therefore works for niche fields too.
+    """
+    target_name = str(target or "").strip()[:160]
+    traits = normalize_career_target_traits(target_traits)
+    synthesis = vocation_synthesis if isinstance(vocation_synthesis, Mapping) else {}
+    ranked_planets = [
+        row for row in synthesis.get("ranked_planets") or []
+        if isinstance(row, Mapping) and _planet_name(row.get("planet"))
+    ]
+    max_planet_score = max([float(row.get("score") or 0) for row in ranked_planets] or [0.0])
+    score_by_planet = {
+        _planet_name(row.get("planet")): float(row.get("score") or 0)
+        for row in ranked_planets
+    }
+    reasons_by_planet = {
+        _planet_name(row.get("planet")): list(row.get("reasons") or [])[:4]
+        for row in ranked_planets
+    }
+    trait_rows: List[Dict[str, Any]] = []
+    for trait in traits:
+        supporters = list(_TARGET_TRAIT_PLANETS.get(trait) or [])
+        supported = sorted(
+            [planet for planet in supporters if score_by_planet.get(planet, 0) > 0],
+            key=lambda planet: -score_by_planet.get(planet, 0),
+        )
+        strongest_score = score_by_planet.get(supported[0], 0.0) if supported else 0.0
+        normalized_score = round(strongest_score / max_planet_score, 3) if max_planet_score else 0.0
+        trait_rows.append({
+            "trait": trait,
+            "support_score": normalized_score,
+            "supporting_planets": supported[:3],
+            "evidence": [
+                reason for planet in supported[:2] for reason in reasons_by_planet.get(planet, [])[:2]
+            ][:5],
+        })
+    average = (
+        round(
+            sum(float(row["support_score"]) for row in trait_rows) / len(trait_rows),
+            3,
+        )
+        if trait_rows
+        else 0.0
+    )
+    if not target_name or not trait_rows or not ranked_planets:
+        field_verdict = "insufficient_target_evidence"
+    elif average >= 0.72 and all(float(row["support_score"]) >= 0.45 for row in trait_rows):
+        field_verdict = "field_fit_supported"
+    elif average >= 0.48:
+        field_verdict = "field_fit_mixed_or_trainable"
+    else:
+        field_verdict = "field_fit_not_primary"
+
+    work_structure = synthesis.get("work_structure") if isinstance(synthesis.get("work_structure"), Mapping) else {}
+    employment_score = float(work_structure.get("employment_score") or 0)
+    business_score = float(work_structure.get("business_score") or 0)
+    structure = str(target_structure or "unspecified").strip().lower()
+    business_requested = structure in {"business", "freelance", "hybrid"}
+    if not business_requested:
+        business_verdict = "not_requested"
+    elif business_score <= 0:
+        business_verdict = "business_evidence_incomplete"
+    elif business_score >= employment_score * 0.9:
+        business_verdict = "business_or_client_led_supported"
+    elif business_score >= employment_score * 0.65:
+        business_verdict = "business_possible_with_structure"
+    else:
+        business_verdict = "field_may_fit_better_than_full_time_business"
+
+    return {
+        "source": "deterministic_requested_field_fit",
+        "target": target_name,
+        "target_structure": structure,
+        "target_traits": traits,
+        "field_fit": {
+            "verdict": field_verdict,
+            "support_score": average,
+            "trait_results": trait_rows,
+        },
+        "business_fit": {
+            "verdict": business_verdict,
+            "business_score": business_score,
+            "employment_score": employment_score,
+            "calculated_inclination": work_structure.get("inclination"),
+            "reasons": list(work_structure.get("reasons") or [])[:4],
+        },
+        "answer_rule": (
+            "Judge the named field and the requested work structure separately. "
+            "Never affirm the field merely because business is supported, or affirm business merely because the field fits."
+        ),
+    }
+
+
 def normalize_career_houses(houses: Iterable[Any]) -> List[int]:
     """Return house numbers from calculator, derivation, or persisted UI shapes.
 
@@ -784,9 +920,11 @@ def classify_manifestations(houses: Iterable[Any], subtype: Any = None) -> List[
     return out
 
 
-def answer_contract(answer_mode: Any, subtype: str) -> Dict[str, Any]:
+def answer_contract(answer_mode: Any, subtype: str, career_target: Any = None) -> Dict[str, Any]:
     mode = str(answer_mode or "topic_reading")
     family = career_question_family(mode, subtype)
+    if str(career_target or "").strip() and mode in {"topic_reading", "potential_capacity"}:
+        family = "target_fit"
     shapes = {
         "topic_reading": "Direct overall career verdict -> Concrete lived work pattern -> D1/D10 professional signature -> Amatyakaraka and Karkamsa vocation signature -> strongest support and pressure -> natural follow-up",
         "potential_capacity": "Best work function -> up to three suitable fields -> preferred environment -> job/business/hybrid inclination -> what to avoid -> natural follow-up",
@@ -812,7 +950,9 @@ def answer_contract(answer_mode: Any, subtype: str) -> Dict[str, Any]:
         "mandatory_foundation": ["D1", "D10"],
         "required_shape": (
             "Direct stay/change verdict -> continuity evidence -> change/separation evidence -> next-role landing support -> condition and practical next step -> natural follow-up"
-            if decision else relationship_shape if family == "relationship" else diagnosis_shape if family == "diagnosis" else shapes.get(mode, shapes["topic_reading"])
+            if decision else relationship_shape if family == "relationship" else diagnosis_shape if family == "diagnosis" else
+            "Name the requested field -> separate field-fit verdict -> separate business/job/freelance fit verdict -> exact supporting and missing traits -> best operating model -> main limitation -> optional relevant follow-up only"
+            if family == "target_fit" else shapes.get(mode, shapes["topic_reading"])
         ),
         "question_family": family,
         "allow_current_activation": family in {"diagnosis", "decision", "timing"},
@@ -827,6 +967,7 @@ def answer_contract(answer_mode: Any, subtype: str) -> Dict[str, Any]:
             "comparison": ["D1", "D10", "option_specific_factors"],
             "remedy": ["D1", "D10", "remedy_blueprint"],
             "relationship": ["D1_role_houses", "D10_role_confirmation", "role_specific_planets"],
+            "target_fit": ["D1", "D10", "vocation_synthesis", "career_target_assessment"],
         }[family],
         "forbidden_evidence": (
             ["future_dates", "future_peaks", "ranked_windows", "calendar_forecast"]
@@ -842,6 +983,14 @@ def answer_contract(answer_mode: Any, subtype: str) -> Dict[str, Any]:
             "Shadbala planet, one placement, or a generic planet-to-career list. Only name fields and work "
             "environments present in vocation_synthesis; if those ranked arrays are empty, ask one focused "
             "clarification instead of inventing a profession."
+        ),
+        "target_fit_rule": (
+            "For a named profession, industry, practice, product, or business, preserve the exact target and use "
+            "career_target_assessment as the controlling result. Judge field_fit from the target's required work "
+            "traits, then judge business/job/freelance structure separately from work_structure. State which traits "
+            "are supported, which are weaker or missing, and the operating model that best fits that combination. "
+            "House 2 may describe income or communication but cannot by itself prove either field fit or business fit."
+            if family == "target_fit" else None
         ),
         "decision_rule": (
             "This is a present career decision, not a vocation-fit reading. Compare H6/H10 continuity, H3/H10/H12 change and separation, H2/H6/H10/H11 next-role landing, and H8 disruption separately using current dasha/transit evidence. Never recommend resignation merely because another profession fits better, because the user is dissatisfied, or because H8/H12 is active. Prefer a secured-offer transition; real-world safety overrides astrology."

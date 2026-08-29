@@ -12,8 +12,10 @@ from google.cloud import texttospeech_v1beta1 as texttospeech_beta
 import logging
 import asyncio
 import time
+from datetime import datetime
 from functools import partial
 from pydantic import BaseModel
+from types import SimpleNamespace
 from typing import Optional, Union
 
 from auth import get_current_user, User
@@ -26,6 +28,16 @@ from tts.podcast_narrator import (
   generate_podcast_script,
 )
 from tts.podcast_cache import get_cached_audio, put_cached_audio
+from tts.podcast_visual_cache import get_visual_json, put_visual_json
+from tts.podcast_visuals import (
+  add_audio_durations_to_source,
+  generate_visual_manifest,
+  mp3_duration_ms,
+  referenced_divisions,
+  referenced_houses,
+  visual_source,
+  visual_source_from_message,
+)
 from tts import notebook_lm_podcast
 from activity.publisher import publish_activity
 from utils.env_json import parse_json_from_env
@@ -37,9 +49,13 @@ from utils.admin_settings import (
 )
 
 credit_service = CreditService()
+_podcast_history_table_ready = False
 
 
 def _ensure_podcast_history_table():
+    global _podcast_history_table_ready
+    if _podcast_history_table_ready:
+        return
     with get_conn() as conn:
         execute(conn, """
             CREATE TABLE IF NOT EXISTS podcast_history (
@@ -53,10 +69,12 @@ def _ensure_podcast_history_table():
                 UNIQUE(userid, message_id, lang)
             )
         """)
+        execute(conn, "ALTER TABLE podcast_history ADD COLUMN IF NOT EXISTS birth_chart_id BIGINT")
         conn.commit()
+    _podcast_history_table_ready = True
 
 
-def _add_podcast_history(userid: int, message_id: str, session_id: Optional[str], lang: str, preview: Optional[str]):
+def _add_podcast_history(userid: int, message_id: str, session_id: Optional[str], lang: str, preview: Optional[str], birth_chart_id: Optional[int] = None):
     if not message_id or not str(message_id).strip():
         return
     _ensure_podcast_history_table()
@@ -65,14 +83,15 @@ def _add_podcast_history(userid: int, message_id: str, session_id: Optional[str]
         execute(
             conn,
             """
-            INSERT INTO podcast_history (userid, message_id, session_id, lang, preview)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO podcast_history (userid, message_id, session_id, lang, preview, birth_chart_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT(userid, message_id, lang) DO UPDATE SET
                 session_id = COALESCE(EXCLUDED.session_id, podcast_history.session_id),
                 preview = COALESCE(EXCLUDED.preview, podcast_history.preview),
+                birth_chart_id = COALESCE(EXCLUDED.birth_chart_id, podcast_history.birth_chart_id),
                 created_at = CURRENT_TIMESTAMP
             """,
-            (userid, str(message_id).strip(), session_id or None, (lang or "en").strip()[:10], preview_trim),
+            (userid, str(message_id).strip(), session_id or None, (lang or "en").strip()[:10], preview_trim, birth_chart_id),
         )
         conn.commit()
 
@@ -1276,6 +1295,7 @@ class PodcastRequest(BaseModel):
   session_id: Optional[str] = None  # optional: for podcast history and opening conversation
   preview: Optional[str] = None  # optional: first ~150 chars for history list
   native_name: Optional[str] = None  # optional: birth chart / native name for personalized intro
+  birth_chart_id: Optional[int] = None  # selected owned chart for factual visual enrichment
   prepare_only: bool = False  # generate/cache a Premium podcast without returning or autoplaying audio
 
 
@@ -1314,7 +1334,7 @@ def _find_podcast_history(userid: int, message_id: str, cache_lang: str):
     cursor = execute(
       conn,
       f"""
-      SELECT message_id, session_id, lang, preview
+      SELECT message_id, session_id, lang, preview, birth_chart_id
       FROM podcast_history
       WHERE userid = ?
         AND message_id IN ({id_ph})
@@ -1330,7 +1350,7 @@ def _find_podcast_history(userid: int, message_id: str, cache_lang: str):
     cursor = execute(
       conn,
       f"""
-      SELECT message_id, session_id, lang, preview
+      SELECT message_id, session_id, lang, preview, birth_chart_id
       FROM podcast_history
       WHERE userid = ?
         AND message_id IN ({id_ph})
@@ -1340,6 +1360,40 @@ def _find_podcast_history(userid: int, message_id: str, cache_lang: str):
       (userid, *ids),
     )
     return cursor.fetchone()
+
+
+def _podcast_history_languages(userid: int, message_id: str) -> list[str]:
+  """Return languages this user has already generated for one message.
+
+  Podcast history is the entitlement record. A missing cache object can be
+  restored by the stream endpoint without charging again, so a status check
+  must not download MP3 data merely to decide whether the user owns it.
+  """
+  ids = _message_id_aliases(message_id)
+  if not ids:
+    return []
+  _ensure_podcast_history_table()
+  id_ph = ",".join("?" for _ in ids)
+  with get_conn() as conn:
+    cursor = execute(
+      conn,
+      f"""
+      SELECT lang
+      FROM podcast_history
+      WHERE userid = ?
+        AND message_id IN ({id_ph})
+      ORDER BY created_at DESC
+      """,
+      (userid, *ids),
+    )
+    rows = cursor.fetchall()
+  languages: list[str] = []
+  for row in rows:
+    value = row[0] if not isinstance(row, dict) else row.get("lang")
+    lang = _podcast_cache_lang(value or "en")
+    if lang not in languages:
+      languages.append(lang)
+  return languages
 
 
 def _cached_podcast_bytes(message_id: str, cache_lang: str):
@@ -1394,6 +1448,391 @@ def _load_assistant_message_content(userid: int, message_id: str, session_id: Op
       if row and str(row[0] or "").strip():
         return str(row[0]).strip(), row[1]
   return None, None
+
+
+def _podcast_ashtakavarga_visual(birth, chart: dict) -> dict:
+  """Return the compact house-indexed SAV/BAV matrix used by video cards."""
+  from calculators.ashtakavarga import AshtakavargaCalculator
+
+  calculated = AshtakavargaCalculator(birth, chart).calculate_sarvashtakavarga()
+  sav = calculated.get("sarvashtakavarga") or {}
+  individual = calculated.get("individual_charts") or {}
+  av_planets = ("Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn")
+  ascendant_sign = int(float(chart.get("ascendant") or 0.0) / 30) % 12
+  rows = []
+  for house in range(1, 13):
+    sign = (ascendant_sign + house - 1) % 12
+    rows.append({
+      "house": house,
+      "sign": sign,
+      "sav": int(sav.get(str(sign), sav.get(sign, 0)) or 0),
+      "bav": {
+        planet: int(
+          ((individual.get(planet) or {}).get("bindus") or {}).get(
+            str(sign),
+            ((individual.get(planet) or {}).get("bindus") or {}).get(sign, 0),
+          ) or 0
+        )
+        for planet in av_planets
+      },
+    })
+  return {
+    "rows": rows,
+    "total_bindus": int(calculated.get("total_bindus") or sum(row["sav"] for row in rows)),
+  }
+
+
+def _compact_podcast_chart(chart: dict) -> dict:
+  planets = []
+  for name, raw in (chart.get("planets") or {}).items():
+    if not isinstance(raw, dict):
+      continue
+    longitude = float(raw.get("longitude") or 0.0)
+    planets.append({
+      "name": str(name),
+      "house": int(raw.get("house") or 0),
+      "sign": raw.get("sign"),
+      "longitude": round(longitude, 4),
+      "degree": round(float(raw.get("degree") or raw.get("degrees") or longitude % 30), 2),
+      "retrograde": bool(raw.get("retrograde") or raw.get("is_retrograde")),
+    })
+  ascendant = round(float(chart.get("ascendant") or 0.0), 4)
+  ascendant_sign = chart.get("ascendant_sign")
+  if not isinstance(ascendant_sign, (int, float)):
+    ascendant_sign = int(ascendant / 30) % 12
+  return {
+    "ascendant": ascendant,
+    "ascendant_sign": int(ascendant_sign) % 12,
+    "planets": planets,
+  }
+
+
+def _podcast_dasha_visual(birth_data: dict) -> dict:
+  """Return real current Vimshottari periods without retaining birth details."""
+  from shared.dasha_calculator import DashaCalculator
+
+  now = datetime.now()
+  calculated = DashaCalculator().calculate_current_dashas(birth_data, current_date=now, strict=True)
+  level_specs = (
+    ("maha", "mahadasha"),
+    ("antar", "antardasha"),
+    ("pratyantar", "pratyantardasha"),
+  )
+  levels = []
+  for kind, key in level_specs:
+    raw = calculated.get(key) or {}
+    if raw.get("planet"):
+      levels.append({
+        "kind": kind,
+        "planet": str(raw["planet"]),
+        "start": raw.get("start"),
+        "end": raw.get("end"),
+      })
+  mahadashas = []
+  for raw in calculated.get("maha_dashas") or []:
+    start = raw.get("start")
+    end = raw.get("end")
+    mahadashas.append({
+      "planet": str(raw.get("planet") or ""),
+      "start": start.strftime("%Y-%m-%d") if hasattr(start, "strftime") else str(start or ""),
+      "end": (end.replace(microsecond=0).strftime("%Y-%m-%d") if hasattr(end, "strftime") else str(end or "")),
+      "current": bool(start and end and start <= now <= end),
+    })
+  return {"as_of": now.strftime("%Y-%m-%d"), "levels": levels, "mahadashas": mahadashas}
+
+
+def _podcast_house_activation_visual(
+  birth,
+  chart: dict,
+  dasha: dict,
+  ashtakavarga: dict,
+  focus_houses: Optional[list[int]] = None,
+) -> dict:
+  """Build a compact four-layer activation ledger for the visual player."""
+  from calculators.badhaka_calculator import BadhakaCalculator
+  from calculators.transit_calculator import TransitCalculator
+  from calculators.vedic_graha_drishti import get_aspect_houses_for_planet
+
+  def aspects(planet: str, house: int) -> set[int]:
+    aspect_numbers = (7,) if planet in {"Rahu", "Ketu"} else get_aspect_houses_for_planet(planet)
+    return {
+      ((int(house) + int(number) - 2) % 12) + 1
+      for number in aspect_numbers
+      if int(number) != 1
+    }
+
+  ascendant_sign = int(float(chart.get("ascendant") or 0.0) / 30.0) % 12
+  dasha_planets = []
+  for level in dasha.get("levels") or []:
+    planet = str(level.get("planet") or "")
+    if planet and planet not in dasha_planets:
+      dasha_planets.append(planet)
+
+  dasha_houses: set[int] = set()
+  dasha_by_house: dict[int, list[str]] = {house: [] for house in range(1, 13)}
+  natal_portfolio: dict[str, set[int]] = {}
+  for planet in dasha_planets:
+    raw = (chart.get("planets") or {}).get(planet) or {}
+    if not raw:
+      continue
+    occupied = int(raw.get("house") or 0)
+    ruled = {
+      house for house in range(1, 13)
+      if BadhakaCalculator.SIGN_LORDS[(ascendant_sign + house - 1) % 12] == planet
+    }
+    portfolio = ruled | ({occupied} if occupied else set()) | aspects(planet, occupied)
+    natal_portfolio[planet] = portfolio
+    dasha_houses.update(portfolio)
+    for house in portfolio:
+      if planet not in dasha_by_house[house]:
+        dasha_by_house[house].append(planet)
+
+  transit_by_house: dict[int, list[str]] = {house: [] for house in range(1, 13)}
+  transits = TransitCalculator(chart).calculate_transits(birth, datetime.now().strftime("%Y-%m-%d"))
+  for planet in dasha_planets:
+    raw = (transits.get("planets") or {}).get(planet) or {}
+    if not raw or planet not in natal_portfolio:
+      continue
+    transit_house = ((int(raw.get("sign") or 0) - ascendant_sign) % 12) + 1
+    contacts = ({transit_house} | aspects(planet, transit_house)) & natal_portfolio[planet]
+    for house in contacts:
+      if planet not in transit_by_house[house]:
+        transit_by_house[house].append(planet)
+
+  sav_by_house = {
+    int(row.get("house") or 0): int(row.get("sav") or 0)
+    for row in (ashtakavarga.get("rows") or [])
+    if int(row.get("house") or 0) in range(1, 13)
+  }
+  natal_houses = {int(house) for house in (focus_houses or []) if int(house) in range(1, 13)}
+  rows = []
+  for house in range(1, 13):
+    sav = sav_by_house.get(house)
+    rows.append({
+      "house": house,
+      "natal_promise": house in natal_houses,
+      "dasha_activation": house in dasha_houses,
+      "transit_activation": bool(transit_by_house[house]),
+      "ashtakavarga_support": sav is not None and sav >= 30,
+      "sav": sav,
+      "dasha_planets": dasha_by_house[house],
+      "transit_planets": transit_by_house[house],
+    })
+  return {
+    "as_of": datetime.now().strftime("%Y-%m-%d"),
+    "sav_support_threshold": 30,
+    "rows": rows,
+  }
+
+
+def _podcast_chart_visual(
+  userid: int,
+  message_id: str,
+  session_id: Optional[str] = None,
+  division_numbers: Optional[list[int]] = None,
+  focus_houses: Optional[list[int]] = None,
+  birth_chart_id: Optional[int] = None,
+  native_name_hint: Optional[str] = None,
+):
+  """Calculate a privacy-minimised D1 chart for the visual companion.
+
+  Only chart geometry is returned to the authenticated owner. Birth date,
+  time, place, coordinates and the native's name never enter the manifest.
+  A missing/deleted chart is non-fatal: the podcast remains fully playable.
+  """
+  row = None
+  try:
+    mid_int = int(str(message_id).strip())
+  except (TypeError, ValueError):
+    mid_int = None
+  try:
+    with get_conn() as conn:
+      if birth_chart_id:
+        cursor = execute(
+          conn,
+          """
+          SELECT id, name, date, time, latitude, longitude,
+                 timezone, place, gender
+          FROM birth_charts
+          WHERE id = %s AND userid = %s
+          LIMIT 1
+          """,
+          (birth_chart_id, userid),
+        )
+        row = cursor.fetchone()
+      if not row and session_id:
+        cursor = execute(
+          conn,
+          """
+          SELECT bc.id, bc.name, bc.date, bc.time, bc.latitude, bc.longitude,
+                 bc.timezone, bc.place, bc.gender
+          FROM chat_sessions cs
+          INNER JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+          WHERE cs.session_id = %s AND cs.user_id = %s AND bc.userid = %s
+          LIMIT 1
+          """,
+          (session_id, userid, userid),
+        )
+        row = cursor.fetchone()
+      if not row and mid_int is not None:
+        cursor = execute(
+          conn,
+          """
+          SELECT bc.id, bc.name, bc.date, bc.time, bc.latitude, bc.longitude,
+                 bc.timezone, bc.place, bc.gender
+          FROM chat_messages cm
+          INNER JOIN chat_sessions cs ON cs.session_id = cm.session_id
+          INNER JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+          WHERE cm.message_id = %s AND cm.sender = 'assistant'
+            AND cs.user_id = %s AND bc.userid = %s
+          LIMIT 1
+          """,
+          (mid_int, userid, userid),
+        )
+        row = cursor.fetchone()
+      if not row and str(native_name_hint or "").strip():
+        # Some instant/day chat sessions predate chart-id persistence. The
+        # fixed podcast intro still names the selected saved profile, allowing
+        # an exact owner-scoped recovery without exposing that name in the
+        # returned visual manifest.
+        cursor = execute(
+          conn,
+          """
+          SELECT id, name, date, time, latitude, longitude,
+                 timezone, place, gender
+          FROM birth_charts
+          WHERE userid = %s
+          ORDER BY id DESC
+          """,
+          (userid,),
+        )
+        candidates = cursor.fetchall()
+        from encryption_utils import EncryptionManager
+
+        decryptor = EncryptionManager()
+        expected_name = re.sub(r"\s+", " ", str(native_name_hint)).strip().casefold()
+        for candidate in candidates:
+          try:
+            candidate_name = decryptor.decrypt(candidate[1])
+          except Exception:
+            candidate_name = str(candidate[1] or "")
+          if re.sub(r"\s+", " ", str(candidate_name)).strip().casefold() == expected_name:
+            row = candidate
+            break
+    if not row:
+      return None
+
+    from calculators.chart_calculator import ChartCalculator
+    from encryption_utils import EncryptionManager
+
+    try:
+      decryptor = EncryptionManager()
+      decrypted = {
+        "name": decryptor.decrypt(row[1]),
+        "date": decryptor.decrypt(row[2]),
+        "time": decryptor.decrypt(row[3]),
+        "latitude": float(decryptor.decrypt(str(row[4]))),
+        "longitude": float(decryptor.decrypt(str(row[5]))),
+        "place": decryptor.decrypt(row[7] or ""),
+      }
+    except Exception:
+      decrypted = {
+        "name": str(row[1] or ""),
+        "date": str(row[2] or ""),
+        "time": str(row[3] or ""),
+        "latitude": float(row[4]),
+        "longitude": float(row[5]),
+        "place": str(row[7] or ""),
+      }
+    birth = SimpleNamespace(
+      **decrypted,
+      timezone=row[6] or "UTC",
+      gender=row[8] or "",
+    )
+    chart = ChartCalculator({}).calculate_chart(birth)
+    payload = _compact_podcast_chart(chart)
+    requested_divisions = [
+      number for number in (division_numbers or [])
+      if number in {2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60}
+    ]
+    if requested_divisions:
+      from calculators.divisional_chart_calculator import DivisionalChartCalculator
+
+      calculator = DivisionalChartCalculator(chart)
+      payload["divisional_charts"] = {}
+      for number in dict.fromkeys(requested_divisions):
+        try:
+          result = calculator.calculate_divisional_chart(number)
+          compact = _compact_podcast_chart(result.get("divisional_chart") or {})
+          compact["label"] = calculator.get_chart_name(number)
+          payload["divisional_charts"][f"D{number}"] = compact
+        except Exception as div_exc:
+          logger.warning("Podcast visuals: D%s unavailable: %s", number, div_exc)
+    try:
+      payload["ashtakavarga"] = _podcast_ashtakavarga_visual(birth, chart)
+    except Exception as av_exc:
+      logger.warning(
+        "Podcast visuals: Ashtakavarga unavailable for message_id=%s user_id=%s: %s",
+        message_id,
+        userid,
+        av_exc,
+      )
+    try:
+      payload["dasha"] = _podcast_dasha_visual({
+        **decrypted,
+        "timezone": row[6] or "UTC",
+        "gender": row[8] or "",
+      })
+    except Exception as dasha_exc:
+      logger.warning(
+        "Podcast visuals: dasha unavailable for message_id=%s user_id=%s: %s",
+        message_id,
+        userid,
+        dasha_exc,
+      )
+    if payload.get("dasha") and payload.get("ashtakavarga"):
+      try:
+        payload["house_activation"] = _podcast_house_activation_visual(
+          birth,
+          chart,
+          payload["dasha"],
+          payload["ashtakavarga"],
+          focus_houses,
+        )
+      except Exception as activation_exc:
+        logger.warning(
+          "Podcast visuals: house activation unavailable for message_id=%s user_id=%s: %s",
+          message_id,
+          userid,
+          activation_exc,
+        )
+    return payload
+  except Exception as exc:
+    logger.warning(
+      "Podcast visuals: chart unavailable for message_id=%s user_id=%s: %s",
+      message_id,
+      userid,
+      exc,
+    )
+    return None
+
+
+def _podcast_native_name_hint(source: dict) -> str:
+  """Recover only the profile name spoken in the application's fixed intro."""
+  segments = source.get("segments") if isinstance(source, dict) else []
+  opening = " ".join(
+    str(item.get("text") or "") for item in (segments or [])[:3] if isinstance(item, dict)
+  )
+  opening = re.sub(r"\[(?:PAUSE|EMPHASIS|RISE|FALL|SLOW):([^\]]*)\]", r"\1", opening, flags=re.IGNORECASE)
+  patterns = (
+    r"today(?:'|’)s\s+personal\s+reading\s+is\s+for\s+([^.!?]+)",
+    r"आज\s+की\s+यह\s+व्यक्तिगत\s+रीडिंग\s+(.+?)\s+के\s+लिए\s+है",
+  )
+  for pattern in patterns:
+    match = re.search(pattern, opening, flags=re.IGNORECASE)
+    if match:
+      return re.sub(r"\s+", " ", match.group(1)).strip()[:120]
+  return ""
 
 
 async def _synthesize_podcast_mp3(text: str, lang: str, native_name: str = "") -> bytes:
@@ -1514,18 +1953,21 @@ async def podcast_check_cache(
   current_user: User = Depends(get_current_user),
 ):
   """
-  Check if a podcast for this message is already cached (no credits will be charged on play).
-  Used by the app to skip the credit confirmation modal when replaying.
+  Return the languages this user has already generated for the message.
+  History is intentionally used instead of downloading GCS audio: the stream
+  route can restore a missing object without charging the user again.
   """
   raw_id = message_id
   mid = str(raw_id).strip() if raw_id is not None else None
   if not mid:
-    return JSONResponse({"cached": False})
+    return JSONResponse({"cached": False, "ready": False, "languages": []})
   cache_lang = _podcast_cache_lang(lang)
-  cached = get_cached_audio(mid, cache_lang)
-  if not cached and cache_lang == "en":
-    cached = get_cached_audio(mid, "english")  # backward compat: old cache used "english"
-  return JSONResponse({"cached": bool(cached)})
+  languages = _podcast_history_languages(current_user.userid, mid)
+  return JSONResponse({
+    "cached": cache_lang in languages,
+    "ready": bool(languages),
+    "languages": languages,
+  })
 
 
 @router.post("/podcast")
@@ -1567,6 +2009,7 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
           request.session_id,
           cache_lang,
           request.preview,
+          request.birth_chart_id,
         )
         if request.prepare_only:
           return JSONResponse({"ready": True, "cached": True, "included_with_premium": premium_included})
@@ -1592,6 +2035,7 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
 
     use_tts = provider != PODCAST_PROVIDER_NOTEBOOK_LM
     audio_bytes = None
+    visual_source_payload = None
     if provider == PODCAST_PROVIDER_NOTEBOOK_LM:
       # NotebookLM (Discovery Engine) Podcast API: full message as context, no script step
       try:
@@ -1688,10 +2132,26 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
       audio_bytes = b"".join(audio_parts)
       if not audio_bytes:
         raise HTTPException(status_code=500, detail="Podcast produced no audio")
+      # Capture visual-only timing metadata after synthesis. Reading the
+      # already-generated segment sizes does not alter voices, bytes, order,
+      # speed or any other podcast-audio behaviour.
+      visual_source_payload = visual_source(
+        script,
+        segments,
+        text,
+        segment_audio_sizes=[len(part) for part in audio_parts],
+        segment_audio_durations_ms=[mp3_duration_ms(part) for part in audio_parts],
+        birth_chart_id=request.birth_chart_id,
+      )
       logger.info("Podcast: generated via Google TTS, audio_bytes=%d", len(audio_bytes))
 
     if message_id:
       await loop.run_in_executor(None, partial(put_cached_audio, message_id, cache_lang, audio_bytes))
+      if visual_source_payload:
+        await loop.run_in_executor(
+          None,
+          partial(put_visual_json, message_id, cache_lang, "source", visual_source_payload),
+        )
 
     # Deduct (we already checked balance above)
     if effective_cost > 0:
@@ -1720,6 +2180,7 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
         request.session_id,
         cache_lang,
         request.preview,
+        request.birth_chart_id,
       )
     if request.prepare_only:
       return JSONResponse({"ready": True, "cached": False, "included_with_premium": premium_included})
@@ -1736,6 +2197,128 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
     )
 
 
+@router.get("/podcast/visuals")
+async def podcast_visuals(
+  message_id: str = Query(..., description="Message ID of an owned podcast"),
+  lang: str = Query("en", description="Language code"),
+  birth_chart_id: Optional[int] = Query(None, description="Selected owned chart for visual enrichment"),
+  current_user: User = Depends(get_current_user),
+):
+  """Return a cached or newly planned visual companion for an owned podcast."""
+  raw_id = str(message_id or "").strip()
+  if not raw_id:
+    raise HTTPException(status_code=400, detail="message_id required")
+  cache_lang = _podcast_cache_lang(lang)
+  history = _find_podcast_history(current_user.userid, raw_id, cache_lang)
+  if not history:
+    raise HTTPException(status_code=404, detail="Podcast not found or access denied")
+  history_id = str(history[0] or raw_id).strip()
+  history_session = history[1]
+  history_lang = _podcast_cache_lang(history[2] or cache_lang)
+  history_birth_chart_id = history[4] if len(history) > 4 else None
+  effective_birth_chart_id = birth_chart_id or history_birth_chart_id
+  loop = asyncio.get_running_loop()
+
+  manifest = await loop.run_in_executor(
+    None,
+    partial(get_visual_json, history_id, history_lang, "manifest"),
+  )
+  if manifest:
+    if not manifest.get("chart") and effective_birth_chart_id:
+      scene_divisions = referenced_divisions(" ".join(
+        str(scene.get("division") or "") for scene in (manifest.get("scenes") or []) if isinstance(scene, dict)
+      ))
+      scene_houses = sorted({
+        int(house)
+        for scene in (manifest.get("scenes") or []) if isinstance(scene, dict)
+        for house in (scene.get("houses") or [])
+        if str(house).isdigit() and 1 <= int(house) <= 12
+      })
+      chart = await loop.run_in_executor(
+        None,
+        partial(
+          _podcast_chart_visual,
+          current_user.userid,
+          history_id,
+          history_session,
+          scene_divisions,
+          scene_houses,
+          effective_birth_chart_id,
+          None,
+        ),
+      )
+      if chart:
+        manifest["chart"] = chart
+        await loop.run_in_executor(
+          None,
+          partial(put_visual_json, history_id, history_lang, "manifest", manifest),
+        )
+    return JSONResponse({"manifest": manifest, "cached": True})
+
+  source = await loop.run_in_executor(
+    None,
+    partial(get_visual_json, history_id, history_lang, "source"),
+  )
+  if not source:
+    content, _ = _load_assistant_message_content(
+      current_user.userid,
+      history_id,
+      history_session,
+    )
+    if not content:
+      raise HTTPException(status_code=404, detail="Podcast source message not found")
+    source = visual_source_from_message(content)
+  elif any(
+    isinstance(item, dict)
+    and int(item.get("audio_weight") or 0) > 0
+    and int(item.get("audio_duration_ms") or 0) <= 0
+    for item in (source.get("segments") or [])
+  ):
+    cached_audio = await loop.run_in_executor(
+      None,
+      partial(_cached_podcast_bytes, history_id, history_lang),
+    )
+    if cached_audio:
+      upgraded_source = add_audio_durations_to_source(source, cached_audio)
+      if upgraded_source is not source:
+        source = upgraded_source
+        await loop.run_in_executor(
+          None,
+          partial(put_visual_json, history_id, history_lang, "source", source),
+        )
+
+  manifest = await loop.run_in_executor(
+    None,
+    partial(generate_visual_manifest, source, history_lang),
+  )
+  spoken_source = " ".join(
+    str(item.get("text") or "")
+    for item in (source.get("segments") or [])
+    if isinstance(item, dict)
+  ) or str(source.get("message_content") or "")
+  chart = await loop.run_in_executor(
+    None,
+    partial(
+      _podcast_chart_visual,
+      current_user.userid,
+      history_id,
+      history_session,
+      referenced_divisions(spoken_source),
+      referenced_houses(spoken_source),
+      effective_birth_chart_id or (source.get("birth_chart_id") if isinstance(source, dict) else None),
+      _podcast_native_name_hint(source),
+    ),
+  )
+  if chart:
+    manifest["chart"] = chart
+  manifest["visual_style"] = "cinematic_v3"
+  await loop.run_in_executor(
+    None,
+    partial(put_visual_json, history_id, history_lang, "manifest", manifest),
+  )
+  return JSONResponse({"manifest": manifest, "cached": False})
+
+
 @router.get("/podcast/history")
 async def podcast_history(current_user: User = Depends(get_current_user)):
   """
@@ -1748,7 +2331,7 @@ async def podcast_history(current_user: User = Depends(get_current_user)):
     cursor = execute(
       conn,
       """
-      SELECT message_id, session_id, lang, preview, created_at
+      SELECT message_id, session_id, lang, preview, created_at, birth_chart_id
       FROM podcast_history
       WHERE userid = ?
       ORDER BY created_at DESC
@@ -1765,6 +2348,7 @@ async def podcast_history(current_user: User = Depends(get_current_user)):
         "lang": _podcast_cache_lang(r[2] or "en"),
         "preview": r[3],
         "created_at": (r[4].isoformat() if hasattr(r[4], "isoformat") else (str(r[4]) if r[4] is not None else None)),
+        "birth_chart_id": r[5],
       }
       for r in rows
     ],
@@ -1825,5 +2409,6 @@ async def podcast_stream(
     session_id or history_session,
     history_lang,
     history[3],
+    history[4] if len(history) > 4 else None,
   )
   return Response(content=audio_bytes, media_type="audio/mpeg")

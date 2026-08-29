@@ -12,6 +12,7 @@ import json
 import logging
 import asyncio
 import os
+import threading
 from datetime import date
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -31,6 +32,23 @@ from .house_significations import HOUSE_SIGNIFICATIONS, relative_house_for_nativ
 
 logger = logging.getLogger(__name__)
 SYNTHESIS_VERSION = "2.4.1"
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default)) or str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+_THEME_SEMAPHORE = asyncio.Semaphore(
+    _positive_int_env("MANIFESTATION_SYNTHESIS_CONCURRENCY", 2)
+)
+# Theme cache reads run in worker threads. Keep their total checkouts bounded
+# across concurrent HTTP requests so they cannot consume the API pool alone.
+_CACHE_DB_SEMAPHORE = threading.BoundedSemaphore(
+    _positive_int_env("MANIFESTATION_CACHE_DB_CONCURRENCY", 2)
+)
 
 _TONE_FOR_LLM = {
     "challenging": "pressure",
@@ -67,8 +85,9 @@ def _model_details() -> tuple[str, str]:
 
 
 def _load(cache_key: str) -> Optional[Dict[str, Any]]:
-    with get_conn() as conn:
-        row = execute(conn, "SELECT output_json FROM prediction_manifestation_syntheses WHERE cache_key = %s", (cache_key,)).fetchone()
+    with _CACHE_DB_SEMAPHORE:
+        with get_conn() as conn:
+            row = execute(conn, "SELECT output_json FROM prediction_manifestation_syntheses WHERE cache_key = %s", (cache_key,)).fetchone()
     if not row:
         return None
     value = row[0]
@@ -76,17 +95,18 @@ def _load(cache_key: str) -> Optional[Dict[str, Any]]:
 
 
 def _save(cache_key: str, *, context: Mapping[str, Any], output: Mapping[str, Any], locale: str, provider: str, model: str) -> None:
-    with get_conn() as conn:
-        execute(conn, """
-            INSERT INTO prediction_manifestation_syntheses
-              (cache_key, locale, provider, model, input_json, output_json)
-            VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb)
-            ON CONFLICT (cache_key) DO UPDATE SET
-              output_json = EXCLUDED.output_json,
-              model = EXCLUDED.model,
-              updated_at = CURRENT_TIMESTAMP
-        """, (cache_key, locale, provider, model, _canonical(context), _canonical(output)))
-        conn.commit()
+    with _CACHE_DB_SEMAPHORE:
+        with get_conn() as conn:
+            execute(conn, """
+                INSERT INTO prediction_manifestation_syntheses
+                  (cache_key, locale, provider, model, input_json, output_json)
+                VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb)
+                ON CONFLICT (cache_key) DO UPDATE SET
+                  output_json = EXCLUDED.output_json,
+                  model = EXCLUDED.model,
+                  updated_at = CURRENT_TIMESTAMP
+            """, (cache_key, locale, provider, model, _canonical(context), _canonical(output)))
+            conn.commit()
 
 
 def _tone_label(tone: Any) -> str:
@@ -471,7 +491,18 @@ async def _synthesize_single_theme(
     theme_key = str(theme.get("theme_key") or "")
     cache_payload = _theme_cache_payload(theme)
     key = _cache_key(cache_payload, locale=locale, provider=provider, model=model)
-    cached = await asyncio.to_thread(_load, key)
+    try:
+        cached = await asyncio.to_thread(_load, key)
+    except Exception as exc:
+        # Cache availability must not decide whether deterministic/LLM
+        # prediction wording can be produced. In particular, a transient
+        # shared-pool saturation is a cache miss, not a theme failure.
+        logger.warning(
+            "Manifestation synthesis cache read unavailable theme_key=%s: %s",
+            theme_key,
+            exc,
+        )
+        cached = None
     if cached:
         hit = _cached_theme_output(cached, theme_key=theme_key)
         if hit:
@@ -497,22 +528,29 @@ async def _synthesize_single_theme(
         raise ValueError("LLM returned no theme for combination")
     item = dict(themes[0])
     item["theme_key"] = theme_key or str(item.get("theme_key") or "")
-    await asyncio.to_thread(
-        _save,
-        key,
-        context=cache_payload,
-        output={
-            "theme": {
-                key_name: item[key_name]
-                for key_name in ("domain", "label", "summary", "possibilities", "rationale", "synthesis_strength")
-                if item.get(key_name) is not None
+    try:
+        await asyncio.to_thread(
+            _save,
+            key,
+            context=cache_payload,
+            output={
+                "theme": {
+                    key_name: item[key_name]
+                    for key_name in ("domain", "label", "summary", "possibilities", "rationale", "synthesis_strength")
+                    if item.get(key_name) is not None
+                },
+                "synthesis_version": SYNTHESIS_VERSION,
             },
-            "synthesis_version": SYNTHESIS_VERSION,
-        },
-        locale=locale,
-        provider=provider,
-        model=model,
-    )
+            locale=locale,
+            provider=provider,
+            model=model,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Manifestation synthesis cache write unavailable theme_key=%s: %s",
+            theme_key,
+            exc,
+        )
     return item
 
 
@@ -537,11 +575,6 @@ async def synthesize_manifestations(
         }
 
     provider, model = _model_details()
-    # Limit concurrency to 2 to avoid exhausting the DB connection pool.
-    # Each theme needs a connection for cache read and potentially another for
-    # cache write; the pool is typically 4 connections.
-    _THEME_SEMAPHORE = asyncio.Semaphore(2)
-
     async def _throttled(theme):
         async with _THEME_SEMAPHORE:
             return await _synthesize_single_theme(theme, locale=locale, provider=provider, model=model)

@@ -2,8 +2,10 @@ from ai.intent_router import apply_career_routing_guards
 from instant_chat_v2.answer_spec import build_answer_spec
 from instant_chat_v2.career import (
     CAREER_PROFILES,
+    CAREER_TARGET_TRAITS,
     _tenth_lord_combination_signature,
     answer_contract,
+    build_career_target_assessment,
     build_vocation_synthesis,
     career_profile,
     classify_manifestations,
@@ -15,9 +17,11 @@ from instant_chat_v2.career import (
     career_question_family,
 )
 from instant_chat_v2.user_derivation import build_user_derivation
+from instant_chat_v2.planner import build_query_plan
 from chat.instant_chat_pipeline import (
     _build_event_timing_verdict,
     _build_instant_composer_context,
+    _build_instant_composer_prompt_v3,
     _compact_career_foundation,
     _instant_compact_profession_evidence,
     _requested_charts_from_intent,
@@ -119,6 +123,84 @@ def test_structured_router_subtype_gets_canonical_houses_and_divisionals():
     assert result["category"] == "business"
     assert result["focus_houses"] == [7, 10, 11, 2]
     assert result["required_divisional_charts"] == ["D1", "D10"]
+
+
+def test_named_career_target_keeps_vocation_chart_for_any_business_field():
+    result = {
+        "category": "career",
+        "career_subtype": "business",
+        "career_target": "software consulting",
+        "career_target_structure": "business",
+        "career_target_traits": ["technical_systems", "client_service"],
+    }
+
+    apply_career_routing_guards(result)
+
+    assert result["career_target"] == "software consulting"
+    assert result["career_subtype"] == "business"
+    assert result["required_divisional_charts"] == ["D1", "D10", "Karkamsa"]
+
+
+def test_query_plan_preserves_named_target_and_semantic_traits():
+    plan = build_query_plan(
+        question="Can I build a software consulting business?",
+        intent={
+            "category": "career",
+            "career_subtype": "business",
+            "career_target": "software consulting",
+            "career_target_structure": "business",
+            "career_target_traits": ["technical_systems", "client_service"],
+        },
+        answer_mode="potential_capacity",
+        target_subject={"key": "self", "label": "self"},
+        language="english",
+    )
+
+    assert plan["career_target"] == "software consulting"
+    assert plan["career_target_structure"] == "business"
+    assert plan["career_target_traits"] == ["technical_systems", "client_service"]
+
+
+def test_named_target_contract_separates_field_fit_from_operating_structure():
+    contract = answer_contract("potential_capacity", "business", "software consulting")
+
+    assert contract["question_family"] == "target_fit"
+    assert "separate field-fit verdict" in contract["required_shape"]
+    assert "separate business/job/freelance fit verdict" in contract["required_shape"]
+    assert "career_target_assessment" in contract["required_evidence"]
+    assert "optional relevant follow-up" in contract["required_shape"]
+
+
+def test_target_assessment_is_generic_and_trait_driven_not_astrology_specific():
+    synthesis = {
+        "ranked_planets": [
+            {"planet": "Mercury", "score": 10, "reasons": ["Mercury repeats in D1 and D10"]},
+            {"planet": "Saturn", "score": 8, "reasons": ["Saturn supports systems in D10"]},
+            {"planet": "Jupiter", "score": 7, "reasons": ["Jupiter supports advice in D1"]},
+            {"planet": "Venus", "score": 4, "reasons": ["Venus supports client rapport"]},
+        ],
+        "work_structure": {
+            "business_score": 8,
+            "employment_score": 6,
+            "inclination": "business_or_hybrid",
+            "reasons": ["Client and gains houses repeat across D1 and D10"],
+        },
+    }
+
+    assessment = build_career_target_assessment(
+        synthesis,
+        target="software consulting",
+        target_traits=["technical_systems", "analytical_research", "client_service"],
+        target_structure="business",
+    )
+
+    assert assessment["target"] == "software consulting"
+    assert assessment["target_traits"] == [
+        "technical_systems", "analytical_research", "client_service"
+    ]
+    assert assessment["field_fit"]["verdict"] == "field_fit_supported"
+    assert assessment["business_fit"]["verdict"] == "business_or_client_led_supported"
+    assert set(assessment["target_traits"]).issubset(CAREER_TARGET_TRAITS)
 
 
 def test_manifestations_do_not_upgrade_single_house_activity_to_offer_or_joining():
@@ -370,6 +452,72 @@ def test_career_capacity_composer_keeps_individual_vocation_synthesis():
     )
     sources = " ".join(row["source"] for row in result["answer_blueprint"]["slots"])
     assert "career_foundation" in sources
+
+
+def test_named_field_composer_uses_separate_field_and_business_verdicts():
+    vocation_synthesis = {
+        "ranked_planets": [
+            {"planet": "Mercury", "score": 10, "reasons": ["Mercury repeats in D1 and D10"]},
+            {"planet": "Saturn", "score": 8, "reasons": ["Saturn supports structured systems"]},
+            {"planet": "Venus", "score": 6, "reasons": ["Venus supports client rapport"]},
+        ],
+        "work_structure": {
+            "business_score": 8,
+            "employment_score": 6,
+            "inclination": "business_or_hybrid",
+            "reasons": ["Business houses repeat in D1 and D10"],
+        },
+    }
+    career_foundation = {
+        "D1": {"houses": [{"house": 10, "lord": "Mercury"}]},
+        "D10": {"calculated_chart": {"ascendant_sign": "Virgo"}},
+        "amatyakaraka": {"planet": "Mercury"},
+        "KARAKAMSHA": {"ascendant_sign": "Gemini"},
+        "vocation_synthesis": vocation_synthesis,
+    }
+    target_intent = {
+        "category": "career",
+        "career_subtype": "business",
+        "career_target": "software consulting",
+        "career_target_structure": "business",
+        "career_target_traits": ["technical_systems", "analytical_research", "client_service"],
+        "answer_mode": "potential_capacity",
+    }
+    instant_context = {
+        "intent_summary": target_intent,
+        "birth_summary": {"name": "Test"},
+        "normalized_evidence": {
+            "career_foundation": career_foundation,
+            "natal_promise": {"status": "supported"},
+            "current_timing": {"mahadasha": "Saturn"},
+        },
+    }
+    packet = {
+        "query_plan": {
+            **target_intent,
+            "user_goal": "Can I build a software consulting business?",
+        },
+        "verdict": {"direction": "supported", "confidence": "medium"},
+        "answer_spec": {"career_rules": {"static_profile_rule": "No timing."}},
+    }
+
+    result = _build_instant_composer_context(instant_context, packet)
+
+    assessment = result["evidence"]["career_target_assessment"]
+    assert assessment["target"] == "software consulting"
+    assert assessment["field_fit"]["verdict"] == "field_fit_supported"
+    assert assessment["business_fit"]["verdict"] == "business_or_client_led_supported"
+    assert result["answer_contract"]["career_contract"]["question_family"] == "target_fit"
+    assert "exact requested field" in result["answer_blueprint"]["purpose"]
+    assert "current_timing" not in result["evidence"]
+    assert result["intent"]["career_target"] == "software consulting"
+    prompt = _build_instant_composer_prompt_v3(
+        "Can I build a software consulting business?",
+        result,
+        "english",
+    )
+    assert "A closing question is optional" in prompt
+    assert "End the visible answer with exactly one natural" not in prompt
 
 
 def test_resignation_subtype_survives_foundation_and_blocks_unsupported_exit_advice():

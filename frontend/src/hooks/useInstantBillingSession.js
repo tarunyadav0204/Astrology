@@ -15,7 +15,9 @@ const getClientId = () => {
 
 const errorMessage = (error) => {
     const detail = error?.response?.data?.detail;
-    return detail?.message || detail || error?.message || 'Instant Chat could not be updated.';
+    return String(detail?.message || detail || error?.message || 'Live chat could not be updated.')
+        .replace(/Instant Chat/gi, 'Live chat')
+        .replace(/Instant consultation/gi, 'Live consultation');
 };
 
 export default function useInstantBillingSession({ refreshBalance }) {
@@ -55,7 +57,7 @@ export default function useInstantBillingSession({ refreshBalance }) {
     }, [acceptState, refreshBalance, serverState?.session_id]);
 
     const start = useCallback(async (chatSessionId) => {
-        if (!chatSessionId) throw new Error('A conversation is required before Instant Chat can start.');
+        if (!chatSessionId) throw new Error('A conversation is required before Live chat can start.');
         setBusy(true);
         setError('');
         try {

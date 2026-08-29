@@ -17,8 +17,10 @@ from instant_chat_v2.planner import build_query_plan  # noqa: E402
 from chat.instant_chat_pipeline import (  # noqa: E402
     _build_instant_answer_blueprint,
     _build_instant_composer_context,
+    _build_instant_context,
     _compact_answer_spec_for_composer,
     _compact_wealth_foundation,
+    _mode_selection_from_intent,
 )
 from calculators.chart_calculator import ChartCalculator  # noqa: E402
 from instant_chat_v2.wealth_graph_policy import WealthGraphPolicyStore  # noqa: E402
@@ -33,7 +35,7 @@ from instant_chat_v2.wealth_graph_runtime import (  # noqa: E402
 EXPECTED_KEYS = {
     "wealth", "wealth_source", "wealth_diagnosis", "wealth_timing",
     "income", "income_timing", "multiple_income",
-    "debt", "debt_diagnosis", "debt_repayment", "loan_support",
+    "debt", "debt_diagnosis", "debt_repayment", "loan_support", "loan_decision",
     "investment", "investing_vs_trading", "investment_timing", "investment_risk",
     "loss_vulnerability", "inheritance", "inheritance_timing", "windfall", "wealth_remedies",
 }
@@ -74,10 +76,10 @@ def test_wealth_ontology_compiles_and_validates() -> None:
         cwd=ROOT, capture_output=True, text=True, check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert "Wealth and Finance ontology PoC valid: 20 competency questions" in result.stdout
+    assert "Wealth and Finance ontology PoC valid: 21 competency questions" in result.stdout
 
 
-def test_compiled_bundle_covers_all_twenty_routes() -> None:
+def test_compiled_bundle_covers_all_twenty_one_routes() -> None:
     assert set(WealthGraphPolicyStore().runtime_keys()) == EXPECTED_KEYS
 
 
@@ -94,10 +96,10 @@ def test_every_route_has_expandable_decision_stages_and_factor_children() -> Non
 
 def test_static_routes_exclude_timing_and_timed_routes_require_both_layers() -> None:
     store = WealthGraphPolicyStore()
-    for key in EXPECTED_KEYS - {"wealth_timing", "income_timing", "debt_repayment", "investment_timing", "inheritance_timing", "loan_support"}:
+    for key in EXPECTED_KEYS - {"wealth_timing", "income_timing", "debt_repayment", "investment_timing", "inheritance_timing", "loan_support", "loan_decision"}:
         policy = store.require(key)
         assert {"wealth:DashaActivation", "wealth:TransitConfirmation"}.issubset(policy.default_exclusions)
-    for key in {"wealth_timing", "income_timing", "debt_repayment", "investment_timing", "inheritance_timing", "loan_support"}:
+    for key in {"wealth_timing", "income_timing", "debt_repayment", "investment_timing", "inheritance_timing", "loan_support", "loan_decision"}:
         policy = store.require(key)
         assert {"wealth:DashaActivation", "wealth:TransitConfirmation"}.issubset(policy.required_factors)
         assert "wealth:StrictHorizon" in policy.guardrails
@@ -130,7 +132,7 @@ def test_financial_safety_guardrails_are_compiled() -> None:
     assert "wealth:NoDeathPrediction" in store.require("inheritance").guardrails
     assert "wealth:NoWindfallCertainty" in store.require("windfall").guardrails
     assert "wealth:NoGenericRemedy" in store.require("wealth_remedies").guardrails
-    for key in ("wealth_timing", "income_timing", "debt_repayment", "loan_support", "investment_timing", "inheritance_timing"):
+    for key in ("wealth_timing", "income_timing", "debt_repayment", "loan_support", "loan_decision", "investment_timing", "inheritance_timing"):
         assert "wealth:NoNodeFifthNinth" in store.require(key).guardrails
 
 
@@ -144,6 +146,7 @@ def test_semantic_subtypes_and_modes_resolve_to_specific_routes() -> None:
         ("debt", "timing_window", "debt_repayment", "debt_repayment"),
         ("wealth", "event_prediction", "debt_repayment", "debt_repayment"),
         ("debt", "timing_window", "loan_support", "loan_support"),
+        ("debt", "event_prediction", "loan_decision", "loan_decision"),
         ("investment", "comparison_choice", "investing_vs_trading", "investing_vs_trading"),
         ("investment", "problem_diagnosis", "investment_risk", "investment_risk"),
         ("wealth", "potential_capacity", "windfall", "windfall"),
@@ -203,6 +206,152 @@ def test_generic_loan_question_cannot_demand_timing_evidence() -> None:
     assert comparison["mode_match"] is True
     assert "wealth:DashaActivation" not in comparison["required_factors"]
     assert "wealth:TransitConfirmation" not in comparison["required_factors"]
+
+
+def test_loan_decision_semantic_subtype_cannot_degrade_to_static_debt_reading() -> None:
+    selection = _mode_selection_from_intent({
+        "category": "debt",
+        "wealth_subtype": "loan_decision",
+        "answer_mode": "topic_reading",
+        "target_subject_key": "self",
+    })
+    assert selection
+    assert selection["answer_mode"] == "event_prediction"
+
+
+def test_business_expansion_loan_decision_requires_conversion_not_just_debt_activity() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    forward_periods = [
+        {
+            "start": "2026-08-28", "end": "2026-09-18", "time_status": "current",
+            "mahadasha": "Saturn", "antardasha": "Rahu", "pratyantardasha": "Saturn",
+            "activated_focus_houses": [2, 8], "relevance_score": 35,
+            "peak_activation_windows": [{
+                "start": "2026-08-28", "end": "2026-09-18", "planet": "Rahu",
+                "activated_focus_houses": [2, 8],
+                "delivered_event_houses": [{"house": 2}, {"house": 8}], "trigger_score": 5,
+            }],
+        },
+        {
+            "start": "2026-09-19", "end": "2027-02-12", "time_status": "future",
+            "mahadasha": "Saturn", "antardasha": "Rahu", "pratyantardasha": "Mercury",
+            "activated_focus_houses": [2, 8, 12], "relevance_score": 33,
+            "peak_activation_windows": [{
+                "start": "2026-09-19", "end": "2026-12-05", "planet": "Rahu",
+                "activated_focus_houses": [2, 8],
+                "delivered_event_houses": [{"house": 2}, {"house": 8}], "trigger_score": 5,
+            }],
+        },
+    ]
+    foundation = _compact_wealth_foundation(
+        chart,
+        birth,
+        {"forward_event_dasha_scan": {"periods": forward_periods}},
+        category="debt",
+        answer_mode="event_prediction",
+        wealth_subtype="loan_decision",
+    )
+    synthesis = foundation["loan_decision_synthesis"]
+    assert foundation["houses_available"] == [2, 6, 7, 8, 10, 11, 12]
+    assert foundation["availability"]["d10"] is True
+    assert synthesis["d2_retention"] == "mixed_capacity_with_retention_pressure"
+    assert all(
+        row["classification"] == "liability_or_outflow_without_business_conversion"
+        for row in synthesis["decision_windows"]
+    )
+
+    context = {
+        "intent_summary": {
+            "category": "debt", "answer_mode": "event_prediction",
+            "wealth_subtype": "loan_decision",
+        },
+        "normalized_evidence": {"wealth_foundation": foundation},
+        "current_dashas": {"levels": {"MD": {"planet": "Saturn"}}},
+        "current_transits": {"planets": {"Saturn": {"house": 9}}},
+    }
+    packet = apply_live_graph_policy(
+        {
+            "query_plan": {
+                "category": "debt", "answer_mode": "event_prediction",
+                "wealth_subtype": "loan_decision",
+                "time_scope": {"as_of": "2026-08-28", "horizon_end": "2026-12-31"},
+            },
+            "answer_spec": {"event_rules": {}}, "verification": {}, "user_derivation": {},
+            "verdict": {"direction": "conditional"},
+        },
+        intent={"category": "debt", "wealth_subtype": "loan_decision"}, context=context,
+    )
+    assert packet["answer_spec"]["knowledge_graph_policy"]["runtime_key"] == "loan_decision"
+    assert packet["verdict"]["direction"] == "not_a_clean_astrological_green_light_for_new_expansion_debt"
+    assert packet["verdict"]["ranked_windows"][-1]["end"] == "2026-12-31"
+    answer = enforce_live_graph_answer("Taking the loan is supported.", packet)
+    assert "lean against taking a new business-expansion loan" in answer
+    assert "houses 7, 10 and 11 do not come together strongly enough" in answer
+    assert "D2 also shows mixed accumulation capacity with retention pressure" in answer
+    assert "Astrology cannot establish affordability" in answer
+
+
+def test_loan_decision_uses_bounded_segments_when_ranked_forward_rows_are_outside_horizon() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    normalized = {
+        "forward_event_dasha_scan": {"periods": [{
+            "start": "2028-04-22", "end": "2028-08-22",
+            "mahadasha": "Saturn", "antardasha": "Jupiter", "pratyantardasha": "Jupiter",
+            "activated_focus_houses": [2, 6, 8], "peak_activation_windows": [],
+        }]},
+        "window_dasha_segments": {"segments": [{
+            "start": "2026-09-19", "end": "2026-12-31",
+            "mahadasha": "Saturn", "antardasha": "Rahu", "pratyantardasha": "Mercury",
+            "activated_focus_houses": [2, 8, 12], "peak_activation_windows": [{
+                "start": "2026-09-19", "end": "2026-12-05", "planet": "Rahu",
+                "activated_focus_houses": [2, 8],
+                "delivered_event_houses": [{"house": 2}, {"house": 8}],
+            }],
+        }]},
+    }
+    foundation = _compact_wealth_foundation(
+        chart, birth, normalized, category="debt",
+        answer_mode="event_prediction", wealth_subtype="loan_decision",
+    )
+    windows = foundation["loan_decision_synthesis"]["decision_windows"]
+    assert any(row["start"] == "2026-09-19" for row in windows)
+    assert not any(row["start"] == "2028-04-22" for row in windows)
+
+
+def test_live_loan_decision_context_keeps_today_and_business_conversion_houses() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    intent = {
+        "category": "debt", "wealth_subtype": "loan_decision",
+        "answer_mode": "topic_reading", "target_subject_key": "self",
+        "extracted_context": {"timeframe": "this year"},
+        "query_context": {
+            "client_now_iso": "2026-08-28T13:02:00+05:30",
+            "timezone_name": "Asia/Kolkata",
+        },
+    }
+    context = _build_instant_context(
+        birth, "Should I take a loan to expand my business this year?", intent, [],
+        answer_mode_override="event_prediction",
+        target_subject_override={"key": "self", "label": "self", "base_house": 1},
+    )
+    assert context["current_dashas"]["as_of"] == "2026-08-28"
+    assert context["intent_summary"]["focus_houses"] == [2, 6, 7, 8, 10, 11, 12]
+    synthesis = context["normalized_evidence"]["wealth_foundation"]["loan_decision_synthesis"]
+    assert any(row["start"] <= "2026-12-31" for row in synthesis["decision_windows"])
 
 
 def test_long_term_potential_log_shape_selects_static_overall_wealth_policy() -> None:
@@ -557,6 +706,7 @@ def test_all_typed_wealth_subtypes_drive_their_own_calculator_layers_from_broad_
         ("multiple_income", "potential_capacity", "multiple_income"),
         ("debt_repayment", "timing_window", "debt_repayment"),
         ("loan_support", "timing_window", "loan_support"),
+        ("loan_decision", "event_prediction", "loan_decision"),
         ("investing_vs_trading", "comparison_choice", "investing_vs_trading"),
         ("investment_risk", "problem_diagnosis", "investment_risk"),
         ("loss_vulnerability", "topic_reading", "loss_vulnerability"),
@@ -1054,7 +1204,7 @@ def test_all_static_wealth_routes_exclude_timing_at_runtime() -> None:
     store = WealthGraphPolicyStore()
     timed = {
         "wealth_timing", "income_timing", "debt_repayment",
-        "loan_support", "investment_timing", "inheritance_timing",
+        "loan_support", "loan_decision", "investment_timing", "inheritance_timing",
     }
     context = _foundation_context(timing=True)
     for runtime_key in EXPECTED_KEYS - timed:
@@ -1102,6 +1252,7 @@ def test_every_timed_wealth_route_requires_dasha_and_transit_confirmation() -> N
         ("income", "timing_window", "general", "income_timing"),
         ("debt", "timing_window", "general", "debt_repayment"),
         ("debt", "timing_window", "loan_support", "loan_support"),
+        ("debt", "event_prediction", "loan_decision", "loan_decision"),
         ("investment", "timing_window", "general", "investment_timing"),
         ("inheritance", "timing_window", "general", "inheritance_timing"),
     ]

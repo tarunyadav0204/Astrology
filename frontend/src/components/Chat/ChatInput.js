@@ -430,7 +430,7 @@ const ChatInput = ({
                             : isPartnershipMode
                                 ? 'Partnership Analysis'
                                 : isInstantSendMode
-                                    ? 'Instant Analysis'
+                                    ? 'Live Chat'
                                     : 'Standard Analysis'}
                         )
                     </span>
@@ -477,7 +477,7 @@ const ChatInput = ({
                                 type="button"
                                 className={`chat-premium-mode-pill ${instantMode && !isPremiumAnalysis ? 'chat-premium-mode-pill--active-instant' : ''}`}
                                 disabled={isLocked || useFreeQuestionEligible}
-                                title={useFreeQuestionEligible ? 'Use your free standard question first; instant uses credits.' : undefined}
+                                title={useFreeQuestionEligible ? 'Use your free standard question first; Live uses credits.' : undefined}
                                 onClick={() => {
                                     if (useFreeQuestionEligible) return;
                                     setIsPremiumAnalysis(false);
@@ -486,7 +486,7 @@ const ChatInput = ({
                                     setShowModeSelector(false);
                                 }}
                             >
-                                <span className="chat-premium-mode-pill__label">Instant</span>
+                                <span className="chat-premium-mode-pill__label">Live</span>
                                 <span className="chat-premium-mode-pill__cost">
                                     {instantFirstMinuteCost} first · {instantPerMinuteCost}/min
                                 </span>
@@ -516,10 +516,10 @@ const ChatInput = ({
                 {!useCompactPremium && (
                     isInstantSendMode && !showDesktopModeSelector ? (
                         instantHeaderControls ? null : (
-                        <div className="chat-instant-mode-bar" role="status" aria-label={`Instant conversation mode, first minute ${instantFirstMinuteCost} credits, then ${instantPerMinuteCost} credits per started minute`}>
+                        <div className="chat-instant-mode-bar" role="status" aria-label={`Live conversation mode, first minute ${instantFirstMinuteCost} credits, then ${instantPerMinuteCost} credits per started minute`}>
                             <span className="chat-instant-mode-bar__pulse" aria-hidden="true" />
                             <span className="chat-instant-mode-bar__copy">
-                                <strong>Instant conversation</strong>
+                                <strong>Live conversation</strong>
                                 <span>First minute {instantFirstMinuteCost} · then {instantPerMinuteCost} credits per started minute</span>
                             </span>
                             <button
@@ -567,7 +567,7 @@ const ChatInput = ({
                                 }}
                             >
                                 <span className="chat-mode-option__topline">
-                                    <span className="chat-mode-option__name">⚡ Instant</span>
+                                    <span className="chat-mode-option__name">⚡ Live</span>
                                     <span className="chat-mode-option__cost">
                                         {instantFirstMinuteCost} first · {instantPerMinuteCost}/min
                                     </span>
@@ -704,7 +704,7 @@ const ChatInput = ({
                                     : isPremiumAnalysis
                                         ? 'Premium mode — tap to change'
                                         : instantMode
-                                            ? 'Instant mode — tap to change'
+                                            ? 'Live mode — tap to change'
                                             : 'Standard mode — tap to change'
                             }
                             aria-expanded={showModeSelector}
@@ -712,14 +712,14 @@ const ChatInput = ({
                                 isPremiumAnalysis
                                     ? 'Premium analysis selected. Open mode picker'
                                     : instantMode
-                                        ? 'Instant analysis selected. Open mode picker'
+                                        ? 'Live chat selected. Open mode picker'
                                         : 'Standard analysis. Open mode picker'
                             }
                         >
                             {isPremiumAnalysis ? (
                                 <span className="chat-premium-sp-toggle__inner chat-premium-sp-toggle__inner--p">P</span>
                             ) : instantMode ? (
-                                <span className="chat-premium-sp-toggle__inner chat-premium-sp-toggle__inner--i">I</span>
+                                <span className="chat-premium-sp-toggle__inner chat-premium-sp-toggle__inner--i">L</span>
                             ) : (
                                 <span className="chat-premium-sp-toggle__inner chat-premium-sp-toggle__inner--s">S</span>
                             )}
@@ -749,7 +749,7 @@ const ChatInput = ({
                                 : isPremiumAnalysis
                                     ? 'Send premium question'
                                     : isInstantSendMode
-                                        ? 'Send instant question'
+                                        ? 'Send Live question'
                                         : isPartnershipMode
                                             ? 'Send partnership question'
                                             : 'Send message'
@@ -773,7 +773,7 @@ const ChatInput = ({
                                 : isPremiumAnalysis
                                     ? 'Send Premium'
                                     : isInstantSendMode
-                                        ? 'Send Instant'
+                                        ? 'Send Live'
                                         : isPartnershipMode
                                             ? 'Send'
                                             : 'Send'}
@@ -813,7 +813,7 @@ const ChatInput = ({
                             : useFreeQuestionEligible
                                 ? 'Standard: free (first question)'
                                 : isInstantSendMode
-                                    ? `Instant: ${instantFirstMinuteCost} first · ${instantPerMinuteCost}/min after`
+                                    ? `Live: ${instantFirstMinuteCost} first · ${instantPerMinuteCost}/min after`
                                     : `Standard: ${chatCost}`}{' '}
                     {isInstantSendMode ? 'credits per started minute' : (!useFreeQuestionEligible || isPremiumAnalysis || isPartnershipMode ? 'credits per question' : '')}
                 </div>

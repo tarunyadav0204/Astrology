@@ -30,6 +30,7 @@ from instant_chat_v2.career import (
     CAREER_ALIASES,
     CAREER_PROFILES,
     answer_contract as build_career_answer_contract,
+    build_career_target_assessment,
     build_vocation_synthesis,
     career_profile,
     classify_manifestations as classify_career_manifestations,
@@ -42,6 +43,12 @@ from instant_chat_v2.career import (
 from instant_chat_v2.health import HEALTH_ALIASES, HEALTH_PROFILES
 from instant_chat_v2.graph_live import apply_live_graph_policy, enforce_live_graph_answer
 from instant_chat_v2.wealth_graph_runtime import effective_wealth_category
+from instant_chat_v2.education import (
+    education_profile,
+    is_education_category,
+    is_education_timing,
+    normalize_education_subtype,
+)
 from instant_chat_v2.marriage_timeline import (
     apply_timeline_intent_guard,
     build_phase_action,
@@ -176,6 +183,12 @@ for _health_name, _health_policy in HEALTH_PROFILES.items():
     }
 for _health_alias, _health_name in HEALTH_ALIASES.items():
     CATEGORY_FOCUS[_health_alias] = dict(CATEGORY_FOCUS[_health_name])
+for _education_category in ("education", "learning", "exams", "research"):
+    _education_policy = education_profile(_education_category)
+    CATEGORY_FOCUS[_education_category] = {
+        "houses": list(_education_policy["houses"]),
+        "planets": list(_education_policy["planets"]),
+    }
 
 EVENT_CATEGORY_PRIORITIES = {
     "career": {"house_weights": {10: 3.0, 6: 2.5, 11: 2.0, 2: 1.5}, "planet_weights": {"Saturn": 2.0, "Sun": 1.8, "Mercury": 1.8, "Jupiter": 1.4}},
@@ -217,6 +230,18 @@ for _health_name, _health_policy in HEALTH_PROFILES.items():
     }
 for _health_alias, _health_name in HEALTH_ALIASES.items():
     EVENT_CATEGORY_PRIORITIES[_health_alias] = dict(EVENT_CATEGORY_PRIORITIES[_health_name])
+for _education_category in ("education", "learning", "exams", "research"):
+    _education_policy = education_profile(_education_category)
+    EVENT_CATEGORY_PRIORITIES[_education_category] = {
+        "house_weights": {
+            house: max(1.2, 3.0 - (index * 0.35))
+            for index, house in enumerate(_education_policy["houses"])
+        },
+        "planet_weights": {
+            planet: max(1.2, 2.0 - (index * 0.18))
+            for index, planet in enumerate(_education_policy["planets"])
+        },
+    }
 
 EVENT_ANSWER_LABELS = {
     "career": "career growth",
@@ -229,6 +254,9 @@ EVENT_ANSWER_LABELS = {
     "marriage": "marriage",
     "progeny": "having a child",
     "education": "education",
+    "learning": "learning progress",
+    "exams": "exam or selection outcome",
+    "research": "research progress",
     "trading": "trading or speculation",
     "property": "property matters",
     "relocation": "relocation",
@@ -350,6 +378,10 @@ PARASHARI_TOPIC_MAP = {
     "litigation": "health",
     "surgery": "health",
     "higher_studies": "career",
+    "education": "education",
+    "learning": "education",
+    "exams": "education",
+    "research": "education",
 }
 
 EVENT_CATEGORY_ALIASES = {
@@ -1224,9 +1256,11 @@ def _slim_event_prediction_payload(
     category: str,
     career_subtype: Any = None,
     wealth_subtype: Any = None,
+    education_subtype: Any = None,
     question: str,
     chart_data: Dict[str, Any],
     house_lordships: Dict[str, List[int]],
+    as_of: Any = None,
     named_dasha_lookup: Optional[Dict[str, Any]] = None,
     evidence_plan: Optional[Dict[str, Any]] = None,
     daily_prediction_spine: Optional[Dict[str, Any]] = None,
@@ -1587,6 +1621,7 @@ def _slim_event_prediction_payload(
         "location_recommendation",
         "muhurat_slots",
         "wealth_foundation",
+        "education_foundation",
     ):
         if (normalized_evidence or {}).get(evidence_key) not in (None, "", [], {}):
             slim_normalized[evidence_key] = (normalized_evidence or {}).get(evidence_key)
@@ -1648,6 +1683,10 @@ def _slim_event_prediction_payload(
                 else None
             ),
             "wealth_subtype": wealth_subtype,
+            "education_subtype": (
+                normalize_education_subtype(education_subtype)
+                if is_education_category(category) else None
+            ),
             "mode": "LIFESPAN_EVENT_TIMING",
             "answer_mode": "event_prediction",
             "period_window": period_window,
@@ -1684,12 +1723,12 @@ def _slim_event_prediction_payload(
         },
         "target_chart_context": compact_target_context,
         "current_dashas": ({
-            "as_of": str((period_window or {}).get("start") or ""),
+            "as_of": str(as_of or (period_window or {}).get("start") or "")[:10],
             "levels": safe_current_dashas_levels,
             "named_dasha_lookup": named_dasha_lookup or {},
         } if not is_retrospective else {}),
         "current_transits": ({
-            "as_of_local": str((period_window or {}).get("start") or ""),
+            "as_of_local": str(as_of or (period_window or {}).get("start") or "")[:10],
             "planets": major_transits,
         } if not is_retrospective else {}),
         "current_transits_formatted": ({} if is_retrospective else major_transits),
@@ -5402,6 +5441,11 @@ def _mode_selection_from_intent(
     if raw_mode not in ANSWER_MODES:
         return None
     mode = raw_mode
+    if str(intent.get("wealth_subtype") or "").strip().lower() == "loan_decision":
+        # The primary semantic router has identified a concrete borrowing
+        # decision. It requires the event/timing evidence path even if the
+        # provider left the generic answer mode on topic_reading.
+        mode = "event_prediction"
     requested_object = str(intent.get("requested_object") or "").strip().lower()
     # Validate the primary LLM's semantic fields against one another. This is
     # intentionally not a keyword parser: the LLM identifies the requested
@@ -7314,6 +7358,14 @@ def _requested_charts_from_intent(intent: Optional[Dict[str, Any]], *, answer_mo
         for code in ("D1", "D10"):
             if code not in requested:
                 requested.append(code)
+    if is_education_category(category):
+        education_subtype = normalize_education_subtype(intent.get("education_subtype"))
+        education_charts = ["D1", "D24", "D9"]
+        if education_subtype in {"education_vs_work", "education_vs_work_timing", "research", "research_timing"}:
+            education_charts.append("D10")
+        for code in education_charts:
+            if code not in requested:
+                requested.append(code)
     if requested:
         return requested
     if str(answer_mode or "").strip() != "factual_chart_lookup":
@@ -8752,6 +8804,949 @@ def _compact_career_foundation(
     }
 
 
+_EDUCATION_FIELD_SIGNATURES = {
+    "Mercury": ("analysis, computing, commerce and languages", "analytical_quantitative"),
+    "Mars": ("engineering, technical and competitive work", "technical_engineering"),
+    "Jupiter": ("teaching, law, strategy and advanced knowledge", "legal_social"),
+    "Venus": ("design, arts and aesthetic disciplines", "creative_design"),
+    "Moon": ("psychology, care and public-facing study", "biological_care"),
+    "Sun": ("leadership, administration and public institutions", "commercial_management"),
+    "Saturn": ("structured systems, engineering and sustained research", "research_depth"),
+    "Rahu": ("technology, data, foreign and unconventional fields", "technical_engineering"),
+    "Ketu": ("investigation, abstraction and deep research", "research_depth"),
+}
+
+_EDUCATION_ALLOWED_TRAITS = frozenset({
+    "analytical_quantitative", "language_communication", "technical_engineering",
+    "creative_design", "biological_care", "legal_social", "commercial_management",
+    "research_depth", "disciplined_memory", "practical_applied",
+})
+
+# A target is scored against more than one carrier.  These are requirements of
+# the study method/field, not generic benefic or malefic labels.
+_EDUCATION_TRAIT_CARRIERS = {
+    "analytical_quantitative": {"Mercury": 1.0, "Saturn": 0.55, "Rahu": 0.35},
+    "language_communication": {"Mercury": 1.0, "Jupiter": 0.35, "Moon": 0.25},
+    "technical_engineering": {"Mars": 0.9, "Saturn": 0.75, "Mercury": 0.55, "Rahu": 0.45},
+    "creative_design": {"Venus": 1.0, "Moon": 0.45, "Mercury": 0.3},
+    "biological_care": {"Moon": 0.8, "Jupiter": 0.7, "Sun": 0.35, "Mars": 0.25},
+    "legal_social": {"Jupiter": 0.9, "Sun": 0.55, "Mercury": 0.45, "Venus": 0.25},
+    "commercial_management": {"Mercury": 0.75, "Sun": 0.7, "Jupiter": 0.5, "Saturn": 0.35},
+    "research_depth": {"Saturn": 0.8, "Ketu": 0.7, "Mercury": 0.55, "Jupiter": 0.45, "Rahu": 0.35},
+    "disciplined_memory": {"Saturn": 0.8, "Moon": 0.6, "Mercury": 0.55, "Jupiter": 0.35},
+    "practical_applied": {"Mars": 0.75, "Mercury": 0.55, "Saturn": 0.5, "Sun": 0.25},
+}
+
+
+def _compact_education_foundation(
+    chart_data: Dict[str, Any],
+    birth_data: Dict[str, Any],
+    normalized_evidence: Dict[str, Any],
+    *,
+    category: str,
+    answer_mode: str,
+    education_subtype: Any = None,
+    education_target: Any = None,
+    education_target_traits: Any = None,
+    education_options: Any = None,
+    period_window: Any = None,
+) -> Dict[str, Any]:
+    """Build one calculated, route-specific Education evidence ledger.
+
+    D1 establishes promise, D24 is the mandatory education chart, D9 only
+    qualifies sustained research carriers, and D10 is used solely for the
+    education-versus-work conversion decision.
+    """
+    profile = education_profile(category, education_subtype)
+    subtype = profile["subtype"]
+    if str(answer_mode or "").strip().lower() == "remedy_action":
+        subtype = "education_remedies"
+        profile = education_profile(category, subtype)
+    elif subtype == "foreign_study" and str(answer_mode or "").strip().lower() in {"comparison_choice", "decision_support"}:
+        subtype = "foreign_study_comparison"
+        profile = education_profile(category, subtype)
+    if is_education_timing(subtype, answer_mode):
+        subtype = {
+            "overall": "education_timing",
+            "higher_education": "higher_education_timing",
+            "exam_capacity": "exam_timing",
+            "admission_capacity": "admission_timing",
+            "research": "research_timing",
+            "foreign_study": "foreign_study_timing",
+            "education_vs_work": "education_vs_work_timing",
+        }.get(subtype, subtype)
+        profile = education_profile(category, subtype)
+    focus_houses = list(profile["houses"])
+    chart_facts = normalized_evidence.get("chart_facts") if isinstance(normalized_evidence.get("chart_facts"), dict) else {}
+    charts = chart_facts.get("charts") if isinstance(chart_facts.get("charts"), dict) else {}
+    d1 = charts.get("D1") if isinstance(charts.get("D1"), dict) else {}
+    d24 = charts.get("D24") if isinstance(charts.get("D24"), dict) else {}
+    d9 = charts.get("D9") if isinstance(charts.get("D9"), dict) else {}
+    d10 = charts.get("D10") if isinstance(charts.get("D10"), dict) else {}
+
+    def bounded_chart(name: str, chart: Dict[str, Any]) -> Dict[str, Any]:
+        if not chart:
+            return {}
+        compact = _compact_chart_for_composer_prediction(name, chart)
+        compact["houses"] = [
+            row for row in compact.get("houses") or []
+            if _safe_int(row.get("house")) in set(focus_houses)
+        ]
+        keep_planets = set(profile["planets"])
+        for row in compact.get("houses") or []:
+            keep_planets.update(str(value) for value in row.get("occupants") or [])
+            lord = str(row.get("lord") or "")
+            if lord:
+                keep_planets.add(lord)
+        compact["planets"] = {
+            key: {
+                **value,
+                "lordships": [
+                    house for house in value.get("lordships") or []
+                    if _safe_int(house) in set(focus_houses)
+                ],
+                "aspects_to_houses": [
+                    house for house in value.get("aspects_to_houses") or []
+                    if _safe_int(house) in set(focus_houses)
+                ],
+            }
+            for key, value in (compact.get("planets") or {}).items()
+            if key in keep_planets and isinstance(value, dict)
+        }
+        return compact
+
+    dignity_scores = {"exalted": 3, "mooltrikona": 3, "own_sign": 2, "debilitated": -3}
+    planet_rows: List[Dict[str, Any]] = []
+    for planet, (field, trait) in _EDUCATION_FIELD_SIGNATURES.items():
+        score = 0
+        condition_score = 0
+        relevance_score = 0
+        reasons: List[str] = []
+        cautions: List[str] = []
+        repeated = 0
+        for chart_name, chart in (("D1", d1), ("D24", d24)):
+            row = (chart.get("planets") or {}).get(planet) if isinstance(chart.get("planets"), dict) else None
+            if not isinstance(row, dict):
+                continue
+            repeated += 1
+            house = _safe_int(row.get("house"))
+            dignity = str(row.get("dignity") or "")
+            delta = dignity_scores.get(dignity, 0)
+            score += delta
+            condition_score += delta
+            if house in focus_houses:
+                score += 2
+                relevance_score += 2
+                reasons.append(f"{chart_name}: {planet} participates in focus house {house}")
+            focus_lordships = sorted(set(_safe_int(v) for v in row.get("lordships") or []) & set(focus_houses))
+            if focus_lordships:
+                score += 2
+                relevance_score += 2
+                reasons.append(f"{chart_name}: {planet} rules focus house(s) {', '.join(map(str, focus_lordships))}")
+            if delta > 0:
+                reasons.append(f"{chart_name}: {planet} is {dignity}")
+            elif delta < 0:
+                cautions.append(f"{chart_name}: {planet} is {dignity}")
+            if row.get("combust"):
+                score -= 1
+                condition_score -= 1
+                cautions.append(f"{chart_name}: {planet} is combust")
+        if repeated == 2:
+            score += 1
+            relevance_score += 1
+        planet_rows.append({
+            "planet": planet, "field_family": field, "target_trait": trait,
+            "score": score, "condition_score": condition_score,
+            "relevance_score": relevance_score, "repeated_across_d1_d24": repeated == 2,
+            "support": reasons[:5], "cautions": cautions[:4],
+        })
+    ranked_fields = sorted(planet_rows, key=lambda row: (-int(row["score"]), row["planet"]))
+    education_carriers = [
+        {
+            key: value for key, value in row.items()
+            if key not in {"field_family", "target_trait"}
+        }
+        for row in ranked_fields
+    ]
+
+    houses_by_number = {
+        _safe_int(row.get("house")): row for row in d1.get("houses") or [] if isinstance(row, dict)
+    }
+    nakshatras = (
+        "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu",
+        "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra",
+        "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha",
+        "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati",
+    )
+    lord_chains: List[Dict[str, Any]] = []
+    raw_planets = chart_data.get("planets") if isinstance(chart_data.get("planets"), dict) else {}
+    for house in focus_houses:
+        lord = str((houses_by_number.get(house) or {}).get("lord") or "")
+        raw = raw_planets.get(lord) if isinstance(raw_planets.get(lord), dict) else {}
+        try:
+            longitude = float(raw.get("longitude")) % 360
+            nakshatra = nakshatras[min(26, int(longitude / (360 / 27)))]
+        except (TypeError, ValueError):
+            nakshatra = None
+        lord_row = (d1.get("planets") or {}).get(lord) if isinstance(d1.get("planets"), dict) else {}
+        lord_chains.append({
+            "house": house, "lord": lord or None, "lord_house": lord_row.get("house"),
+            "lord_sign": lord_row.get("sign_name"), "lord_dignity": lord_row.get("dignity"),
+            "lord_nakshatra": nakshatra,
+        })
+
+    def house_lord_condition(chart_name: str, chart: Dict[str, Any], house: int) -> Dict[str, Any]:
+        chart_houses = {
+            _safe_int(row.get("house")): row
+            for row in chart.get("houses") or []
+            if isinstance(row, dict)
+        }
+        house_row = chart_houses.get(house) or {}
+        lord = str(house_row.get("lord") or "")
+        lord_row = (chart.get("planets") or {}).get(lord) if isinstance(chart.get("planets"), dict) else {}
+        if not lord or not isinstance(lord_row, dict):
+            return {"chart": chart_name, "house": house, "available": False, "score": 0}
+        dignity = str(lord_row.get("dignity") or "")
+        placement = _safe_int(lord_row.get("house"))
+        score = dignity_scores.get(dignity, 0)
+        support: List[str] = []
+        cautions: List[str] = []
+        if dignity_scores.get(dignity, 0) > 0:
+            support.append(f"{chart_name} H{house} lord {lord} is {dignity}")
+        elif dignity_scores.get(dignity, 0) < 0:
+            cautions.append(f"{chart_name} H{house} lord {lord} is {dignity}")
+        if placement in {1, 4, 5, 9, 10, 11}:
+            score += 1
+            support.append(f"{chart_name} H{house} lord {lord} is placed in H{placement}")
+        elif placement in {6, 8}:
+            score -= 1
+            cautions.append(f"{chart_name} H{house} lord {lord} is placed in H{placement}")
+        elif placement == 12:
+            cautions.append(f"{chart_name} H{house} lord {lord} in H12 may redirect study through distance, retreat or extra expenditure")
+        if lord_row.get("combust"):
+            score -= 1
+            cautions.append(f"{chart_name} H{house} lord {lord} is combust")
+        return {
+            "chart": chart_name, "house": house, "available": True,
+            "lord": lord, "lord_house": placement, "lord_sign": lord_row.get("sign_name"),
+            "lord_dignity": dignity, "score": score,
+            "support": support, "cautions": cautions,
+        }
+
+    def chain_synthesis(
+        *,
+        route: str,
+        primary_houses: List[int],
+        supporting_houses: List[int],
+        include_d9: bool = False,
+        include_d10: bool = False,
+        rule: str,
+    ) -> Dict[str, Any]:
+        chart_sequence: List[tuple[str, Dict[str, Any]]] = [("D1", d1), ("D24", d24)]
+        if include_d9:
+            chart_sequence.append(("D9", d9))
+        if include_d10:
+            chart_sequence.append(("D10", d10))
+        rows: List[Dict[str, Any]] = []
+        weighted_score = 0.0
+        total_weight = 0.0
+        primary_complete = True
+        for chart_name, chart in chart_sequence:
+            chart_weight = 1.0 if chart_name in {"D1", "D24"} else 0.5
+            for house in primary_houses + supporting_houses:
+                row = house_lord_condition(chart_name, chart, house)
+                house_weight = 2.0 if house in primary_houses else 1.0
+                weight = chart_weight * house_weight
+                row["decision_weight"] = weight
+                rows.append(row)
+                if not row.get("available"):
+                    if chart_name in {"D1", "D24"} and house in primary_houses:
+                        primary_complete = False
+                    continue
+                weighted_score += float(row.get("score") or 0) * weight
+                total_weight += weight
+        normalized_score = round(weighted_score / total_weight, 3) if total_weight else 0.0
+        if not d1 or not d24 or not primary_complete:
+            verdict = "not_established"
+        elif normalized_score >= 0.75:
+            verdict = "supported"
+        elif normalized_score >= 0:
+            verdict = "qualified"
+        else:
+            verdict = "pressured"
+        return {
+            "route": route,
+            "verdict": verdict,
+            "primary_houses": primary_houses,
+            "supporting_houses": supporting_houses,
+            "weighted_condition_score": round(weighted_score, 3),
+            "normalized_condition_score": normalized_score,
+            "primary_evidence_complete": primary_complete and bool(d1) and bool(d24),
+            "house_lord_conditions": rows,
+            "supporting_factors": [line for row in rows for line in row.get("support") or []][:10],
+            "cautions": [line for row in rows for line in row.get("cautions") or []][:8],
+            "rule": rule,
+        }
+
+    def branch_synthesis(
+        *, route: str, chart_sequence: List[tuple[str, Dict[str, Any]]],
+        primary_houses: List[int], supporting_houses: List[int], rule: str,
+    ) -> Dict[str, Any]:
+        rows: List[Dict[str, Any]] = []
+        weighted_score = 0.0
+        total_weight = 0.0
+        complete = True
+        for chart_name, chart in chart_sequence:
+            for house in primary_houses + supporting_houses:
+                row = house_lord_condition(chart_name, chart, house)
+                weight = 2.0 if house in primary_houses else 1.0
+                row["decision_weight"] = weight
+                rows.append(row)
+                if not row.get("available") and house in primary_houses:
+                    complete = False
+                    continue
+                if row.get("available"):
+                    weighted_score += float(row.get("score") or 0) * weight
+                    total_weight += weight
+        score = round(weighted_score / total_weight, 3) if total_weight else 0.0
+        verdict = (
+            "not_established" if not complete or not total_weight else
+            "supported" if score >= 0.75 else
+            "qualified" if score >= 0 else "pressured"
+        )
+        return {
+            "route": route, "verdict": verdict, "score": score,
+            "primary_houses": primary_houses, "supporting_houses": supporting_houses,
+            "evidence_complete": complete and bool(total_weight),
+            "house_lord_conditions": rows,
+            "supporting_factors": [line for row in rows for line in row.get("support") or []][:8],
+            "cautions": [line for row in rows for line in row.get("cautions") or []][:6],
+            "rule": rule,
+        }
+
+    planet_row_map = {str(row.get("planet")): row for row in planet_rows}
+
+    def trait_assessment(requested_traits: Any, *, target: str | None = None) -> Dict[str, Any]:
+        valid_traits = [
+            str(value).strip() for value in requested_traits or []
+            if str(value).strip() in _EDUCATION_ALLOWED_TRAITS
+        ][:4]
+        trait_rows: List[Dict[str, Any]] = []
+        for trait in valid_traits:
+            carriers = _EDUCATION_TRAIT_CARRIERS.get(trait) or {}
+            carrier_rows = []
+            weighted_score = 0.0
+            total_weight = 0.0
+            for planet, weight in carriers.items():
+                row = planet_row_map.get(planet)
+                if not row:
+                    continue
+                weighted_score += float(row.get("score") or 0) * float(weight)
+                total_weight += float(weight)
+                carrier_rows.append({
+                    "planet": planet, "weight": weight, "score": row.get("score"),
+                    "support": list(row.get("support") or [])[:2],
+                    "cautions": list(row.get("cautions") or [])[:2],
+                })
+            normalized = round(weighted_score / total_weight, 3) if total_weight else 0.0
+            trait_rows.append({
+                "trait": trait,
+                "score": normalized,
+                "carriers": carrier_rows,
+                "verdict": "supported" if normalized >= 0.75 else "qualified" if normalized >= 0 else "pressured",
+            })
+        aggregate = round(sum(float(row["score"]) for row in trait_rows) / len(trait_rows), 3) if trait_rows else None
+        if aggregate is None:
+            verdict = "not_established"
+        elif aggregate >= 0.75:
+            verdict = "supported"
+        elif aggregate >= 0:
+            verdict = "qualified"
+        else:
+            verdict = "pressured"
+        return {
+            "target": target,
+            "requested_traits": valid_traits,
+            "traits_complete": bool(valid_traits),
+            "trait_results": trait_rows,
+            "aggregate_score": aggregate,
+            "verdict": verdict,
+            "rule": "Score every declared demand independently against repeated D1+D24 carriers; never infer a result from the target name or one planet.",
+        }
+
+    overall_synthesis = chain_synthesis(
+        route="overall education", primary_houses=[4, 5, 9], supporting_houses=[2, 11],
+        rule="Judge foundational learning from H4, comprehension from H5, advanced learning from H9, retention/expression from H2 and realization from H11 across D1 and D24.",
+    ) if subtype in {"overall", "education_timing"} else {}
+
+    learning_chain = chain_synthesis(
+        route="learning method and retention", primary_houses=[3, 4, 5], supporting_houses=[1, 2],
+        rule="Learning method requires H3 practice, H4 learning environment, H5 comprehension and H2 retention/expression; no single planet labels intelligence.",
+    ) if subtype == "learning_style" else {}
+
+    method_carriers = {
+        "reading_and_note_making": {"Mercury": 1.0, "Saturn": 0.35},
+        "discussion_and_teaching_back": {"Mercury": 0.8, "Jupiter": 0.7},
+        "hands_on_practice": {"Mars": 0.8, "Mercury": 0.45, "Saturn": 0.35},
+        "structured_instruction": {"Jupiter": 0.8, "Saturn": 0.7},
+        "visual_and_associative_recall": {"Moon": 0.8, "Venus": 0.45, "Mercury": 0.3},
+        "spaced_repetition_and_routine": {"Saturn": 0.9, "Moon": 0.45, "Mercury": 0.4},
+    }
+    learning_methods: List[Dict[str, Any]] = []
+    if subtype == "learning_style":
+        for method, carriers in method_carriers.items():
+            rows = [planet_row_map[p] for p in carriers if p in planet_row_map]
+            denominator = sum(float(carriers[str(row["planet"])]) for row in rows)
+            score = (
+                sum(float(row.get("score") or 0) * float(carriers[str(row["planet"])]) for row in rows) / denominator
+                if denominator else 0.0
+            )
+            learning_methods.append({
+                "method": method, "score": round(score, 3),
+                "supporting_planets": [str(row.get("planet")) for row in rows],
+                "support": [line for row in rows for line in row.get("support") or []][:4],
+                "cautions": [line for row in rows for line in row.get("cautions") or []][:3],
+            })
+        learning_methods.sort(key=lambda row: (-float(row["score"]), str(row["method"])))
+
+    higher_education_synthesis: Dict[str, Any] = {}
+    if subtype in {"higher_education", "higher_education_timing"}:
+        higher_rows = [
+            house_lord_condition(chart_name, chart, house)
+            for chart_name, chart in (("D1", d1), ("D24", d24))
+            for house in (9, 5, 11)
+        ]
+        ninth_rows = [row for row in higher_rows if row.get("house") == 9 and row.get("available")]
+        weighted_score = sum(
+            int(row.get("score") or 0) * (2 if row.get("house") == 9 else 1)
+            for row in higher_rows if row.get("available")
+        )
+        if len(ninth_rows) < 2:
+            higher_verdict = "not_established"
+        elif all(int(row.get("score") or 0) > 0 for row in ninth_rows) and weighted_score >= 4:
+            higher_verdict = "supported"
+        elif weighted_score >= 1:
+            higher_verdict = "qualified"
+        else:
+            higher_verdict = "pressured"
+        higher_education_synthesis = {
+            "verdict": higher_verdict,
+            "primary_house": 9,
+            "supporting_houses": [5, 11],
+            "excluded_house": 4,
+            "weighted_condition_score": weighted_score,
+            "house_lord_conditions": higher_rows,
+            "supporting_factors": [line for row in higher_rows for line in row.get("support") or []][:8],
+            "cautions": [line for row in higher_rows for line in row.get("cautions") or []][:6],
+            "rule": "Judge postgraduate promise from H9 first, H5 academic depth, H11 realization and actual D24 conditions. H4 describes foundational/formal education and is excluded from this route.",
+        }
+
+    kp_needed = subtype in {
+        "education_timing", "exam_capacity", "exam_timing", "admission_capacity", "admission_timing",
+        "scholarship", "higher_education_timing", "research_timing", "foreign_study_timing",
+        "education_vs_work_timing",
+    }
+    kp = _instant_real_kp_evidence(birth_data) if kp_needed else {}
+    options: List[Dict[str, Any]] = []
+    for value in education_options or []:
+        if isinstance(value, dict):
+            label = str(value.get("label") or value.get("target") or "").strip()
+            option_traits = [str(v).strip() for v in value.get("traits") or [] if str(v).strip()]
+        else:
+            label = str(value or "").strip()
+            option_traits = []
+        if label:
+            options.append({"label": label, "traits": option_traits})
+        if len(options) >= 6:
+            break
+    traits = [
+        str(v).strip() for v in (education_target_traits or [])
+        if str(v).strip() in _EDUCATION_ALLOWED_TRAITS
+    ][:4]
+    target_assessment = trait_assessment(
+        traits,
+        target=str(education_target or "").strip() or None,
+    ) if str(education_target or "").strip() or traits else {}
+    option_rows: List[Dict[str, Any]] = []
+    for option in options:
+        demands = [value for value in option["traits"] if value in _EDUCATION_ALLOWED_TRAITS] or traits
+        assessment = trait_assessment(demands, target=option["label"])
+        option_rows.append({
+            "option": option["label"], "demand_traits": demands,
+            "evaluated": bool(demands),
+            "aggregate_score": assessment.get("aggregate_score"),
+            "verdict": assessment.get("verdict"),
+            "trait_results": assessment.get("trait_results") or [],
+            "comparison_rule": assessment.get("rule"),
+        })
+    evaluated_options = [row for row in option_rows if row.get("evaluated")]
+    ranked_options = sorted(
+        evaluated_options,
+        key=lambda row: (-float(row.get("aggregate_score") or 0), str(row.get("option") or "")),
+    )
+    if len(ranked_options) >= 2:
+        margin = round(float(ranked_options[0].get("aggregate_score") or 0) - float(ranked_options[1].get("aggregate_score") or 0), 3)
+        comparison_direction = "clear_lead" if margin >= 0.75 else "close_call"
+    else:
+        margin = None
+        comparison_direction = "insufficient_option_evidence"
+    option_synthesis = {
+        "options": option_rows,
+        "ranked_options": ranked_options,
+        "winner": ranked_options[0].get("option") if comparison_direction == "clear_lead" else None,
+        "margin": margin,
+        "direction": comparison_direction,
+        "rule": "Each named choice is scored separately from its declared demands. A winner is allowed only when at least two options are evaluated and the calculated margin is material.",
+    } if options else {}
+
+    kp_cusps = kp.get("cusp_lords") if isinstance(kp.get("cusp_lords"), dict) else {}
+    kp_significators = kp.get("significators") if isinstance(kp.get("significators"), dict) else {}
+    kp_planet_significators = kp.get("planet_significators") if isinstance(kp.get("planet_significators"), dict) else {}
+    kp_route = {
+        "cusps": {
+            str(house): kp_cusps.get(house) or kp_cusps.get(str(house))
+            for house in focus_houses
+            if kp_cusps.get(house) or kp_cusps.get(str(house))
+        },
+        "significators": {
+            str(house): kp_significators.get(house) or kp_significators.get(str(house))
+            for house in focus_houses
+            if kp_significators.get(house) or kp_significators.get(str(house))
+        },
+        "materialization_rule": "Judge the complete route house chain; one supportive cusp or significator cannot promise the outcome.",
+    } if kp else {}
+    kp_success_houses = {
+        "education_timing": {4, 5, 9, 11},
+        "higher_education_timing": {5, 9, 11},
+        "exam_capacity": {5, 6, 11}, "exam_timing": {5, 6, 11},
+        "admission_capacity": {4, 5, 9, 11}, "admission_timing": {4, 5, 9, 11},
+        "scholarship": {2, 5, 9, 11},
+        "research_timing": {5, 8, 9, 11},
+        "foreign_study_timing": {3, 9, 11, 12},
+        "education_vs_work_timing": {2, 5, 6, 9, 10, 11},
+    }.get(subtype, set())
+    kp_primary_cusps = {
+        "education_timing": [4, 9, 11], "higher_education_timing": [9, 11],
+        "exam_capacity": [5, 6, 11], "exam_timing": [5, 6, 11],
+        "admission_capacity": [4, 9, 11], "admission_timing": [4, 9, 11],
+        "scholarship": [2, 9, 11], "research_timing": [5, 8, 11],
+        "foreign_study_timing": [9, 12, 11], "education_vs_work_timing": [9, 10, 11],
+    }.get(subtype, [])
+    kp_judgments = []
+    if kp_route and kp_primary_cusps:
+        for cusp in kp_primary_cusps:
+            cusp_row = kp_cusps.get(cusp) or kp_cusps.get(str(cusp)) or {}
+            sub_lord = str(cusp_row.get("sub_lord") or "") if isinstance(cusp_row, dict) else ""
+            signified = {
+                _safe_int(value) for value in kp_planet_significators.get(sub_lord) or []
+                if _safe_int(value) is not None
+            }
+            support = sorted(signified & kp_success_houses)
+            kp_judgments.append({
+                "cusp": cusp, "sub_lord": sub_lord or None,
+                "sub_lord_signifies": sorted(signified), "success_house_links": support,
+                "supports_route": bool(support),
+            })
+        supported_cusps = sum(1 for row in kp_judgments if row.get("supports_route"))
+        kp_route["adjudication"] = {
+            "complete": len(kp_judgments) == len(kp_primary_cusps) and all(row.get("sub_lord") for row in kp_judgments),
+            "supported_cusps": supported_cusps,
+            "required_cusps": len(kp_primary_cusps),
+            "verdict": (
+                "supported" if supported_cusps == len(kp_primary_cusps) else
+                "qualified" if supported_cusps >= max(1, len(kp_primary_cusps) // 2) else "pressured"
+            ),
+            "cusp_judgments": kp_judgments,
+            "rule": "Each decisive cusp sub-lord must signify the route's success-house chain; mere KP data availability is not fructification support.",
+        }
+
+    timing_source = normalized_evidence.get("forward_event_dasha_scan")
+    timing_rows = []
+    if isinstance(timing_source, dict):
+        timing_rows = timing_source.get("ranked_windows") or timing_source.get("periods") or timing_source.get("windows") or []
+    elif isinstance(timing_source, list):
+        timing_rows = timing_source
+    route_success_houses = {
+        "education_timing": {4, 5, 9, 11},
+        "higher_education_timing": {9, 5, 11},
+        "exam_timing": {5, 6, 11},
+        "admission_timing": {4, 9, 11},
+        "research_timing": {5, 8, 9, 11},
+        "foreign_study_timing": {9, 11, 12, 3},
+        "education_vs_work_timing": {2, 5, 6, 9, 10, 11},
+    }.get(subtype, set(focus_houses))
+    ranked_timing_rows: List[Dict[str, Any]] = []
+    requested_start = _parse_ymd((period_window or {}).get("start")) if isinstance(period_window, dict) else None
+    requested_end = _parse_ymd((period_window or {}).get("end")) if isinstance(period_window, dict) else None
+    for source_row in timing_rows:
+        if not isinstance(source_row, dict):
+            continue
+        row_start = _parse_ymd(source_row.get("start") or source_row.get("start_date"))
+        row_end = _parse_ymd(source_row.get("end") or source_row.get("end_date"))
+        if requested_start and row_end and row_end < requested_start:
+            continue
+        if requested_end and row_start and row_start > requested_end:
+            continue
+        active = {
+            _safe_int(value) for value in (
+                source_row.get("activated_focus_houses")
+                or source_row.get("active_houses")
+                or []
+            )
+            if _safe_int(value) is not None
+        }
+        coverage = sorted(active & route_success_houses)
+        if route_success_houses and len(coverage) < 2:
+            continue
+        ranked_timing_rows.append({
+            **source_row,
+            "requested_horizon_overlap": {
+                "start": max(value for value in (row_start, requested_start) if value).strftime("%Y-%m-%d")
+                if (row_start or requested_start) else None,
+                "end": min(value for value in (row_end, requested_end) if value).strftime("%Y-%m-%d")
+                if (row_end or requested_end) else None,
+            },
+            "route_success_houses": sorted(route_success_houses),
+            "route_success_coverage": coverage,
+            "coverage_count": len(coverage),
+            "timing_claim": "supportive window, not a guaranteed result",
+        })
+    timing_rows = sorted(
+        ranked_timing_rows,
+        key=lambda row: (-int(row.get("coverage_count") or 0), -float(row.get("score") or 0)),
+    )[:8]
+
+    all_trait_rows: List[Dict[str, Any]] = []
+    if subtype in {"overall", "education_timing", "subject_fit", "research", "research_timing"}:
+        for trait in sorted(_EDUCATION_ALLOWED_TRAITS):
+            assessment = trait_assessment([trait], target=trait)
+            all_trait_rows.append({
+                "trait": trait,
+                "score": assessment.get("aggregate_score"),
+                "verdict": assessment.get("verdict"),
+                "trait_results": assessment.get("trait_results") or [],
+            })
+        all_trait_rows.sort(key=lambda row: (-float(row.get("score") or 0), str(row["trait"])))
+    field_family_rows = all_trait_rows if subtype == "subject_fit" and not target_assessment else []
+    if overall_synthesis:
+        overall_synthesis["ranked_educational_abilities"] = all_trait_rows
+        overall_synthesis["ability_rule"] = "Describe repeated learning capacities as abilities, not course recommendations or fixed intelligence labels."
+
+    exam_synthesis = chain_synthesis(
+        route="competitive examination capacity", primary_houses=[5, 6, 11], supporting_houses=[9],
+        rule="H5 judges preparation and recall, H6 competitive effort, H11 selection realization and H9 the advanced-knowledge layer; capacity is not a result guarantee.",
+    ) if subtype in {"exam_capacity", "exam_timing"} else {}
+
+    admission_synthesis = chain_synthesis(
+        route="admission and institutional selection", primary_houses=[9, 11], supporting_houses=[4, 5, 6],
+        rule="H9 judges the programme or university, H11 admission realization, H5 merit, H6 competition and H4 the formal institution; none alone promises selection.",
+    ) if subtype in {"admission_capacity", "admission_timing"} else {}
+
+    scholarship_synthesis = chain_synthesis(
+        route="scholarship and education funding", primary_houses=[9, 11], supporting_houses=[2, 5],
+        rule="H9 represents higher-learning patronage, H11 institutional award, H5 merit and H2 usable funding. This shows funding potential and conditions, never a guaranteed award.",
+    ) if subtype == "scholarship" else {}
+    for synthesis in (exam_synthesis, admission_synthesis, scholarship_synthesis):
+        if synthesis and isinstance(kp_route.get("adjudication"), dict):
+            synthesis["kp_fructification"] = kp_route["adjudication"]
+    if scholarship_synthesis:
+        weakest = sorted(
+            [row for row in scholarship_synthesis.get("house_lord_conditions") or [] if row.get("available")],
+            key=lambda row: (float(row.get("score") or 0), str(row.get("chart") or ""), int(row.get("house") or 0)),
+        )
+        scholarship_synthesis["strengthening_conditions"] = [
+            {
+                "chart": row.get("chart"), "house": row.get("house"), "lord": row.get("lord"),
+                "condition_score": row.get("score"), "cautions": row.get("cautions") or [],
+                "practical_focus": (
+                    "documented merit and application quality" if row.get("house") == 5 else
+                    "programme/institution fit and mentor support" if row.get("house") == 9 else
+                    "eligibility, network and institutional realization" if row.get("house") == 11 else
+                    "funding documentation and usable resources"
+                ),
+            }
+            for row in weakest[:3]
+        ]
+
+    research_synthesis = chain_synthesis(
+        route="research depth and completion", primary_houses=[5, 8, 9], supporting_houses=[11, 12],
+        include_d9=True,
+        rule="H5 supplies analytical depth, H8 investigation, H9 advanced knowledge, H11 completion/publication and H12 sustained solitary work. D9 only qualifies persistence after D1 and D24.",
+    ) if subtype in {"research", "research_timing"} else {}
+    if research_synthesis:
+        research_synthesis["target_assessment"] = target_assessment
+        research_synthesis["ranked_research_subject_traits"] = all_trait_rows
+        research_synthesis["career_conversion"] = branch_synthesis(
+            route="research-to-career conversion", chart_sequence=[("D1", d1), ("D10", d10)],
+            primary_houses=[10], supporting_houses=[6, 11],
+            rule="A research career additionally requires D10 work conversion through H10, H6 and H11; research aptitude alone does not prove a career path.",
+        ) if d10 else {"verdict": "not_established", "evidence_complete": False}
+
+    foreign_study_synthesis = chain_synthesis(
+        route="foreign education", primary_houses=[9, 12], supporting_houses=[3, 11],
+        rule="H9 is advanced education, H12 distance/overseas environment, H3 movement and H11 realization. This route never decides settlement or immigration.",
+    ) if subtype in {"foreign_study", "foreign_study_timing", "foreign_study_comparison"} else {}
+    if subtype == "foreign_study_comparison":
+        domestic_study = branch_synthesis(
+            route="domestic education", chart_sequence=[("D1", d1), ("D24", d24)],
+            primary_houses=[4, 9], supporting_houses=[5, 11],
+            rule="Domestic study is judged from formal learning environment H4, advanced study H9, academic depth H5 and realization H11.",
+        )
+        foreign_score = float(foreign_study_synthesis.get("normalized_condition_score") or 0)
+        domestic_score = float(domestic_study.get("score") or 0)
+        comparison_margin = round(foreign_score - domestic_score, 3)
+        foreign_study_synthesis["comparison"] = {
+            "foreign": foreign_study_synthesis.get("verdict"),
+            "foreign_score": foreign_score,
+            "domestic": domestic_study.get("verdict"),
+            "domestic_score": domestic_score,
+            "margin": comparison_margin,
+            "direction": (
+                "foreign_stronger" if comparison_margin >= 0.5 else
+                "domestic_stronger" if comparison_margin <= -0.5 else "mixed_or_close"
+            ),
+            "domestic_evidence": domestic_study,
+        }
+
+    obstacle_synthesis: Dict[str, Any] = {}
+    if subtype in {"education_obstacles", "education_remedies"}:
+        mechanism_specs = {
+            "concentration": ([4, 5], [], ["Moon", "Mercury"]),
+            "retention_and_recall": ([2, 5], [], ["Mercury", "Moon", "Saturn"]),
+            "consistency": ([3, 6], [], ["Saturn", "Mars"]),
+            "examination_pressure": ([5, 6], [11], ["Sun", "Mars", "Saturn"]),
+            "interruption_or_withdrawal": ([8, 12], [], ["Saturn", "Rahu", "Ketu"]),
+            "changing_direction": ([9], [3], ["Mercury", "Rahu"]),
+        }
+        mechanisms = []
+        for mechanism, (primary, supporting, planets) in mechanism_specs.items():
+            chain = branch_synthesis(
+                route=mechanism, chart_sequence=[("D1", d1), ("D24", d24)],
+                primary_houses=primary, supporting_houses=supporting,
+                rule="Relative vulnerability combines the relevant house-lord chain with the condition of its learning carriers across D1 and D24.",
+            )
+            carrier_scores = [float(planet_row_map[p].get("score") or 0) for p in planets if p in planet_row_map]
+            carrier_score = sum(carrier_scores) / len(carrier_scores) if carrier_scores else 0.0
+            resilience_score = round(float(chain.get("score") or 0) * 0.7 + carrier_score * 0.3, 3)
+            mechanisms.append({
+                "mechanism": mechanism, "resilience_score": resilience_score,
+                "relative_pressure_score": round(-resilience_score, 3),
+                "house_chain": chain, "carriers": planets,
+            })
+        mechanisms.sort(key=lambda row: (float(row["resilience_score"]), str(row["mechanism"])))
+        obstacle_synthesis = {
+            "verdict": "relative_vulnerability_ranked" if mechanisms else "not_established",
+            "dominant_relative_vulnerability": mechanisms[0].get("mechanism") if mechanisms else None,
+            "mechanisms": mechanisms,
+            "rule": "Name the weakest repeated mechanism, not a global intelligence defect. A relative vulnerability is not a diagnosis or proof that interruption must occur.",
+        }
+
+    resume_synthesis = chain_synthesis(
+        route="resuming education after a break", primary_houses=[3, 9, 11], supporting_houses=[4, 5],
+        rule="H3 shows renewed effort, H9 return to advanced learning, H11 completion, while H4 and H5 qualify environment and academic continuity.",
+    ) if subtype == "education_resume" else {}
+
+    education_vs_work_synthesis: Dict[str, Any] = {}
+    if subtype in {"education_vs_work", "education_vs_work_timing"}:
+        study_branch = branch_synthesis(
+            route="further education", chart_sequence=[("D1", d1), ("D24", d24)],
+            primary_houses=[9, 11], supporting_houses=[5],
+            rule="Further study requires H9 advanced education, H11 realization and H5 academic depth across D1 and D24.",
+        )
+        work_branch = branch_synthesis(
+            route="professional experience", chart_sequence=[("D1", d1), ("D10", d10)],
+            primary_houses=[10, 6], supporting_houses=[2, 11],
+            rule="Work requires H10 role, H6 employment/effort, H2 income and H11 realization across D1 and D10.",
+        )
+        branch_margin = round(float(study_branch.get("score") or 0) - float(work_branch.get("score") or 0), 3)
+        decision_windows = []
+        for row in timing_rows:
+            active = {_safe_int(v) for v in row.get("route_success_coverage") or []}
+            study_coverage = sorted(active & {5, 9, 11})
+            work_coverage = sorted(active & {2, 6, 10, 11})
+            decision_windows.append({
+                **row,
+                "study_coverage": study_coverage, "work_coverage": work_coverage,
+                "window_direction": (
+                    "study" if len(study_coverage) > len(work_coverage) else
+                    "work" if len(work_coverage) > len(study_coverage) else "mixed"
+                ),
+            })
+        education_vs_work_synthesis = {
+            "study": study_branch, "work": work_branch, "static_margin": branch_margin,
+            "static_direction": (
+                "study" if branch_margin >= 0.5 else "work" if branch_margin <= -0.5 else "mixed"
+            ),
+            "timing_windows": decision_windows,
+            "decision_scope": "current/bounded period" if subtype.endswith("_timing") else "structural suitability",
+            "rule": "Compare both branches independently. A time-bound decision additionally requires branch-specific dasha/transit coverage inside the requested horizon.",
+        }
+
+    remedy_blueprint = normalized_evidence.get("remedy_blueprint") if isinstance(normalized_evidence.get("remedy_blueprint"), dict) else {}
+    remedy_synthesis = {
+        "verdict": "calculated_remedy" if remedy_blueprint.get("top_recommendation") else "not_established",
+        "diagnosed_mechanism": obstacle_synthesis.get("dominant_relative_vulnerability"),
+        "top_recommendation": remedy_blueprint.get("top_recommendation"),
+        "alternatives": list(remedy_blueprint.get("alternatives") or [])[:3],
+        "calculated": bool(remedy_blueprint.get("top_recommendation")),
+        "rule": "Return only the calculated remedy tied to the diagnosed education mechanism; never substitute a generic mantra, gemstone or ritual.",
+    } if subtype == "education_remedies" else {}
+
+    learning_style = {
+        **learning_chain,
+        "ranked_methods": learning_methods,
+        "best_supported_methods": learning_methods[:3],
+        "retention_synthesis": branch_synthesis(
+            route="retention and recall",
+            chart_sequence=[("D1", d1), ("D24", d24)],
+            primary_houses=[2, 5], supporting_houses=[4],
+            rule="Explain uneven understanding versus retention from the H2/H5/H4 chain and the supplied Mercury, Moon and Saturn conditions; comprehension and recall are separate functions.",
+        ),
+        "retention_rule": "Use the H2/H4/H5 condition plus Mercury, Moon and Saturn; do not infer retention from Mercury alone.",
+    } if subtype == "learning_style" else {}
+    subject_synthesis = (
+        target_assessment
+        if target_assessment
+        else {
+            "verdict": field_family_rows[0].get("verdict") if field_family_rows else "not_established",
+            "ranked_field_traits": field_family_rows,
+            "rule": "Rank study-demand families from repeated D1+D24 carriers; labels are broad educational directions, not guaranteed professions.",
+        }
+    ) if subtype == "subject_fit" else {}
+    synthesis_by_subtype: Dict[str, Dict[str, Any]] = {
+        "overall": overall_synthesis,
+        "education_timing": overall_synthesis,
+        "learning_style": learning_style,
+        "subject_fit": subject_synthesis,
+        "course_comparison": option_synthesis,
+        "higher_education": higher_education_synthesis,
+        "higher_education_timing": higher_education_synthesis,
+        "exam_capacity": exam_synthesis,
+        "exam_timing": exam_synthesis,
+        "admission_capacity": admission_synthesis,
+        "admission_timing": admission_synthesis,
+        "scholarship": scholarship_synthesis,
+        "research": research_synthesis,
+        "research_timing": research_synthesis,
+        "foreign_study": foreign_study_synthesis,
+        "foreign_study_comparison": foreign_study_synthesis,
+        "foreign_study_timing": foreign_study_synthesis,
+        "education_obstacles": obstacle_synthesis,
+        "education_resume": resume_synthesis,
+        "education_vs_work": education_vs_work_synthesis,
+        "education_vs_work_timing": education_vs_work_synthesis,
+        "education_remedies": remedy_synthesis,
+    }
+    route_synthesis = dict(synthesis_by_subtype.get(subtype) or {})
+    def collect_chart_facts(value: Any, collected: Dict[str, List[str]]) -> None:
+        if isinstance(value, str):
+            for chart_name in ("D1", "D24", "D9", "D10"):
+                if value.startswith(f"{chart_name}:") and value not in collected[chart_name]:
+                    collected[chart_name].append(value)
+            return
+        if isinstance(value, dict):
+            chart_name = str(value.get("chart") or "")
+            if chart_name in collected and value.get("available") and value.get("house") and value.get("lord"):
+                fact = (
+                    f"{chart_name}: H{value.get('house')} lord {value.get('lord')} is placed in "
+                    f"H{value.get('lord_house')}"
+                    + (f" in {value.get('lord_sign')}" if value.get("lord_sign") else "")
+                    + (f" with dignity {value.get('lord_dignity')}" if value.get("lord_dignity") else "")
+                )
+                if fact not in collected[chart_name]:
+                    collected[chart_name].append(fact)
+            for nested in value.values():
+                collect_chart_facts(nested, collected)
+        elif isinstance(value, (list, tuple)):
+            for nested in value:
+                collect_chart_facts(nested, collected)
+    visible_facts = {"D1": [], "D24": [], "D9": [], "D10": []}
+    collect_chart_facts(route_synthesis, visible_facts)
+    route_synthesis["required_visible_facts"] = {
+        chart_name: rows[:2] for chart_name, rows in visible_facts.items() if rows
+    }
+    if subtype in {
+        "education_timing", "higher_education_timing", "exam_timing", "admission_timing",
+        "research_timing", "foreign_study_timing", "education_vs_work_timing",
+    }:
+        promise_verdict = str(route_synthesis.get("verdict") or route_synthesis.get("static_direction") or "not_established")
+        kp_required = True
+        kp_adjudication = kp_route.get("adjudication") if isinstance(kp_route.get("adjudication"), dict) else {}
+        kp_complete = bool(kp_adjudication.get("complete"))
+        route_synthesis["promise_verdict"] = promise_verdict
+        route_synthesis["kp_fructification"] = kp_adjudication
+        route_synthesis["kp_chain_available"] = kp_complete
+        route_synthesis["timing_window_count"] = len(timing_rows)
+        route_synthesis["timing_verdict"] = (
+            "not_established" if promise_verdict in {"not_established", "pressured"}
+            else "missing_kp_fructification" if kp_required and not kp_complete
+            else "supportive_windows_found" if timing_rows else "no_supported_window_in_horizon"
+        )
+        route_synthesis["timing_rule"] = "Promise must exist before KP, dasha and transit may rank a bounded supportive window; a window is not a guaranteed result."
+    return {
+        "education_subtype": subtype,
+        "focus_houses": focus_houses,
+        "education_planets": profile["planets"],
+        "education_target": str(education_target or "").strip() or None,
+        "charts": {key: value for key, value in {
+            "D1": bounded_chart("D1", d1), "D24": bounded_chart("D24", d24),
+            "D9": bounded_chart("D9", d9) if subtype in {"research", "research_timing"} else {},
+            "D10": bounded_chart("D10", d10) if subtype in {"research", "research_timing", "education_vs_work", "education_vs_work_timing"} else {},
+        }.items() if value},
+        "houses_available": focus_houses if d1 else [],
+        "lord_nakshatra_chains": lord_chains,
+        "education_carriers": education_carriers[:6],
+        "higher_education_synthesis": higher_education_synthesis,
+        "overall_synthesis": overall_synthesis,
+        "ranked_field_signatures": (
+            ranked_fields[:6] if subtype in {"subject_fit", "course_comparison"} else []
+        ),
+        "learning_style_synthesis": learning_style,
+        "subject_synthesis": subject_synthesis,
+        "target_assessment": target_assessment,
+        "option_synthesis": option_synthesis,
+        "exam_synthesis": exam_synthesis,
+        "admission_synthesis": admission_synthesis,
+        "scholarship_synthesis": scholarship_synthesis,
+        "research_synthesis": research_synthesis,
+        "foreign_study_synthesis": foreign_study_synthesis,
+        "obstacle_synthesis": obstacle_synthesis,
+        "resume_synthesis": resume_synthesis,
+        "education_vs_work_synthesis": education_vs_work_synthesis,
+        "remedy_synthesis": remedy_synthesis,
+        "route_synthesis": route_synthesis,
+        "timing_windows": timing_rows,
+        "kp_route_evidence": kp_route,
+        "availability": {
+            "d1": bool(d1), "d24": bool(d24),
+            "d9": bool(d9) and subtype in {"research", "research_timing"},
+            "d10": bool(d10) and subtype in {"research", "research_timing", "education_vs_work", "education_vs_work_timing"},
+            "learning_significators": bool(ranked_fields),
+            "lord_nakshatra_chain": bool(lord_chains) and all(row.get("lord_nakshatra") for row in lord_chains),
+            "dignity_strength": bool(ranked_fields),
+            "education_yogas": False,
+            "kp_fructification": bool((kp_route.get("adjudication") or {}).get("complete")) if isinstance(kp_route.get("adjudication"), dict) else False,
+            "option_evidence": bool(
+                (subtype == "subject_fit" and (target_assessment.get("traits_complete") or field_family_rows))
+                or (subtype == "course_comparison" and len(evaluated_options) >= 2)
+                or (subtype in {"foreign_study_comparison", "education_vs_work", "education_vs_work_timing"}
+                    and bool(route_synthesis))
+            ),
+            "remedy_blueprint": bool(remedy_synthesis.get("calculated")),
+        },
+        "interpretation_rules": [
+            "D1 establishes educational promise; D24 must confirm or qualify how education is acquired and sustained.",
+            "House 4 is restricted to foundational/formal education, learning environment, interruption/resumption and admission routes; it must not drive higher education, subject fit, competitive exams, foreign study or education-versus-work.",
+            "For postgraduate education, use higher_education_synthesis as controlling evidence and do not infer a subject or profession.",
+            "Never infer a field, exam result, admission, scholarship or research outcome from one placement.",
+            "Use D9 only to qualify research persistence. Use D10 for education-versus-work and research-career conversion, never as a substitute for education aptitude.",
+            "For timing, require promise plus KP materialization plus dasha permission plus transit confirmation.",
+            "Rahu and Ketu contribute through occupation, conjunction and seventh aspect only, never fifth or ninth aspects.",
+            "Foreign-study support is not settlement support. Scholarship potential is not an award guarantee.",
+        ],
+    }
+
+
 def _compact_wealth_foundation(
     chart_data: Dict[str, Any],
     birth_data: Dict[str, Any],
@@ -8790,6 +9785,8 @@ def _compact_wealth_foundation(
         route_houses = [2, 6, 8, 11, 12]
     elif subtype == "loss_vulnerability":
         route_houses = [2, 5, 6, 8, 11, 12]
+    elif subtype == "loan_decision":
+        route_houses = [2, 6, 7, 8, 10, 11, 12]
     elif subtype == "windfall":
         route_houses = [2, 5, 8, 9, 11, 12]
     result: Dict[str, Any] = {
@@ -8802,7 +9799,7 @@ def _compact_wealth_foundation(
     needed_output_divisions = {2}
     if effective_category == "investment": needed_output_divisions.add(5)
     if effective_category == "inheritance": needed_output_divisions.add(8)
-    if effective_category == "income" or subtype in {"source", "multiple_income"}: needed_output_divisions.add(10)
+    if effective_category == "income" or subtype in {"source", "multiple_income", "loan_decision"}: needed_output_divisions.add(10)
     divisions: Dict[str, Any] = {}
     try:
         divisional_calc = DivisionalChartCalculator(chart_data)
@@ -9658,7 +10655,7 @@ def _compact_wealth_foundation(
             result["loss_vulnerability_synthesis"] = loss_vulnerability_synthesis
 
     debt_repayment_synthesis: Dict[str, Any] = {}
-    if effective_category == "debt" and timing_mode:
+    if effective_category == "debt" and timing_mode and subtype not in {"loan_decision", "loan_support"}:
         forward_scan = (
             normalized_evidence.get("forward_event_dasha_scan")
             if isinstance(normalized_evidence.get("forward_event_dasha_scan"), dict)
@@ -9802,6 +10799,190 @@ def _compact_wealth_foundation(
             ),
         }
         result["debt_repayment_synthesis"] = debt_repayment_synthesis
+
+    loan_decision_synthesis: Dict[str, Any] = {}
+    if subtype == "loan_decision" and timing_mode:
+        forward_scan = (
+            normalized_evidence.get("forward_event_dasha_scan")
+            if isinstance(normalized_evidence.get("forward_event_dasha_scan"), dict)
+            else {}
+        )
+        forward_periods = [
+            row for row in list(forward_scan.get("periods") or [])
+            if isinstance(row, dict) and (row.get("start") or row.get("end"))
+        ]
+        window_scan = (
+            normalized_evidence.get("window_dasha_segments")
+            if isinstance(normalized_evidence.get("window_dasha_segments"), dict)
+            else {}
+        )
+        bounded_periods = [
+            {**row, "time_status": row.get("time_status") or "future"}
+            for row in list(window_scan.get("segments") or [])
+            if isinstance(row, dict) and (row.get("start") or row.get("end"))
+        ]
+        # The forward scan is score-ranked and capped. Its retained rows can
+        # all fall outside a short requested horizon even when the dedicated
+        # window calculation contains valid in-horizon phases. For a bounded
+        # request, that exhaustive window calculation is authoritative; use
+        # the forward ranking only when no bounded timeline was calculated.
+        timing_periods = bounded_periods or forward_periods
+
+        kp_significators = (
+            (result.get("kp_financial") or {}).get("significators")
+            if isinstance(result.get("kp_financial"), dict)
+            else {}
+        )
+        kp_planet_houses: Dict[str, set[int]] = {}
+        for house_value, planets in (kp_significators or {}).items():
+            house_number = _safe_int(house_value)
+            if house_number is None:
+                continue
+            for planet in list(planets or []):
+                kp_planet_houses.setdefault(str(planet), set()).add(house_number)
+
+        debt_access_houses = {6, 8}
+        resource_houses = {2, 11}
+        business_conversion_houses = {7, 10, 11}
+        pressure_houses = {8, 12}
+        decision_windows: List[Dict[str, Any]] = []
+        for row in timing_periods:
+            activated = {
+                house for house in (_safe_int(value) for value in row.get("activated_focus_houses") or [])
+                if house is not None
+            }
+            chain_planets = [
+                str(row.get(key) or "")
+                for key in ("mahadasha", "antardasha", "pratyantardasha")
+                if row.get(key)
+            ]
+            kp_houses: set[int] = set()
+            for planet in chain_planets:
+                kp_houses.update(kp_planet_houses.get(planet, set()))
+            transit_houses: set[int] = set()
+            peak_windows: List[Dict[str, Any]] = []
+            for peak in list(row.get("peak_activation_windows") or [])[:6]:
+                if not isinstance(peak, dict):
+                    continue
+                delivered = {
+                    house for house in (
+                        _safe_int(item.get("house"))
+                        for item in peak.get("delivered_event_houses") or []
+                        if isinstance(item, dict)
+                    )
+                    if house is not None
+                }
+                triggered = {
+                    house for house in (_safe_int(value) for value in peak.get("activated_focus_houses") or [])
+                    if house is not None
+                }
+                all_peak_houses = delivered | triggered
+                transit_houses.update(all_peak_houses)
+                peak_windows.append({
+                    "start": peak.get("start"), "end": peak.get("end"),
+                    "planet": peak.get("planet"), "trigger_score": peak.get("trigger_score"),
+                    "debt_access_houses": sorted(all_peak_houses & debt_access_houses),
+                    "resource_houses": sorted(all_peak_houses & resource_houses),
+                    "business_conversion_houses": sorted(all_peak_houses & business_conversion_houses),
+                    "pressure_houses": sorted(all_peak_houses & pressure_houses),
+                })
+
+            active_debt = activated & debt_access_houses
+            active_resources = activated & resource_houses
+            active_business = activated & business_conversion_houses
+            active_pressure = activated & pressure_houses
+            kp_debt = kp_houses & debt_access_houses
+            kp_resources = kp_houses & resource_houses
+            kp_business = kp_houses & business_conversion_houses
+            transit_resources = transit_houses & resource_houses
+            transit_business = transit_houses & business_conversion_houses
+            has_repayment_capacity = 2 in active_resources and bool({6, 11} & activated)
+            has_business_conversion = 11 in active_business and bool({7, 10} & active_business)
+            kp_confirms_same_result = bool(kp_debt and kp_resources and kp_business)
+            transit_confirms_same_result = bool(transit_resources and transit_business)
+            if (
+                active_debt
+                and has_repayment_capacity
+                and has_business_conversion
+                and kp_confirms_same_result
+                and transit_confirms_same_result
+            ):
+                classification = "loan_and_business_conversion_supported"
+                tier = 3
+            elif has_repayment_capacity and has_business_conversion and (kp_confirms_same_result or transit_confirms_same_result):
+                classification = "conditional_expansion_finance_support"
+                tier = 2
+            elif active_pressure and not has_business_conversion:
+                classification = "liability_or_outflow_without_business_conversion"
+                tier = 0
+            elif active_debt or active_resources:
+                classification = "credit_activity_without_complete_expansion_support"
+                tier = 1
+            else:
+                classification = "no_clear_loan_decision_support"
+                tier = 0
+            decision_windows.append({
+                "start": row.get("start"), "end": row.get("end"),
+                "chain": " - ".join(chain_planets),
+                "classification": classification, "tier": tier,
+                "debt_access_houses": sorted(active_debt),
+                "resource_houses": sorted(active_resources),
+                "business_conversion_houses": sorted(active_business),
+                "pressure_houses": sorted(active_pressure),
+                "kp_debt_houses": sorted(kp_debt),
+                "kp_resource_houses": sorted(kp_resources),
+                "kp_business_houses": sorted(kp_business),
+                "transit_resource_houses": sorted(transit_resources),
+                "transit_business_houses": sorted(transit_business),
+                "peak_windows": peak_windows,
+                "source_score": row.get("relevance_score"),
+                "time_status": row.get("time_status"),
+            })
+
+        natal_houses = (result.get("natal_wealth") or {}).get("houses") or {}
+        d10_planets = (
+            ((result.get("divisional_charts") or {}).get("D10") or {}).get("planets")
+            if isinstance((result.get("divisional_charts") or {}).get("D10"), dict)
+            else {}
+        )
+        business_carriers: List[Dict[str, Any]] = []
+        for house_number in (7, 10, 11):
+            house_row = natal_houses.get(str(house_number)) if isinstance(natal_houses, dict) else {}
+            lord = (((house_row or {}).get("basic_info") or {}).get("lord")) if isinstance(house_row, dict) else None
+            d10_row = (d10_planets or {}).get(str(lord or "")) if isinstance(d10_planets, dict) else {}
+            business_carriers.append({
+                "house": house_number,
+                "lord": lord,
+                "d1_placement": ((house_row or {}).get("lord") or {}).get("placement") if isinstance(house_row, dict) else {},
+                "d10_placement": d10_row if isinstance(d10_row, dict) else {},
+            })
+        loan_decision_synthesis = {
+            "verdict": "adjudicate_within_requested_horizon",
+            "decision_windows": decision_windows,
+            "d2_retention": d2_verdict,
+            "business_expansion_foundation": {
+                "houses": [7, 10, 11],
+                "carriers": business_carriers,
+                "d10_available": bool((result.get("divisional_charts") or {}).get("D10")),
+            },
+            "decision_rule": {
+                "loan_access": [6, 8],
+                "repayment_resources": [2, 11],
+                "business_conversion": [7, 10, 11],
+                "pressure": [8, 12],
+                "rule": (
+                    "Loan availability is not advisability. A productive expansion loan needs debt access, repayment "
+                    "resources and business conversion through 7/10/11 in the same KP-dasha-transit chain. Activation "
+                    "of 8/12 without 10/11 is liability or outflow pressure, not a green light."
+                ),
+            },
+            "claim_rule": (
+                "Give a chart-based proceed, delay/avoid, or conditional verdict only for the requested horizon. "
+                "Never recommend borrowing from astrology alone; conventional cash-flow coverage, loan cost, downside "
+                "capacity and professional financial review remain necessary."
+            ),
+        }
+        result["loan_decision_synthesis"] = loan_decision_synthesis
 
     wealth_growth_timing_synthesis: Dict[str, Any] = {}
     if effective_category == "wealth" and timing_mode:
@@ -10169,6 +11350,7 @@ def _compact_wealth_foundation(
         "loss_vulnerability_synthesis": result.get("loss_vulnerability_synthesis") or {},
         "wealth_source_synthesis": wealth_source_synthesis,
         "debt_repayment_synthesis": debt_repayment_synthesis,
+        "loan_decision_synthesis": loan_decision_synthesis,
         "wealth_growth_timing_synthesis": wealth_growth_timing_synthesis,
         "forbidden_inference": [
             "Do not call the foundation strong, clear or confirmed when strength_claim_permission is qualified_only.",
@@ -10220,6 +11402,12 @@ def _build_instant_context(
         focus = {**focus, "houses": marriage_route_houses[marriage_subtype]}
     if marriage_subtype == "spouse_details" and _spouse_detail_scope(question, intent) == "location":
         focus = {**focus, "houses": [3, 4, 7, 9, 12]}
+    wealth_subtype = str((intent or {}).get("wealth_subtype") or "").strip().lower()
+    if wealth_subtype == "loan_decision":
+        focus = {**focus, "houses": [2, 6, 7, 8, 10, 11, 12]}
+    if is_education_category(category):
+        education_route = education_profile(category, (intent or {}).get("education_subtype"))
+        focus = {**focus, "houses": education_route["houses"], "planets": education_route["planets"]}
     focus_planets = set(focus["planets"]) | {"Moon"}
 
     query_context = (intent or {}).get("query_context") if isinstance((intent or {}).get("query_context"), dict) else None
@@ -10236,7 +11424,11 @@ def _build_instant_context(
     # Event-window scans always start from the actual query date. The legacy
     # period resolver treats phrases containing "year" as a calendar-year
     # outlook and can otherwise anchor "next three years" to 1 January.
-    if _should_force_event_current_window(resolved_answer_mode, period_window) and not retrospective_event:
+    if (
+        _should_force_event_current_window(resolved_answer_mode, period_window)
+        and not retrospective_event
+        and wealth_subtype != "loan_decision"
+    ):
         period_window = {
             "kind": "current",
             "start": now_local.strftime("%Y-%m-%d"),
@@ -10268,6 +11460,11 @@ def _build_instant_context(
     if retrospective_event:
         time_relation = "past"
     dasha_anchor = _as_naive_local_datetime(_period_anchor_datetime(period_window, now_local))
+    if wealth_subtype == "loan_decision" and not retrospective_event:
+        # A present-tense borrowing decision starts at the decision date, even
+        # when its horizon is the current calendar year. Anchoring to 1 January
+        # exposes past dashas as though they were still actionable.
+        dasha_anchor = _as_naive_local_datetime(now_local)
     dasha_calc = DashaCalculator()
     current_dashas = dasha_calc.calculate_current_dashas(birth_data, dasha_anchor)
     evidence_plan = (intent or {}).get("evidence_plan") if isinstance((intent or {}).get("evidence_plan"), dict) else {}
@@ -10492,6 +11689,17 @@ def _build_instant_context(
         focus = {**focus, "houses": marriage_route_houses[marriage_subtype]}
     if marriage_subtype == "spouse_details" and _spouse_detail_scope(question, intent) == "location":
         focus = {**focus, "houses": [3, 4, 7, 9, 12]}
+    if wealth_subtype == "loan_decision":
+        # Broad category normalization resets this to the generic Debt focus.
+        # Restore the typed route before its dasha/transit scan so business
+        # conversion through houses 7 and 10 is not silently discarded.
+        focus = {**focus, "houses": [2, 6, 7, 8, 10, 11, 12]}
+        instant_parashari["focus_houses"] = list(focus["houses"])
+    if is_education_category(category):
+        education_route = education_profile(category, (intent or {}).get("education_subtype"))
+        focus = {**focus, "houses": education_route["houses"], "planets": education_route["planets"]}
+        instant_parashari["focus_houses"] = list(focus["houses"])
+        instant_parashari["education_subtype"] = education_route["subtype"]
     if (
         answer_mode == "remedy_action"
         and str(category or "").lower() in {"marriage", "relationship", "love", "partner", "spouse"}
@@ -10505,7 +11713,11 @@ def _build_instant_context(
         birth_data,
     )
     
-    if answer_mode == "event_prediction" and authoritative_event_prediction_dashas:
+    education_event_timing = bool(
+        is_education_category(category)
+        and is_education_timing((intent or {}).get("education_subtype"), answer_mode)
+    )
+    if (answer_mode == "event_prediction" or education_event_timing) and authoritative_event_prediction_dashas:
         instant_parashari["active_dashas_formatted"] = authoritative_event_prediction_dashas
         instant_parashari["active_dasha_source"] = "dasha_calculator_authoritative_event_prediction"
     elif authoritative_dasha_context:
@@ -10524,7 +11736,7 @@ def _build_instant_context(
     birth_dt_for_age = _parse_birth_date_only(birth_data)
     age_years = _compute_age_years(birth_dt_for_age, now_local)
     life_stage = _life_stage_from_age(age_years)
-    if answer_mode == "event_prediction" and not retrospective_event:
+    if (answer_mode == "event_prediction" or education_event_timing) and not retrospective_event:
         instant_parashari["timing_policy"] = _timing_policy_for_instant_event(
             age_years=age_years,
             life_stage=life_stage,
@@ -10846,6 +12058,19 @@ def _build_instant_context(
             answer_mode=answer_mode,
             wealth_subtype=str((intent or {}).get("wealth_subtype") or ""),
         )
+    if is_education_category(category):
+        normalized_evidence["education_foundation"] = _compact_education_foundation(
+            chart_data,
+            birth_data,
+            normalized_evidence,
+            category=category,
+            answer_mode=answer_mode,
+            education_subtype=(intent or {}).get("education_subtype"),
+            education_target=(intent or {}).get("education_target"),
+            education_target_traits=(intent or {}).get("education_target_traits") or [],
+            education_options=(intent or {}).get("education_options") or [],
+            period_window=period_window,
+        )
 
     location_evidence = _instant_real_location_evidence(
         birth_data=birth_data,
@@ -11136,9 +12361,11 @@ def _build_instant_context(
             instant_parashari=evidence_instant_parashari,
             normalized_evidence=normalized_evidence,
             period_window=period_window,
+            as_of=dasha_anchor.strftime("%Y-%m-%d"),
             category=category,
             career_subtype=(intent or {}).get("career_subtype"),
             wealth_subtype=(intent or {}).get("wealth_subtype"),
+            education_subtype=(intent or {}).get("education_subtype"),
             question=question,
             chart_data=chart_data,
             house_lordships=house_lordships,
@@ -11170,8 +12397,9 @@ def _build_instant_context(
         career_subtype = career_profile(category, (intent or {}).get("career_subtype"))["subtype"]
         profession_evidence = (
             _instant_compact_profession_evidence(chart_data, birth_data)
-            if is_static_career_profile(
-                category, career_subtype, answer_mode=answer_mode
+            if (
+                is_static_career_profile(category, career_subtype, answer_mode=answer_mode)
+                or bool(str((intent or {}).get("career_target") or "").strip())
             )
             else {}
         )
@@ -11476,11 +12704,20 @@ def _build_instant_context(
     session_extracted = (intent or {}).get("_session_extracted_context")
     if not isinstance(session_extracted, dict):
         session_extracted = (intent or {}).get("extracted_context") if isinstance((intent or {}).get("extracted_context"), dict) else {}
+    context_as_of = (
+        now_local.strftime("%Y-%m-%d")
+        if wealth_subtype == "loan_decision" and not retrospective_event
+        else dasha_anchor.strftime("%Y-%m-%d")
+    )
 
     context_result = {
         "birth_summary": evidence_birth_summary if is_non_self_target else birth_summary,
         "intent_summary": {
             "category": category,
+            "career_subtype": (intent or {}).get("career_subtype"),
+            "career_target": (intent or {}).get("career_target"),
+            "career_target_structure": (intent or {}).get("career_target_structure"),
+            "career_target_traits": (intent or {}).get("career_target_traits") or [],
             "wealth_subtype": (intent or {}).get("wealth_subtype"),
             "mode": (intent or {}).get("mode") or "birth",
             "answer_mode": instant_parashari.get("answer_mode") or "topic_reading",
@@ -11496,7 +12733,7 @@ def _build_instant_context(
         "natal_snapshot": evidence_natal_snapshot if is_non_self_target else natal_snapshot,
         "target_chart_context": target_chart_context,
         "current_dashas": {
-            "as_of": dasha_anchor.strftime("%Y-%m-%d"),
+            "as_of": context_as_of,
             "levels": prompt_current_dashas_levels,
             "named_dasha_lookup": named_dasha_lookup,
         },
@@ -12276,6 +13513,11 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
         if isinstance(source_evidence.get("wealth_foundation"), dict)
         else {}
     )
+    source_education = (
+        source_evidence.get("education_foundation")
+        if isinstance(source_evidence.get("education_foundation"), dict)
+        else {}
+    )
     if source_wealth:
         # Wealth needs nested D1 house/lord rows, D2 placements and the Indu
         # chain. A slightly larger bounded brief is safer than flattening those
@@ -12289,6 +13531,11 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
     source_career_decision = (
         source_evidence.get("career_decision")
         if isinstance(source_evidence.get("career_decision"), dict)
+        else {}
+    )
+    source_career_target = (
+        source_evidence.get("career_target_assessment")
+        if isinstance(source_evidence.get("career_target_assessment"), dict)
         else {}
     )
     source_option_comparison = (
@@ -12339,6 +13586,43 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
                 string_limit=200,
             )
 
+    def restore_education(payload: Dict[str, Any]) -> None:
+        """Keep the selected Education route's calculated facts intact.
+
+        Generic depth limiting retained a bare verdict but dropped nested
+        D1/D24 house-lord, target-trait, KP and option rows.  The writer then
+        described a chart as confirming the result without being able to name
+        the supplied condition.  Preserve only the active route ledger rather
+        than the full calculation workspace.
+        """
+        if not source_education:
+            return
+        route = source_education.get("route_synthesis") if isinstance(source_education.get("route_synthesis"), dict) else {}
+        compact_foundation = {
+            "education_subtype": source_education.get("education_subtype"),
+            "focus_houses": source_education.get("focus_houses"),
+            "education_target": source_education.get("education_target"),
+            "route_synthesis": _limit_composer_value(
+                route, max_depth=9, list_limit=10, string_limit=220,
+            ),
+            "timing_windows": _limit_composer_value(
+                list(source_education.get("timing_windows") or [])[:6],
+                max_depth=7, list_limit=8, string_limit=220,
+            ),
+            "kp_route_evidence": _limit_composer_value(
+                source_education.get("kp_route_evidence") or {},
+                max_depth=7, list_limit=10, string_limit=220,
+            ),
+            "availability": source_education.get("availability"),
+            "interpretation_rules": list(source_education.get("interpretation_rules") or [])[:8],
+        }
+        payload_evidence = payload.setdefault("evidence", {})
+        if isinstance(payload_evidence, dict):
+            payload_evidence["education_foundation"] = {
+                key: value for key, value in compact_foundation.items()
+                if value not in (None, "", [], {})
+            }
+
     def restore_career_decision(payload: Dict[str, Any]) -> None:
         """Keep the calculated cause of every stay/change verdict.
 
@@ -12357,6 +13641,20 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
             source_career_decision,
             max_depth=9,
             list_limit=12,
+            string_limit=220,
+        )
+
+    def restore_career_target(payload: Dict[str, Any]) -> None:
+        """Keep the per-trait field and work-structure verdict intact."""
+        if not source_career_target:
+            return
+        payload_evidence = payload.setdefault("evidence", {})
+        if not isinstance(payload_evidence, dict):
+            return
+        payload_evidence["career_target_assessment"] = _limit_composer_value(
+            source_career_target,
+            max_depth=8,
+            list_limit=8,
             string_limit=220,
         )
 
@@ -12419,7 +13717,9 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
     compact = compact if isinstance(compact, dict) else {}
     restore_vocation(compact)
     restore_wealth(compact)
+    restore_education(compact)
     restore_career_decision(compact)
+    restore_career_target(compact)
     restore_option_comparison(compact)
     restore_retrospective_windows(compact)
     if _json_size(compact) <= target_chars:
@@ -12434,7 +13734,9 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
     tighter = tighter if isinstance(tighter, dict) else {}
     restore_vocation(tighter)
     restore_wealth(tighter)
+    restore_education(tighter)
     restore_career_decision(tighter)
+    restore_career_target(tighter)
     restore_option_comparison(tighter)
     restore_retrospective_windows(tighter)
 
@@ -12808,6 +14110,32 @@ def _build_instant_answer_blueprint(
         query_plan.get("answer_mode") in {"topic_reading", "potential_capacity"}
         and evidence.get("career_foundation")
     ):
+        target_assessment = (
+            evidence.get("career_target_assessment")
+            if isinstance(evidence.get("career_target_assessment"), dict)
+            else {}
+        )
+        if target_assessment:
+            return {
+                "purpose": "evaluate the user's exact requested field and work structure; not a generic career profile",
+                "slots": [
+                    {"slot": "name the exact requested field", "source": "evidence.career_target_assessment.target"},
+                    {"slot": "field-fit verdict", "source": "evidence.career_target_assessment.field_fit"},
+                    {"slot": "separate business, freelance, hybrid, or employment verdict", "source": "evidence.career_target_assessment.business_fit"},
+                    {"slot": "strongest matched work traits with exact chart reasons", "source": "evidence.career_target_assessment.field_fit.trait_results"},
+                    {"slot": "missing or weaker trait that changes the operating model", "source": "lowest supported requested trait and evidence.career_target_assessment.business_fit"},
+                    {"slot": "specific best-fit operating model", "source": "field_fit plus business_fit; distinguish full-time, staged, hybrid, advisory, client-led, or structured employment only when supported"},
+                    {"slot": "one practical limitation", "source": "calculated target assessment; no generic caution"},
+                ],
+                "forbidden_content": [
+                    "replacing the named field with generic career strengths",
+                    "using House 2 alone as a career or business verdict",
+                    "affirming business because the field fits, or affirming the field because business fits",
+                    "inventing a profession, field trait, chart placement, or current timing",
+                    "a compulsory coaching question when the answer is already complete",
+                ],
+                "user_goal": query_plan.get("user_goal"),
+            }
         return {
             "purpose": "semantic slots for a timeless career-profile reading; not a forecast and not prewritten prose",
             "slots": [
@@ -13013,6 +14341,10 @@ def _build_instant_composer_context(
         for key in (
             "category",
             "wealth_subtype",
+            "education_subtype",
+            "education_target",
+            "education_target_traits",
+            "education_options",
             "answer_mode",
             "user_goal",
             "interpretation_frame",
@@ -13059,8 +14391,19 @@ def _build_instant_composer_context(
         or career_foundation.get("career_subtype")
         or career_reading.get("subtype"),
     )
+    career_target = str(
+        intent.get("career_target") or query_plan.get("career_target") or ""
+    ).strip()
+    career_target_structure = str(
+        intent.get("career_target_structure") or query_plan.get("career_target_structure") or "unspecified"
+    ).strip().lower()
+    career_target_traits = (
+        intent.get("career_target_traits")
+        if isinstance(intent.get("career_target_traits"), list)
+        else query_plan.get("career_target_traits") or []
+    )
     career_contract = (
-        build_career_answer_contract(answer_mode, career_subtype)
+        build_career_answer_contract(answer_mode, career_subtype, career_target)
         if is_career_category(category)
         else {}
     )
@@ -13070,15 +14413,34 @@ def _build_instant_composer_context(
     career_decision_question = is_career_decision(category, career_subtype)
     if is_career_category(category):
         compact_query_plan["career_subtype"] = career_subtype
+        if career_target:
+            compact_query_plan["career_target"] = career_target
+            compact_query_plan["career_target_structure"] = career_target_structure
+            compact_query_plan["career_target_traits"] = career_target_traits
     if intent.get("wealth_subtype") or query_plan.get("wealth_subtype"):
         compact_query_plan["wealth_subtype"] = intent.get("wealth_subtype") or query_plan.get("wealth_subtype")
+    education_foundation = (
+        normalized.get("education_foundation")
+        if isinstance(normalized.get("education_foundation"), dict) else {}
+    )
+    education_subtype = normalize_education_subtype(
+        education_foundation.get("education_subtype")
+        or intent.get("education_subtype")
+        or query_plan.get("education_subtype")
+    )
+    if is_education_category(category):
+        compact_query_plan["education_subtype"] = education_subtype
+        for key in ("education_target", "education_target_traits", "education_options"):
+            value = intent.get(key) or query_plan.get(key)
+            if value not in (None, "", [], {}):
+                compact_query_plan[key] = value
     if career_decision_question:
         compact_query_plan["forecast_shape"] = "career_decision"
     static_career_profile = is_static_career_profile(
         category,
         career_subtype,
         answer_mode=answer_mode,
-    )
+    ) or bool(career_target and answer_mode in {"topic_reading", "potential_capacity"})
     health_rules = (
         answer_spec.get("health_rules")
         if isinstance(answer_spec, dict) and isinstance(answer_spec.get("health_rules"), dict)
@@ -13216,6 +14578,7 @@ def _build_instant_composer_context(
         "divisional_specifics": list(normalized.get("divisional_specifics") or [])[:3],
         "career_foundation": normalized.get("career_foundation"),
         "wealth_foundation": normalized.get("wealth_foundation"),
+        "education_foundation": normalized.get("education_foundation"),
         "risk_specifics": list(normalized.get("risk_specifics") or [])[:3],
         "health_body_area": normalized.get("health_body_area"),
         "option_comparison": normalized.get("option_comparison"),
@@ -13229,6 +14592,13 @@ def _build_instant_composer_context(
             instant_context.get("daily_prediction_spine") or normalized.get("daily_prediction_spine")
         ) if exact_day else None,
     }
+    if career_target and isinstance(career_foundation, dict):
+        evidence["career_target_assessment"] = build_career_target_assessment(
+            career_foundation.get("vocation_synthesis") or {},
+            target=career_target,
+            target_traits=career_target_traits,
+            target_structure=career_target_structure,
+        )
     live_graph_policy = (
         compact_answer_contract.get("knowledge_graph_policy")
         if isinstance(compact_answer_contract.get("knowledge_graph_policy"), dict)
@@ -13236,6 +14606,9 @@ def _build_instant_composer_context(
     )
     is_wealth_graph = bool(
         live_graph_policy.get("live") and live_graph_policy.get("domain") == "wealth"
+    )
+    is_education_graph = bool(
+        live_graph_policy.get("live") and live_graph_policy.get("domain") == "education"
     )
     wealth_rules = (
         compact_answer_contract.get("wealth_answer_rules")
@@ -13311,6 +14684,59 @@ def _build_instant_composer_context(
                 "wealth_foundation": evidence.get("wealth_foundation"),
                 "_wealth_rules": wealth_rules,
             }
+    if is_education_graph:
+        static_education = not is_education_timing(education_subtype, answer_mode)
+        education_rules = {
+            "subtype": education_subtype,
+            "static_route": static_education,
+            "controlling_source": "education_foundation",
+            "higher_education_synthesis": (
+                (evidence.get("education_foundation") or {}).get("higher_education_synthesis")
+                if education_subtype in {"higher_education", "higher_education_timing"}
+                and isinstance(evidence.get("education_foundation"), dict)
+                else {}
+            ),
+            "route_synthesis": (
+                (evidence.get("education_foundation") or {}).get("route_synthesis")
+                if isinstance(evidence.get("education_foundation"), dict) else {}
+            ),
+            "required_order": [
+                "direct route-specific answer",
+                "D1 promise with one actual supplied planet/house/lord condition",
+                "D24 confirmation or qualification with one actual supplied condition",
+                "question-specific house chain and significators",
+                "one practical implication",
+            ],
+            "forbidden": [
+                "No conclusion from one placement or one planet.",
+                "No exam, admission, scholarship, course, research or foreign-study guarantee.",
+                "No timing on a static route and no dates outside calculated timing_windows.",
+                "Do not call D24 availability confirmation; use its actual supplied conditions.",
+                "Do not say D1 or D24 supports/confirms the answer without naming an actual condition from route_synthesis supporting_factors, cautions, house_lord_conditions or carrier rows.",
+                "Do not equate foreign study with settlement or immigration.",
+                "Use D9 only to qualify research persistence. Use D10 only for education-versus-work or research-career conversion.",
+                "Never call a route supported merely because D1, D24, KP, dasha or transit data exists; follow the calculated route_synthesis verdict.",
+                "Do not label the user's intelligence.",
+                "For postgraduate education, H4 is excluded: use H9 first, H5 and H11 as supporting houses, and actual D24 conditions.",
+                "Do not recommend a subject or profession in a higher-education capacity answer unless field fit was separately requested.",
+            ],
+        }
+        compact_answer_contract["education_answer_rules"] = education_rules
+        compact_verdict = {
+            key: value for key, value in {
+                "direction": "synthesize_from_calculated_education_foundation",
+                "confidence": verdict.get("confidence"),
+                "ranked_windows": compact_verdict.get("ranked_windows") if not static_education else None,
+                "missing_required_capabilities": verdict.get("missing_required_capabilities"),
+                "scope": f"calculated education route: {education_subtype}",
+            }.items() if value not in (None, "", [], {})
+        }
+        evidence = {
+            "education_foundation": evidence.get("education_foundation"),
+            "current_timing": None if static_education else evidence.get("current_timing"),
+            "transit_activation_timeline": None if static_education else evidence.get("transit_activation_timeline"),
+            "_education_rules": education_rules,
+        }
     if career_decision_question:
         career_rules = (
             answer_spec.get("career_rules")
@@ -13497,6 +14923,7 @@ def _build_instant_composer_context(
         evidence = {
             "natal_promise": natal_promise,
             "career_foundation": evidence.get("career_foundation"),
+            "career_target_assessment": evidence.get("career_target_assessment"),
             "special_natal_factors": evidence.get("special_natal_factors"),
             "topic_confirmation": topic_confirmation,
             "divisional_specifics": evidence.get("divisional_specifics"),
@@ -13520,8 +14947,11 @@ def _build_instant_composer_context(
             "career_foundation": (
                 evidence.get("career_foundation") if static_career_profile else None
             ),
+            "career_target_assessment": evidence.get("career_target_assessment"),
             "wealth_foundation": evidence.get("wealth_foundation"),
             "_wealth_rules": wealth_rules if is_wealth_graph else None,
+            "education_foundation": evidence.get("education_foundation") if is_education_graph else None,
+            "_education_rules": evidence.get("_education_rules") if is_education_graph else None,
         }
     if exact_day:
         # Exact-day forecasts have their own authoritative calculation spine.
@@ -13533,6 +14963,8 @@ def _build_instant_composer_context(
             "natal_promise": None if is_wealth_graph else evidence.get("natal_promise"),
             "daily_prediction": evidence.get("daily_prediction"),
             "_wealth_rules": wealth_rules if is_wealth_graph else None,
+            "education_foundation": evidence.get("education_foundation") if is_education_graph else None,
+            "_education_rules": evidence.get("_education_rules") if is_education_graph else None,
         }
     if is_chart_fact:
         compact_charts: Dict[str, Any] = {}
@@ -13586,6 +15018,8 @@ def _build_instant_composer_context(
             ),
             "wealth_foundation": normalized.get("wealth_foundation") if is_wealth_graph else None,
             "_wealth_rules": wealth_rules if is_wealth_graph else None,
+            "education_foundation": normalized.get("education_foundation") if is_education_graph else None,
+            "_education_rules": evidence.get("_education_rules") if is_education_graph else None,
         }
     evidence = {key: value for key, value in evidence.items() if value not in (None, "", [], {})}
 
@@ -13612,6 +15046,22 @@ def _build_instant_composer_context(
             "time_relation": intent.get("time_relation"),
             "target_subject": intent.get("target_subject") or query_plan.get("target_subject"),
             "career_subtype": career_subtype if is_career_category(category) else None,
+            "career_target": career_target or None,
+            "career_target_structure": career_target_structure if career_target else None,
+            "career_target_traits": career_target_traits if career_target else None,
+            "education_subtype": education_subtype if is_education_category(category) else None,
+            "education_target": (
+                intent.get("education_target") or query_plan.get("education_target")
+                if is_education_category(category) else None
+            ),
+            "education_target_traits": (
+                intent.get("education_target_traits") or query_plan.get("education_target_traits")
+                if is_education_category(category) else None
+            ),
+            "education_options": (
+                intent.get("education_options") or query_plan.get("education_options")
+                if is_education_category(category) else None
+            ),
         },
         "query_plan": compact_query_plan,
         "verdict": compact_verdict,
@@ -13628,6 +15078,13 @@ def _build_instant_composer_context(
             else list(instant_context.get("recent_history") or [])[-2:]
         ),
     }
+    if is_education_graph and isinstance(evidence.get("education_foundation"), dict):
+        education_route = evidence["education_foundation"].get("route_synthesis")
+        if isinstance(education_route, dict) and education_route.get("required_visible_facts"):
+            # Keep these two tiny immutable facts at the top level so even the
+            # emergency prompt-budget pass cannot discard the chart proof the
+            # visible answer is required to cite.
+            context["education_required_visible_facts"] = education_route["required_visible_facts"]
     context["intent"] = {
         key: value for key, value in context["intent"].items()
         if value not in (None, "", [], {})
@@ -13678,13 +15135,20 @@ def _build_budgeted_instant_prompt(
 ) -> str:
     """Compact equivalent used only when the full house prompt exceeds budget."""
     context_json = json.dumps(context, ensure_ascii=False, default=str, separators=(",", ":"))
+    education_fact_rule = ""
+    if isinstance(context.get("education_required_visible_facts"), dict):
+        education_fact_rule = (
+            "- EDUCATION: The visible answer must accurately state one supplied D1 fact and one supplied D24 fact "
+            "from `education_required_visible_facts`. Generic phrases such as 'D24 confirms' or 'the houses are strong' "
+            "do not satisfy this requirement.\n"
+        )
     return f"""You are AstroRoshni's Instant Chat answer composer.
 Answer the user's astrology question from the supplied adjudicated context only.
 {_instant_composer_language_rule(language)}
 {_instant_relational_voice_contract()}
 - Lead with the direct real-world answer. Stay under the contract word limit and end with one natural question.
 - Treat query_plan, verdict, answer_contract, and evidence as strict. Never invent a date, body area, option winner, chart fact, activated house, or causal factor.
-- A live knowledge_graph_policy is authoritative. Obey its exclusions, required sections, guardrails, claim_permission, and limitation_instruction. Missing required factors mean the dependent conclusion is unavailable.
+{education_fact_rule}- A live knowledge_graph_policy is authoritative. Obey its exclusions, required sections, guardrails, claim_permission, and limitation_instruction. Missing required factors mean the dependent conclusion is unavailable.
 - Never mention a date after query_plan.time_scope.horizon_end. Use only ranked/allowed windows attached to their own evidence.
 - When query_plan.time_scope.retrospective is true, rank only past windows and describe them as probable periods that need user confirmation; never claim you recovered the factual marriage date.
 - For retrospective marriage timing, every ranked window must show: (1) the broad MD-AD phase, (2) the exact strongest_pd_window as an MD-AD-PD sub-sub-period with its start and end dates, and (3) one or two probable_peak_windows. Never label the whole MD-AD phase with its winning PD planet.
@@ -14182,6 +15646,15 @@ NATAL-ONLY HEALTH EVIDENCE:
 - Recognition must be explained as a conversion chain: House 6 effort/workload -> House 10 visibility/authority -> House 11 recognition/reward -> House 2 compensation.
 - Hard work alone does not prove recognition. Identify the first unsupported or difficult conversion in that chain from `evidence.career_diagnosis`; do not substitute vocation fields or future timing.
 """
+        elif career_family == "target_fit":
+            career_rules += """
+- This is a fit assessment for the exact named target in `query_plan.career_target`. Name that target in the opening verdict; never replace it with a generic list of suitable careers.
+- Treat `evidence.career_target_assessment` as controlling. Give two separate conclusions: (1) fit for the field itself and (2) fit for the requested business, employment, freelance, or hybrid structure. One conclusion must not stand in for the other.
+- Explain the field verdict through the supplied `target_traits` and their supporting planets/reasons. Identify a weaker or unsupported required trait honestly and adapt the recommended operating model around it.
+- Use `business_fit.business_score`, `employment_score`, `calculated_inclination`, and supplied reasons for the structure verdict. Do not infer entrepreneurship from the field name.
+- House 2 can modify communication, resources, or monetization; it cannot by itself establish the profession or business capacity. Use the repeated D1/D10/Jaimini evidence supplied in the assessment.
+- Do not add dates or current activation. A closing question is optional and must ask for a decision-relevant detail; never append a canned coaching question such as what feels exciting, daunting, or resonant.
+"""
         elif career_family == "relationship":
             career_rules += """
 - This is a workplace-relationship reading, not a vocation profile and not a generic career forecast. The named counterpart in `evidence.career_relationship.target` is the entire subject of the answer.
@@ -14418,6 +15891,18 @@ AUTHORITATIVE COMPOSER BRIEF:
 - Never recommend or reject a medical treatment and never advise avoiding experimental or conventional treatment. Use restrained preventive language and qualified medical care where appropriate.
 - State protective factors when supplied. Never predict illness, diagnosis, recovery, hospitalization, surgery, or an acute event as certain.
 """
+    composer_graph_policy = (
+        answer_contract.get("knowledge_graph_policy")
+        if isinstance(answer_contract.get("knowledge_graph_policy"), dict) else {}
+    )
+    education_rules = ""
+    if composer_graph_policy.get("domain") == "education":
+        education_rules = """
+- EDUCATION EVIDENCE CHECK: before writing, find one actual D1 condition and one actual D24 condition inside `evidence.education_foundation.route_synthesis` (including nested house-lord, carrier, trait, option, support or caution rows).
+- Copy the meaning of one D1 fact and one D24 fact from `route_synthesis.required_visible_facts` into the visible answer. Name its chart, planet/lord and house or dignity accurately. Never write only "D1 shows support", "D24 confirms", "the houses are strong", "key planets are well placed", or similar generic proof.
+- If the active route ledger contains no actual D1 or D24 condition, explicitly say that layer is unavailable and limit the conclusion. Never manufacture a planet, house, dignity, learning trait, or confirmation.
+- Follow `route_synthesis.verdict`, `timing_verdict`, option margin and cautions exactly. Data availability is not a positive verdict.
+"""
     speech_rules = ""
     if speech_mode:
         speech_rules = f"""
@@ -14431,6 +15916,12 @@ AUTHORITATIVE COMPOSER BRIEF:
 """
     else:
         word_guidance = str(answer_contract.get("composer_word_target") or "Usually 90-180 words; expand when necessary.")
+        closing_question_rule = (
+            "A closing question is optional. Include one only when a concrete missing detail would materially change "
+            "the field or operating-model verdict; never use a generic coaching question."
+            if career_family == "target_fit"
+            else "End the visible answer with exactly one natural, topic-specific question about the user's real concern or goal."
+        )
         prohibited_additions = (
             "feedback requests, mode suggestions, or sales copy"
             if answer_mode == "remedy_action"
@@ -14438,7 +15929,7 @@ AUTHORITATIVE COMPOSER BRIEF:
         )
         speech_rules = f"""
 - Length guidance: {word_guidance} Do not omit a material phase, evidence limitation, or direct answer merely to stay short.
-- End the visible answer with exactly one natural, topic-specific question about the user's real concern or goal.
+- {closing_question_rule}
 - Do not recommend a deeper reading and do not add {prohibited_additions} beyond what this answer mode explicitly requires.
 - Append exactly one final metadata line after the visible answer:
 NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}}
@@ -14471,6 +15962,7 @@ Hard rules:
 {constitutional_health_rules}
 {career_rules}
 {marriage_rules}
+{education_rules}
 {speech_rules}
 
 USER QUESTION:
@@ -15206,7 +16698,7 @@ async def generate_instant_chat_response(
     buffer_graph_delivery = bool(
         pre_generation_graph_policy.get("live")
         and str(pre_generation_graph_policy.get("runtime_key") or "").lower() in {
-            "debt_repayment", "wealth_timing",
+            "debt_repayment", "wealth_timing", "loan_decision",
         }
     )
     # Constitutional health claims are buffered until their immutable chart

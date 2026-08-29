@@ -177,7 +177,7 @@ LIFE_DOMAINS: Dict[str, Dict[str, Any]] = {
     "friends": {"aliases": ["network", "community"], "divisionals": ["D1", "D11"]},
     "creativity": {"aliases": ["arts"], "divisionals": ["D1", "D5"]},
     "sports": {"aliases": ["athletics"], "divisionals": ["D1", "D3", "D10"]},
-    "research": {"aliases": ["occult"], "divisionals": ["D1", "D8", "D9"]},
+    "research": {"aliases": ["occult"], "divisionals": ["D1", "D24", "D9"]},
     "karma": {"aliases": ["repeating_patterns"], "divisionals": ["D1", "D9", "D60"]},
     "retirement": {"aliases": [], "divisionals": ["D1", "D10", "D12"]},
     "adoption": {"aliases": ["stepchildren"], "divisionals": ["D1", "D7"]},

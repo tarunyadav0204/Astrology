@@ -872,7 +872,7 @@ export const textToSpeech = {
     }
   },
 
-  async playPodcast(messageContent, { language = 'english', messageId, sessionId, preview, nativeName, onStart, onDone, onError, onPause, onResume, onStop, onProgress } = {}) {
+  async playPodcast(messageContent, { language = 'english', messageId, sessionId, preview, nativeName, birthChartId, onStart, onDone, onError, onPause, onResume, onStop, onProgress } = {}) {
     try {
       if (!messageContent || !String(messageContent).trim()) return;
 
@@ -891,7 +891,7 @@ export const textToSpeech = {
 
       const lang = language?.toLowerCase().startsWith('hi') ? 'hi' : 'en';
       console.log('[Podcast] Requesting podcast audio', { lang, messageId: messageId || 'none', length: messageContent?.length, nativeName: nativeName || null });
-      const response = await chatAPI.getPodcastAudio(messageContent, lang, messageId || null, sessionId || null, preview || null, nativeName || null);
+      const response = await chatAPI.getPodcastAudio(messageContent, lang, messageId || null, sessionId || null, preview || null, nativeName || null, birthChartId || null);
       const base64Audio = response?.data?.audio;
       if (!base64Audio || typeof base64Audio !== 'string') {
         if (onError) onError(new Error('Podcast: missing audio from server'));

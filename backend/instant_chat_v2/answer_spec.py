@@ -595,7 +595,11 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             })
         career_rules = {
             "profile": career,
-            "answer_contract": build_career_answer_contract(answer_mode, career["subtype"]),
+            "answer_contract": build_career_answer_contract(
+                answer_mode,
+                career["subtype"],
+                query_plan.get("career_target"),
+            ),
             "material_windows": material_windows,
             "required_foundation": {
                 "D1": "Professional promise, work capacity, income linkage and natal obstacles.",

@@ -1452,7 +1452,7 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <ul className="tara-promo__points" aria-label="What you get">
               <li>Expert-style reading</li>
               <li>Personalised answers</li>
-              <li>Instant chat</li>
+              <li>Live chat</li>
             </ul>
             <span className="tara-promo__cta">
               Ask Tara

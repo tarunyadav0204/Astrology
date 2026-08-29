@@ -129,8 +129,8 @@ const SpeechChatPage = () => {
     }, [birthData]);
 
     const headerSubtitle = useMemo(() => {
-        if (!birthData?.name) return 'Voice guide on AstroRoshni · Instant spoken answers';
-        return `Voice guide on AstroRoshni · Instant answers for ${birthData.name}`;
+        if (!birthData?.name) return 'Voice guide on AstroRoshni · Live spoken answers';
+        return `Voice guide on AstroRoshni · Live answers for ${birthData.name}`;
     }, [birthData?.name]);
 
     useEffect(() => {
@@ -215,7 +215,7 @@ const SpeechChatPage = () => {
             return;
         }
         if (!instantChatEnabled) {
-            setErrorText('Instant chat is turned off right now. Use typed chat instead.');
+            setErrorText('Live chat is turned off right now. Use typed chat instead.');
             return;
         }
         if (credits < speechChatCost) {
@@ -429,7 +429,7 @@ const SpeechChatPage = () => {
             }
 
             if (statusData.status === 'failed') {
-                throw new Error(statusData.error_message || 'Instant speech reply failed.');
+                throw new Error(statusData.error_message || 'Live speech reply failed.');
             }
 
             pollCount += 1;
@@ -552,7 +552,7 @@ const SpeechChatPage = () => {
                         <p>
                             {!speechChatEnabled
                                 ? 'Voice features are not enabled for your account right now.'
-                                : 'Instant chat is turned off. You can still use typed chat from the main chat screen.'}
+                                : 'Live chat is turned off. You can still use typed chat from the main chat screen.'}
                         </p>
                         <button type="button" onClick={() => navigate('/chat?app=1')}>
                             Back to chat

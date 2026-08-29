@@ -396,7 +396,7 @@ export const chatAPI = {
     }),
   getTtsVoices: () =>
     api.get(getEndpoint('/tts/voices')),
-  getPodcastAudio: (messageContent, language = 'en', messageId = null, sessionId = null, preview = null, nativeName = null) =>
+  getPodcastAudio: (messageContent, language = 'en', messageId = null, sessionId = null, preview = null, nativeName = null, birthChartId = null) =>
     api.post(getEndpoint('/tts/podcast'), {
       message_content: messageContent,
       language,
@@ -404,6 +404,7 @@ export const chatAPI = {
       ...(sessionId ? { session_id: sessionId } : {}),
       ...(preview ? { preview } : {}),
       ...(nativeName ? { native_name: nativeName } : {}),
+      ...(birthChartId ? { birth_chart_id: Number(birthChartId) } : {}),
     }),
   checkPodcastCache: (messageId, lang = 'en') =>
     api.get(getEndpoint('/tts/podcast/check-cache'), {
@@ -411,6 +412,14 @@ export const chatAPI = {
     }),
   getPodcastHistory: () =>
     api.get(getEndpoint('/tts/podcast/history')),
+  getPodcastVisuals: (messageId, lang = 'en', birthChartId = null) =>
+    api.get(getEndpoint('/tts/podcast/visuals'), {
+      params: {
+        message_id: messageId,
+        lang: lang?.toLowerCase?.()?.startsWith?.('hi') ? 'hi' : 'en',
+        ...(birthChartId ? { birth_chart_id: Number(birthChartId) } : {}),
+      },
+    }),
   getPodcastStreamUrl: (messageId, lang = 'en') => {
     const langCode = lang?.toLowerCase?.()?.startsWith?.('hi') ? 'hi' : 'en';
     const base = API_BASE_URL?.replace(/\/$/, '') || '';

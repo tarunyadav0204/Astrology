@@ -242,7 +242,7 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
             </div>
             <div className="subscription-page-hero__proof" aria-label="Membership highlights">
               <div><strong>Monthly</strong><span>Flexible membership</span></div>
-              <div><strong>Instant</strong><span>Member pricing</span></div>
+              <div><strong>Live</strong><span>Member pricing</span></div>
               <div><strong>Separate</strong><span>Credits stay in your control</span></div>
             </div>
           </div>

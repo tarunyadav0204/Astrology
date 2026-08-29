@@ -215,8 +215,31 @@ def build_query_plan(
         "language": str(language or "english").strip().lower(),
         "category": category,
         "career_subtype": intent.get("career_subtype") or query_context.get("career_subtype"),
+        "career_target": intent.get("career_target") or query_context.get("career_target"),
+        "career_target_structure": (
+            intent.get("career_target_structure")
+            or query_context.get("career_target_structure")
+            or "unspecified"
+        ),
+        "career_target_traits": (
+            intent.get("career_target_traits")
+            if isinstance(intent.get("career_target_traits"), list)
+            else query_context.get("career_target_traits") or []
+        ),
         "marriage_subtype": intent.get("marriage_subtype") or query_context.get("marriage_subtype"),
         "wealth_subtype": intent.get("wealth_subtype") or query_context.get("wealth_subtype"),
+        "education_subtype": intent.get("education_subtype") or query_context.get("education_subtype"),
+        "education_target": intent.get("education_target") or query_context.get("education_target"),
+        "education_target_traits": (
+            intent.get("education_target_traits")
+            if isinstance(intent.get("education_target_traits"), list)
+            else query_context.get("education_target_traits") or []
+        ),
+        "education_options": (
+            intent.get("education_options")
+            if isinstance(intent.get("education_options"), list)
+            else query_context.get("education_options") or []
+        ),
         "prior_marriage_context": extracted.get("prior_marriage_context"),
         "answer_mode": str(answer_mode or "topic_reading"),
         "route_action": route_action,

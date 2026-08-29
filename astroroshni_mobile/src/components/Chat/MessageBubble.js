@@ -241,6 +241,8 @@ function MessageBubble({
   onContinueSingleChartGate,
   onRelationshipContextGate,
   sessionId,
+  podcastNativeName = null,
+  podcastBirthChartId = null,
   podcastAutoLaunchMessageId = null,
   podcastAutoLaunchKey = 0,
   podcastAutoLaunchLang = 'en',
@@ -313,6 +315,11 @@ function MessageBubble({
   const [podcastPositionMillis, setPodcastPositionMillis] = useState(0);
   const [podcastDurationMillis, setPodcastDurationMillis] = useState(0);
   const [podcastPlaybackRate, setPodcastPlaybackRate] = useState(1);
+  const [podcastViewMode, setPodcastViewMode] = useState('listen');
+  const [podcastVisualManifest, setPodcastVisualManifest] = useState(null);
+  const [isPodcastVisualLoading, setIsPodcastVisualLoading] = useState(false);
+  const [podcastVisualError, setPodcastVisualError] = useState('');
+  const podcastVisualKeyRef = useRef('');
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageZoomScale, setImageZoomScale] = useState(1);
   const [isImageLoading, setIsImageLoading] = useState(true);
@@ -496,6 +503,11 @@ function MessageBubble({
 
   const persistPodcastListenLang = (listenLang) => {
     const lang = podcastLangFromUiLanguage(listenLang);
+    if (podcastListenLangRef.current !== lang) {
+      podcastVisualKeyRef.current = '';
+      setPodcastVisualManifest(null);
+      setPodcastVisualError('');
+    }
     podcastListenLangRef.current = lang;
     setPodcastListenLang(lang);
     AsyncStorage.setItem(PODCAST_LISTEN_LANG_KEY, lang).catch(() => {});
@@ -523,7 +535,8 @@ function MessageBubble({
         messageId: message.messageId || null,
         sessionId: sessionId || null,
         preview: (cleanText || message.content || '').slice(0, 150),
-        nativeName: message.native_name || null,
+        nativeName: message.native_name || podcastNativeName || null,
+        birthChartId: message.birth_chart_id || podcastBirthChartId || null,
         onProgress: (pos, dur) => {
           if (userDismissedGeneratingRef.current) return;
           if (Date.now() - lastSeekedAtRef.current < 600) return; // don't overwrite seek with stale callback
@@ -841,13 +854,53 @@ function MessageBubble({
     setPodcastPositionMillis(positionMillis);
   };
 
+  const handlePodcastViewModeChange = async (nextMode) => {
+    const normalizedMode = nextMode === 'watch' ? 'watch' : 'listen';
+    setPodcastViewMode(normalizedMode);
+    if (normalizedMode !== 'watch') return;
+
+    const messageId = message.messageId || message.id;
+    if (!messageId) {
+      setPodcastVisualError(t('podcast.visualUnavailableBody', 'You can continue listening to the podcast.'));
+      return;
+    }
+    const lang = podcastLangFromUiLanguage(podcastListenLangRef.current || language);
+    const key = `${String(messageId)}:${lang}`;
+    if (podcastVisualKeyRef.current === key && podcastVisualManifest) return;
+    if (isPodcastVisualLoading) return;
+
+    try {
+      setPodcastVisualError('');
+      setIsPodcastVisualLoading(true);
+      const response = await chatAPI.getPodcastVisuals(
+        messageId,
+        lang,
+        message.birth_chart_id || podcastBirthChartId || null,
+      );
+      const manifest = response?.data?.manifest;
+      if (!manifest || !Array.isArray(manifest.scenes) || !manifest.scenes.length) {
+        throw new Error('Visual podcast manifest was empty');
+      }
+      podcastVisualKeyRef.current = key;
+      setPodcastVisualManifest(manifest);
+    } catch (error) {
+      console.error('[Podcast] visual manifest error', error);
+      setPodcastVisualError(
+        error?.response?.data?.detail
+        || t('podcast.visualUnavailableBody', 'You can continue listening to the podcast.'),
+      );
+    } finally {
+      setIsPodcastVisualLoading(false);
+    }
+  };
+
   const sharePodcastAudio = async () => {
     const cleanText = getCleanMessageText();
     if (!cleanText) return;
     try {
       setIsSharingPodcast(true);
       const lang = podcastLangFromUiLanguage(podcastListenLangRef.current || language);
-      const response = await chatAPI.getPodcastAudio(cleanText, lang, message.messageId || null, null, null, message.native_name || null);
+      const response = await chatAPI.getPodcastAudio(cleanText, lang, message.messageId || null, null, null, message.native_name || podcastNativeName || null, message.birth_chart_id || podcastBirthChartId || null);
       const base64Audio = response?.data?.audio;
       if (!base64Audio || typeof base64Audio !== 'string') {
         Alert.alert('Error', 'Could not get podcast audio to share.');
@@ -2925,6 +2978,11 @@ function MessageBubble({
         onStop={handleStopPodcast}
         onShare={sharePodcastAudio}
         playbackRate={podcastPlaybackRate}
+        viewMode={podcastViewMode}
+        onViewModeChange={handlePodcastViewModeChange}
+        visualManifest={podcastVisualManifest}
+        isVisualLoading={isPodcastVisualLoading}
+        visualError={podcastVisualError}
         onSpeedChange={(rate) => {
           setPodcastPlaybackRate(rate);
           getTextToSpeech().setPodcastRate(rate);

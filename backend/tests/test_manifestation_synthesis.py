@@ -1,3 +1,7 @@
+import asyncio
+
+import pytest
+
 from prediction_engine.manifestation_synthesis import (
     _cache_key,
     _merge,
@@ -206,6 +210,78 @@ def test_extract_json_accepts_common_llm_shapes():
         expected_theme_keys=expected,
     )
     assert fenced["themes"][0]["label"] == "Fenced"
+
+
+@pytest.mark.asyncio
+async def test_theme_synthesis_treats_cache_pool_failure_as_nonfatal(monkeypatch):
+    from prediction_engine import manifestation_synthesis as module
+
+    def unavailable(*_args, **_kwargs):
+        raise RuntimeError("connection pool exhausted")
+
+    class FakeAnalyzer:
+        async def generate_text_from_prompt(self, *_args, **_kwargs):
+            return {
+                "success": True,
+                "response": '{"themes":[{"theme_key":"theme-a","label":"Useful wording","possibilities":["One path"]}]}',
+            }
+
+    monkeypatch.setattr(module, "_load", unavailable)
+    monkeypatch.setattr(module, "_save", unavailable)
+    monkeypatch.setattr(module, "GeminiChatAnalyzer", FakeAnalyzer)
+    result = await module._synthesize_single_theme(
+        {
+            "theme_key": "theme-a",
+            "subject": "self",
+            "activated_houses": [{"house": 2, "significations": ["resources"]}],
+            "tone_by_house": {"2": "constructive"},
+        },
+        locale="en",
+        provider="gemini",
+        model="models/test",
+    )
+
+    assert result["label"] == "Useful wording"
+    assert result["theme_key"] == "theme-a"
+
+
+@pytest.mark.asyncio
+async def test_theme_concurrency_limit_is_shared_across_requests(monkeypatch):
+    from prediction_engine import manifestation_synthesis as module
+
+    active = 0
+    max_active = 0
+
+    async def fake_single(theme, **_kwargs):
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        return {"theme_key": theme["theme_key"], "label": theme["theme_key"]}
+
+    monkeypatch.setattr(module, "_model_details", lambda: ("gemini", "models/test"))
+    monkeypatch.setattr(module, "_synthesize_single_theme", fake_single)
+
+    async def run(prefix):
+        deterministic = [
+            {"manifestation_id": f"{prefix}-{index}", "label": "old", "house_roles": []}
+            for index in range(3)
+        ]
+        themes = [{"theme_key": f"{prefix}-theme-{index}"} for index in range(3)]
+        mapping = {
+            f"{prefix}-{index}": f"{prefix}-theme-{index}"
+            for index in range(3)
+        }
+        return await module.synthesize_manifestations(
+            deterministic=deterministic,
+            context={"themes": themes},
+            theme_by_manifestation_id=mapping,
+        )
+
+    await asyncio.gather(run("a"), run("b"))
+
+    assert max_active <= 2
 
 
 def _canonical_like(value) -> str:

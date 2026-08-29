@@ -386,6 +386,8 @@ _ALIASES = {
     "son": "progeny",
     "daughter": "progeny",
     "learning": "education",
+    "exams": "education",
+    "research": "education",
     "travel": "foreign",
     "visa": "foreign",
     "soul": "spirituality",

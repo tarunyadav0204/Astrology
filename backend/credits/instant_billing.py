@@ -2,7 +2,8 @@
 
 Each started minute is paid before it is used.  A heartbeat never trusts client
 elapsed time; it advances the session using PostgreSQL's clock.  Missing
-heartbeats receive a short reconnect grace and then end the consultation.
+heartbeats receive a short reconnect grace for session recovery, but time after
+the last confirmed heartbeat is not billable once the client is disconnected.
 """
 
 from __future__ import annotations
@@ -88,6 +89,13 @@ def _balance_for_update(conn, userid: int) -> int:
     cur = execute(conn, "SELECT credits FROM user_credits WHERE userid = ? FOR UPDATE", (userid,))
     row = cur.fetchone()
     return int(row[0] or 0) if row else 0
+
+
+def _settlement_billable_seconds(*, prior: int, total: int, disconnected: bool) -> int:
+    """Return server-confirmed billable time without monetizing reconnect grace."""
+    prior_seconds = max(0, int(prior or 0))
+    total_seconds = max(prior_seconds, int(total or 0))
+    return prior_seconds if disconnected else total_seconds
 
 
 def _charge(
@@ -218,12 +226,13 @@ def _settle_locked(conn, row, *, explicit_end_reason: Optional[str] = None) -> D
     prior_billable_seconds = max(0, int(row[13] or 0))
     total_elapsed_seconds = max(prior_billable_seconds, int(row[18] or 0))
     # While heartbeats are healthy, elapsed time comes directly from the server
-    # start timestamp so sub-second truncation cannot accumulate.  A genuinely
-    # disconnected client is charged only through the reconnect grace window.
-    billable_seconds = (
-        prior_billable_seconds + RECONNECT_GRACE_SECONDS
-        if disconnected
-        else total_elapsed_seconds
+    # start timestamp so sub-second truncation cannot accumulate. If the client
+    # disappears, freeze billing at the last confirmed heartbeat. The grace
+    # period is only a recovery lease; it must never become paid time.
+    billable_seconds = _settlement_billable_seconds(
+        prior=prior_billable_seconds,
+        total=total_elapsed_seconds,
+        disconnected=disconnected,
     )
     rate = max(1, int(row[5] or 1))
     billed_minutes = max(1, int(row[12] or 1))

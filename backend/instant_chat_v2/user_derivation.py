@@ -13,7 +13,7 @@ from typing import Any, Dict, Iterable, List
 
 from .career import (
     answer_contract as career_answer_contract,
-    career_question_family,
+    build_career_target_assessment,
     career_profile,
     classify_career_decision,
     classify_manifestations,
@@ -820,15 +820,24 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
             or _dict(karkamsa.get("lagna")).get("sign_name")
             or _dict(karkamsa.get("ascendant")).get("sign_name")
         )
+        career_target = str(intent_summary.get("career_target") or "").strip()
+        career_target_structure = str(
+            intent_summary.get("career_target_structure") or "unspecified"
+        ).strip().lower()
+        career_target_traits = intent_summary.get("career_target_traits") or []
         career_decision = is_career_decision(event_key, profile["subtype"])
-        question_family = career_question_family(answer_mode, profile["subtype"])
         career_relationship = is_career_relationship(event_key, profile["subtype"])
-        family_contract = career_answer_contract(answer_mode, profile["subtype"])
+        family_contract = career_answer_contract(
+            answer_mode,
+            profile["subtype"],
+            career_target,
+        )
+        question_family = str(family_contract.get("question_family") or "profile")
         static_profile = is_static_career_profile(
             event_key,
             profile["subtype"],
             answer_mode=answer_mode,
-        )
+        ) or bool(career_target and answer_mode in {"topic_reading", "potential_capacity"})
         # A present-tense stay/leave decision is not a timeless vocation
         # profile.  It needs current and forward dasha/transit activation even
         # when the router labels its prose shape as ``topic_reading``.
@@ -942,6 +951,18 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
             "subtype": profile["subtype"],
             "question_family": question_family,
             "answer_contract": family_contract,
+            "career_target": career_target or None,
+            "career_target_structure": career_target_structure if career_target else None,
+            "career_target_traits": career_target_traits if career_target else [],
+            "career_target_assessment": (
+                build_career_target_assessment(
+                    vocation_synthesis,
+                    target=career_target,
+                    target_traits=career_target_traits,
+                    target_structure=career_target_structure,
+                )
+                if career_target else {}
+            ),
             "professional_foundation": d1_house_factors,
             "professional_expression": [
                 row for row in divisional_house_factors

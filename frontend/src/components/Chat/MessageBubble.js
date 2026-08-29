@@ -16,6 +16,7 @@ import {
     storePodcastListenLang,
 } from './podcastPlayback';
 import PodcastLanguageModal from './PodcastLanguageModal';
+import PodcastGenerationExperience from './PodcastGenerationExperience';
 import { buildInstantTypingLines, INSTANT_LOADER_TAKING_LONGER } from '../../constants/instantChatLoader';
 import { buildReadableEvidence, buildRoutingSummary } from '../../utils/instantEvidence';
 
@@ -682,6 +683,7 @@ const MessageBubble = ({
     const [podcastModalOpen, setPodcastModalOpen] = useState(false);
     const [podcastModalMode, setPodcastModalMode] = useState('loading');
     const [podcastLoading, setPodcastLoading] = useState(false);
+    const [podcastGenerationStartedAt, setPodcastGenerationStartedAt] = useState(() => Date.now());
     const [podcastReady, setPodcastReady] = useState(() => {
         const mid = message?.messageId != null ? String(message.messageId) : '';
         if (!mid) return false;
@@ -985,6 +987,7 @@ const MessageBubble = ({
         setPodcastModalOpen(true);
         setPodcastModalMode('loading');
         setPodcastLoading(true);
+        setPodcastGenerationStartedAt(Date.now());
         setPodcastCurrentTime(0);
         setPodcastDuration(0);
 
@@ -2400,7 +2403,9 @@ const MessageBubble = ({
                             justifyContent: 'center',
                             zIndex: 10001,
                         }}
-                        onClick={closePodcastModal}
+                        onClick={(event) => {
+                            if (podcastModalMode !== 'loading' && !podcastLoading) closePodcastModal(event);
+                        }}
                         role="presentation"
                     >
                         <div
@@ -2415,13 +2420,16 @@ const MessageBubble = ({
                             }}
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <h3 style={{ margin: '0 0 12px 0', color: '#c2410c', fontSize: '18px' }}>
-                                Podcast
-                            </h3>
+                            {podcastModalMode !== 'loading' && !podcastLoading ? (
+                                <h3 style={{ margin: '0 0 12px 0', color: '#c2410c', fontSize: '18px' }}>
+                                    Podcast
+                                </h3>
+                            ) : null}
                             {podcastModalMode === 'loading' || podcastLoading ? (
-                                <p style={{ margin: 0, lineHeight: 1.5, color: '#444' }}>
-                                    Generating your podcast… this can take up to a couple of minutes.
-                                </p>
+                                <PodcastGenerationExperience
+                                    startedAt={podcastGenerationStartedAt}
+                                    onCancel={closePodcastModal}
+                                />
                             ) : (
                                 <>
                                     <div style={{ marginBottom: '12px', fontSize: '12px', color: '#666' }}>

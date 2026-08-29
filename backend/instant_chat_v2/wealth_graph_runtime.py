@@ -22,6 +22,7 @@ WEALTH_SUBTYPE_CATEGORIES = {
     "multiple_income": "income",
     "debt_repayment": "debt",
     "loan_support": "debt",
+    "loan_decision": "debt",
     "investing_vs_trading": "investment",
     "investment_risk": "investment",
     "loss_vulnerability": "investment",
@@ -115,6 +116,7 @@ def wealth_graph_runtime_key(category: Any, query_plan: Mapping[str, Any] | None
     if category_key == "debt":
         if mode == "problem_diagnosis": return "debt_diagnosis"
         if subtype == "debt_repayment": return "debt_repayment" if _timing_requested(plan) else "debt"
+        if subtype == "loan_decision": return "loan_decision"
         # A generic question about loans or borrowing is a static natal debt
         # pattern. ``loan_support`` is the dated approval/support route and may
         # require dasha/transit evidence only when timing was actually asked.

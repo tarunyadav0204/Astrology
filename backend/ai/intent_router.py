@@ -17,6 +17,7 @@ from daily.daily_micro_intents import classify_daily_micro_intent
 from utils.query_context import normalize_query_context, resolve_query_now
 from ai.gemini_chat_analyzer import generate_content_rest_v1beta_result
 from instant_chat_v2.career import CAREER_ALIASES, CAREER_PROFILES, career_profile
+from instant_chat_v2.education import education_profile, is_education_category
 from utils.admin_settings import (
     CHAT_LLM_DEEPSEEK,
     get_instant_chat_llm_provider,
@@ -105,6 +106,8 @@ _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY: dict[str, list[str]] = {
     "father": ["D1", "D9", "D10", "D12"],
     "education": ["D1", "D9", "D24"],
     "learning": ["D1", "D9", "D24"],
+    "exams": ["D1", "D9", "D24"],
+    "research": ["D1", "D9", "D24"],
     "vehicles": ["D1", "D4", "D16"],
     "travel": ["D1", "D3", "D9"],
     "foreign": ["D1", "D9", "D12"],
@@ -150,8 +153,55 @@ def apply_career_routing_guards(result: Dict[str, Any]) -> None:
     # the D1/D10 career contract entirely.
     result["category"] = "career" if profile["subtype"] == "general" else profile["subtype"]
     result["focus_houses"] = list(profile["houses"])
-    result["divisional_charts"] = list(profile["divisionals"])
-    result["required_divisional_charts"] = list(profile["divisionals"])
+    divisionals = list(profile["divisionals"])
+    # A named-field fit question needs the vocation layer even when its work
+    # structure is routed as business, employment, or freelance.
+    if str(result.get("career_target") or "").strip() and "Karkamsa" not in divisionals:
+        divisionals.append("Karkamsa")
+    result["divisional_charts"] = divisionals
+    result["required_divisional_charts"] = divisionals
+
+
+def apply_education_routing_guards(result: Dict[str, Any]) -> None:
+    """Normalize the LLM's semantic Education route without parsing prose."""
+    category = str(result.get("category") or "").strip().lower()
+    subtype = result.get("education_subtype")
+    if not is_education_category(category) and not subtype:
+        return
+    if not is_education_category(category):
+        category = "education"
+    profile = education_profile(category, subtype)
+    result["category"] = category
+    result["education_subtype"] = profile["subtype"]
+    result["focus_houses"] = list(profile["houses"])
+    allowed_traits = {
+        "analytical_quantitative", "language_communication", "technical_engineering",
+        "creative_design", "biological_care", "legal_social", "commercial_management",
+        "research_depth", "disciplined_memory", "practical_applied",
+    }
+    result["education_target_traits"] = [
+        str(value).strip() for value in result.get("education_target_traits") or []
+        if str(value).strip() in allowed_traits
+    ][:4]
+    clean_options = []
+    for value in result.get("education_options") or []:
+        if isinstance(value, dict):
+            label = str(value.get("label") or value.get("target") or "").strip()
+            traits = [
+                str(trait).strip() for trait in value.get("traits") or []
+                if str(trait).strip() in allowed_traits
+            ][:4]
+            if label:
+                clean_options.append({"label": label, "traits": traits})
+        elif str(value or "").strip():
+            clean_options.append(str(value).strip())
+    if clean_options:
+        result["education_options"] = clean_options[:6]
+    charts = ["D1", "D24", "D9"]
+    if profile["subtype"] in {"education_vs_work", "education_vs_work_timing", "research", "research_timing"}:
+        charts.append("D10")
+    result["divisional_charts"] = charts
+    result["required_divisional_charts"] = charts
 
 
 _CHART_FOCUS_SYNONYMS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -1409,6 +1459,7 @@ class IntentRouter:
                 ]
             )
         apply_career_routing_guards(result)
+        apply_education_routing_guards(result)
         if 'divisional_charts' not in result or not isinstance(result.get('divisional_charts'), list):
             result['divisional_charts'] = self._get_default_divisional_charts(result.get('category', 'general'))
         merge_divisional_charts_with_category_defaults(result, user_question=user_question)
@@ -1593,6 +1644,13 @@ class IntentRouter:
         result["needs_transits"] = bool(result.get("needs_transits"))
         result["chart_insights"] = []
 
+        # Instant uses a separate finalizer from standard chat. Apply the same
+        # structured semantic guards here so subtype profiles, validated target
+        # traits and required divisional charts actually reach the live graph.
+        # These guards inspect only the model's JSON, never the user's prose.
+        apply_career_routing_guards(result)
+        apply_education_routing_guards(result)
+
         if normalized_query_context:
             result["query_context"] = normalized_query_context
 
@@ -1655,7 +1713,9 @@ class IntentRouter:
             }
             _refine_life_event_category(user_question, result)
             apply_career_routing_guards(result)
-            result["divisional_charts"] = self._get_default_divisional_charts(result.get("category", "general"))
+            apply_education_routing_guards(result)
+            if not isinstance(result.get("divisional_charts"), list):
+                result["divisional_charts"] = self._get_default_divisional_charts(result.get("category", "general"))
             merge_divisional_charts_with_category_defaults(result, user_question=user_question)
             if normalized_query_context:
                 result["query_context"] = normalized_query_context
@@ -1813,8 +1873,15 @@ Calibration:
 - Set `response_language` to the language actually used by the latest user message. The app language, chart data, prior assistant language, and internal English instructions must not override the latest user message. For English input return `english`; for Hindi input return `hindi`; for Romanized Hindi return `hinglish`; use a concise lowercase language name for other languages.
 - "How will my career be in the second half of 2028?" -> READY, PREDICT_PERIOD_OUTLOOK, category career, answer_mode timing_window, target_subject_key self, needs_transits true, timeframe second half of 2028.
 - For every career/work question, set career_subtype semantically from the user's meaning in any language. Use general only when no narrower subtype applies. Examples: finding work=employment, receiving a specific appointment/offer=offer, reporting to a selected role or joining date=joining, raise/pay=salary, changing role=job_change, quitting=resignation, losing job=job_security, clients/enterprise=business, starting a new enterprise=business_launch, whether an existing enterprise will succeed=business_success, major initiative=project, management role=leadership, public-sector selection=government, overseas work=foreign_career, returning after a break=return_to_work, conflict at work=workplace_conflict, no progress=career_stagnation, hard work not being seen/rewarded or lack of visibility/appraisal=recognition, suitable profession=career_fit, job versus business=job_vs_business. Workplace relationships must use the person-role: manager/boss/supervisor=manager_relationship, colleague/coworker/peer=colleague_relationship, subordinate/direct report/team member=subordinate_relationship, client/customer=client_relationship, business partner=business_partner_relationship, mentor/professional guide=mentor_relationship. Classify these meanings semantically in every supported language; do not implement question-text keyword matching in application code.
+- For a question about suitability for a specific named profession, industry, practice, product, or business, preserve that exact object in `career_target`. Set `career_target_structure` to business, employment, freelance, hybrid, or unspecified from the user's meaning. Map the work itself to 1-4 `career_target_traits` using only: knowledge_advisory, analytical_research, communication_content, technical_systems, creative_aesthetic, care_healing, commercial_trade, operations_execution, leadership_authority, client_service, spiritual_esoteric, physical_competitive. These traits describe the work, not the user's chart. For example, a counselling practice may need knowledge_advisory, client_service and care_healing; a software business may need technical_systems, analytical_research, commercial_trade and client_service. Do this semantically for any field and language; never drop the named target into generic career/business.
 - For every marriage/relationship question, set marriage_subtype semantically in every language: general, love_vs_arranged, remarriage, engagement_vs_wedding, spouse_meeting, spouse_details, or affair. Love-versus-arranged uses comparison_choice. Remarriage uses potential_capacity for promise and event_prediction for timing; clarify the prior marriage/legal status when unknown and store it in extracted_context.prior_marriage_context. Engagement and wedding remain separate milestones. Where/how a spouse may be met uses topic_reading. Spouse profession/location/appearance uses relationship_person and marriage_subtype=spouse_details; also set extracted_context.spouse_detail_scope to profession, location, appearance, or combined. Questions such as "How will they look?" inherit the spouse reference from the immediately preceding exchange and use scope=appearance. Affair concerns use problem_diagnosis and require relationship context; never assert cheating. Marriage Muhurat uses dedicated_muhurat_flow with muhurat_event_type=marriage. Actual compatibility uses dedicated_partnership_flow and requires two resolved charts.
-- For wealth/finance questions, set wealth_subtype semantically in every language: general, source, savings_instability, multiple_income, debt_repayment, loan_support, investing_vs_trading, investment_risk, loss_vulnerability, or windfall. Keep income, debt, investment and inheritance as their specific categories. Generic questions about loans, borrowing capacity or loan tendencies (for example "What do you think about loans from my chart?") are static debt questions with wealth_subtype=general and topic_reading/potential_capacity. Questions asking when loans will be repaid, cleared, closed or when the user may become debt-free use category=debt, wealth_subtype=debt_repayment and a timing mode. Use loan_support only when the user asks about receiving loan approval/support during a stated period; never use it for repaying an existing loan. Use problem_diagnosis for instability, persistent debt or fluctuating investments; potential_capacity for source, multiple income, investment suitability or windfall assessment; comparison_choice for investing versus trading; and a timing mode only when the user asks when, names a bounded calendar period, or requests dated phases. Descriptive phrases such as long-term wealth potential, lifetime potential, overall prospects, future capacity, or sustainable wealth are static potential_capacity questions—not timing requests—and their timeframe must not be marked open_future merely because those phrases look temporal.
+- For wealth/finance questions, set wealth_subtype semantically in every language: general, source, savings_instability, multiple_income, debt_repayment, loan_support, loan_decision, investing_vs_trading, investment_risk, loss_vulnerability, or windfall. Keep income, debt, investment and inheritance as their specific categories. Generic questions about loans, borrowing capacity or loan tendencies (for example "What do you think about loans from my chart?") are static debt questions with wealth_subtype=general and topic_reading/potential_capacity. Questions asking when loans will be repaid, cleared, closed or when the user may become debt-free use category=debt, wealth_subtype=debt_repayment and a timing mode. Use loan_support only when the user asks about receiving loan approval/support during a stated period. Use loan_decision when the user asks whether they should take, accept, increase or use a loan for a stated purpose; route it as one concrete event/decision with event_prediction when a current or bounded period is named. Never use either subtype for repaying an existing loan. Use problem_diagnosis for instability, persistent debt or fluctuating investments; potential_capacity for source, multiple income, investment suitability or windfall assessment; comparison_choice for investing versus trading; and a timing mode only when the user asks when, names a bounded calendar period, or requests dated phases. Descriptive phrases such as long-term wealth potential, lifetime potential, overall prospects, future capacity, or sustainable wealth are static potential_capacity questions—not timing requests—and their timeframe must not be marked open_future merely because those phrases look temporal.
+- For education, exams and research questions, set category to education, exams, or research and set education_subtype semantically in every language: overall, education_timing, learning_style, subject_fit, course_comparison, higher_education, higher_education_timing, exam_capacity, exam_timing, admission_capacity, admission_timing, scholarship, research, research_timing, foreign_study, foreign_study_timing, education_obstacles, education_resume, education_vs_work, or education_remedies. Use potential_capacity for capability/fit, comparison_choice for named course choices, problem_diagnosis for obstacles, decision_support for an undated education-versus-work choice, remedy_action only for explicit remedies, and timing only when the user asks when or names a period. A time-bound study-versus-work question must remain education_vs_work with a timing answer_mode; never reduce it to higher_education. Foreign-versus-domestic study must remain foreign_study with comparison_choice. PhD/doctoral aptitude and completion belong to research, while a Masters/postgraduate degree belongs to higher_education. A why-question about retention, concentration, exam underperformance, research completion or changing course belongs to education_obstacles. Preserve a named subject/course/exam/research area in education_target, map its demands to education_target_traits, and preserve every explicitly named choice in education_options. Foreign study is not settlement; scholarship potential is not a guaranteed award; exam capacity is not exam timing or a guaranteed result.
+- "Is this a better year for higher education or professional experience?" -> category education, education_subtype education_vs_work, answer_mode timing_window, needs_transits true, education_options Higher education and Professional experience. The words "higher education" must not collapse this comparison into higher_education.
+- "Is foreign education stronger for me than studying in India?" -> category education, education_subtype foreign_study, answer_mode comparison_choice, education_options Foreign education and Education in India.
+- "Does my chart support completing a PhD?" -> category research, education_subtype research, answer_mode potential_capacity, education_target PhD.
+- An explicit education/exam/research remedy request -> category education, education_subtype education_remedies, answer_mode remedy_action, even when the named problem is concentration or exam anxiety.
+- "Should I take a loan to expand my business this year?" (and the same meaning in any language) -> READY, category debt, wealth_subtype loan_decision, answer_mode event_prediction, needs_transits true, timeframe this year. This asks whether new debt is advisable for a productive use; it is neither a static debt tendency nor merely loan-approval timing.
 - "Did I have a love or arranged marriage?" and the same meaning in any language -> READY, category marriage, marriage_subtype love_vs_arranged, answer_mode comparison_choice, route_action answer. This asks which natal pathway better matches an already-past marriage; it is not retrospective marriage-date discovery and must not request historical dasha or transit windows.
 - "Should I leave my current job?" (and the same meaning in any language) -> READY, category career, career_subtype resignation, answer_mode topic_reading, needs_transits true. This is a current employment decision, not career_fit and not a static description of suitable professions. The answer must compare staying (H6+H10), changing direction (H3+H10), separation (H10+H12), and evidence that another role can land (H2+H6+H10+H11) through D1, D10, current dasha and transit support.
 - "Is my job secure?" -> READY, category career, career_subtype job_security, answer_mode topic_reading, needs_transits true. Do not substitute vocation, Amatyakaraka or Karakamsha analysis for the current decision evidence.
@@ -1852,11 +1919,18 @@ Return exactly this JSON shape:
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
   "requested_object": "named_chart" or "life_outcome" or "period" or "person" or "mechanism" or "other",
-  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "location_recommendation" or "factual_chart_lookup" or "dedicated_muhurat_flow" or "dedicated_partnership_flow" or "compound_plan" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "decision_support" or "location_recommendation" or "factual_chart_lookup" or "dedicated_muhurat_flow" or "dedicated_partnership_flow" or "compound_plan" or "problem_diagnosis" or "remedy_action" or "topic_reading",
   "response_language": "lowercase language of the latest user message, for example english, hindi, hinglish, tamil, bengali, telugu, marathi or gujarati",
   "career_subtype": "general" or "employment" or "offer" or "joining" or "promotion" or "job_change" or "resignation" or "job_security" or "business" or "business_launch" or "business_success" or "salary" or "project" or "leadership" or "government" or "foreign_career" or "return_to_work" or "workplace_conflict" or "career_stagnation" or "recognition" or "career_fit" or "job_vs_business" or "manager_relationship" or "colleague_relationship" or "subordinate_relationship" or "client_relationship" or "business_partner_relationship" or "mentor_relationship" or null,
+  "career_target": "concise user-named profession, industry, practice, product, or business; null when none",
+  "career_target_structure": "business" or "employment" or "freelance" or "hybrid" or "unspecified",
+  "career_target_traits": ["0-4 allowed semantic work-trait ids"],
   "marriage_subtype": "general" or "love_vs_arranged" or "remarriage" or "engagement_vs_wedding" or "spouse_meeting" or "spouse_details" or "affair" or null,
-  "wealth_subtype": "general" or "source" or "savings_instability" or "multiple_income" or "debt_repayment" or "loan_support" or "investing_vs_trading" or "investment_risk" or "loss_vulnerability" or "windfall" or null,
+  "wealth_subtype": "general" or "source" or "savings_instability" or "multiple_income" or "debt_repayment" or "loan_support" or "loan_decision" or "investing_vs_trading" or "investment_risk" or "loss_vulnerability" or "windfall" or null,
+  "education_subtype": "overall" or "education_timing" or "learning_style" or "subject_fit" or "course_comparison" or "higher_education" or "higher_education_timing" or "exam_capacity" or "exam_timing" or "admission_capacity" or "admission_timing" or "scholarship" or "research" or "research_timing" or "foreign_study" or "foreign_study_timing" or "education_obstacles" or "education_resume" or "education_vs_work" or "education_remedies" or null,
+  "education_target": "concise user-named subject, course, exam, degree or research area; null when none",
+  "education_target_traits": ["0-4 of analytical_quantitative, language_communication, technical_engineering, creative_design, biological_care, legal_social, commercial_management, research_depth, disciplined_memory, practical_applied"],
+  "education_options": [{{"label":"every explicitly named course/subject/degree choice", "traits":["0-4 allowed education_target_traits describing this option's actual demands"]}}],
   "target_subject_key": "one allowed target subject",
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
@@ -2034,7 +2108,13 @@ Rules:
 - For `RECOMMEND_LOCATION`: if the user has NOT clearly said India-only / abroad-overseas / both, return CLARIFY. Your clarification_question MUST ask that geography preference in the SAME language/script as the current question (LLM-authored; never English-by-default). Set extracted_context.location_scope to "india"|"abroad"|"both" when known, else null.
 - Use `RECOMMEND_REMEDY_FOR_PROBLEM` when query_context marks a Remedies CTA follow-up OR the latest message is an unambiguous direct request for astrological remedies/upayas/corrective actions for one clear problem or life area. Set `explicit_remedy_request=true` for the latter. Infer this semantically in every language/script. A vague "what should I do?" is not enough by itself.
 - For every marriage/relationship question, set marriage_subtype semantically in every language: general, love_vs_arranged, remarriage, engagement_vs_wedding, spouse_meeting, spouse_details, or affair. Love-versus-arranged uses comparison_choice. Remarriage uses potential_capacity for promise and event_prediction for timing; clarify the prior marriage/legal status when unknown and store it in extracted_context.prior_marriage_context. Keep engagement and wedding as separate milestones. Spouse-meeting questions use topic_reading; profession/location/appearance questions use relationship_person and marriage_subtype=spouse_details; also set extracted_context.spouse_detail_scope to profession, location, appearance, or combined. A follow-up such as "How will they look?" retains the spouse reference and uses scope=appearance. Affair concerns use problem_diagnosis and require relationship context; never assert cheating. Marriage Muhurat uses dedicated_muhurat_flow with muhurat_event_type=marriage. Compatibility uses dedicated_partnership_flow and requires two resolved charts.
-- For wealth/finance questions, set wealth_subtype semantically in every language: general, source, savings_instability, multiple_income, debt_repayment, loan_support, investing_vs_trading, investment_risk, loss_vulnerability, or windfall. Preserve income, debt, investment and inheritance as specific categories. Generic questions about loans, borrowing capacity or loan tendencies (for example "What do you think about loans from my chart?") are static debt questions with wealth_subtype=general and topic_reading/potential_capacity. Questions asking when loans will be repaid, cleared, closed or when the user may become debt-free use category=debt, wealth_subtype=debt_repayment and a timing mode. Use loan_support only for receiving loan approval/support during a stated period, never for repaying an existing loan. Use problem_diagnosis for instability, persistent debt or fluctuating investments; potential_capacity for source, multiple income, investment suitability or windfall assessment; comparison_choice for investing versus trading; and timing only when the user asks when, names a bounded calendar period, or requests dated phases. Descriptive phrases such as long-term wealth potential, lifetime potential, overall prospects, future capacity, or sustainable wealth remain static potential_capacity questions and must not receive an open_future timeframe solely because of that wording.
+- For wealth/finance questions, set wealth_subtype semantically in every language: general, source, savings_instability, multiple_income, debt_repayment, loan_support, loan_decision, investing_vs_trading, investment_risk, loss_vulnerability, or windfall. Preserve income, debt, investment and inheritance as specific categories. Generic questions about loans, borrowing capacity or loan tendencies (for example "What do you think about loans from my chart?") are static debt questions with wealth_subtype=general and topic_reading/potential_capacity. Questions asking when loans will be repaid, cleared, closed or when the user may become debt-free use category=debt, wealth_subtype=debt_repayment and a timing mode. Use loan_support only for receiving loan approval/support during a stated period. Use loan_decision when the user asks whether they should take, accept, increase or use a loan for a stated purpose; use event_prediction for a current or bounded decision. Never use either subtype for repaying an existing loan. Use problem_diagnosis for instability, persistent debt or fluctuating investments; potential_capacity for source, multiple income, investment suitability or windfall assessment; comparison_choice for investing versus trading; and timing only when the user asks when, names a bounded calendar period, or requests dated phases. Descriptive phrases such as long-term wealth potential, lifetime potential, overall prospects, future capacity, or sustainable wealth remain static potential_capacity questions and must not receive an open_future timeframe solely because of that wording.
+- For education, exams and research questions, set category to education, exams, or research and set education_subtype semantically in every language: overall, education_timing, learning_style, subject_fit, course_comparison, higher_education, higher_education_timing, exam_capacity, exam_timing, admission_capacity, admission_timing, scholarship, research, research_timing, foreign_study, foreign_study_timing, education_obstacles, education_resume, education_vs_work, or education_remedies. Use potential_capacity for capability/fit, comparison_choice for named course choices, problem_diagnosis for obstacles, decision_support for an undated education-versus-work choice, remedy_action only for explicit remedies, and timing only when the user asks when or names a period. A time-bound study-versus-work question must remain education_vs_work with a timing answer_mode; foreign-versus-domestic study must remain foreign_study with comparison_choice. Route PhD/doctoral questions to research, Masters/postgraduate questions to higher_education, and causal questions about retention, concentration, exam underperformance, research completion or changing direction to education_obstacles. Preserve a named subject/course/exam/research area in education_target, its demands in education_target_traits, and all explicit choices in education_options. Do not conflate foreign study with settlement, scholarship potential with an award, or exam capacity with timing/results.
+- "Is this a better year for higher education or professional experience?" -> category education, education_subtype education_vs_work, answer_mode timing_window, needs_transits true, education_options Higher education and Professional experience. Never collapse it into higher_education.
+- "Is foreign education stronger for me than studying in India?" -> category education, education_subtype foreign_study, answer_mode comparison_choice, education_options Foreign education and Education in India.
+- "Does my chart support completing a PhD?" -> category research, education_subtype research, answer_mode potential_capacity, education_target PhD.
+- Explicit education/exam/research remedies always use education_subtype education_remedies and answer_mode remedy_action.
+- "Should I take a loan to expand my business this year?" -> category debt, wealth_subtype loan_decision, answer_mode event_prediction, timeframe this year, needs_transits true.
 - "Did I have a love or arranged marriage?" and the same meaning in any language -> READY, category marriage, marriage_subtype love_vs_arranged, answer_mode comparison_choice, route_action answer. It is a static natal-pathway comparison about a past marriage, not retrospective date discovery; do not request historical dasha or transit evidence.
 - IMPORTANT: clarification is ALLOWED in instant mode. Do NOT default to READY when the ask is genuinely unclear.
 - All natural-language understanding belongs to you. Resolve ambiguous people, pronouns, relationships, event meanings, and corrections from the current message, recent conversation, and persisted dialogue state. Never guess an unresolved person or relationship.
@@ -2111,6 +2191,7 @@ EVIDENCE PLAN:
 - For multiple independently answerable questions, return CLARIFY with answer_mode=compound_plan and route_action=clarify. Ask one natural same-language question telling the user to choose one question first. Do not emit calculator evidence needs yet.
 - A comparison is multi-part: emit one `question_part` per option and give each option its own event_profile (for example promotion and job_change). Add a `decision_option_context` evidence need covering those parts. Never collapse both options into `general_event`.
 - Planner chooses evidence needs; agents own detailed astrology rule combinations.
+- For any specific named profession, industry, practice, product, or business, preserve it in `career_target`; set `career_target_structure`; and map the work to 1-4 allowed `career_target_traits`. Never collapse a named target into generic career/business. Allowed traits: knowledge_advisory, analytical_research, communication_content, technical_systems, creative_aesthetic, care_healing, commercial_trade, operations_execution, leadership_authority, client_service, spiritual_esoteric, physical_competitive.
 - Always include blocked content checks for `death_prediction` and `fetal_sex_determination`.
 - For direct dasha/date questions, add evidence need kind `dasha_timeline_lookup` with params like {{"planet":"Mercury","level":"mahadasha","operation":"find_start_end"}}.
 - For event timing like marriage, add `natal_topic_foundation`, `future_dasha_event_windows`, and `transit_event_windows` with `event_profile":"marriage"`.
@@ -2147,10 +2228,18 @@ Return ONLY this JSON shape:
   "chart_insights": [],
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
   "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
-  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "location_recommendation" or "factual_chart_lookup" or "dedicated_muhurat_flow" or "dedicated_partnership_flow" or "compound_plan" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "decision_support" or "location_recommendation" or "factual_chart_lookup" or "dedicated_muhurat_flow" or "dedicated_partnership_flow" or "compound_plan" or "problem_diagnosis" or "remedy_action" or "topic_reading",
   "response_language": "lowercase language of the latest user message, for example english, hindi, hinglish, tamil, bengali, telugu, marathi or gujarati",
+  "career_subtype": "general" or "employment" or "offer" or "joining" or "promotion" or "job_change" or "resignation" or "job_security" or "business" or "business_launch" or "business_success" or "salary" or "project" or "leadership" or "government" or "foreign_career" or "return_to_work" or "workplace_conflict" or "career_stagnation" or "recognition" or "career_fit" or "job_vs_business" or "manager_relationship" or "colleague_relationship" or "subordinate_relationship" or "client_relationship" or "business_partner_relationship" or "mentor_relationship" or null,
+  "career_target": "concise user-named profession, industry, practice, product, or business; null when none",
+  "career_target_structure": "business" or "employment" or "freelance" or "hybrid" or "unspecified",
+  "career_target_traits": ["0-4 of knowledge_advisory, analytical_research, communication_content, technical_systems, creative_aesthetic, care_healing, commercial_trade, operations_execution, leadership_authority, client_service, spiritual_esoteric, physical_competitive"],
   "marriage_subtype": "general" or "love_vs_arranged" or "remarriage" or "engagement_vs_wedding" or "spouse_meeting" or "spouse_details" or "affair" or null,
-  "wealth_subtype": "general" or "source" or "savings_instability" or "multiple_income" or "debt_repayment" or "loan_support" or "investing_vs_trading" or "investment_risk" or "loss_vulnerability" or "windfall" or null,
+  "wealth_subtype": "general" or "source" or "savings_instability" or "multiple_income" or "debt_repayment" or "loan_support" or "loan_decision" or "investing_vs_trading" or "investment_risk" or "loss_vulnerability" or "windfall" or null,
+  "education_subtype": "overall" or "education_timing" or "learning_style" or "subject_fit" or "course_comparison" or "higher_education" or "higher_education_timing" or "exam_capacity" or "exam_timing" or "admission_capacity" or "admission_timing" or "scholarship" or "research" or "research_timing" or "foreign_study" or "foreign_study_timing" or "education_obstacles" or "education_resume" or "education_vs_work" or "education_remedies" or null,
+  "education_target": "concise user-named subject, course, exam, degree or research area; null when none",
+  "education_target_traits": ["0-4 of analytical_quantitative, language_communication, technical_engineering, creative_design, biological_care, legal_social, commercial_management, research_depth, disciplined_memory, practical_applied"],
+  "education_options": [{{"label":"every explicitly named course/subject/degree choice", "traits":["0-4 allowed education_target_traits describing this option's actual demands"]}}],
   "target_subject_key": "self" or "spouse" or "wife" or "husband" or "partner" or "child" or "first_child" or "second_child" or "third_child" or "mother" or "father" or "sibling" or "brother" or "sister" or "younger_brother" or "younger_sister" or "younger_sibling" or "elder_brother" or "elder_sister" or "elder_sibling" or "maternal_uncle" or "uncle",
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,

@@ -1,4 +1,8 @@
-from credits.instant_billing import LOW_BALANCE_MINUTES, _payload
+from credits.instant_billing import (
+    LOW_BALANCE_MINUTES,
+    _payload,
+    _settlement_billable_seconds,
+)
 
 
 def _session_row(*, billed_minutes=1, billable_seconds=0):
@@ -35,3 +39,19 @@ def test_low_balance_only_below_five_minutes_worth():
     assert at_threshold["low_balance"] is False
     assert below_threshold["remaining_seconds"] < threshold_seconds
     assert below_threshold["low_balance"] is True
+
+
+def test_disconnected_session_does_not_bill_reconnect_grace():
+    assert _settlement_billable_seconds(
+        prior=58,
+        total=140,
+        disconnected=True,
+    ) == 58
+
+
+def test_connected_session_uses_server_elapsed_time():
+    assert _settlement_billable_seconds(
+        prior=58,
+        total=68,
+        disconnected=False,
+    ) == 68

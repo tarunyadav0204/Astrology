@@ -5236,7 +5236,7 @@ export default function ChatScreen({ navigation, route }) {
 
   const getChatModeCompactName = (modeKey = getChatModeKey()) => {
     if (modeKey === 'premium') return 'P';
-    if (modeKey === 'instant') return 'I';
+    if (modeKey === 'instant') return 'L';
     return 'S';
   };
 
@@ -6859,6 +6859,8 @@ export default function ChatScreen({ navigation, route }) {
                       onContinueSingleChartGate={handleContinueSingleChartGate}
                       onRelationshipContextGate={handleRelationshipContextGate}
                       sessionId={sessionId}
+                      podcastNativeName={item.native_name || birthData?.name || null}
+                      podcastBirthChartId={item.birth_chart_id || birthData?.id || birthData?.birth_chart_id || null}
                       podcastAutoLaunchMessageId={podcastPromoMessageId}
                       podcastAutoLaunchKey={podcastAutoLaunchKey}
                       podcastAutoLaunchLang={podcastAutoLaunchLang}

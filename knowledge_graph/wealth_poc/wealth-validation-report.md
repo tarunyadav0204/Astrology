@@ -1,7 +1,7 @@
 # Wealth and Finance ontology validation report
 
-- Ontology version: `0.2.4`
-- Competency questions: **20**
+- Ontology version: `0.2.5`
+- Competency questions: **21**
 - Result: **PASS**
 
 | Test | Human question | Runtime key | Answer mode | Factors | Calculators | Result |
@@ -17,6 +17,7 @@
 | `debt_diagnosis` | Why am I struggling to clear my loans? | `debt_diagnosis` | `ModeDiagnosis` | 10 | 5 | PASS |
 | `debt_repayment` | When can I become debt-free? | `debt_repayment` | `ModeTiming` | 12 | 7 | PASS |
 | `loan_support` | When is a supportive period for loan approval? | `loan_support` | `ModeTiming` | 10 | 5 | PASS |
+| `loan_decision` | Should I take a loan to expand my business this year? | `loan_decision` | `ModeDecision` | 15 | 8 | PASS |
 | `investment` | Does my chart support active investing? | `investment` | `ModeCapacity` | 13 | 7 | PASS |
 | `investing_vs_trading` | Is long-term investing or active trading better for me? | `investing_vs_trading` | `ModeComparison` | 12 | 6 | PASS |
 | `investment_timing` | Is this a supportive period for investing? | `investment_timing` | `ModeTiming` | 12 | 6 | PASS |
