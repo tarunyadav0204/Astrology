@@ -21,6 +21,12 @@ from ai.parallel_chat.orchestrator import (
     _totals_from_rows,
 )
 from ai.parallel_chat.config import parallel_branch_stagger_s
+from ai.parallel_chat.presentation_style import (
+    build_simple_final_precedence_block,
+    build_simple_merge_depth_instruction,
+    build_simple_merge_instruction,
+    build_simple_merge_response_format,
+)
 from ai.parallel_chat.relational_payloads import (
     build_relational_branch_payloads,
     build_relational_evidence_spine,
@@ -101,7 +107,7 @@ async def run_parallel_relational_chat_pipeline(
     mode: str,
     total_request_start: float,
 ) -> Dict[str, Any]:
-    del response_style, user_context, mode  # Relational merge is question-shaped; these remain in signature parity.
+    del user_context, mode  # Relational merge is question-shaped; these remain in signature parity.
 
     ctx = astrological_context
     t_parallel = time.time()
@@ -165,6 +171,18 @@ async def run_parallel_relational_chat_pipeline(
         "enabled_branches": list(enabled_branches),
     }
     merge_static = build_relational_merge_static(language or "english")
+    simple_presentation_instruction = build_simple_merge_instruction(response_style)
+    if simple_presentation_instruction:
+        merge_static = "\n\n".join(
+            [
+                merge_static,
+                build_simple_merge_depth_instruction(
+                    premium_analysis=premium_analysis,
+                ),
+                build_simple_merge_response_format(),
+                simple_presentation_instruction,
+            ]
+        )
     merge_user = (
         f"CURRENT_DATE: {datetime.now().strftime('%Y-%m-%d')}\n"
         f"RELATIONSHIP_PROFILE_JSON:\n{_json_compact(relation_profile)}\n\n"
@@ -173,7 +191,13 @@ async def run_parallel_relational_chat_pipeline(
         f"{hist_text}\n{mq_focus}\nCURRENT QUESTION: {user_question}\n"
         f"{NEXT_ACTION_META_INSTRUCTION.strip()}\n{FAQ_META_INSTRUCTION.strip()}"
     )
+    final_presentation_override = build_simple_final_precedence_block(
+        response_style,
+        premium_analysis=premium_analysis,
+    )
     merge_prompt = f"{merge_static}\n\n{merge_user}"
+    if final_presentation_override:
+        merge_prompt = f"{merge_prompt}\n\n{final_presentation_override}"
     if os.environ.get("ASTRO_PARALLEL_LOG_PROMPT_BODIES", "").strip().lower() in {"1", "true", "yes"}:
         preview_chars = int(os.environ.get("ASTRO_PARALLEL_LOG_PROMPT_BODIES_MAX_CHARS", "6000") or "6000")
         prompt_preview = merge_prompt if preview_chars <= 0 else merge_prompt[:preview_chars]

@@ -556,6 +556,10 @@ export default function ChatScreen({ navigation, route }) {
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showChatModeIntro, setShowChatModeIntro] = useState(false);
   const [isInstantAnalysis, setIsInstantAnalysis] = useState(false);
+  const [instantAnswerStyle, setInstantAnswerStyle] = useState('simple');
+  const [fullAnswerStyle, setFullAnswerStyle] = useState('technical');
+  const [pendingChatMode, setPendingChatMode] = useState(null);
+  const [pendingAnswerStyle, setPendingAnswerStyle] = useState(null);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
   const [showInstantEndConfirm, setShowInstantEndConfirm] = useState(false);
   const [pendingModeAfterInstantEnd, setPendingModeAfterInstantEnd] = useState(null);
@@ -4895,7 +4899,7 @@ export default function ChatScreen({ navigation, route }) {
           question: finalQuestion,
           query_context: requestQueryContext,
           language: language || 'english',
-          response_style: 'detailed',
+          response_style: useInstantChat ? instantAnswerStyle : fullAnswerStyle,
           premium_analysis: useFreeQuestion ? false : (useInstantChat ? false : isPremiumAnalysis),
           chat_tier: requestedTier,
           native_name: partnershipMode ? nativeChart?.name : birthData?.name,
@@ -5240,6 +5244,35 @@ export default function ChatScreen({ navigation, route }) {
     return 'S';
   };
 
+  const getAnswerStyleName = (styleKey) => (
+    styleKey === 'technical'
+      ? t('chat.answerStyle.technical', 'Technical')
+      : t('chat.answerStyle.simple', 'Simple')
+  );
+
+  const getAnswerStyleForMode = (modeKey = getChatModeKey()) => (
+    modeKey === 'instant' ? instantAnswerStyle : fullAnswerStyle
+  );
+
+  const getPendingChatModeKey = () => pendingChatMode || getChatModeKey();
+
+  const getPendingAnswerStyleKey = () => (
+    pendingAnswerStyle || getAnswerStyleForMode(getPendingChatModeKey())
+  );
+
+  const getAnswerStyleDescription = (styleKey) => (
+    styleKey === 'technical'
+      ? t('chat.answerStyle.technicalDescription', 'Full calculations and terminology')
+      : t('chat.answerStyle.simpleDescription', 'Clear, everyday astrology')
+  );
+
+  useEffect(() => {
+    if (!showChatModeIntro) return;
+    const currentMode = getChatModeKey();
+    setPendingChatMode(currentMode);
+    setPendingAnswerStyle(getAnswerStyleForMode(currentMode));
+  }, [showChatModeIntro]);
+
   const formatModeCost = (cost) => {
     const numericCost = Number(cost) || 0;
     if (numericCost <= 0) return t('chat.modeIntro.free', 'Free');
@@ -5279,6 +5312,27 @@ export default function ChatScreen({ navigation, route }) {
       return;
     }
     applyChatMode(modeKey);
+  };
+
+  const selectPendingChatMode = (modeKey) => {
+    setPendingChatMode(modeKey);
+  };
+
+  const applyPendingChatPreferences = () => {
+    const modeKey = pendingChatMode || getChatModeKey();
+    const styleKey = pendingAnswerStyle || getAnswerStyleForMode(modeKey);
+    if (modeKey === 'instant') {
+      setInstantAnswerStyle(styleKey);
+    } else {
+      setFullAnswerStyle(styleKey);
+    }
+    // Continue is a dedicated sheet action, so close immediately instead of
+    // waiting for InteractionManager. Modal gestures can keep that queue busy
+    // and leave the sheet visible even though the preference was applied.
+    modeIntroSuppressOpenUntilRef.current = Date.now() + 900;
+    setShowModeSelector(false);
+    setShowChatModeIntro(false);
+    switchChatMode(modeKey);
   };
 
   useEffect(() => {
@@ -7168,7 +7222,7 @@ export default function ChatScreen({ navigation, route }) {
                 blurOnSubmit={false}
               />
 
-              {!partnershipMode && !isMundane && !freeQuestionAvailable && !(isInstantAnalysis && instantBilling.active) && (
+              {!partnershipMode && !isMundane && !freeQuestionAvailable && (
                 <TouchableOpacity
                   style={[
                     styles.chatModeIdentityButton,
@@ -7199,7 +7253,7 @@ export default function ChatScreen({ navigation, route }) {
                   <Text numberOfLines={1} style={[styles.chatModeIdentityText, { color: colors.text }]}>
                     {isComposerFocused || inputText.trim().length > 0
                       ? getChatModeCompactName()
-                      : getChatModeName()}
+                      : `${getChatModeName()} · ${getAnswerStyleName(getAnswerStyleForMode())}`}
                   </Text>
                   {!(isComposerFocused || inputText.trim().length > 0) && (
                     <Ionicons name="chevron-down" size={13} color={colors.textSecondary} />
@@ -7214,6 +7268,7 @@ export default function ChatScreen({ navigation, route }) {
                     navigation.navigate('SpeechChat', {
                       birthData,
                       language,
+                      responseStyle: instantAnswerStyle,
                     })
                   }
                   accessibilityRole="button"
@@ -7517,17 +7572,72 @@ export default function ChatScreen({ navigation, route }) {
                 {t('chat.modeIntro.eyebrow', 'Chat mode')}
               </Text>
               <Text style={[styles.chatModeIntroTitle, { color: colors.text }]}>
-                {t('chat.modeIntro.title', {
-                  mode: getChatModeName(),
-                  defaultValue: `You are in ${getChatModeName()} mode`,
+                {t('chat.answerStyle.selectionTitle', {
+                  mode: getChatModeName(getPendingChatModeKey()),
+                  style: getAnswerStyleName(getPendingAnswerStyleKey()),
+                  defaultValue: `You’re using ${getChatModeName(getPendingChatModeKey())} · ${getAnswerStyleName(getPendingAnswerStyleKey())}`,
                 })}
               </Text>
               <Text style={[styles.chatModeIntroBody, { color: colors.textSecondary }]}>
-                {t(
-                  'chat.modeIntro.body',
-                  'Compare the experience and price before you ask. You can change modes anytime.'
-                )}
+                {t('chat.answerStyle.selectionBody', {
+                  styleDescription: getAnswerStyleDescription(getPendingAnswerStyleKey()),
+                  defaultValue: `${getAnswerStyleDescription(getPendingAnswerStyleKey())}. Choose the consultation mode and answer style, then continue.`,
+                })}
               </Text>
+
+              <View
+                style={[
+                  styles.chatModeAnswerStyleSection,
+                  {
+                    backgroundColor: colors.cosmicGlow || colors.surfaceMuted,
+                    borderColor: colors.cardBorder || colors.border,
+                  },
+                ]}
+                accessibilityRole="radiogroup"
+                accessibilityLabel={t('chat.answerStyle.label', 'Answer style')}
+              >
+                <Text style={[styles.chatModeAnswerStyleTitle, { color: colors.text }]}>
+                  {t('chat.answerStyle.label', 'Answer style')}
+                </Text>
+                <View style={styles.chatModeAnswerStyleOptions}>
+                  {['simple', 'technical'].map((styleKey) => {
+                    const selected = (pendingAnswerStyle || getAnswerStyleForMode(pendingChatMode || getChatModeKey())) === styleKey;
+                    const label = getAnswerStyleName(styleKey);
+                    const description = getAnswerStyleDescription(styleKey);
+                    return (
+                      <TouchableOpacity
+                        key={styleKey}
+                        onPress={() => setPendingAnswerStyle(styleKey)}
+                        style={[
+                          styles.chatModeAnswerStyleOption,
+                          {
+                            backgroundColor: selected ? colors.selectionSurface : colors.surfaceMuted,
+                            borderColor: selected
+                              ? (colors.selectionBorder || colors.primary)
+                              : (colors.cardBorder || colors.border),
+                          },
+                        ]}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected, checked: selected }}
+                        accessibilityLabel={`${label}. ${description}`}
+                      >
+                        <View
+                          style={[
+                            styles.chatModeAnswerStyleRadio,
+                            { borderColor: selected ? colors.primary : colors.textTertiary },
+                          ]}
+                        >
+                          {selected ? <View style={[styles.chatModeAnswerStyleRadioDot, { backgroundColor: colors.primary }]} /> : null}
+                        </View>
+                        <View style={styles.chatModeAnswerStyleCopy}>
+                          <Text style={[styles.chatModeAnswerStyleName, { color: colors.text }]}>{label}</Text>
+                          <Text style={[styles.chatModeAnswerStyleDescription, { color: colors.textSecondary }]}>{description}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
 
               <ScrollView
                 style={styles.chatModeIntroRowsScroll}
@@ -7536,29 +7646,29 @@ export default function ChatScreen({ navigation, route }) {
                 nestedScrollEnabled
               >
                 {chatModeOptions.map((option) => {
+                  const isSelected = option.key === (pendingChatMode || getChatModeKey());
                   const isCurrent = option.key === getChatModeKey();
                   const hasDiscount = option.originalCost != null && Number(option.originalCost) > Number(option.cost || 0);
                   return (
                     <TouchableOpacity
                       key={option.key}
                       activeOpacity={0.86}
-                      onPress={() => switchChatMode(option.key)}
+                      onPress={() => selectPendingChatMode(option.key)}
                       accessibilityRole="radio"
-                      accessibilityState={{ selected: isCurrent }}
+                      accessibilityState={{ selected: isSelected }}
                       accessibilityLabel={`${option.name}. ${option.benefit}`}
-                      accessibilityHint={isCurrent ? 'Current chat mode' : `Switch to ${option.name}`}
                       style={[
                         styles.chatModeIntroRow,
                         {
-                          backgroundColor: isCurrent ? colors.selectionSurface : colors.surfaceMuted,
-                          borderColor: isCurrent
+                          backgroundColor: isSelected ? colors.selectionSurface : colors.surfaceMuted,
+                          borderColor: isSelected
                             ? (colors.selectionBorder || colors.primary)
                             : (colors.cardBorder || colors.border),
                         },
                       ]}
                     >
-                      <View style={[styles.chatModeIntroIcon, { backgroundColor: isCurrent ? colors.primary : colors.selectionSurface }]}>
-                        <Ionicons name={option.icon} size={17} color={isCurrent ? colors.onPrimary : colors.primary} />
+                      <View style={[styles.chatModeIntroIcon, { backgroundColor: isSelected ? colors.primary : colors.selectionSurface }]}>
+                        <Ionicons name={option.icon} size={17} color={isSelected ? colors.onPrimary : colors.primary} />
                       </View>
                       <View style={styles.chatModeIntroContent}>
                         <View style={styles.chatModeIntroRowHeader}>
@@ -7600,25 +7710,23 @@ export default function ChatScreen({ navigation, route }) {
                     </TouchableOpacity>
                   );
                 })}
+
               </ScrollView>
 
               <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={() => {
-                  modeIntroSuppressOpenUntilRef.current = Date.now() + 900;
-                  setShowChatModeIntro(false);
-                }}
+                onPress={applyPendingChatPreferences}
                 style={[styles.chatModeIntroContinue, { backgroundColor: colors.primary }]}
                 accessibilityRole="button"
                 accessibilityLabel={t('chat.modeIntro.continue', {
-                  mode: getChatModeName(),
-                  defaultValue: `Continue in ${getChatModeName()}`,
+                  mode: `${getChatModeName(pendingChatMode || getChatModeKey())} · ${getAnswerStyleName(pendingAnswerStyle || getAnswerStyleForMode(pendingChatMode || getChatModeKey()))}`,
+                  defaultValue: `Continue in ${getChatModeName(pendingChatMode || getChatModeKey())} · ${getAnswerStyleName(pendingAnswerStyle || getAnswerStyleForMode(pendingChatMode || getChatModeKey()))}`,
                 })}
               >
                 <Text style={styles.chatModeIntroContinueText}>
                   {t('chat.modeIntro.continue', {
-                    mode: getChatModeName(),
-                    defaultValue: `Continue in ${getChatModeName()}`,
+                    mode: `${getChatModeName(pendingChatMode || getChatModeKey())} · ${getAnswerStyleName(pendingAnswerStyle || getAnswerStyleForMode(pendingChatMode || getChatModeKey()))}`,
+                    defaultValue: `Continue in ${getChatModeName(pendingChatMode || getChatModeKey())} · ${getAnswerStyleName(pendingAnswerStyle || getAnswerStyleForMode(pendingChatMode || getChatModeKey()))}`,
                   })}
                 </Text>
               </TouchableOpacity>
@@ -9508,6 +9616,62 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: '600',
   },
+  chatModeAnswerStyleSection: {
+    borderWidth: 1,
+    borderRadius: 18,
+    marginTop: 2,
+    marginBottom: 14,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  chatModeAnswerStyleTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 9,
+  },
+  chatModeAnswerStyleOptions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  chatModeAnswerStyleOption: {
+    flex: 1,
+    minHeight: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 15,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  chatModeAnswerStyleRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 9,
+  },
+  chatModeAnswerStyleRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  chatModeAnswerStyleCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  chatModeAnswerStyleName: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  chatModeAnswerStyleDescription: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '500',
+  },
   chatModeIntroContinue: {
     borderRadius: 16,
     paddingVertical: 14,
@@ -9694,7 +9858,7 @@ const styles = StyleSheet.create({
   },
   chatModeIdentityButton: {
     minHeight: 40,
-    maxWidth: 104,
+    maxWidth: 142,
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 9,

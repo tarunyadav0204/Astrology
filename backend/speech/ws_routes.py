@@ -178,7 +178,11 @@ async def _handle_ask(
         "question": question,
         "query_context": payload.get("query_context") or {},
         "language": language,
-        "response_style": "concise",
+        "response_style": (
+            "technical"
+            if str(payload.get("response_style") or "").strip().lower() == "technical"
+            else "simple"
+        ),
         "premium_analysis": False,
         "chat_tier": "instant",
         "speech_chat": True,

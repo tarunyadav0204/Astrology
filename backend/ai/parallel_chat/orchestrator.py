@@ -16,6 +16,14 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from ai.parallel_chat.presentation_style import (
+    build_simple_final_precedence_block,
+    build_simple_merge_depth_instruction,
+    build_simple_merge_instruction,
+    build_simple_merge_response_format,
+    normalize_merge_response_style,
+)
+
 logger = logging.getLogger(__name__)
 
 _ALL_BRANCHES: Tuple[str, ...] = (
@@ -288,6 +296,11 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
         premium_analysis=premium_analysis,
         chart_focus=chart_focus if isinstance(chart_focus, dict) else None,
     )
+    if normalize_merge_response_style(_response_style) == "simple":
+        elaborate_instruction = build_simple_merge_depth_instruction(
+            premium_analysis=premium_analysis,
+        )
+        response_format_instruction = build_simple_merge_response_format()
 
     user_context_instruction = ""
     if user_context:
@@ -1061,20 +1074,22 @@ async def run_parallel_chat_pipeline(
             f"- Current Time: {current_date.strftime('%H:%M UTC')}\n"
             f"- Current Year: {current_date.year}\n\n{_timing_label_guard_text(current_date)}\nCRITICAL CHART INFORMATION:\n{ascendant_summary}"
         )
-        final_static = "\n\n".join(
-            [
-                build_parashari_final_answer_static(
-                    category,
-                    death_analysis_unlocked=death_analysis_unlocked,
-                ),
-                language_instruction,
-                delivery_format_instruction,
-                elaborate_instruction,
-                response_format_instruction,
-                user_context_instruction,
-                CLASSICAL_RULE_MATCH_INSTRUCTION,
-            ]
-        )
+        final_static_parts = [
+            build_parashari_final_answer_static(
+                category,
+                death_analysis_unlocked=death_analysis_unlocked,
+            ),
+            language_instruction,
+            delivery_format_instruction,
+            elaborate_instruction,
+            response_format_instruction,
+            user_context_instruction,
+            CLASSICAL_RULE_MATCH_INSTRUCTION,
+        ]
+        simple_presentation_instruction = build_simple_merge_instruction(response_style)
+        if simple_presentation_instruction:
+            final_static_parts.append(simple_presentation_instruction)
+        final_static = "\n\n".join(final_static_parts)
         parashari_branch_bundle = {
             "parashari": par_out,
             "scope": {
@@ -1138,7 +1153,13 @@ async def run_parallel_chat_pipeline(
                 f"{final_user}\n"
                 f"NO INLINE REMEDY PLAN: {NO_INLINE_REMEDY_PLAN_RULE}"
             )
+        final_presentation_override = build_simple_final_precedence_block(
+            response_style,
+            premium_analysis=premium_analysis,
+        )
         final_prompt = f"{final_static}\n\n{final_user}"
+        if final_presentation_override:
+            final_prompt = f"{final_prompt}\n\n{final_presentation_override}"
         t_final = time.time()
         # Free / remedy single-lane final is the merge writer — use Standard chat model
         # for non-premium (same admin setting as Gemini standard chat).
@@ -1469,21 +1490,29 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             f"{merge_user}\n"
             f"NO INLINE REMEDY PLAN: {NO_INLINE_REMEDY_PLAN_RULE}"
         )
-    merge_static = "\n\n".join(
-        [
-            build_merge_role_preamble(),
-            merge_system_instruction,
-            language_instruction,
-            delivery_format_instruction,
-            elaborate_instruction,
-            response_format_instruction,
-            user_context_instruction,
-            single_native_format_guard,
-            CLASSICAL_RULE_MATCH_INSTRUCTION,
-            VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION.strip(),
-        ]
+    merge_static_parts = [
+        build_merge_role_preamble(),
+        merge_system_instruction,
+        language_instruction,
+        delivery_format_instruction,
+        elaborate_instruction,
+        response_format_instruction,
+        user_context_instruction,
+        single_native_format_guard,
+        CLASSICAL_RULE_MATCH_INSTRUCTION,
+        VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION.strip(),
+    ]
+    simple_presentation_instruction = build_simple_merge_instruction(response_style)
+    if simple_presentation_instruction:
+        merge_static_parts.append(simple_presentation_instruction)
+    merge_static = "\n\n".join(merge_static_parts)
+    final_presentation_override = build_simple_final_precedence_block(
+        response_style,
+        premium_analysis=premium_analysis,
     )
     merge_prompt = f"{merge_static}\n\n{merge_user}"
+    if final_presentation_override:
+        merge_prompt = f"{merge_prompt}\n\n{final_presentation_override}"
     if _parallel_diag_enabled("ASTRO_PARALLEL_LOG_PROMPT_PARTS"):
         logger.info(
             "PARALLEL_PROMPT_PARTS parallel_merge merge_static_chars=%s merge_user_chars=%s "

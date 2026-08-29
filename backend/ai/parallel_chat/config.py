@@ -7,10 +7,11 @@ Where to set `ASTRO_PARALLEL_CHAT` (and related logging env vars):
 - **Alternative:** process / systemd / Docker `environment=`, Kubernetes Secret → env, PaaS dashboard.
 - **Not required:** there is no separate JSON config file for this flag — it is read only from the environment.
 
-Production rollout (parallel only for some users):
+Production rollout:
 - Set ``ASTRO_PARALLEL_CHAT=1``.
-- Set ``ASTRO_PARALLEL_CHAT_USER_IDS`` to a comma-separated list of numeric user IDs (e.g. ``42,1001``). Only those users get the parallel pipeline; everyone else stays on legacy chat for the same request types.
-- Omit ``ASTRO_PARALLEL_CHAT_USER_IDS`` (or leave it empty) to allow **any** user when parallel is on (useful for staging; not recommended for broad production unless intentional).
+- Every user is eligible when the feature flag is on. The former
+  ``ASTRO_PARALLEL_CHAT_USER_IDS`` rollout list is retained only for diagnostic
+  compatibility and no longer restricts routing.
 
 Optional LLM round-trip logging (parallel path + any `generate_text_from_prompt` with `llm_log_tag`):
 - `ASTRO_LLM_LOG_ROUNDS` — set to `0` / `false` to disable the one-line `[LLM_ROUNDTRIP]` summary (dump dir / bodies may still run).
@@ -30,7 +31,7 @@ Rate limits & long tails (429 / TPM / preview models fire many parallel handshak
 
 Relational / partnership parallel rollout:
 - Set ``ASTRO_PARALLEL_RELATIONAL_CHAT=1`` to route partnership mode through the relational multi-branch pipeline.
-- It uses the same allowlist variable, ``ASTRO_PARALLEL_CHAT_USER_IDS``, so A/B testing can share one rollout control.
+- Every user is eligible when the relational feature flag is on.
 - Legacy partnership chat remains the default when this flag is off.
 
 Agent-built branch payloads (compact JSON, not legacy `ChatContextBuilder` keys):
@@ -56,13 +57,13 @@ def parallel_relational_chat_enabled() -> bool:
 
 def parallel_chat_user_allowlist() -> Optional[frozenset[int]]:
     """
-    Optional production gate: only these user IDs may use the parallel pipeline.
+    Parse the former production rollout list for diagnostics only.
 
     Env: ``ASTRO_PARALLEL_CHAT_USER_IDS`` — comma/semicolon/whitespace-separated integers, e.g. ``42,1001,2048``.
 
     - If unset or empty after strip → **None** (no allowlist: any user may use parallel when other gates pass).
-    - If set and parses to at least one ID → **only** those IDs; unknown callers without ``user_id`` are excluded.
-    - If set but no valid integers → empty frozenset (**nobody** uses parallel).
+    This value no longer controls eligibility. It remains readable so operators
+    can identify and remove stale deployment configuration safely.
     """
     raw = os.environ.get("ASTRO_PARALLEL_CHAT_USER_IDS", "").strip()
     if not raw:
@@ -83,7 +84,8 @@ def should_use_parallel_chat(context: dict, *, user_id: Optional[int] = None) ->
     Parallel pipeline is only for standard natal chart chat.
     Synastry, mundane, annual, prashna, and other modes keep the legacy single-call path.
 
-    When ``ASTRO_PARALLEL_CHAT_USER_IDS`` is set, only listed ``user_id`` values pass (``user_id`` must be passed from routes).
+    User IDs do not restrict the pipeline. Eligibility is determined by the
+    feature flag, provider compatibility, analysis type, and mode.
 
     Self-hosted Gemma (HTTP) is incompatible with this pipeline: branches expect vendor JSON/tooling
     and fan out many specialist prompts; use the single-call ``generate_chat_response`` path instead.
@@ -122,11 +124,6 @@ def evaluate_parallel_chat_gate(context: dict, *, user_id: Optional[int] = None)
     allow = parallel_chat_user_allowlist()
     diagnostics["allowlist_present"] = allow is not None
     diagnostics["allowlist_size"] = len(allow) if isinstance(allow, frozenset) else -1
-    if allow is not None:
-        if not allow:
-            return False, "allowlist_empty", diagnostics
-        if user_id is None or user_id not in allow:
-            return False, "user_not_in_allowlist", diagnostics
     if not isinstance(context, dict):
         return False, "context_not_dict", diagnostics
     analysis_type = str(context.get("analysis_type") or "").strip().lower()
@@ -158,7 +155,7 @@ def should_use_parallel_relational_chat(context: dict, *, user_id: Optional[int]
     """
     Opt-in two-person relationship/partnership pipeline.
 
-    Uses the same user allowlist as natal parallel chat so production A/B testing has one control surface.
+    All users are eligible when the relational flag and route requirements pass.
     """
     if not parallel_relational_chat_enabled():
         return False
@@ -169,12 +166,6 @@ def should_use_parallel_relational_chat(context: dict, *, user_id: Optional[int]
             return False
     except Exception:
         pass
-    allow = parallel_chat_user_allowlist()
-    if allow is not None:
-        if not allow:
-            return False
-        if user_id is None or user_id not in allow:
-            return False
     if not isinstance(context, dict):
         return False
     if context.get("analysis_type") not in ("synastry", "relational"):

@@ -161,12 +161,12 @@ def test_relational_parallel_requires_flag(monkeypatch):
     assert should_use_parallel_relational_chat(_synastry_context(), user_id=1) is False
 
 
-def test_relational_parallel_uses_shared_allowlist(monkeypatch):
+def test_relational_parallel_is_available_to_all_users(monkeypatch):
     monkeypatch.setenv("ASTRO_PARALLEL_RELATIONAL_CHAT", "1")
     monkeypatch.setenv("ASTRO_PARALLEL_CHAT_USER_IDS", "42,100")
 
     assert should_use_parallel_relational_chat(_synastry_context(), user_id=42) is True
-    assert should_use_parallel_relational_chat(_synastry_context(), user_id=41) is False
+    assert should_use_parallel_relational_chat(_synastry_context(), user_id=41) is True
 
 
 def test_relationship_profile_preserves_relation_and_event():

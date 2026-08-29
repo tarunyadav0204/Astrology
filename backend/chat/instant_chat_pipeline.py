@@ -7033,7 +7033,7 @@ def _instant_parashari_instruction_block(
             f"This answer uses universal answer mode `{answer_mode}`.",
             "CRITICAL: Follow the method instructions below exactly.",
             "CRITICAL: For timing/window answers, reason internally through PD and Sookshma/Prana when supplied. These are calculation evidence, not the user-facing answer.",
-            "CRITICAL: Internally distinguish the jobs of MD, AD, PD, and SK/PR, but do not make the user decode those levels. Expose at most one compact astrological reason unless the user explicitly asks how the prediction was derived.",
+            "CRITICAL: Internally distinguish the jobs of MD, AD, PD, and SK/PR. In Simple style expose at most one compact reason; in Technical style explain the supplied levels without making the user decode unexplained abbreviations.",
             "CRITICAL: Do not be biased by the wording of the user's question. Center the answer on astrological logic, not on agreeing with what the user seems to want.",
             "CRITICAL: For event-prediction questions like 'will X happen' or 'is X likely', act like an investigator. Examine support, obstruction, and uncertainty before giving the verdict.",
             f"Answer skeleton: {skeleton}.",
@@ -7104,7 +7104,7 @@ def _instant_parashari_instruction_block(
             "- `topic_signals`: this is the first topic-specific Parashari summary. Prefer it over inventing your own broad category summary from scratch.",
             "- `activation_mechanisms`: if you say a house is activated, justify it from these links. If the links are weak or absent, do not overclaim.",
             "Do not give vague lines like 'communication is generally supported' unless you immediately explain why in chart terms.",
-            "Use 2 or 3 concrete astrological reasons internally to form the conclusion, but expose at most one compact proof sentence unless the user explicitly asks for the astrological derivation.",
+            "Use 2 or 3 concrete astrological reasons internally to form the conclusion. Expose at most one compact proof sentence in Simple style; Technical style may explain the same supplied evidence in more depth.",
             "Avoid dramatic filler language like 'massive emphasis', 'high stakes', 'disciplined architect', 'catalyst', or similar polished phrases unless the evidence is unusually explicit. Prefer plain, mechanism-first wording.",
             "If the user asks 'how exactly' or challenges an earlier claim, answer that challenge directly from the activation mechanisms. If the earlier claim is not strongly supported, say that clearly and correct course.",
             "If exact transit placement is not needed, do not mention it. If you do mention it, it must match the provided transit row exactly.",
@@ -15481,9 +15481,9 @@ def _build_budgeted_instant_prompt(
     education_fact_rule = ""
     if isinstance(context.get("education_required_visible_facts"), dict):
         education_fact_rule = (
-            "- EDUCATION: Use one supplied D1 fact and one supplied D24 fact internally, then express them as "
-            "evidence-bound planetary reasons in ordinary life language. Keep chart codes and specialist terms in "
-            "the evidence details unless the user requests them.\n"
+            "- EDUCATION: Use one supplied D1 fact and one supplied D24 fact. Explain them technically only when "
+            "`answer_contract.visible_astrology.technical_detail_allowed` is true; otherwise translate them into "
+            "evidence-bound planetary reasons in ordinary life language.\n"
         )
     return f"""You are AstroRoshni's Instant Chat answer composer.
 Answer the user's astrology question from the supplied adjudicated context only.
@@ -15500,7 +15500,7 @@ Answer the user's astrology question from the supplied adjudicated context only.
 - For comparisons, every date, dasha chain, score, and reason belongs only to the option row that contains it. Never attach one option's window to the other.
 - MD, AD, and PD mean major, sub-, and sub-sub-period. Never call the PD planet the sub-period lord.
 - Health statements are susceptibilities, not diagnoses. Name only zones explicitly allowed by health_rules and recommend professional care for persistent symptoms.
-- Translate astrology into ordinary life language. Keep the visible astrological reason planetary and human-readable; specialist calculations belong in the evidence details unless the user explicitly requests them.
+- Follow `answer_contract.visible_astrology.technical_terms_rule` for presentation depth. Simple keeps specialist calculations out of the visible answer; Technical may explain only the supplied technical evidence.
 - Do not expose internal IDs or JSON. Do not add a decorative heading.
 - Finish the response with exactly: NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":""}}
 
@@ -15932,9 +15932,9 @@ Required answer:
 0a. The live `knowledge_graph_policy` is authoritative. Follow its guardrails and required output sections, never use its default exclusions, and do not infer any missing required factor.
 1. Answer directly by naming every supplied anatomical region in its exact ranked order. None may be omitted, including a region derived from the anatomical field of the house occupied by the 6th lord.
 2. Give every region its own explicit explanatory sentence. That sentence must name the region and faithfully express at least one item from that row's `required_cause_facts`; a bare label or a shared phrase such as "these areas are inflammatory" does not satisfy this requirement.
-3. Treat every planet, sign, nakshatra, lordship and house number in `required_cause_facts` as immutable calculated data; never replace, infer, or change those facts. Use those facts internally, but in the visible answer name the evidence-bound planet and translate the specialist condition into its practical health meaning. Do not expose chart codes, numbered houses, degrees, nakshatras or specialist conditions unless the user explicitly asks for technical detail.
+3. Treat every planet, sign, nakshatra, lordship and house number in `required_cause_facts` as immutable calculated data; never replace, infer, or change those facts. In the visible answer, name the evidence-bound planet and follow `answer_contract.visible_astrology.technical_terms_rule`. In Simple, do not expose chart codes, numbered houses, degrees, nakshatras or specialist conditions; translate them into practical health meaning. In Technical, explain only those technical details actually supplied.
    Copy that row's `validation_marker` exactly at the end of its explanatory sentence in every language. This temporary marker is mandatory for every row and will be removed before display. Do not translate, alter, or collect the markers elsewhere.
-4. When a row is derived from the house occupied by the 6th lord, use that exact destination house internally and connect its supplied anatomical field to the named region in ordinary language. Preserve the exact binding in the hidden validation marker; do not display the house number unless technical detail was requested. Do not reduce this to a generic acute/inflammatory mechanism.
+4. When a row is derived from the house occupied by the 6th lord, use that exact destination house internally and connect its supplied anatomical field to the named region. Preserve the exact binding in the hidden validation marker; display the house number only when `technical_detail_allowed` is true. Do not reduce this to a generic acute/inflammatory mechanism.
 5. Explain each region only from its own `required_zone_rows` row. Do not move a reason or mechanism from one region to another and do not combine multiple regions under one shared explanation.
 6. Give ordinary preventive care guidance without diagnosis, certainty, fear, or invented symptoms.
 7. End with exactly one natural question about symptoms or preventive care.
@@ -16253,7 +16253,7 @@ AUTHORITATIVE COMPOSER BRIEF:
     if composer_graph_policy.get("domain") == "education":
         education_rules = """
 - EDUCATION EVIDENCE CHECK: before writing, find one actual D1 condition and one actual D24 condition inside `evidence.education_foundation.route_synthesis` (including nested house-lord, carrier, trait, option, support or caution rows).
-- Use one actual D1 fact and one actual D24 fact from `route_synthesis.required_visible_facts`, but translate them into one or two evidence-bound planetary reasons in ordinary life language. Keep D1/D24 labels, numbered houses and dignity jargon in the evidence details unless the user asks for technical detail. Never write only "the chart confirms", "the houses are strong", "key planets are well placed", or similar generic proof.
+- Use one actual D1 fact and one actual D24 fact from `route_synthesis.required_visible_facts`. Follow `answer_contract.visible_astrology.technical_terms_rule`: Simple translates them into evidence-bound planetary reasons in ordinary language; Technical may name the supplied D1/D24 details, numbered houses and dignity conditions. Never write only "the chart confirms", "the houses are strong", "key planets are well placed", or similar generic proof.
 - If the active route ledger contains no actual D1 or D24 condition, explicitly say that layer is unavailable and limit the conclusion. Never manufacture a planet, house, dignity, learning trait, or confirmation.
 - Follow `route_synthesis.verdict`, `timing_verdict`, option margin and cautions exactly. Data availability is not a positive verdict.
 """
@@ -16261,7 +16261,7 @@ AUTHORITATIVE COMPOSER BRIEF:
     if composer_graph_policy.get("domain") == "children":
         children_rules = """
 - CHILDREN EVIDENCE CHECK: use only `evidence.children_foundation` and its selected `route_synthesis`; a calculated D1 or D7 chart is not automatically supportive.
-- Use one actual D1 condition and one actual D7 condition when the route is an astrological reading, but translate them into evidence-bound planetary reasons in ordinary life language. Keep D1/D7 labels and specialist chart terms in the evidence details unless requested. If either layer is unavailable, limit the claim instead of inventing evidence.
+- Use one actual D1 condition and one actual D7 condition when the route is an astrological reading. In Simple, translate them into evidence-bound planetary reasons in ordinary life language; in Technical, name only the supplied D1/D7 and specialist details. If either layer is unavailable, limit the claim instead of inventing evidence.
 - Keep conception, sustaining pregnancy, childbirth, adoption, assisted conception, first child, later children and parent-child relationship as separate mechanisms. Do not copy one route's explanation into another.
 - Never diagnose infertility or pregnancy risk, predict miscarriage or fetal sex, promise an exact number of children or twins, or use the parent's chart as the child's own fate chart.
 - Follow `route_synthesis.verdict`, `timing_verdict`, KP adjudication, requested horizon and claim boundaries exactly. A supportive period is not a guaranteed event.
@@ -16315,7 +16315,7 @@ Hard rules:
 - A dated peak is only the most concentrated part of its containing phase. Never present the final or strongest peak as though nothing meaningful happens during the rest of the requested period.
 - A period is "highly active" only when it appears in an allowed/peak window. Copy supplied dates exactly. If no peak exists, call it background activity, not a peak.
 - Include at least one short, understandable, evidence-bound planetary reason in every completed answer when `answer_contract.visible_astrology.required` is true. Add a second only when it explains a materially different support or pressure.
-- `evidence.special_natal_factors` contains calculated specialist modifiers. If one materially qualifies the verdict, translate its effect into ordinary life language through its evidence-bound planet; do not name the specialist condition in the visible answer unless the user requests technical detail. Do not list every factor, turn a caution into denial, or invent one.
+- `evidence.special_natal_factors` contains calculated specialist modifiers. If one materially qualifies the verdict, translate its effect through its evidence-bound planet. Name the specialist condition only when `answer_contract.visible_astrology.technical_detail_allowed` is true. Do not list every factor, turn a caution into denial, or invent one.
 - If evidence is missing, state the limited conclusion plainly. Never fill gaps with generic planet folklore.
 - Preserve all cautions and limitations. For health, describe only allowed susceptibilities, never diagnosis or certainty.
 - For a constitutional health question, name every ranked zone in `health_rules.allowed_zone_evidence` in exact order; `required_zone_count` is mandatory, not a maximum. Do not reorder or omit the fourth region to shorten the answer. Explain each zone only from its own row. The composer brief intentionally contains no current timing: never add a dasha, transit, or "currently active" statement from general astrology knowledge.
@@ -16670,13 +16670,13 @@ Style rules:
 - For broad questions such as "How is my career this year?", the first sentence must give a clear real-world verdict such as supportive, mixed-but-improving, demanding, or change-oriented. Then state what that means in life: workload, recognition, income, role change, interviews, clients, authority, conflict, or stability—but only when supported by the supplied evidence.
 - Translate house themes into ordinary outcomes. Do not say only "houses 2, 6 and 11 are active"; say what the supplied themes mean for the user's work and money. House numbers may appear once as a short reason, never as the substance of the reply.
 - When the evidence supports timing phases, describe how the lived experience changes between phases. Do not merely list three dasha chains and their dates.
-- Unless the user asks "why" or requests technical astrology, use no more than one sentence of astrological proof. The rest must answer the life question.
+- In Simple style use no more than one sentence of astrological proof. In Technical style provide useful supplied technical reasoning without allowing it to crowd out the direct life answer.
 - If `named_dasha_lookup.matches` is present, use its `authoritative_fact` for the requested planet dasha start/end date. Do not infer a different date from transits, event windows, or current dasha summaries.
 - If `normalized_evidence.event_timing_verdict.answer_event_label` is present, name that event plainly in the first sentence. Avoid vague placeholders like "this event" or "these matters" as the only topic name.
 - In speech mode, sound like a live guide, not a report. Prefer openers like "For promotion, I would look most closely at..." or "For having a child, the cleaner window is..." Avoid stiff phrases such as "the astrological indicators suggest", "materialization window", "these matters", "this event", and "planetary influences".
 - In speech mode, do not repeat the same timing noun in every sentence. After naming the window once, use natural phrasing like "that phase", "that stretch", or "then" only when the reference is clear.
 - In speech mode, keep technical proof compact: name the dasha chain and 1 concrete reason from `allowed_house_themes` or `why`; do not narrate every activated house if it makes the answer sound mechanical.
-- If `normalized_evidence.divisional_specifics` has concrete D7, D9, D10, or Karkamsa evidence, mention one relevant chart code naturally. This is good credibility in speech, but keep it to one compact sentence unless the user asks for technical detail.
+- If `normalized_evidence.divisional_specifics` has concrete D7, D9, D10, or Karkamsa evidence, mention one relevant chart code naturally. Keep it to one compact sentence in Simple style; Technical style may explain the supplied divisional evidence in more depth.
 - Mention the strongest current dasha or transit factor only when it genuinely helps clarity for this answer mode.
 - Start from `normalized_evidence.primary_drivers` and only then bring in `secondary_modifiers`.
 - Use `normalized_evidence.answer_mode_contract.answer_skeleton` as the structural backbone of the response.
@@ -16732,6 +16732,7 @@ async def generate_instant_chat_response(
     language: str = "english",
     latest_user_question: Optional[str] = None,
     speech_mode: bool = False,
+    response_style: str = "simple",
     stream_callback: Optional[Callable[[str, str], None]] = None,
 ) -> Dict[str, Any]:
     intent = apply_timeline_intent_guard(intent)
@@ -16749,6 +16750,11 @@ async def generate_instant_chat_response(
         latest_user_question or question,
         intent,
         requested_app_language,
+    )
+    response_style = (
+        "technical"
+        if str(response_style or "").strip().lower() == "technical"
+        else "simple"
     )
     medical_triage = _instant_medical_triage_decision(question, intent)
     if medical_triage:
@@ -16941,6 +16947,7 @@ async def generate_instant_chat_response(
             prompt_context,
             question=question,
             language=language,
+            response_style=response_style,
         )
         prompt_context = dict(prompt_context)
         prompt_answer_contract = dict(prompt_context.get("answer_contract") or {})
@@ -17205,7 +17212,7 @@ Your previous constitutional-health answer was rejected because it changed or om
 
 The rejected answer may itself use the wrong language. Do not copy its language; follow the USER QUESTION below.
 
-Rewrite the complete answer once. Use every region in ranked order. For each region, state one distinct cause sentence using only that row's exact `required_cause_facts`. Planet, sign, nakshatra and house data are immutable internally. In the visible prose, name the evidence-bound planet and translate the technical condition into its practical health meaning; do not expose chart codes, numbered houses, degrees, nakshatras or specialist conditions unless the question requests technical detail. Copy each row's exact `validation_marker` at the end of that row's explanatory sentence in every language; it is mandatory, must not be translated, and will be removed before display. Do not mention dashas, transits, timing, current periods, diagnoses, or additional body regions. End with one natural preventive-care or symptom question, followed by the required metadata line.
+Rewrite the complete answer once. Use every region in ranked order. For each region, state one distinct cause sentence using only that row's exact `required_cause_facts`. Planet, sign, nakshatra and house data are immutable. Follow `VISIBLE ASTROLOGY CONTRACT.technical_terms_rule`: Simple translates the condition into its practical health meaning; Technical may expose only supplied chart codes, houses, degrees, nakshatras and specialist conditions. Copy each row's exact `validation_marker` at the end of that row's explanatory sentence in every language; it is mandatory, must not be translated, and will be removed before display. Do not mention dashas, transits, timing, current periods, diagnoses, or additional body regions. End with one natural preventive-care or symptom question, followed by the required metadata line.
 
 VALIDATION FAILURES:
 {json.dumps(health_fact_validation_errors, ensure_ascii=False)}

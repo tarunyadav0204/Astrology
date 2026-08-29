@@ -65,20 +65,20 @@ const InstantEvidenceDetails = ({ evidence, colors, t }) => {
           <View style={styles.instantEvidenceSectionTitleRow}>
             {section.step ? (
               <View style={[styles.instantEvidenceStepBadge, { backgroundColor: colors.accentSoft }]}>
-                <Text style={[styles.instantEvidenceStepText, { color: colors.accent }]}>{section.step}</Text>
+                <Text style={[styles.instantEvidenceStepText, { color: colors.onAccent }]}>{section.step}</Text>
               </View>
             ) : null}
-            <Text style={[styles.instantEvidenceLabel, styles.instantEvidenceSectionTitle, { color: colors.textSecondary }]}>{section.title}</Text>
+            <Text style={[styles.instantEvidenceLabel, styles.instantEvidenceSectionTitle, { color: colors.text }]}>{section.title}</Text>
           </View>
           {(section.lines || []).map((line, index) => (
             <View key={`${section.key}_${index}`} style={styles.instantEvidenceBulletRow}>
-              <View style={[styles.instantEvidenceBulletDot, { backgroundColor: colors.accent }]} />
+              <View style={[styles.instantEvidenceBulletDot, { backgroundColor: colors.primary }]} />
               <Text style={[styles.instantEvidenceBulletText, { color: colors.text }]}>{line}</Text>
             </View>
           ))}
           {(section.groups || []).map((group) => (
             <View key={`${section.key}_${group.key}`} style={[styles.instantEvidenceGroup, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceMuted }]}>
-              <Text style={[styles.instantEvidenceGroupTitle, { color: colors.accent }]}>{group.title}</Text>
+              <Text style={[styles.instantEvidenceGroupTitle, { color: colors.primary }]}>{group.title}</Text>
               {(group.lines || []).map((line, index) => (
                 <Text key={`${group.key}_line_${index}`} style={[styles.instantEvidenceBulletText, { color: colors.text }]}>{line}</Text>
               ))}
@@ -2036,30 +2036,145 @@ function MessageBubble({
               ))}
             </View>
           ) : null}
-          <Text style={[styles.instantMessageTime, { color: colors.textTertiary }]}>{instantTime}</Text>
-          {!isUser && instantEvidence ? (
-            <>
+          <View style={styles.instantMessageMetaRow}>
+            {!isUser && instantEvidence ? (
               <TouchableOpacity
                 accessibilityRole="button"
                 accessibilityState={{ expanded: showInstantEvidence }}
                 accessibilityLabel={whyTaraSaysThis(language || i18n.resolvedLanguage || i18n.language)}
-                style={[styles.instantEvidenceToggle, {
-                  backgroundColor: colors.accentSoft,
-                  borderColor: colors.cardBorder,
-                }]}
+                style={styles.instantEvidenceToggle}
                 onPress={() => setShowInstantEvidence(true)}
+                hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
               >
-                <Ionicons name="diamond-outline" size={16} color={colors.text} />
                 <Text
-                  style={[styles.instantEvidenceToggleText, { color: colors.text }]}
+                  style={[styles.instantEvidenceToggleText, { color: colors.primary }]}
                 >
-                  {whyTaraSaysThis(language || i18n.resolvedLanguage || i18n.language)
+                  ◇ {whyTaraSaysThis(language || i18n.resolvedLanguage || i18n.language)
                     || t('premiumUi.chat.whyThisAnswer', 'Why Tara says this')}
                 </Text>
-                <Ionicons name="open-outline" size={15} color={colors.text} />
               </TouchableOpacity>
-            </>
-          ) : null}
+            ) : null}
+            <Text style={[styles.instantMessageTime, { color: colors.textTertiary }]}>{instantTime}</Text>
+          </View>
+        {!isUser && !message.isTyping && !message.instantStreaming && !message.isWelcome && !isNativeGate && (message.messageId || message.content) ? (
+          <View
+            style={[
+              styles.actionButtons,
+              styles.instantActionButtons,
+              { borderTopColor: colors.cardBorder },
+            ]}
+            accessibilityRole="toolbar"
+            accessibilityLabel={t('chat.messageActions', 'Message actions')}
+          >
+            {!(isPlayingPodcast || isPausedPodcast) ? (
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  styles.listenPodcastButton,
+                  highlightedActionStyle,
+                  podcastReady && styles.listenPodcastButtonReady,
+                ]}
+                onPress={onPodcastButtonPress}
+                disabled={isLoadingPodcast}
+                accessibilityRole="button"
+                accessibilityLabel={podcastReady
+                  ? t('chat.podcastReadyToast', 'Podcast ready — tap to listen')
+                  : t('chat.listenPodcast', 'Listen as podcast')}
+              >
+                {isLoadingPodcast ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <View style={styles.podcastReadyIconWrap}>
+                    <Ionicons
+                      name={podcastReady ? 'radio' : 'radio-outline'}
+                      size={17}
+                      color={podcastReady ? '#15803d' : colors.primary}
+                    />
+                    {podcastReady ? <View style={styles.podcastReadyDot} /> : null}
+                  </View>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.actionButton, messageActionStyle]}
+                  onPress={isPlayingPodcast ? handlePausePodcast : onPodcastButtonPress}
+                  accessibilityRole="button"
+                  accessibilityLabel={isPlayingPodcast ? t('chat.pausePodcast', 'Pause podcast') : t('chat.resumePodcast', 'Resume podcast')}
+                >
+                  <Ionicons name={isPlayingPodcast ? 'pause' : 'play'} size={16} color={isPlayingPodcast ? colors.primary : messageActionIcon} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, messageActionStyle]}
+                  onPress={handleStopPodcast}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('chat.stopPodcast', 'Stop podcast')}
+                >
+                  <Ionicons name="stop-circle" size={16} color={messageActionIcon} />
+                </TouchableOpacity>
+              </>
+            )}
+            <TouchableOpacity
+              style={[styles.actionButton, messageActionStyle]}
+              onPress={sharePodcastAudio}
+              disabled={isSharingPodcast || isLoadingPodcast}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.sharePodcast', 'Share podcast audio')}
+            >
+              {isSharingPodcast ? (
+                <ActivityIndicator size="small" color={messageActionIcon} />
+              ) : (
+                <Ionicons name="share-outline" size={16} color={messageActionIcon} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, messageActionStyle]}
+              onPress={copyToClipboard}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.copyMessage', 'Copy message')}
+            >
+              <Ionicons name="copy-outline" size={16} color={messageActionIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, messageActionStyle]}
+              onPress={shareMessage}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.shareMessage', 'Share message')}
+            >
+              <Ionicons name="share-social-outline" size={16} color={messageActionIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.pdfButton, messageActionStyle]}
+              onPress={sharePDF}
+              disabled={isGeneratingPDF}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.downloadPdf', 'Download as PDF')}
+            >
+              {isGeneratingPDF ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="document-text-outline" size={16} color={messageActionIcon} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.deleteButton, destructiveActionStyle]}
+              onPress={() => {
+                Alert.alert(
+                  t('chat.deleteMessage', 'Delete Message'),
+                  t('chat.deleteMessageConfirm', 'Are you sure you want to delete this message?'),
+                  [
+                    { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+                    { text: t('common.delete', 'Delete'), style: 'destructive', onPress: deleteMessage },
+                  ],
+                );
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.deleteMessage', 'Delete message')}
+            >
+              <Ionicons name="trash-outline" size={16} color={colors.error} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
         </View>
       </Animated.View>
         <Modal
@@ -2073,7 +2188,7 @@ function MessageBubble({
             <View style={[styles.instantEvidenceModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
               <View style={[styles.instantEvidenceModalHeader, { borderBottomColor: colors.cardBorder }]}>
                 <View style={styles.instantEvidenceHeaderCopy}>
-                  <Text style={[styles.instantEvidenceEyebrow, { color: colors.accent }]}>
+                  <Text style={[styles.instantEvidenceEyebrow, { color: colors.primary }]}>
                     {whyTaraSaysThis(language || i18n.resolvedLanguage || i18n.language)}
                   </Text>
                 </View>
@@ -2096,6 +2211,58 @@ function MessageBubble({
             </View>
           </View>
         </Modal>
+        <ConfirmCreditsModal
+          visible={showPodcastCreditsModal}
+          onClose={() => setShowPodcastCreditsModal(false)}
+          onConfirm={confirmPodcastCredits}
+          title={t('credits.podcastModal.title', 'Listen as Podcast')}
+          description={t('credits.podcastModal.description', 'This will generate an audio podcast of this message. Credits will be deducted when the podcast is created.')}
+          cost={podcastCost ?? 2}
+          credits={credits ?? 0}
+          confirmLabel={t('common.continue', 'Continue')}
+        />
+        <PodcastLanguageModal
+          visible={showPodcastLanguageModal}
+          selectedLang={podcastListenLang}
+          included={isPremiumChatMessage}
+          colors={colors}
+          onSelect={continuePodcastAfterLanguage}
+          onClose={() => {
+            skipPodcastCreditsRef.current = false;
+            setShowPodcastLanguageModal(false);
+          }}
+        />
+        <AppAlertModal
+          visible={copyAlert.visible}
+          variant={copyAlert.error ? 'error' : 'success'}
+          icon={copyAlert.error ? 'alert-circle-outline' : 'copy-outline'}
+          title={t(copyAlert.error ? 'copyAlert.failedTitle' : 'copyAlert.successTitle')}
+          message={t(copyAlert.error ? 'copyAlert.failedBody' : 'copyAlert.successBody')}
+          onPrimaryPress={() => setCopyAlert({ visible: false, error: false })}
+          onRequestClose={() => setCopyAlert({ visible: false, error: false })}
+        />
+        <PodcastPlayerModal
+          visible={showPodcastPlayerModal}
+          onClose={handlePodcastPlayerClose}
+          mode={podcastPlayerMode}
+          positionMillis={podcastPositionMillis}
+          durationMillis={podcastDurationMillis}
+          onSeek={handlePodcastSeek}
+          onPause={handlePausePodcast}
+          onResume={handleResumePodcast}
+          onStop={handleStopPodcast}
+          onShare={sharePodcastAudio}
+          playbackRate={podcastPlaybackRate}
+          viewMode={podcastViewMode}
+          onViewModeChange={handlePodcastViewModeChange}
+          visualManifest={podcastVisualManifest}
+          isVisualLoading={isPodcastVisualLoading}
+          visualError={podcastVisualError}
+          onSpeedChange={(rate) => {
+            setPodcastPlaybackRate(rate);
+            getTextToSpeech().setPodcastRate(rate);
+          }}
+        />
       </>
     );
   }
@@ -3024,6 +3191,12 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   instantMessageRowAssistant: {
     alignItems: 'flex-start',
   },
+  instantActionButtons: {
+    width: '100%',
+    alignSelf: 'stretch',
+    marginTop: 8,
+    paddingTop: 8,
+  },
   instantMessageBubble: {
     maxWidth: '82%',
     minWidth: 72,
@@ -3044,10 +3217,16 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     fontWeight: '400',
   },
   instantMessageTime: {
-    marginTop: 5,
-    alignSelf: 'flex-end',
     fontSize: 12,
     lineHeight: 16,
+  },
+  instantMessageMetaRow: {
+    minHeight: 24,
+    marginTop: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
   },
   instantInlineTyping: {
     flexDirection: 'row',
@@ -3061,21 +3240,12 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     borderRadius: 3,
   },
   instantEvidenceToggle: {
-    marginTop: 8,
-    minHeight: 44,
-    paddingHorizontal: 9,
-    paddingVertical: 7,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 999,
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
+    paddingVertical: 2,
   },
   instantEvidenceToggleText: {
     fontSize: 13,
     lineHeight: 17,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   instantEvidenceModalBackdrop: {
     flex: 1,
@@ -3086,6 +3256,7 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   instantEvidenceModalCard: {
     flex: 1,
     width: '100%',
+    maxWidth: '100%',
     maxHeight: '94%',
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
@@ -3094,13 +3265,15 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   },
   instantEvidenceModalHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
     paddingHorizontal: 18,
     paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   instantEvidenceModalClose: {
+    flexShrink: 0,
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -3112,6 +3285,8 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     flex: 1,
   },
   instantEvidenceModalContent: {
+    width: '100%',
+    maxWidth: '100%',
     paddingHorizontal: 18,
     paddingBottom: 32,
   },
@@ -3121,31 +3296,31 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     justifyContent: 'space-between',
     gap: 8,
   },
-  instantEvidenceHeaderCopy: { flex: 1, gap: 2 },
-  instantEvidenceEyebrow: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1.2 },
+  instantEvidenceHeaderCopy: { flex: 1, minWidth: 0, flexShrink: 1, gap: 2 },
+  instantEvidenceEyebrow: { flexShrink: 1, fontSize: 15, lineHeight: 20, fontWeight: '800', letterSpacing: 0.2 },
   instantEvidenceTitle: { fontSize: 13, lineHeight: 17, fontWeight: '800', textTransform: 'capitalize' },
   instantEvidenceStatus: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 999 },
   instantEvidenceStatusText: { fontSize: 9, lineHeight: 11, fontWeight: '800' },
   instantEvidenceVerdict: { marginTop: 9, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
-  instantEvidenceLabel: { marginTop: 8, marginBottom: 4, fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1 },
+  instantEvidenceLabel: { marginTop: 8, marginBottom: 4, fontSize: 13, lineHeight: 18, fontWeight: '800', letterSpacing: 0.2 },
   instantEvidenceValue: { fontSize: 13, lineHeight: 17, fontWeight: '800' },
   instantEvidenceMeta: { marginTop: 2, fontSize: 10, lineHeight: 14 },
   instantEvidenceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   instantEvidenceRowName: { flex: 1, fontSize: 10, lineHeight: 14, fontWeight: '600' },
   instantEvidenceRowStatus: { fontSize: 9, lineHeight: 12, fontWeight: '800' },
   instantEvidenceSectionLabel: { marginTop: 12 },
-  instantEvidenceSection: { marginTop: 8 },
-  instantEvidenceSectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 3 },
-  instantEvidenceSectionTitle: { flex: 1, marginTop: 0, marginBottom: 0 },
-  instantEvidenceGroup: { marginTop: 8, marginLeft: 22, padding: 10, borderWidth: 1, borderRadius: 12, gap: 6 },
+  instantEvidenceSection: { width: '100%', maxWidth: '100%', minWidth: 0, marginTop: 12 },
+  instantEvidenceSectionTitleRow: { width: '100%', minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
+  instantEvidenceSectionTitle: { flex: 1, minWidth: 0, flexShrink: 1, marginTop: 0, marginBottom: 0 },
+  instantEvidenceGroup: { maxWidth: '100%', minWidth: 0, marginTop: 8, marginLeft: 22, padding: 10, borderWidth: 1, borderRadius: 12, gap: 6 },
   instantEvidenceGroupTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' },
   instantEvidenceFactor: { paddingTop: 7, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.24)', gap: 2 },
   instantEvidenceFactorTitle: { fontSize: 12, fontWeight: '700' },
   instantEvidenceStepBadge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   instantEvidenceStepText: { fontSize: 10, lineHeight: 12, fontWeight: '900' },
-  instantEvidenceBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, paddingVertical: 2 },
+  instantEvidenceBulletRow: { width: '100%', minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 7, paddingVertical: 3 },
   instantEvidenceBulletDot: { width: 5, height: 5, borderRadius: 3, marginTop: 6 },
-  instantEvidenceBulletText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' },
+  instantEvidenceBulletText: { flex: 1, minWidth: 0, flexShrink: 1, fontSize: 13, lineHeight: 19, fontWeight: '600' },
   instantEvidenceRecord: { marginTop: 6, padding: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 9 },
   instantEvidenceRecordTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 6 },
   instantEvidenceId: { fontSize: 9, lineHeight: 12, fontWeight: '900' },

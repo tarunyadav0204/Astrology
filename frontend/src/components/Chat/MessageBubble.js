@@ -1661,11 +1661,94 @@ const MessageBubble = ({
                         ) : null}
                         {time ? <time>{time}</time> : null}
                     </div>
+                    {message.role === 'assistant' && showMessageToolbar ? (
+                        <div className="message-action-buttons message-action-buttons--bottom message-action-buttons--instant" role="toolbar" aria-label="Message actions">
+                        <button
+                            type="button"
+                            className={`action-btn action-btn--podcast${podcastReady ? ' action-btn--podcast-ready' : ''}`}
+                            disabled={podcastLoading}
+                            onClick={handlePodcastButtonClick}
+                            title={podcastReady ? PODCAST_READY_TOAST : 'Listen as podcast'}
+                            aria-label={podcastReady ? PODCAST_READY_TOAST : 'Listen as podcast'}
+                        >
+                            {podcastLoading ? (
+                                <span className="podcast-prep-spinner" aria-hidden="true" />
+                            ) : podcastReady ? (
+                                <><IconRadioFilled /><span className="podcast-ready-label">Ready</span></>
+                            ) : (
+                                <IconRadioOutline />
+                            )}
+                        </button>
+                        <button type="button" className="action-btn action-btn--toolbar" onClick={handleCopyClick} title="Copy message" aria-label="Copy message">
+                            <IconCopyOutline />
+                        </button>
+                        <button type="button" className="action-btn action-btn--toolbar" onClick={handleShareMessage} title="Share" aria-label="Share message">
+                            <IconShareSocialOutline />
+                        </button>
+                        <button
+                            type="button"
+                            className="action-btn action-btn--pdf"
+                            disabled={pdfGenerating}
+                            onClick={handleMessagePdf}
+                            title="Download as PDF"
+                            aria-label="Download as PDF"
+                        >
+                            <IconDocumentOutline />
+                        </button>
+                        <button type="button" className="action-btn action-btn--delete" onClick={handleDeleteMessage} title="Delete message" aria-label="Delete message">
+                            <IconTrashOutline />
+                        </button>
+                        </div>
+                    ) : null}
                 </div>
                 {renderTimelineSelectionCard()}
                 {showInstantEvidence && instantEvidence ? (
                     <InstantEvidenceModal evidence={instantEvidence} onClose={() => setShowInstantEvidence(false)} />
                 ) : null}
+                <PodcastLanguageModal
+                    open={showPodcastLanguageModal}
+                    selectedLang={podcastListenLang}
+                    uiLanguage={language}
+                    included={isPremiumChatMessage}
+                    onSelect={continuePodcastAfterLanguage}
+                    onClose={() => {
+                        skipPodcastCreditsRef.current = false;
+                        setShowPodcastLanguageModal(false);
+                    }}
+                />
+                {podcastModalOpen && createPortal(
+                    <div className="instant-podcast-backdrop" role="presentation" onClick={(event) => {
+                        if (podcastModalMode !== 'loading' && !podcastLoading) closePodcastModal(event);
+                    }}>
+                        <div className="instant-podcast-player" role="dialog" aria-modal="true" aria-label="Podcast player" onClick={(event) => event.stopPropagation()}>
+                            {podcastModalMode === 'loading' || podcastLoading ? (
+                                <PodcastGenerationExperience startedAt={podcastGenerationStartedAt} onCancel={closePodcastModal} />
+                            ) : (
+                                <>
+                                    <strong>Podcast</strong>
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={podcastDuration > 0 ? podcastDuration : 1}
+                                        step={0.1}
+                                        value={Math.min(podcastCurrentTime, podcastDuration > 0 ? podcastDuration : 0)}
+                                        onChange={(event) => handlePodcastSeek(parseFloat(event.target.value))}
+                                        aria-label="Podcast position"
+                                    />
+                                    <div className="instant-podcast-player__actions">
+                                        <button type="button" onClick={handlePodcastTogglePause}>{podcastIsPlaying ? 'Pause' : 'Play'}</button>
+                                        <button type="button" onClick={closePodcastModal}>Stop & close</button>
+                                        <select value={String(podcastPlaybackRate)} onChange={(event) => handlePodcastRateChange(event.target.value)} aria-label="Playback speed">
+                                            <option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option>
+                                        </select>
+                                    </div>
+                                    <button type="button" className="instant-podcast-player__share" onClick={handlePodcastShare}>Share or download MP3</button>
+                                </>
+                            )}
+                        </div>
+                    </div>,
+                    document.body
+                )}
             </div>
         );
     }

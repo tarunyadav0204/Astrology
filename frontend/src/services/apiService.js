@@ -264,13 +264,14 @@ export const apiService = {
     return response.data;
   },
 
-  getEventWindows: async ({ birthChartId, birthData, eventKey, year, includeDeveloping = false }) => {
+  getEventWindows: async ({ birthChartId, birthData, eventKey, year, includeDeveloping = false, focusHouses = null }) => {
     const response = await apiClient.post(getEndpoint('/prediction-engine/event-windows'), {
       birth_chart_id: birthChartId || null,
       birth_data: birthChartId ? null : birthData,
       event_key: eventKey,
       year,
       include_developing: includeDeveloping,
+      focus_houses: eventKey === 'custom' ? (focusHouses || []) : null,
     });
     return response.data;
   },

@@ -6,12 +6,14 @@ import chat.instant_chat_pipeline as pipeline
 class _FakeAnalyzer:
     def __init__(self):
         self.generate_calls = 0
+        self.prompts = []
 
     def get_named_gemini_model(self, model_name, premium_analysis=False):
         return {"model": model_name}
 
     async def generate_text_from_prompt(self, prompt, **kwargs):
         self.generate_calls += 1
+        self.prompts.append(prompt)
         return {
             "success": True,
             "response": (
@@ -66,11 +68,14 @@ def test_instant_answer_uses_exactly_one_generation_call(monkeypatch):
             },
             history=[],
             language="english",
+            response_style="technical",
         )
     )
 
     assert result["success"] is True
     assert analyzer.generate_calls == 1
+    assert "TECHNICAL STYLE IS SELECTED" in analyzer.prompts[0]
+    assert "two renderings of the same adjudicated answer" in analyzer.prompts[0]
     debug = result["instant_evidence_debug"]
     assert debug["contract_enforcement"]["generation_calls"] == 1
     assert debug["contract_enforcement"]["reason"] == "single_call_contract_in_primary_prompt"

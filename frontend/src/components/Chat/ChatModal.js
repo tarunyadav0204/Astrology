@@ -27,7 +27,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
     const [isLoading, setIsLoading] = useState(false);
     const [sessionId, setSessionId] = useState(null);
     const language = 'english';
-    const [responseStyle, setResponseStyle] = useState('detailed');
+    const [responseStyle, setResponseStyle] = useState('technical');
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [hoveredMessage, setHoveredMessage] = useState(null);
     const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0 });
@@ -1146,8 +1146,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 ← Back
                             </button>
                         )}
-                        <button onClick={() => setResponseStyle(responseStyle === 'detailed' ? 'concise' : 'detailed')}>
-                            {responseStyle === 'detailed' ? '⚡ Quick' : '📋 Detailed'}
+                        <button onClick={() => setResponseStyle(responseStyle === 'technical' ? 'simple' : 'technical')}>
+                            {responseStyle === 'technical' ? 'Simple' : 'Technical'}
                         </button>
                         <button onClick={downloadChatPDF}>
                             📄 Download PDF
@@ -1339,8 +1339,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                 pointerEvents: 'auto'
             }}>
                     <button 
-                        onClick={(e) => { e.stopPropagation(); setResponseStyle(responseStyle === 'detailed' ? 'concise' : 'detailed'); setShowMobileMenu(false); }}
-                        onTouchEnd={(e) => { e.stopPropagation(); setResponseStyle(responseStyle === 'detailed' ? 'concise' : 'detailed'); setShowMobileMenu(false); }}
+                        onClick={(e) => { e.stopPropagation(); setResponseStyle(responseStyle === 'technical' ? 'simple' : 'technical'); setShowMobileMenu(false); }}
+                        onTouchEnd={(e) => { e.stopPropagation(); setResponseStyle(responseStyle === 'technical' ? 'simple' : 'technical'); setShowMobileMenu(false); }}
                         style={{
                             width: '100%',
                             padding: '10px 15px',
@@ -1355,7 +1355,7 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                             userSelect: 'none'
                         }}
                     >
-                        {responseStyle === 'detailed' ? '⚡ Quick Mode' : '📋 Detailed Mode'}
+                        {responseStyle === 'technical' ? 'Simple' : 'Technical'}
                     </button>
                     <button 
                         onClick={(e) => {

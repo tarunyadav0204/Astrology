@@ -11,7 +11,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 
@@ -31,6 +31,7 @@ class SignalGroup:
     houses: Tuple[int, ...]
     weight: int
     required: bool = False
+    require_all: bool = False
     description: str = ""
 
 
@@ -56,6 +57,8 @@ class EventDefinition:
     outcome: SignalGroup
     classifications: Tuple[ClassificationRule, ...]
     version: str
+    independent_confirmation_required: bool = True
+    score_activation_quality: bool = False
 
 
 JOB_CHANGE = EventDefinition(
@@ -173,10 +176,568 @@ HEALTH = EventDefinition(
 )
 
 
+PROPERTY_PURCHASE = EventDefinition(
+    key="property_purchase",
+    label="Property purchase",
+    description=(
+        "A home or property acquisition window: the fourth house must be dasha-opened, "
+        "together with a payment or financing signal. Natal property yogas are context only "
+        "and never veto a window."
+    ),
+    varga="D4",
+    varga_houses=(4,),
+    varga_description=(
+        "D4 is the property and residence chart. An active dasha lord connected to D4 H4 "
+        "strengthens home, land and fixed-asset relevance. D4 confirms but never vetoes the event."
+    ),
+    anchor=SignalGroup(
+        key="property_anchor", label="Property anchor", houses=(4,), weight=25,
+        required=True,
+        description=(
+            "H4 describes home, residence, land, vehicles as conveyances and inner stability. "
+            "It must be opened by the current MD/AD/PD."
+        ),
+    ),
+    transition=SignalGroup(
+        key="purchase_outlay", label="Payment or financing", houses=(2, 8), weight=20,
+        required=True,
+        description=(
+            "A purchase needs an outlay as well as a property house: H2 can show using savings "
+            "or family resources; H8 can show a loan, mortgage, inheritance or joint purchase."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="property_fulfilment", label="Property fulfilment", houses=(11,), weight=10,
+        description=(
+            "H11 describes gaining the asset, fulfilment of the property objective and the benefit "
+            "received. It classifies a completed-looking purchase but is not required for the window."
+        ),
+    ),
+    classifications=(
+        ClassificationRule(
+            "property_purchase_with_gain", "Property purchase with gain support", outcome="present"
+        ),
+        ClassificationRule(
+            "loan_or_shared_purchase", "Loan, mortgage or shared-purchase pattern",
+            transition_any=(8,), outcome="absent",
+        ),
+        ClassificationRule(
+            "purchase_from_savings", "Purchase from savings or family resources",
+            transition_any=(2,), outcome="absent",
+        ),
+        ClassificationRule("property_purchase", "Property purchase window"),
+    ),
+    version="property_purchase.v1",
+)
+
+
+RELOCATION = EventDefinition(
+    key="relocation",
+    label="Relocation",
+    description=(
+        "A change of residence or time away from the present home. The fourth house must be "
+        "dasha-opened together with a movement or leaving signal. This is a housing-timing aid, "
+        "not a guaranteed move date."
+    ),
+    varga="D4",
+    varga_houses=(4, 12),
+    varga_description=(
+        "D4 H4 strengthens residence and property relevance; D4 H12 strengthens leaving, "
+        "distance or a stay away from the present home. D4 confirms but never vetoes the event."
+    ),
+    anchor=SignalGroup(
+        key="home_anchor", label="Home anchor", houses=(4,), weight=25,
+        required=True,
+        description=(
+            "H4 describes the current home, residence and living foundation. "
+            "It must be opened by the current MD/AD/PD."
+        ),
+    ),
+    transition=SignalGroup(
+        key="home_shift", label="Move or leaving signal", houses=(3, 12), weight=20,
+        required=True,
+        description=(
+            "A relocation reading needs movement as well as a home house: H3 can show shifting, "
+            "papers, short-distance change or the effort of moving; H12 can show leaving the "
+            "present arrangement, expense of the move or a stay away from home."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="settlement_support", label="Settlement or distance support", houses=(9, 11), weight=10,
+        description=(
+            "H9 can show a longer-distance or fortune-linked shift; H11 can show securing a new "
+            "place or fulfilment of the move. They classify the flavour of relocation and are not required."
+        ),
+    ),
+    classifications=(
+        ClassificationRule(
+            "relocation_with_settlement", "Relocation with settlement or distance support",
+            outcome="present",
+        ),
+        ClassificationRule(
+            "away_from_home", "Leaving or stay-away pattern",
+            transition_any=(12,), outcome="absent",
+        ),
+        ClassificationRule(
+            "local_home_shift", "Local home-shift pattern",
+            transition_any=(3,), outcome="absent",
+        ),
+        ClassificationRule("relocation", "Relocation window"),
+    ),
+    version="relocation.v1",
+)
+
+
+PROPERTY_GAIN = EventDefinition(
+    key="property_gain",
+    label="Property gain",
+    description=(
+        "Periods where a home or property objective can reach fulfilment: the fourth house and "
+        "an eleventh-house gain signal must both be dasha-opened. This does not guarantee a sale, "
+        "allotment or possession date."
+    ),
+    varga="D4",
+    varga_houses=(4, 11),
+    varga_description=(
+        "D4 H4 strengthens property and residence; D4 H11 strengthens fulfilment and gain of the "
+        "fixed-asset objective. D4 confirms but never vetoes the event."
+    ),
+    anchor=SignalGroup(
+        key="property_anchor", label="Property anchor", houses=(4,), weight=25,
+        required=True,
+        description=(
+            "H4 describes home, residence, land and fixed assets. "
+            "It must be opened by the current MD/AD/PD."
+        ),
+    ),
+    transition=SignalGroup(
+        key="property_gain_signal", label="Property gain signal", houses=(11,), weight=20,
+        required=True,
+        description=(
+            "H11 describes gaining the asset, progress toward a property objective and the benefit "
+            "received. For this search it must be opened in the same dasha window as H4."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="resource_support", label="Resource support", houses=(2,), weight=10,
+        description=(
+            "H2 can show savings, family resources or liquidity supporting the gain. "
+            "It classifies how the fulfilment is resourced and is not required."
+        ),
+    ),
+    classifications=(
+        ClassificationRule(
+            "property_gain_with_resources", "Property gain with resource support", outcome="present"
+        ),
+        ClassificationRule("property_gain", "Property-gain window"),
+    ),
+    version="property_gain.v1",
+)
+
+
+PROMOTION = EventDefinition(
+    key="promotion",
+    label="Promotion / status",
+    description=(
+        "A rise in professional status, responsibility or recognition while remaining in career. "
+        "This is not a job-change search: exit, resignation or role-break houses are not required "
+        "and natal career yogas never veto a window."
+    ),
+    varga="D10",
+    varga_houses=(10, 11),
+    varga_description=(
+        "D10 is the career-specific divisional chart. An active dasha lord connected to D10 H10 "
+        "strengthens profession, authority and status; connection to D10 H11 strengthens recognition "
+        "and the fruit of that status. D10 confirms but never vetoes the event."
+    ),
+    anchor=SignalGroup(
+        key="status_anchor", label="Career status anchor", houses=(10,), weight=25,
+        required=True,
+        description=(
+            "H10 describes profession, public role, authority and career status. "
+            "It must be opened by the current MD/AD/PD."
+        ),
+    ),
+    transition=SignalGroup(
+        key="status_rise", label="Status or recognition signal", houses=(5, 11), weight=20,
+        required=True,
+        description=(
+            "A promotion reading needs a rise as well as a career house: H11 can show gain, "
+            "recognition, fulfilment and the fruit of status; H5 can show authority, honour, "
+            "award or a visible step-up without leaving the role."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="pay_support", label="Salary or resource support", houses=(2,), weight=10,
+        description=(
+            "H2 describes salary, accumulated resources and financial continuity with the rise. "
+            "It classifies a pay-linked promotion and is not required for a status window."
+        ),
+    ),
+    classifications=(
+        ClassificationRule(
+            "promotion_with_salary_support", "Promotion with salary support", outcome="present"
+        ),
+        ClassificationRule(
+            "recognition_or_authority", "Recognition or authority pattern",
+            transition_any=(5,), outcome="absent",
+        ),
+        ClassificationRule("career_status_rise", "Career status-rise window"),
+    ),
+    version="promotion.v1",
+)
+
+
+MARRIAGE = EventDefinition(
+    key="marriage",
+    label="Marriage / partnership",
+    description=(
+        "A partnership-commitment window: the seventh house must be dasha-opened together with "
+        "a joining, romance or fulfilment signal. This is relationship timing, not a guaranteed "
+        "wedding date, and natal marriage yogas never veto a window."
+    ),
+    varga="D9",
+    varga_houses=(7,),
+    varga_description=(
+        "D9 is the marriage and dharma chart. An active dasha lord connected to D9 H7 "
+        "strengthens spouse and partnership relevance. D9 confirms but never vetoes the event."
+    ),
+    anchor=SignalGroup(
+        key="partnership_anchor", label="Partnership anchor", houses=(7,), weight=25,
+        required=True,
+        description=(
+            "H7 describes spouse, one-to-one partnership, agreements and the counterpart. "
+            "It must be opened by the current MD/AD/PD."
+        ),
+    ),
+    transition=SignalGroup(
+        key="joining_signal", label="Joining, romance or fulfilment", houses=(2, 5, 11), weight=20,
+        required=True,
+        description=(
+            "A marriage reading needs a joining signal as well as H7: H2 can show family "
+            "coming together or shared resources; H5 can show romance, meeting or affection; "
+            "H11 can show gaining a partner and fulfilment of the relationship objective."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="ceremony_support", label="Dharma or ceremony support", houses=(9,), weight=10,
+        description=(
+            "H9 can show a dharmic, ceremonial or fortune-linked flavour to the partnership. "
+            "It classifies support for formalisation and is not required for the window."
+        ),
+    ),
+    classifications=(
+        ClassificationRule(
+            "partnership_with_fulfilment", "Partnership with fulfilment support",
+            transition_any=(11,),
+        ),
+        ClassificationRule(
+            "romance_or_meeting", "Romance or meeting pattern",
+            transition_any=(5,),
+        ),
+        ClassificationRule(
+            "family_joining", "Family-joining pattern",
+            transition_any=(2,),
+        ),
+        ClassificationRule("partnership_commitment", "Partnership-commitment window"),
+    ),
+    version="marriage.v1",
+)
+
+
+FOREIGN_TRAVEL = EventDefinition(
+    key="foreign_travel",
+    label="Foreign travel / stay",
+    description=(
+        "Long-distance travel or a stay away from the native land. The ninth house must be "
+        "dasha-opened together with a movement or foreign-stay signal. This is not a home-move "
+        "search: relocation still requires the fourth house."
+    ),
+    varga="D9",
+    varga_houses=(9, 12),
+    varga_description=(
+        "D9 H9 strengthens long journeys, fortune and dharma-linked travel; D9 H12 strengthens "
+        "foreign stay, distance or residence abroad. D9 confirms but never vetoes the event."
+    ),
+    anchor=SignalGroup(
+        key="journey_anchor", label="Long-journey anchor", houses=(9,), weight=25,
+        required=True,
+        description=(
+            "H9 describes long journeys, fortune, teachers and the far horizon. "
+            "It must be opened by the current MD/AD/PD."
+        ),
+    ),
+    transition=SignalGroup(
+        key="travel_or_stay", label="Travel or foreign-stay signal", houses=(3, 12), weight=20,
+        required=True,
+        description=(
+            "A travel reading needs movement as well as H9: H3 can show papers, planning or "
+            "the short-distance start of a journey; H12 can show foreign stay, expense of travel "
+            "or residence away from the native land."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="travel_opportunity", label="Opportunity support", houses=(11,), weight=10,
+        description=(
+            "H11 can show gain, opportunity or fulfilment through the journey. "
+            "It classifies a fruit-bearing trip and is not required."
+        ),
+    ),
+    classifications=(
+        ClassificationRule(
+            "travel_with_opportunity", "Travel with opportunity support", outcome="present"
+        ),
+        ClassificationRule(
+            "foreign_stay", "Foreign-stay pattern",
+            transition_any=(12,), outcome="absent",
+        ),
+        ClassificationRule(
+            "journey_or_travel_plans", "Journey or travel-plans pattern",
+            transition_any=(3,), outcome="absent",
+        ),
+        ClassificationRule("long_distance_movement", "Long-distance movement window"),
+    ),
+    version="foreign_travel.v1",
+)
+
+
+CHILDREN = EventDefinition(
+    key="children",
+    label="Children",
+    description=(
+        "Child-related development, responsibility or fulfilment around the fifth house. "
+        "This is an astrological timing aid and does not predict a birth, diagnose fertility "
+        "or determine the sex of a child."
+    ),
+    varga="D7",
+    varga_houses=(5,),
+    varga_description=(
+        "D7 is used here only as a confirming chart for children and creative progeny. "
+        "A dasha-lord connection to D7 H5 strengthens relevance, but D7 never predicts a birth "
+        "and never vetoes the window."
+    ),
+    anchor=SignalGroup(
+        key="children_anchor", label="Children anchor", houses=(5,), weight=25,
+        required=True,
+        description=(
+            "H5 describes children, creative progeny and the intelligence applied to them. "
+            "It must be opened by the current MD/AD/PD."
+        ),
+    ),
+    transition=SignalGroup(
+        key="child_development", label="Expansion or fulfilment", houses=(9, 11), weight=20,
+        required=True,
+        description=(
+            "A children reading needs growth as well as H5: H9 can show dharma, expansion or "
+            "a blessing-linked development; H11 can show fulfilment of a child-related objective."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="family_support", label="Family-resource support", houses=(2,), weight=10,
+        description=(
+            "H2 can show family resources or the household supporting the development. "
+            "It classifies support and is not required."
+        ),
+    ),
+    classifications=(
+        ClassificationRule(
+            "child_development_with_fulfilment", "Child-related development with fulfilment",
+            transition_any=(11,),
+        ),
+        ClassificationRule(
+            "child_dharma_or_expansion", "Dharma or expansion pattern",
+            transition_any=(9,),
+        ),
+        ClassificationRule("child_development", "Child-related development window"),
+    ),
+    version="children.v1",
+)
+
+
+EDUCATION = EventDefinition(
+    key="education",
+    label="Education / exams",
+    description=(
+        "Study, qualification or examination windows around the fifth house. "
+        "Natal education yogas never veto a window, and this does not guarantee a result."
+    ),
+    varga="D24",
+    varga_houses=(5, 9),
+    varga_description=(
+        "D24 is the learning chart. An active dasha lord connected to D24 H5 strengthens "
+        "study and intelligence; connection to D24 H9 strengthens higher learning. "
+        "D24 confirms but never vetoes the event."
+    ),
+    anchor=SignalGroup(
+        key="learning_anchor", label="Learning anchor", houses=(5,), weight=25,
+        required=True,
+        description=(
+            "H5 describes intelligence, study, examinations and the application of learning. "
+            "It must be opened by the current MD/AD/PD."
+        ),
+    ),
+    transition=SignalGroup(
+        key="study_path", label="Study path", houses=(4, 9), weight=20,
+        required=True,
+        description=(
+            "An education reading needs a path as well as H5: H4 can show foundational learning, "
+            "schooling or the educational base; H9 can show higher studies, teachers or long-form "
+            "qualification."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="exam_result", label="Result support", houses=(11,), weight=10,
+        description=(
+            "H11 can show fulfilment of a course, examination success or the fruit of study. "
+            "It classifies a result-looking window and is not a guarantee."
+        ),
+    ),
+    classifications=(
+        ClassificationRule(
+            "education_with_result", "Education with result support", outcome="present"
+        ),
+        ClassificationRule(
+            "higher_learning", "Higher-learning pattern",
+            transition_any=(9,), outcome="absent",
+        ),
+        ClassificationRule(
+            "foundational_study", "Foundational-study pattern",
+            transition_any=(4,), outcome="absent",
+        ),
+        ClassificationRule("education_milestone", "Education-milestone window"),
+    ),
+    version="education.v1",
+)
+
+
+INCOME_GAIN = EventDefinition(
+    key="income_gain",
+    label="Income / gains",
+    description=(
+        "Income and accumulated-resource windows: the second and eleventh houses must both "
+        "be dasha-opened in the same period. This is not a job-change or promotion search."
+    ),
+    varga="D2",
+    varga_houses=(2, 11),
+    varga_description=(
+        "D2 is the resource chart. An active dasha lord connected to D2 H2 strengthens savings "
+        "and accumulated wealth; connection to D2 H11 strengthens gains and inflow. "
+        "D2 confirms but never vetoes the event."
+    ),
+    anchor=SignalGroup(
+        key="savings_anchor", label="Savings anchor", houses=(2,), weight=25,
+        required=True,
+        description=(
+            "H2 describes accumulated resources, savings, family money and the store of wealth. "
+            "It must be opened by the current MD/AD/PD."
+        ),
+    ),
+    transition=SignalGroup(
+        key="gains_signal", label="Gains signal", houses=(11,), weight=20,
+        required=True,
+        description=(
+            "H11 describes income, gains, fulfilment of financial objectives and inflow. "
+            "For this search it must be opened in the same dasha window as H2."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="fortune_or_speculation", label="Fortune or speculation support", houses=(5, 9), weight=10,
+        description=(
+            "H5 can show speculative or intelligent-risk income; H9 can show fortune-linked or "
+            "guidance-linked gain. They classify the flavour of inflow and are not required."
+        ),
+    ),
+    classifications=(
+        ClassificationRule(
+            "income_with_fortune_or_speculation",
+            "Income with fortune or speculation support",
+            outcome="present",
+        ),
+        ClassificationRule("income_and_gains", "Income and gains window"),
+    ),
+    version="income_gain.v1",
+)
+
+
 EVENT_DEFINITIONS: Mapping[str, EventDefinition] = {
     JOB_CHANGE.key: JOB_CHANGE,
+    PROMOTION.key: PROMOTION,
     HEALTH.key: HEALTH,
+    PROPERTY_PURCHASE.key: PROPERTY_PURCHASE,
+    RELOCATION.key: RELOCATION,
+    PROPERTY_GAIN.key: PROPERTY_GAIN,
+    MARRIAGE.key: MARRIAGE,
+    FOREIGN_TRAVEL.key: FOREIGN_TRAVEL,
+    CHILDREN.key: CHILDREN,
+    EDUCATION.key: EDUCATION,
+    INCOME_GAIN.key: INCOME_GAIN,
 }
+
+CUSTOM_EVENT_KEY = "custom"
+
+
+def normalise_focus_houses(houses: Sequence[Any] | None) -> Tuple[int, ...]:
+    if not houses:
+        raise PredictionConfigurationError("Custom focus requires at least one house")
+    unique: List[int] = []
+    seen = set()
+    for value in houses:
+        house = int(value)
+        if house < 1 or house > 12:
+            raise PredictionConfigurationError("Custom houses must be between 1 and 12")
+        if house not in seen:
+            seen.add(house)
+            unique.append(house)
+    return tuple(sorted(unique))
+
+
+def build_custom_definition(houses: Sequence[Any] | None) -> EventDefinition:
+    selected = normalise_focus_houses(houses)
+    labels = "/".join(f"H{house}" for house in selected)
+    return EventDefinition(
+        key=CUSTOM_EVENT_KEY,
+        label="Custom",
+        description=(
+            "Find periods where every selected house is opened by the current MD, AD or PD. "
+            "Transit hits, dasha boundaries, Jupiter–Saturn contact and exact returns are optional "
+            "and only change the strength of a window."
+        ),
+        varga="",
+        varga_houses=(),
+        varga_description="",
+        anchor=SignalGroup(
+            key="selected_houses",
+            label="Selected houses",
+            houses=selected,
+            weight=55,
+            required=True,
+            require_all=True,
+            description=(
+                f"Every selected house ({labels}) must be opened by the active MD/AD/PD through "
+                "lordship, occupation or aspect. Transit-only contact is not enough."
+            ),
+        ),
+        transition=SignalGroup(
+            key="unused_transition",
+            label="Transition",
+            houses=(),
+            weight=0,
+            required=False,
+        ),
+        outcome=SignalGroup(
+            key="unused_outcome",
+            label="Outcome",
+            houses=(),
+            weight=0,
+            required=False,
+        ),
+        classifications=(
+            ClassificationRule("selected_houses_dasha", "Selected houses in dasha"),
+        ),
+        version=f"custom.v1.h{'-'.join(str(house) for house in selected)}",
+        independent_confirmation_required=False,
+        score_activation_quality=True,
+    )
 
 
 STATE_RANK = {
@@ -288,12 +849,18 @@ def _group_trace(group: SignalGroup, rows: Mapping[int, HouseActivation]) -> Dic
         rows[house] for house in group.houses
         if house in rows and STATE_RANK[rows[house].state] >= 1
     ]
+    if not group.houses:
+        passed = not group.required
+    elif group.require_all:
+        passed = len(matched) == len(group.houses)
+    else:
+        passed = bool(matched)
     return {
         "key": group.key,
         "label": group.label,
         "required": group.required,
-        "passed": bool(matched),
-        "score": group.weight if matched else 0,
+        "passed": passed,
+        "score": group.weight if passed else 0,
         "maximum_score": group.weight,
         "description": group.description,
         "evidence": [
@@ -308,6 +875,14 @@ def _group_trace(group: SignalGroup, rows: Mapping[int, HouseActivation]) -> Dic
             for row in matched
         ],
     }
+
+
+def _custom_classification(independent_passed: bool, transit_reinforced: bool) -> Tuple[str, str]:
+    if independent_passed and transit_reinforced:
+        return "selected_houses_reinforced", "Selected houses with dasha and transit"
+    if independent_passed:
+        return "selected_houses_confirmed", "Selected houses with timing confirmation"
+    return "selected_houses_dasha", "Selected houses in dasha"
 
 
 def _confirmations(rows: Iterable[HouseActivation]) -> List[Dict[str, Any]]:
@@ -406,12 +981,16 @@ class EventWindowEngine:
         calculation: CalculationContext,
         activations: Sequence[HouseActivation],
         include_developing: bool = False,
+        focus_houses: Optional[Sequence[Any]] = None,
     ) -> Dict[str, Any]:
-        definition = EVENT_DEFINITIONS.get(event_key)
-        if definition is None:
-            raise PredictionConfigurationError(f"Unsupported event focus: {event_key}")
+        if event_key == CUSTOM_EVENT_KEY:
+            definition = build_custom_definition(focus_houses)
+        else:
+            definition = EVENT_DEFINITIONS.get(event_key)
+            if definition is None:
+                raise PredictionConfigurationError(f"Unsupported event focus: {event_key}")
 
-        varga_chart = _build_varga(calculation, definition.varga)
+        varga_chart = _build_varga(calculation, definition.varga) if definition.varga else {}
         varga_by_dasha: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
         output: List[Dict[str, Any]] = []
         rejected = {"missing_anchor": 0, "missing_transition": 0, "missing_confirmation": 0}
@@ -423,7 +1002,7 @@ class EventWindowEngine:
             if not anchor["passed"]:
                 rejected["missing_anchor"] += 1
                 continue
-            if not transition["passed"]:
+            if definition.transition.required and not transition["passed"]:
                 rejected["missing_transition"] += 1
                 continue
 
@@ -431,11 +1010,16 @@ class EventWindowEngine:
             relevant_rows = [rows[house] for house in relevant_houses if house in rows]
             confirmations = _confirmations(relevant_rows)
             dasha_key = (window.mahadasha, window.antardasha, window.pratyantardasha)
-            if dasha_key not in varga_by_dasha:
-                varga_by_dasha[dasha_key] = _varga_confirmation(
-                    varga_chart, window, definition
-                )
-            varga_confirmation = varga_by_dasha[dasha_key]
+            if definition.varga:
+                if dasha_key not in varga_by_dasha:
+                    varga_by_dasha[dasha_key] = _varga_confirmation(
+                        varga_chart, window, definition
+                    )
+                varga_confirmation = varga_by_dasha[dasha_key]
+            else:
+                varga_confirmation = {
+                    "passed": False, "chart": "", "matches": [], "explanation": "",
+                }
             double = _double_transit(calculation, window, definition.anchor.houses)
             transit_reinforced = any(STATE_RANK[row.state] >= 2 for row in relevant_rows)
             dasha_boundary = [row for row in window.opened_by if row.get("kind") == "dasha"]
@@ -448,7 +1032,7 @@ class EventWindowEngine:
             confirmation_trace = {
                 "key": "independent_confirmation",
                 "label": "Independent timing confirmation",
-                "required": True,
+                "required": definition.independent_confirmation_required,
                 "passed": independent_passed,
                 "score": 15 if independent_passed else 0,
                 "maximum_score": 15,
@@ -456,6 +1040,10 @@ class EventWindowEngine:
                     "Dasha describes what is available, but it is too broad to time an event alone. "
                     "This gate therefore asks for a separate clock: a direct dasha-lord transit, "
                     "Jupiter–Saturn contact, an MD/AD/PD boundary, or an exact/repeated natal contact."
+                    if definition.independent_confirmation_required else
+                    "Optional. A separate clock — dasha-lord transit, Jupiter–Saturn contact, "
+                    "an MD/AD/PD boundary, or an exact/repeated natal contact — raises strength "
+                    "but is not required to qualify the window."
                 ),
                 "evidence": {
                     "transit_reinforced": transit_reinforced,
@@ -492,9 +1080,41 @@ class EventWindowEngine:
                 "description": definition.varga_description,
                 "evidence": varga_confirmation,
             }
-            trace = [anchor, transition, dasha_trace, confirmation_trace, outcome, varga_trace]
+            quality_trace = {
+                "key": "activation_quality",
+                "label": "Transit reinforcement",
+                "required": False,
+                "passed": transit_reinforced,
+                "score": 10 if transit_reinforced else 0,
+                "maximum_score": 10,
+                "description": (
+                    "Optional. A selected house is stronger when the dasha lord that opens it "
+                    "also occupies or aspects it in transit, or is fully reinforced by self-contact or the Sun."
+                ),
+                "evidence": {
+                    "transit_reinforced": transit_reinforced,
+                    "houses": [
+                        {"house": row.house, "state": row.state.value}
+                        for row in relevant_rows if STATE_RANK[row.state] >= 2
+                    ],
+                },
+            }
+            trace = [anchor]
+            if definition.transition.houses:
+                trace.append(transition)
+            trace.extend([dasha_trace, confirmation_trace])
+            if definition.outcome.houses:
+                trace.append(outcome)
+            if definition.varga:
+                trace.append(varga_trace)
+            if definition.score_activation_quality:
+                trace.append(quality_trace)
             score = sum(int(row["score"]) for row in trace)
-            required_passed = anchor["passed"] and transition["passed"] and independent_passed
+            required_passed = anchor["passed"]
+            if definition.transition.required:
+                required_passed = required_passed and transition["passed"]
+            if definition.independent_confirmation_required:
+                required_passed = required_passed and independent_passed
             strength = (
                 "exceptional" if required_passed and score >= 95 else
                 "strong" if required_passed and score >= 80 else
@@ -502,9 +1122,14 @@ class EventWindowEngine:
             )
             if strength == "developing" and not include_developing:
                 continue
-            classification_key, classification_label = _classification(
-                definition, transition, outcome
-            )
+            if definition.key == CUSTOM_EVENT_KEY:
+                classification_key, classification_label = _custom_classification(
+                    independent_passed, transit_reinforced
+                )
+            else:
+                classification_key, classification_label = _classification(
+                    definition, transition, outcome
+                )
             exact_peak = next(
                 (
                     (str(row.get("exact_at"))[:10], str(row.get("label") or "Exact transit confirmation"))
@@ -581,6 +1206,7 @@ class EventWindowEngine:
             "engine": self.version,
             "definition": definition.version,
             "event": event_key,
+            "focus_houses": list(definition.anchor.houses) if event_key == CUSTOM_EVENT_KEY else [],
             "year": calculation.windows[0].start_date[:4] if calculation.windows else "",
             "windows": [(row["window_id"], row["score"]) for row in output],
         }, sort_keys=True).encode()).hexdigest()
@@ -590,7 +1216,8 @@ class EventWindowEngine:
             "event_key": definition.key,
             "event_label": definition.label,
             "event_description": definition.description,
-            "varga": definition.varga,
+            "varga": definition.varga or None,
+            "focus_houses": list(definition.anchor.houses) if event_key == CUSTOM_EVENT_KEY else [],
             "include_developing": include_developing,
             "evaluated_windows": len(calculation.windows),
             "qualified_windows": len(output),

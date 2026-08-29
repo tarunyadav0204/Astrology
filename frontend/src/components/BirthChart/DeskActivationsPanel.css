@@ -714,6 +714,13 @@
   background: var(--color-surface);
 }
 
+.desk-act__event-controls:has(.desk-act__event-houses-picker) {
+  grid-template-areas:
+    "event year run"
+    "developing expand ."
+    "houses houses houses";
+}
+
 .desk-act__event-controls > label:first-child { grid-area: event; }
 .desk-act__event-controls > label:nth-child(2) { grid-area: year; }
 .desk-act__event-controls .desk-act__event-developing { grid-area: developing; }
@@ -721,6 +728,46 @@
 .desk-act__event-controls .desk-act__event-run {
   grid-area: run;
   align-self: end;
+}
+
+.desk-act__event-houses-picker {
+  grid-area: houses;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  padding-top: 0.12rem;
+}
+
+.desk-act__event-houses-picker button {
+  display: grid;
+  justify-items: start;
+  gap: 0.02rem;
+  min-width: 3.55rem;
+  padding: 0.22rem 0.34rem;
+  border: 1px solid color-mix(in srgb, var(--color-text) 16%, transparent);
+  border-radius: 6px;
+  background: var(--color-surface-raised);
+  color: var(--da-ink);
+  cursor: pointer;
+}
+
+.desk-act__event-houses-picker button.is-selected {
+  border-color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 12%, var(--color-surface));
+  color: var(--color-brand-active);
+}
+
+.desk-act__event-houses-picker b {
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.desk-act__event-houses-picker span {
+  color: var(--da-muted);
+  font-size: 0.48rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .desk-act__event-controls label {
@@ -748,6 +795,11 @@
   font: inherit;
   font-size: 0.66rem;
   font-weight: 750;
+}
+
+.desk-act__event-controls select optgroup {
+  font-weight: 800;
+  font-style: normal;
 }
 
 .desk-act__event-controls .desk-act__event-developing {
@@ -793,8 +845,12 @@
 }
 
 .desk-act__event-run:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.6;
+}
+
+.desk-act__event-run.is-busy:disabled {
+  cursor: wait;
 }
 
 .desk-act__event-intro {
@@ -1291,6 +1347,12 @@
   padding: 0.7rem;
 }
 
+.desk-act--event-fullscreen .desk-act__event-controls:has(.desk-act__event-houses-picker) {
+  grid-template-areas:
+    "event year developing expand run"
+    "houses houses houses houses houses";
+}
+
 .desk-act--event-fullscreen .desk-act__event-controls label > span {
   font-size: 0.66rem;
 }
@@ -1438,6 +1500,14 @@
     padding: 0.7rem;
   }
 
+  .desk-act__event-controls:has(.desk-act__event-houses-picker) {
+    grid-template-areas:
+      "event year"
+      "developing expand"
+      "run run"
+      "houses houses";
+  }
+
   .desk-act__event-controls select,
   .desk-act__event-run,
   .desk-act__event-expand {
@@ -1539,6 +1609,14 @@
       "developing expand"
       "run run";
     padding: max(0.7rem, env(safe-area-inset-top)) 0.7rem 0.7rem;
+  }
+
+  .desk-act--event-fullscreen .desk-act__event-controls:has(.desk-act__event-houses-picker) {
+    grid-template-areas:
+      "event year"
+      "developing expand"
+      "run run"
+      "houses houses";
   }
 }
 

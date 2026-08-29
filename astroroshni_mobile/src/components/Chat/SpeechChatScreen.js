@@ -265,6 +265,9 @@ export default function SpeechChatScreen({ navigation, route }) {
   const [birthData, setBirthData] = useState(route.params?.birthData || null);
   const [sessionId, setSessionId] = useState(null);
   const [language, setLanguage] = useState(route.params?.language || 'english');
+  const [answerStyle, setAnswerStyle] = useState(
+    route.params?.responseStyle === 'technical' ? 'technical' : 'simple'
+  );
   const [status, setStatus] = useState('idle');
   const [turns, setTurns] = useState([]);
   const [currentTranscript, setCurrentTranscript] = useState('');
@@ -1714,6 +1717,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         question,
         query_context: buildQueryContext(),
         language: turnLanguage || language || 'english',
+        response_style: answerStyle,
         speech_billing: false,
         native_name: birthData?.name,
         birth_details: toChatBirthDetails(birthData),
@@ -1744,7 +1748,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       question,
       query_context: buildQueryContext(),
       language: turnLanguage || language || 'english',
-      response_style: 'concise',
+      response_style: answerStyle,
       premium_analysis: false,
       chat_tier: 'instant',
       speech_chat: true,
@@ -2143,6 +2147,41 @@ export default function SpeechChatScreen({ navigation, route }) {
           </Text>
         </View>
 
+        <View
+          style={[styles.answerStyleBar, { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong }]}
+          accessibilityRole="radiogroup"
+          accessibilityLabel={t('chat.answerStyle.label', 'Answer style')}
+        >
+          <Text style={[styles.answerStyleLabel, { color: screenPalette.textSecondary }]}>
+            {t('chat.answerStyle.label', 'Answer style')}
+          </Text>
+          <View style={[styles.answerStyleToggle, { borderColor: screenPalette.border }]}>
+            {['simple', 'technical'].map((styleKey) => {
+              const selected = answerStyle === styleKey;
+              const label = styleKey === 'simple'
+                ? t('chat.answerStyle.simple', 'Simple')
+                : t('chat.answerStyle.technical', 'Technical');
+              return (
+                <TouchableOpacity
+                  key={styleKey}
+                  onPress={() => setAnswerStyle(styleKey)}
+                  style={[styles.answerStyleOption, selected && { backgroundColor: screenPalette.accent }]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected, checked: selected }}
+                  accessibilityLabel={label}
+                >
+                  <Text style={[
+                    styles.answerStyleOptionText,
+                    { color: selected ? '#ffffff' : screenPalette.textSecondary },
+                  ]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         <View style={styles.mainColumn}>
         <ScrollView ref={scrollRef} style={styles.conversation} contentContainerStyle={styles.conversationContent}>
           {turns.length === 0 && !currentTranscript ? (
@@ -2501,6 +2540,39 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: '700',
+  },
+  answerStyleBar: {
+    minHeight: 50,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexShrink: 0,
+  },
+  answerStyleLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  answerStyleToggle: {
+    padding: 2,
+    borderWidth: 1,
+    borderRadius: 999,
+    flexDirection: 'row',
+  },
+  answerStyleOption: {
+    minWidth: 78,
+    minHeight: 44,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  answerStyleOptionText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   conversation: {
     flex: 1,

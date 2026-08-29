@@ -38,7 +38,12 @@ from .homepage_prompts import HOMEPAGE_PROMPT_KEYS, HomepagePromptRepository
 from .profiles import get_profile
 from .service import PredictionService
 from .manifestation_synthesis import synthesize_manifestations
-from .event_windows import EVENT_DEFINITIONS, EventWindowEngine
+from .event_windows import (
+    CUSTOM_EVENT_KEY,
+    EVENT_DEFINITIONS,
+    EventWindowEngine,
+    normalise_focus_houses,
+)
 from .primitives import build_calculation_context
 
 
@@ -99,11 +104,18 @@ class EventWindowRequest(BaseModel):
     event_key: str = "job_change"
     year: int = Field(ge=1900, le=2200)
     include_developing: bool = False
+    focus_houses: Optional[List[int]] = None
 
     @model_validator(mode="after")
     def validate_request(self):
         if self.birth_chart_id is None and not self.birth_data:
             raise ValueError("birth_chart_id or birth_data is required")
+        if self.event_key == CUSTOM_EVENT_KEY:
+            try:
+                self.focus_houses = list(normalise_focus_houses(self.focus_houses))
+            except PredictionEngineError as exc:
+                raise ValueError(str(exc)) from exc
+            return self
         if self.event_key not in EVENT_DEFINITIONS:
             raise ValueError(f"Unsupported event focus: {self.event_key}")
         return self
@@ -268,6 +280,7 @@ def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, 
     cache_key = (
         birth.birth_chart_id, birth.date, birth.time, birth.latitude, birth.longitude,
         str(birth.timezone), payload.year, payload.event_key, payload.include_developing,
+        tuple(payload.focus_houses or ()),
     )
     now = time.monotonic()
     with _event_window_cache_lock:
@@ -301,6 +314,7 @@ def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, 
         calculation=calculation,
         activations=result.house_activations,
         include_developing=payload.include_developing,
+        focus_houses=payload.focus_houses,
     )
     response.update({
         "year": payload.year,

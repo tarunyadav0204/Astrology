@@ -293,6 +293,8 @@ const ChatPage = ({ onLogin }) => {
     const firstPurchaseOfferShownRef = useRef(null);
     const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
     const [isInstantAnalysis, setIsInstantAnalysis] = useState(false);
+    const [instantAnswerStyle, setInstantAnswerStyle] = useState('simple');
+    const [fullAnswerStyle, setFullAnswerStyle] = useState('technical');
     const [exitInstantAfterEnd, setExitInstantAfterEnd] = useState(false);
     const [instantLoaderWordCount, setInstantLoaderWordCount] = useState(1);
     const instantRevealTimersRef = useRef(new Set());
@@ -1937,7 +1939,7 @@ const ChatPage = ({ onLogin }) => {
                 ...(options?.queryContext || {}),
             }),
             language: 'english',
-            response_style: useInstantChat || options?.instant_chat ? 'concise' : 'detailed',
+            response_style: useInstantChat || options?.instant_chat ? instantAnswerStyle : fullAnswerStyle,
             premium_analysis: useFreeQuestion || useInstantChat ? false : !!options.premium_analysis,
             partnership_mode: isPartnershipMode,
             native_name: partnershipBirth?.name,
@@ -3216,6 +3218,25 @@ const ChatPage = ({ onLogin }) => {
                                     </span>
                                 </div>
 
+                                <div className="chat-answer-style" role="group" aria-label="Answer language detail">
+                                    <button
+                                        type="button"
+                                        className={instantAnswerStyle === 'simple' ? 'is-selected' : ''}
+                                        aria-pressed={instantAnswerStyle === 'simple'}
+                                        onClick={() => setInstantAnswerStyle('simple')}
+                                    >
+                                        Simple
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={instantAnswerStyle === 'technical' ? 'is-selected' : ''}
+                                        aria-pressed={instantAnswerStyle === 'technical'}
+                                        onClick={() => setInstantAnswerStyle('technical')}
+                                    >
+                                        Technical
+                                    </button>
+                                </div>
+
                                 {instantBilling.active ? (
                                     <>
                                         <div className="chat-header-instant__metrics" aria-live="polite">
@@ -3262,6 +3283,26 @@ const ChatPage = ({ onLogin }) => {
                             </section>
                         )}
                         <div className="chat-header-toolbar__actions">
+                            {!(instantChatEnabled && isInstantAnalysis && !isPartnershipMode && !isMundaneMode) && (
+                                <div className="chat-answer-style" role="group" aria-label="Answer style">
+                                    <button
+                                        type="button"
+                                        className={fullAnswerStyle === 'simple' ? 'is-selected' : ''}
+                                        aria-pressed={fullAnswerStyle === 'simple'}
+                                        onClick={() => setFullAnswerStyle('simple')}
+                                    >
+                                        Simple
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={fullAnswerStyle === 'technical' ? 'is-selected' : ''}
+                                        aria-pressed={fullAnswerStyle === 'technical'}
+                                        onClick={() => setFullAnswerStyle('technical')}
+                                    >
+                                        Technical
+                                    </button>
+                                </div>
+                            )}
                             {responseElapsedMs !== null && (
                                 <div
                                     className={`chat-response-timer ${isLoading ? 'chat-response-timer--running' : 'chat-response-timer--complete'}`}

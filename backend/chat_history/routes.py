@@ -4595,6 +4595,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 language=language,
                 latest_user_question=question,
                 speech_mode=bool(is_speech_chat),
+                response_style=response_style,
                 stream_callback=_persist_instant_stream_delta,
             )
             logger.info(

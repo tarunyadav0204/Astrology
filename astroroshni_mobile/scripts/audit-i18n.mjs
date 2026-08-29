@@ -87,6 +87,67 @@ const mergedPremiumCopy = Object.fromEntries(Object.entries(normalizedPremiumCop
   { ...copy, homeRecommendations: homeRecommendationsCopy[language] || homeRecommendationsCopy.english },
 ]));
 const failures = [];
+const i18nSource = fs.readFileSync(path.join(projectRoot, 'src/locales/i18n.js'), 'utf8');
+const i18nAst = parse(i18nSource, { sourceType: 'module' });
+
+const staticObjectValue = (node) => {
+  if (node?.type === 'CallExpression' && node.arguments?.length === 1) {
+    return staticObjectValue(node.arguments[0]);
+  }
+  if (node?.type !== 'ObjectExpression') return null;
+  const value = {};
+  for (const property of node.properties || []) {
+    if (property.type !== 'ObjectProperty') return null;
+    const key = property.key?.name ?? property.key?.value;
+    if (!key) return null;
+    if (property.value?.type === 'StringLiteral') value[key] = property.value.value;
+    else {
+      const nested = staticObjectValue(property.value);
+      if (!nested) return null;
+      value[key] = nested;
+    }
+  }
+  return value;
+};
+
+const readLocalizationTable = (name) => {
+  for (const statement of i18nAst.program.body || []) {
+    if (statement.type !== 'VariableDeclaration') continue;
+    for (const declaration of statement.declarations || []) {
+      if (declaration.id?.name === name) return staticObjectValue(declaration.init);
+    }
+  }
+  return null;
+};
+
+const chatControlTables = {
+  answerStyle: readLocalizationTable('ANSWER_STYLE_COPY'),
+  messageActions: readLocalizationTable('MESSAGE_ACTION_COPY'),
+};
+const expectedChatControlLanguages = Object.keys(chatScreenSource).sort();
+let chatControlEnglishKeys = [];
+Object.entries(chatControlTables).forEach(([tableName, table]) => {
+  if (!table) {
+    failures.push(`chat-controls: could not parse ${tableName} localization table`);
+    return;
+  }
+  const languages = Object.keys(table).sort();
+  const missingLanguages = expectedChatControlLanguages.filter((language) => !languages.includes(language));
+  const extraLanguages = languages.filter((language) => !expectedChatControlLanguages.includes(language));
+  if (missingLanguages.length) failures.push(`chat-controls/${tableName}: missing languages ${missingLanguages.join(', ')}`);
+  if (extraLanguages.length) failures.push(`chat-controls/${tableName}: unexpected languages ${extraLanguages.join(', ')}`);
+
+  const english = flatten(table.english || {});
+  const englishTableKeys = Object.keys(english).sort();
+  chatControlEnglishKeys = [...chatControlEnglishKeys, ...englishTableKeys.map((key) => `${tableName}.${key}`)];
+  Object.entries(table).forEach(([language, copy]) => {
+    const localized = flatten(copy);
+    const missing = englishTableKeys.filter((key) => !(key in localized) || !String(localized[key] || '').trim());
+    const extra = Object.keys(localized).filter((key) => !englishTableKeys.includes(key));
+    if (missing.length) failures.push(`chat-controls/${tableName}/${language}: missing ${missing.join(', ')}`);
+    if (extra.length) failures.push(`chat-controls/${tableName}/${language}: unexpected ${extra.join(', ')}`);
+  });
+});
 const expectedDrawerExplore = {
   english: 'Explore', hindi: 'खोजें', es: 'Explorar', fr: 'Explorer', german: 'Entdecken',
   russian: 'Обзор', chinese: '探索', tamil: 'ஆராய்க', telugu: 'అన్వేషించండి',
@@ -266,4 +327,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`i18n audit passed: ${englishKeys.length} premium keys, ${lifeAnalysisEnglishKeys.length + lifeAnalysisPdfEnglishKeys.length} Life Analysis keys, ${historyUiEnglishKeys.length + historyDetailEnglishKeys.length} history keys, ${knowledgeSupportEnglishKeys.length} knowledge/support keys, and ${accountNotificationsEnglishKeys.length} notification keys across ${Object.keys(premiumCopy).length} languages; ${protectedFiles.length} screens protected.`);
+console.log(`i18n audit passed: ${englishKeys.length} premium keys, ${lifeAnalysisEnglishKeys.length + lifeAnalysisPdfEnglishKeys.length} Life Analysis keys, ${historyUiEnglishKeys.length + historyDetailEnglishKeys.length} history keys, ${knowledgeSupportEnglishKeys.length} knowledge/support keys, ${accountNotificationsEnglishKeys.length} notification keys, and ${chatControlEnglishKeys.length} chat-control keys across ${Object.keys(premiumCopy).length} languages; ${protectedFiles.length} screens protected.`);

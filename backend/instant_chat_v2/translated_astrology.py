@@ -123,6 +123,7 @@ def build_translated_astrology_contract(
     *,
     question: str,
     language: str,
+    response_style: str | None = None,
 ) -> dict[str, Any]:
     context = composer_context if isinstance(composer_context, Mapping) else {}
     query_plan = context.get("query_plan") if isinstance(context.get("query_plan"), Mapping) else {}
@@ -138,8 +139,12 @@ def build_translated_astrology_contract(
     # The progressive retrospective timeline deliberately shows MD/AD/PD
     # boundaries because the user selects among them. That dedicated product
     # flow is the one exception to the ordinary no-jargon main-answer rule.
+    selected_style = str(response_style or "").strip().lower()
+    if selected_style not in {"simple", "technical"}:
+        selected_style = ""
     technical_requested = bool(
-        _TECHNICAL_REQUEST_RE.search(str(question or ""))
+        selected_style == "technical"
+        or (not selected_style and _TECHNICAL_REQUEST_RE.search(str(question or "")))
         or time_scope.get("retrospective")
     )
     evidence = {
@@ -167,23 +172,44 @@ def build_translated_astrology_contract(
     for row in anchors:
         row.pop("score", None)
     required = bool(anchors and not exempt)
+    verdict = context.get("verdict") if isinstance(context.get("verdict"), Mapping) else {}
+    verdict_snapshot = {
+        key: verdict.get(key)
+        for key in ("direction", "confidence", "status", "scope")
+        if verdict.get(key) not in (None, "", [], {})
+    }
     return {
         "schema_version": "instant-visible-astrology/v1",
         "required": required,
         "exempt": exempt,
+        "response_style": selected_style or ("technical" if technical_requested else "simple"),
         "technical_detail_allowed": technical_requested,
         "minimum_planet_reasons": 1 if required else 0,
         "maximum_planet_reasons": 2,
         "allowed_planets": [row["planet"] for row in anchors],
         "reason_anchors": anchors,
+        "verdict_snapshot": verdict_snapshot,
+        "claim_fidelity_rule": (
+            "Simple and Technical are two renderings of the same adjudicated answer, not two interpretations. "
+            "Preserve the verdict direction, confidence, polarity, conditions, uncertainty and material cautions. "
+            "Changing style may change terminology, definitions and explanation depth only. Never upgrade neutral, "
+            "mixed, qualified, conditional, fluctuating or cautionary evidence into excellent, unequivocally strong, "
+            "certain or unqualified language. Never weaken a supported conclusion, drop a material caution, or add "
+            "an ability or outcome absent from the supplied verdict and source facts."
+        ),
         "main_answer_rule": (
             "Direct answer -> translated planetary reason -> lived meaning -> one useful action. "
             "A planet name is not permission to add generic folklore; every effect must remain tied to its source_fact."
         ),
         "technical_terms_rule": (
-            "Technical terms are allowed because the user explicitly requested technical detail."
+            "TECHNICAL STYLE IS SELECTED. Explain the same verdict with the relevant supplied houses, lords, "
+            "nakshatras, divisional charts, dasha levels, KP significators and transits. Define or briefly translate "
+            "specialist terms as you use them. Use only details present in the supplied evidence. Do not expose graph "
+            "names, ontology versions, internal IDs, scores, JSON, routing rules or hidden calculation machinery. "
+            "This style instruction overrides generic requests elsewhere in the prompt to hide specialist terms."
             if technical_requested else
-            "Keep chart codes, dasha-level names, house numbers, degrees and specialist conditions out of the visible answer."
+            "SIMPLE STYLE IS SELECTED. Keep chart codes, dasha-level names, house numbers, degrees and specialist "
+            "conditions out of the visible answer; translate the evidence into planetary reasons and lived meaning."
         ),
     }
 
@@ -191,13 +217,20 @@ def build_translated_astrology_contract(
 def translated_astrology_prompt_rule(contract: Mapping[str, Any] | None) -> str:
     contract = contract if isinstance(contract, Mapping) else {}
     if not contract.get("required"):
-        return "- Do not invent a planetary reason when the supplied evidence does not provide one."
+        return (
+            "- Do not invent a planetary reason when the supplied evidence does not provide one. "
+            + str(contract.get("claim_fidelity_rule") or "")
+            + " "
+            + str(contract.get("technical_terms_rule") or "")
+        )
     return (
         "- VISIBLE ASTROLOGY CONTRACT: Mention one or two planets from "
         f"`answer_contract.visible_astrology.reason_anchors` ({', '.join(contract.get('allowed_planets') or [])}). "
         "For each named planet, immediately translate its supplied source fact into the user's lived experience. "
         "Use the structure: direct answer -> planetary reason -> human meaning -> useful action. "
         "Do not mention a planet absent from the anchors and do not add remembered planet folklore. "
+        + str(contract.get("claim_fidelity_rule") or "")
+        + " "
         + str(contract.get("technical_terms_rule") or "")
     )
 

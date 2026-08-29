@@ -25,6 +25,56 @@ const EVENT_FOCUS_META = {
     intro: 'Looks for health attention plus pressure, treatment or rest indicators, then assesses recovery support. This is an astrological timing aid—not a diagnosis or substitute for medical care.',
     loading: 'Calculating one strict year of dasha, transit, D30 and exact-return evidence…',
   },
+  custom: {
+    label: 'Custom',
+    intro: 'Select one or more houses. A window qualifies only when every selected house is opened by the current dasha. Transits, dasha boundaries and exact returns are optional and raise strength.',
+    loading: 'Calculating one year of dasha and transit evidence for the selected houses…',
+  },
+  property_purchase: {
+    label: 'Property purchase',
+    intro: 'Requires a dasha-opened fourth house plus a payment or financing signal (savings or loan). Natal property yogas never veto the window.',
+    loading: 'Calculating one strict year of dasha, transit, D4 and exact-return evidence…',
+  },
+  relocation: {
+    label: 'Relocation',
+    intro: 'Looks for a home house plus a move or leaving signal in the same dasha period, then notes settlement or long-distance support. This is housing timing—not a guaranteed move date.',
+    loading: 'Calculating one strict year of dasha, transit, D4 and exact-return evidence…',
+  },
+  property_gain: {
+    label: 'Property gain',
+    intro: 'Requires both H4 and H11 dasha-opened in the same period so a property objective can reach fulfilment. Savings (H2) classify support and are not required.',
+    loading: 'Calculating one strict year of dasha, transit, D4 and exact-return evidence…',
+  },
+  promotion: {
+    label: 'Promotion / status',
+    intro: 'Requires a dasha-opened tenth house plus a status or recognition signal (H11 gain or H5 honour). This is not Job change: leaving or break houses are not required.',
+    loading: 'Calculating one strict year of dasha, transit, D10 and exact-return evidence…',
+  },
+  marriage: {
+    label: 'Marriage / partnership',
+    intro: 'Requires a dasha-opened seventh house plus joining, romance or fulfilment (H2 / H5 / H11). This is relationship timing—not a guaranteed wedding date.',
+    loading: 'Calculating one strict year of dasha, transit, D9 and exact-return evidence…',
+  },
+  foreign_travel: {
+    label: 'Foreign travel / stay',
+    intro: 'Requires H9 plus movement or foreign stay (H3 papers or H12 abroad). This is not Relocation: a house move still needs H4.',
+    loading: 'Calculating one strict year of dasha, transit, D9 and exact-return evidence…',
+  },
+  children: {
+    label: 'Children',
+    intro: 'Looks for H5 plus expansion or fulfilment (H9 / H11). This is a timing aid—not a birth prediction, fertility diagnosis or determination of a child’s sex.',
+    loading: 'Calculating one strict year of dasha, transit, D7 and exact-return evidence…',
+  },
+  education: {
+    label: 'Education / exams',
+    intro: 'Requires H5 plus a study path (H4 foundational or H9 higher learning). H11 classifies a result-looking window and is not a guarantee.',
+    loading: 'Calculating one strict year of dasha, transit, D24 and exact-return evidence…',
+  },
+  income_gain: {
+    label: 'Income / gains',
+    intro: 'Requires both H2 and H11 dasha-opened in the same period. This is not Job change or Promotion. H5 / H9 classify speculative or fortune-linked inflow.',
+    loading: 'Calculating one strict year of dasha, transit, D2 and exact-return evidence…',
+  },
 };
 
 const EVENT_HOUSE_MEANINGS = {
@@ -45,6 +95,75 @@ const EVENT_HOUSE_MEANINGS = {
     11: 'Improvement, support and fulfilment of treatment.',
     12: 'Rest, withdrawal, hospitalization, isolation or sustained recovery time.',
   },
+  custom: {
+    1: 'Self, body and overall life direction.',
+    2: 'Wealth, speech and family resources.',
+    3: 'Effort, courage, siblings and short movement.',
+    4: 'Home, mother, property and inner stability.',
+    5: 'Creativity, children, intelligence and speculation.',
+    6: 'Service, employment, health effort and conflict.',
+    7: 'Partnership, marriage and open counterparts.',
+    8: 'Transformation, shared resources and disruption.',
+    9: 'Dharma, fortune, teachers and long journeys.',
+    10: 'Career, status, public role and authority.',
+    11: 'Gains, fulfilment, networks and outcomes.',
+    12: 'Release, expenditure, isolation and foreign movement.',
+  },
+  property_purchase: {
+    2: 'Savings, family resources or liquidity used to acquire the property.',
+    4: 'Home, residence, land, conveyances and the living foundation being acquired.',
+    8: 'Loan, mortgage, inheritance or a joint / shared-cost purchase.',
+    11: 'Gaining the asset and fulfilment of the property objective.',
+  },
+  relocation: {
+    3: 'Shifting, paperwork, short-distance change or the effort of moving.',
+    4: 'The current home, residence and living foundation.',
+    9: 'A longer-distance or fortune-linked shift.',
+    11: 'Securing a new place or fulfilment of the move.',
+    12: 'Leaving the present home, expense of the move or a stay away from home.',
+  },
+  property_gain: {
+    2: 'Savings or family resources supporting the property fulfilment.',
+    4: 'Home, residence, land and the property objective.',
+    11: 'Gaining the asset, progress and fulfilment of the property objective.',
+  },
+  promotion: {
+    2: 'Salary, accumulated resources and financial continuity with the rise.',
+    5: 'Honour, award, authority or a visible step-up without leaving the role.',
+    10: 'Profession, public role, authority and career status.',
+    11: 'Gain, recognition, fulfilment and the fruit of professional status.',
+  },
+  marriage: {
+    2: 'Family coming together, shared household resources or joining two families.',
+    5: 'Romance, meeting, affection or the emotional step toward partnership.',
+    7: 'Spouse, one-to-one partnership, agreements and the counterpart.',
+    9: 'Dharmic, ceremonial or fortune-linked flavour to the commitment.',
+    11: 'Gaining a partner and fulfilment of the relationship objective.',
+  },
+  foreign_travel: {
+    3: 'Papers, planning, short-distance start of a journey or the effort of travel.',
+    9: 'Long journeys, fortune, teachers and the far horizon.',
+    11: 'Gain, opportunity or fulfilment through the journey.',
+    12: 'Foreign stay, expense of travel or residence away from the native land.',
+  },
+  children: {
+    2: 'Family resources or the household supporting a child-related development.',
+    5: 'Children, creative progeny and the intelligence applied to them.',
+    9: 'Dharma, expansion or a blessing-linked child-related development.',
+    11: 'Fulfilment of a child-related objective.',
+  },
+  education: {
+    4: 'Foundational learning, schooling or the educational base.',
+    5: 'Intelligence, study, examinations and the application of learning.',
+    9: 'Higher studies, teachers or long-form qualification.',
+    11: 'Fulfilment of a course, examination result or the fruit of study.',
+  },
+  income_gain: {
+    2: 'Accumulated resources, savings, family money and the store of wealth.',
+    5: 'Speculative or intelligent-risk income.',
+    9: 'Fortune-linked or guidance-linked gain.',
+    11: 'Income, gains, fulfilment of financial objectives and inflow.',
+  },
 };
 
 const HEALTH_HOUSE_LABELS = {
@@ -56,8 +175,67 @@ const HEALTH_HOUSE_LABELS = {
   12: 'Rest & retreat',
 };
 
+const EVENT_HOUSE_LABELS = {
+  health: HEALTH_HOUSE_LABELS,
+  property_purchase: {
+    2: 'Savings & outlay',
+    4: 'Home & property',
+    8: 'Loan or shared cost',
+    11: 'Gain of the asset',
+  },
+  relocation: {
+    3: 'Shift & papers',
+    4: 'Current home',
+    9: 'Long-distance shift',
+    11: 'New place',
+    12: 'Leaving home',
+  },
+  property_gain: {
+    2: 'Resources',
+    4: 'Home & property',
+    11: 'Property fulfilment',
+  },
+  promotion: {
+    2: 'Salary',
+    5: 'Honour & authority',
+    10: 'Career status',
+    11: 'Recognition & fruit',
+  },
+  marriage: {
+    2: 'Family joining',
+    5: 'Romance & meeting',
+    7: 'Partnership',
+    9: 'Ceremony & dharma',
+    11: 'Partner gained',
+  },
+  foreign_travel: {
+    3: 'Papers & planning',
+    9: 'Long journey',
+    11: 'Opportunity',
+    12: 'Foreign stay',
+  },
+  children: {
+    2: 'Family resources',
+    5: 'Children',
+    9: 'Expansion',
+    11: 'Fulfilment',
+  },
+  education: {
+    4: 'Foundational study',
+    5: 'Learning & exams',
+    9: 'Higher learning',
+    11: 'Result',
+  },
+  income_gain: {
+    2: 'Savings',
+    5: 'Speculation',
+    9: 'Fortune',
+    11: 'Gains & inflow',
+  },
+};
+
 function eventHouseLabel(eventKey, house) {
-  return eventKey === 'health' ? (HEALTH_HOUSE_LABELS[house] || HOUSE_LABELS[house]) : HOUSE_LABELS[house];
+  return EVENT_HOUSE_LABELS[eventKey]?.[house] || HOUSE_LABELS[house];
 }
 
 const STATE_META = {
@@ -386,7 +564,7 @@ function HouseGroupEvidence({ rows, eventKey }) {
   );
 }
 
-function CalculationEvidence({ step, eventKey }) {
+function CalculationEvidence({ step, eventKey, focusHouses }) {
   const evidence = step.evidence || {};
   if (Array.isArray(evidence)) return <HouseGroupEvidence rows={evidence} eventKey={eventKey} />;
 
@@ -421,23 +599,36 @@ function CalculationEvidence({ step, eventKey }) {
     );
   }
 
+  if (step.key === 'activation_quality') {
+    return (
+      <EvidenceList
+        items={(evidence.houses || []).map((row) => (
+          `H${row.house} · ${STATE_META[row.state]?.short || row.state}`
+        ))}
+        empty="Selected houses are dasha-open without a direct transit hit."
+      />
+    );
+  }
+
   if (step.key === 'independent_confirmation') {
     const double = evidence.double_transit || {};
     const exact = evidence.exact_and_repetition_confirmations || [];
     const boundaries = evidence.dasha_boundaries || [];
+    const contactHouses = (Array.isArray(focusHouses) && focusHouses.length)
+      ? focusHouses
+      : Object.keys(EVENT_HOUSE_MEANINGS[eventKey] || {}).map(Number);
     const doublePlanetLines = double.planets ? ['Jupiter', 'Saturn'].map((planet) => {
       const row = double.planets[planet] || {};
       const contacts = row.contacted_focus_houses || row.contacted_career_houses || [];
-      const focusHouses = Object.keys(EVENT_HOUSE_MEANINGS[eventKey] || {}).map(Number);
       return contacts.length
         ? `${planet} from H${row.transit_house} contacts ${contacts.map((house) => `H${house}`).join(' and ')}.`
-        : `${planet} from H${row.transit_house || '—'} does not contact ${focusHouses.map((house) => `H${house}`).join('/')}.`;
+        : `${planet} from H${row.transit_house || '—'} does not contact ${contactHouses.map((house) => `H${house}`).join('/')}.`;
     }) : [];
     return (
       <div className="desk-act__event-confirmation-grid">
         <article className={evidence.transit_reinforced ? 'is-confirmed' : ''}>
           <strong>Dasha-lord transit</strong>
-          <span>{evidence.transit_reinforced ? 'A required event house receives a direct timing hit.' : 'No direct timing hit in this slice.'}</span>
+          <span>{evidence.transit_reinforced ? (eventKey === 'custom' ? 'A selected house receives a direct timing hit.' : 'A required event house receives a direct timing hit.') : 'No direct timing hit in this slice.'}</span>
         </article>
         <article className={double.passed ? 'is-confirmed' : ''}>
           <strong>Jupiter–Saturn</strong>
@@ -500,6 +691,7 @@ export default function DeskActivationsPanel({
   const [detailMaximized, setDetailMaximized] = useState(false);
   const [legendExpanded, setLegendExpanded] = useState(false);
   const [eventKey, setEventKey] = useState('job_change');
+  const [customHouses, setCustomHouses] = useState([]);
   const [eventYear, setEventYear] = useState(() => (asOfDate || new Date()).getFullYear());
   const [includeDeveloping, setIncludeDeveloping] = useState(false);
   const [eventResult, setEventResult] = useState(null);
@@ -610,6 +802,10 @@ export default function DeskActivationsPanel({
 
   const runEventFocus = async () => {
     if (!birthData || eventLoading) return;
+    if (eventKey === 'custom' && customHouses.length === 0) {
+      setEventError('Select at least one house to search.');
+      return;
+    }
     setEventLoading(true);
     setEventError('');
     try {
@@ -619,6 +815,7 @@ export default function DeskActivationsPanel({
         eventKey,
         year: Number(eventYear),
         includeDeveloping,
+        focusHouses: eventKey === 'custom' ? customHouses : null,
       });
       setEventResult(data);
     } catch (err) {
@@ -635,6 +832,17 @@ export default function DeskActivationsPanel({
   };
 
   const eventMeta = EVENT_FOCUS_META[eventKey] || EVENT_FOCUS_META.job_change;
+  const customRunDisabled = eventKey === 'custom' && customHouses.length === 0;
+
+  const toggleCustomHouse = (house) => {
+    setCustomHouses((current) => (
+      current.includes(house)
+        ? current.filter((value) => value !== house)
+        : [...current, house].sort((left, right) => left - right)
+    ));
+    setEventResult(null);
+    setEventError('');
+  };
 
   const selectRow = (row, { syncAsOf = false } = {}) => {
     setSelected({
@@ -1118,13 +1326,35 @@ export default function DeskActivationsPanel({
                 <select
                   value={eventKey}
                   onChange={(e) => {
-                    setEventKey(e.target.value);
+                    const next = e.target.value;
+                    setEventKey(next);
                     setEventResult(null);
                     setEventError('');
+                    if (next === 'custom') setIncludeDeveloping(true);
                   }}
                 >
-                  <option value="job_change">Job change</option>
+                  <optgroup label="Career">
+                    <option value="job_change">Job change</option>
+                    <option value="promotion">Promotion / status</option>
+                  </optgroup>
+                  <optgroup label="Money">
+                    <option value="income_gain">Income / gains</option>
+                  </optgroup>
                   <option value="health">Health</option>
+                  <optgroup label="Property">
+                    <option value="property_purchase">Property purchase</option>
+                    <option value="relocation">Relocation</option>
+                    <option value="property_gain">Property gain</option>
+                  </optgroup>
+                  <optgroup label="Relationship">
+                    <option value="marriage">Marriage / partnership</option>
+                    <option value="children">Children</option>
+                  </optgroup>
+                  <optgroup label="Learning & travel">
+                    <option value="education">Education / exams</option>
+                    <option value="foreign_travel">Foreign travel / stay</option>
+                  </optgroup>
+                  <option value="custom">Custom</option>
                 </select>
               </label>
               <label>
@@ -1151,9 +1381,31 @@ export default function DeskActivationsPanel({
               >
                 {eventFullScreen ? '✕ Close full view' : '⛶ Full view'}
               </button>
-              <button type="button" className="desk-act__event-run" onClick={runEventFocus} disabled={eventLoading}>
+              <button
+                type="button"
+                className={`desk-act__event-run${eventLoading ? ' is-busy' : ''}`}
+                onClick={runEventFocus}
+                disabled={eventLoading || customRunDisabled}
+              >
                 {eventLoading ? 'Calculating…' : 'Find windows'}
               </button>
+              {eventKey === 'custom' ? (
+                <div className="desk-act__event-houses-picker" role="group" aria-label="Select houses">
+                  {Array.from({ length: 12 }, (_, index) => index + 1).map((house) => (
+                    <button
+                      key={house}
+                      type="button"
+                      className={customHouses.includes(house) ? 'is-selected' : ''}
+                      onClick={() => toggleCustomHouse(house)}
+                      title={HOUSE_LABELS[house]}
+                      aria-pressed={customHouses.includes(house)}
+                    >
+                      <b>H{house}</b>
+                      <span>{HOUSE_LABELS[house]}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             <div className="desk-act__event-intro">
@@ -1235,7 +1487,11 @@ export default function DeskActivationsPanel({
                               <b>+{step.score}/{step.maximum_score}</b>
                             </header>
                             <p>{step.description}</p>
-                            <CalculationEvidence step={step} eventKey={eventKey} />
+                            <CalculationEvidence
+                              step={step}
+                              eventKey={eventKey}
+                              focusHouses={eventResult.focus_houses || window.activated_houses}
+                            />
                           </section>
                         ))}
                         <details className="desk-act__event-technical">
@@ -1254,7 +1510,11 @@ export default function DeskActivationsPanel({
                 </>
               ) : null}
               {!eventLoading && !eventResult && !eventError ? (
-                <div className="desk-act__event-empty">Choose a year and run {eventMeta.label} to evaluate the complete event algorithm.</div>
+                <div className="desk-act__event-empty">
+                  {eventKey === 'custom'
+                    ? 'Select houses, choose a year, and run Custom. Every selected house must be dasha-opened in the same period.'
+                    : `Choose a year and run ${eventMeta.label} to evaluate the complete event algorithm.`}
+                </div>
               ) : null}
             </div>
           </div>

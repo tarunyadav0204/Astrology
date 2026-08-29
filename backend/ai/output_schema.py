@@ -880,6 +880,35 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
         premium_analysis=premium_analysis,
         chart_focus=intent_block.get("chart_focus") if isinstance(intent_block.get("chart_focus"), dict) else None,
     )
+
+    # The legacy single-prompt Standard/Premium path must honor the same
+    # presentation choice as the parallel merge path.  Keep all chart evidence
+    # and method instructions intact; only replace the user-visible depth/schema
+    # when Simple was explicitly selected.  Technical and legacy style values
+    # continue through the byte-for-byte existing prompt blocks above.
+    from ai.parallel_chat.presentation_style import (
+        build_simple_final_precedence_block,
+        build_simple_merge_depth_instruction,
+        build_simple_merge_instruction,
+        build_simple_merge_response_format,
+        normalize_merge_response_style,
+    )
+
+    simple_presentation_instruction = build_simple_merge_instruction(response_style)
+    if normalize_merge_response_style(response_style) == "simple":
+        simple_depth_instruction = build_simple_merge_depth_instruction(
+            premium_analysis=premium_analysis,
+        )
+        if str(intent_mode or "").upper() in {
+            "FOMO_MANIFESTATION_DETAIL",
+            "PREDICT_DAILY",
+        }:
+            # Retain the mode's strict temporal/scope contract while translating
+            # only the final answer's presentation.
+            elaborate_instruction = f"{elaborate_instruction}\n\n{simple_depth_instruction}"
+        else:
+            elaborate_instruction = simple_depth_instruction
+        response_format_instruction = build_simple_merge_response_format()
     
     from chat.system_instruction_config import build_system_instruction
     from calculators.mundane.mundane_context_builder import MundaneContextBuilder
@@ -913,6 +942,17 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
     
     import copy
     static_context = copy.deepcopy(context)
+    if normalize_merge_response_style(response_style) == "simple":
+        # The legacy analyzer stores a technical header mandate in this context
+        # field.  Do not pass that contradictory presentation contract to the
+        # final writer in Simple mode.
+        static_context["response_format"] = {
+            "presentation_mode": "simple",
+            "instruction": (
+                "Preserve the complete analysis internally and present only the "
+                "translated, user-facing Simple answer defined later in this prompt."
+            ),
+        }
     transits = static_context.pop('transit_activations', None)
 
     mundane_auth = None
@@ -1061,6 +1101,10 @@ You MUST NOT:
         f"{_single_native_format_guard(analysis_type)}"
         f"{FOMO_PARASHARI_SYSTEM_INSTRUCTION if str(intent_mode or '').upper() == 'FOMO_MANIFESTATION_DETAIL' else VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION}"
     )
+    if simple_presentation_instruction:
+        # Keep this after the legacy system/template blocks so visible Simple
+        # formatting has final precedence over their technical report layouts.
+        prompt_parts.append(simple_presentation_instruction)
     
     prompt_parts.append(build_multi_question_focus_instruction(_lang))
     try:
@@ -1093,6 +1137,12 @@ You MUST NOT:
     prompt_parts.append(final_check)
     prompt_parts.append(NEXT_ACTION_META_INSTRUCTION.strip())
     prompt_parts.append(FAQ_META_INSTRUCTION.strip())
+    final_presentation_override = build_simple_final_precedence_block(
+        response_style,
+        premium_analysis=premium_analysis,
+    )
+    if final_presentation_override:
+        prompt_parts.append(final_presentation_override)
     
     return "\n\n".join(prompt_parts)
 

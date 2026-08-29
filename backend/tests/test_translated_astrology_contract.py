@@ -118,6 +118,63 @@ def test_explicit_technical_question_allows_technical_terms():
     ) == []
 
 
+def test_selected_technical_style_allows_detail_without_technical_words_in_question():
+    contract = build_translated_astrology_contract(
+        _context({"planet": "Jupiter", "reason": "Jupiter is the D24 learning carrier"}),
+        question="What does my chart show about education?",
+        language="english",
+        response_style="technical",
+    )
+
+    assert contract["response_style"] == "technical"
+    assert contract["technical_detail_allowed"] is True
+    assert "TECHNICAL STYLE IS SELECTED" in translated_astrology_prompt_rule(contract)
+    assert validate_translated_astrology_answer(
+        "Jupiter is the learning carrier in D24 and supports the relevant education houses.",
+        contract,
+    ) == []
+
+
+def test_selected_simple_style_remains_simple_even_if_question_mentions_technical_detail():
+    contract = build_translated_astrology_contract(
+        _context({"planet": "Jupiter", "reason": "Jupiter supports careful judgment"}),
+        question="Show me the technical D24 logic.",
+        language="english",
+        response_style="simple",
+    )
+
+    assert contract["response_style"] == "simple"
+    assert contract["technical_detail_allowed"] is False
+    assert validate_translated_astrology_answer(
+        "Jupiter in D24 supports careful judgment.", contract
+    ) == ["technical astrology leaked into the main answer"]
+
+
+def test_style_contract_forbids_simple_mode_from_strengthening_the_verdict():
+    context = _context(
+        {"planet": "Moon", "reason": "Moon gives adaptable retention with fluctuations"},
+    )
+    context["verdict"] = {
+        "direction": "qualified_support",
+        "confidence": "medium",
+    }
+    contract = build_translated_astrology_contract(
+        context,
+        question="What does my chart show about education?",
+        language="english",
+        response_style="simple",
+    )
+    rule = translated_astrology_prompt_rule(contract)
+
+    assert contract["verdict_snapshot"] == {
+        "direction": "qualified_support",
+        "confidence": "medium",
+    }
+    assert "two renderings of the same adjudicated answer" in rule
+    assert "Never upgrade neutral, mixed, qualified" in rule
+    assert "drop a material caution" in rule
+
+
 def test_handoff_and_boundary_answers_do_not_require_planet_dressing():
     handoff = build_translated_astrology_contract(
         _context(

@@ -917,6 +917,16 @@ class GeminiChatAnalyzer:
             'header_enforcement': 'You MUST use the exact headers defined in the RESPONSE FORMAT STRUCTURE, especially for Nadi Precision and Sudarshana analysis.'
         }
 
+        from ai.parallel_chat.presentation_style import normalize_merge_response_style
+
+        logger.info(
+            "chat_presentation_style requested=%r normalized=%s user_id=%s premium_analysis=%s",
+            response_style,
+            normalize_merge_response_style(response_style),
+            user_id,
+            bool(premium_analysis),
+        )
+
         intent_mode = str(intent_block.get("mode") or mode or "").upper()
         if intent_mode == "PREDICT_DAILY":
             from daily.daily_orchestrator import run_daily_chat_pipeline

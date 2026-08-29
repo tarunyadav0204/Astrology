@@ -37,7 +37,7 @@ def test_parallel_chat_skips_non_birth(monkeypatch):
     assert should_use_parallel_chat({"analysis_type": "synastry", "native": {}, "partner": {}}) is False
 
 
-def test_parallel_chat_user_allowlist(monkeypatch):
+def test_parallel_chat_stale_user_allowlist_no_longer_restricts_users(monkeypatch):
     from ai.parallel_chat.config import should_use_parallel_chat
 
     monkeypatch.setenv("ASTRO_PARALLEL_CHAT", "1")
@@ -45,17 +45,17 @@ def test_parallel_chat_user_allowlist(monkeypatch):
     monkeypatch.setenv("ASTRO_PARALLEL_CHAT_USER_IDS", "100, 200")
     assert should_use_parallel_chat(ctx, user_id=100) is True
     assert should_use_parallel_chat(ctx, user_id=200) is True
-    assert should_use_parallel_chat(ctx, user_id=3) is False
-    assert should_use_parallel_chat(ctx, user_id=None) is False
+    assert should_use_parallel_chat(ctx, user_id=3) is True
+    assert should_use_parallel_chat(ctx, user_id=None) is True
 
 
-def test_parallel_chat_allowlist_invalid_ids_means_nobody(monkeypatch):
+def test_parallel_chat_invalid_stale_allowlist_does_not_block_users(monkeypatch):
     from ai.parallel_chat.config import should_use_parallel_chat
 
     monkeypatch.setenv("ASTRO_PARALLEL_CHAT", "1")
     ctx = {"analysis_type": "birth", "intent": {"mode": "birth"}}
     monkeypatch.setenv("ASTRO_PARALLEL_CHAT_USER_IDS", "not_a_number, also_bad")
-    assert should_use_parallel_chat(ctx, user_id=1) is False
+    assert should_use_parallel_chat(ctx, user_id=1) is True
 
 
 def test_parallel_chat_skipped_when_gemma_vendor(monkeypatch):
@@ -72,4 +72,3 @@ def test_parallel_chat_skipped_when_gemma_vendor(monkeypatch):
     monkeypatch.setattr(ads, "get_chat_llm_provider", lambda: ads.CHAT_LLM_GEMINI)
     monkeypatch.setattr(ads, "get_chat_llm_provider_premium", lambda: ads.CHAT_LLM_GEMMA)
     assert should_use_parallel_chat(ctx) is False
-
