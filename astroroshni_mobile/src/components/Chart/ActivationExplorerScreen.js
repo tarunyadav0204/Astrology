@@ -18,6 +18,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { chartAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import NorthIndianChart from './NorthIndianChart';
+import EventFocusPanel from './EventFocusPanel';
+import DoubleTransitPanel from './DoubleTransitPanel';
 
 const HOUSE_LABELS = {
   1: 'Self, body and direction', 2: 'Savings, family, speech and face/mouth',
@@ -405,42 +407,83 @@ export default function ActivationExplorerScreen({ navigation, route }) {
             <View style={styles.controlCopy}><Text style={[styles.eyebrow, { color: colors.textSecondary }]}>VIEW FROM</Text><Text style={[styles.controlValue, { color: colors.text }]}>{new Date(`${asOf}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</Text></View>
             <TouchableOpacity onPress={() => shiftDate(1)} style={[styles.miniButton, { backgroundColor: ui.surfaceMuted }]}><Ionicons name="chevron-forward" size={18} color={colors.text} /></TouchableOpacity>
           </View>
+          {activeTab === 'houses' || activeTab === 'manifestations' ? (
           <View style={styles.segmentRow}>
             {[30, 90, 180].map((days) => <TouchableOpacity key={days} onPress={() => setHorizonDays(days)} style={[styles.segment, { borderColor: horizonDays === days ? colors.selectionBorder : ui.border, backgroundColor: horizonDays === days ? colors.selectionSurface : ui.surfaceMuted }]}><Text style={[styles.segmentText, { color: horizonDays === days ? colors.selectionText : colors.textSecondary }]}>{days} days</Text></TouchableOpacity>)}
           </View>
+          ) : (
+            <Text style={[styles.stateText, { color: colors.textSecondary }]}>
+              {activeTab === 'double'
+                ? 'Double Transit searches a year range. Use Set as-of on a window to inspect that date here.'
+                : 'Focus searches one calendar year. Use Set as-of on a window to inspect that date here.'}
+            </Text>
+          )}
         </View>
 
-        {loading ? <View style={styles.state}><ActivityIndicator size="large" color={colors.primary} /><Text style={[styles.stateTitle, { color: colors.text }]}>Reading the chart</Text><Text style={[styles.stateText, { color: colors.textSecondary }]}>We’re connecting the birth chart, current planetary period, transits and timing highlights.</Text></View> : null}
-        {!loading && error ? <View style={[card, styles.state]}>
-          <Ionicons name={licenseRequired ? 'school-outline' : 'alert-circle-outline'} size={34} color={licenseRequired ? colors.primary : colors.error} />
-          <Text style={[styles.stateTitle, { color: colors.text }]}>{licenseRequired ? 'Astrologer License required' : 'Calculation could not be completed'}</Text>
+        {licenseRequired ? <View style={[card, styles.state]}>
+          <Ionicons name="school-outline" size={34} color={colors.primary} />
+          <Text style={[styles.stateTitle, { color: colors.text }]}>Astrologer License required</Text>
           <Text style={[styles.stateText, { color: colors.textSecondary }]}>{error}</Text>
           <TouchableOpacity
-            onPress={licenseRequired
-              ? () => navigation.navigate('Credits', {
-                focusSubscriptionFamily: 'astrologer',
-                returnTo: 'ActivationExplorer',
-                returnParams: { birthData },
-              })
-              : loadExplorer}
+            onPress={() => navigation.navigate('Credits', {
+              focusSubscriptionFamily: 'astrologer',
+              returnTo: 'ActivationExplorer',
+              returnParams: { birthData },
+            })}
             style={[styles.primaryButton, { backgroundColor: colors.primary }]}
           >
-            <Text style={styles.primaryButtonText}>{licenseRequired ? 'View ₹100 monthly plan' : 'Try again'}</Text>
+            <Text style={styles.primaryButtonText}>View ₹100 monthly plan</Text>
           </TouchableOpacity>
         </View> : null}
 
-        {!loading && result ? <>
-          <LinearGradient colors={[colors.cosmicRaised, colors.surfaceRaised]} style={[styles.card, styles.dashaCard, { borderColor: colors.cosmicLine }]}>
+        {!licenseRequired ? <>
+          {result && activeTab !== 'double' ? (
+          <View style={[card, styles.dashaCard]}>
             <Text style={[styles.eyebrow, { color: colors.textSecondary }]}>YOUR CURRENT TIMING CYCLE</Text>
             <Text style={[styles.dashaChain, { color: colors.text }]}>{currentWindow?.mahadasha || '—'} <Text style={{ color: colors.primary }}>major →</Text> {currentWindow?.antardasha || '—'} <Text style={{ color: colors.primary }}>sub-period →</Text> {currentWindow?.pratyantardasha || '—'}</Text>
             <Text style={[styles.meta, { color: colors.textSecondary }]}>{shortDate(currentWindow?.start_date)} – {shortDate(currentWindow?.end_date)} · {currentRows.filter((row) => !['transit_only', 'dormant'].includes(row.state)).length} houses active now · based on D1</Text>
-          </LinearGradient>
+          </View>
+          ) : null}
 
           <View style={[styles.viewTabs, { backgroundColor: ui.surfaceMuted, borderColor: ui.border }]}>
-            {[['houses', 'House by House'], ['manifestations', 'Combined Life Themes']].map(([key, label]) => <TouchableOpacity key={key} onPress={() => setActiveTab(key)} style={[styles.viewTab, activeTab === key && { backgroundColor: colors.selectionSurface }]}><Text style={[styles.viewTabText, { color: activeTab === key ? colors.selectionText : colors.textSecondary }]}>{label}</Text></TouchableOpacity>)}
+            {[['houses', 'Houses'], ['manifestations', 'Themes'], ['focus', 'Focus'], ['double', 'Double']].map(([key, label]) => <TouchableOpacity key={key} onPress={() => setActiveTab(key)} style={[styles.viewTab, activeTab === key && { backgroundColor: colors.selectionSurface }]}><Text style={[styles.viewTabText, { color: activeTab === key ? colors.selectionText : colors.textSecondary }]}>{label}</Text></TouchableOpacity>)}
           </View>
 
-          {activeTab === 'houses' ? <>
+          {activeTab === 'double' ? (
+            <DoubleTransitPanel
+              birthData={birthData}
+              chartData={d1ChartData}
+              colors={colors}
+              ui={ui}
+              card={card}
+              onInspectDate={(iso) => {
+                if (!iso) return;
+                setAsOf(String(iso).slice(0, 10));
+              }}
+            />
+          ) : loading ? <View style={styles.state}><ActivityIndicator size="large" color={colors.primary} /><Text style={[styles.stateTitle, { color: colors.text }]}>Reading the chart</Text><Text style={[styles.stateText, { color: colors.textSecondary }]}>We’re connecting the birth chart, current planetary period, transits and timing highlights.</Text></View>
+          : error ? <View style={[card, styles.state]}>
+          <Ionicons name="alert-circle-outline" size={34} color={colors.error} />
+          <Text style={[styles.stateTitle, { color: colors.text }]}>Calculation could not be completed</Text>
+          <Text style={[styles.stateText, { color: colors.textSecondary }]}>{error}</Text>
+          <TouchableOpacity onPress={loadExplorer} style={[styles.primaryButton, { backgroundColor: colors.primary }]}>
+            <Text style={styles.primaryButtonText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+          : result && activeTab === 'focus' ? (
+            <EventFocusPanel
+              birthData={birthData}
+              asOf={asOf}
+              colors={colors}
+              ui={ui}
+              card={card}
+              navigation={navigation}
+              onInspectDate={(iso) => {
+                if (!iso) return;
+                setAsOf(String(iso).slice(0, 10));
+              }}
+            />
+          ) : result && activeTab === 'houses' ? <>
           <View style={card}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Where life is drawing your attention</Text>
             <Text style={[styles.sectionIntro, { color: colors.textSecondary }]}>Tap any house to understand why it matters now and what you may notice.</Text>
@@ -649,8 +692,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 17,
   },
-  viewTab: { flex: 1, minHeight: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
-  viewTabText: { fontSize: 12, lineHeight: 16, fontWeight: '600', textAlign: 'center' },
+  viewTab: { flex: 1, minHeight: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  viewTabText: { fontSize: 11, lineHeight: 15, fontWeight: '600', textAlign: 'center' },
   state: { alignItems: 'center', paddingVertical: 46, paddingHorizontal: 24, gap: 10 },
   stateTitle: { fontSize: 18, lineHeight: 24, fontWeight: '700', textAlign: 'center' },
   stateText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },

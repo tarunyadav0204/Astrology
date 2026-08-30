@@ -558,6 +558,25 @@ export const chartAPI = {
       trace,
     }
   ),
+  getEventWindows: ({ birthChartId, birthData, eventKey, year, includeDeveloping = false, focusHouses = null }) => api.post(
+    getEndpoint('/prediction-engine/event-windows'),
+    {
+      ...(birthChartId ? { birth_chart_id: Number(birthChartId) } : { birth_data: birthData }),
+      event_key: eventKey,
+      year,
+      include_developing: includeDeveloping,
+      focus_houses: eventKey === 'custom' ? (focusHouses || []) : null,
+    }
+  ),
+  getDoubleTransits: ({ chartData, startDate, endDate, includeAspectOnly = true }) => api.post(
+    getEndpoint('/double-transits'),
+    {
+      chart_data: chartData,
+      start_date: startDate,
+      end_date: endDate,
+      include_aspect_only: includeAspectOnly,
+    }
+  ),
   calculateChart: (birthData) => {
     // console.log('[API] Calling calculateChart');
     const startTime = Date.now();

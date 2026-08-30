@@ -514,20 +514,6 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
           </View>
         </SafeAreaView>
 
-          <View style={[styles.hero, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine }]}>
-            <View pointerEvents="none" style={styles.heroLinework}>
-              <View style={[styles.heroOrbit, styles.heroOrbitLarge, { borderColor: colors.onSurfaceInverseMuted }]} />
-              <View style={[styles.heroOrbit, styles.heroOrbitSmall, { borderColor: colors.onSurfaceInverseMuted }]} />
-            </View>
-            <Text style={[styles.heroEyebrow, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.skyMap', 'YOUR CELESTIAL MAP')}</Text>
-            <Text style={[styles.heroTitle, { color: colors.onSurfaceInverse }]}>{t('premiumUi.planetaryPositions.heroTitle', 'The sky at your birth.')}</Text>
-            <Text style={[styles.heroBody, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.heroBody', 'Read each planet through its sign, house, exact degree and nakshatra placement.')}</Text>
-            <View style={[styles.heroMeta, { borderTopColor: colors.onSurfaceInverseMuted }]}>
-              <Text style={[styles.heroMetaText, { color: colors.onSurfaceInverse }]}>{t('premiumUi.planetaryPositions.positionCount', '{{count}} planetary positions', { count: planets.length })}</Text>
-              <Text style={[styles.heroMetaText, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.sidereal', 'Sidereal · Lahiri')}</Text>
-            </View>
-          </View>
-
           <View style={[styles.tabBar, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
             <GHScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
               <TabButton label={t('premiumUi.planetaryPositions.tabs.planets', 'Planets')} emoji="🪐" value="planets" active={activeTab === 'planets'} />
@@ -537,7 +523,20 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
             </GHScrollView>
           </View>
 
-          <GHScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <GHScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <View style={[styles.hero, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine }]}>
+              <View pointerEvents="none" style={styles.heroLinework}>
+                <View style={[styles.heroOrbit, styles.heroOrbitLarge, { borderColor: colors.onSurfaceInverseMuted }]} />
+                <View style={[styles.heroOrbit, styles.heroOrbitSmall, { borderColor: colors.onSurfaceInverseMuted }]} />
+              </View>
+              <Text style={[styles.heroEyebrow, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.skyMap', 'YOUR CELESTIAL MAP')}</Text>
+              <Text style={[styles.heroTitle, { color: colors.onSurfaceInverse }]}>{t('premiumUi.planetaryPositions.heroTitle', 'The sky at your birth.')}</Text>
+              <Text style={[styles.heroBody, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.heroBody', 'Read each planet through its sign, house, exact degree and nakshatra placement.')}</Text>
+              <View style={[styles.heroMeta, { borderTopColor: colors.onSurfaceInverseMuted }]}>
+                <Text style={[styles.heroMetaText, { color: colors.onSurfaceInverse }]}>{t('premiumUi.planetaryPositions.positionCount', '{{count}} planetary positions', { count: planets.length })}</Text>
+                <Text style={[styles.heroMetaText, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.sidereal', 'Sidereal · Lahiri')}</Text>
+              </View>
+            </View>
             {renderTabContent()}
             <View style={{ height: 32 }} />
           </GHScrollView>
@@ -568,7 +567,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 21, lineHeight: 25 },
   headerSubtitle: { fontSize: 11, lineHeight: 15, marginTop: 2, fontWeight: '600' },
   placeholder: { width: 40 },
-  hero: { minHeight: 190, marginHorizontal: 18, marginTop: 16, padding: 22, borderWidth: 1, borderRadius: 26, overflow: 'hidden' },
+  hero: { minHeight: 190, marginBottom: 16, padding: 22, borderWidth: 1, borderRadius: 26, overflow: 'hidden' },
   heroLinework: { ...StyleSheet.absoluteFillObject, opacity: 0.25 },
   heroOrbit: { position: 'absolute', borderWidth: 1 },
   heroOrbitLarge: { width: 190, height: 190, borderRadius: 95, right: -70, top: -92 },
@@ -613,6 +612,8 @@ const styles = StyleSheet.create({
 
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 18,
     paddingTop: 16,
   },
