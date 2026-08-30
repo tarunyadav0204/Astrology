@@ -99,6 +99,7 @@ import { chatAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
+import { chatSentimentColors } from '../../theme/tokens';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 import { useCredits } from '../../credits/CreditContext';
 import { useAuthGate } from '../../auth/AuthGateContext';
@@ -251,6 +252,7 @@ function MessageBubble({
 }) {
   const { t, i18n } = useTranslation();
   const { theme, colors } = useTheme();
+  const sentiment = chatSentimentColors(colors);
   const messageActionStyle = {
     backgroundColor: colors.surfaceRaised,
     borderColor: colors.cardBorder,
@@ -1495,7 +1497,7 @@ function MessageBubble({
           }
           const isPos = m[1] !== undefined;
           const inner = isPos ? m[1] : m[2];
-          const sentimentColor = isPos ? '#15803d' : '#b91c1c';
+          const sentimentColor = isPos ? sentiment.positive : sentiment.negative;
           const innerEls = renderPlainSegmentWithBoldItalic(
             inner,
             `${keyPrefix}-${i}-${sub++}`,
@@ -1506,7 +1508,7 @@ function MessageBubble({
           elements.push(
             <Text
               key={`sentiment-${keyPrefix}-${i}-${m.index}`}
-              style={[baseTextStyle, isPos ? styles.sentimentPositive : styles.sentimentNegative]}
+              style={[baseTextStyle, styles.sentimentEmphasis, { color: sentimentColor }]}
             >
               {innerEls}
             </Text>
@@ -3524,12 +3526,7 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     fontWeight: '700',
     flexShrink: 1,
   },
-  sentimentPositive: {
-    color: '#15803d',
-    fontWeight: '700',
-  },
-  sentimentNegative: {
-    color: '#b91c1c',
+  sentimentEmphasis: {
     fontWeight: '700',
   },
   headerContainer: {

@@ -30,6 +30,13 @@ export const THEME_DEFINITIONS = Object.freeze([
     preview: ['#002147', '#d2b48c', '#f7eddd'],
   },
   {
+    id: 'stargazing',
+    label: 'Stargazing',
+    description: 'Charcoal slate and warm 466 C khaki',
+    colorScheme: 'dark',
+    preview: ['#424348', '#C6A97D', '#EDE4D4'],
+  },
+  {
     id: 'mistyRose',
     label: 'Misty Rose',
     description: 'Old rose, misty blush and deep cocoa plum',
@@ -260,6 +267,62 @@ export const THEME_PALETTES = Object.freeze({
     strokeMuted: 'rgba(248, 239, 226, 0.20)',
     strokeStrong: 'rgba(210, 180, 140, 0.48)',
   },
+  stargazing: {
+    ...base,
+    colorScheme: 'dark',
+    success: '#8fb89a',
+    warning: '#d4b87a',
+    error: '#d08890',
+    info: '#8aa3b8',
+    background: '#424348',
+    backgroundSecondary: '#3a3b40',
+    backgroundTertiary: '#4d4e54',
+    surface: '#4c4d53',
+    surfaceRaised: '#58595f',
+    surfaceMuted: '#38393e',
+    surfaceInverse: '#EDE4D4',
+    onSurfaceInverse: '#2a2b2f',
+    onSurfaceInverseMuted: 'rgba(42, 43, 47, 0.68)',
+    headerSurface: '#2c2d31',
+    text: '#EDE4D4',
+    textSecondary: 'rgba(237, 228, 212, 0.72)',
+    textTertiary: 'rgba(237, 228, 212, 0.50)',
+    textInverse: '#EDE4D4',
+    textInverseMuted: 'rgba(237, 228, 212, 0.72)',
+    primary: '#C6A97D',
+    primaryStrong: '#A88B5F',
+    onPrimary: '#2a2b2f',
+    secondary: '#D4C49A',
+    accent: '#C6A97D',
+    accentSoft: '#D8C4A0',
+    onAccent: '#2a2b2f',
+    cardBackground: '#4c4d53',
+    cardBorder: 'rgba(198, 169, 125, 0.24)',
+    borderStrong: 'rgba(198, 169, 125, 0.48)',
+    selectionSurface: '#C6A97D',
+    selectionControl: '#D8C4A0',
+    selectionBorder: '#E4D4B4',
+    selectionText: '#2a2b2f',
+    selectionTextMuted: 'rgba(42, 43, 47, 0.68)',
+    overlay: 'rgba(18, 19, 22, 0.88)',
+    cosmicSurface: '#25262a',
+    cosmicRaised: '#35363b',
+    cosmicLine: 'rgba(198, 169, 125, 0.30)',
+    cosmicGlow: 'rgba(198, 169, 125, 0.20)',
+    chartSurface: '#EDE4D4',
+    chartRaised: '#E0D4BE',
+    chartText: '#2a2b2f',
+    chartTextMuted: 'rgba(42, 43, 47, 0.62)',
+    chartLine: 'rgba(66, 67, 72, 0.22)',
+    chartLineStrong: '#A88B5F',
+    gradientStart: '#2c2d31',
+    gradientMid: '#424348',
+    gradientEnd: '#4d4e54',
+    gradientAccent: '#C6A97D',
+    statusBarStyle: 'light-content',
+    strokeMuted: 'rgba(237, 228, 212, 0.20)',
+    strokeStrong: 'rgba(198, 169, 125, 0.48)',
+  },
   mistyRose: {
     ...base,
     colorScheme: 'light',
@@ -369,6 +432,7 @@ export const THEME_PALETTES = Object.freeze({
     tabActiveColor: '#ffffff',
     tabIdleColor: 'rgba(255, 255, 255, 0.72)',
     chatPalette: {
+      colorScheme: 'light',
       background: '#ffffff',
       backgroundSecondary: '#fffaf7',
       backgroundTertiary: '#fff0e6',
@@ -694,4 +758,35 @@ export function normalizeThemeId(value) {
   if (value === 'dark') return 'midnight';
   if (value === 'light') return 'heritage';
   return THEME_PALETTES[value] ? value : 'heritage';
+}
+
+function hexLuminance(value) {
+  const hex = String(value || '').trim();
+  if (!hex.startsWith('#') || (hex.length !== 7 && hex.length !== 4)) return null;
+  const raw = hex.length === 4
+    ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+    : hex;
+  const r = parseInt(raw.slice(1, 3), 16) / 255;
+  const g = parseInt(raw.slice(3, 5), 16) / 255;
+  const b = parseInt(raw.slice(5, 7), 16) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Body-text greens/reds for chat sentiment. Follow the bubble surface, not the app chrome. */
+export function chatSentimentColors(palette) {
+  const surface = palette?.cardBackground || palette?.surface || palette?.background;
+  const luminance = hexLuminance(surface);
+  const lightChat = luminance == null
+    ? palette?.colorScheme !== 'dark'
+    : luminance >= 0.55;
+  if (!lightChat) {
+    return {
+      positive: palette.sentimentPositive || '#8EE4A8',
+      negative: palette.sentimentNegative || '#F6B4BB',
+    };
+  }
+  return {
+    positive: palette?.sentimentPositive || '#15803d',
+    negative: palette?.sentimentNegative || '#b91c1c',
+  };
 }

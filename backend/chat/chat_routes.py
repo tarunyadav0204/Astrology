@@ -26,6 +26,7 @@ from calculators.real_transit_calculator import RealTransitCalculator
 from calculators.event_predictor_ai import EventPredictor
 from utils.user_facing_errors import user_facing_message_from_any
 from calculators.ashtakavarga import AshtakavargaCalculator
+from chat.answer_style import normalize_chat_answer_style
 from shared.dasha_calculator import DashaCalculator
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ class ChatRequest(BaseModel):
     gender: Optional[str] = None
     question: str
     language: Optional[str] = 'english'
-    response_style: Optional[str] = 'detailed'
+    response_style: Optional[str] = 'simple'
     selected_period: Optional[Dict] = None
     include_context: Optional[bool] = False
     premium_analysis: Optional[bool] = False
@@ -60,6 +61,11 @@ class ChatRequest(BaseModel):
     partner_gender: Optional[str] = Field(None, alias="partnerGender")
     partnership_relationship: Optional[str] = Field(None, alias="partnershipRelationship")
     query_context: Optional[Dict] = Field(None, alias="queryContext")
+
+    @field_validator("response_style", mode="before")
+    @classmethod
+    def normalize_response_style(cls, value):
+        return normalize_chat_answer_style(value)
     
     class Config:
         populate_by_name = True  # Allows both snake_case and camelCase

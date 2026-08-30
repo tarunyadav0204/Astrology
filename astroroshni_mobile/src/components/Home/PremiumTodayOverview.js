@@ -352,41 +352,41 @@ export function PremiumExploreIntro({
   const guidedPaths = paths.filter((item) => item.action !== 'events');
   return (
     <View style={styles.exploreIntroWrap}>
-      <View style={[styles.exploreHero, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine }]}>
+      <View style={[styles.exploreHero, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
         <View pointerEvents="none" style={styles.exploreHeroLinework} accessibilityElementsHidden>
-          <View style={[styles.exploreHeroOrbit, styles.exploreHeroOrbitLarge, { borderColor: colors.onSurfaceInverseMuted || colors.cosmicLine }]} />
-          <View style={[styles.exploreHeroOrbit, styles.exploreHeroOrbitSmall, { borderColor: colors.onSurfaceInverseMuted || colors.cosmicLine }]} />
-          <View style={[styles.exploreHeroMeridian, { backgroundColor: colors.onSurfaceInverseMuted || colors.cosmicLine }]} />
-          <View style={[styles.exploreHeroBaseline, { backgroundColor: colors.onSurfaceInverseMuted || colors.cosmicLine }]} />
+          <View style={[styles.exploreHeroOrbit, styles.exploreHeroOrbitLarge, { borderColor: colors.cosmicLine }]} />
+          <View style={[styles.exploreHeroOrbit, styles.exploreHeroOrbitSmall, { borderColor: colors.cosmicLine }]} />
+          <View style={[styles.exploreHeroMeridian, { backgroundColor: colors.cosmicLine }]} />
+          <View style={[styles.exploreHeroBaseline, { backgroundColor: colors.cosmicLine }]} />
         </View>
         <View style={styles.exploreHeroEyebrowRow}>
-          <View style={[styles.exploreHeroEyebrowRule, { backgroundColor: colors.onSurfaceInverseMuted || colors.onSurfaceInverse }]} />
-          <Text style={[typography.eyebrow, { color: colors.onSurfaceInverseMuted || colors.onSurfaceInverse }]}>
+          <View style={[styles.exploreHeroEyebrowRule, { backgroundColor: colors.textInverseMuted }]} />
+          <Text style={[typography.eyebrow, { color: colors.accent }]}>
             {t('premiumUi.home.vedicStudio')}
           </Text>
         </View>
-        <Text style={[typography.title, styles.exploreHeroTitle, { color: colors.onSurfaceInverse }]}>{t('premiumUi.home.exploreWith')}{`\n`}{t('premiumUi.home.purpose')}</Text>
-        <Text style={[styles.exploreHeroBody, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.home.studioBody')}</Text>
+        <Text style={[typography.title, styles.exploreHeroTitle, { color: colors.textInverse }]}>{t('premiumUi.home.exploreWith')}{`\n`}{t('premiumUi.home.purpose')}</Text>
+        <Text style={[styles.exploreHeroBody, { color: colors.textInverseMuted }]}>{t('premiumUi.home.studioBody')}</Text>
       </View>
-      <View style={[styles.timingSpotlight, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine }]}>
+      <View style={[styles.timingSpotlight, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
         <View pointerEvents="none" style={styles.timingSpotlightGlow} />
         <View style={styles.timingSpotlightHeader}>
           <View style={styles.timingSpotlightHeading}>
             <Text style={[typography.eyebrow, { color: colors.accent }]}>
               {t('premiumUi.home.signatureTiming', 'SIGNATURE TIMING')}
             </Text>
-            <Text style={[typography.sectionTitle, styles.timingSpotlightTitle, { color: colors.onSurfaceInverse }]}>
+            <Text style={[typography.sectionTitle, styles.timingSpotlightTitle, { color: colors.textInverse }]}>
               {t('premiumUi.home.yourTimeAhead', 'Your time ahead')}
             </Text>
           </View>
-          <View style={[styles.timingCostPill, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicGlow }]}>
+          <View style={[styles.timingCostPill, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicRaised }]}>
             <Ionicons name="diamond-outline" size={12} color={colors.accent} />
-            <Text style={[styles.timingCostText, { color: colors.onSurfaceInverse }]}>
+            <Text style={[styles.timingCostText, { color: colors.textInverse }]}>
               {t('premiumUi.home.creditsShort', { count: eventsCost })}
             </Text>
           </View>
         </View>
-        <Text style={[styles.timingSpotlightBody, { color: colors.onSurfaceInverseMuted }]}>
+        <Text style={[styles.timingSpotlightBody, { color: colors.textInverseMuted }]}>
           {t(
             'premiumUi.home.timingSpotlightBody',
             'Personal timing from dashas, transits, Parashari, Nadi, Jaimini and KP.'
@@ -396,15 +396,15 @@ export function PremiumExploreIntro({
           <TouchableOpacity
             onPress={onOpenYearly}
             activeOpacity={0.82}
-            style={[styles.timingChoice, { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine }]}
+            style={[styles.timingChoice, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
           >
             <View style={[styles.timingChoiceIcon, { backgroundColor: colors.accentSoft }]}>
               <Ionicons name="calendar-outline" size={20} color={colors.onAccent} />
             </View>
-            <Text style={[styles.timingChoiceTitle, { color: colors.onSurfaceInverse }]}>
+            <Text style={[styles.timingChoiceTitle, { color: colors.textInverse }]}>
               {t('premiumUi.home.yearlyTimeline', 'Yearly timeline')}
             </Text>
-            <Text style={[styles.timingChoiceBody, { color: colors.onSurfaceInverseMuted }]} numberOfLines={2}>
+            <Text style={[styles.timingChoiceBody, { color: colors.textInverseMuted }]} numberOfLines={2}>
               {t('premiumUi.home.yearlyTimelineBody', '12 monthly chapters and major turning points')}
             </Text>
             <View style={styles.timingChoiceCta}>
@@ -417,15 +417,15 @@ export function PremiumExploreIntro({
           <TouchableOpacity
             onPress={onOpenMonthly}
             activeOpacity={0.82}
-            style={[styles.timingChoice, { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine }]}
+            style={[styles.timingChoice, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
           >
             <View style={[styles.timingChoiceIcon, { backgroundColor: colors.accentSoft }]}>
               <Ionicons name="moon-outline" size={20} color={colors.onAccent} />
             </View>
-            <Text style={[styles.timingChoiceTitle, { color: colors.onSurfaceInverse }]}>
+            <Text style={[styles.timingChoiceTitle, { color: colors.textInverse }]}>
               {t('premiumUi.home.monthlyDeepDive', 'Monthly deep dive')}
             </Text>
-            <Text style={[styles.timingChoiceBody, { color: colors.onSurfaceInverseMuted }]} numberOfLines={2}>
+            <Text style={[styles.timingChoiceBody, { color: colors.textInverseMuted }]} numberOfLines={2}>
               {t('premiumUi.home.monthlyDeepDiveBody', 'Detailed triggers and scenarios for one month')}
             </Text>
             <View style={styles.timingChoiceCta}>

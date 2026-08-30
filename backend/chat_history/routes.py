@@ -17,6 +17,7 @@ import jwt
 from auth import ALGORITHM, SECRET_KEY, User, get_current_user
 from db import get_conn, execute
 from charts.house_insight_service import build_chart_preview_insights
+from chat.answer_style import normalize_chat_answer_style
 from credits.instant_billing import InstantBillingError, require_active_session
 
 logger = logging.getLogger(__name__)
@@ -1874,7 +1875,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     
     # Optional fields with defaults
     language = request.get("language", "english")
-    response_style = request.get("response_style", "detailed")
+    response_style = normalize_chat_answer_style(request.get("response_style"))
     premium_analysis = request.get("premium_analysis", False)
     requested_chat_tier = str(request.get("chat_tier") or request.get("chatTier") or "standard").strip().lower()
     if fomo_chat_requested and requested_chat_tier not in {"standard", "premium"}:
@@ -2881,7 +2882,7 @@ async def process_chat_task(request: dict, x_chat_task_secret: Optional[str] = H
             question=sanitize_text(request.get("question")),
             user_id=int(request.get("user_id")),
             language=request.get("language", "english"),
-            response_style=request.get("response_style", "detailed"),
+            response_style=normalize_chat_answer_style(request.get("response_style")),
             premium_analysis=bool(request.get("premium_analysis")),
             birth_details=request.get("birth_details"),
             chat_cost=int(request.get("chat_cost", 1) or 1),

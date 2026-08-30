@@ -362,8 +362,16 @@ export const authAPI = {
 };
 
 export const chatAPI = {
+  getAnswerStylePreference: () =>
+    api.get(getEndpoint('/user-settings/chat-answer-style'), BACKGROUND_REQUEST_CONFIG),
+  updateAnswerStylePreference: (answerStyle) =>
+    api.put(
+      getEndpoint('/user-settings/chat-answer-style'),
+      { answer_style: answerStyle === 'technical' ? 'technical' : 'simple' },
+      BACKGROUND_REQUEST_CONFIG
+    ),
   sendMessage: (birthData, message, language = 'english') => 
-    api.post(getEndpoint('/chat/ask'), { ...birthData, question: message, language, response_style: 'detailed', query_context: buildQueryContext() }, GLOBAL_ERROR_CONFIG),
+    api.post(getEndpoint('/chat/ask'), { ...birthData, question: message, language, response_style: 'simple', query_context: buildQueryContext() }, GLOBAL_ERROR_CONFIG),
   getChatHistory: (birthData) => api.post(getEndpoint('/chat/history'), birthData),
   getSession: (sessionId) => api.get(getEndpoint(`/chat-v2/session/${sessionId}`)),
   createV2Session: (birthChartId) =>

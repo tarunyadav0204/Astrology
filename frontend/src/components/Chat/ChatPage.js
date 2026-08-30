@@ -32,6 +32,12 @@ import {
 import '../Shared/nativeSelectorChip.css';
 import './ChatPage.css';
 
+const CHAT_ANSWER_STYLE_STORAGE_PREFIX = 'chatAnswerStyle_v1:';
+
+function normalizeChatAnswerStyle(value) {
+    return String(value || '').trim().toLowerCase() === 'technical' ? 'technical' : 'simple';
+}
+
 function formatInstantDuration(value) {
     const seconds = Math.max(0, Number(value || 0));
     const minutes = Math.floor(seconds / 60);
@@ -293,12 +299,78 @@ const ChatPage = ({ onLogin }) => {
     const firstPurchaseOfferShownRef = useRef(null);
     const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
     const [isInstantAnalysis, setIsInstantAnalysis] = useState(false);
-    const [instantAnswerStyle, setInstantAnswerStyle] = useState('simple');
-    const [fullAnswerStyle, setFullAnswerStyle] = useState('technical');
+    const [answerStyle, setAnswerStyle] = useState('simple');
+    const [pendingAnswerStyle, setPendingAnswerStyle] = useState('simple');
+    const [answerStylePreferenceHydrated, setAnswerStylePreferenceHydrated] = useState(false);
+    const [showAnswerStyleIntro, setShowAnswerStyleIntro] = useState(false);
     const [exitInstantAfterEnd, setExitInstantAfterEnd] = useState(false);
     const [instantLoaderWordCount, setInstantLoaderWordCount] = useState(1);
     const instantRevealTimersRef = useRef(new Set());
     const instantRevealActiveRef = useRef(new Set());
+
+    const answerStyleStorageKey = useMemo(() => {
+        const userId = headerUser?.userid ?? headerUser?.user_id ?? headerUser?.id ?? headerUser?.phone ?? 'guest';
+        return `${CHAT_ANSWER_STYLE_STORAGE_PREFIX}${String(userId)}`;
+    }, [headerUser]);
+
+    const persistAnswerStyle = useCallback((style) => {
+        const normalized = normalizeChatAnswerStyle(style);
+        setAnswerStyle(normalized);
+        setPendingAnswerStyle(normalized);
+        setShowAnswerStyleIntro(false);
+        try {
+            localStorage.setItem(answerStyleStorageKey, normalized);
+        } catch (_) {
+            // The account preference remains authoritative when browser storage is unavailable.
+        }
+        apiService.updateChatAnswerStyle(normalized).catch(() => {
+            // Keep the local selection; the next chat entry will retry account hydration.
+        });
+    }, [answerStyleStorageKey]);
+
+    useEffect(() => {
+        let active = true;
+        const hydrateAnswerStyle = async () => {
+            let localStyle = null;
+            try {
+                const stored = String(localStorage.getItem(answerStyleStorageKey) || '').trim().toLowerCase();
+                if (stored === 'simple' || stored === 'technical') {
+                    localStyle = stored;
+                    if (active) {
+                        setAnswerStyle(stored);
+                        setPendingAnswerStyle(stored);
+                    }
+                }
+            } catch (_) {}
+
+            try {
+                const preference = await apiService.getChatAnswerStyle();
+                const accountStyle = String(preference?.answer_style || '').trim().toLowerCase();
+                if (!active) return;
+                if (accountStyle === 'simple' || accountStyle === 'technical') {
+                    setAnswerStyle(accountStyle);
+                    setPendingAnswerStyle(accountStyle);
+                    setShowAnswerStyleIntro(false);
+                    try {
+                        localStorage.setItem(answerStyleStorageKey, accountStyle);
+                    } catch (_) {}
+                } else if (localStyle) {
+                    setShowAnswerStyleIntro(false);
+                    apiService.updateChatAnswerStyle(localStyle).catch(() => {});
+                } else {
+                    setAnswerStyle('simple');
+                    setPendingAnswerStyle('simple');
+                    setShowAnswerStyleIntro(true);
+                }
+            } catch (_) {
+                if (active) setShowAnswerStyleIntro(!localStyle);
+            } finally {
+                if (active) setAnswerStylePreferenceHydrated(true);
+            }
+        };
+        hydrateAnswerStyle();
+        return () => { active = false; };
+    }, [answerStyleStorageKey]);
 
     const hasInstantTypingMessage = useMemo(
         () => messages.some(
@@ -1939,7 +2011,7 @@ const ChatPage = ({ onLogin }) => {
                 ...(options?.queryContext || {}),
             }),
             language: 'english',
-            response_style: useInstantChat || options?.instant_chat ? instantAnswerStyle : fullAnswerStyle,
+            response_style: answerStyle,
             premium_analysis: useFreeQuestion || useInstantChat ? false : !!options.premium_analysis,
             partnership_mode: isPartnershipMode,
             native_name: partnershipBirth?.name,
@@ -3221,17 +3293,17 @@ const ChatPage = ({ onLogin }) => {
                                 <div className="chat-answer-style" role="group" aria-label="Answer language detail">
                                     <button
                                         type="button"
-                                        className={instantAnswerStyle === 'simple' ? 'is-selected' : ''}
-                                        aria-pressed={instantAnswerStyle === 'simple'}
-                                        onClick={() => setInstantAnswerStyle('simple')}
+                                        className={answerStyle === 'simple' ? 'is-selected' : ''}
+                                        aria-pressed={answerStyle === 'simple'}
+                                        onClick={() => persistAnswerStyle('simple')}
                                     >
                                         Simple
                                     </button>
                                     <button
                                         type="button"
-                                        className={instantAnswerStyle === 'technical' ? 'is-selected' : ''}
-                                        aria-pressed={instantAnswerStyle === 'technical'}
-                                        onClick={() => setInstantAnswerStyle('technical')}
+                                        className={answerStyle === 'technical' ? 'is-selected' : ''}
+                                        aria-pressed={answerStyle === 'technical'}
+                                        onClick={() => persistAnswerStyle('technical')}
                                     >
                                         Technical
                                     </button>
@@ -3287,17 +3359,17 @@ const ChatPage = ({ onLogin }) => {
                                 <div className="chat-answer-style" role="group" aria-label="Answer style">
                                     <button
                                         type="button"
-                                        className={fullAnswerStyle === 'simple' ? 'is-selected' : ''}
-                                        aria-pressed={fullAnswerStyle === 'simple'}
-                                        onClick={() => setFullAnswerStyle('simple')}
+                                        className={answerStyle === 'simple' ? 'is-selected' : ''}
+                                        aria-pressed={answerStyle === 'simple'}
+                                        onClick={() => persistAnswerStyle('simple')}
                                     >
                                         Simple
                                     </button>
                                     <button
                                         type="button"
-                                        className={fullAnswerStyle === 'technical' ? 'is-selected' : ''}
-                                        aria-pressed={fullAnswerStyle === 'technical'}
-                                        onClick={() => setFullAnswerStyle('technical')}
+                                        className={answerStyle === 'technical' ? 'is-selected' : ''}
+                                        aria-pressed={answerStyle === 'technical'}
+                                        onClick={() => persistAnswerStyle('technical')}
                                     >
                                         Technical
                                     </button>
@@ -3510,6 +3582,45 @@ const ChatPage = ({ onLogin }) => {
                     instantHeaderControls
                 />
                 </>
+            )}
+
+            {answerStylePreferenceHydrated && showAnswerStyleIntro && wizardCompleted && (
+                <div className="answer-style-intro" role="dialog" aria-modal="true" aria-labelledby="answer-style-intro-title">
+                    <div className="answer-style-intro__card">
+                        <span className="answer-style-intro__eyebrow">New answer preference</span>
+                        <h2 id="answer-style-intro-title">How should Tara explain your chart?</h2>
+                        <p>Your choice applies to Standard, Premium and Live, and you can change it later from the chat header.</p>
+                        <div className="answer-style-intro__options" role="radiogroup" aria-label="Answer style">
+                            <button
+                                type="button"
+                                className={pendingAnswerStyle === 'simple' ? 'is-selected' : ''}
+                                role="radio"
+                                aria-checked={pendingAnswerStyle === 'simple'}
+                                onClick={() => setPendingAnswerStyle('simple')}
+                            >
+                                <strong>Simple</strong>
+                                <span>Clear, everyday astrology with the important reasoning translated.</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={pendingAnswerStyle === 'technical' ? 'is-selected' : ''}
+                                role="radio"
+                                aria-checked={pendingAnswerStyle === 'technical'}
+                                onClick={() => setPendingAnswerStyle('technical')}
+                            >
+                                <strong>Technical</strong>
+                                <span>The full calculations, chart terminology and specialist detail.</span>
+                            </button>
+                        </div>
+                        <button
+                            type="button"
+                            className="answer-style-intro__continue"
+                            onClick={() => persistAnswerStyle(pendingAnswerStyle)}
+                        >
+                            Continue with {pendingAnswerStyle === 'technical' ? 'Technical' : 'Simple'}
+                        </button>
+                    </div>
+                </div>
             )}
 
             {showInstantEndConfirm && (

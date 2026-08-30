@@ -89,6 +89,7 @@ const DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS = 210;
 const FIRST_PURCHASE_MODAL_DURATION_MS = 10 * 1000;
 const FIRST_PURCHASE_MODAL_SEEN_PREFIX = 'first_purchase_bonus_modal_seen_v1:';
 const THEME_DISCOVERY_SEEN_KEY = 'theme_discovery_seen_v1';
+const CHAT_ANSWER_STYLE_STORAGE_PREFIX = 'chatAnswerStyle_v1:';
 const formatMeterTime = (seconds) => {
   const safe = Math.max(0, Math.floor(Number(seconds) || 0));
   return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
@@ -556,8 +557,9 @@ export default function ChatScreen({ navigation, route }) {
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showChatModeIntro, setShowChatModeIntro] = useState(false);
   const [isInstantAnalysis, setIsInstantAnalysis] = useState(false);
-  const [instantAnswerStyle, setInstantAnswerStyle] = useState('simple');
-  const [fullAnswerStyle, setFullAnswerStyle] = useState('technical');
+  const [answerStyle, setAnswerStyle] = useState('simple');
+  const [answerStylePreferenceKnown, setAnswerStylePreferenceKnown] = useState(false);
+  const [answerStylePreferenceHydrated, setAnswerStylePreferenceHydrated] = useState(false);
   const [pendingChatMode, setPendingChatMode] = useState(null);
   const [pendingAnswerStyle, setPendingAnswerStyle] = useState(null);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
@@ -595,6 +597,89 @@ export default function ChatScreen({ navigation, route }) {
   const premiumGlowLoopRef = useRef(null);
   const badgeFadeHandleRef = useRef(null);
   const instantBilling = useInstantBillingSession({ refreshBalance: fetchBalance });
+
+  const getAnswerStyleStorageKey = useCallback(async () => {
+    const user = await storage.getUserData().catch(() => null);
+    const userId = user?.userid ?? user?.user_id ?? user?.id ?? 'guest';
+    return `${CHAT_ANSWER_STYLE_STORAGE_PREFIX}${String(userId)}`;
+  }, []);
+
+  const persistAnswerStyle = useCallback(async (style) => {
+    const normalized = style === 'technical' ? 'technical' : 'simple';
+    setAnswerStyle(normalized);
+    setAnswerStylePreferenceKnown(true);
+    try {
+      const key = await getAnswerStyleStorageKey();
+      await AsyncStorage.setItem(key, normalized);
+    } catch (_) {
+      // The account API remains the cross-device authority when local storage is unavailable.
+    }
+    try {
+      await chatAPI.updateAnswerStylePreference(normalized);
+    } catch (_) {
+      // Keep the local choice and retry naturally the next time chat is opened.
+    }
+  }, [getAnswerStyleStorageKey]);
+
+  useEffect(() => {
+    let active = true;
+    const hydrateAnswerStyle = async () => {
+      let localStyle = null;
+      try {
+        const key = await getAnswerStyleStorageKey();
+        const stored = String(await AsyncStorage.getItem(key) || '').trim().toLowerCase();
+        if (stored === 'simple' || stored === 'technical') {
+          localStyle = stored;
+          if (active) setAnswerStyle(stored);
+        }
+      } catch (_) {
+        // Continue with the account preference.
+      }
+
+      try {
+        const response = await chatAPI.getAnswerStylePreference();
+        const accountStyle = String(response?.data?.answer_style || '').trim().toLowerCase();
+        if (accountStyle === 'simple' || accountStyle === 'technical') {
+          if (!active) return;
+          setAnswerStyle(accountStyle);
+          setAnswerStylePreferenceKnown(true);
+          try {
+            const key = await getAnswerStyleStorageKey();
+            await AsyncStorage.setItem(key, accountStyle);
+          } catch (_) {}
+        } else if (localStyle) {
+          if (!active) return;
+          setAnswerStylePreferenceKnown(true);
+          chatAPI.updateAnswerStylePreference(localStyle).catch(() => {});
+        } else if (active) {
+          setAnswerStyle('simple');
+          setAnswerStylePreferenceKnown(false);
+        }
+      } catch (_) {
+        if (active) setAnswerStylePreferenceKnown(Boolean(localStyle));
+      } finally {
+        if (active) setAnswerStylePreferenceHydrated(true);
+      }
+    };
+    hydrateAnswerStyle();
+    return () => { active = false; };
+  }, [getAnswerStyleStorageKey, isGuest]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!answerStylePreferenceHydrated) return undefined;
+      let active = true;
+      chatAPI.getAnswerStylePreference()
+        .then((response) => {
+          const stored = String(response?.data?.answer_style || '').trim().toLowerCase();
+          if (!active || (stored !== 'simple' && stored !== 'technical')) return;
+          setAnswerStyle(stored);
+          setAnswerStylePreferenceKnown(true);
+        })
+        .catch(() => {});
+      return () => { active = false; };
+    }, [answerStylePreferenceHydrated])
+  );
 
   // The first free question is always answered in Standard mode. Preserve any
   // paid-mode selection in storage, but temporarily reset the UI and hide
@@ -2992,12 +3077,12 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={[styles.setupSlotNumber, { color: colors.accent }]}>{isNativeSet ? '✓' : '01'}</Text>
                   </View>
                   <View style={styles.setupSlotContent}>
-                    <Text style={[styles.setupSlotLabel, { color: colors.textTertiary }]}>{t('premiumUi.chatScreen.firstPerson')}</Text>
-                    <Text style={[isNativeSet ? styles.setupSlotValue : styles.setupSlotPlaceholder, { color: isNativeSet ? colors.text : colors.textSecondary }]} numberOfLines={1}>
+                    <Text style={[styles.setupSlotLabel, { color: isNativeSet ? colors.selectionTextMuted : colors.textTertiary }]}>{t('premiumUi.chatScreen.firstPerson')}</Text>
+                    <Text style={[isNativeSet ? styles.setupSlotValue : styles.setupSlotPlaceholder, { color: isNativeSet ? colors.selectionText : colors.textSecondary }]} numberOfLines={1}>
                       {isNativeSet ? nativeChart.name : 'Select from list below...'}
                     </Text>
                   </View>
-                  {isNativeSet && <Ionicons name="checkmark-circle" size={20} color={colors.accent} />}
+                  {isNativeSet && <Ionicons name="checkmark-circle" size={20} color={colors.selectionText} />}
                 </TouchableOpacity>
 
                 {/* Slot 2: Partner */}
@@ -3023,12 +3108,12 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={[styles.setupSlotNumber, { color: colors.accent }]}>{isPartnerSet ? '✓' : '02'}</Text>
                   </View>
                   <View style={styles.setupSlotContent}>
-                    <Text style={[styles.setupSlotLabel, { color: colors.textTertiary }]}>{t('premiumUi.chatScreen.partnerPerson')}</Text>
-                    <Text style={[isPartnerSet ? styles.setupSlotValue : styles.setupSlotPlaceholder, { color: isPartnerSet ? colors.text : colors.textSecondary }]} numberOfLines={1}>
+                    <Text style={[styles.setupSlotLabel, { color: isPartnerSet ? colors.selectionTextMuted : colors.textTertiary }]}>{t('premiumUi.chatScreen.partnerPerson')}</Text>
+                    <Text style={[isPartnerSet ? styles.setupSlotValue : styles.setupSlotPlaceholder, { color: isPartnerSet ? colors.selectionText : colors.textSecondary }]} numberOfLines={1}>
                       {isPartnerSet ? partnerChart.name : (isNativeSet ? 'Select from list below...' : 'Complete Step 1 first')}
                     </Text>
                   </View>
-                  {isPartnerSet && <Ionicons name="checkmark-circle" size={20} color={colors.accent} />}
+                  {isPartnerSet && <Ionicons name="checkmark-circle" size={20} color={colors.selectionText} />}
                 </TouchableOpacity>
 
                 {/* Slot 3: Relationship */}
@@ -3053,12 +3138,12 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={[styles.setupSlotNumber, { color: colors.accent }]}>{isRelationSet ? '✓' : '03'}</Text>
                   </View>
                   <View style={styles.setupSlotContent}>
-                    <Text style={[styles.setupSlotLabel, { color: colors.textTertiary }]}>{t('premiumUi.chatScreen.relationshipStatus')}</Text>
-                    <Text style={[isRelationSet ? styles.setupSlotValue : styles.setupSlotPlaceholder, { color: isRelationSet ? colors.text : colors.textSecondary }]} numberOfLines={1}>
+                    <Text style={[styles.setupSlotLabel, { color: isRelationSet ? colors.selectionTextMuted : colors.textTertiary }]}>{t('premiumUi.chatScreen.relationshipStatus')}</Text>
+                    <Text style={[isRelationSet ? styles.setupSlotValue : styles.setupSlotPlaceholder, { color: isRelationSet ? colors.selectionText : colors.textSecondary }]} numberOfLines={1}>
                       {isRelationSet ? partnershipRelation : (isPartnerSet ? 'Select or describe relationship...' : 'Complete Step 2 first')}
                     </Text>
                   </View>
-                  {isRelationSet && <Ionicons name="checkmark-circle" size={20} color={colors.accent} />}
+                  {isRelationSet && <Ionicons name="checkmark-circle" size={20} color={colors.selectionText} />}
                 </TouchableOpacity>
               </View>
 
@@ -3115,7 +3200,7 @@ export default function ChatScreen({ navigation, route }) {
                             }}
                             disabled={chart.id === 'add-new' && !chart.isEmpty}
                           >
-                            <Text style={[styles.setupSelectorText, { color: colors.text }]}>
+                            <Text style={[styles.setupSelectorText, { color: colors.selectionText }]}>
                               {chart.id === 'add-new' ? (chart.isEmpty ? '➕ ' : '🔍 ') : '👤 '}
                               {chart.name}
                             </Text>
@@ -3159,7 +3244,7 @@ export default function ChatScreen({ navigation, route }) {
                             }}
                             disabled={chart.id === 'add-new' && !chart.isEmpty}
                           >
-                            <Text style={[styles.setupSelectorText, { color: colors.text }]}>
+                            <Text style={[styles.setupSelectorText, { color: colors.selectionText }]}>
                               {chart.id === 'add-new' ? (chart.isEmpty ? '➕ ' : '🔍 ') : '👤 '}
                               {chart.name}
                             </Text>
@@ -3249,7 +3334,7 @@ export default function ChatScreen({ navigation, route }) {
                                 style={[styles.setupSelectorChip, { backgroundColor: colors.selectionSurface, borderColor: colors.cardBorder, minWidth: 100 }]}
                                 onPress={() => handleRelationshipSelect(item)}
                               >
-                                <Text style={[styles.setupSelectorText, { color: colors.text }]}>{item.label}</Text>
+                                <Text style={[styles.setupSelectorText, { color: colors.selectionText }]}>{item.label}</Text>
                               </TouchableOpacity>
                             )}
                           />
@@ -3270,7 +3355,7 @@ export default function ChatScreen({ navigation, route }) {
                               style={[styles.setupSelectorChip, { backgroundColor: colors.selectionSurface, borderColor: colors.cardBorder }]}
                               onPress={() => handleRelationshipSelect(relation.label)}
                             >
-                              <Text style={[styles.setupSelectorText, { color: colors.text }]}>{relation.label}</Text>
+                              <Text style={[styles.setupSelectorText, { color: colors.selectionText }]}>{relation.label}</Text>
                             </TouchableOpacity>
                           )}
                         />
@@ -4899,7 +4984,7 @@ export default function ChatScreen({ navigation, route }) {
           question: finalQuestion,
           query_context: requestQueryContext,
           language: language || 'english',
-          response_style: useInstantChat ? instantAnswerStyle : fullAnswerStyle,
+          response_style: answerStyle,
           premium_analysis: useFreeQuestion ? false : (useInstantChat ? false : isPremiumAnalysis),
           chat_tier: requestedTier,
           native_name: partnershipMode ? nativeChart?.name : birthData?.name,
@@ -5179,7 +5264,8 @@ export default function ChatScreen({ navigation, route }) {
       !suppressModeIntroAfterFreeRef.current &&
       birthData &&
       !freeQuestionAvailable &&
-      !chatModePreferenceLoadedRef.current &&
+      answerStylePreferenceHydrated &&
+      (!chatModePreferenceLoadedRef.current || !answerStylePreferenceKnown) &&
       pendingFomoQueryContextRef.current?.source !== 'homepage_fomo' &&
       !partnershipMode &&
       !isMundane &&
@@ -5212,6 +5298,8 @@ export default function ChatScreen({ navigation, route }) {
     setShowChatModeIntro(true);
   }, [
     activeWaitSideMessage,
+    answerStylePreferenceHydrated,
+    answerStylePreferenceKnown,
     birthData,
     currentPersonId,
     freeQuestionAvailable,
@@ -5250,9 +5338,7 @@ export default function ChatScreen({ navigation, route }) {
       : t('chat.answerStyle.simple', 'Simple')
   );
 
-  const getAnswerStyleForMode = (modeKey = getChatModeKey()) => (
-    modeKey === 'instant' ? instantAnswerStyle : fullAnswerStyle
-  );
+  const getAnswerStyleForMode = () => answerStyle;
 
   const getPendingChatModeKey = () => pendingChatMode || getChatModeKey();
 
@@ -5321,11 +5407,7 @@ export default function ChatScreen({ navigation, route }) {
   const applyPendingChatPreferences = () => {
     const modeKey = pendingChatMode || getChatModeKey();
     const styleKey = pendingAnswerStyle || getAnswerStyleForMode(modeKey);
-    if (modeKey === 'instant') {
-      setInstantAnswerStyle(styleKey);
-    } else {
-      setFullAnswerStyle(styleKey);
-    }
+    persistAnswerStyle(styleKey);
     // Continue is a dedicated sheet action, so close immediately instead of
     // waiting for InteractionManager. Modal gestures can keep that queue busy
     // and leave the sheet visible even though the preference was applied.
@@ -7268,7 +7350,7 @@ export default function ChatScreen({ navigation, route }) {
                     navigation.navigate('SpeechChat', {
                       birthData,
                       language,
-                      responseStyle: instantAnswerStyle,
+                      responseStyle: answerStyle,
                     })
                   }
                   accessibilityRole="button"
@@ -7371,7 +7453,7 @@ export default function ChatScreen({ navigation, route }) {
                     {t('premiumUi.chatScreen.askAnythingFree')}
                   </Text>
                 </View>
-                <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                <Ionicons name="checkmark-circle" size={20} color={colors.selectionText} />
               </View>
             )}
 
@@ -7483,7 +7565,7 @@ export default function ChatScreen({ navigation, route }) {
                     },
                   ]}
                 >
-                  <Ionicons name="language-outline" size={22} color={colors.primary} />
+                  <Ionicons name="language-outline" size={22} color={colors.selectionText} />
                 </View>
                 <Text style={[styles.modalTitle, styles.languageModalTitle, { color: colors.text }]}>
                   {t('languageModal.title')}
@@ -7513,7 +7595,7 @@ export default function ChatScreen({ navigation, route }) {
                     accessibilityRole="radio"
                     accessibilityState={{ selected: language === lang.code }}
                   >
-                    <Text style={[styles.languageText, { color: colors.text }]}>
+                    <Text style={[styles.languageText, { color: language === lang.code ? colors.selectionText : colors.text }]}>
                       {lang.flag} {lang.name}
                     </Text>
                     {language === lang.code ? (
@@ -7569,7 +7651,9 @@ export default function ChatScreen({ navigation, route }) {
             >
               <View style={styles.chatModeIntroHandle} />
               <Text style={[styles.chatModeIntroEyebrow, { color: colors.primary }]}>
-                {t('chat.modeIntro.eyebrow', 'Chat mode')}
+                {!answerStylePreferenceKnown
+                  ? t('chat.answerStyle.newLabel', 'New answer preference')
+                  : t('chat.modeIntro.eyebrow', 'Chat mode')}
               </Text>
               <Text style={[styles.chatModeIntroTitle, { color: colors.text }]}>
                 {t('chat.answerStyle.selectionTitle', {
@@ -7579,10 +7663,12 @@ export default function ChatScreen({ navigation, route }) {
                 })}
               </Text>
               <Text style={[styles.chatModeIntroBody, { color: colors.textSecondary }]}>
-                {t('chat.answerStyle.selectionBody', {
-                  styleDescription: getAnswerStyleDescription(getPendingAnswerStyleKey()),
-                  defaultValue: `${getAnswerStyleDescription(getPendingAnswerStyleKey())}. Choose the consultation mode and answer style, then continue.`,
-                })}
+                {!answerStylePreferenceKnown
+                  ? t('chat.answerStyle.newSelectionBody', 'Tara can now answer in Simple or Technical style. Choose once for Standard, Premium and Live; you can change it later.')
+                  : t('chat.answerStyle.selectionBody', {
+                    styleDescription: getAnswerStyleDescription(getPendingAnswerStyleKey()),
+                    defaultValue: `${getAnswerStyleDescription(getPendingAnswerStyleKey())}. Choose the consultation mode and answer style, then continue.`,
+                  })}
               </Text>
 
               <View
@@ -7604,6 +7690,8 @@ export default function ChatScreen({ navigation, route }) {
                     const selected = (pendingAnswerStyle || getAnswerStyleForMode(pendingChatMode || getChatModeKey())) === styleKey;
                     const label = getAnswerStyleName(styleKey);
                     const description = getAnswerStyleDescription(styleKey);
+                    const titleColor = selected ? colors.selectionText : colors.text;
+                    const bodyColor = selected ? colors.selectionTextMuted : colors.textSecondary;
                     return (
                       <TouchableOpacity
                         key={styleKey}
@@ -7624,14 +7712,14 @@ export default function ChatScreen({ navigation, route }) {
                         <View
                           style={[
                             styles.chatModeAnswerStyleRadio,
-                            { borderColor: selected ? colors.primary : colors.textTertiary },
+                            { borderColor: selected ? colors.selectionText : colors.textTertiary },
                           ]}
                         >
-                          {selected ? <View style={[styles.chatModeAnswerStyleRadioDot, { backgroundColor: colors.primary }]} /> : null}
+                          {selected ? <View style={[styles.chatModeAnswerStyleRadioDot, { backgroundColor: colors.selectionText }]} /> : null}
                         </View>
                         <View style={styles.chatModeAnswerStyleCopy}>
-                          <Text style={[styles.chatModeAnswerStyleName, { color: colors.text }]}>{label}</Text>
-                          <Text style={[styles.chatModeAnswerStyleDescription, { color: colors.textSecondary }]}>{description}</Text>
+                          <Text style={[styles.chatModeAnswerStyleName, { color: titleColor }]}>{label}</Text>
+                          <Text style={[styles.chatModeAnswerStyleDescription, { color: bodyColor }]}>{description}</Text>
                         </View>
                       </TouchableOpacity>
                     );
@@ -7649,6 +7737,9 @@ export default function ChatScreen({ navigation, route }) {
                   const isSelected = option.key === (pendingChatMode || getChatModeKey());
                   const isCurrent = option.key === getChatModeKey();
                   const hasDiscount = option.originalCost != null && Number(option.originalCost) > Number(option.cost || 0);
+                  const titleColor = isSelected ? colors.selectionText : colors.text;
+                  const bodyColor = isSelected ? colors.selectionTextMuted : colors.textSecondary;
+                  const mutedColor = isSelected ? colors.selectionTextMuted : (colors.textTertiary || colors.textSecondary);
                   return (
                     <TouchableOpacity
                       key={option.key}
@@ -7668,23 +7759,23 @@ export default function ChatScreen({ navigation, route }) {
                       ]}
                     >
                       <View style={[styles.chatModeIntroIcon, { backgroundColor: isSelected ? colors.primary : colors.selectionSurface }]}>
-                        <Ionicons name={option.icon} size={17} color={isSelected ? colors.onPrimary : colors.primary} />
+                        <Ionicons name={option.icon} size={17} color={isSelected ? colors.onPrimary : colors.selectionText} />
                       </View>
                       <View style={styles.chatModeIntroContent}>
                         <View style={styles.chatModeIntroRowHeader}>
-                          <Text style={[styles.chatModeIntroModeName, { color: colors.text }]}>{option.name}</Text>
+                          <Text style={[styles.chatModeIntroModeName, { color: titleColor }]}>{option.name}</Text>
                           {isCurrent ? (
-                            <Text style={[styles.chatModeIntroCurrent, { color: colors.primary }]}>
+                            <Text style={[styles.chatModeIntroCurrent, { color: isSelected ? colors.selectionText : colors.primary }]}>
                               {t('chat.modeIntro.current', 'Current')}
                             </Text>
                           ) : null}
                           <View style={styles.chatModeIntroCostWrap}>
                             {hasDiscount ? (
-                              <Text style={[styles.chatModeIntroOriginalCost, { color: colors.textTertiary || colors.textSecondary }]}>
+                              <Text style={[styles.chatModeIntroOriginalCost, { color: mutedColor }]}>
                                 {formatModeCost(option.originalCost)}
                               </Text>
                             ) : null}
-                            <Text style={[styles.chatModeIntroCost, { color: colors.text }]}>
+                            <Text style={[styles.chatModeIntroCost, { color: titleColor }]}>
                               {option.key === 'instant'
                                 ? t('instantBilling.splitRateShort', '{{first}} first · {{following}}/min', {
                                     first: instantChatFirstMinuteCost,
@@ -7696,16 +7787,16 @@ export default function ChatScreen({ navigation, route }) {
                             </Text>
                           </View>
                         </View>
-                        <Text style={[styles.chatModeIntroBenefit, { color: colors.textSecondary }]}>{option.benefit}</Text>
+                        <Text style={[styles.chatModeIntroBenefit, { color: bodyColor }]}>{option.benefit}</Text>
                         <View style={styles.chatModeIntroFeatureList}>
                           {option.features.map((feature) => (
                             <View key={feature} style={styles.chatModeIntroFeatureRow}>
-                              <Ionicons name="checkmark-circle" size={14} color={colors.primary} />
-                              <Text style={[styles.chatModeIntroFeatureText, { color: colors.text }]}>{feature}</Text>
+                              <Ionicons name="checkmark-circle" size={14} color={isSelected ? colors.selectionText : colors.primary} />
+                              <Text style={[styles.chatModeIntroFeatureText, { color: titleColor }]}>{feature}</Text>
                             </View>
                           ))}
                         </View>
-                        <Text style={[styles.chatModeIntroBestFor, { color: colors.textTertiary || colors.textSecondary }]}>{option.bestFor}</Text>
+                        <Text style={[styles.chatModeIntroBestFor, { color: mutedColor }]}>{option.bestFor}</Text>
                       </View>
                     </TouchableOpacity>
                   );
@@ -7723,7 +7814,7 @@ export default function ChatScreen({ navigation, route }) {
                   defaultValue: `Continue in ${getChatModeName(pendingChatMode || getChatModeKey())} · ${getAnswerStyleName(pendingAnswerStyle || getAnswerStyleForMode(pendingChatMode || getChatModeKey()))}`,
                 })}
               >
-                <Text style={styles.chatModeIntroContinueText}>
+                <Text style={[styles.chatModeIntroContinueText, { color: colors.onPrimary }]}>
                   {t('chat.modeIntro.continue', {
                     mode: `${getChatModeName(pendingChatMode || getChatModeKey())} · ${getAnswerStyleName(pendingAnswerStyle || getAnswerStyleForMode(pendingChatMode || getChatModeKey()))}`,
                     defaultValue: `Continue in ${getChatModeName(pendingChatMode || getChatModeKey())} · ${getAnswerStyleName(pendingAnswerStyle || getAnswerStyleForMode(pendingChatMode || getChatModeKey()))}`,

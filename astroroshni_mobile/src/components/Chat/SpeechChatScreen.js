@@ -2164,7 +2164,10 @@ export default function SpeechChatScreen({ navigation, route }) {
               return (
                 <TouchableOpacity
                   key={styleKey}
-                  onPress={() => setAnswerStyle(styleKey)}
+                  onPress={() => {
+                    setAnswerStyle(styleKey);
+                    chatAPI.updateAnswerStylePreference(styleKey).catch(() => {});
+                  }}
                   style={[styles.answerStyleOption, selected && { backgroundColor: screenPalette.accent }]}
                   accessibilityRole="radio"
                   accessibilityState={{ selected, checked: selected }}

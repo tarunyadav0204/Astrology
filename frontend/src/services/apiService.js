@@ -392,6 +392,18 @@ export const apiService = {
     const response = await apiClient.put(`${getEndpoint('/user-settings/settings')}/${phone}`, settings);
     return response.data;
   },
+
+  getChatAnswerStyle: async () => {
+    const response = await apiClient.get(getEndpoint('/user-settings/chat-answer-style'));
+    return response.data;
+  },
+
+  updateChatAnswerStyle: async (answerStyle) => {
+    const response = await apiClient.put(getEndpoint('/user-settings/chat-answer-style'), {
+      answer_style: answerStyle === 'technical' ? 'technical' : 'simple',
+    });
+    return response.data;
+  },
   
   analyzeHouses: async (birthData) => {
     const response = await apiClient.post(getEndpoint('/analyze-houses'), birthData);
