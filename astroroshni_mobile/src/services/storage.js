@@ -3,7 +3,15 @@ import { setAnalyticsUserId, clearFacebookUserId } from '../utils/analytics';
 
 export const storage = {
   // Auth
-  setAuthToken: (token) => AsyncStorage.setItem('authToken', token),
+  setAuthToken: async (token) => {
+    await AsyncStorage.setItem('authToken', token);
+    try {
+      const { syncThemeWithAccountAfterAuth } = require('./themeAccountSync');
+      syncThemeWithAccountAfterAuth();
+    } catch (_) {
+      // Theme sync is best-effort after login.
+    }
+  },
   getAuthToken: () => AsyncStorage.getItem('authToken'),
   removeAuthToken: async () => {
     await AsyncStorage.removeItem('authToken');

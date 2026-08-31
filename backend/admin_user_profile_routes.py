@@ -10,6 +10,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from auth import get_current_user, User
 from db import get_conn_dict
+from user_settings import (
+    APP_THEME_SETTING_KEY,
+    CHAT_ANSWER_STYLE_SETTING_KEY,
+    app_theme_label,
+    parse_stored_app_theme,
+    parse_stored_chat_answer_style,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +196,35 @@ def _build_user_profile_payload(user_id: int, from_date: str, to_date: str) -> D
 
             cur.execute(
                 """
-                SELECT cm.message_id, cm.session_id, cm.content, cm.timestamp, cm.category, cm.canonical_question
+                SELECT setting_key, setting_value, updated_at
+                FROM user_settings
+                WHERE user_id = %s AND setting_key IN (%s, %s)
+                """,
+                (user_id, APP_THEME_SETTING_KEY, CHAT_ANSWER_STYLE_SETTING_KEY),
+            )
+            theme_id = None
+            theme_updated_at = None
+            answer_style = None
+            answer_style_updated_at = None
+            for setting_row in cur.fetchall() or []:
+                setting_data = _row_dict(setting_row)
+                if setting_data.get("setting_key") == APP_THEME_SETTING_KEY:
+                    theme_id = parse_stored_app_theme(setting_data.get("setting_value"))
+                    theme_updated_at = setting_data.get("updated_at")
+                elif setting_data.get("setting_key") == CHAT_ANSWER_STYLE_SETTING_KEY:
+                    answer_style = parse_stored_chat_answer_style(setting_data.get("setting_value"))
+                    answer_style_updated_at = setting_data.get("updated_at")
+            profile["user"]["app_theme"] = theme_id
+            profile["user"]["app_theme_label"] = app_theme_label(theme_id)
+            profile["user"]["app_theme_updated_at"] = theme_updated_at
+            profile["user"]["chat_answer_style"] = answer_style
+            profile["user"]["chat_answer_style_selected"] = answer_style is not None
+            profile["user"]["chat_answer_style_updated_at"] = answer_style_updated_at
+
+            cur.execute(
+                """
+                SELECT cm.message_id, cm.session_id, cm.content, cm.timestamp, cm.category,
+                       cm.canonical_question, cm.response_style
                 FROM chat_messages cm
                 INNER JOIN chat_sessions cs ON cs.session_id = cm.session_id
                 WHERE cs.user_id = %s

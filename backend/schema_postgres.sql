@@ -825,6 +825,7 @@ CREATE TABLE "chat_messages" (
     "client_request_id" TEXT,
     "gate_metadata" TEXT,
     "chat_tier" TEXT NOT NULL DEFAULT 'standard',
+    "response_style" TEXT,
     PRIMARY KEY ("message_id"),
     FOREIGN KEY ("session_id") REFERENCES "chat_sessions" ("session_id")
 );

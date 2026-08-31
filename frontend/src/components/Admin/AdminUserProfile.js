@@ -435,6 +435,14 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
               {' · '}
               <span>role {user.role || 'user'}</span>
               {' · '}
+              <span title={user.app_theme_updated_at ? `Saved ${user.app_theme_updated_at}` : undefined}>
+                theme {user.app_theme_label || user.app_theme || '—'}
+              </span>
+              {' · '}
+              <span title={user.chat_answer_style_updated_at ? `Saved ${user.chat_answer_style_updated_at}` : 'No saved preference'}>
+                answers {user.chat_answer_style === 'technical' ? 'Technical' : user.chat_answer_style === 'simple' ? 'Simple' : 'Simple (default, not selected)'}
+              </span>
+              {' · '}
               <span>
                 signup{' '}
                 {user.signup_client === 'web'
@@ -555,11 +563,12 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
                     <th>Session</th>
                     <th>Question</th>
                     <th>Category</th>
+                    <th>Answer style</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(data.chat_questions || []).length === 0 ? (
-                    <tr><td colSpan={4}>No rows in range.</td></tr>
+                    <tr><td colSpan={5}>No rows in range.</td></tr>
                   ) : (
                     data.chat_questions.map((row) => (
                       <tr key={row.message_id}>
@@ -567,6 +576,7 @@ export default function AdminUserProfile({ initialUserId, initialDateFrom, initi
                         <td className="mono">{row.session_id || '—'}</td>
                         <td>{row.content || '—'}</td>
                         <td>{row.category || row.canonical_question || '—'}</td>
+                        <td>{row.response_style === 'technical' ? 'Technical' : row.response_style === 'simple' ? 'Simple' : '—'}</td>
                       </tr>
                     ))
                   )}

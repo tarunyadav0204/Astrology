@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import { authService, toUserFriendlyAuthError } from '../../services/authService';
+import { normalizeTheme } from '../../theme/ThemeContext';
+import { syncStoredThemeWithAccount } from '../../theme/themeAccountSync';
 import PhoneWithCountrySelect from './PhoneWithCountrySelect';
 import { buildFullPhone, isNationalPhoneValid } from '../../utils/countryCodes';
 
@@ -80,6 +82,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
       
       localStorage.setItem('token', response.access_token);
       localStorage.setItem('user', JSON.stringify(userWithAdmin));
+      syncStoredThemeWithAccount(normalizeTheme).catch(() => {});
       
       // Save user data for biometric login if supported
       if (biometricSupported && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
@@ -262,6 +265,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
         // Auto-login with saved user data
         localStorage.setItem('token', userData.token);
         localStorage.setItem('user', JSON.stringify(userData));
+        syncStoredThemeWithAccount(normalizeTheme).catch(() => {});
         onLogin(userData);
       }
     } catch (error) {

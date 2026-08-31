@@ -361,6 +361,17 @@ export const authAPI = {
 
 };
 
+export const userSettingsAPI = {
+  getThemePreference: () =>
+    api.get(getEndpoint('/user-settings/theme'), BACKGROUND_REQUEST_CONFIG),
+  updateThemePreference: (themeId) =>
+    api.put(
+      getEndpoint('/user-settings/theme'),
+      { theme_id: themeId },
+      BACKGROUND_REQUEST_CONFIG
+    ),
+};
+
 export const chatAPI = {
   getAnswerStylePreference: () =>
     api.get(getEndpoint('/user-settings/chat-answer-style'), BACKGROUND_REQUEST_CONFIG),

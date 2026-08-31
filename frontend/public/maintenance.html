@@ -16,6 +16,7 @@
         heritage:  { shell: '#2d0c1c', canvas: '#f7f1e8', surface: '#fffaf2', text: '#210b17', muted: 'rgba(33,11,23,.64)', accent: '#d7b878', primary: '#701d3f', onPrimary: '#fffaf2', line: 'rgba(69,35,46,.18)' },
         oliveGold: { shell: '#4f4b38', canvas: '#f2eac9', surface: '#fbf5df', text: '#29281f', muted: 'rgba(41,40,31,.68)', accent: '#aaa171', primary: '#736e52', onPrimary: '#fff9e7', line: 'rgba(79,75,56,.20)' },
         oxfordTan: { shell: '#00162f', canvas: '#001a39', surface: '#08294f', text: '#f8efe2', muted: 'rgba(248,239,226,.72)', accent: '#d2b48c', primary: '#d2b48c', onPrimary: '#001a39', line: 'rgba(210,180,140,.28)' },
+        stargazing:{ shell: '#2c2d31', canvas: '#424348', surface: '#4c4d53', text: '#EDE4D4', muted: 'rgba(237,228,212,.72)', accent: '#C6A97D', primary: '#C6A97D', onPrimary: '#2a2b2f', line: 'rgba(198,169,125,.28)' },
         mistyRose: { shell: '#633e49', canvas: '#ffe4e1', surface: '#fff7f4', text: '#37242c', muted: 'rgba(55,36,44,.68)', accent: '#c08081', primary: '#a85f67', onPrimary: '#fff8f5', line: 'rgba(99,62,73,.19)' },
         midnight:  { shell: '#09060e', canvas: '#100b17', surface: '#1d1427', text: '#f8f0e4', muted: 'rgba(248,240,228,.68)', accent: '#d9bd7e', primary: '#d1789b', onPrimary: '#190d18', line: 'rgba(248,240,228,.18)' },
         obsidian:  { shell: '#120810', canvas: '#120810', surface: '#1d1019', text: '#fff8ec', muted: 'rgba(255,248,236,.70)', accent: '#d8bc7a', primary: '#a94d70', onPrimary: '#fff8ec', line: 'rgba(216,188,122,.25)' },
@@ -46,7 +47,7 @@
       root.dataset.theme = saved;
       Object.keys(p).forEach(function (key) { root.style.setProperty('--' + key, p[key]); });
       root.style.backgroundColor = p.shell;
-      root.style.colorScheme = ['midnight', 'obsidian', 'oxfordTan'].indexOf(saved) >= 0 ? 'dark' : 'light';
+      root.style.colorScheme = ['midnight', 'obsidian', 'oxfordTan', 'stargazing'].indexOf(saved) >= 0 ? 'dark' : 'light';
       var meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.setAttribute('content', p.shell);
     }());

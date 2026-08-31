@@ -1,6 +1,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  persistThemeToAccount,
+  registerThemeAccountApplier,
+  syncStoredThemeWithAccount,
+  THEME_STORAGE_KEY,
+} from './themeAccountSync';
 
-export const THEME_STORAGE_KEY = 'astroroshni_theme';
+export { THEME_STORAGE_KEY };
 
 export const THEMES = Object.freeze([
   {
@@ -53,6 +59,13 @@ export const THEMES = Object.freeze([
     preview: { canvas: '#002147', surface: '#10365f', accent: '#d2b48c', border: 'rgba(210, 180, 140, 0.32)' },
   },
   {
+    id: 'stargazing',
+    label: 'Stargazing',
+    colorScheme: 'dark',
+    themeColor: '#2c2d31',
+    preview: { canvas: '#424348', surface: '#4c4d53', accent: '#C6A97D', border: 'rgba(198, 169, 125, 0.30)' },
+  },
+  {
     id: 'mistyRose',
     label: 'Misty Rose',
     colorScheme: 'light',
@@ -86,6 +99,13 @@ export const THEMES = Object.freeze([
     colorScheme: 'dark',
     themeColor: '#401f70',
     preview: { canvas: '#401f70', surface: '#3d1b6d', accent: '#cc6475', border: 'rgba(204, 100, 117, 0.40)' },
+  },
+  {
+    id: 'refinedEarth',
+    label: 'Refined Earth',
+    colorScheme: 'dark',
+    themeColor: '#000000',
+    preview: { canvas: '#000000', surface: '#1F1F1F', accent: '#E2725B', border: 'rgba(226, 114, 91, 0.40)' },
   },
   {
     id: 'clarity',
@@ -146,11 +166,24 @@ export function ThemeProvider({ children }) {
     } catch (_) {
       /* Theme persistence is optional when storage is unavailable. */
     }
+    persistThemeToAccount(normalized);
   }, []);
 
   useEffect(() => {
     applyThemeToDocument(theme);
   }, [theme]);
+
+  useEffect(() => {
+    registerThemeAccountApplier((themeId) => {
+      const normalized = normalizeTheme(themeId);
+      setThemeState(normalized);
+      applyThemeToDocument(normalized);
+    });
+    if (typeof window !== 'undefined' && window.localStorage.getItem('token')) {
+      syncStoredThemeWithAccount(normalizeTheme).catch(() => {});
+    }
+    return () => registerThemeAccountApplier(null);
+  }, []);
 
   useEffect(() => {
     const syncThemeAcrossTabs = (event) => {

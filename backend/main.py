@@ -40,7 +40,14 @@ import bcrypt
 import jwt
 from horoscope.api import HoroscopeAPI
 from rule_engine.api import router as rule_engine_router
-from user_settings import router as settings_router
+from user_settings import (
+    router as settings_router,
+    APP_THEME_SETTING_KEY,
+    CHAT_ANSWER_STYLE_SETTING_KEY,
+    app_theme_label,
+    parse_stored_chat_answer_style,
+    parse_stored_app_theme,
+)
 from daily_predictions import DailyPredictionEngine
 from house_combinations import router as house_combinations_router
 from marriage_analysis.marriage_analyzer import MarriageAnalyzer
@@ -4146,6 +4153,17 @@ async def calculate_ashtakavarga(
 
         birth_data = BirthData(**request['birth_data'])
         chart_type = request.get('chart_type', 'lagna')
+        if chart_type not in {'lagna', 'transit'}:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    'code': 'UNSUPPORTED_ASHTAKAVARGA_CHART_TYPE',
+                    'message': (
+                        "Ashtakavarga is available only for the natal Rashi chart and "
+                        "transits evaluated against its fixed natal ledger."
+                    ),
+                },
+            )
         reduction_profile = str(request.get('ashtakavarga_profile') or 'pvr_narasimha_rao')
         if reduction_profile not in EKADHIPATYA_PROFILES:
             raise HTTPException(
@@ -5300,6 +5318,29 @@ async def get_admin_users(
                     "end_date": sub[4],
                 }
 
+        themes_by_user: dict = {uid: None for uid in user_ids}
+        answer_styles_by_user: dict = {uid: None for uid in user_ids}
+        if user_ids:
+            _setting_ph = ",".join(["?"] * len(user_ids))
+            cur = execute(
+                conn,
+                f"""
+                    SELECT user_id, setting_key, setting_value
+                    FROM user_settings
+                    WHERE setting_key IN (?, ?)
+                      AND user_id IN ({_setting_ph})
+                """,
+                [APP_THEME_SETTING_KEY, CHAT_ANSWER_STYLE_SETTING_KEY] + user_ids,
+            )
+            for setting_row in cur.fetchall() or []:
+                uid, setting_key, setting_value = setting_row[0], setting_row[1], setting_row[2]
+                if uid not in themes_by_user:
+                    continue
+                if setting_key == APP_THEME_SETTING_KEY:
+                    themes_by_user[uid] = parse_stored_app_theme(setting_value)
+                elif setting_key == CHAT_ANSWER_STYLE_SETTING_KEY:
+                    answer_styles_by_user[uid] = parse_stored_chat_answer_style(setting_value)
+
         users = []
         for row in rows:
             # Only users.gender — no birth_chart fallback (avoids extra queries per row).
@@ -5314,6 +5355,8 @@ async def get_admin_users(
                 normalized_gender = user_gender
 
             subscriptions = dict(subscriptions_by_user.get(row[0], {}))
+            theme_id = themes_by_user.get(row[0])
+            answer_style = answer_styles_by_user.get(row[0])
             users.append({
                 'userid': row[0],
                 'name': row[1],
@@ -5327,6 +5370,10 @@ async def get_admin_users(
                 # From device_tokens (Expo push). Not set on users table; empty ≠ "web-only"
                 # (mobile user may not have registered push).
                 'app_push_platforms': push_platforms_by_user.get(row[0], []),
+                'app_theme': theme_id,
+                'app_theme_label': app_theme_label(theme_id),
+                'chat_answer_style': answer_style,
+                'chat_answer_style_selected': answer_style is not None,
             })
 
     total_pages = (total + limit - 1) // limit if limit else 0

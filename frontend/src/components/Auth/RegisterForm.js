@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
 import { authService } from '../../services/authService';
+import { normalizeTheme } from '../../theme/ThemeContext';
+import { syncStoredThemeWithAccount } from '../../theme/themeAccountSync';
 import PhoneWithCountrySelect from './PhoneWithCountrySelect';
 import { buildFullPhone, isNationalPhoneValid } from '../../utils/countryCodes';
 import './RegisterForm.css';
@@ -164,6 +166,7 @@ const RegisterForm = ({ onRegister, onSwitchToLogin }) => {
       });
       localStorage.setItem('token', response.access_token);
       localStorage.setItem('user', JSON.stringify(response.user));
+      syncStoredThemeWithAccount(normalizeTheme).catch(() => {});
       toast.success('Registration successful!');
       onRegister(response.user);
     } catch (error) {

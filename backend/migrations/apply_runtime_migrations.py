@@ -23,6 +23,7 @@ RUNTIME_MIGRATIONS = (
     "add_instant_billing_sessions.sql",
     "add_instant_billing_split_rates.sql",
     "add_chat_message_tier.sql",
+    "add_chat_message_response_style.sql",
 )
 
 if str(BACKEND_DIR) not in sys.path:

@@ -545,6 +545,13 @@ def _ensure_chat_messages_chat_tier(conn):
     _mark_schema_ready("chat_messages_chat_tier")
 
 
+def _ensure_chat_messages_response_style(conn):
+    if _schema_already_ready("chat_messages_response_style"):
+        return
+    execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS response_style TEXT")
+    _mark_schema_ready("chat_messages_response_style")
+
+
 def _conversation_state_pending_gate_cols_exist(conn) -> bool:
     cur = execute(
         conn,
@@ -684,18 +691,20 @@ def _create_native_gate_response(
     userid: int,
     nudge_id: str = "",
     chat_tier: str = "standard",
+    response_style: str = "simple",
 ):
     _ensure_chat_messages_gate_metadata(conn)
     _ensure_chat_messages_chat_tier(conn)
+    _ensure_chat_messages_response_style(conn)
     _ensure_conversation_state_pending_gate_cols(conn)
     cur = execute(
         conn,
         """
-            INSERT INTO chat_messages (session_id, sender, content, status, completed_at)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO chat_messages (session_id, sender, content, status, completed_at, response_style)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING message_id
         """,
-        (session_id, "user", sanitize_text(question), "completed", datetime.now()),
+        (session_id, "user", sanitize_text(question), "completed", datetime.now(), response_style),
     )
     user_message_id = cur.fetchone()[0]
     _record_nudge_conversion_safe(
@@ -708,8 +717,8 @@ def _create_native_gate_response(
         conn,
         """
             INSERT INTO chat_messages
-                (session_id, sender, content, status, message_type, gate_metadata, completed_at, client_request_id, chat_tier)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (session_id, sender, content, status, message_type, gate_metadata, completed_at, client_request_id, chat_tier, response_style)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING message_id
         """,
         (
@@ -722,6 +731,7 @@ def _create_native_gate_response(
             datetime.now(),
             client_request_id,
             chat_tier,
+            response_style,
         ),
     )
     assistant_message_id = cur.fetchone()[0]
@@ -1271,7 +1281,8 @@ def init_chat_tables():
                 llm_output_tokens INTEGER,
                 llm_prompt_chars INTEGER,
                 llm_response_chars INTEGER,
-                client_request_id TEXT
+                client_request_id TEXT,
+                response_style TEXT
             )
         """)
 
@@ -1291,6 +1302,7 @@ def init_chat_tables():
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_prompt_chars INTEGER")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS llm_response_chars INTEGER")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_request_id TEXT")
+        execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS response_style TEXT")
         execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type TEXT")
         _ensure_chat_messages_gate_metadata(conn)
         _ensure_chat_messages_parallel_llm_usage(conn)
@@ -2147,6 +2159,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                         userid=current_user.userid,
                         nudge_id=nudge_id,
                         chat_tier=effective_chat_tier,
+                        response_style=response_style,
                     )
                     conn.commit()
                     return response
@@ -2168,6 +2181,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                     userid=current_user.userid,
                     nudge_id=nudge_id,
                     chat_tier=effective_chat_tier,
+                    response_style=response_style,
                 )
                 conn.commit()
                 return response
@@ -2270,6 +2284,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                         userid=current_user.userid,
                         nudge_id=nudge_id,
                         chat_tier=effective_chat_tier,
+                        response_style=response_style,
                     )
                     conn.commit()
                 return response
@@ -2468,16 +2483,17 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             )
 
         _ensure_chat_messages_chat_tier(conn)
+        _ensure_chat_messages_response_style(conn)
 
         # Save user question (sanitized)
         cur = execute(
             conn,
             """
-                INSERT INTO chat_messages (session_id, sender, content, status, completed_at)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO chat_messages (session_id, sender, content, status, completed_at, response_style)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING message_id
             """,
-            (session_id, "user", sanitize_text(question), "completed", datetime.now()),
+            (session_id, "user", sanitize_text(question), "completed", datetime.now(), response_style),
         )
         user_message_id = cur.fetchone()[0]
         _record_nudge_conversion_safe(
@@ -2491,11 +2507,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         cur = execute(
             conn,
             """
-                INSERT INTO chat_messages (session_id, sender, content, status, started_at, client_request_id, chat_tier)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO chat_messages (session_id, sender, content, status, started_at, client_request_id, chat_tier, response_style)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING message_id
             """,
-            (session_id, "assistant", "", "processing", datetime.now(), client_request_id, effective_chat_tier),
+            (session_id, "assistant", "", "processing", datetime.now(), client_request_id, effective_chat_tier, response_style),
         )
         assistant_message_id = cur.fetchone()[0]
         conn.commit()

@@ -10,11 +10,17 @@ import {
   layoutTokens,
   typographyTokens,
 } from '../theme/tokens';
+import {
+  APP_THEME_KEY,
+  persistThemeToAccount,
+  registerThemeAccountApplier,
+  syncThemeWithAccountAfterAuth,
+} from '../services/themeAccountSync';
 
 const ThemeContext = createContext();
 
 export const PANDIT_MODE_KEY = 'panditMode';
-export const APP_THEME_KEY = 'appTheme';
+export { APP_THEME_KEY } from '../services/themeAccountSync';
 export const PANDIT_PREV_LANG_KEY = 'panditModePrevLanguage';
 const PANDIT_UI_LANGUAGE = 'hindi';
 
@@ -124,10 +130,18 @@ export const ThemeProvider = ({ children, initialTheme, initialPanditMode = fals
       if (initialPanditMode) {
         applyPanditLanguage();
       }
-      return undefined;
+    } else {
+      loadTheme();
     }
-    loadTheme();
     return undefined;
+  }, []);
+
+  useEffect(() => {
+    registerThemeAccountApplier((themeId) => {
+      setConsumerThemeId(normalizeThemeId(themeId));
+    });
+    syncThemeWithAccountAfterAuth().catch(() => {});
+    return () => registerThemeAccountApplier(null);
   }, []);
 
   useEffect(() => {
@@ -185,6 +199,7 @@ export const ThemeProvider = ({ children, initialTheme, initialPanditMode = fals
     } catch (error) {
       console.error('Error saving theme:', error);
     }
+    persistThemeToAccount(normalized);
   }, [isPanditMode]);
 
   const toggleTheme = async () => {

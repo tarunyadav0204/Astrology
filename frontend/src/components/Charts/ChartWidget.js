@@ -36,6 +36,7 @@ const ChartWidget = ({
   const [internalChartStyle, setInternalChartStyle] = useState(defaultStyle || 'north');
   const chartStyle = controlledChartStyle ?? internalChartStyle;
   const [showAshtakavarga, setShowAshtakavarga] = useState(false);
+  const supportsAshtakavarga = chartType === 'lagna' || chartType === 'transit';
   const [showMaximized, setShowMaximized] = useState(false);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(!deskMode);
   const [showSpecialPoints, setShowSpecialPoints] = useState(false);
@@ -301,7 +302,7 @@ const ChartWidget = ({
             {isMobile ? (showDegreeNakshatra ? 'H' : 'S') : (showDegreeNakshatra ? 'Hide' : 'Show')}
           </button>
           {chartType === 'lagna' && (
-            <button 
+            <button
               onClick={() => handleSpecialPoints()}
               style={{
                 padding: '4px 8px',
@@ -337,7 +338,7 @@ const ChartWidget = ({
             {isMobile ? 'PD' : 'Dignities'}
           </button>
           {chartType === 'lagna' && (
-            <button 
+            <button
               onClick={() => handleCharaKarakas()}
               style={{
                 padding: '4px 8px',
@@ -372,22 +373,24 @@ const ChartWidget = ({
           >
             {isMobile ? 'SB' : 'Shadbala'}
           </button>
-          <button 
-            onClick={() => setShowAshtakavarga(true)}
-            style={{
-              padding: '4px 8px',
-              fontSize: '10px',
-              background: 'white',
-              color: '#666',
-              border: '1px solid #ddd',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              fontWeight: '500',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {isMobile ? 'AV' : 'Ashtak'}
-          </button>
+          {supportsAshtakavarga && (
+            <button
+              onClick={() => setShowAshtakavarga(true)}
+              style={{
+                padding: '4px 8px',
+                fontSize: '10px',
+                background: 'white',
+                color: '#666',
+                border: '1px solid #ddd',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                fontWeight: '500',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {isMobile ? 'AV' : 'Ashtak'}
+            </button>
+          )}
           <StyleToggle onClick={toggleStyle}>
             {chartStyle === 'north' ? 'N' : 'S'}
           </StyleToggle>
@@ -492,13 +495,15 @@ const ChartWidget = ({
         )}
       </ChartContainer>
       
-      <AshtakavargaModal 
-        isOpen={showAshtakavarga}
-        onClose={() => setShowAshtakavarga(false)}
-        birthData={birthData}
-        chartType={chartType}
-        transitDate={transitDate}
-      />
+      {supportsAshtakavarga ? (
+        <AshtakavargaModal
+          isOpen={showAshtakavarga}
+          onClose={() => setShowAshtakavarga(false)}
+          birthData={birthData}
+          chartType={chartType}
+          transitDate={transitDate}
+        />
+      ) : null}
       
       {showShadbala && (
         <ShadbalaModal
@@ -1039,13 +1044,15 @@ const ChartWidget = ({
                 >
                   Shadbala
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAshtakavarga(true)}
-                  className="chart-maximized-modal__tool"
-                >
-                  Ashtakavarga
-                </button>
+                {supportsAshtakavarga && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAshtakavarga(true)}
+                    className="chart-maximized-modal__tool"
+                  >
+                    Ashtakavarga
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={toggleStyle}

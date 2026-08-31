@@ -151,6 +151,16 @@ function userRowMenuKey(user) {
   return `${String(user.userid ?? '')}__${String(user.phone ?? '')}`;
 }
 
+function formatAppTheme(user) {
+  return user?.app_theme_label || user?.app_theme || '—';
+}
+
+function formatChatAnswerStyle(user) {
+  if (user?.chat_answer_style === 'technical') return 'Technical';
+  if (user?.chat_answer_style === 'simple') return 'Simple';
+  return 'Not selected · Simple default';
+}
+
 function formatDateTimeIST(value) {
   if (!value) return '—';
   const raw = String(value).trim();
@@ -3890,6 +3900,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   <thead>
                     <tr>
                       <th className="ledger-col-actions" aria-label="Row menu" />
+                      <th>User ID</th>
                       <th>Phone</th>
                       <th>Name</th>
                       <th>Email</th>
@@ -3904,13 +3915,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       >
                         App (push)
                       </th>
+                      <th title="Appearance theme saved on the account. Blank means they have not saved a theme yet.">
+                        Theme
+                      </th>
+                      <th title="Account-wide answer style used by Standard, Premium and Live chat.">
+                        Answer style
+                      </th>
                       <th>Created</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {users.length === 0 ? (
-                      <tr><td colSpan={11} className="users-table-empty">No users match the search.</td></tr>
+                      <tr><td colSpan={14} className="users-table-empty">No users match the search.</td></tr>
                     ) : (
                       users.map(user => (
                       <tr
@@ -3931,6 +3948,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                             </button>
                           </div>
                         </td>
+                        <td>{user.userid ?? '—'}</td>
                         <td>{user.phone}</td>
                         <td>{user.name || user.phone || '—'}</td>
                         <td>{user.email || '—'}</td>
@@ -4058,6 +4076,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                                 .map((p) => (p === 'ios' ? 'iOS' : p === 'android' ? 'Android' : p))
                                 .join(', ')
                             : '—'}
+                        </td>
+                        <td title={user.app_theme || ''}>{formatAppTheme(user)}</td>
+                        <td title={user.chat_answer_style_selected ? 'Explicit account preference' : 'No saved preference; chats default to Simple'}>
+                          {formatChatAnswerStyle(user)}
                         </td>
                         <td>{formatDateTimeIST(user.created_at)}</td>
                         <td onClick={(e) => e.stopPropagation()}>

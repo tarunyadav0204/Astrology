@@ -33,6 +33,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(false);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
+  const supportsAshtakavarga = currentChartType === 'lagna' || currentChartType === 'transit';
   const [rotatedAscendant, setRotatedAscendant] = useState(null);
   const [showKarakas, setShowKarakas] = useState(false);
   const [karakas, setKarakas] = useState(null);
@@ -627,7 +628,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             contentContainerStyle={styles.advancedToolsRow}
           >
             {[
-              ['grid-outline', 'Ashtakvarga', () => navigation?.navigate('AshtakvargaOracle')],
+              ...(supportsAshtakavarga ? [['grid-outline', 'Ashtakvarga', () => navigation?.navigate('AshtakvargaOracle')]] : []),
               ['compass-outline', 'KP system', () => navigation?.navigate('KPSystem', { birthDetails: birthData })],
               ['shield-outline', 'Kota Chakra', () => navigation?.navigate('KotaChakra', { birthChartId: birthData?.id })],
               ...(onOpenChartGuide ? [['play-circle-outline', 'Chart guide', onOpenChartGuide]] : []),

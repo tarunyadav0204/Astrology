@@ -419,6 +419,18 @@ export const apiService = {
     });
     return response.data;
   },
+
+  getAppTheme: async () => {
+    const response = await apiClient.get(getEndpoint('/user-settings/theme'));
+    return response.data;
+  },
+
+  updateAppTheme: async (themeId) => {
+    const response = await apiClient.put(getEndpoint('/user-settings/theme'), {
+      theme_id: themeId,
+    });
+    return response.data;
+  },
   
   analyzeHouses: async (birthData) => {
     const response = await apiClient.post(getEndpoint('/analyze-houses'), birthData);

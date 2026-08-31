@@ -2203,7 +2203,10 @@ const AdminChatHistory = () => {
                   return (
                 <div key={index} className={`message message--${role}`}>
                     <div className="message-label">
-                      {label}{isInstantUsage ? <span className="admin-instant-message-badge">⚡ Instant</span> : null}
+                      {label}
+                      {message.response_style === 'simple' ? <span className="admin-instant-message-badge">Simple</span> : null}
+                      {message.response_style === 'technical' ? <span className="admin-instant-message-badge">Technical</span> : null}
+                      {isInstantUsage ? <span className="admin-instant-message-badge">⚡ Instant</span> : null}
                     </div>
                     <div
                       className="message-content"

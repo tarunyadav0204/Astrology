@@ -28,6 +28,20 @@ def test_account_preference_accepts_only_public_styles():
         ChatAnswerStylePreference(answer_style="detailed")
 
 
+@pytest.mark.parametrize(
+    ("stored", "expected"),
+    [
+        ('"simple"', "simple"),
+        ('"technical"', "technical"),
+        (" SIMPLE ", "simple"),
+        ("detailed", None),
+        (None, None),
+    ],
+)
+def test_parse_stored_answer_style_for_admin_and_account_reads(stored, expected):
+    assert user_settings.parse_stored_chat_answer_style(stored) == expected
+
+
 def test_missing_account_preference_requests_one_time_selection(monkeypatch):
     monkeypatch.setattr(user_settings, "get_conn", lambda: nullcontext(object()))
     monkeypatch.setattr(user_settings, "_read_setting", lambda *_: None)

@@ -1206,6 +1206,7 @@ async def get_admin_chat_user_thread(
             has_llm_prompt_chars = "llm_prompt_chars" in msg_cols
             has_llm_response_chars = "llm_response_chars" in msg_cols
             has_parallel_llm_usage = "parallel_llm_usage" in msg_cols
+            has_response_style = "response_style" in msg_cols
             select_llm_input_tokens = "cm.llm_input_tokens" if has_llm_input_tokens else "CAST(NULL AS INTEGER)"
             select_llm_output_tokens = "cm.llm_output_tokens" if has_llm_output_tokens else "CAST(NULL AS INTEGER)"
             select_llm_cached_input_tokens = (
@@ -1221,6 +1222,7 @@ async def get_admin_chat_user_thread(
             select_parallel_llm_usage = (
                 "cm.parallel_llm_usage" if has_parallel_llm_usage else "CAST(NULL AS TEXT)"
             )
+            select_response_style = "cm.response_style" if has_response_style else "CAST(NULL AS TEXT)"
             has_message_type = "message_type" in msg_cols
             select_message_type = "COALESCE(cm.message_type, '')" if has_message_type else "''"
 
@@ -1243,7 +1245,8 @@ async def get_admin_chat_user_thread(
                     {select_llm_prompt_chars},
                     {select_llm_response_chars},
                     {select_parallel_llm_usage},
-                    {select_message_type}
+                    {select_message_type},
+                    {select_response_style}
                 FROM chat_messages cm
                 INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
                 LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
@@ -1291,6 +1294,9 @@ async def get_admin_chat_user_thread(
             llm_response_chars = _row_optional_int(row[13]) if len(row) > 13 else None
             parallel_llm_usage = _parse_parallel_llm_usage(row[14]) if len(row) > 14 else None
             message_type = (row[15] or "").strip() if len(row) > 15 and row[15] else ""
+            response_style = (row[16] or "").strip().lower() if len(row) > 16 and row[16] else None
+            if response_style not in {"simple", "technical"}:
+                response_style = None
             cache_setup_tokens = _parallel_cache_setup_tokens(parallel_llm_usage) or None
 
             input_non_cached_cost_inr = 0.0
@@ -1337,6 +1343,7 @@ async def get_admin_chat_user_thread(
                     "content": row[3],
                     "timestamp": _timestamp_to_ist_iso(row[4]),
                     "message_type": message_type or None,
+                    "response_style": response_style,
                     "native_name": native_name,
                     "llm_input_tokens": llm_input_tokens if sender_key == "assistant" else None,
                     "llm_output_tokens": llm_output_tokens if sender_key == "assistant" else None,
