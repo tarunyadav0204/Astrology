@@ -14,6 +14,22 @@ GRAHA_MULTIPLIERS = {
     'Sun': 5, 'Moon': 5, 'Mars': 8, 'Mercury': 5,
     'Jupiter': 10, 'Venus': 7, 'Saturn': 5,
 }
+EKADHIPATYA_PROFILES = {
+    'pvr_narasimha_rao': {
+        'label': 'P.V.R. Narasimha Rao published convention',
+        'mixed_higher_empty_rule': 'replace_with_occupied_value',
+        'count_ascendant_as_occupant': False,
+        'source': 'Vedic Astrology: An Integrated Approach, 12.7.2',
+        'source_url': 'https://lakshminarayanlenasia.com/articles/vedic-astrology-an-integrated-approach2.pdf',
+    },
+    'parasharas_light_7': {
+        'label': "Parashara's Light 7.0.3 worked-report convention (inferred from published tables)",
+        'mixed_higher_empty_rule': 'subtract_occupied_value',
+        'count_ascendant_as_occupant': True,
+        'source': "Parashara's Light 7.0.3 Sample Report 5, pp. 14–18",
+        'source_url': 'https://www.astrograha.com/Content/AstrologyReports/Circular-Astrology-Report.pdf',
+    },
+}
 SIGN_NAMES = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
               'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
 NAKSHATRA_NAMES = [
@@ -56,10 +72,17 @@ def _safe_gemini_response_text(response):
 
 
 class AshtakavargaCalculator:
-    def __init__(self, birth_data, chart_data):
+    def __init__(self, birth_data, chart_data, reduction_profile='pvr_narasimha_rao'):
         self.birth_data = birth_data
         self.chart_data = chart_data
         self.planets = chart_data['planets']
+        if reduction_profile not in EKADHIPATYA_PROFILES:
+            raise ValueError(
+                f"Unknown Ekadhipatya profile {reduction_profile!r}; "
+                f"expected one of {sorted(EKADHIPATYA_PROFILES)}"
+            )
+        self.reduction_profile = reduction_profile
+        self.ekadhipatya_profile = EKADHIPATYA_PROFILES[reduction_profile]
         
         # Classical Bhinnashtakavarga rules from Brihat Jataka, Chapter IX
         # (same fixed totals also summarized by B.V. Raman's Ashtakavarga tables).
@@ -311,15 +334,21 @@ class AshtakavargaCalculator:
         return reduced, trace
 
     def apply_ekadhipatya_shodhana(self, values):
-        """Apply the co-lordship reduction after Trikona Shodhana.
+        """Apply the selected co-lordship reduction after Trikona Shodhana.
 
-        Occupancy is determined only from the seven classical grahas; nodes are
-        excluded from this classical reduction.
+        P.V.R. Narasimha Rao and Parashara's Light agree on most branches but
+        differ when an empty sign has the larger value. The published
+        Parashara's Light tables can only be reproduced when Lagna is also
+        treated as occupancy. These are named profiles rather than silently
+        blended rules. Nodes are excluded.
         """
         reduced = [int(values[i] if not isinstance(values, dict) else values.get(i, values.get(str(i), 0))) for i in range(12)]
         occupants = {sign: [] for sign in range(12)}
         for planet in CLASSICAL_PLANETS:
             occupants[int(self.planets[planet]['sign']) % 12].append(planet)
+        if self.ekadhipatya_profile['count_ascendant_as_occupant']:
+            ascendant_sign = int(float(self.chart_data['ascendant']) // 30) % 12
+            occupants[ascendant_sign].append('Ascendant')
         trace = []
         for lord, signs in EKADHIPATYA_PAIRS.items():
             left, right = signs
@@ -335,8 +364,12 @@ class AshtakavargaCalculator:
                 occupied = left if left_occupied else right
                 empty = right if left_occupied else left
                 if reduced[empty] > reduced[occupied]:
-                    reduced[empty] = reduced[occupied]
-                    action = 'empty_reduced_to_occupied_value'
+                    if self.ekadhipatya_profile['mixed_higher_empty_rule'] == 'subtract_occupied_value':
+                        reduced[empty] -= reduced[occupied]
+                        action = 'occupied_value_subtracted_from_empty'
+                    else:
+                        reduced[empty] = reduced[occupied]
+                        action = 'empty_reduced_to_occupied_value'
                 else:
                     reduced[empty] = 0
                     action = 'empty_reduced_to_zero'
@@ -357,6 +390,7 @@ class AshtakavargaCalculator:
                 'before': before,
                 'after': [reduced[left], reduced[right]],
                 'action': action,
+                'profile': self.reduction_profile,
             })
         return reduced, trace
 
@@ -384,6 +418,8 @@ class AshtakavargaCalculator:
         graha_pinda = sum(row['product'] for row in graha_products)
         return {
             'planet': target_planet,
+            'reduction_profile': self.reduction_profile,
+            'reduction_profile_details': self.ekadhipatya_profile,
             'raw_bav': {str(i): raw[i] for i in range(12)},
             'after_trikona': {str(i): trikona[i] for i in range(12)},
             'after_ekadhipatya': {str(i): shodhita[i] for i in range(12)},
@@ -412,6 +448,8 @@ class AshtakavargaCalculator:
         rashi_trines = [((rashi_number - 1 + offset) % 12) + 1 for offset in (0, 4, 8)]
         return {
             'planet': target_planet,
+            'reduction_profile': pinda.get('reduction_profile', self.reduction_profile),
+            'reduction_profile_details': pinda.get('reduction_profile_details', self.ekadhipatya_profile),
             'house_from_planet': int(house_from_planet),
             'source_sign_id': source_sign,
             'source_sign': SIGN_NAMES[source_sign],
@@ -436,9 +474,14 @@ class AshtakavargaCalculator:
         return {
             'schema_version': 'ashtakavarga.advanced.v1',
             'convention': {
-                'school': 'Parashara / P.V.R. Narasimha Rao',
+                'school': self.ekadhipatya_profile['label'],
+                'reduction_profile': self.reduction_profile,
+                'reduction_profile_source': self.ekadhipatya_profile['source'],
+                'reduction_profile_source_url': self.ekadhipatya_profile['source_url'],
+                'mixed_higher_empty_rule': self.ekadhipatya_profile['mixed_higher_empty_rule'],
+                'count_ascendant_as_occupant': self.ekadhipatya_profile['count_ascendant_as_occupant'],
                 'reduction_order': ['Trikona Shodhana', 'Ekadhipatya Shodhana'],
-                'occupancy_grahas': CLASSICAL_PLANETS,
+                'occupancy_points': CLASSICAL_PLANETS + (['Ascendant'] if self.ekadhipatya_profile['count_ascendant_as_occupant'] else []),
                 'kakshya_interval': '[start, end)',
             },
             'prastara': {planet: self.calculate_prastara_ashtakavarga(planet) for planet in CLASSICAL_PLANETS},

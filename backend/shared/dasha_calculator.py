@@ -293,7 +293,8 @@ class DashaCalculator:
                 tz_offset = parse_timezone_offset(
                     tz_offset,
                     birth_data.get('latitude'),
-                    birth_data.get('longitude')
+                    birth_data.get('longitude'),
+                    for_date=birth_data.get('date'),
                 )
             elif tz_offset is None:
                 tz_offset = 5.5  # IST fallback

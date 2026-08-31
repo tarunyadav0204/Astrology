@@ -1,13 +1,244 @@
-from .ashtakavarga import AshtakavargaCalculator
 from datetime import datetime, timedelta
+
 import swisseph as swe
-from datetime import datetime, timedelta
+
+from .ashtakavarga import AshtakavargaCalculator, NAKSHATRA_NAMES, SIGN_NAMES
+
+
+TRANSIT_PLANET_IDS = {
+    'Sun': swe.SUN,
+    'Moon': swe.MOON,
+    'Mars': swe.MARS,
+    'Mercury': swe.MERCURY,
+    'Jupiter': swe.JUPITER,
+    'Venus': swe.VENUS,
+    'Saturn': swe.SATURN,
+}
+KAKSHYA_SIZE = 30.0 / 8.0
 
 class AshtakavargaTransitCalculator(AshtakavargaCalculator):
     """Enhanced Ashtakavarga calculator with transit integration"""
     
-    def __init__(self, birth_data, chart_data):
-        super().__init__(birth_data, chart_data)
+    def __init__(self, birth_data, chart_data, reduction_profile='pvr_narasimha_rao'):
+        # Ashtakavarga transit judgment is always made against the fixed natal
+        # BAV/SAV/Prastara. Transit positions are inputs to that natal ledger;
+        # they do not generate a replacement "transit SAV".
+        super().__init__(birth_data, chart_data, reduction_profile=reduction_profile)
+
+    @staticmethod
+    def _parse_moment(value):
+        if isinstance(value, datetime):
+            return value.replace(tzinfo=None)
+        text = str(value or '').strip()
+        if 'T' in text:
+            return datetime.fromisoformat(text.replace('Z', '+00:00')).replace(tzinfo=None)
+        return datetime.strptime(text, '%Y-%m-%d').replace(hour=12)
+
+    @staticmethod
+    def _julian_day(moment):
+        hour = moment.hour + moment.minute / 60.0 + moment.second / 3600.0
+        return swe.julday(moment.year, moment.month, moment.day, hour)
+
+    def _transit_position(self, planet, moment):
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+        values = swe.calc_ut(
+            self._julian_day(moment),
+            TRANSIT_PLANET_IDS[planet],
+            swe.FLG_SIDEREAL | swe.FLG_SPEED,
+        )[0]
+        longitude = float(values[0]) % 360.0
+        speed = float(values[3])
+        sign_id = int(longitude // 30) % 12
+        degree = longitude % 30.0
+        nakshatra_number = int(longitude // (360.0 / 27.0)) + 1
+        kakshya_number = min(8, int(degree // KAKSHYA_SIZE) + 1)
+        return {
+            'longitude': longitude,
+            'speed_degrees_per_day': speed,
+            'retrograde': speed < 0,
+            'sign_id': sign_id,
+            'sign': SIGN_NAMES[sign_id],
+            'degree_in_sign': degree,
+            'nakshatra_number': nakshatra_number,
+            'nakshatra': NAKSHATRA_NAMES[nakshatra_number - 1],
+            'kakshya_number': kakshya_number,
+        }
+
+    def _all_transit_positions(self, moment):
+        return {planet: self._transit_position(planet, moment) for planet in TRANSIT_PLANET_IDS}
+
+    @staticmethod
+    def _sav_band(points):
+        # Parashara's Light manual: <=24 weak, 25–30 medium, >30 strong.
+        if points > 30:
+            return 'strong'
+        if points >= 25:
+            return 'medium'
+        return 'weak'
+
+    @staticmethod
+    def _bav_band(points):
+        # A neutral display band only; no probability or invented composite score.
+        if points >= 5:
+            return 'bindu_rich'
+        if points >= 3:
+            return 'mixed'
+        return 'bindu_poor'
+
+    def _planet_transit_evidence(self, planet, position, natal_sav, advanced):
+        sign_id = position['sign_id']
+        bav = self.calculate_individual_ashtakavarga(planet)
+        bindus = bav.get('bindus', {})
+        bav_points = int(bindus.get(sign_id, bindus.get(str(sign_id), 0)) or 0)
+        sav_points = int(natal_sav.get(str(sign_id), natal_sav.get(sign_id, 0)) or 0)
+        kakshya = self.calculate_kakshya_activation(planet, position['longitude'])
+        timing_key = {
+            'Sun': 'father', 'Moon': 'mother', 'Mars': 'siblings',
+            'Mercury': 'profession', 'Jupiter': 'children',
+            'Venus': 'marriage', 'Saturn': 'longevity',
+        }[planet]
+        sensitive = (advanced.get('classical_timing') or {}).get(timing_key, {})
+        rashi_match = (sign_id + 1) in (sensitive.get('rashi_trine_numbers') or [])
+        nakshatra_match = position['nakshatra_number'] in (sensitive.get('vimshottari_group_numbers') or [])
+        natal_asc_sign = int(float(self.chart_data.get('ascendant', 0)) // 30) % 12
+        return {
+            'planet': planet,
+            **position,
+            'natal_house': ((sign_id - natal_asc_sign) % 12) + 1,
+            'natal_bav_bindus': bav_points,
+            'natal_bav_band': self._bav_band(bav_points),
+            'natal_sav_bindus': sav_points,
+            'natal_sav_band': self._sav_band(sav_points),
+            'kakshya': kakshya,
+            'sensitive_timing': {
+                'topic': timing_key,
+                'reference_nakshatra': sensitive.get('nakshatra'),
+                'reference_rashi': sensitive.get('rashi'),
+                'nakshatra_group': sensitive.get('vimshottari_group', []),
+                'rashi_trines': sensitive.get('rashi_trines', []),
+                'nakshatra_match': nakshatra_match,
+                'rashi_match': rashi_match,
+                'double_match': nakshatra_match and rashi_match,
+            },
+            'evidence_flags': [
+                flag for flag, present in (
+                    ('kakshya_bindu', bool(kakshya.get('active'))),
+                    ('sensitive_nakshatra', nakshatra_match),
+                    ('sensitive_rashi', rashi_match),
+                    ('natal_bav_bindus_5_plus', bav_points >= 5),
+                    ('natal_sav_above_30', sav_points > 30),
+                ) if present
+            ],
+        }
+
+    @staticmethod
+    def _state_key(position):
+        return (
+            position['sign_id'],
+            position['nakshatra_number'],
+            position['kakshya_number'],
+            position['retrograde'],
+        )
+
+    def _refine_state_change(self, planet, left, right, field, old_value):
+        # The three-hour scan interval is narrower than one lunar Kakshya, so each
+        # interval contains at most one boundary for every tracked field.
+        for _ in range(20):
+            middle = left + (right - left) / 2
+            if self._transit_position(planet, middle)[field] == old_value:
+                left = middle
+            else:
+                right = middle
+        return right
+
+    def calculate_transit_calendar(self, start, days=30):
+        start = self._parse_moment(start).replace(hour=0, minute=0, second=0, microsecond=0)
+        days = max(1, min(int(days), 366))
+        end = start + timedelta(days=days)
+        natal_sav = self.calculate_sarvashtakavarga().get('sarvashtakavarga', {})
+        advanced = self.calculate_advanced_ashtakavarga()
+        events = []
+        step = timedelta(hours=3)
+        fields = (
+            ('sign_id', 'rashi_ingress'),
+            ('nakshatra_number', 'nakshatra_ingress'),
+            ('kakshya_number', 'kakshya_ingress'),
+            ('retrograde', 'direction_station'),
+        )
+        for planet in TRANSIT_PLANET_IDS:
+            left = start
+            left_position = self._transit_position(planet, left)
+            while left < end:
+                right = min(left + step, end)
+                right_position = self._transit_position(planet, right)
+                for field, event_type in fields:
+                    if left_position[field] == right_position[field]:
+                        continue
+                    boundary = self._refine_state_change(planet, left, right, field, left_position[field])
+                    after = self._transit_position(planet, boundary + timedelta(seconds=1))
+                    evidence = self._planet_transit_evidence(planet, after, natal_sav, advanced)
+                    events.append({
+                        'type': event_type,
+                        'timestamp_utc': boundary.isoformat(timespec='minutes') + 'Z',
+                        'planet': planet,
+                        'direction': 'retrograde' if after['retrograde'] else 'direct',
+                        'from': left_position[field],
+                        'to': after[field],
+                        'sign': after['sign'],
+                        'nakshatra': after['nakshatra'],
+                        'kakshya_number': after['kakshya_number'],
+                        'kakshya_ruler': evidence['kakshya'].get('kakshya_ruler'),
+                        'kakshya_bindu': evidence['kakshya'].get('bindu'),
+                        'natal_bav_bindus': evidence['natal_bav_bindus'],
+                        'natal_sav_bindus': evidence['natal_sav_bindus'],
+                        'sensitive_timing': evidence['sensitive_timing'],
+                    })
+                left = right
+                left_position = right_position
+        return sorted(events, key=lambda row: (row['timestamp_utc'], row['planet'], row['type']))
+
+    def calculate_classical_transit_analysis(self, transit_date, window_days=30):
+        moment = self._parse_moment(transit_date)
+        natal_sarva = self.calculate_sarvashtakavarga()
+        natal_sav = natal_sarva.get('sarvashtakavarga', {})
+        advanced = self.calculate_advanced_ashtakavarga()
+        rows = self.calculate_transit_snapshot(moment, natal_sav=natal_sav, advanced=advanced)
+        return {
+            'schema_version': 'ashtakavarga.transit.v2',
+            'basis': 'fixed_natal_bav_sav_prastara',
+            'snapshot_utc': moment.isoformat(timespec='minutes') + 'Z',
+            'transit_date': moment.date().isoformat(),
+            'convention': advanced.get('convention', {}),
+            'natal_sav': natal_sav,
+            'planet_transits': rows,
+            'sensitive_hits': [
+                row for row in rows
+                if row['sensitive_timing']['rashi_match'] or row['sensitive_timing']['nakshatra_match']
+            ],
+            'kakshya_bindu_hits': [row for row in rows if row['kakshya'].get('active')],
+            'calendar_window': {
+                'start_date': moment.date().isoformat(),
+                'days': max(1, min(int(window_days), 366)),
+                'events': self.calculate_transit_calendar(moment, window_days),
+            },
+            'interpretation_guardrail': (
+                'Rows expose classical bindu and sensitive-place evidence independently. '
+                'No composite probability or guaranteed event result is calculated.'
+            ),
+        }
+
+    def calculate_transit_snapshot(self, transit_date, natal_sav=None, advanced=None):
+        """Return the seven grahas placed against one fixed natal AV ledger."""
+        moment = self._parse_moment(transit_date)
+        if natal_sav is None:
+            natal_sav = self.calculate_sarvashtakavarga().get('sarvashtakavarga', {})
+        if advanced is None:
+            advanced = self.calculate_advanced_ashtakavarga()
+        positions = self._all_transit_positions(moment)
+        return [
+            self._planet_transit_evidence(planet, positions[planet], natal_sav, advanced)
+            for planet in TRANSIT_PLANET_IDS
+        ]
         
     def calculate_transit_ashtakavarga(self, transit_date):
         """Calculate Ashtakavarga for transit positions"""

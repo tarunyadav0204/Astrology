@@ -10,18 +10,24 @@ import './LongevityPage.css';
 const TABS = [
   ['pillars', 'Pillars & Safeguards'],
   ['dossier', 'Maraka & Badhaka'],
-  ['timeline', 'Crisis Time-Windows'],
+  ['timeline', 'Classical Time Layers'],
 ];
 const SUBJECTS = [['self', 'Native'], ['mother', 'Mother'], ['father', 'Father']];
+const CALCULATION_PROFILES = [
+  ['pvr_narasimha_rao', 'P.V.R. Narasimha Rao', 'Replacement rule · seven grahas'],
+  ['parasharas_light_7', "Parashara’s Light 7", 'Published-table profile · Lagna occupancy'],
+];
 
 const prettyDate = (value) => new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
   month: 'short', year: 'numeric',
 });
 
-function ScoreRing({ score = 0, level = 'low' }) {
+function SystemConvergence({ activation }) {
+  const confirmed = activation?.confirmed_systems ?? 0;
+  const considered = activation?.systems_considered ?? 3;
   return (
-    <div className={`longevity-score-ring longevity-score-ring--${level}`} style={{ '--score': score }}>
-      <strong>{score}</strong><span>/ 100</span>
+    <div className={`longevity-system-count longevity-system-count--${activation?.level || 'none'}`}>
+      <strong>{confirmed}</strong><span>of {considered}<br />systems</span>
     </div>
   );
 }
@@ -81,10 +87,10 @@ function Dossier({ data }) {
   };
   return <div className="longevity-dossier-grid">
     <section className="longevity-panel longevity-ranking">
-      <div className="longevity-section-heading"><div><p>Mrityu Sthana Strength</p><h2>Ranked crisis grahas</h2></div><span>Badhaka house {data.badhaka_house}</span></div>
+      <div className="longevity-section-heading"><div><p>Mrityu Sthana audit</p><h2>Classical graha linkages</h2></div><span>Badhaka house {data.badhaka_house}</span></div>
       {data.ranked_planets.map((planet, index) => <details key={planet.planet} open={index < 3}>
-        <summary><span className="longevity-rank">{index + 1}</span><b>{planet.planet}</b><span>{planet.sign} · H{planet.house}</span><strong>{planet.score}</strong></summary>
-        <div className="longevity-rank-detail"><p>{planet.longitude}</p><ul>{planet.factors.map((factor) => <li key={factor}>{factor}</li>)}</ul></div>
+        <summary><span className="longevity-rank">{index + 1}</span><b>{planet.planet}</b><span>{planet.sign} · H{planet.house}</span><strong>{planet.classical_factor_count} links</strong></summary>
+        <div className="longevity-rank-detail"><p>{planet.longitude} · {planet.prominence}</p><ul>{planet.factors.length ? planet.factors.map((factor) => <li key={factor}>{factor}</li>) : <li>No listed Maraka, Badhaka or sensitive-point lordship</li>}{planet.protective_factors?.map((factor) => <li key={factor}>Protective evidence: {factor}</li>)}</ul></div>
       </details>)}
     </section>
     <section className="longevity-panel longevity-sensitive">
@@ -98,8 +104,8 @@ function Dossier({ data }) {
 
 function Timeline({ windows }) {
   return <section className="longevity-panel longevity-timeline">
-    <div className="longevity-section-heading"><div><p>Vimshottari × Shoola × Transit</p><h2>Vulnerability timeline</h2></div><span>Next 12 years</span></div>
-    <div className="longevity-timeline__legend"><span className="low">Lower</span><span className="moderate">Moderate</span><span className="critical">Critical vigilance</span></div>
+    <div className="longevity-section-heading"><div><p>Vimshottari × Shoola × Transit</p><h2>Classical activation timeline</h2></div><span>Next 12 years</span></div>
+    <div className="longevity-timeline__legend"><span className="none">None</span><span className="single">One system</span><span className="convergent">Two systems</span><span className="strong_convergence">Three systems</span></div>
     {windows.map((window) => <details key={`${window.start_date}-${window.antardasha}`}>
       <summary>
         <span className={`longevity-risk-dot longevity-risk-dot--${window.level}`} />
@@ -108,8 +114,10 @@ function Timeline({ windows }) {
       </summary>
       <div className="longevity-window-detail">
         <div>{Object.entries(window.components).map(([key, value]) => <span key={key}>{key}<b>{value}</b></span>)}</div>
-        {window.khanda_boundary && <p>{window.khanda_boundary.status === 'not_applicable' ? window.khanda_boundary.policy : <>Khanda boundary: <b>{window.khanda_boundary.status}</b> · midpoint age {window.khanda_boundary.age_at_midpoint}</>}</p>}
-        <ul>{window.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+        <p>Actual {window.mahadasha}–{window.antardasha} boundary: <b>{prettyDate(window.dasha_period.start_date)} — {prettyDate(window.dasha_period.end_date)}</b></p>
+        {window.khanda_boundary && <p>{window.khanda_boundary.status === 'not_applicable' ? window.khanda_boundary.policy : <>Khanda context: <b>{window.khanda_boundary.status}</b> · age {window.khanda_boundary.age_at_start}–{window.khanda_boundary.age_at_end}</>}</p>}
+        <ul>{window.reasons.length ? window.reasons.map((reason) => <li key={reason}>{reason}</li>) : <li>No listed system meets its complete activation rule.</li>}</ul>
+        {window.supporting_observations?.length > 0 && <><p><b>Non-qualifying observations</b> (not counted):</p><ul>{window.supporting_observations.map((reason) => <li key={reason}>{reason}</li>)}</ul></>}
       </div>
     </details>)}
   </section>;
@@ -120,6 +128,7 @@ export default function LongevityPage({ user, onLogout, onAdminClick, onLogin })
   const { birthData, chartData } = useAstrology();
   const [activeTab, setActiveTab] = useState('pillars');
   const [subject, setSubject] = useState('self');
+  const [ashtakavargaProfile, setAshtakavargaProfile] = useState('pvr_narasimha_rao');
   const [showBirthModal, setShowBirthModal] = useState(!birthData || !chartData);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -130,7 +139,7 @@ export default function LongevityPage({ user, onLogout, onAdminClick, onLogin })
     if (!birthData || !chartData) return;
     let cancelled = false;
     setLoading(true); setError('');
-    longevityService.calculate(birthData, chartData, 12, subject)
+    longevityService.calculate(birthData, chartData, 12, subject, ashtakavargaProfile)
       .then((payload) => { if (!cancelled) setResult(payload); })
       .catch((requestError) => {
         if (cancelled) return;
@@ -139,7 +148,7 @@ export default function LongevityPage({ user, onLogout, onAdminClick, onLogin })
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [identity, subject]);
+  }, [identity, subject, ashtakavargaProfile]);
 
   const verdict = result?.verdict;
   return <div className="longevity-page">
@@ -156,6 +165,17 @@ export default function LongevityPage({ user, onLogout, onAdminClick, onLogin })
         <div className="longevity-subject__buttons">{SUBJECTS.map(([id, label]) => <button type="button" key={id} className={subject === id ? 'active' : ''} aria-pressed={subject === id} onClick={() => { setSubject(id); setActiveTab('pillars'); }}>{label}</button>)}</div>
       </section>}
 
+      {birthData && chartData && <section className="longevity-convention" aria-labelledby="longevity-convention-title">
+        <div className="longevity-convention__intro">
+          <b id="longevity-convention-title">Shodhya Pinda convention</b>
+          <span>Choose the classical Ekadhipatya reduction used for Shodhya-Pinda timing. Raw BAV, SAV and Kakshya do not change.</span>
+        </div>
+        <div className="longevity-convention__buttons">
+          {CALCULATION_PROFILES.map(([id, label, detail]) => <button type="button" key={id} className={ashtakavargaProfile === id ? 'active' : ''} aria-pressed={ashtakavargaProfile === id} onClick={() => setAshtakavargaProfile(id)}><b>{label}</b><span>{detail}</span></button>)}
+        </div>
+        {result?.calculation_convention?.ashtakavarga_profile === ashtakavargaProfile && <small>Active calculation: {result.calculation_convention.label}</small>}
+      </section>}
+
       {!birthData || !chartData ? <section className="longevity-empty longevity-panel"><span>✦</span><h2>Your chart is the starting point</h2><p>Enter an accurate birth date, time and place to calculate the three Ayurdaya pillars.</p><button onClick={() => setShowBirthModal(true)}>Enter birth details</button></section>
       : loading ? <section className="longevity-empty longevity-panel"><div className="longevity-loader" /><h2>Calculating classical factors…</h2><p>Resolving D3, D9, Shadbala, Ashtakavarga and dasha intersections.</p></section>
       : error ? <section className="longevity-empty longevity-panel"><h2>Calculator unavailable</h2><p>{error}</p><button onClick={() => setShowBirthModal(true)}>Review birth details</button></section>
@@ -166,13 +186,13 @@ export default function LongevityPage({ user, onLogout, onAdminClick, onLogin })
             <div className="longevity-confidence"><b>{verdict.compartment.confidence} {subject === 'self' ? 'agreement' : 'technical agreement'}</b><span>{verdict.compartment.agreement} · {verdict.compartment.adjustment}</span></div>
             {verdict.compartment.age_validation?.reconciled && <div className="longevity-confidence"><b>Attained-age reconciliation</b><span>{verdict.compartment.age_validation.reason}</span></div>}
           </div>
-          <div className="longevity-verdict__threat"><p>{result.subject.label} threat vector</p><h3>{verdict.primary_threat.planet}</h3><span>{verdict.primary_threat.summary}</span><div className="longevity-threat-score">MPS {verdict.primary_threat.score}</div></div>
-          <div className="longevity-verdict__current"><p>Current {result.subject.label.toLowerCase()} vulnerability</p><ScoreRing score={verdict.current_vulnerability.score} level={verdict.current_vulnerability.level} /><h3>{verdict.current_vulnerability.label}</h3></div>
+          <div className="longevity-verdict__threat"><p>{result.subject.label} classical linkage</p><h3>{verdict.primary_threat.planet}</h3><span>{verdict.primary_threat.summary}</span><div className="longevity-threat-score">{verdict.primary_threat.classical_factor_count} classical links</div></div>
+          <div className="longevity-verdict__current"><p>Current classical convergence</p><SystemConvergence activation={verdict.current_activation || verdict.current_vulnerability} /><h3>{(verdict.current_activation || verdict.current_vulnerability).label}</h3></div>
         </section>
         <nav className="longevity-tabs" aria-label="Longevity report sections">{TABS.map(([id, label]) => <button className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)} key={id}>{label}</button>)}</nav>
         {activeTab === 'pillars' && <Pillars items={result.pillars} safeguards={result.safeguards} />}
         {activeTab === 'dossier' && <Dossier data={result.maraka_dossier} />}
-        {activeTab === 'timeline' && <Timeline windows={result.crisis_windows} />}
+        {activeTab === 'timeline' && <Timeline windows={result.activation_windows || result.crisis_windows} />}
         <aside className="longevity-disclaimer"><b>Use as a vigilance tool—not a fate verdict.</b><span>{result.disclaimer}</span></aside>
       </>}
     </main>

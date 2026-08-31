@@ -1,0 +1,56 @@
+{
+  "dataset_id": "public_figures_v1",
+  "purpose": "Seed regression and methodology audit; not a sufficient external-validation cohort",
+  "cases": [
+    {
+      "id": "john_f_kennedy",
+      "name": "John F. Kennedy",
+      "birth_rating": "A",
+      "cause_group": "external_homicide",
+      "source_url": "https://www.astro.com/astro-databank/Kennedy%2C_John_F.",
+      "birth": {"name": "John F. Kennedy", "date": "1917-05-29", "time": "15:00:00", "place": "Brookline, Massachusetts, USA", "latitude": 42.3334, "longitude": -71.1200, "timezone": "America/New_York", "gender": "Male"},
+      "event": "1963-11-22T13:00:00",
+      "event_precision": "Death certificate time; shooting occurred at 12:30 local"
+    },
+    {
+      "id": "elvis_presley",
+      "name": "Elvis Presley",
+      "birth_rating": "AA",
+      "cause_group": "medical_substance_related",
+      "source_url": "https://www.astro.com/astro-databank/Presley%2C_Elvis",
+      "birth": {"name": "Elvis Presley", "date": "1935-01-08", "time": "04:35:00", "place": "Tupelo, Mississippi, USA", "latitude": 34.2576, "longitude": -88.7034, "timezone": "America/Chicago", "gender": "Male"},
+      "event": "1977-08-16T14:50:00",
+      "event_precision": "Reported local death time"
+    },
+    {
+      "id": "steve_jobs",
+      "name": "Steve Jobs",
+      "birth_rating": "AA",
+      "cause_group": "medical_disease",
+      "source_url": "https://www.astro.com/adbvip/adbvip_02_24.htm",
+      "birth": {"name": "Steve Jobs", "date": "1955-02-24", "time": "19:15:00", "place": "San Francisco, California, USA", "latitude": 37.7749, "longitude": -122.4194, "timezone": "America/Los_Angeles", "gender": "Male"},
+      "event": "2011-10-05T15:00:00",
+      "event_precision": "Reported local time"
+    },
+    {
+      "id": "princess_diana",
+      "name": "Diana, Princess of Wales",
+      "birth_rating": "A",
+      "cause_group": "external_accident",
+      "source_url": "https://www.astro.com/astro-databank/Diana%2C_Princess_of_Wales",
+      "birth": {"name": "Diana, Princess of Wales", "date": "1961-07-01", "time": "19:45:00", "place": "Sandringham, England", "latitude": 52.8333, "longitude": 0.5000, "timezone": "Europe/London", "gender": "Female"},
+      "event": "1997-08-31T04:00:00",
+      "event_precision": "Declared dead after crash"
+    },
+    {
+      "id": "marilyn_monroe",
+      "name": "Marilyn Monroe",
+      "birth_rating": "AA",
+      "cause_group": "substance_related_uncertain",
+      "source_url": "https://www.astro.com/astro-databank/Monroe%2C_Marilyn",
+      "birth": {"name": "Marilyn Monroe", "date": "1926-06-01", "time": "09:30:00", "place": "Los Angeles, California, USA", "latitude": 34.0522, "longitude": -118.2437, "timezone": "America/Los_Angeles", "gender": "Female"},
+      "event": "1962-08-05T00:00:00",
+      "event_precision": "Date known; exact death time uncertain"
+    }
+  ]
+}

@@ -101,4 +101,5 @@ def test_parent_view_never_presents_a_direct_lifespan_compartment_or_child_age_k
     assert "not the parent's lifespan compartment" in jaimini["detail"]
     assert all(window["level"] != "critical" for window in result["crisis_windows"])
     assert all(window["khanda_boundary"]["status"] == "not_applicable" for window in result["crisis_windows"])
-    assert all(window["khanda_boundary"]["age_at_midpoint"] is None for window in result["crisis_windows"])
+    assert all(window["khanda_boundary"]["age_at_start"] is None for window in result["crisis_windows"])
+    assert all(window["khanda_boundary"]["age_at_end"] is None for window in result["crisis_windows"])

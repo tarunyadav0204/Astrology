@@ -4142,15 +4142,31 @@ async def calculate_ashtakavarga(
         _enforce_guest_chart_only_rate_limit(http_request)
     import traceback
     try:
-        from calculators.ashtakavarga import AshtakavargaCalculator
+        from calculators.ashtakavarga import AshtakavargaCalculator, EKADHIPATYA_PROFILES
 
         birth_data = BirthData(**request['birth_data'])
         chart_type = request.get('chart_type', 'lagna')
+        reduction_profile = str(request.get('ashtakavarga_profile') or 'pvr_narasimha_rao')
+        if reduction_profile not in EKADHIPATYA_PROFILES:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    'code': 'INVALID_ASHTAKAVARGA_PROFILE',
+                    'message': f"ashtakavarga_profile must be one of {', '.join(sorted(EKADHIPATYA_PROFILES))}",
+                },
+            )
         debug_trace = bool(request.get('debug_trace', False))
         debug_trace_planet = str(request.get('debug_trace_planet') or 'Moon')
 
+        from calculators.chart_calculator import ChartCalculator
+        chart_calculator = ChartCalculator({})
+        natal_chart_data = chart_calculator.calculate_chart(birth_data, 'mean')
+        display_chart_data = natal_chart_data
+        classical_transit = None
+
         if chart_type == 'transit':
-            # For transit charts, use current transit positions
+            # Transit planets are displayed over the natal ascendant. The AV
+            # ledger itself remains the fixed natal BAV/SAV/Prastara.
             transit_date = request.get('transit_date', datetime.now().strftime('%Y-%m-%d'))
             # Parse ISO datetime string to date if needed
             if isinstance(transit_date, str) and 'T' in transit_date:
@@ -4159,14 +4175,25 @@ async def calculate_ashtakavarga(
                 birth_data=birth_data,
                 transit_date=transit_date
             )
-            chart_data = await calculate_transits(transit_request)
-        else:
-            # For birth charts (lagna, navamsa), use birth positions - DON'T SAVE TO DATABASE
-            from calculators.chart_calculator import ChartCalculator
-            calculator = ChartCalculator({})
-            chart_data = calculator.calculate_chart(birth_data, 'mean')
+            transit_chart_data = await calculate_transits(transit_request)
+            display_chart_data = {
+                **transit_chart_data,
+                'ascendant': natal_chart_data.get('ascendant', 0),
+            }
 
-        calculator = AshtakavargaCalculator(birth_data, chart_data)
+        calculator = AshtakavargaCalculator(
+            birth_data,
+            natal_chart_data,
+            reduction_profile=reduction_profile,
+        )
+
+        if chart_type == 'transit':
+            from calculators.ashtakavarga_transit import AshtakavargaTransitCalculator
+            classical_transit = AshtakavargaTransitCalculator(
+                birth_data,
+                natal_chart_data,
+                reduction_profile=reduction_profile,
+            ).calculate_classical_transit_analysis(transit_date, request.get('window_days', 30))
 
         sarva = calculator.calculate_sarvashtakavarga()
         analysis = calculator.get_ashtakavarga_analysis(chart_type)
@@ -4178,7 +4205,7 @@ async def calculate_ashtakavarga(
         # - chart_ashtakavarga["1".."12"] reindexes by house-from-lagna; each value includes the occupying sign in "sign".
 
         chart_ashtakavarga = {}
-        ascendant_sign = int(chart_data.get('ascendant', 0) / 30) if chart_data.get('ascendant') else 0
+        ascendant_sign = int(natal_chart_data.get('ascendant', 0) / 30) if natal_chart_data.get('ascendant') else 0
 
         for sign_num in range(12):
             house_num = ((sign_num - ascendant_sign) % 12) + 1
@@ -4195,68 +4222,111 @@ async def calculate_ashtakavarga(
             "advanced_ashtakavarga": calculator.calculate_advanced_ashtakavarga() if chart_type == 'lagna' else None,
             "analysis": analysis,
             "chart_type": chart_type,
-            "chart_data": chart_data,  # Include chart_data for oracle calculations
+            "chart_data": display_chart_data,
+            "natal_chart_data": natal_chart_data,
+            "classical_transit": classical_transit,
             "chart_ashtakavarga": chart_ashtakavarga  # Formatted for chart widget
         }
         if debug_trace:
             response_payload["debug_trace"] = calculator.calculate_individual_ashtakavarga_trace(debug_trace_planet)
         return response_payload
+    except HTTPException:
+        raise
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Ashtakavarga calculation failed: {type(e).__name__}: {str(e)}")
 
 @app.post("/api/ashtakavarga/transit-analysis")
 async def get_transit_ashtakavarga(request: dict, current_user: User = Depends(get_current_user)):
-    """Get Ashtakavarga analysis for transit date"""
+    """Evaluate transiting grahas against the fixed natal AV ledger."""
+    from calculators.ashtakavarga import EKADHIPATYA_PROFILES
     from calculators.ashtakavarga_transit import AshtakavargaTransitCalculator
     
     birth_data = BirthData(**request['birth_data'])
     transit_date = request.get('transit_date', datetime.now().strftime('%Y-%m-%d'))
+    window_days = max(1, min(int(request.get('window_days', 30)), 366))
+    reduction_profile = str(request.get('ashtakavarga_profile') or 'pvr_narasimha_rao')
+    if reduction_profile not in EKADHIPATYA_PROFILES:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                'code': 'INVALID_ASHTAKAVARGA_PROFILE',
+                'message': f"ashtakavarga_profile must be one of {', '.join(sorted(EKADHIPATYA_PROFILES))}",
+            },
+        )
     
     from calculators.chart_calculator import ChartCalculator
     calculator = ChartCalculator({})
     chart_data = calculator.calculate_chart(birth_data, 'mean')
-    calculator = AshtakavargaTransitCalculator(birth_data, chart_data)
-    
-    transit_av = calculator.calculate_transit_ashtakavarga(transit_date)
-    recommendations = calculator.get_transit_recommendations(transit_date)
-    comparison = calculator.compare_birth_transit_strength(transit_date)
-    
+    calculator = AshtakavargaTransitCalculator(
+        birth_data,
+        chart_data,
+        reduction_profile=reduction_profile,
+    )
+    classical_transit = calculator.calculate_classical_transit_analysis(transit_date, window_days)
+    natal_av = calculator.calculate_sarvashtakavarga()
     return {
         "transit_date": transit_date,
-        "transit_ashtakavarga": transit_av,
-        "recommendations": recommendations,
-        "birth_transit_comparison": comparison
+        "classical_transit": classical_transit,
+        # Compatibility for matrix clients: AV is natal and fixed, never rebuilt
+        # from transit planets. New clients should read classical_transit.
+        "transit_ashtakavarga": {**natal_av, "basis": "fixed_natal_bav_sav"},
     }
 
 @app.post("/api/ashtakavarga/monthly-forecast")
 async def get_monthly_ashtakavarga_forecast(request: dict, current_user: User = Depends(get_current_user)):
-    """Get monthly Ashtakavarga forecast"""
+    """Return a month of auditable natal-reference AV transit evidence."""
+    from calculators.ashtakavarga import EKADHIPATYA_PROFILES
     from calculators.ashtakavarga_transit import AshtakavargaTransitCalculator
-    
+
     birth_data = BirthData(**request['birth_data'])
     start_date = datetime.strptime(request.get('start_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
-    
+    window_days = max(1, min(int(request.get('window_days', 30)), 366))
+    reduction_profile = str(request.get('ashtakavarga_profile') or 'pvr_narasimha_rao')
+    if reduction_profile not in EKADHIPATYA_PROFILES:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                'code': 'INVALID_ASHTAKAVARGA_PROFILE',
+                'message': f"ashtakavarga_profile must be one of {', '.join(sorted(EKADHIPATYA_PROFILES))}",
+            },
+        )
+
     from calculators.chart_calculator import ChartCalculator
     calculator = ChartCalculator({})
     chart_data = calculator.calculate_chart(birth_data, 'mean')
-    calculator = AshtakavargaTransitCalculator(birth_data, chart_data)
-    
-    forecast = []
-    for i in range(0, 30, 7):
+    calculator = AshtakavargaTransitCalculator(
+        birth_data,
+        chart_data,
+        reduction_profile=reduction_profile,
+    )
+    natal_sav = calculator.calculate_sarvashtakavarga().get('sarvashtakavarga', {})
+    advanced = calculator.calculate_advanced_ashtakavarga()
+    weekly_reference_points = []
+    for i in range(0, window_days, 7):
         check_date = start_date + timedelta(days=i)
-        recommendations = calculator.get_transit_recommendations(check_date.strftime('%Y-%m-%d'))
-        
-        forecast.append({
+        weekly_reference_points.append({
             "date": check_date.strftime('%Y-%m-%d'),
             "week": f"Week {i//7 + 1}",
-            "strength": recommendations['transit_strength'],
-            "key_activities": recommendations['favorable_activities'][:2] if recommendations['favorable_activities'] else []
+            "planet_transits": calculator.calculate_transit_snapshot(
+                check_date,
+                natal_sav=natal_sav,
+                advanced=advanced,
+            ),
         })
-    
+
     return {
-        "forecast_period": f"{start_date.strftime('%Y-%m-%d')} to {(start_date + timedelta(days=30)).strftime('%Y-%m-%d')}",
-        "weekly_forecast": forecast
+        "schema_version": "ashtakavarga.transit.month.v2",
+        "basis": "fixed_natal_bav_sav_prastara",
+        "forecast_period": f"{start_date.strftime('%Y-%m-%d')} to {(start_date + timedelta(days=window_days)).strftime('%Y-%m-%d')}",
+        "convention": advanced.get('convention', {}),
+        "natal_sav": natal_sav,
+        "weekly_reference_points": weekly_reference_points,
+        "events": calculator.calculate_transit_calendar(start_date, window_days),
+        "interpretation_guardrail": (
+            "Weekly rows and boundary events expose classical evidence independently. "
+            "No composite strength, activity recommendation, probability, or guaranteed result is calculated."
+        ),
     }
 
 @app.post("/api/ashtakavarga/predict-events")

@@ -122,6 +122,10 @@ const MATRIX_PLANETS = [
   { key: 'Venus', abbr: 'Ve' },
   { key: 'Saturn', abbr: 'Sa' },
 ];
+const ASHTAKAVARGA_PROFILES = [
+  { id: 'pvr_narasimha_rao', label: 'P.V.R. Narasimha Rao', detail: 'Replacement rule · seven grahas' },
+  { id: 'parasharas_light_7', label: "Parashara’s Light 7", detail: 'Published-table profile · Lagna occupancy' },
+];
 
 function binduAt(bindus, signIndex) {
   if (bindus == null) return 0;
@@ -155,6 +159,8 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
   const [eventPredictions, setEventPredictions] = useState(null);
   const [selectedEventType, setSelectedEventType] = useState('marriage');
   const [selectedAdvancedPlanet, setSelectedAdvancedPlanet] = useState('Saturn');
+  const [ashtakavargaProfile, setAshtakavargaProfile] = useState('pvr_narasimha_rao');
+  const [transitEventFilter, setTransitEventFilter] = useState('all');
   const ashtakRequestIdRef = useRef(0);
   const transitRequestIdRef = useRef(0);
   const eventsRequestIdRef = useRef(0);
@@ -269,6 +275,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
             birth_data: birthData,
             chart_type: chartType,
             transit_date: transitDate,
+            ashtakavarga_profile: ashtakavargaProfile,
           }),
         });
 
@@ -291,7 +298,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
         }
       }
     })();
-  }, [isOpen, birthData, chartType, transitDate]);
+  }, [isOpen, birthData, chartType, transitDate, ashtakavargaProfile]);
 
   useEffect(() => {
     if (!isOpen || !birthData) return;
@@ -316,6 +323,8 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
           body: JSON.stringify({
             birth_data: birthData,
             transit_date: selectedDate,
+            window_days: 30,
+            ashtakavarga_profile: ashtakavargaProfile,
           }),
         });
 
@@ -338,7 +347,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
         }
       }
     })();
-  }, [isOpen, birthData, viewMode, selectedDate]);
+  }, [isOpen, birthData, viewMode, selectedDate, ashtakavargaProfile]);
 
   useEffect(() => {
     if (!isOpen || !birthData) return;
@@ -408,7 +417,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
     ];
 
     if (viewMode === 'transit') {
-      return baseTabs;
+      return [{ id: 'transitDesk', label: short('Transit Desk', 'Transits'), icon: '◎' }, ...baseTabs];
     }
 
     if (chartType === 'lagna') {
@@ -443,6 +452,12 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
       <section className="av-advanced__intro">
         <div><p>Classical reduction chain</p><h3>Kakshya, Prastara & Shodhya Pinda</h3></div>
         <span>{advanced.convention?.school}</span>
+      </section>
+
+      <section className="av-profile-selector" aria-label="Select Shodhya Pinda convention" aria-busy={ashtakLoading}>
+        <div><b>Shodhya Pinda convention</b><span>Changes Ekadhipatya Shodhana and derived timing only. Raw BAV, SAV and Kakshya geometry remain unchanged.</span></div>
+        <div>{ASHTAKAVARGA_PROFILES.map((profile) => <button type="button" key={profile.id} className={ashtakavargaProfile === profile.id ? 'active' : ''} aria-pressed={ashtakavargaProfile === profile.id} onClick={() => setAshtakavargaProfile(profile.id)}><b>{profile.label}</b><span>{profile.detail}</span></button>)}</div>
+        <small>{ashtakLoading ? 'Recalculating…' : `Active calculation: ${advanced.convention?.school}`}</small>
       </section>
 
       <section className="av-advanced__panel">
@@ -483,11 +498,8 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
   };
 
   useEffect(() => {
-    if (viewMode !== 'transit') return;
-    if (['recommendations', 'events', 'analysis'].includes(activeTab)) {
-      setActiveTab('matrix');
-    }
-  }, [viewMode, activeTab]);
+    if (viewMode === 'transit') setActiveTab('transitDesk');
+  }, [viewMode]);
 
   const lifePredictionsApiUrl = API_BASE_URL.includes('/api')
     ? `${API_BASE_URL}/ashtakavarga/life-predictions`
@@ -954,7 +966,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
       return transitLoading ? (
         <AshtakavargaProgressState
           title="Loading transit Ashtakavarga"
-          description="Computing transit positions and bindus for your selected date…"
+          description="Placing transit grahas against the fixed natal bindu ledger…"
         />
       ) : (
         <div className="loading">
@@ -1099,7 +1111,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
 
     const data = viewMode === 'transit' ? transitData.transit_ashtakavarga : ashtakavargaData.ashtakavarga;
     const { sarvashtakavarga, total_bindus } = data;
-    const title = viewMode === 'transit' ? `Transit Sarvashtakavarga (${selectedDate})` : 'Birth Sarvashtakavarga';
+    const title = viewMode === 'transit' ? `Natal SAV reference for transits (${selectedDate})` : 'Birth Sarvashtakavarga';
 
     return (
       <div className="sarva-chart">
@@ -1124,146 +1136,63 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
     );
   };
 
-  const renderComparison = () => {
-    if (!ashtakavargaData || !transitData) return null;
-
-    const birthData = ashtakavargaData.ashtakavarga.sarvashtakavarga;
-    const transitAV = transitData.transit_ashtakavarga.sarvashtakavarga;
-    const comparison = transitData.birth_transit_comparison;
-    
-    // Handle both old and new comparison format
-    const comparisonData = comparison.summary ? comparison : 
-      Object.keys(comparison).reduce((acc, sign) => {
-        if (typeof comparison[sign] === 'object' && comparison[sign].birth_points !== undefined) {
-          acc[sign] = comparison[sign];
-        }
-        return acc;
-      }, {});
-
-    return (
-      <div className="comparison-chart">
-        <h3>Birth vs Transit Comparison ({selectedDate})</h3>
-        <div className="comparison-grid">
-          {signNames.map((sign, index) => {
-            const signData = comparisonData[sign] || comparison[sign];
-            if (!signData) return null;
-            
-            const status = signData.status.includes('significantly') ? 
-              signData.status : 
-              signData.difference > 0 ? 'enhanced' : 
-              signData.difference < 0 ? 'reduced' : 'stable';
-            
-            const houseNum = savHouseNumbersFromAsc[index];
-            return (
-              <div key={index} className={`comparison-cell ${status}`}>
-                <div className="sign-name">{sign}</div>
-                {houseNum != null ? (
-                  <div className="bindu-house comparison-house" title={`House ${houseNum} from ascendant`}>
-                    H{houseNum}
-                  </div>
-                ) : null}
-                <div className="birth-count">B: {signData.birth_points}</div>
-                <div className="transit-count">T: {signData.transit_points}</div>
-                <div className={`difference ${status}`}>
-                  {signData.difference > 0 ? '+' : ''}{signData.difference}
-                  {signData.percentage_change !== 0 && (
-                    <span className="percentage">({signData.percentage_change}%)</span>
-                  )}
-                </div>
-                <div className="strength-category">{signData.strength_category}</div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="legend">
-          <span className="significantly_enhanced">■ Significantly Enhanced</span>
-          <span className="enhanced">■ Enhanced</span>
-          <span className="stable">■ Stable</span>
-          <span className="reduced">■ Reduced</span>
-          <span className="significantly_reduced">■ Significantly Reduced</span>
-        </div>
-        {comparison.summary && (
-          <div className="comparison-summary">
-            <h4>Analysis Summary</h4>
-            <div className="summary-stats">
-              <span>Stability Index: {comparison.summary.stability_index}%</span>
-              <span>Enhanced Signs: {comparison.summary.enhanced_signs}</span>
-              <span>Reduced Signs: {comparison.summary.reduced_signs}</span>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderTransitRecommendations = () => {
-    if (!transitData) {
+  const renderClassicalTransitDesk = () => {
+    const transit = transitData?.classical_transit;
+    if (!transit) {
       return transitLoading ? (
         <AshtakavargaProgressState
-          title="Loading transit analysis"
-          description="Personalized timing, favorable windows, and birth vs transit comparison…"
+          title="Building the classical transit desk"
+          description="Resolving each graha against natal BAV, SAV, Prastara, Kakshya and Shodhya-sensitive places…"
         />
       ) : (
-        <div className="loading">
-          <p>No transit data.</p>
-        </div>
+        <div className="loading"><p>No classical transit data.</p></div>
       );
     }
+    const filterOptions = [
+      ['all', 'All'], ['kakshya_ingress', 'Kakshya'], ['rashi_ingress', 'Rāśi'],
+      ['nakshatra_ingress', 'Nakshatra'], ['direction_station', 'Stations'],
+    ];
+    const events = transit.calendar_window?.events || [];
+    const visibleEvents = transitEventFilter === 'all' ? events : events.filter((row) => row.type === transitEventFilter);
+    const eventLabels = {
+      kakshya_ingress: 'Kakshya ingress', rashi_ingress: 'Rāśi ingress',
+      nakshatra_ingress: 'Nakshatra ingress', direction_station: 'Direction station',
+    };
+    return <div className="av-transit-desk">
+      <section className="av-advanced__intro">
+        <div><p>Fixed natal AV ledger</p><h3>Classical transit desk · {selectedDate}</h3></div>
+        <span>{transit.convention?.school}</span>
+      </section>
 
-    const { recommendations, birth_transit_comparison } = transitData;
+      <section className="av-profile-selector" aria-label="Select transit Shodhya convention" aria-busy={transitLoading}>
+        <div><b>Shodhya Pinda convention</b><span>BAV, SAV and Prastara stay natal and fixed. The profile changes Shodhya-sensitive transit coordinates only.</span></div>
+        <div>{ASHTAKAVARGA_PROFILES.map((profile) => <button type="button" key={profile.id} className={ashtakavargaProfile === profile.id ? 'active' : ''} aria-pressed={ashtakavargaProfile === profile.id} onClick={() => setAshtakavargaProfile(profile.id)}><b>{profile.label}</b><span>{profile.detail}</span></button>)}</div>
+        <small>{transitLoading ? 'Recalculating…' : `Basis: ${transit.basis.replaceAll('_', ' ')}`}</small>
+      </section>
 
-    return (
-      <div className="transit-recommendations">
-        <h3>Personalized Transit Analysis</h3>
-        <div className="strength-indicator">
-          <span className={`strength-badge ${recommendations.transit_strength}`}>
-            {recommendations.transit_strength.toUpperCase()} PERIOD
-          </span>
-          {birth_transit_comparison?.summary && (
-            <div className="transit-summary">
-              <span className="change-indicator">
-                Energy Redistribution: {birth_transit_comparison.summary.distribution_shift} bindus shifted 
-                ({birth_transit_comparison.summary.distribution_percentage}% of total energy)
-              </span>
-            </div>
-          )}
-        </div>
-        
-        {recommendations.favorable_activities.length > 0 && (
-          <div className="favorable-section">
-            <h4 style={{color: '#4caf50'}}>✓ Favorable Activities</h4>
-            <ul>
-              {recommendations.favorable_activities.map((activity, index) => (
-                <li key={index}>{activity}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        
-        {recommendations.avoid_activities.length > 0 && (
-          <div className="avoid-section">
-            <h4 style={{color: '#f44336'}}>⚠ Activities to Avoid</h4>
-            <ul>
-              {recommendations.avoid_activities.map((activity, index) => (
-                <li key={index}>{activity}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        
-        {recommendations.best_timing && recommendations.best_timing.length > 0 && (
-          <div className="timing-section">
-            <h4 style={{color: '#2196f3'}}>⏰ Best Timing</h4>
-            <ul>
-              {recommendations.best_timing.map((timing, index) => (
-                <li key={index}>{timing}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    );
+      <section className="av-advanced__panel">
+        <div className="av-advanced__heading"><div><p>Seven grahas at the selected moment</p><h4>Natal-reference transit evidence</h4></div><small>Snapshot {transit.snapshot_utc}</small></div>
+        <div className="av-transit-table-wrap"><table className="av-transit-table"><thead><tr><th>Graha</th><th>Position</th><th>House</th><th>Natal BAV</th><th>Natal SAV</th><th>Kakshya</th><th>Sensitive place</th></tr></thead><tbody>
+          {transit.planet_transits?.map((row) => <tr key={row.planet}><th>{row.planet}<small>{row.retrograde ? ' Rx' : ' Direct'}</small></th><td>{row.sign} {Number(row.degree_in_sign).toFixed(2)}°<small>{row.nakshatra}</small></td><td>H{row.natal_house}</td><td><b>{row.natal_bav_bindus}</b><small>{row.natal_bav_band.replaceAll('_', ' ')}</small></td><td><b>{row.natal_sav_bindus}</b><small>{row.natal_sav_band}</small></td><td className={row.kakshya?.active ? 'has-bindu' : 'no-bindu'}>K{row.kakshya?.kakshya_number} · {row.kakshya?.kakshya_ruler}<small>{row.kakshya?.active ? 'Contributor bindu' : 'No contributor bindu'}</small></td><td>{row.sensitive_timing?.double_match ? 'Rāśi + Nakshatra' : row.sensitive_timing?.rashi_match ? 'Rāśi match' : row.sensitive_timing?.nakshatra_match ? 'Nakshatra match' : 'No match'}<small>{row.sensitive_timing?.topic}</small></td></tr>)}
+        </tbody></table></div>
+      </section>
+
+      <section className="av-advanced__panel">
+        <div className="av-advanced__heading"><div><p>Shodhya-sensitive coordinates</p><h4>Current sensitive-place matches</h4></div><small>{transit.sensitive_hits?.length || 0} of 7 grahas</small></div>
+        <div className="av-transit-hit-grid">{transit.sensitive_hits?.length ? transit.sensitive_hits.map((row) => <article key={row.planet}><b>{row.planet} · {row.sensitive_timing.topic}</b><strong>{row.sign} · {row.nakshatra}</strong><span>{row.sensitive_timing.rashi_match ? 'Rāśi trine matched' : 'Rāśi not matched'} · {row.sensitive_timing.nakshatra_match ? 'Nakshatra group matched' : 'Nakshatra not matched'}</span><small>Reference: {row.sensitive_timing.reference_rashi} · {row.sensitive_timing.reference_nakshatra}</small></article>) : <p>No Shodhya-sensitive rāśi or nakshatra match at this snapshot.</p>}</div>
+      </section>
+
+      <section className="av-advanced__panel">
+        <div className="av-advanced__heading"><div><p>Exact UTC boundary search</p><h4>Next {transit.calendar_window?.days} days</h4></div><small>Rāśi · nakshatra · Kakshya · stations</small></div>
+        <div className="av-transit-filters">{filterOptions.map(([id, label]) => <button type="button" key={id} className={transitEventFilter === id ? 'active' : ''} onClick={() => setTransitEventFilter(id)}>{label}</button>)}</div>
+        <div className="av-transit-events">{visibleEvents.map((event, index) => <article key={`${event.timestamp_utc}-${event.planet}-${event.type}-${index}`}><time>{new Date(event.timestamp_utc).toLocaleString()}</time><div><b>{event.planet} · {eventLabels[event.type]}</b><span>{event.sign} · {event.nakshatra} · K{event.kakshya_number} {event.kakshya_ruler}</span><small>Natal BAV {event.natal_bav_bindus} · SAV {event.natal_sav_bindus} · Kakshya {event.kakshya_bindu ? 'bindu' : 'no bindu'}{event.sensitive_timing?.double_match ? ' · double sensitive match' : event.sensitive_timing?.rashi_match || event.sensitive_timing?.nakshatra_match ? ' · sensitive-place match' : ''}</small></div></article>)}</div>
+      </section>
+      <aside className="av-transit-guardrail">{transit.interpretation_guardrail}</aside>
+    </div>;
   };
+
+  const renderComparison = () => renderClassicalTransitDesk();
+  const renderTransitRecommendations = () => renderClassicalTransitDesk();
 
   const eventTypeSelect = (
     <select
@@ -1580,6 +1509,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
             {activeTab === 'sarva' && renderSarvashtakavarga()}
             {activeTab === 'individual' && renderIndividualCharts()}
             {activeTab === 'advanced' && renderAdvancedAshtakavarga()}
+            {activeTab === 'transitDesk' && renderClassicalTransitDesk()}
             {activeTab === 'recommendations' && renderTransitRecommendations()}
             {activeTab === 'events' && renderEventPredictions()}
             {activeTab === 'analysis' && renderAnalysis()}

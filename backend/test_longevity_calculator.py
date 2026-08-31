@@ -59,25 +59,48 @@ def test_longevity_result_is_ui_and_chat_ready():
         as_of=datetime(2026, 8, 30), horizon_years=3
     )
 
-    assert result["schema_version"] == "longevity.v1"
+    assert result["schema_version"] == "longevity.v2"
+    assert result["calculation_convention"]["ashtakavarga_profile"] == "pvr_narasimha_rao"
+    assert result["chat_context"]["ashtakavarga_profile"] == "pvr_narasimha_rao"
     assert result["verdict"]["compartment"]["label"] in {"Alpayu", "Madhyayu", "Purnayu"}
     assert result["verdict"]["compartment"]["classical_modifications"]["source"].startswith("Jaimini")
     assert result["safeguards"]["source"].startswith("Brihat Parashara")
     assert len(result["pillars"]) == 3
     assert len(result["maraka_dossier"]["ranked_planets"]) == 9
-    assert result["maraka_dossier"]["ranked_planets"][0]["score"] >= result["maraka_dossier"]["ranked_planets"][-1]["score"]
+    assert result["maraka_dossier"]["ranked_planets"][0]["classical_factor_count"] >= result["maraka_dossier"]["ranked_planets"][-1]["classical_factor_count"]
     assert result["chat_context"]["context_type"] == "deterministic_longevity_evidence"
     assert "never predict a death date" in result["chat_context"]["guardrail"]
     assert all(window["label"] != "death" for window in result["crisis_windows"])
-    assert all(window["score"] in {0, 33, 67, 100} for window in result["crisis_windows"])
-    assert all(window["level"] not in {"critical", "transformative"} for window in result["crisis_windows"] if window["convergence"]["confirmed_systems"] < 3)
+    assert all("score" not in window for window in result["crisis_windows"])
+    assert "score" not in result["verdict"]["current_activation"]
+    assert all(window["convergence"]["classification_basis"].endswith("classical numerical score") for window in result["crisis_windows"])
+    assert all(window["level"] != "strong_convergence" for window in result["crisis_windows"] if window["convergence"]["confirmed_systems"] < 3)
+    assert all("ad_start" not in window for window in result["crisis_windows"])
+    assert all(window["dasha_period"]["boundary_type"] == "actual_antardasha" for window in result["crisis_windows"])
+    assert all(not window["convergence"]["micro"]["evidence"] for window in result["crisis_windows"] if not window["components"]["transit_bav"])
+
+
+def test_longevity_uses_selected_ashtakavarga_reduction_profile_end_to_end():
+    result = LongevityCalculator(
+        BIRTH,
+        CHART,
+        ashtakavarga_profile="parasharas_light_7",
+    ).calculate(as_of=datetime(2026, 8, 30), horizon_years=1)
+
+    convention = result["calculation_convention"]
+    timing = result["maraka_dossier"]["sensitive_points"]["ashtakavarga_timing"]
+    assert convention["ashtakavarga_profile"] == "parasharas_light_7"
+    assert convention["count_ascendant_as_occupant"] is True
+    assert convention["mixed_higher_empty_rule"] == "subtract_occupied_value"
+    assert timing["reduction_profile"] == "parasharas_light_7"
+    assert result["chat_context"]["ashtakavarga_profile"] == "parasharas_light_7"
 
 
 def test_jaimini_jupiter_vriddhi_is_one_whole_compartment():
     chart = deepcopy(CHART)
     chart["ascendant"] = 0.0
     chart["planets"]["Jupiter"].update({"sign": 0, "longitude": 5.0})
-    chart["planets"]["Venus"].update({"sign": 0, "longitude": 15.0})
+    chart["planets"]["Venus"].update({"sign": 1, "longitude": 45.0})
     chart["planets"]["Moon"].update({"sign": 11, "longitude": 350.0})
     chart["planets"]["Sun"].update({"sign": 9, "longitude": 270.0})
     chart["planets"]["Rahu"].update({"sign": 2, "longitude": 70.0})
@@ -101,8 +124,8 @@ def test_jaimini_saturn_hrasa_and_own_sign_exception_are_traceable():
     chart["planets"]["Jupiter"].update({"sign": 3, "longitude": 95.0})
     chart["planets"]["Venus"].update({"sign": 2, "longitude": 75.0})
     chart["planets"]["Saturn"].update({"sign": 5, "longitude": 170.0})
-    chart["planets"]["Rahu"].update({"sign": 3, "longitude": 110.0})
-    chart["planets"]["Ketu"].update({"sign": 9, "longitude": 290.0})
+    chart["planets"]["Rahu"].update({"sign": 8, "longitude": 250.0})
+    chart["planets"]["Ketu"].update({"sign": 2, "longitude": 70.0})
     calculator = LongevityCalculator(BIRTH, chart)
     pair_rows = [{"verdict": "Alpayu"}, {"verdict": "Madhyayu"}, {"verdict": "Madhyayu"}]
     reduced = calculator._jaimini_kakshya_modification("Madhyayu", pair_rows)
@@ -113,6 +136,40 @@ def test_jaimini_saturn_hrasa_and_own_sign_exception_are_traceable():
     protected = calculator._jaimini_kakshya_modification("Madhyayu", pair_rows)
     assert protected["final_compartment"] == "Madhyayu"
     assert protected["rules"][0]["exception"] == "own_or_exalted"
+
+
+def test_jaimini_saturn_hrasa_requires_malefic_influence_in_selected_profile():
+    chart = deepcopy(CHART)
+    chart["ascendant"] = 0.0
+    chart["planets"]["Saturn"].update({"sign": 5, "longitude": 170.0})
+    chart["planets"]["Rahu"].update({"sign": 3, "longitude": 110.0})
+    chart["planets"]["Ketu"].update({"sign": 9, "longitude": 290.0})
+    calculator = LongevityCalculator(BIRTH, chart)
+    result = calculator._jaimini_kakshya_modification(
+        "Madhyayu", [{"verdict": "Alpayu"}, {"verdict": "Madhyayu"}, {"verdict": "Madhyayu"}]
+    )
+    assert result["final_compartment"] == "Madhyayu"
+    assert result["rules"][0]["applied"] is False
+    assert "requires malefic influence" in result["rules"][0]["interpretive_profile"]
+
+
+def test_moon_in_lagna_or_seventh_gives_moon_saturn_pair_precedence():
+    chart = deepcopy(CHART)
+    chart["ascendant"] = 30.0
+    chart["planets"]["Moon"].update({"sign": 1, "longitude": 35.0})
+    result = LongevityCalculator(BIRTH, chart).calculate(as_of=datetime(2026, 8, 30), horizon_years=1)
+    moon_saturn = result["pillars"][0]["pairs"][1]["verdict"]
+    assert result["verdict"]["compartment"]["pair_majority"] == moon_saturn
+    assert "2.1.9" in result["verdict"]["compartment"]["selection_rule"]
+
+
+def test_shared_lagna_and_eighth_lord_uses_eighth_from_eighth_lord():
+    chart = deepcopy(CHART)
+    chart["ascendant"] = 0.0  # Aries: Mars rules both Lagna and the eighth.
+    result = LongevityCalculator(BIRTH, chart).calculate(as_of=datetime(2026, 8, 30), horizon_years=1)
+    first_pair = result["pillars"][0]["pairs"][0]
+    assert first_pair["label"] == "Lagnesha + 8th-from-8th Lord"
+    assert "eighth from the eighth" in first_pair["right"]["derivation"]
 
 
 def test_parent_views_rotate_native_houses_and_include_d12_confirmation():

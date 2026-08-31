@@ -1,0 +1,126 @@
+{
+  "registry_version": "longevity.rules.v1",
+  "interpretive_profile": "Lahiri sidereal; selected Sanjay Rath/Jaimini readings where translations differ",
+  "status_definitions": {
+    "source_locked": "The implemented rule and cited passage materially agree.",
+    "translation_profile": "Classical rule exists, but the implementation selects and discloses one disputed translation.",
+    "supporting_only": "Classical or arithmetic evidence displayed separately and not allowed to change the lifespan compartment.",
+    "product_audit": "A transparent organization of evidence, not represented as a classical formula.",
+    "derived_proxy": "Secondary parent evidence from the native chart; never a direct parental lifespan calculation."
+  },
+  "bibliography": [
+    {
+      "id": "jus_rath_1997",
+      "title": "Jaimini Maharishi's Upadesa Sutras",
+      "translator_commentator": "Sanjay Rath",
+      "publisher": "Sagar Publications",
+      "year": 1997,
+      "isbn_or_catalog": "Google Books ID BwIvAAAAYAAJ",
+      "url": "https://books.google.com/books?id=BwIvAAAAYAAJ",
+      "scope": "Primary interpretive edition for Jaimini 2.1.1–14. The registry explicitly labels readings that are translation-dependent."
+    },
+    {
+      "id": "jus_sanskrit_transcription",
+      "title": "Upadeshasutram by Jaimini Maharshi — Sanskrit transcription",
+      "editor_transcriber": "Sanjay Rath",
+      "url": "https://sanskritdocuments.org/~sanskrit/doc_trial/fortransfer/sanjayrath/jaiminIyasUtram_sa.html",
+      "scope": "Sanskrit cross-reference; not silently treated as an independent translation."
+    },
+    {
+      "id": "bphs_sanskrit_chapters",
+      "title": "Brihat Parashara Hora Shastra — Sanskrit chapter text with English rendering",
+      "url": "https://www.siva.sh/brihat-parashara-hora-shastra/5",
+      "scope": "Chapter 5 verses 4–5 are the pinned Hora Lagna formula reference. Chapter numbering and wording must be rechecked before changing any BPHS-derived rule."
+    },
+    {
+      "id": "bphs_arishta_chapter",
+      "title": "Brihat Parashara Hora Shastra — Sanskrit chapter 10 text with English rendering",
+      "url": "https://www.siva.sh/brihat-parashara-hora-shastra/10",
+      "scope": "Pinned text for the early-life affliction and cancellation audit; not a general adult longevity cancellation."
+    }
+  ],
+  "rules": [
+    {
+      "id": "jaimini_three_pairs",
+      "status": "source_locked",
+      "source": "Jaimini Upadesha Sutras 2.1.1–9",
+      "source_ids": ["jus_rath_1997", "jus_sanskrit_transcription"],
+      "implementation": "LongevityCalculator._pillars_and_compartment",
+      "notes": "Includes two-of-three agreement, Lagna–Hora Lagna precedence when all differ, Moon–Saturn precedence when Moon occupies Lagna/seventh, and the eighth-from-eighth substitute when Lagna and eighth share a lord."
+    },
+    {
+      "id": "hora_lagna",
+      "status": "source_locked",
+      "source": "Brihat Parashara Hora Shastra Ch. 5.4–5",
+      "source_ids": ["bphs_sanskrit_chapters"],
+      "implementation": "LongevityCalculator._hora_lagna",
+      "notes": "Local sunrise, Sun longitude at sunrise, and one sign per 2.5 elapsed ghatis; pre-sunrise births use the previous sunrise."
+    },
+    {
+      "id": "jaimini_saturn_kakshya_hrasa",
+      "status": "translation_profile",
+      "source": "Jaimini Upadesha Sutras 2.1.10–13",
+      "source_ids": ["jus_rath_1997", "jus_sanskrit_transcription"],
+      "implementation": "LongevityCalculator._jaimini_kakshya_modification",
+      "notes": "Uses the Sanjay Rath reading: Saturn must determine the selected pair result, receive malefic influence, and not be own/exalted. Other translations reverse the Sutra 2.1.13 influence condition; the chosen profile is emitted in evidence."
+    },
+    {
+      "id": "jaimini_jupiter_kakshya_vriddhi",
+      "status": "translation_profile",
+      "source": "Jaimini Upadesha Sutra 2.1.14",
+      "source_ids": ["jus_rath_1997", "jus_sanskrit_transcription"],
+      "implementation": "LongevityCalculator._jaimini_kakshya_modification",
+      "notes": "Jupiter in Lagna/seventh must be unaffiliated under the selected translation."
+    },
+    {
+      "id": "attained_age_reconciliation",
+      "status": "product_audit",
+      "source": "Observational consistency safeguard; not a classical Ayurdaya rule",
+      "implementation": "LongevityCalculator._reconcile_with_attained_age",
+      "notes": "Preserves the original classical result and prevents an already disproved age band from being presented as currently possible."
+    },
+    {
+      "id": "parashari_relative_strength",
+      "status": "supporting_only",
+      "source": "Parashari dignity, house placement, and Shadbala concepts",
+      "implementation": "LongevityCalculator._relative_strength",
+      "notes": "Displayed as vitality evidence; tier_offset is fixed at zero and cannot alter the Jaimini compartment."
+    },
+    {
+      "id": "bphs_early_life_cancellation_audit",
+      "status": "source_locked",
+      "source": "Brihat Parashara Hora Shastra Ch. 10.2–5 under the selected translation",
+      "source_ids": ["bphs_arishta_chapter"],
+      "implementation": "LongevityCalculator._arishta_bhanga_evidence",
+      "notes": "Balarishta/natal-affliction audit only. It is not a percentage, remedy, or blanket adult cancellation."
+    },
+    {
+      "id": "ashtakavarga_eighth_support",
+      "status": "supporting_only",
+      "source": "Sarvashtakavarga total for the eighth-house sign; 28 is the approximate arithmetic per-sign reference",
+      "implementation": "LongevityCalculator._pillars_and_compartment",
+      "notes": "Does not change the lifespan compartment or produce years."
+    },
+    {
+      "id": "maraka_badhaka_sensitive_dossier",
+      "status": "product_audit",
+      "source": "Classical Maraka, Badhaka, 22nd Drekkana, 64th Navamsha, A8 and Jaimini significator concepts",
+      "implementation": "LongevityCalculator._rank_marakas and _sensitive_points",
+      "notes": "Ordering is by count of explicitly listed linkages. Counts are not weights, probabilities, or a classical Maraka Potential Score."
+    },
+    {
+      "id": "three_layer_activation_timeline",
+      "status": "product_audit",
+      "source": "Product cross-audit of separately calculated Vimshottari, Shoola and transit/Ashtakavarga layers",
+      "implementation": "LongevityCalculator._activation_windows",
+      "notes": "The 0–3 count is descriptive. It is not a classical formula, severity score, medical risk, or claim that the layers are statistically independent."
+    },
+    {
+      "id": "parent_native_chart_proxy",
+      "status": "derived_proxy",
+      "source": "Derived fourth/ninth house references with D12 corroboration",
+      "implementation": "LongevityCalculator subject=mother/father",
+      "notes": "Never exposes a direct parental age band; the parent's own chart is required."
+    }
+  ]
+}

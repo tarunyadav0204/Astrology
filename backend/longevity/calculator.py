@@ -104,11 +104,17 @@ def _format_longitude(data: Dict[str, Any]) -> str:
 class LongevityCalculator:
     """Build a stable, UI- and chat-ready longevity evidence contract.
 
-    The result deliberately describes vulnerability and crisis periods. It never
-    asserts a date of death or treats an astrological score as medical advice.
+    The result reports classical lifespan categories and independently calculated
+    activation layers. It never asserts a date of death or emits a risk percentage.
     """
 
-    def __init__(self, birth_data: Dict[str, Any], chart_data: Dict[str, Any], subject: str = "self"):
+    def __init__(
+        self,
+        birth_data: Dict[str, Any],
+        chart_data: Dict[str, Any],
+        subject: str = "self",
+        ashtakavarga_profile: str = "pvr_narasimha_rao",
+    ):
         subject = str(subject or "self").strip().lower()
         if subject not in SUBJECTS:
             raise ValueError("subject must be self, mother, or father")
@@ -123,7 +129,11 @@ class LongevityCalculator:
         self.d3 = self.divisional.calculate_divisional_chart(3).get("divisional_chart", {})
         self.d9 = self.divisional.calculate_divisional_chart(9).get("divisional_chart", {})
         self.d12 = self.divisional.calculate_divisional_chart(12).get("divisional_chart", {})
-        self.ashtakavarga = AshtakavargaCalculator(self.birth, self.chart)
+        self.ashtakavarga = AshtakavargaCalculator(
+            self.birth,
+            self.chart,
+            reduction_profile=ashtakavarga_profile,
+        )
         self._shadbala_cache: Optional[Dict[str, Any]] = None
         self._hora_lagna_cache: Optional[Dict[str, Any]] = None
         self.sensitive = self._sensitive_points()
@@ -133,12 +143,22 @@ class LongevityCalculator:
         pillars, compartment = self._pillars_and_compartment(as_of)
         safeguards = self._arishta_bhanga_evidence()
         marakas = self._rank_marakas()
-        windows = self._risk_windows(compartment, safeguards, as_of, horizon_years)
-        current = self._current_vulnerability(windows, as_of)
+        windows = self._activation_windows(compartment, safeguards, as_of, horizon_years)
+        current = self._current_activation(windows, as_of)
         primary = marakas[0] if marakas else {}
         return {
-            "schema_version": "longevity.v1",
+            "schema_version": "longevity.v2",
+            "rule_registry_version": "longevity.rules.v1",
             "calculated_at": as_of.isoformat(timespec="seconds"),
+            "calculation_convention": {
+                "ashtakavarga_profile": self.ashtakavarga.reduction_profile,
+                "label": self.ashtakavarga.ekadhipatya_profile["label"],
+                "source": self.ashtakavarga.ekadhipatya_profile["source"],
+                "source_url": self.ashtakavarga.ekadhipatya_profile["source_url"],
+                "mixed_higher_empty_rule": self.ashtakavarga.ekadhipatya_profile["mixed_higher_empty_rule"],
+                "count_ascendant_as_occupant": self.ashtakavarga.ekadhipatya_profile["count_ascendant_as_occupant"],
+                "scope": "Changes Ekadhipatya Shodhana and Shodhya-Pinda-derived timing only; raw BAV, SAV and Kakshya geometry are unchanged.",
+            },
             "subject": {
                 "key": self.subject_key,
                 "label": self.subject["label"],
@@ -151,10 +171,15 @@ class LongevityCalculator:
                 "compartment": compartment,
                 "primary_threat": {
                     "planet": primary.get("planet"),
-                    "score": primary.get("score", 0),
+                    "classical_factor_count": primary.get("classical_factor_count", 0),
+                    "protective_factor_count": primary.get("protective_factor_count", 0),
+                    "prominence": primary.get("prominence", "No listed classical linkage"),
                     "summary": primary.get("summary", "No dominant crisis factor"),
                     "factors": primary.get("factors", []),
+                    "protective_factors": primary.get("protective_factors", []),
                 },
+                "current_activation": current,
+                # Compatibility alias. This object intentionally has no numerical score.
                 "current_vulnerability": current,
             },
             "pillars": pillars,
@@ -164,26 +189,34 @@ class LongevityCalculator:
                 "ranked_planets": marakas,
                 "sensitive_points": self.sensitive,
             },
+            "activation_windows": windows,
+            # Compatibility alias for v1 clients. Entries use the v2 activation contract.
             "crisis_windows": windows,
             "chat_context": {
                 "context_type": "deterministic_longevity_evidence",
-                "schema_version": "longevity.v1",
+                "schema_version": "longevity.v2",
                 "subject": self.subject_key,
+                "ashtakavarga_profile": self.ashtakavarga.reduction_profile,
                 "verdict": compartment,
                 "top_crisis_planets": [item["planet"] for item in marakas[:3]],
                 "sensitive_points": self.sensitive,
                 "classical_modifications": compartment.get("classical_modifications"),
                 "safeguards": safeguards,
-                "risk_windows": windows[:6],
-                "guardrail": "Discuss vulnerability, resilience and preventive vigilance only; never predict a death date.",
+                "activation_windows": windows[:6],
+                "guardrail": "Describe the supplied classical activations and their limitations; never predict a death date or convert them into a probability or medical claim.",
             },
-            "disclaimer": "Astrological longevity categories are traditional interpretive tools, not medical facts or a prediction of death. Parent views are derived from the native's chart and do not replace a parent's own birth chart. Use risk windows only for preventive awareness and seek qualified medical care for health concerns.",
+            "disclaimer": "Astrological longevity categories and activation layers are traditional interpretive tools, not medical facts, probabilities, or a prediction of death. Parent views are derived from the native's chart and do not replace a parent's own birth chart. Seek qualified medical care for health concerns.",
         }
 
     def _pillars_and_compartment(self, as_of: datetime) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         lagna_lord = SIGN_LORDS[self.asc_sign]
         eighth_sign = (self.asc_sign + 7) % 12
         eighth_lord = SIGN_LORDS[eighth_sign]
+        pair_eighth_lord = (
+            SIGN_LORDS[(self.asc_sign + 2) % 12]
+            if self.subject_key == "self" and eighth_lord == lagna_lord
+            else eighth_lord
+        )
         karaka = self.subject["karaka"]
         karaka_sign = int(self.planets[karaka]["sign"])
         saturn_sign = int(self.planets["Saturn"]["sign"])
@@ -191,7 +224,7 @@ class LongevityCalculator:
             hora_lagna = self._hora_lagna()
             third_reference_sign = hora_lagna["sign_id"]
             pairs = [
-                ("Lagnesha + 8th Lord", int(self.planets[lagna_lord]["sign"]), int(self.planets[eighth_lord]["sign"])),
+                ("Lagnesha + 8th Lord" if pair_eighth_lord == eighth_lord else "Lagnesha + 8th-from-8th Lord", int(self.planets[lagna_lord]["sign"]), int(self.planets[pair_eighth_lord]["sign"])),
                 ("Moon + Saturn", karaka_sign, saturn_sign),
                 ("Lagna + Hora Lagna", self.asc_sign, third_reference_sign),
             ]
@@ -215,6 +248,10 @@ class LongevityCalculator:
                 "verdict": category,
             })
         if self.subject_key == "self":
+            if pair_eighth_lord != eighth_lord:
+                pair_rows[0]["right"]["derivation"] = (
+                    f"{lagna_lord} rules both Lagna and the eighth; {pair_eighth_lord}, lord of the eighth from the eighth, is used as the second member"
+                )
             pair_rows[2]["right"].update({
                 "longitude": round(hora_lagna["longitude"], 6),
                 "derivation": hora_lagna["derivation"],
@@ -222,10 +259,15 @@ class LongevityCalculator:
             })
         counts = {category: votes.count(category) for category in AYU_RANGES}
         majority = max(counts, key=counts.get)
-        if max(counts.values()) == 1:
+        selection_rule = "Jaimini 2.1.7: agreement of at least two pairs"
+        if self.subject_key == "self" and self._subject_house("Moon") in {1, 7}:
+            majority = votes[1]
+            selection_rule = "Jaimini 2.1.9: Moon in Lagna or seventh gives precedence to the Moon–Saturn pair"
+        elif max(counts.values()) == 1:
             majority = votes[2]
+            selection_rule = "Jaimini 2.1.8: all three differ, so Lagna–Hora Lagna prevails"
 
-        strength = self._relative_strength(lagna_lord, eighth_lord)
+        strength = self._relative_strength(lagna_lord, pair_eighth_lord)
         modification = self._jaimini_kakshya_modification(majority, pair_rows)
         modification, age_validation = self._reconcile_with_attained_age(modification, as_of)
         final_name = modification["final_compartment"]
@@ -233,6 +275,7 @@ class LongevityCalculator:
         base.update({
             "pair_majority": majority,
             "agreement": f"{counts[majority]} of 3 pairs",
+            "selection_rule": selection_rule,
             "adjustment": modification["summary"],
             "classical_modifications": modification,
             "age_validation": age_validation,
@@ -257,7 +300,7 @@ class LongevityCalculator:
                 "id": "jaimini",
                 "title": "Jaimini 3-Pairs" if self.subject_key == "self" else f"Derived {self.subject['label']} 3-Pairs",
                 "verdict": final_name if self.subject_key == "self" else PARENT_SUPPORT_LABELS[final_name],
-                "detail": f"Base vote: {majority}; final compartment: {final_name}" if self.subject_key == "self" else f"Technical three-pair category: {final_name}. Displayed only as {PARENT_SUPPORT_LABELS[final_name].lower()}; this is not the parent's lifespan compartment.",
+                "detail": f"Base selection: {majority}; {selection_rule}; final compartment: {final_name}" if self.subject_key == "self" else f"Technical three-pair category: {final_name}. Displayed only as {PARENT_SUPPORT_LABELS[final_name].lower()}; this is not the parent's lifespan compartment.",
                 "pairs": pair_rows,
                 "modifications": modification,
             },
@@ -518,12 +561,9 @@ class LongevityCalculator:
         saturn_sign = int(self.planets["Saturn"]["sign"])
         saturn_determines = len(pair_rows) > 1 and pair_rows[1]["verdict"] == majority
         saturn_influences = self._jaimini_influences("Saturn")
-        saturn_exception = (
-            saturn_sign in OWN_SIGNS["Saturn"]
-            or saturn_sign == EXALTATION["Saturn"]
-            or (bool(saturn_influences["malefic"]) and not saturn_influences["benefic"])
-        )
-        saturn_applies = saturn_determines and not saturn_exception and tier > 0
+        saturn_dignity_exception = saturn_sign in OWN_SIGNS["Saturn"] or saturn_sign == EXALTATION["Saturn"]
+        saturn_malefic_condition = bool(saturn_influences["malefic"])
+        saturn_applies = saturn_determines and not saturn_dignity_exception and saturn_malefic_condition and tier > 0
         if saturn_applies:
             tier -= 1
         rules.append({
@@ -533,19 +573,21 @@ class LongevityCalculator:
             "used_in_final_verdict": saturn_applies,
             "validation_status": "accepted" if saturn_applies else "not_triggered",
             "determinant": saturn_determines,
-            "exception": "own_or_exalted" if saturn_sign in OWN_SIGNS["Saturn"] or saturn_sign == EXALTATION["Saturn"] else "exclusively_malefic_influence" if saturn_exception else None,
+            "exception": "own_or_exalted" if saturn_dignity_exception else None,
             "evidence": f"Saturn in {SIGN_NAMES[saturn_sign]}; benefic influences: {', '.join(saturn_influences['benefic']) or 'none'}; malefic influences: {', '.join(saturn_influences['malefic']) or 'none'}",
-            "requirement": "Saturn must determine the selected three-pair compartment and must not meet the Sutra 12–13 exceptions used by this calculation profile",
+            "requirement": "Under the selected Rath reading of Sutras 2.1.10–13, Saturn must determine the selected compartment, receive malefic influence, and be neither in its own nor exaltation sign",
             "status_explanation": (
-                f"Applied because the Moon–Saturn pair agrees with the {majority} majority, Saturn is neither in its own nor exaltation sign, and the selected Sutra 13 exception does not apply."
+                f"Applied because the Moon–Saturn pair determines {majority}, Saturn receives malefic influence, and it is neither in its own nor exaltation sign."
                 if saturn_applies else
-                "Not applied because Saturn does not determine the selected compartment, the result is already at the lowest tier, or a configured Sutra 12–13 exception applies."
+                "Not applied because Saturn does not determine the selected compartment, lacks the selected Sutra 2.1.13 malefic-influence condition, is own/exalted, or the result is already at the lowest tier."
             ),
+            "interpretive_profile": "Sanjay Rath: Sutra 2.1.13 requires malefic influence; other translations reverse this condition, so the profile is explicit",
         })
 
         jupiter_house = self._subject_house("Jupiter")
         jupiter_influences = self._jaimini_influences("Jupiter")
-        jupiter_qualifies = jupiter_house in {1, 7} and bool(jupiter_influences["benefic"]) and not jupiter_influences["malefic"]
+        jupiter_unaffiliated = not jupiter_influences["benefic"] and not jupiter_influences["malefic"]
+        jupiter_qualifies = jupiter_house in {1, 7} and jupiter_unaffiliated
         jupiter_applies = jupiter_qualifies and tier < 2
         if jupiter_applies:
             tier += 1
@@ -556,13 +598,14 @@ class LongevityCalculator:
             "used_in_final_verdict": jupiter_applies,
             "validation_status": "accepted" if jupiter_applies else "not_triggered",
             "qualified": jupiter_qualifies,
+            "unaffiliated": jupiter_unaffiliated,
             "ceiling_reached": jupiter_qualifies and tier == 2 and not jupiter_applies,
             "evidence": f"Jupiter in house {jupiter_house}; benefic influences: {', '.join(jupiter_influences['benefic']) or 'none'}; malefic influences: {', '.join(jupiter_influences['malefic']) or 'none'}",
-            "requirement": "Jupiter must occupy the 1st or 7th house, receive benefic influence, and have no malefic influence under the selected Sutra 14 profile",
+            "requirement": "Jaimini 2.1.14: Jupiter must occupy the 1st or 7th and be unaffiliated under the selected translation",
             "status_explanation": (
-                f"Applied because Jupiter is in house {jupiter_house} with benefic-only influence."
+                f"Applied because Jupiter is in house {jupiter_house} without association or Jaimini sign-aspect influence from another graha."
                 if jupiter_applies else
-                f"Not applied because Jupiter is in house {jupiter_house}, benefic influences are {', '.join(jupiter_influences['benefic']) or 'none'}, and malefic influences are {', '.join(jupiter_influences['malefic']) or 'none'}; all three requirements must be satisfied."
+                f"Not applied because Jupiter is in house {jupiter_house}, benefic influences are {', '.join(jupiter_influences['benefic']) or 'none'}, and malefic influences are {', '.join(jupiter_influences['malefic']) or 'none'}; house and unaffiliated conditions must both be satisfied."
             ),
         })
         final_name = ["Alpayu", "Madhyayu", "Purnayu"][tier]
@@ -895,32 +938,36 @@ class LongevityCalculator:
             sign = int(data.get("sign", 0))
             house = self._subject_house(planet)
             native_house = self._native_house(planet)
-            score, factors = 0, []
+            factors, protective_factors = [], []
             if planet in maraka_lords:
-                score += 35; factors.append(f"Rules the 2nd or 7th from {self.subject['label']} Lagna")
+                factors.append(f"Rules the 2nd or 7th from {self.subject['label']} Lagna")
             if planet == badhaka_lord:
-                score += 25; factors.append(f"Badhakesh for house {self.sensitive['badhaka']['house']}")
+                factors.append(f"Badhakesh for house {self.sensitive['badhaka']['house']}")
             if planet in special_lords:
-                score += 20; factors.append("Rules a critical derived or divisional point" if self.subject_key != "self" else "Rules the 22nd Drekkana or 64th Navamsha")
+                factors.append("Rules a critical derived or divisional point" if self.subject_key != "self" else "Rules the 22nd Drekkana or 64th Navamsha")
             if house in {2, 7}:
-                score += 15; factors.append(f"Occupies derived maraka house {house} (native H{native_house})")
+                factors.append(f"Occupies derived maraka house {house} (native H{native_house})")
             associated = [p for p in maraka_lords if p != planet and int(self.planets.get(p, {}).get("sign", -1)) == sign]
             if associated:
-                score += 15; factors.append(f"Associated with maraka lord {', '.join(associated)}")
+                factors.append(f"Associated with maraka lord {', '.join(associated)}")
             saturn_sign = int(self.planets.get("Saturn", {}).get("sign", -1))
             if planet != "Saturn" and ((sign - saturn_sign) % 12) in {0, 2, 6, 9} and (planet in maraka_lords or planet == badhaka_lord):
-                score += 10; factors.append("Receives Saturn association")
+                factors.append("Receives Saturn association")
             jupiter_sign = int(self.planets.get("Jupiter", {}).get("sign", -1))
             if planet != "Jupiter" and ((sign - jupiter_sign) % 12) in {4, 6, 8}:
-                score -= 20; factors.append("Protected by Jupiter aspect (−20)")
-            score = max(0, min(100, score))
+                protective_factors.append("Receives Jupiter aspect")
+            factor_count = len(factors)
+            prominence = "Multiple classical linkages" if factor_count >= 2 else "One classical linkage" if factor_count == 1 else "No listed classical linkage"
             ranked.append({
-                "planet": planet, "score": score, "house": house, "native_house": native_house,
+                "planet": planet, "classical_factor_count": factor_count,
+                "protective_factor_count": len(protective_factors), "prominence": prominence,
+                "house": house, "native_house": native_house,
                 "sign": SIGN_NAMES[sign], "longitude": _format_longitude(data),
-                "factors": factors or ["No major maraka multiplier"],
-                "summary": f"{planet} in {SIGN_NAMES[sign]} · {'derived ' if self.subject_key != 'self' else ''}house {house}{f' (native H{native_house})' if self.subject_key != 'self' else ''} · {' + '.join(f for f in factors if '−20' not in f) or 'baseline'}",
+                "factors": factors,
+                "protective_factors": protective_factors,
+                "summary": f"{planet} in {SIGN_NAMES[sign]} · {'derived ' if self.subject_key != 'self' else ''}house {house}{f' (native H{native_house})' if self.subject_key != 'self' else ''} · {prominence.lower()}",
             })
-        return sorted(ranked, key=lambda row: (-row["score"], row["planet"]))
+        return sorted(ranked, key=lambda row: (-row["classical_factor_count"], row["protective_factor_count"], row["planet"]))
 
     def _macro_dasha_activation(self, mahadasha: str, antardasha: str) -> Dict[str, Any]:
         if self.subject_key == "self":
@@ -947,7 +994,7 @@ class LongevityCalculator:
             "evidence": [f"{planet} is active as {label}" for label, planet in active.items()],
         }
 
-    def _risk_windows(self, compartment: Dict[str, Any], safeguards: Dict[str, Any], as_of: datetime, horizon_years: int) -> List[Dict[str, Any]]:
+    def _activation_windows(self, compartment: Dict[str, Any], safeguards: Dict[str, Any], as_of: datetime, horizon_years: int) -> List[Dict[str, Any]]:
         end = as_of + timedelta(days=365.25 * max(1, min(horizon_years, 30)))
         try:
             dasha_rows = DashaCalculator().iter_ad_periods(self.birth, as_of, end)
@@ -958,75 +1005,89 @@ class LongevityCalculator:
             shoola = ShoolaDashaCalculator(self.chart).calculate_shoola_dasha(self.birth, relative_house_idx=relative_house_idx).get("all_periods", [])
         except Exception:
             shoola = []
-        windows = []
+        windows: List[Dict[str, Any]] = []
+        birth_date = datetime.strptime(str(self.birth["date"])[:10], "%Y-%m-%d") if self.subject_key == "self" else None
         for row in dasha_rows:
             start = datetime.strptime(row["start_date"], "%Y-%m-%d")
             finish = datetime.strptime(row["end_date"], "%Y-%m-%d")
-            midpoint = start + (finish - start) / 2
             macro = self._macro_dasha_activation(row["mahadasha"], row["antardasha"])
-            active_shoola = next((p for p in shoola if p["start_date"] <= midpoint.strftime("%Y-%m-%d") <= p["end_date"]), None)
-            meso = self._shoola_activation(active_shoola)
-            micro = self._transit_activation(midpoint)
-            systems = {"macro_vimshottari": macro["hit"], "meso_shoola": meso["hit"], "micro_transit_bav": micro["hit"]}
-            confirmation_count = sum(1 for hit in systems.values() if hit)
-            total = round(confirmation_count * 100 / 3)
-            if self.subject_key == "self":
-                birth_date = datetime.strptime(str(self.birth["date"])[:10], "%Y-%m-%d")
-                age = (midpoint - birth_date).days / 365.25
-                khanda_min, khanda_max = compartment["baseline_window"]
-                khanda_status = "before" if age < khanda_min else "within" if age <= khanda_max else "after"
-            else:
-                age = None
-                khanda_status = "not_applicable"
-            parent_d12_stress = self.subject_key == "self" or self.sensitive["d12_confirmation"]["stressed"]
-            early_life_cancellation = self.subject_key == "self" and age is not None and age < 32 and safeguards.get("active", False)
-            if confirmation_count == 3 and self.subject_key != "self":
-                d12_note = "with D12 stress confirmation" if parent_d12_stress else "without D12 stress confirmation"
-                level, label = "moderate", f"Heightened derived {self.subject['label'].lower()} vigilance {d12_note}; confirm with the parent's own chart"
-            elif confirmation_count == 3 and early_life_cancellation:
-                level, label = "moderate", "Early-life vigilance moderated by a classical Arishta-Bhanga condition"
-            elif confirmation_count == 3 and khanda_status == "before":
-                level, label = "transformative", "Severe life-transition / health-stress window before the calculated Khanda"
-            elif confirmation_count == 3:
-                level, label = "critical", "High three-system vigilance window"
-            elif confirmation_count == 2:
-                level, label = "moderate", "Moderate health & physical vigilance"
-            else:
-                level, label = "low", "Lower relative vulnerability"
-            reasons = [*macro["evidence"], *meso["evidence"], *micro["evidence"]]
-            if early_life_cancellation:
-                reasons.append("A BPHS Ch. 10 natal antidote is present; no percentage multiplier is applied")
-            if self.subject_key != "self":
-                reasons.append(f"D12 parental stress confirmation: {'present' if parent_d12_stress else 'absent'}")
-            windows.append({
-                "start_date": row["start_date"], "end_date": row["end_date"],
-                "mahadasha": row["mahadasha"], "antardasha": row["antardasha"],
-                "shoola_sign": active_shoola.get("sign_name") if active_shoola else None,
-                "score": total, "level": level, "label": label,
-                "components": {"vimshottari": int(macro["hit"]), "shoola": int(meso["hit"]), "transit_bav": int(micro["hit"])},
-                "convergence": {
-                    "confirmed_systems": confirmation_count,
-                    "required_for_high": 3,
-                    "systems": systems,
-                    "classification_basis": "Product safety policy; not a classical numerical formula",
-                    "macro": macro,
-                    "meso": meso,
-                    "micro": micro,
-                },
-                "khanda_boundary": {
-                    "status": khanda_status,
-                    "age_at_midpoint": round(age, 1) if age is not None else None,
-                    "baseline_window": compartment["baseline_window"] if self.subject_key == "self" else None,
-                    "policy": "A pre-Khanda three-system hit is labelled as transition/stress, never as mortality." if self.subject_key == "self" else "Parent age and Khanda are not calculated from the child's age; the parent's own birth chart is required.",
-                },
-                "parent_corroboration": None if self.subject_key == "self" else {
-                    "d12_stress_required_for_high": True,
-                    "d12_stress_present": parent_d12_stress,
-                    "own_parent_chart_required": True,
-                },
-                "reasons": reasons or ["No independent system reached its specified activation condition"],
-            })
+            cursor = start
+            while cursor <= finish:
+                stamp = cursor.strftime("%Y-%m-%d")
+                active_shoola = next((p for p in shoola if p["start_date"] <= stamp <= p["end_date"]), None)
+                meso = self._shoola_activation(active_shoola)
+                micro = self._transit_activation(cursor)
+                systems = {"macro_vimshottari": macro["hit"], "meso_shoola": meso["hit"], "micro_transit_bav": micro["hit"]}
+                confirmation_count = sum(1 for hit in systems.values() if hit)
+                level, label = self._convergence_classification(confirmation_count)
+                if birth_date is not None:
+                    age = (cursor - birth_date).days / 365.2425
+                    khanda_min, khanda_max = compartment["baseline_window"]
+                    khanda_status = "before" if age < khanda_min else "within" if age <= khanda_max else "after"
+                else:
+                    age = None
+                    khanda_status = "not_applicable"
+                parent_d12_stress = self.subject_key == "self" or self.sensitive["d12_confirmation"]["stressed"]
+                early_life_cancellation = self.subject_key == "self" and age is not None and age < 32 and safeguards.get("active", False)
+                reasons = [
+                    *(macro["evidence"] if macro["hit"] else []),
+                    *(meso["evidence"] if meso["hit"] else []),
+                    *(micro["evidence"] if micro["hit"] else []),
+                ]
+                notes = []
+                if early_life_cancellation:
+                    notes.append("BPHS Ch. 10 early-life Arishta-Bhanga condition is present; it is shown separately and does not create a numerical adjustment")
+                if self.subject_key != "self":
+                    notes.append(f"D12 parental stress confirmation: {'present' if parent_d12_stress else 'absent'}; the parent's own chart remains required")
+                candidate = {
+                    "start_date": stamp, "end_date": stamp,
+                    "mahadasha": row["mahadasha"], "antardasha": row["antardasha"],
+                    "dasha_period": {"start_date": row.get("ad_start", row["start_date"]), "end_date": row.get("ad_end", row["end_date"]), "boundary_type": "actual_antardasha"},
+                    "shoola_sign": active_shoola.get("sign_name") if active_shoola else None,
+                    "level": level, "label": label,
+                    "components": {"vimshottari": bool(macro["hit"]), "shoola": bool(meso["hit"]), "transit_bav": bool(micro["hit"])},
+                    "convergence": {
+                        "confirmed_systems": confirmation_count,
+                        "systems_considered": 3,
+                        "systems": systems,
+                        "classification_basis": "Descriptive count of independently calculated classical systems; not a probability, percentage, or classical numerical score",
+                        "macro": macro, "meso": meso, "micro": micro,
+                    },
+                    "khanda_boundary": {
+                        "status": khanda_status,
+                        "age_at_start": round(age, 1) if age is not None else None,
+                        "age_at_end": round(age, 1) if age is not None else None,
+                        "baseline_window": compartment["baseline_window"] if self.subject_key == "self" else None,
+                        "policy": "Khanda is contextual evidence only and is not converted into a mortality claim." if self.subject_key == "self" else "Parent age and Khanda are not calculated from the child's age; the parent's own birth chart is required.",
+                    },
+                    "parent_corroboration": None if self.subject_key == "self" else {
+                        "d12_stress_present": parent_d12_stress,
+                        "own_parent_chart_required": True,
+                    },
+                    "reasons": reasons,
+                    "supporting_observations": [*micro.get("non_qualifying_observations", []), *notes],
+                }
+                if windows and self._same_activation_segment(windows[-1], candidate):
+                    windows[-1]["end_date"] = stamp
+                    windows[-1]["khanda_boundary"]["age_at_end"] = candidate["khanda_boundary"]["age_at_end"]
+                else:
+                    windows.append(candidate)
+                cursor += timedelta(days=1)
         return sorted(windows, key=lambda item: item["start_date"])
+
+    @staticmethod
+    def _convergence_classification(count: int) -> Tuple[str, str]:
+        return {
+            0: ("none", "No listed classical activation"),
+            1: ("single", "Single-system activation"),
+            2: ("convergent", "Two-system convergence"),
+            3: ("strong_convergence", "Three-system convergence"),
+        }[max(0, min(3, int(count)))]
+
+    @staticmethod
+    def _same_activation_segment(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
+        fields = ("mahadasha", "antardasha", "shoola_sign", "level", "label", "components", "reasons", "supporting_observations", "dasha_period")
+        return all(left.get(field) == right.get(field) for field in fields) and left.get("khanda_boundary", {}).get("status") == right.get("khanda_boundary", {}).get("status")
 
     def _shoola_activation(self, period: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         if not period:
@@ -1052,10 +1113,6 @@ class LongevityCalculator:
             "supporting_influences": malefics,
         }
 
-    def _shoola_score(self, period: Optional[Dict[str, Any]]) -> Tuple[int, List[str]]:
-        activation = self._shoola_activation(period)
-        return (30 if activation["hit"] else 0), activation["evidence"]
-
     def _transit_activation(self, when: datetime) -> Dict[str, Any]:
         try:
             with _SWISSEPH_CHART_LOCK:
@@ -1069,7 +1126,7 @@ class LongevityCalculator:
                 rahu_sign = int(rahu_longitude / 30)
                 sun_sign = int(sun_longitude / 30)
         except Exception:
-            return {"hit": False, "primary": [], "confirmers": [], "evidence": ["Transit calculation unavailable"]}
+            return {"hit": False, "primary": [], "confirmers": [], "evidence": [], "non_qualifying_observations": ["Transit calculation unavailable"]}
         primary, confirmers = [], []
         if self.subject_key == "self":
             sensitive_signs = {self.sensitive["kharesh_22nd_drekkana"]["sign_id"], self.sensitive["navamsha_64_moon"]["sign_id"], int(self.planets[SIGN_LORDS[(self.asc_sign + 7) % 12]]["sign"])}
@@ -1101,25 +1158,29 @@ class LongevityCalculator:
         trigger_trines = {((root + offset) % 12) for root in trigger_roots for offset in (0, 4, 8)}
         if sun_sign in trigger_trines:
             confirmers.append("Solar-month trigger is active")
+        hit = bool(primary) and bool(confirmers)
+        observations = [*primary, *confirmers]
         return {
-            "hit": bool(primary) and bool(confirmers),
+            "hit": hit,
             "primary": primary,
             "confirmers": confirmers,
-            "evidence": [*primary, *confirmers],
+            "evidence": observations if hit else [],
+            "non_qualifying_observations": [] if hit else observations,
             "saturn_sign": SIGN_NAMES[saturn_sign],
             "rahu_sign": SIGN_NAMES[rahu_sign],
             "sun_sign": SIGN_NAMES[sun_sign],
             "kakshya": kakshya,
         }
 
-    def _transit_score(self, when: datetime) -> Tuple[int, List[str]]:
-        activation = self._transit_activation(when)
-        return (30 if activation["hit"] else 0), activation["evidence"]
-
     @staticmethod
-    def _current_vulnerability(windows: Iterable[Dict[str, Any]], as_of: datetime) -> Dict[str, Any]:
+    def _current_activation(windows: Iterable[Dict[str, Any]], as_of: datetime) -> Dict[str, Any]:
         stamp = as_of.strftime("%Y-%m-%d")
         active = next((row for row in windows if row["start_date"] <= stamp <= row["end_date"]), None)
         if not active:
-            return {"level": "low", "label": "Low", "score": 0, "window": None}
-        return {"level": active["level"], "label": active["label"], "score": active["score"], "window": active}
+            return {"level": "none", "label": "No listed classical activation", "confirmed_systems": 0, "systems_considered": 3, "window": None}
+        return {
+            "level": active["level"], "label": active["label"],
+            "confirmed_systems": active["convergence"]["confirmed_systems"],
+            "systems_considered": active["convergence"]["systems_considered"],
+            "window": active,
+        }

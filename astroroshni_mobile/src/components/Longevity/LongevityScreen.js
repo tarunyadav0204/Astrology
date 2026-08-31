@@ -13,8 +13,12 @@ import AppAlertModal from '../Common/AppAlertModal';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useAuthGate } from '../../auth/AuthGateContext';
 
-const TABS = [['pillars', 'Pillars + Safety'], ['dossier', 'Maraka Dossier'], ['timeline', 'Time-Windows']];
+const TABS = [['pillars', 'Pillars + Safety'], ['dossier', 'Maraka Dossier'], ['timeline', 'Classical Time Layers']];
 const SUBJECTS = [['self', 'Native'], ['mother', 'Mother'], ['father', 'Father']];
+const CALCULATION_PROFILES = [
+  ['pvr_narasimha_rao', 'P.V.R. Narasimha Rao', 'Replacement rule · seven grahas'],
+  ['parasharas_light_7', 'Parashara’s Light 7', 'Published-table profile · Lagna occupancy'],
+];
 const monthYear = (value) => {
   const [year, month] = String(value).split('-').map(Number);
   return `${new Date(year, month - 1).toLocaleString('en', { month: 'short' })} ${year}`;
@@ -29,6 +33,7 @@ export default function LongevityScreen({ navigation }) {
   const [result, setResult] = useState(null);
   const [tab, setTab] = useState('pillars');
   const [subject, setSubject] = useState('self');
+  const [ashtakavargaProfile, setAshtakavargaProfile] = useState('pvr_narasimha_rao');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [checkingLicense, setCheckingLicense] = useState(false);
@@ -99,6 +104,7 @@ export default function LongevityScreen({ navigation }) {
         birth_data: birth,
         horizon_years: 12,
         subject,
+        ashtakavarga_profile: ashtakavargaProfile,
       });
       setResult(response.data?.result);
     } catch (requestError) {
@@ -112,7 +118,7 @@ export default function LongevityScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [navigation, requireAuthForPaid, subject]);
+  }, [navigation, requireAuthForPaid, subject, ashtakavargaProfile]);
 
   useFocusEffect(useCallback(() => { calculate(); }, [calculate]));
 
@@ -156,6 +162,20 @@ export default function LongevityScreen({ navigation }) {
         </View>
       </View>}
 
+      {birthData && <View style={[styles.conventionWrap, { backgroundColor: colors.surfaceRaised, borderBottomColor: colors.cardBorder }]}>
+        <Text style={[styles.conventionTitle, { color: colors.text }]}>Shodhya Pinda convention</Text>
+        <Text style={[styles.conventionHint, { color: colors.textSecondary }]}>Changes Ekadhipatya reduction and Shodhya-Pinda timing only. BAV, SAV and Kakshya remain unchanged.</Text>
+        <View style={styles.conventionSwitch}>
+          {CALCULATION_PROFILES.map(([id, label, detail]) => (
+            <TouchableOpacity key={id} accessibilityRole="button" accessibilityState={{ selected: ashtakavargaProfile === id }} onPress={() => { setAshtakavargaProfile(id); setTab('pillars'); }} style={[styles.conventionButton, { backgroundColor: colors.surface, borderColor: ashtakavargaProfile === id ? colors.primary : colors.cardBorder }, ashtakavargaProfile === id && styles.conventionButtonActive]}>
+              <Text style={[styles.conventionButtonTitle, { color: ashtakavargaProfile === id ? colors.primary : colors.text }]}>{label}</Text>
+              <Text style={[styles.conventionButtonDetail, { color: colors.textSecondary }]}>{detail}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {result?.calculation_convention?.ashtakavarga_profile === ashtakavargaProfile && <Text style={[styles.conventionActive, { color: colors.textSecondary }]}>Active calculation: {result.calculation_convention.label}</Text>}
+      </View>}
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -175,8 +195,8 @@ export default function LongevityScreen({ navigation }) {
             <Text style={[styles.verdictRange, { color: colors.textInverse }]}>{subject === 'self' ? `${result.verdict.compartment.range} years · baseline ${result.verdict.compartment.baseline_window.join('–')}` : result.verdict.compartment.interpretation}</Text>
             {result.verdict.compartment.age_validation?.reconciled && <Text style={[styles.verdictRange, { color: colors.textInverse }]}>Age reconciliation · {result.verdict.compartment.age_validation.reason}</Text>}
             <View style={[styles.verdictMetrics, { borderTopColor: colors.cardBorder }]}>
-              <View style={styles.metric}><Text style={[styles.metricLabel, { color: colors.textInverse }]}>{result.subject.label} vector</Text><Text style={[styles.metricValue, { color: colors.textInverse }]}>{result.verdict.primary_threat.planet} · {result.verdict.primary_threat.score}</Text></View>
-              <View style={styles.metric}><Text style={[styles.metricLabel, { color: colors.textInverse }]}>Current {result.subject.label.toLowerCase()} vulnerability</Text><Text style={[styles.metricValue, { color: colors.textInverse }]}>{result.verdict.current_vulnerability.label} · {result.verdict.current_vulnerability.score}</Text></View>
+              <View style={styles.metric}><Text style={[styles.metricLabel, { color: colors.textInverse }]}>{result.subject.label} classical linkage</Text><Text style={[styles.metricValue, { color: colors.textInverse }]}>{result.verdict.primary_threat.planet} · {result.verdict.primary_threat.classical_factor_count} links</Text></View>
+              <View style={styles.metric}><Text style={[styles.metricLabel, { color: colors.textInverse }]}>Current classical convergence</Text><Text style={[styles.metricValue, { color: colors.textInverse }]}>{(result.verdict.current_activation || result.verdict.current_vulnerability).label} · {(result.verdict.current_activation || result.verdict.current_vulnerability).confirmed_systems}/3 systems</Text></View>
             </View>
           </View>
 
@@ -243,12 +263,12 @@ export default function LongevityScreen({ navigation }) {
             <>
               <View style={cardStyle}>
                 <Text style={[styles.eyebrow, { color: colors.primary }]}>MRITYU STHANA STRENGTH</Text>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Ranked crisis grahas</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Classical graha linkages</Text>
                 {result.maraka_dossier.ranked_planets.map((planet, index) => (
                   <View style={[styles.rankRow, { borderTopColor: colors.cardBorder }]} key={planet.planet}>
                     <Text style={[styles.rank, { backgroundColor: colors.primary, color: colors.onPrimary }]}>#{index + 1}</Text>
-                    <View style={styles.grow}><Text style={[styles.rowTitle, { color: colors.text }]}>{planet.planet}</Text><Text style={[styles.small, { color: colors.textSecondary }]}>{planet.sign} · {subject === 'self' ? `H${planet.house}` : `derived H${planet.house} · native H${planet.native_house}`} · {planet.longitude}</Text><Text style={[styles.reason, { color: colors.textSecondary }]}>{planet.factors.join(' · ')}</Text></View>
-                    <Text style={[styles.bigScore, { color: colors.primary }]}>{planet.score}</Text>
+                    <View style={styles.grow}><Text style={[styles.rowTitle, { color: colors.text }]}>{planet.planet}</Text><Text style={[styles.small, { color: colors.textSecondary }]}>{planet.sign} · {subject === 'self' ? `H${planet.house}` : `derived H${planet.house} · native H${planet.native_house}`} · {planet.longitude}</Text><Text style={[styles.reason, { color: colors.textSecondary }]}>{planet.factors.length ? planet.factors.join(' · ') : 'No listed Maraka, Badhaka or sensitive-point lordship'}{planet.protective_factors?.length ? ` · Protective evidence: ${planet.protective_factors.join(' · ')}` : ''}</Text></View>
+                    <Text style={[styles.bigScore, { color: colors.primary }]}>{planet.classical_factor_count} links</Text>
                   </View>
                 ))}
               </View>
@@ -267,11 +287,11 @@ export default function LongevityScreen({ navigation }) {
           {tab === 'timeline' && (
             <View style={cardStyle}>
               <Text style={[styles.eyebrow, { color: colors.primary }]}>VIMSHOTTARI × SHOOLA × TRANSIT</Text>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Next 12 years</Text>
-              {result.crisis_windows.map((window) => (
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Classical activation timeline · next 12 years</Text>
+              {(result.activation_windows || result.crisis_windows).map((window) => (
                 <View style={[styles.windowRow, { borderTopColor: colors.cardBorder }]} key={`${window.start_date}-${window.antardasha}`}>
-                  <View style={[styles.dot, { backgroundColor: window.level === 'critical' ? colors.error : ['moderate', 'transformative'].includes(window.level) ? colors.warning : colors.success }]} />
-                    <View style={styles.grow}><Text style={[styles.rowTitle, { color: colors.text }]}>{monthYear(window.start_date)} — {monthYear(window.end_date)}</Text><Text style={[styles.small, { color: colors.textSecondary }]}>{window.mahadasha}–{window.antardasha} · {window.label}</Text><Text style={[styles.small, { color: colors.textSecondary }]}>{window.khanda_boundary?.status === 'not_applicable' ? 'Parent Khanda not calculated from the child’s age' : `Convergence ${window.convergence?.confirmed_systems || 0}/3 · Khanda ${window.khanda_boundary?.status}`}</Text><Text style={[styles.reason, { color: colors.textSecondary }]}>{window.reasons.join(' · ')}</Text></View>
+                  <View style={[styles.dot, { backgroundColor: window.level === 'none' ? colors.textSecondary : colors.primary }]} />
+                    <View style={styles.grow}><Text style={[styles.rowTitle, { color: colors.text }]}>{monthYear(window.start_date)} — {monthYear(window.end_date)}</Text><Text style={[styles.small, { color: colors.textSecondary }]}>{window.mahadasha}–{window.antardasha} · {window.label}</Text><Text style={[styles.small, { color: colors.textSecondary }]}>Actual dasha: {monthYear(window.dasha_period.start_date)} — {monthYear(window.dasha_period.end_date)} · {window.khanda_boundary?.status === 'not_applicable' ? 'Parent Khanda not calculated from child age' : `Khanda ${window.khanda_boundary?.status}`}</Text><Text style={[styles.reason, { color: colors.textSecondary }]}>{window.reasons.length ? window.reasons.join(' · ') : 'No listed system meets its complete activation rule.'}</Text>{window.supporting_observations?.length > 0 && <Text style={[styles.reason, { color: colors.textSecondary }]}>Not counted: {window.supporting_observations.join(' · ')}</Text>}</View>
                   <Text style={[styles.bigScore, { color: colors.primary }]}>{window.convergence?.confirmed_systems || 0}/3</Text>
                 </View>
               ))}
@@ -314,5 +334,5 @@ export default function LongevityScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  screen:{flex:1},header:{height:72,flexDirection:'row',alignItems:'center',borderBottomWidth:1,paddingHorizontal:12},headerButton:{width:42,height:42,alignItems:'center',justifyContent:'center'},headerCenter:{flex:1,alignItems:'center',justifyContent:'center',gap:4},headerTitle:{fontSize:17,fontWeight:'900'},headerNativeChip:{minHeight:28,paddingVertical:2,paddingHorizontal:11,borderRadius:14,elevation:0,shadowOpacity:0,maxWidth:180},subjectWrap:{paddingHorizontal:14,paddingVertical:11,borderBottomWidth:1},subjectHint:{fontSize:10,fontWeight:'700',marginBottom:7,textTransform:'uppercase',letterSpacing:.5},subjectSwitch:{flexDirection:'row',padding:3,borderRadius:12},subjectButton:{flex:1,alignItems:'center',paddingVertical:8,borderRadius:9},subjectButtonText:{fontSize:12,fontWeight:'900'},center:{flex:1,alignItems:'center',justifyContent:'center',padding:30,gap:14},centerText:{textAlign:'center',fontSize:13,lineHeight:19},retry:{paddingVertical:11,paddingHorizontal:22,borderRadius:22},retryText:{color:'#fff',fontWeight:'800'},content:{padding:14,paddingBottom:50},verdict:{borderWidth:1,borderRadius:22,padding:23},verdictEyebrow:{color:'#d4b477',fontSize:10,fontWeight:'900',letterSpacing:1.2},verdictTitle:{color:'#fff',fontFamily:'Georgia',fontSize:40,fontWeight:'700',marginTop:7},verdictRange:{color:'#c8dad0',fontSize:13},verdictMetrics:{flexDirection:'row',gap:12,borderTopWidth:1,borderTopColor:'rgba(255,255,255,.16)',paddingTop:17,marginTop:22},metric:{flex:1},metricLabel:{color:'#b6c8be',fontSize:9,textTransform:'uppercase'},metricValue:{color:'#fff',fontSize:12,fontWeight:'800',marginTop:4},tabs:{gap:8,paddingVertical:15},tab:{borderWidth:1,borderRadius:22,paddingVertical:9,paddingHorizontal:14},card:{borderWidth:1,borderRadius:18,padding:17,marginBottom:12},eyebrow:{fontSize:10,fontWeight:'900',letterSpacing:1},sectionTitle:{fontFamily:'Georgia',fontSize:24,fontWeight:'700',marginVertical:6},body:{fontSize:13,lineHeight:19},pairRow:{flexDirection:'row',alignItems:'center',borderWidth:1,borderRadius:12,padding:11,marginTop:8,gap:8},grow:{flex:1},rowTitle:{fontSize:14,fontWeight:'800'},small:{fontSize:11,lineHeight:16},rowScore:{fontSize:11,fontWeight:'900'},rankRow:{flexDirection:'row',alignItems:'flex-start',gap:9,borderTopWidth:1,paddingVertical:12},rank:{fontSize:9,fontWeight:'900',paddingVertical:5,paddingHorizontal:6,borderRadius:10,overflow:'hidden'},reason:{fontSize:10,lineHeight:14,marginTop:4},bigScore:{fontSize:18,fontWeight:'900'},pointRow:{borderTopWidth:1,paddingVertical:11,gap:3},pointLabel:{fontSize:9,textTransform:'uppercase',letterSpacing:.7},windowRow:{flexDirection:'row',alignItems:'flex-start',gap:9,borderTopWidth:1,paddingVertical:13},dot:{width:9,height:9,borderRadius:5,marginTop:5},disclaimer:{borderLeftWidth:3,borderRadius:10,padding:13},disclaimerTitle:{fontSize:13,fontWeight:'900',marginBottom:4}
+  screen:{flex:1},header:{height:72,flexDirection:'row',alignItems:'center',borderBottomWidth:1,paddingHorizontal:12},headerButton:{width:42,height:42,alignItems:'center',justifyContent:'center'},headerCenter:{flex:1,alignItems:'center',justifyContent:'center',gap:4},headerTitle:{fontSize:17,fontWeight:'900'},headerNativeChip:{minHeight:28,paddingVertical:2,paddingHorizontal:11,borderRadius:14,elevation:0,shadowOpacity:0,maxWidth:180},subjectWrap:{paddingHorizontal:14,paddingVertical:11,borderBottomWidth:1},subjectHint:{fontSize:10,fontWeight:'700',marginBottom:7,textTransform:'uppercase',letterSpacing:.5},subjectSwitch:{flexDirection:'row',padding:3,borderRadius:12},subjectButton:{flex:1,alignItems:'center',paddingVertical:8,borderRadius:9},subjectButtonText:{fontSize:12,fontWeight:'900'},conventionWrap:{paddingHorizontal:14,paddingVertical:11,borderBottomWidth:1},conventionTitle:{fontSize:13,fontWeight:'900'},conventionHint:{fontSize:10,lineHeight:14,marginTop:2},conventionSwitch:{flexDirection:'row',gap:7,marginTop:8},conventionButton:{flex:1,borderWidth:1,borderRadius:11,paddingVertical:9,paddingHorizontal:10},conventionButtonActive:{borderWidth:2,paddingVertical:8,paddingHorizontal:9},conventionButtonTitle:{fontSize:11,fontWeight:'900'},conventionButtonDetail:{fontSize:9,lineHeight:12,marginTop:2},conventionActive:{fontSize:9,marginTop:6},center:{flex:1,alignItems:'center',justifyContent:'center',padding:30,gap:14},centerText:{textAlign:'center',fontSize:13,lineHeight:19},retry:{paddingVertical:11,paddingHorizontal:22,borderRadius:22},retryText:{color:'#fff',fontWeight:'800'},content:{padding:14,paddingBottom:50},verdict:{borderWidth:1,borderRadius:22,padding:23},verdictEyebrow:{color:'#d4b477',fontSize:10,fontWeight:'900',letterSpacing:1.2},verdictTitle:{color:'#fff',fontFamily:'Georgia',fontSize:40,fontWeight:'700',marginTop:7},verdictRange:{color:'#c8dad0',fontSize:13},verdictMetrics:{flexDirection:'row',gap:12,borderTopWidth:1,borderTopColor:'rgba(255,255,255,.16)',paddingTop:17,marginTop:22},metric:{flex:1},metricLabel:{color:'#b6c8be',fontSize:9,textTransform:'uppercase'},metricValue:{color:'#fff',fontSize:12,fontWeight:'800',marginTop:4},tabs:{gap:8,paddingVertical:15},tab:{borderWidth:1,borderRadius:22,paddingVertical:9,paddingHorizontal:14},card:{borderWidth:1,borderRadius:18,padding:17,marginBottom:12},eyebrow:{fontSize:10,fontWeight:'900',letterSpacing:1},sectionTitle:{fontFamily:'Georgia',fontSize:24,fontWeight:'700',marginVertical:6},body:{fontSize:13,lineHeight:19},pairRow:{flexDirection:'row',alignItems:'center',borderWidth:1,borderRadius:12,padding:11,marginTop:8,gap:8},grow:{flex:1},rowTitle:{fontSize:14,fontWeight:'800'},small:{fontSize:11,lineHeight:16},rowScore:{fontSize:11,fontWeight:'900'},rankRow:{flexDirection:'row',alignItems:'flex-start',gap:9,borderTopWidth:1,paddingVertical:12},rank:{fontSize:9,fontWeight:'900',paddingVertical:5,paddingHorizontal:6,borderRadius:10,overflow:'hidden'},reason:{fontSize:10,lineHeight:14,marginTop:4},bigScore:{fontSize:18,fontWeight:'900'},pointRow:{borderTopWidth:1,paddingVertical:11,gap:3},pointLabel:{fontSize:9,textTransform:'uppercase',letterSpacing:.7},windowRow:{flexDirection:'row',alignItems:'flex-start',gap:9,borderTopWidth:1,paddingVertical:13},dot:{width:9,height:9,borderRadius:5,marginTop:5},disclaimer:{borderLeftWidth:3,borderRadius:10,padding:13},disclaimerTitle:{fontSize:13,fontWeight:'900',marginBottom:4}
 });

@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { storage } from '../../services/storage';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
@@ -54,12 +55,24 @@ const LIFE_PREDICTION_DOMAIN_LABELS = {
 const LIFE_PREDICTIONS_POLL_MS = 3000;
 const LIFE_PREDICTIONS_MAX_POLLS = 120;
 const ASHTAKVARGA_TABS = [
-  { key: 'matrix', label: 'Matrix', icon: 'table-outline' },
-  { key: 'sav', label: 'SAV', icon: 'grid-outline' },
-  { key: 'bav', label: 'BAV', icon: 'planet-outline' },
-  { key: 'ai', label: 'Analysis', icon: 'analytics-outline' },
+  { key: 'matrix', labelKey: 'matrix', icon: 'table-outline' },
+  { key: 'sav', labelKey: 'sav', icon: 'grid-outline' },
+  { key: 'bav', labelKey: 'bav', icon: 'planet-outline' },
+  { key: 'advanced', labelKey: 'pinda', icon: 'calculator-outline' },
+  { key: 'transit', labelKey: 'transit', icon: 'navigate-circle-outline' },
+  { key: 'ai', labelKey: 'analysis', icon: 'analytics-outline' },
 ];
 const SIGN_SHORT_NAMES = ['Ari', 'Tau', 'Gem', 'Can', 'Leo', 'Vir', 'Lib', 'Sco', 'Sag', 'Cap', 'Aqu', 'Pis'];
+const ASHTAKVARGA_PROFILES = [
+  { id: 'pvr_narasimha_rao', label: 'P.V.R. Narasimha Rao', detail: 'Replacement rule · seven grahas' },
+  { id: 'parasharas_light_7', label: 'Parashara’s Light 7', detail: 'Published-table profile · Lagna occupancy' },
+];
+const ADVANCED_PLANETS = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'];
+const ADVANCED_TIMING_LABELS = {
+  father: 'Sun · H9', mother: 'Moon · H4', siblings: 'Mars · H3',
+  profession: 'Mercury · H10', children: 'Jupiter · H5',
+  marriage: 'Venus · H7', longevity: 'Saturn · H8',
+};
 const ASHTAKVARGA_QUESTION_SUGGESTIONS = [
   'How is career support right now?',
   'Which houses are weakest at the moment?',
@@ -162,12 +175,13 @@ const HOUSE_SIGNIFICATIONS = {
 };
 
 export default function AshtakvargaOracle({ navigation, route, onHeaderStateChange }) {
+  const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const { credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
   const embedded = !!route?.params?.embedded;
-  const themedSurface = { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder };
-  const themedMutedSurface = { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder };
+  const themedSurface = { backgroundColor: colors.surfaceRaised, borderColor: colors.borderStrong };
+  const themedMutedSurface = { backgroundColor: colors.surfaceMuted, borderColor: colors.borderStrong };
   const themedAccentSurface = { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder };
   const inverseSurface = { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine };
   const [activeTab, setActiveTab] = useState(0);
@@ -185,6 +199,11 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
   const [analysisResultMode, setAnalysisResultMode] = useState(null);
   const [askMessages, setAskMessages] = useState([]);
   const [lastAskedQuestion, setLastAskedQuestion] = useState('');
+  const [ashtakavargaProfile, setAshtakavargaProfile] = useState('pvr_narasimha_rao');
+  const [selectedAdvancedPlanet, setSelectedAdvancedPlanet] = useState('Saturn');
+  const [classicalTransitData, setClassicalTransitData] = useState(null);
+  const [transitDeskLoading, setTransitDeskLoading] = useState(false);
+  const [transitEventFilter, setTransitEventFilter] = useState('all');
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -262,7 +281,37 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
     if (birthData) {
       fetchAshtakvargaData(birthData, selectedDate);
     }
-  }, [birthData, selectedDate]);
+  }, [birthData, selectedDate, ashtakavargaProfile]);
+
+  useEffect(() => {
+    if (!birthData || ASHTAKVARGA_TABS[activeTab]?.key !== 'transit') return;
+    let cancelled = false;
+    setTransitDeskLoading(true);
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem('authToken');
+        const response = await fetch(`${API_BASE_URL}${getEndpoint('/ashtakavarga/transit-analysis')}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            birth_data: normalizeBirthForApi(birthData),
+            transit_date: (selectedDate || new Date()).toISOString().split('T')[0],
+            window_days: 30,
+            ashtakavarga_profile: ashtakavargaProfile,
+          }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(typeof body?.detail === 'string' ? body.detail : body?.detail?.message || `Transit request failed (${response.status})`);
+        if (!cancelled) setClassicalTransitData(body.classical_transit || null);
+      } catch (error) {
+        console.error('Error loading classical AV transit desk:', error);
+        if (!cancelled) setClassicalTransitData(null);
+      } finally {
+        if (!cancelled) setTransitDeskLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, birthData, selectedDate, ashtakavargaProfile]);
 
   const startAnimations = () => {
     Animated.loop(
@@ -369,7 +418,8 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
 
       const requestBody = {
         birth_data: birthNorm,
-        chart_type: isSameDate ? 'lagna' : 'transit'
+        chart_type: isSameDate ? 'lagna' : 'transit',
+        ashtakavarga_profile: ashtakavargaProfile,
       };
 
       if (!isSameDate) {
@@ -1184,11 +1234,271 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
     );
   };
 
+  const renderAdvancedTab = () => {
+    const advanced = oracleData?.advanced_ashtakavarga;
+    const selected = advanced?.shodhya_pinda?.[selectedAdvancedPlanet];
+    const selectedPrastara = advanced?.prastara?.[selectedAdvancedPlanet];
+    const reductionRows = [
+      [t('ashtakavargaUi.labels.raw'), selected?.raw_bav],
+      [t('ashtakavargaUi.labels.afterTrikona'), selected?.after_trikona],
+      [t('ashtakavargaUi.labels.afterEkadhipatya'), selected?.after_ekadhipatya],
+    ];
+    const chooseProfile = (profileId) => {
+      setAshtakavargaProfile(profileId);
+      const natalDate = parseCalendarDateInput(birthData?.date);
+      if (natalDate) setSelectedDate(natalDate);
+    };
+
+    return (
+      <ScrollView style={styles.tabContent} contentContainerStyle={styles.advancedContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.titleContainer}>
+          <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>{t('ashtakavargaUi.advanced.eyebrow').toUpperCase()}</Text>
+          <Text style={[styles.mapTitle, { color: colors.text }]}>{t('ashtakavargaUi.advanced.title')}</Text>
+          <Text style={[styles.mapSubtitle, { color: colors.textSecondary }]}>{t('ashtakavargaUi.advanced.subtitle')}</Text>
+        </View>
+
+        <View style={[styles.advancedCard, themedSurface]}>
+          <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.advanced.convention')}</Text>
+          <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.advanced.conventionBody')}</Text>
+          <View style={styles.profileButtonRow}>
+            {ASHTAKVARGA_PROFILES.map((profile) => {
+              const active = ashtakavargaProfile === profile.id;
+              return (
+                <TouchableOpacity key={profile.id} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => chooseProfile(profile.id)} style={[styles.profileButton, { backgroundColor: active ? colors.primary : colors.surfaceMuted, borderColor: active ? colors.primary : colors.borderStrong }]}>
+                  <Text style={[styles.profileButtonTitle, { color: active ? colors.onPrimary : colors.text }]}>{profile.label}</Text>
+                  <Text style={[styles.profileButtonDetail, { color: active ? colors.onPrimary : colors.textSecondary }]}>Ekādhipatya · 7 grahas{profile.id === 'parasharas_light_7' ? ' · Lagna' : ''}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={[styles.advancedAudit, { color: colors.textSecondary }]}>{advanced ? t('ashtakavargaUi.advanced.active', { school: advanced.convention?.school }) : t('ashtakavargaUi.advanced.natalBody')}</Text>
+        </View>
+
+        {!advanced ? (
+          <View style={[styles.advancedCard, themedSurface]}>
+            <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.advanced.natalRequired')}</Text>
+            <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.advanced.natalBody')}</Text>
+            <TouchableOpacity onPress={() => { const natalDate = parseCalendarDateInput(birthData?.date); if (natalDate) setSelectedDate(natalDate); }} style={[styles.advancedAction, { backgroundColor: colors.primary }]}><Text style={{ color: colors.onPrimary, fontWeight: '800' }}>{t('ashtakavargaUi.advanced.showNatal')}</Text></TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <View style={[styles.advancedCard, themedSurface]}>
+              <Text style={[styles.advancedEyebrow, { color: colors.primary }]}>{t('ashtakavargaUi.advanced.tableTitle').toUpperCase()}</Text>
+              <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.advanced.tableTitle')}</Text>
+              <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.advanced.tableBody')}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.advancedTableScroll}>
+                <View>
+                  <View style={[styles.advancedTableRow, styles.advancedTableHeader, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.cardBorder }]}>
+                    {[t('ashtakavargaUi.labels.graha'), t('ashtakavargaUi.labels.raw'), t('ashtakavargaUi.labels.reduced'), t('ashtakavargaUi.labels.rashi'), t('ashtakavargaUi.labels.graha'), t('ashtakavargaUi.labels.shodhya')].map((label, index) => <Text key={`${label}-${index}`} style={[styles.advancedTableCell, index === 0 && styles.advancedTableFirstCell, { color: colors.text }]}>{label}</Text>)}
+                  </View>
+                  {ADVANCED_PLANETS.map((planet) => {
+                    const row = advanced.shodhya_pinda?.[planet];
+                    const active = selectedAdvancedPlanet === planet;
+                    const values = [planet, Object.values(row?.raw_bav || {}).reduce((sum, value) => sum + Number(value), 0), Object.values(row?.after_ekadhipatya || {}).reduce((sum, value) => sum + Number(value), 0), row?.rashi_pinda, row?.graha_pinda, row?.shodhya_pinda];
+                    return <TouchableOpacity key={planet} onPress={() => setSelectedAdvancedPlanet(planet)} style={[styles.advancedTableRow, { backgroundColor: active ? colors.surfaceMuted : 'transparent', borderBottomColor: colors.borderStrong }]}>{values.map((value, index) => <Text key={`${planet}-${index}`} style={[styles.advancedTableCell, index === 0 && styles.advancedTableFirstCell, index === 5 && styles.advancedTableStrong, { color: index === 5 || active ? colors.primary : colors.textSecondary }]}>{value ?? '—'}</Text>)}</TouchableOpacity>;
+                  })}
+                </View>
+              </ScrollView>
+            </View>
+
+            <View style={[styles.advancedCard, themedSurface]}>
+              <Text style={[styles.advancedEyebrow, { color: colors.primary }]}>{t('ashtakavargaUi.advanced.audit').toUpperCase()}</Text>
+              <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.advanced.inspector', { planet: selectedAdvancedPlanet })}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.advancedPlanetChips}>
+                {ADVANCED_PLANETS.map((planet) => <TouchableOpacity key={planet} onPress={() => setSelectedAdvancedPlanet(planet)} style={[styles.advancedPlanetChip, { backgroundColor: selectedAdvancedPlanet === planet ? colors.primary : colors.surfaceMuted, borderColor: selectedAdvancedPlanet === planet ? colors.primary : colors.borderStrong }]}><Text style={{ color: selectedAdvancedPlanet === planet ? colors.onPrimary : colors.textSecondary, fontWeight: '800', fontSize: 11 }}>{planet}</Text></TouchableOpacity>)}
+              </ScrollView>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.advancedTableScroll}>
+                <View>
+                  <View style={[styles.reductionRow, styles.advancedTableHeader, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, { color: colors.text }]}>{t('ashtakavargaUi.labels.stage')}</Text>{SIGN_SHORT_NAMES.map((sign) => <Text key={sign} style={[styles.reductionCell, { color: colors.text }]}>{sign.slice(0, 2)}</Text>)}</View>
+                  {reductionRows.map(([label, values]) => <View key={label} style={[styles.reductionRow, { borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, { color: colors.text }]}>{label}</Text>{Array.from({ length: 12 }, (_, sign) => <Text key={sign} style={[styles.reductionCell, { color: colors.textSecondary }]}>{values?.[String(sign)] ?? 0}</Text>)}</View>)}
+                </View>
+              </ScrollView>
+              <View style={[styles.traceBlock, { backgroundColor: colors.surfaceMuted }]}><Text style={[styles.traceTitle, { color: colors.text }]}>Trikona Shodhana</Text>{selected?.trikona_trace?.map((row) => <Text key={row.signs.join('-')} style={[styles.traceText, { color: colors.textSecondary }]}>{row.signs.join(' · ')}: {row.before.join('/')} → {row.after.join('/')}</Text>)}</View>
+              <View style={[styles.traceBlock, { backgroundColor: colors.surfaceMuted }]}><Text style={[styles.traceTitle, { color: colors.text }]}>Ekadhipatya Shodhana</Text>{selected?.ekadhipatya_trace?.map((row) => <Text key={row.lord} style={[styles.traceText, { color: colors.textSecondary }]}>{row.signs.join(' · ')}: {row.before.join('/')} → {row.after.join('/')}</Text>)}</View>
+
+              <Text style={[styles.advancedSubheading, { color: colors.text }]}>{t('ashtakavargaUi.advanced.prastara', { planet: selectedAdvancedPlanet })}</Text>
+              <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.advanced.prastaraBody')}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.advancedTableScroll}>
+                <View>
+                  <View style={[styles.reductionRow, styles.advancedTableHeader, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, { color: colors.text }]}>{t('ashtakavargaUi.labels.contributor')}</Text>{SIGN_SHORT_NAMES.map((sign) => <Text key={sign} style={[styles.reductionCell, { color: colors.text }]}>{sign.slice(0, 2)}</Text>)}</View>
+                  {selectedPrastara?.contributors?.map((contributor) => <View key={contributor} style={[styles.reductionRow, { borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, { color: colors.text }]}>{contributor}</Text>{Array.from({ length: 12 }, (_, sign) => { const bindu = selectedPrastara.matrix?.[contributor]?.[String(sign)] ?? 0; return <Text key={sign} style={[styles.reductionCell, bindu ? { backgroundColor: colors.primary, color: colors.onPrimary } : { color: colors.textSecondary }]}>{bindu}</Text>; })}</View>)}
+                  <View style={[styles.reductionRow, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, { color: colors.text, fontWeight: '900' }]}>{t('ashtakavargaUi.labels.bavTotal')}</Text>{Array.from({ length: 12 }, (_, sign) => <Text key={sign} style={[styles.reductionCell, { color: colors.primary, fontWeight: '900' }]}>{selectedPrastara?.sign_totals?.[String(sign)] ?? 0}</Text>)}</View>
+                </View>
+              </ScrollView>
+            </View>
+
+            <View style={[styles.advancedCard, themedSurface]}>
+              <Text style={[styles.advancedEyebrow, { color: colors.primary }]}>{t('ashtakavargaUi.advanced.kakshyaTitle').toUpperCase()}</Text>
+              <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.advanced.kakshyaTitle')}</Text>
+              <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.advanced.kakshyaBody')}</Text>
+              {ADVANCED_PLANETS.map((planet) => { const row = advanced.natal_kakshya?.[planet]; return <View key={planet} style={[styles.kakshyaCard, { backgroundColor: colors.surfaceMuted, borderColor: row?.active ? colors.success : colors.error }]}><View style={styles.advancedCardHeader}><Text style={[styles.kakshyaPlanet, { color: colors.text }]}>{planet}</Text><Text style={[styles.kakshyaStatus, { color: row?.active ? colors.success : colors.error }]}>{row?.active ? t('ashtakavargaUi.labels.bindu').toUpperCase() : t('ashtakavargaUi.labels.noBindu').toUpperCase()}</Text></View><Text style={[styles.kakshyaCoordinate, { color: colors.text }]}>{row?.sign} {Number(row?.degree_in_sign || 0).toFixed(2)}°</Text><Text style={[styles.advancedBody, { color: colors.primary }]}>K{row?.kakshya_number} · {row?.kakshya_ruler}</Text><Text style={[styles.traceText, { color: colors.textSecondary }]}>{row?.start_degree}° ≤ degree &lt; {row?.end_degree}° · BAV {row?.sign_bav_total}</Text></View>; })}
+            </View>
+
+            <View style={[styles.advancedCard, themedSurface]}>
+              <Text style={[styles.advancedEyebrow, { color: colors.primary }]}>{t('ashtakavargaUi.advanced.timingTitle').toUpperCase()}</Text>
+              <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.advanced.timingTitle')}</Text>
+              <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.advanced.timingBody')}</Text>
+              {Object.entries(advanced.classical_timing || {}).map(([key, row]) => <View key={key} style={[styles.timingCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}><Text style={[styles.traceTitle, { color: colors.text }]}>{ADVANCED_TIMING_LABELS[key] || key}</Text><Text style={[styles.timingCoordinate, { color: colors.text }]}>{row.nakshatra} · {row.rashi}</Text><Text style={[styles.advancedBody, { color: colors.primary }]}>{row.raw_rekhas} × {row.shodhya_pinda} = {row.product}</Text><Text style={[styles.traceText, { color: colors.textSecondary }]}>Nakshatra group: {row.vimshottari_group?.join(', ')}{`\n`}Rāśi trines: {row.rashi_trines?.join(', ')}</Text></View>)}
+            </View>
+          </>
+        )}
+      </ScrollView>
+    );
+  };
+
+  const renderTransitDesk = () => {
+    const transit = classicalTransitData;
+    const filterOptions = [
+      ['all', t('ashtakavargaUi.labels.all')],
+      ['kakshya_ingress', t('ashtakavargaUi.labels.kakshya')],
+      ['rashi_ingress', t('ashtakavargaUi.labels.rashi')],
+      ['nakshatra_ingress', 'Nakshatra'],
+      ['direction_station', t('ashtakavargaUi.labels.stations')],
+    ];
+    const eventLabels = {
+      kakshya_ingress: t('ashtakavargaUi.labels.kakshya'),
+      rashi_ingress: t('ashtakavargaUi.labels.rashi'),
+      nakshatra_ingress: 'Nakshatra',
+      direction_station: t('ashtakavargaUi.labels.stations'),
+    };
+    const allEvents = transit?.calendar_window?.events || [];
+    const visibleEvents = transitEventFilter === 'all'
+      ? allEvents
+      : allEvents.filter((row) => row.type === transitEventFilter);
+
+    const sensitiveLabel = (row) => {
+      if (row?.sensitive_timing?.double_match) return 'Rāśi + Nakshatra ✓';
+      if (row?.sensitive_timing?.rashi_match) return 'Rāśi ✓';
+      if (row?.sensitive_timing?.nakshatra_match) return 'Nakshatra ✓';
+      return '—';
+    };
+
+    return (
+      <ScrollView style={styles.tabContent} contentContainerStyle={styles.advancedContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.titleContainer}>
+          <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>{t('ashtakavargaUi.transit.eyebrow').toUpperCase()}</Text>
+          <Text style={[styles.mapTitle, { color: colors.text }]}>{t('ashtakavargaUi.transit.title')}</Text>
+          <Text style={[styles.mapSubtitle, { color: colors.textSecondary }]}>{t('ashtakavargaUi.transit.subtitle')}</Text>
+        </View>
+
+        <DateNavigator
+          date={selectedDate}
+          onDateChange={setSelectedDate}
+          cosmicTheme={true}
+          resetDate={new Date()}
+        />
+
+        <View style={[styles.advancedCard, themedSurface]}>
+          <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.advanced.convention')}</Text>
+          <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.transit.profileBody')}</Text>
+          <View style={styles.profileButtonRow}>
+            {ASHTAKVARGA_PROFILES.map((profile) => {
+              const active = ashtakavargaProfile === profile.id;
+              return (
+                <TouchableOpacity
+                  key={profile.id}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => setAshtakavargaProfile(profile.id)}
+                  style={[styles.profileButton, { backgroundColor: active ? colors.primary : colors.surfaceMuted, borderColor: active ? colors.primary : colors.borderStrong }]}
+                >
+                  <Text style={[styles.profileButtonTitle, { color: active ? colors.onPrimary : colors.text }]}>{profile.label}</Text>
+                  <Text style={[styles.profileButtonDetail, { color: active ? colors.onPrimary : colors.textSecondary }]}>Ekādhipatya · 7 grahas{profile.id === 'parasharas_light_7' ? ' · Lagna' : ''}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={[styles.advancedAudit, { color: colors.textSecondary }]}>{transitDeskLoading ? t('ashtakavargaUi.transit.recalculating') : t('ashtakavargaUi.transit.calculation', { school: transit?.convention?.school || 'BAV/SAV/Prastara' })}</Text>
+        </View>
+
+        {transitDeskLoading ? (
+          <View style={[styles.transitLoadingCard, themedSurface]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.transit.resolving')}</Text>
+          </View>
+        ) : !transit ? (
+          <View style={[styles.advancedCard, themedSurface]}>
+            <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.transit.unavailable')}</Text>
+            <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.transit.unavailableBody')}</Text>
+          </View>
+        ) : (
+          <>
+            <View style={[styles.advancedCard, themedSurface]}>
+              <Text style={[styles.advancedEyebrow, { color: colors.primary }]}>{t('ashtakavargaUi.transit.snapshot').toUpperCase()}</Text>
+              <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.transit.snapshot')}</Text>
+              <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.transit.snapshotBody')}</Text>
+              {(transit.planet_transits || []).map((row) => (
+                <View key={row.planet} style={[styles.transitSnapshotCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.borderStrong }]}>
+                  <View style={styles.advancedCardHeader}>
+                    <Text style={[styles.kakshyaPlanet, { color: colors.text }]}>{row.planet} · {row.retrograde ? t('ashtakavargaUi.labels.retrograde') : t('ashtakavargaUi.labels.direct')}</Text>
+                    <Text style={[styles.transitHouse, { color: colors.primary }]}>{t('ashtakavargaUi.labels.natalHouse', { house: row.natal_house })}</Text>
+                  </View>
+                  <Text style={[styles.kakshyaCoordinate, { color: colors.text }]}>{row.sign} {Number(row.degree_in_sign || 0).toFixed(2)}°</Text>
+                  <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{row.nakshatra}</Text>
+                  <View style={styles.transitMetricRow}>
+                    <View style={[styles.transitMetric, { borderColor: colors.borderStrong }]}><Text style={[styles.transitMetricLabel, { color: colors.textSecondary }]}>{t('ashtakavargaUi.labels.natalBav')}</Text><Text style={[styles.transitMetricValue, { color: colors.text }]}>{row.natal_bav_bindus}</Text></View>
+                    <View style={[styles.transitMetric, { borderColor: colors.borderStrong }]}><Text style={[styles.transitMetricLabel, { color: colors.textSecondary }]}>{t('ashtakavargaUi.labels.natalSav')}</Text><Text style={[styles.transitMetricValue, { color: colors.text }]}>{row.natal_sav_bindus}</Text></View>
+                    <View style={[styles.transitMetric, { borderColor: row.kakshya?.active ? colors.success : colors.borderStrong }]}><Text style={[styles.transitMetricLabel, { color: colors.textSecondary }]}>{t('ashtakavargaUi.labels.kakshya')}</Text><Text style={[styles.transitMetricValue, { color: row.kakshya?.active ? colors.success : colors.text }]}>K{row.kakshya?.kakshya_number}</Text><Text style={[styles.transitMetricBand, { color: colors.textSecondary }]}>{row.kakshya?.kakshya_ruler} · {row.kakshya?.active ? t('ashtakavargaUi.labels.bindu') : t('ashtakavargaUi.labels.noBindu')}</Text></View>
+                  </View>
+                  <Text style={[styles.transitSensitiveLine, { color: row.sensitive_timing?.rashi_match || row.sensitive_timing?.nakshatra_match ? colors.primary : colors.textSecondary }]}>{sensitiveLabel(row)}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={[styles.advancedCard, themedSurface]}>
+              <View style={styles.advancedCardHeader}>
+                <View>
+                  <Text style={[styles.advancedEyebrow, { color: colors.primary }]}>{t('ashtakavargaUi.transit.current').toUpperCase()}</Text>
+                  <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.transit.current')}</Text>
+                </View>
+                <Text style={[styles.transitHitCount, { color: colors.primary }]}>{transit.sensitive_hits?.length || 0}/7</Text>
+              </View>
+              {transit.sensitive_hits?.length ? transit.sensitive_hits.map((row) => (
+                <View key={row.planet} style={[styles.transitHitCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.borderStrong }]}>
+                  <Text style={[styles.traceTitle, { color: colors.text }]}>{row.planet}</Text>
+                  <Text style={[styles.timingCoordinate, { color: colors.text }]}>{row.sign} · {row.nakshatra}</Text>
+                  <Text style={[styles.traceText, { color: colors.textSecondary }]}>Rāśi {row.sensitive_timing?.rashi_match ? '✓' : '—'} · Nakshatra {row.sensitive_timing?.nakshatra_match ? '✓' : '—'}{`\n`}→ {row.sensitive_timing?.reference_rashi} · {row.sensitive_timing?.reference_nakshatra}</Text>
+                </View>
+              )) : <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.transit.noMatch')}</Text>}
+            </View>
+
+            <View style={[styles.advancedCard, themedSurface]}>
+              <Text style={[styles.advancedEyebrow, { color: colors.primary }]}>{t('ashtakavargaUi.transit.nextDays', { days: transit.calendar_window?.days }).toUpperCase()}</Text>
+              <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.transit.nextDays', { days: transit.calendar_window?.days })}</Text>
+              <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.transit.boundaryBody')}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.transitFilterRow}>
+                {filterOptions.map(([id, label]) => {
+                  const active = transitEventFilter === id;
+                  return <TouchableOpacity key={id} onPress={() => setTransitEventFilter(id)} style={[styles.transitFilterChip, { backgroundColor: active ? colors.primary : colors.surfaceMuted, borderColor: active ? colors.primary : colors.borderStrong }]}><Text style={[styles.transitFilterText, { color: active ? colors.onPrimary : colors.textSecondary }]}>{label}</Text></TouchableOpacity>;
+                })}
+              </ScrollView>
+              {visibleEvents.length ? visibleEvents.map((event, index) => (
+                <View key={`${event.timestamp_utc}-${event.planet}-${event.type}-${index}`} style={[styles.transitEventCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.borderStrong }]}>
+                  <Text style={[styles.transitEventTime, { color: colors.primary }]}>{new Date(event.timestamp_utc).toLocaleString()}</Text>
+                  <Text style={[styles.traceTitle, { color: colors.text }]}>{event.planet} · {eventLabels[event.type] || event.type}</Text>
+                  <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{event.sign} · {event.nakshatra} · K{event.kakshya_number} {event.kakshya_ruler}</Text>
+                  <Text style={[styles.traceText, { color: colors.textSecondary }]}>{t('ashtakavargaUi.labels.natalBav')} {event.natal_bav_bindus} · {t('ashtakavargaUi.labels.natalSav')} {event.natal_sav_bindus} · {t('ashtakavargaUi.labels.kakshya')} {event.kakshya_bindu ? t('ashtakavargaUi.labels.bindu') : t('ashtakavargaUi.labels.noBindu')}{event.sensitive_timing?.double_match ? ' · Rāśi + Nakshatra ✓' : event.sensitive_timing?.rashi_match ? ' · Rāśi ✓' : event.sensitive_timing?.nakshatra_match ? ' · Nakshatra ✓' : ''}</Text>
+                </View>
+              )) : <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.transit.noEvents')}</Text>}
+            </View>
+
+            <View style={[styles.transitGuardrail, { backgroundColor: colors.surfaceMuted, borderColor: colors.borderStrong }]}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+              <Text style={[styles.transitGuardrailText, { color: colors.textSecondary }]}>{t('ashtakavargaUi.transit.guardrail')}</Text>
+            </View>
+          </>
+        )}
+      </ScrollView>
+    );
+  };
+
   const renderActiveTab = () => {
     const tabKey = ASHTAKVARGA_TABS[activeTab]?.key;
     if (tabKey === 'ai') return renderOraclesPulse();
     if (tabKey === 'bav') return renderBavTab();
     if (tabKey === 'matrix') return renderCombinedMatrixTab();
+    if (tabKey === 'advanced') return renderAdvancedTab();
+    if (tabKey === 'transit') return renderTransitDesk();
     return renderDestinyMap();
   };
 
@@ -1579,7 +1889,7 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
           </SafeAreaView>
           ) : null}
 
-          <View style={[styles.tabNavigation, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }, embedded && styles.tabNavigationEmbedded]}>
+          <View style={[styles.tabNavigation, { backgroundColor: colors.surfaceRaised, borderColor: colors.borderStrong }, embedded && styles.tabNavigationEmbedded]}>
             {ASHTAKVARGA_TABS.map((tab, index) => {
               const isActive = activeTab === index;
               return (
@@ -1588,23 +1898,23 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
                   style={[
                     styles.tab,
                     isActive && styles.activeTab,
-                    { backgroundColor: isActive ? colors.selectionSurface : 'transparent' },
+                    { backgroundColor: isActive ? colors.primary : 'transparent' },
                   ]}
                   onPress={() => setActiveTab(index)}
                 >
                   <Ionicons
                     name={tab.icon}
                     size={18}
-                    color={isActive ? colors.selectionText : colors.textSecondary}
+                    color={isActive ? colors.onPrimary : colors.textSecondary}
                   />
                   <Text
                     style={[
                       styles.tabText,
-                      { color: isActive ? colors.selectionText : colors.textSecondary },
+                      { color: isActive ? colors.onPrimary : colors.textSecondary },
                       isActive && styles.activeTabText,
                     ]}
                   >
-                    {tab.label}
+                    {t(`ashtakavargaUi.tabs.${tab.labelKey}`)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -3267,5 +3577,286 @@ const styles = {
   infoText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  advancedContent: {
+    paddingBottom: 32,
+  },
+  advancedCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 15,
+    marginBottom: 12,
+  },
+  advancedCardTitle: {
+    ...typographyTokens.display,
+    fontSize: 21,
+    lineHeight: 26,
+    marginBottom: 5,
+  },
+  advancedBody: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  advancedEyebrow: {
+    ...typographyTokens.eyebrow,
+    marginBottom: 6,
+  },
+  profileButtonRow: {
+    flexDirection: 'row',
+    gap: 7,
+    marginTop: 11,
+  },
+  profileButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  profileButtonTitle: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '900',
+  },
+  profileButtonDetail: {
+    fontSize: 9,
+    lineHeight: 12,
+    marginTop: 3,
+  },
+  advancedAudit: {
+    fontSize: 9,
+    lineHeight: 13,
+    marginTop: 8,
+  },
+  advancedAction: {
+    alignSelf: 'flex-start',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginTop: 12,
+  },
+  advancedTableScroll: {
+    marginTop: 12,
+  },
+  advancedTableRow: {
+    flexDirection: 'row',
+    minHeight: 38,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+  },
+  advancedTableHeader: {
+    minHeight: 40,
+  },
+  advancedTableCell: {
+    width: 64,
+    textAlign: 'right',
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  advancedTableFirstCell: {
+    width: 76,
+    textAlign: 'left',
+    fontWeight: '800',
+  },
+  advancedTableStrong: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  advancedPlanetChips: {
+    gap: 6,
+    paddingVertical: 10,
+  },
+  advancedPlanetChip: {
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+  },
+  reductionRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    minHeight: 36,
+    borderBottomWidth: 1,
+  },
+  reductionLabel: {
+    width: 112,
+    paddingVertical: 9,
+    paddingHorizontal: 7,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  reductionCell: {
+    width: 34,
+    paddingVertical: 9,
+    textAlign: 'center',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  traceBlock: {
+    borderRadius: 12,
+    padding: 11,
+    marginTop: 10,
+  },
+  traceTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    marginBottom: 5,
+  },
+  traceText: {
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 2,
+  },
+  advancedSubheading: {
+    ...typographyTokens.display,
+    fontSize: 18,
+    marginTop: 18,
+    marginBottom: 4,
+  },
+  kakshyaCard: {
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 9,
+  },
+  advancedCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  kakshyaPlanet: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  kakshyaStatus: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.7,
+  },
+  kakshyaCoordinate: {
+    ...typographyTokens.display,
+    fontSize: 18,
+    marginTop: 4,
+  },
+  timingCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 9,
+  },
+  timingCoordinate: {
+    ...typographyTokens.display,
+    fontSize: 18,
+    marginBottom: 3,
+  },
+  transitLoadingCard: {
+    minHeight: 150,
+    borderWidth: 1,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  transitSnapshotCard: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 10,
+  },
+  transitHouse: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  transitMetricRow: {
+    flexDirection: 'row',
+    gap: 7,
+    marginTop: 10,
+  },
+  transitMetric: {
+    flex: 1,
+    minHeight: 76,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+  },
+  transitMetricLabel: {
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  transitMetricValue: {
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '900',
+  },
+  transitMetricBand: {
+    fontSize: 8,
+    lineHeight: 11,
+    textTransform: 'capitalize',
+  },
+  transitSensitiveLine: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '800',
+    marginTop: 10,
+    textTransform: 'capitalize',
+  },
+  transitHitCount: {
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  transitHitCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 11,
+    marginTop: 9,
+  },
+  transitFilterRow: {
+    gap: 7,
+    paddingVertical: 12,
+  },
+  transitFilterChip: {
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  transitFilterText: {
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  transitEventCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 11,
+    marginBottom: 8,
+  },
+  transitEventTime: {
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  transitGuardrail: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 13,
+    marginBottom: 12,
+  },
+  transitGuardrailText: {
+    flex: 1,
+    fontSize: 10,
+    lineHeight: 15,
   },
 };

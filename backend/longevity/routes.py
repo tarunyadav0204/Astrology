@@ -18,6 +18,7 @@ class LongevityRequest(BaseModel):
     chart_data: Optional[Dict[str, Any]] = None
     horizon_years: int = Field(default=12, ge=1, le=30)
     subject: Literal["self", "mother", "father"] = "self"
+    ashtakavarga_profile: Literal["pvr_narasimha_rao", "parasharas_light_7"] = "pvr_narasimha_rao"
 
 
 @router.post("/calculate")
@@ -29,7 +30,12 @@ async def calculate_longevity(
     require_entitlement(current_user, ASTROLOGER_TOOLS_ENTITLEMENT)
     try:
         chart = request.chart_data or calculate_chart_for_birth(request.birth_data)
-        result = LongevityCalculator(request.birth_data, chart, subject=request.subject).calculate(horizon_years=request.horizon_years)
+        result = LongevityCalculator(
+            request.birth_data,
+            chart,
+            subject=request.subject,
+            ashtakavarga_profile=request.ashtakavarga_profile,
+        ).calculate(horizon_years=request.horizon_years)
         return {"success": True, "result": result}
     except (KeyError, TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=f"Unable to calculate longevity: {exc}") from exc

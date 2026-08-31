@@ -132,5 +132,8 @@ backend/gcp_key.json
 !package-lock.json
 !astroroshni_mobile/src/locales/*.json
 !backend/whatsapp/flows/registration_flow.json
+!backend/longevity/classical_rule_registry.json
+!backend/longevity/validation_data/
+!backend/longevity/validation_data/*.json
 !frontend/public/.well-known/
 !frontend/public/.well-known/assetlinks.json

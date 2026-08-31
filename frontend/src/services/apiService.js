@@ -116,12 +116,13 @@ apiClient.interceptors.response.use(
 );
 
 export const apiService = {
-  calculateLongevity: async ({ birthData, chartData, horizonYears = 12, subject = 'self' }) => {
+  calculateLongevity: async ({ birthData, chartData, horizonYears = 12, subject = 'self', ashtakavargaProfile = 'pvr_narasimha_rao' }) => {
     const response = await apiClient.post(getEndpoint('/longevity/calculate'), {
       birth_data: birthData,
       chart_data: chartData,
       horizon_years: horizonYears,
       subject,
+      ashtakavarga_profile: ashtakavargaProfile,
     });
     return response.data;
   },

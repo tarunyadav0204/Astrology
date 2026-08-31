@@ -107,7 +107,12 @@ class ChartCalculator(BaseCalculator):
         latitude_input = getattr(birth_data, 'latitude', None)
         longitude_input = getattr(birth_data, 'longitude', None)
         
-        tz_offset = parse_timezone_offset(timezone_input, latitude_input, longitude_input)
+        tz_offset = parse_timezone_offset(
+            timezone_input,
+            latitude_input,
+            longitude_input,
+            for_date=getattr(birth_data, 'date', None),
+        )
         tz_end = time.time()
         # print(f"[CALC] Timezone calculation took {tz_end - tz_start:.3f}s")
         
