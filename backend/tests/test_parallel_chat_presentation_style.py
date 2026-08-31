@@ -3,6 +3,7 @@ from ai.parallel_chat.presentation_style import (
     build_simple_merge_depth_instruction,
     build_simple_merge_instruction,
     build_simple_merge_response_format,
+    build_simple_relational_structure_instruction,
     normalize_merge_response_style,
 )
 from ai.parallel_chat.orchestrator import _merge_instruction_blocks
@@ -81,6 +82,69 @@ def test_final_simple_override_wins_over_later_timing_contracts():
     assert "Executive Summary" in simple
     assert "Ranked Potential Windows" in simple
     assert "translate that content into the Simple format" in simple
+
+
+def test_simple_relational_structure_requires_visible_question_shaped_sections():
+    general = build_simple_relational_structure_instruction(
+        "simple",
+        {
+            "question_mode": "general_answer",
+            "event_topic": "general_relationship",
+            "timing_request": {"requested_granularity": "none"},
+        },
+    )
+
+    assert "MUST use 4-6 short Markdown level-2 headings" in general
+    assert "Derive the section plan afresh from the exact CURRENT QUESTION every time" in general
+    assert "For a broad bond question" in general
+    assert "not a timing request" in general
+    assert "Do not add a dated forecast" in general
+    assert build_simple_relational_structure_instruction("technical", {}) == ""
+
+
+def test_simple_relational_timing_structure_keeps_timing_section_when_requested():
+    timing = build_simple_relational_structure_instruction(
+        "simple",
+        {
+            "question_mode": "predictive_timing",
+            "event_topic": "reconciliation_return",
+            "timing_request": {"requested_granularity": "month"},
+        },
+    )
+
+    assert "exact requested event, decision, behavior, time horizon" in timing
+    assert "because the question asks for timing" in timing
+
+
+def test_specific_relational_event_does_not_receive_generic_bond_sections():
+    legal = build_simple_relational_structure_instruction(
+        "simple",
+        {
+            "relation_family": "spouse_romantic",
+            "question_mode": "predictive_yes_no",
+            "event_topic": "legal_confinement",
+            "timing_request": {"requested_granularity": "day"},
+        },
+    )
+
+    assert "select the astrological evidence and safety lens" in legal
+    assert "spouse question about tomorrow's legal filing" in legal
+    assert "not sections about emotional bonding or chemistry" in legal
+
+
+def test_unknown_relational_event_still_uses_the_exact_question_for_sections():
+    unknown = build_simple_relational_structure_instruction(
+        "simple",
+        {
+            "relation_family": "spouse_romantic",
+            "question_mode": "general_answer",
+            "event_topic": "general_relationship",
+            "timing_request": {"requested_granularity": "none"},
+        },
+    )
+
+    assert "even when its internal event topic is general or unknown" in unknown
+    assert "must never be imposed on a specific event question" in unknown
 
 
 def test_legacy_single_prompt_honors_simple_without_changing_technical_path():

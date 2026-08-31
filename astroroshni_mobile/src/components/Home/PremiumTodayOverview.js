@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
   timingCostText: { fontSize: 10, fontWeight: '900' },
   timingSpotlightBody: { fontSize: 12, lineHeight: 18, marginTop: 8, marginBottom: 16, maxWidth: 320 },
   timingChoices: { flexDirection: 'row', gap: 10 },
-  timingChoice: { flex: 1, minWidth: 0, minHeight: 176, borderWidth: 1, borderRadius: 18, padding: 13 },
+  timingChoice: { flex: 1, minWidth: 0, minHeight: 176, borderWidth: 1, borderRadius: 18, padding: 13, overflow: 'hidden' },
   timingChoiceIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   timingChoiceTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 18, lineHeight: 21, marginBottom: 6 },
   timingChoiceBody: { fontSize: 10, lineHeight: 15, fontWeight: '500', flexGrow: 1 },

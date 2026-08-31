@@ -154,6 +154,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [eventPredictions, setEventPredictions] = useState(null);
   const [selectedEventType, setSelectedEventType] = useState('marriage');
+  const [selectedAdvancedPlanet, setSelectedAdvancedPlanet] = useState('Saturn');
   const ashtakRequestIdRef = useRef(0);
   const transitRequestIdRef = useRef(0);
   const eventsRequestIdRef = useRef(0);
@@ -411,7 +412,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
     }
 
     if (chartType === 'lagna') {
-      return [...baseTabs, { id: 'analysis', label: 'Predictions', icon: '✦' }];
+      return [...baseTabs, { id: 'advanced', label: short('Kakshya & Pinda', 'Pinda'), icon: '⌘' }, { id: 'analysis', label: 'Predictions', icon: '✦' }];
     }
     if (chartType === 'navamsa') {
       return [...baseTabs, { id: 'analysis', label: short('Marriage Analysis', 'Marriage') }];
@@ -421,6 +422,65 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
     }
     return [...baseTabs, { id: 'analysis', label: short('General Analysis', 'Analysis') }];
   }, [chartType, viewMode, isMobileLayout]);
+
+  const renderAdvancedAshtakavarga = () => {
+    const advanced = ashtakavargaData?.advanced_ashtakavarga;
+    if (!advanced) return <div className="loading"><p>Advanced Ashtakavarga data is unavailable.</p></div>;
+    const planets = MATRIX_PLANETS.map(({ key }) => key);
+    const selected = advanced.shodhya_pinda?.[selectedAdvancedPlanet];
+    const selectedPrastara = advanced.prastara?.[selectedAdvancedPlanet];
+    const timingLabels = {
+      father: 'Father · Sun H9', mother: 'Mother · Moon H4', siblings: 'Siblings · Mars H3',
+      profession: 'Profession · Mercury H10', children: 'Children · Jupiter H5',
+      marriage: 'Marriage · Venus H7', longevity: 'Longevity · Saturn H8',
+    };
+    const reductionRows = [
+      ['Raw BAV', selected?.raw_bav],
+      ['After Trikona', selected?.after_trikona],
+      ['After Ekadhipatya', selected?.after_ekadhipatya],
+    ];
+    return <div className="av-advanced">
+      <section className="av-advanced__intro">
+        <div><p>Classical reduction chain</p><h3>Kakshya, Prastara & Shodhya Pinda</h3></div>
+        <span>{advanced.convention?.school}</span>
+      </section>
+
+      <section className="av-advanced__panel">
+        <div className="av-advanced__heading"><div><p>Purified planetary aggregates</p><h4>Shodhya Pinda table</h4></div><small>Rāśi Pinda + Graha Pinda</small></div>
+        <div className="av-advanced__table-wrap"><table className="av-advanced__table"><thead><tr><th>Graha</th><th>Raw</th><th>Reduced</th><th>Rāśi</th><th>Graha</th><th>Shodhya</th></tr></thead><tbody>
+          {planets.map((planet) => { const row = advanced.shodhya_pinda?.[planet]; return <tr key={planet} className={selectedAdvancedPlanet === planet ? 'selected' : ''} onClick={() => setSelectedAdvancedPlanet(planet)}><th>{planet}</th><td>{Object.values(row?.raw_bav || {}).reduce((sum, value) => sum + Number(value), 0)}</td><td>{Object.values(row?.after_ekadhipatya || {}).reduce((sum, value) => sum + Number(value), 0)}</td><td>{row?.rashi_pinda}</td><td>{row?.graha_pinda}</td><td><b>{row?.shodhya_pinda}</b></td></tr>; })}
+        </tbody></table></div>
+      </section>
+
+      <section className="av-advanced__panel">
+        <div className="av-advanced__heading"><div><p>Auditable calculation</p><h4>{selectedAdvancedPlanet} reduction inspector</h4></div><small>Tap another graha in the table above</small></div>
+        <div className="av-reduction-grid">
+          <div className="av-reduction-grid__head"><span>Stage</span>{signNames.map((sign) => <b key={sign}>{sign.slice(0, 2)}</b>)}</div>
+          {reductionRows.map(([label, values]) => <div className="av-reduction-grid__row" key={label}><span>{label}</span>{Array.from({ length: 12 }, (_, sign) => <b key={sign}>{values?.[String(sign)] ?? 0}</b>)}</div>)}
+        </div>
+        <div className="av-reduction-trace">
+          <div><b>Trikona Shodhana</b>{selected?.trikona_trace?.map((row) => <span key={row.signs.join('-')}>{row.signs.join(' · ')}: {row.before.join('/')} → {row.after.join('/')} ({row.action.replaceAll('_', ' ')})</span>)}</div>
+          <div><b>Ekadhipatya Shodhana</b>{selected?.ekadhipatya_trace?.map((row) => <span key={row.lord}>{row.signs.join(' · ')}: {row.before.join('/')} → {row.after.join('/')} ({row.action.replaceAll('_', ' ')})</span>)}</div>
+        </div>
+        <div className="av-advanced__heading av-advanced__heading--sub"><div><p>Eight contributors × twelve signs</p><h4>{selectedAdvancedPlanet} Prastara matrix</h4></div><small>Each column sums to the corresponding raw BAV value</small></div>
+        <div className="av-reduction-grid av-prastara-grid">
+          <div className="av-reduction-grid__head"><span>Contributor</span>{signNames.map((sign) => <b key={sign}>{sign.slice(0, 2)}</b>)}</div>
+          {selectedPrastara?.contributors?.map((contributor) => <div className="av-reduction-grid__row" key={contributor}><span>{contributor}</span>{Array.from({ length: 12 }, (_, sign) => <b className={selectedPrastara.matrix?.[contributor]?.[String(sign)] ? 'has-bindu' : ''} key={sign}>{selectedPrastara.matrix?.[contributor]?.[String(sign)] ?? 0}</b>)}</div>)}
+          <div className="av-reduction-grid__row av-prastara-total"><span>BAV total</span>{Array.from({ length: 12 }, (_, sign) => <b key={sign}>{selectedPrastara?.sign_totals?.[String(sign)] ?? 0}</b>)}</div>
+        </div>
+      </section>
+
+      <section className="av-advanced__panel">
+        <div className="av-advanced__heading"><div><p>Exact 3°45′ orbital zones</p><h4>Natal Kakshya activation</h4></div><small>Bindu is read from the named ruler’s Prastara row</small></div>
+        <div className="av-kakshya-grid">{planets.map((planet) => { const row = advanced.natal_kakshya?.[planet]; return <article key={planet} className={row?.active ? 'active' : 'inactive'}><header><b>{planet}</b><em>{row?.active ? 'Bindu' : 'No bindu'}</em></header><strong>{row?.sign} {Number(row?.degree_in_sign || 0).toFixed(2)}°</strong><span>K{row?.kakshya_number} · {row?.kakshya_ruler}</span><small>{row?.start_degree}° ≤ degree &lt; {row?.end_degree}° · sign BAV {row?.sign_bav_total}</small></article>; })}</div>
+      </section>
+
+      <section className="av-advanced__panel">
+        <div className="av-advanced__heading"><div><p>Rekhas × Shodhya Pinda</p><h4>Classical transit timing coordinates</h4></div><small>Remainders 0 map to 27 / 12</small></div>
+        <div className="av-timing-grid">{Object.entries(advanced.classical_timing || {}).map(([key, row]) => <article key={key}><b>{timingLabels[key] || key}</b><strong>{row.nakshatra} · {row.rashi}</strong><span>{row.raw_rekhas} × {row.shodhya_pinda} = {row.product}</span><small>Nakshatra group: {row.vimshottari_group?.join(', ')}<br />Rāśi trines: {row.rashi_trines?.join(', ')}</small></article>)}</div>
+      </section>
+    </div>;
+  };
 
   useEffect(() => {
     if (viewMode !== 'transit') return;
@@ -1519,6 +1579,7 @@ const AshtakavargaModal = ({ isOpen, onClose, birthData, chartType, transitDate,
             {activeTab === 'matrix' && renderBinduMatrix()}
             {activeTab === 'sarva' && renderSarvashtakavarga()}
             {activeTab === 'individual' && renderIndividualCharts()}
+            {activeTab === 'advanced' && renderAdvancedAshtakavarga()}
             {activeTab === 'recommendations' && renderTransitRecommendations()}
             {activeTab === 'events' && renderEventPredictions()}
             {activeTab === 'analysis' && renderAnalysis()}

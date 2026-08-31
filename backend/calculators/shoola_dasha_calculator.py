@@ -83,7 +83,7 @@ class ShoolaDashaCalculator(BaseCalculator):
             start_time = end_time
 
         return {
-            "type": "Matri Shoola" if relative_house_idx == 3 else "Shoola Dasha",
+            "type": "Matri Shoola" if relative_house_idx == 3 else "Pitri Shoola" if relative_house_idx == 8 else "Shoola Dasha",
             "start_sign": self.sign_names[start_sign_idx],
             "direction": "Forward" if is_forward else "Backward",
             "current_period": current_period_info,

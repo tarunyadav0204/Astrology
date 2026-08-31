@@ -125,6 +125,7 @@ const PanchangPage = lazy(() => import('./components/Panchang/PanchangPage'));
 const HoroscopePage = lazy(() => import('./components/Horoscope/HoroscopePage'));
 const AstroRoshniPage = lazy(() => import('./components/AstroRoshni/AstroRoshniPage'));
 const AnalysisDetailPage = lazy(() => import('./components/Analysis/AnalysisDetailPage'));
+const LongevityPage = lazy(() => import('./components/Longevity/LongevityPage'));
 const MuhuratFinderPage = lazy(() => import('./components/MuhuratFinder/MuhuratFinderPage'));
 const ChatPage = lazy(() => import('./components/Chat/ChatPage'));
 const SpeechChatPage = lazy(() => import('./components/Chat/SpeechChatPage'));
@@ -876,6 +877,14 @@ function App() {
                   onAuthenticated={handleLogin}
                 />
               </>
+            } />
+            <Route path="/longevity" element={
+              <LongevityPage
+                user={user}
+                onLogout={user ? handleLogout : undefined}
+                onAdminClick={user ? handleAdminClick : undefined}
+                onLogin={() => { setAuthView('login'); setShowLoginModal(true); }}
+              />
             } />
             <Route path="/wealth-analysis" element={
               <>

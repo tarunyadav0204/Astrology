@@ -1,6 +1,31 @@
 import swisseph as swe
 
 
+CLASSICAL_PLANETS = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+KAKSHYA_RULERS = ['Saturn', 'Jupiter', 'Mars', 'Sun', 'Venus', 'Mercury', 'Moon', 'Ascendant']
+TRIKONA_GROUPS = ((0, 4, 8), (1, 5, 9), (2, 6, 10), (3, 7, 11))
+EKADHIPATYA_PAIRS = {
+    'Mars': (0, 7), 'Venus': (1, 6), 'Mercury': (2, 5),
+    'Jupiter': (8, 11), 'Saturn': (9, 10),
+}
+# Parashara convention used by P.V.R. Narasimha Rao/Jagannatha Hora.
+RASHI_MULTIPLIERS = (7, 10, 8, 4, 10, 6, 7, 8, 9, 5, 11, 12)
+GRAHA_MULTIPLIERS = {
+    'Sun': 5, 'Moon': 5, 'Mars': 8, 'Mercury': 5,
+    'Jupiter': 10, 'Venus': 7, 'Saturn': 5,
+}
+SIGN_NAMES = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+              'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
+NAKSHATRA_NAMES = [
+    'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra',
+    'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni',
+    'Uttara Phalguni', 'Hasta', 'Chitra', 'Swati', 'Vishakha',
+    'Anuradha', 'Jyeshtha', 'Mula', 'Purva Ashadha', 'Uttara Ashadha',
+    'Shravana', 'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada',
+    'Uttara Bhadrapada', 'Revati',
+]
+
+
 def _safe_gemini_response_text(response):
     """
     Read text from a google-generativeai GenerateContentResponse.
@@ -201,6 +226,237 @@ class AshtakavargaCalculator:
                 for i in range(12)
             },
         }
+
+    def calculate_prastara_ashtakavarga(self, target_planet):
+        """Return the classical 8×12 contributor matrix behind one BAV.
+
+        A value of one means the contributor (and therefore its Kakshya) gives
+        a rekha/bindu to the target planet in that zodiac sign.
+        """
+        if target_planet not in self.contribution_rules:
+            return {}
+        matrix = {contributor: {str(sign): 0 for sign in range(12)} for contributor in KAKSHYA_RULERS}
+        for contributor, beneficial_houses in self.contribution_rules[target_planet].items():
+            if contributor == 'Ascendant':
+                contributor_sign = int(self.chart_data['ascendant'] / 30) % 12
+            else:
+                contributor_sign = int(self.planets[contributor]['sign']) % 12
+            for house_num in beneficial_houses:
+                sign = (contributor_sign + house_num - 1) % 12
+                matrix[contributor][str(sign)] = 1
+        sign_totals = {
+            str(sign): sum(matrix[contributor][str(sign)] for contributor in KAKSHYA_RULERS)
+            for sign in range(12)
+        }
+        return {
+            'planet': target_planet,
+            'contributors': KAKSHYA_RULERS,
+            'matrix': matrix,
+            'sign_totals': sign_totals,
+        }
+
+    def calculate_kakshya_activation(self, target_planet, longitude):
+        """Resolve an exact longitude against a target planet's Prastara AV."""
+        prastara = self.calculate_prastara_ashtakavarga(target_planet)
+        if not prastara:
+            return {}
+        normalized = float(longitude) % 360.0
+        sign = int(normalized // 30) % 12
+        degree = normalized - sign * 30
+        index = min(7, int(degree // 3.75))
+        ruler = KAKSHYA_RULERS[index]
+        start = index * 3.75
+        end = (index + 1) * 3.75
+        bindu = int(prastara['matrix'][ruler][str(sign)])
+        return {
+            'planet': target_planet,
+            'longitude': round(normalized, 8),
+            'sign_id': sign,
+            'sign': SIGN_NAMES[sign],
+            'degree_in_sign': round(degree, 8),
+            'kakshya_number': index + 1,
+            'kakshya_ruler': ruler,
+            'start_degree': start,
+            'end_degree': end,
+            'interval': '[start, end)',
+            'bindu': bindu,
+            'active': bindu == 1,
+            'sign_bav_total': int(prastara['sign_totals'][str(sign)]),
+        }
+
+    @staticmethod
+    def apply_trikona_shodhana(values):
+        """Apply Parashara's trinal reduction to a 12-sign BAV vector."""
+        reduced = [int(values[i] if not isinstance(values, dict) else values.get(i, values.get(str(i), 0))) for i in range(12)]
+        trace = []
+        for signs in TRIKONA_GROUPS:
+            before = [reduced[sign] for sign in signs]
+            minimum = min(before)
+            if minimum == 0:
+                action = 'unchanged_zero_present'
+                after = before[:]
+            else:
+                action = 'subtract_minimum'
+                after = [value - minimum for value in before]
+                for sign, value in zip(signs, after):
+                    reduced[sign] = value
+            trace.append({
+                'sign_ids': list(signs),
+                'signs': [SIGN_NAMES[sign] for sign in signs],
+                'before': before,
+                'minimum': minimum,
+                'after': after,
+                'action': action,
+            })
+        return reduced, trace
+
+    def apply_ekadhipatya_shodhana(self, values):
+        """Apply the co-lordship reduction after Trikona Shodhana.
+
+        Occupancy is determined only from the seven classical grahas; nodes are
+        excluded from this classical reduction.
+        """
+        reduced = [int(values[i] if not isinstance(values, dict) else values.get(i, values.get(str(i), 0))) for i in range(12)]
+        occupants = {sign: [] for sign in range(12)}
+        for planet in CLASSICAL_PLANETS:
+            occupants[int(self.planets[planet]['sign']) % 12].append(planet)
+        trace = []
+        for lord, signs in EKADHIPATYA_PAIRS.items():
+            left, right = signs
+            before = [reduced[left], reduced[right]]
+            left_occupied = bool(occupants[left])
+            right_occupied = bool(occupants[right])
+            action = 'unchanged'
+            if before[0] == 0 or before[1] == 0:
+                action = 'unchanged_zero_present'
+            elif left_occupied and right_occupied:
+                action = 'unchanged_both_occupied'
+            elif left_occupied != right_occupied:
+                occupied = left if left_occupied else right
+                empty = right if left_occupied else left
+                if reduced[empty] > reduced[occupied]:
+                    reduced[empty] = reduced[occupied]
+                    action = 'empty_reduced_to_occupied_value'
+                else:
+                    reduced[empty] = 0
+                    action = 'empty_reduced_to_zero'
+            elif before[0] == before[1]:
+                reduced[left] = reduced[right] = 0
+                action = 'both_empty_equal_reduced_to_zero'
+            elif before[0] > before[1]:
+                reduced[left] = reduced[right]
+                action = 'both_empty_higher_reduced_to_lower'
+            else:
+                reduced[right] = reduced[left]
+                action = 'both_empty_higher_reduced_to_lower'
+            trace.append({
+                'lord': lord,
+                'sign_ids': [left, right],
+                'signs': [SIGN_NAMES[left], SIGN_NAMES[right]],
+                'occupants': [occupants[left], occupants[right]],
+                'before': before,
+                'after': [reduced[left], reduced[right]],
+                'action': action,
+            })
+        return reduced, trace
+
+    def calculate_shodhya_pinda(self, target_planet):
+        """Calculate fully reduced BAV, Rashi/Graha Pinda and Shodhya Pinda."""
+        bav = self.calculate_individual_ashtakavarga(target_planet)
+        if not bav:
+            return {}
+        raw = [int(bav['bindus'][sign]) for sign in range(12)]
+        trikona, trikona_trace = self.apply_trikona_shodhana(raw)
+        shodhita, ekadhipatya_trace = self.apply_ekadhipatya_shodhana(trikona)
+        rashi_products = [shodhita[sign] * RASHI_MULTIPLIERS[sign] for sign in range(12)]
+        graha_products = []
+        for planet in CLASSICAL_PLANETS:
+            sign = int(self.planets[planet]['sign']) % 12
+            graha_products.append({
+                'planet': planet,
+                'sign_id': sign,
+                'sign': SIGN_NAMES[sign],
+                'reduced_bindus': shodhita[sign],
+                'multiplier': GRAHA_MULTIPLIERS[planet],
+                'product': shodhita[sign] * GRAHA_MULTIPLIERS[planet],
+            })
+        rashi_pinda = sum(rashi_products)
+        graha_pinda = sum(row['product'] for row in graha_products)
+        return {
+            'planet': target_planet,
+            'raw_bav': {str(i): raw[i] for i in range(12)},
+            'after_trikona': {str(i): trikona[i] for i in range(12)},
+            'after_ekadhipatya': {str(i): shodhita[i] for i in range(12)},
+            'trikona_trace': trikona_trace,
+            'ekadhipatya_trace': ekadhipatya_trace,
+            'rashi_multipliers': {str(i): RASHI_MULTIPLIERS[i] for i in range(12)},
+            'rashi_products': {str(i): rashi_products[i] for i in range(12)},
+            'graha_products': graha_products,
+            'rashi_pinda': rashi_pinda,
+            'graha_pinda': graha_pinda,
+            'shodhya_pinda': rashi_pinda + graha_pinda,
+        }
+
+    def calculate_shodhya_timing(self, target_planet, house_from_planet):
+        """Calculate Parashara's nakshatra/rashi transit trigger for one house."""
+        pinda = self.calculate_shodhya_pinda(target_planet)
+        if not pinda:
+            return {}
+        source_sign = int(self.planets[target_planet]['sign']) % 12
+        target_sign = (source_sign + int(house_from_planet) - 1) % 12
+        rekhas = int(pinda['raw_bav'][str(target_sign)])
+        product = rekhas * int(pinda['shodhya_pinda'])
+        nakshatra_number = product % 27 or 27
+        rashi_number = product % 12 or 12
+        vimshottari_group = [((nakshatra_number - 1 + offset) % 27) + 1 for offset in (0, 9, 18)]
+        rashi_trines = [((rashi_number - 1 + offset) % 12) + 1 for offset in (0, 4, 8)]
+        return {
+            'planet': target_planet,
+            'house_from_planet': int(house_from_planet),
+            'source_sign_id': source_sign,
+            'source_sign': SIGN_NAMES[source_sign],
+            'target_sign_id': target_sign,
+            'target_sign': SIGN_NAMES[target_sign],
+            'raw_rekhas': rekhas,
+            'shodhya_pinda': pinda['shodhya_pinda'],
+            'product': product,
+            'nakshatra_number': nakshatra_number,
+            'nakshatra': NAKSHATRA_NAMES[nakshatra_number - 1],
+            'vimshottari_group_numbers': vimshottari_group,
+            'vimshottari_group': [NAKSHATRA_NAMES[number - 1] for number in vimshottari_group],
+            'rashi_number': rashi_number,
+            'rashi': SIGN_NAMES[rashi_number - 1],
+            'rashi_trine_numbers': rashi_trines,
+            'rashi_trines': [SIGN_NAMES[number - 1] for number in rashi_trines],
+        }
+
+    def calculate_advanced_ashtakavarga(self):
+        """Return production-ready Prastara, Kakshya and Shodhya evidence."""
+        pindas = {planet: self.calculate_shodhya_pinda(planet) for planet in CLASSICAL_PLANETS}
+        return {
+            'schema_version': 'ashtakavarga.advanced.v1',
+            'convention': {
+                'school': 'Parashara / P.V.R. Narasimha Rao',
+                'reduction_order': ['Trikona Shodhana', 'Ekadhipatya Shodhana'],
+                'occupancy_grahas': CLASSICAL_PLANETS,
+                'kakshya_interval': '[start, end)',
+            },
+            'prastara': {planet: self.calculate_prastara_ashtakavarga(planet) for planet in CLASSICAL_PLANETS},
+            'natal_kakshya': {
+                planet: self.calculate_kakshya_activation(planet, self.planets[planet]['longitude'])
+                for planet in CLASSICAL_PLANETS
+            },
+            'shodhya_pinda': pindas,
+            'classical_timing': {
+                'father': self.calculate_shodhya_timing('Sun', 9),
+                'mother': self.calculate_shodhya_timing('Moon', 4),
+                'siblings': self.calculate_shodhya_timing('Mars', 3),
+                'profession': self.calculate_shodhya_timing('Mercury', 10),
+                'children': self.calculate_shodhya_timing('Jupiter', 5),
+                'marriage': self.calculate_shodhya_timing('Venus', 7),
+                'longevity': self.calculate_shodhya_timing('Saturn', 8),
+            },
+        }
     
     def calculate_sarvashtakavarga(self):
         """Calculate Sarvashtakavarga (combined chart)"""
@@ -208,7 +464,7 @@ class AshtakavargaCalculator:
         individual_charts = {}
         
         # Calculate for all planets
-        planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+        planets = CLASSICAL_PLANETS
         
         for planet in planets:
             chart = self.calculate_individual_ashtakavarga(planet)

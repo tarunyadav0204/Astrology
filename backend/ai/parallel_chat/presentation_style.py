@@ -7,6 +7,8 @@ calculated evidence, branch verdicts, timing windows, or confidence.
 
 from __future__ import annotations
 
+from typing import Mapping
+
 
 def normalize_merge_response_style(value: object) -> str:
     """Only an explicit ``simple`` request opts into translated presentation.
@@ -86,10 +88,48 @@ All preceding timing, ontology, specialist, and response-contract instructions c
     )
 
 
+def build_simple_relational_structure_instruction(
+    response_style: object,
+    relationship_profile: Mapping[str, object] | None,
+) -> str:
+    """Make Simple two-chart answers visibly structured without templating every question alike."""
+
+    if normalize_merge_response_style(response_style) != "simple":
+        return ""
+
+    profile = relationship_profile if isinstance(relationship_profile, Mapping) else {}
+    timing_request = profile.get("timing_request") if isinstance(profile.get("timing_request"), Mapping) else {}
+    timing_requested = str(timing_request.get("requested_granularity") or "none") != "none"
+
+    timing_rule = (
+        "Include a clearly named timing/current-phase section because the question asks for timing."
+        if timing_requested
+        else (
+            "The question is not a timing request. Do not add a dated forecast, future shift, current-dasha section, "
+            "or timing window merely because timing evidence exists."
+        )
+    )
+    return f"""
+FINAL SIMPLE RELATIONSHIP STRUCTURE — OVERRIDES THE GENERIC SIMPLE FORMAT:
+- The visible answer MUST use 4-6 short Markdown level-2 headings (`## Heading`) with substantive text under each. Do not return a wall of paragraphs with only one late heading.
+- Write every heading naturally in the answer language; the English labels below describe meaning, not mandatory wording.
+- Relationship type and the internal event classification select the astrological evidence and safety lens; neither selects a visible template. Derive the section plan afresh from the exact CURRENT QUESTION every time—even when its internal event topic is general or unknown.
+- The exact requested event, decision, behavior, time horizon, safety class and subquestions select the visible sections. Lead with the direct answer, then organize only the evidence, timing, uncertainty and practical implications that materially answer this particular question.
+- For a broad bond question, natural sections may cover the bond, each person's experience, friction and strengths. These are examples only and must never be imposed on a specific event question.
+- For a specific event, name that event in the headings where natural. For example, a spouse question about tomorrow's legal filing needs sections about the likely legal action and tomorrow's timing—not sections about emotional bonding or chemistry.
+- When CURRENT QUESTION contains multiple requested outcomes, give the primary outcome first and use a compact heading for each materially distinct subquestion instead of squeezing them into a compatibility template.
+- Keep headings user-facing and specific to the question. Never use astrology-school names, chart codes, or calculation labels as headings.
+- Do not manufacture a section when its evidence is unavailable. Combine adjacent sections if needed, but still use at least 3 meaningful headings.
+- {timing_rule}
+- Preserve all supported nuance and evidence. Structure changes readability only; it must not shorten the analysis into generic advice.
+""".strip()
+
+
 __all__ = [
     "build_simple_final_precedence_block",
     "build_simple_merge_depth_instruction",
     "build_simple_merge_instruction",
     "build_simple_merge_response_format",
+    "build_simple_relational_structure_instruction",
     "normalize_merge_response_style",
 ]

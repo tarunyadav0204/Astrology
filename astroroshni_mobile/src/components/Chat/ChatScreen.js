@@ -1012,6 +1012,7 @@ export default function ChatScreen({ navigation, route }) {
     () => hasScopedChatPalette ? { ...themeColors, ...themeColors.chatPalette } : themeColors,
     [hasScopedChatPalette, themeColors],
   );
+  const goldBarInk = colors.tabActiveColor || colors.text;
   const theme = hasScopedChatPalette ? 'light' : themeMode;
   const [fomoHomeOpen, setFomoHomeOpen] = useState(false);
   const [fomoNotificationPromptNonce, setFomoNotificationPromptNonce] = useState(0);
@@ -3032,7 +3033,7 @@ export default function ChatScreen({ navigation, route }) {
           style={styles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={[styles.partnershipModalContent, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
+          <View style={[styles.partnershipModalContent, { backgroundColor: colors.surfaceRaised || colors.headerSurface, borderColor: colors.cardBorder }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={[styles.partnershipModalIcon, { backgroundColor: colors.accentSoft }]}>
@@ -7490,24 +7491,24 @@ export default function ChatScreen({ navigation, route }) {
               style={styles.quickActionButton}
               onPress={() => setShowLanguageModal(true)}
             >
-              <Ionicons name="language-outline" size={18} color={colors.text} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.language')}</Text>
+              <Ionicons name="language-outline" size={18} color={goldBarInk} />
+              <Text style={[styles.quickActionText, { color: goldBarInk }]}>{t('quickActions.language')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.quickActionButton}
               onPress={() => navigation.navigate('ChartsHub', { birthData })}
             >
-              <Ionicons name="pie-chart-outline" size={18} color={colors.text} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.chart')}</Text>
+              <Ionicons name="pie-chart-outline" size={18} color={goldBarInk} />
+              <Text style={[styles.quickActionText, { color: goldBarInk }]}>{t('quickActions.chart')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.quickActionButton}
               onPress={() => setShowDashaBrowser(true)}
             >
-              <Ionicons name="time-outline" size={18} color={colors.text} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.dasha')}</Text>
+              <Ionicons name="time-outline" size={18} color={goldBarInk} />
+              <Text style={[styles.quickActionText, { color: goldBarInk }]}>{t('quickActions.dasha')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -7520,16 +7521,16 @@ export default function ChatScreen({ navigation, route }) {
                 }
               }}
             >
-              <Ionicons name="people-outline" size={18} color={colors.text} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.partner')}</Text>
+              <Ionicons name="people-outline" size={18} color={goldBarInk} />
+              <Text style={[styles.quickActionText, { color: goldBarInk }]}>{t('quickActions.partner')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.quickActionButton}
               onPress={() => navigation.navigate('ChatHistory')}
             >
-              <Ionicons name="chatbubbles-outline" size={18} color={colors.text} />
-              <Text style={[styles.quickActionText, { color: colors.text }]}>{t('quickActions.history')}</Text>
+              <Ionicons name="chatbubbles-outline" size={18} color={goldBarInk} />
+              <Text style={[styles.quickActionText, { color: goldBarInk }]}>{t('quickActions.history')}</Text>
             </TouchableOpacity>
           </View>
         )}

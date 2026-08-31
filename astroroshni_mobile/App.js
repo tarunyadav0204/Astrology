@@ -31,6 +31,7 @@ import ProfileScreen from './src/components/Profile/ProfileScreen';
 import AccountSecurityScreen from './src/components/Profile/AccountSecurityScreen';
 import AnalysisHubScreen from './src/components/Analysis/AnalysisHubScreen';
 import AnalysisDetailScreen from './src/components/Analysis/AnalysisDetailScreen';
+import LongevityScreen from './src/components/Longevity/LongevityScreen';
 import RelationshipMatchScreen from './src/components/Relationship/RelationshipMatchScreen';
 import ReportsStudioScreen from './src/components/Reports/ReportsStudioScreen';
 import ReportViewerScreen from './src/components/Reports/ReportViewerScreen';
@@ -1011,6 +1012,11 @@ export default function App() {
           <Stack.Screen 
             name="AnalysisDetail" 
             component={AnalysisDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Longevity"
+            component={LongevityScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

@@ -87,6 +87,17 @@ const mergedPremiumCopy = Object.fromEntries(Object.entries(normalizedPremiumCop
   { ...copy, homeRecommendations: homeRecommendationsCopy[language] || homeRecommendationsCopy.english },
 ]));
 const failures = [];
+const requiredSharedLocaleKeys = ['common.notNow'];
+const appLocaleFiles = {
+  english: 'en', hindi: 'hi', es: 'es', fr: 'fr', german: 'de', russian: 'ru',
+  chinese: 'zh', tamil: 'ta', telugu: 'te', gujarati: 'gu', marathi: 'mr',
+};
+Object.entries(appLocaleFiles).forEach(([language, fileName]) => {
+  const copy = JSON.parse(fs.readFileSync(path.join(projectRoot, `src/locales/${fileName}.json`), 'utf8'));
+  const localized = flatten(copy);
+  const missing = requiredSharedLocaleKeys.filter((key) => !(key in localized) || !String(localized[key] || '').trim());
+  if (missing.length) failures.push(`shared-locale/${language}: missing ${missing.join(', ')}`);
+});
 const i18nSource = fs.readFileSync(path.join(projectRoot, 'src/locales/i18n.js'), 'utf8');
 const i18nAst = parse(i18nSource, { sourceType: 'module' });
 

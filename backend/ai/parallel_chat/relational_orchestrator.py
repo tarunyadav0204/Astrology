@@ -26,6 +26,7 @@ from ai.parallel_chat.presentation_style import (
     build_simple_merge_depth_instruction,
     build_simple_merge_instruction,
     build_simple_merge_response_format,
+    build_simple_relational_structure_instruction,
 )
 from ai.parallel_chat.relational_payloads import (
     build_relational_branch_payloads,
@@ -198,6 +199,14 @@ async def run_parallel_relational_chat_pipeline(
     merge_prompt = f"{merge_static}\n\n{merge_user}"
     if final_presentation_override:
         merge_prompt = f"{merge_prompt}\n\n{final_presentation_override}"
+    relational_structure_override = build_simple_relational_structure_instruction(
+        response_style,
+        relation_profile,
+    )
+    if relational_structure_override:
+        # This must remain last: the shared Simple formatter deliberately makes
+        # headings optional, while two-chart answers need visible navigation.
+        merge_prompt = f"{merge_prompt}\n\n{relational_structure_override}"
     if os.environ.get("ASTRO_PARALLEL_LOG_PROMPT_BODIES", "").strip().lower() in {"1", "true", "yes"}:
         preview_chars = int(os.environ.get("ASTRO_PARALLEL_LOG_PROMPT_BODIES_MAX_CHARS", "6000") or "6000")
         prompt_preview = merge_prompt if preview_chars <= 0 else merge_prompt[:preview_chars]

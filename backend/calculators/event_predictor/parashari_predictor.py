@@ -322,38 +322,11 @@ class ParashariEventPredictor:
             Bonus points (0 or 15)
         """
         try:
-            # Calculate which Kakshya transit planet is in
-            sign_degree = transit_longitude % 30
-            kakshya_index = int(sign_degree / 3.75)  # 0-7
-            
-            # Kakshya rulers in order
-            kakshya_rulers = ['Saturn', 'Jupiter', 'Mars', 'Sun', 'Venus', 'Mercury', 'Moon', 'Ascendant']
-            kakshya_ruler = kakshya_rulers[kakshya_index]
-            
-            # Get Bhinnashtakavarga for transit planet
             av_calc = self.ashtakavarga_calc(birth_data, self.chart_data)
-            bav = av_calc.calculate_bhinnashtakavarga(transit_planet)
-            
-            # Get sign of transit
-            transit_sign = int(transit_longitude / 30)
-            
-            # Check if kakshya ruler contributed a Bindu
-            if kakshya_ruler == 'Ascendant':
-                # Check if Ascendant contributed
-                contributions = bav.get('contributions', {})
-                asc_contribution = contributions.get('Ascendant', {})
-                if asc_contribution.get(str(transit_sign), 0) == 1:
-                    return 15  # Kakshya is ACTIVE - precise timing!
-            else:
-                # Check if planet contributed
-                contributions = bav.get('contributions', {})
-                planet_contribution = contributions.get(kakshya_ruler, {})
-                if planet_contribution.get(str(transit_sign), 0) == 1:
-                    return 15  # Kakshya is ACTIVE - precise timing!
-            
-            return 0  # Kakshya not active
-        except:
-            return 0  # Default if calculation fails
+            activation = av_calc.calculate_kakshya_activation(transit_planet, transit_longitude)
+            return 15 if activation.get('active') else 0
+        except (KeyError, TypeError, ValueError, AttributeError):
+            return 0
     
     def _check_double_transit(self, triggers: List[Dict], house: int) -> int:
         """

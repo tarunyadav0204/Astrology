@@ -72,6 +72,12 @@ export const SEO_CONFIG = {
       description: "Get AI-powered health astrology insights and health horoscope predictions based on your date of birth with personalized Vedic astrology analysis.",
       keywords: "AI powered health astrology, health astrology by date of birth, health horoscope prediction, health prediction by date of birth"
     },
+
+    longevity: {
+      title: "Vedic Longevity Calculator & Ayurdaya Analysis | AstroRoshni",
+      description: "Calculate traditional Ayurdaya compartments, Maraka and Badhaka strength, sensitive D3 and D9 points, and preventive vigilance windows from your Vedic birth chart.",
+      keywords: "vedic longevity calculator, ayurdaya calculator, maraka analysis, badhaka astrology, 22nd drekkana, 64th navamsha, longevity astrology"
+    },
     
     wealthAnalysis: {
       title: "AI Powered Wealth Astrology & Wealth Analysis by Kundli | AstroRoshni",

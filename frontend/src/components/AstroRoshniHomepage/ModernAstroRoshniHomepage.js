@@ -479,7 +479,7 @@ const ModernAstroRoshniHomepage = ({
           </div>
           <div className="mh-tools-grid">
             {TOOLS.map((tool, index) => (
-              <button type="button" className="mh-tool-card" key={tool.title} onClick={() => requireAccount(tool.path)}>
+              <button type="button" className="mh-tool-card" key={tool.title} onClick={() => tool.public ? navigate(tool.path) : requireAccount(tool.path)}>
                 <span className="mh-tool-card__index">0{index + 1}</span>
                 <span className="mh-tool-card__code">{tool.code}</span>
                 <strong>{tool.title}</strong>

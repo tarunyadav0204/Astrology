@@ -61,6 +61,7 @@ from panchang.muhurat_routes import router as muhurat_router
 from muhurat_routes import router as childbirth_router
 from health.health_routes import router as health_router
 from wealth.wealth_routes import router as wealth_router
+from longevity.routes import router as longevity_router
 from chat.chat_routes import router as chat_router
 from chat.feedback_routes import router as chat_feedback_router
 from calculators.event_predictor.routes import router as event_prediction_router
@@ -1024,6 +1025,7 @@ app.include_router(charts_router, prefix="/api")
 app.include_router(birth_charts_router, prefix="/api")
 app.include_router(prediction_engine_router, prefix="/api")
 app.include_router(wealth_router, prefix="/api")
+app.include_router(longevity_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(chat_feedback_router, prefix="/api")
 app.include_router(nakshatra_router, prefix="/api")
@@ -4189,6 +4191,8 @@ async def calculate_ashtakavarga(
 
         response_payload = {
             "ashtakavarga": sarva,
+            # Classical Shodhana/Pinda is anchored to the natal D1 BAV.
+            "advanced_ashtakavarga": calculator.calculate_advanced_ashtakavarga() if chart_type == 'lagna' else None,
             "analysis": analysis,
             "chart_type": chart_type,
             "chart_data": chart_data,  # Include chart_data for oracle calculations

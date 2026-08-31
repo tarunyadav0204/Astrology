@@ -92,6 +92,10 @@ apiClient.interceptors.response.use(
     if (error.response?.status >= 500) {
       throw new Error('Server error. Please try again later.');
     }
+    const denialCode = error.response?.data?.detail?.code;
+    if (error.response?.status === 403 && denialCode === 'ASTROLOGER_LICENSE_REQUIRED') {
+      return Promise.reject(error);
+    }
     if (error.response?.status === 401 || error.response?.status === 403) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -112,6 +116,16 @@ apiClient.interceptors.response.use(
 );
 
 export const apiService = {
+  calculateLongevity: async ({ birthData, chartData, horizonYears = 12, subject = 'self' }) => {
+    const response = await apiClient.post(getEndpoint('/longevity/calculate'), {
+      birth_data: birthData,
+      chart_data: chartData,
+      horizon_years: horizonYears,
+      subject,
+    });
+    return response.data;
+  },
+
   startInstantChatSession: async ({ chatSessionId, clientInstanceId }) => {
     const response = await apiClient.post(getEndpoint('/credits/instant-session/start'), {
       chat_session_id: chatSessionId,

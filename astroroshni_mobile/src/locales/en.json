@@ -1769,6 +1769,7 @@
     }
   },
   "common": {
+    "notNow": "Not now",
     "cancel": "Cancel",
     "ok": "OK",
     "delete": "Delete",

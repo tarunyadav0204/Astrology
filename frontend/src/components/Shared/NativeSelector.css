@@ -3,140 +3,93 @@
   align-self: center;
 }
 
-.current-native {
+.native-selector .current-native {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, rgba(233, 30, 99, 0.1), rgba(255, 111, 0, 0.1));
-  border: 1px solid rgba(233, 30, 99, 0.2);
-  border-radius: 8px;
   gap: 16px;
+  padding: 12px 16px;
+  color: var(--color-text);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-brand) 9%, var(--color-surface-raised)),
+      color-mix(in srgb, var(--color-accent) 7%, var(--color-surface-raised))
+    );
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
 }
 
-.native-info {
+.native-selector .native-info {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 4px;
-  flex: 1;
+  min-width: 0;
 }
 
-.native-label {
+.native-selector .native-label {
+  color: var(--color-brand);
   font-size: 12px;
-  font-weight: 600;
-  color: #e91e63;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
-.native-details {
-  font-size: 14px;
-  color: #333;
-  font-weight: 500;
-}
-
-.change-native-btn {
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #e91e63, #ff6f00);
-  color: white;
-  border: none;
-  border-radius: 6px;
+.native-selector .native-details {
+  color: var(--color-text);
   font-size: 14px;
   font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s;
-  white-space: nowrap;
+  line-height: 1.35;
 }
 
-.change-native-btn:hover {
+.native-selector .change-native-btn {
+  min-height: var(--touch-target);
+  padding: 8px 16px;
+  color: var(--color-on-brand);
+  background: var(--color-brand);
+  border: 1px solid color-mix(in srgb, var(--color-brand) 70%, var(--color-border-strong));
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--motion-standard) var(--ease-standard),
+    transform var(--motion-standard) var(--ease-standard);
+}
+
+.native-selector .change-native-btn:hover {
+  background: var(--color-brand-hover);
   transform: translateY(-1px);
 }
 
-.form-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  z-index: 2147483647;
-  padding: 20px;
-  overflow-y: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.native-selector .change-native-btn:active {
+  background: var(--color-brand-active);
+  transform: translateY(0);
 }
 
-.form-modal-content {
-  background: white;
-  border-radius: 12px;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-}
-
-.form-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 2px solid #e91e63;
-  background: white;
-  border-radius: 12px 12px 0 0;
-}
-
-.form-modal-header h3 {
-  margin: 0;
-  color: #e91e63;
-  font-size: 1.5rem;
-}
-
-.close-btn {
-  background: #e91e63 !important;
-  border: none !important;
-  font-size: 28px !important;
-  cursor: pointer !important;
-  color: white !important;
-  padding: 8px !important;
-  width: 44px !important;
-  height: 44px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  border-radius: 50% !important;
-  font-weight: bold !important;
-  line-height: 1 !important;
-  font-family: Arial, sans-serif !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
-}
-
-.close-btn:hover {
-  background: #c2185b !important;
-  transform: scale(1.1) !important;
+.native-selector .change-native-btn:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-focus) 36%, transparent);
+  outline-offset: 3px;
 }
 
 @media (max-width: 768px) {
-  .current-native {
-    flex-direction: column;
+  .native-selector .current-native {
     align-items: stretch;
+    flex-direction: column;
     gap: 12px;
   }
-  
-  .native-info {
+
+  .native-selector .native-info {
     text-align: center;
   }
-  
-  .change-native-btn {
+
+  .native-selector .change-native-btn {
     align-self: center;
     width: fit-content;
-  }
-  
-  .form-modal {
-    padding: 10px;
-  }
-  
-  .form-modal-content {
-    margin: 50px auto 20px;
   }
 }

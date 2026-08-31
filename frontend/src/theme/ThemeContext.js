@@ -67,6 +67,27 @@ export const THEMES = Object.freeze([
     preview: { canvas: '#1a0033', surface: '#ffffff', accent: '#ff6b35', border: 'rgba(255, 107, 53, 0.34)' },
   },
   {
+    id: 'umberGold',
+    label: 'Umber Gold',
+    colorScheme: 'light',
+    themeColor: '#583714',
+    preview: { canvas: '#583714', surface: '#E0C46E', accent: '#FFF6D6', border: 'rgba(224, 196, 110, 0.40)' },
+  },
+  {
+    id: 'lilacRose',
+    label: 'Lilac Rose',
+    colorScheme: 'light',
+    themeColor: '#6968a6',
+    preview: { canvas: '#6968a6', surface: '#cf9892', accent: '#fff7f4', border: 'rgba(207, 152, 146, 0.40)' },
+  },
+  {
+    id: 'obsidianPlum',
+    label: 'Obsidian Plum',
+    colorScheme: 'dark',
+    themeColor: '#401f70',
+    preview: { canvas: '#401f70', surface: '#3d1b6d', accent: '#cc6475', border: 'rgba(204, 100, 117, 0.40)' },
+  },
+  {
     id: 'clarity',
     label: 'Clarity',
     colorScheme: 'light',
