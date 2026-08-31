@@ -42,6 +42,8 @@ from utils.birth_hash import birth_hash_from_parts
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_PARASHARI_DIVISIONS = frozenset({2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60})
+
 # Simple in-memory rate limit for public chart-only (guest) calls.
 _GUEST_CHART_ONLY_WINDOW_SEC = 60
 _GUEST_CHART_ONLY_MAX = 20
@@ -764,12 +766,17 @@ async def calculate_divisional_chart(
     try:
         birth_data = request.get('birth_data', {})
         # Support both 'division' and 'division_number' for backward compatibility
-        division_number = request.get('division', request.get('division_number', 9))
+        division_number = int(request.get('division', request.get('division_number', 9)))
+        if division_number not in SUPPORTED_PARASHARI_DIVISIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported Parashari divisional chart: D{division_number}",
+            )
         ayanamsha, node_type, explicit_profile = _parashari_view_profile(request)
         birth_hash = _birth_hash_from_dict(birth_data)
         cache_key = (
             build_chart_cache_key(
-                "parashari-view-divisional-v1" if explicit_profile else "calculate-divisional-chart",
+                "parashari-view-divisional-v2" if explicit_profile else "calculate-divisional-chart-v2",
                 birth_hash,
                 division=division_number,
                 **({"ayanamsha": ayanamsha, "node_type": node_type} if explicit_profile else {}),
@@ -792,7 +799,9 @@ async def calculate_divisional_chart(
                 self.time = data.get('time')
                 self.latitude = float(data.get('latitude', 0))
                 self.longitude = float(data.get('longitude', 0))
-                self.timezone = data.get('timezone', 'UTC+0')
+                # Empty means infer the historical timezone from coordinates.
+                # Treating an omitted timezone as UTC changes the birth moment.
+                self.timezone = data.get('timezone', '')
                 self.place = data.get('place', '')
                 self.gender = data.get('gender', '')
                 self.relation = data.get('relation', 'other')
@@ -805,79 +814,14 @@ async def calculate_divisional_chart(
         if explicit_profile:
             chart_data["calculation_profile"] = {"ayanamsha": ayanamsha, "node_type": node_type}
 
-        # Calculate divisional chart
-        divisional_data = {
-            'planets': {},
-            'houses': [],
-            'ayanamsa': chart_data.get('ayanamsa', 0)
-        }
-        
-        # Calculate divisional ascendant
-        asc_sign = int(chart_data['ascendant'] / 30)
-        asc_degree = chart_data['ascendant'] % 30
-        divisional_asc_sign = get_divisional_sign(asc_sign, asc_degree, division_number)
-        
-        # Calculate degree within divisional sign - USE RATIO METHOD FOR ALL DIVISIONS
-        EPS = 1e-9
-        part_size = 30.0 / division_number
-        part_index = int((asc_degree + EPS) / part_size)
-        degree_within_part = (asc_degree + EPS) - (part_index * part_size)
-        scaled_asc_degree = (degree_within_part / part_size) * 30.0
-        divisional_data['ascendant'] = divisional_asc_sign * 30 + scaled_asc_degree
-
-        # Calculate divisional houses
-        for i in range(12):
-            house_sign = (divisional_asc_sign + i) % 12
-            divisional_data['houses'].append({
-                'longitude': house_sign * 30,
-                'sign': house_sign
-            })
-        
-        # Calculate divisional positions for planets
-        planets_to_process = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
-        
-        for planet in planets_to_process:
-            if planet in chart_data['planets']:
-                planet_data = chart_data['planets'][planet]
-                
-                # For Gulika and Mandi, keep original positions (don't apply divisional transformation)
-                if planet in ['Gulika', 'Mandi']:
-                    divisional_data['planets'][planet] = {
-                        'longitude': planet_data['longitude'],
-                        'sign': planet_data['sign'],
-                        'degree': planet_data['degree'],
-                        'retrograde': planet_data.get('retrograde', False)
-                    }
-                else:
-                    # Regular planetary divisional calculation
-                    planet_sign = int(planet_data['longitude'] / 30)
-                    planet_degree = planet_data['longitude'] % 30
-                    
-                    divisional_sign = get_divisional_sign(planet_sign, planet_degree, division_number)
-                    
-                    # Calculate the actual degree within the divisional sign - USE RATIO METHOD
-                    EPS = 1e-9
-                    part_size = 30.0 / division_number
-                    part_index = int((planet_degree + EPS) / part_size)
-                    degree_within_part = (planet_degree + EPS) - (part_index * part_size)
-                    actual_degree = (degree_within_part / part_size) * 30.0
-
-                    divisional_longitude = divisional_sign * 30 + actual_degree
-                    
-                    divisional_data['planets'][planet] = {
-                        'longitude': divisional_longitude,
-                        'sign': divisional_sign,
-                        'degree': actual_degree,
-                        'retrograde': planet_data.get('retrograde', False)
-                    }
+        # Keep the HTTP route and every client on the same calculator used by
+        # reports, chat, and domain analyzers. This prevents formula drift.
+        response_payload = DivisionalChartCalculator(chart_data).calculate_divisional_chart(
+            division_number
+        )
+        divisional_data = response_payload['divisional_chart']
 
         attach_graha_drishti_to_chart(divisional_data)
-
-        response_payload = {
-            'divisional_chart': divisional_data,
-            'division_number': division_number,
-            'chart_name': f'D{division_number}'
-        }
 
         if cache_key and birth_hash:
             with get_conn() as conn:
@@ -886,6 +830,8 @@ async def calculate_divisional_chart(
 
         return response_payload
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(
             "divisional chart calculation failed for user_id=%s division=%s",

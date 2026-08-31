@@ -6,6 +6,7 @@ import { parse } from '@babel/parser';
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const reportAll = process.argv.includes('--report');
 const premiumCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/premium-ui.json'), 'utf8'));
+const shadbalaUiCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/shadbala-ui.json'), 'utf8'));
 const lifeAnalysisCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/life-analysis.json'), 'utf8'));
 const lifeAnalysisPdfCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/life-analysis-pdf.json'), 'utf8'));
 const historyUiCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/history-ui.json'), 'utf8'));
@@ -22,7 +23,15 @@ const chatScreenSource = {
 };
 const normalizedPremiumCopy = Object.fromEntries(Object.entries(premiumCopy).map(([language, copy]) => [
   language,
-  { ...copy, chatScreen: premiumCopy[chatScreenSource[language]]?.chatScreen || copy.chatScreen },
+  {
+    ...copy,
+    chatScreen: premiumCopy[chatScreenSource[language]]?.chatScreen || copy.chatScreen,
+    shadbala: {
+      ...copy.shadbala,
+      ...shadbalaUiCopy.technical,
+      ...(shadbalaUiCopy[language] || shadbalaUiCopy.english),
+    },
+  },
 ]));
 const protectedFiles = [
   'src/components/Yogas/YogaScreen.js',

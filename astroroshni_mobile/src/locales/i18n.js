@@ -12,6 +12,7 @@ import fr from './fr.json';
 import ru from './ru.json';
 import zh from './zh.json';
 import premiumUi from './premium-ui.json';
+import shadbalaUi from './shadbala-ui.json';
 import lifeAnalysis from './life-analysis.json';
 import lifeAnalysisPdf from './life-analysis-pdf.json';
 import historyUi from './history-ui.json';
@@ -157,6 +158,11 @@ const normalizedPremiumUi = Object.fromEntries(
     language,
     {
       ...copy,
+      shadbala: {
+        ...copy.shadbala,
+        ...shadbalaUi.technical,
+        ...(shadbalaUi[language] || shadbalaUi.english),
+      },
       chatScreen: premiumUi[CHAT_SCREEN_SOURCE[language]]?.chatScreen || copy.chatScreen,
       home: {
         ...copy.home,

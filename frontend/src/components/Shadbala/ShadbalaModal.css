@@ -78,6 +78,41 @@
   line-height: 1.4;
 }
 
+.shadbala-tabs {
+  position: sticky;
+  top: -0.75rem;
+  z-index: 8;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.3rem;
+  margin: -0.1rem 0 0.8rem;
+  padding: 0.3rem;
+  border: 1px solid var(--sb-line);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--sb-panel) 94%, transparent);
+  backdrop-filter: blur(10px);
+}
+.shadbala-tabs button {
+  min-height: 2.35rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sb-muted);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.shadbala-tabs button:hover { background: var(--sb-soft); color: var(--sb-ink); }
+.shadbala-tabs button.is-active { background: var(--color-brand); color: var(--color-on-brand); box-shadow: var(--shadow-sm); }
+.shadbala-empty-tab { padding: 2rem; border: 1px solid var(--sb-line); border-radius: 12px; color: var(--sb-muted); text-align: center; }
+.shadbala-house-score__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.55rem; padding: 0.8rem; }
+.shadbala-house-score__grid article { display: grid; gap: 0.28rem; padding: 0.72rem; border: 1px solid var(--sb-line); border-radius: 9px; background: var(--sb-soft); }
+.shadbala-house-score__grid span { color: var(--sb-muted); font-size: 0.62rem; font-weight: 750; }
+.shadbala-house-score__grid strong { color: var(--sb-ink); font-size: 1.05rem; }
+.shadbala-house-score__grid strong small { margin-left: 0.12rem; color: var(--sb-muted); font-size: 0.55rem; }
+.shadbala-house-score__grid em { color: var(--sb-rose); font-size: 0.62rem; font-style: normal; font-weight: 800; }
+
 .shadbala-close-btn {
   width: 2.35rem;
   height: 2.35rem;
@@ -96,6 +131,7 @@
 
 .shadbala-close-btn:hover { border-color: var(--sb-rose); color: var(--color-on-brand); background: var(--sb-rose); }
 .shadbala-close-btn:focus-visible,
+.shadbala-tabs button:focus-visible,
 .shadbala-planet__summary:focus-visible,
 .shadbala-formulas summary:focus-visible,
 .shadbala-guide summary:focus-visible { outline: 2px solid var(--sb-rose); outline-offset: 2px; }
@@ -223,6 +259,8 @@
 .shadbala-grade--average { color: #8a5524; background: #f6e8d5; }
 .shadbala-grade--weak { color: #8c3d39; background: #f5dfdc; }
 .shadbala-grade--unrated { color: #675b56; background: #eee7e2; }
+.shadbala-grade--meets-requirement { color: #4f6b38; background: color-mix(in srgb, #78934e 16%, var(--sb-panel)); }
+.shadbala-grade--below-requirement { color: #8c3d39; background: color-mix(in srgb, #a55d48 16%, var(--sb-panel)); }
 
 .shadbala-results {
   overflow: hidden;
@@ -305,6 +343,57 @@
 .shadbala-components small { color: var(--sb-muted); font-size: 0.55rem; }
 .shadbala-components > div > b { color: var(--sb-rose); font-size: 0.72rem; }
 
+.shadbala-standard {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+.shadbala-standard > div { min-width: 0; display: grid; gap: 0.13rem; padding: 0.55rem; border: 1px solid var(--sb-line); border-radius: 8px; background: var(--sb-panel); }
+.shadbala-standard span { color: var(--sb-muted); font-size: 0.55rem; font-weight: 750; text-transform: uppercase; letter-spacing: 0.035em; }
+.shadbala-standard strong { color: var(--sb-ink); font-size: 0.75rem; }
+.shadbala-standard small { color: var(--sb-muted); font-size: 0.54rem; line-height: 1.35; }
+
+.shadbala-subtables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; margin-top: 0.55rem; }
+.shadbala-subtables section { overflow: hidden; border: 1px solid var(--sb-line); border-radius: 8px; background: var(--sb-panel); }
+.shadbala-subtables h4 { margin: 0; padding: 0.52rem 0.6rem; border-bottom: 1px solid var(--sb-line); color: var(--sb-ink); font-size: 0.66rem; }
+.shadbala-subtables section > div { display: flex; justify-content: space-between; gap: 0.6rem; padding: 0.38rem 0.6rem; border-bottom: 1px solid var(--sb-line); color: var(--sb-muted); font-size: 0.6rem; }
+.shadbala-subtables section > div:last-child { border-bottom: 0; }
+.shadbala-subtables b { color: var(--sb-ink); font-size: 0.62rem; }
+
+.shadbala-worksheet { margin-top: 0.85rem; overflow: hidden; border: 1px solid var(--sb-line); border-radius: 13px; background: var(--sb-panel); box-shadow: 0 5px 16px rgba(61, 39, 32, 0.055); }
+.shadbala-worksheet > header { display: flex; align-items: end; justify-content: space-between; gap: 1rem; padding: 0.72rem 0.9rem; border-bottom: 1px solid var(--sb-line); background: linear-gradient(90deg, var(--sb-panel), var(--sb-soft)); }
+.shadbala-worksheet > header span { color: var(--sb-rose); font-size: 0.58rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; }
+.shadbala-worksheet h3 { margin: 0.08rem 0 0; font-size: 1rem; }
+.shadbala-worksheet header small { color: var(--sb-muted); font-size: 0.61rem; }
+.shadbala-worksheet__scroll { overflow-x: auto; scrollbar-width: thin; }
+.shadbala-worksheet table { width: 100%; min-width: 790px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.shadbala-worksheet th,
+.shadbala-worksheet td { padding: 0.4rem 0.55rem; border-bottom: 1px solid var(--sb-line); text-align: right; font-size: 0.61rem; white-space: nowrap; }
+.shadbala-worksheet thead th { position: sticky; top: 0; background: var(--sb-soft); color: var(--sb-ink); font-size: 0.62rem; }
+.shadbala-worksheet th:first-child { position: sticky; left: 0; z-index: 1; min-width: 155px; background: var(--sb-panel); text-align: left; }
+.shadbala-worksheet thead th:first-child { z-index: 2; background: var(--sb-soft); }
+.shadbala-worksheet tr.is-major th,
+.shadbala-worksheet tr.is-major td { border-top: 1px solid var(--color-border-strong); color: var(--sb-ink); font-weight: 800; }
+.shadbala-worksheet tr.is-total th,
+.shadbala-worksheet tr.is-total td { background: var(--sb-soft); color: var(--sb-ink); font-weight: 850; }
+.shadbala-worksheet tr.is-total th { background: var(--sb-soft); }
+.shadbala-worksheet tr.is-standard th,
+.shadbala-worksheet tr.is-standard td { color: var(--sb-rose); font-weight: 800; }
+.shadbala-worksheet tr:last-child th,
+.shadbala-worksheet tr:last-child td { border-bottom: 0; }
+
+.bhava-bala-worksheet { margin-top: 0.85rem; }
+.bhava-bala-worksheet table { min-width: 980px; }
+.bhava-bala-worksheet__note {
+  margin: 0;
+  padding: 0.68rem 0.9rem;
+  border-top: 1px solid var(--sb-line);
+  color: var(--sb-muted);
+  font-size: 0.62rem;
+  line-height: 1.5;
+}
+
 .shadbala-formulas { margin-top: 0.65rem; border: 1px solid var(--sb-line); border-radius: 8px; background: var(--sb-panel); }
 .shadbala-formulas > summary,
 .shadbala-guide > summary { list-style: none; cursor: pointer; }
@@ -338,6 +427,10 @@
 .shadbala-grade-dot--average { background: #bd7c38; }
 .shadbala-grade-dot--weak { background: #a55d48; }
 .shadbala-guide > p { margin: 0; padding: 0.65rem 0.8rem; border-top: 1px solid var(--sb-line); color: var(--sb-muted); font-size: 0.62rem; line-height: 1.5; }
+.shadbala-guide > p strong { color: var(--sb-ink); }
+.shadbala-guide .shadbala-method-grid > span { display: grid; grid-template-columns: 1fr; gap: 0.2rem; }
+.shadbala-guide .shadbala-method-grid > span strong,
+.shadbala-guide .shadbala-method-grid > span em { grid-column: auto; }
 
 @media (max-width: 760px) {
   .shadbala-modal-overlay { place-items: end center; padding: 0; }
@@ -364,7 +457,13 @@
   .shadbala-planet__details > header { align-items: start; }
   .shadbala-planet__details > header span { max-width: 10rem; text-align: right; line-height: 1.35; }
   .shadbala-components { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shadbala-standard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shadbala-subtables { grid-template-columns: 1fr; }
+  .shadbala-worksheet > header { align-items: start; }
+  .shadbala-worksheet header small { max-width: 11rem; text-align: right; line-height: 1.35; }
   .shadbala-guide > div { grid-template-columns: repeat(2, 1fr); }
+  .shadbala-tabs { top: -0.75rem; overflow-x: auto; grid-template-columns: repeat(3, minmax(130px, 1fr)); }
+  .shadbala-house-score__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 420px) {

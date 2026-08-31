@@ -46,6 +46,7 @@ const ShadbalaScreen = ({ route, navigation }) => {
   const [shadbalaData, setData] = useState(null);
   const [selectedPlanet, setSelectedPlanet] = useState(null);
   const [expandedBreakdown, setExpandedBreakdown] = useState(null);
+  const [activeTab, setActiveTab] = useState('planetary');
 
   const chartIdentity = birthData?.id || birthData?._id || `${birthData?.name || ''}-${birthData?.date || ''}-${birthData?.time || ''}`;
 
@@ -80,23 +81,24 @@ const ShadbalaScreen = ({ route, navigation }) => {
   };
 
   const planetData = shadbalaData?.shadbala || {};
-  const bhavBala = shadbalaData?.bhav_bala || {};
+  const bhavaBala = shadbalaData?.bhava_bala || {};
+  const supplementaryHouseStrength = shadbalaData?.supplementary_house_strength || {};
 
   const planets = useMemo(() => VISIBLE_PLANETS
     .filter((planet) => planetData[planet])
     .map((planet) => ({ name: planet, ...planetData[planet] })), [planetData]);
 
   const rankedPlanets = useMemo(() => [...planets]
-    .sort((first, second) => numericValue(second.total_rupas) - numericValue(first.total_rupas)), [planets]);
+    .sort((first, second) => numericValue(first.relative_rank) - numericValue(second.relative_rank)), [planets]);
 
   const selected = selectedPlanet ? planetData[selectedPlanet] : null;
   const selectedRank = rankedPlanets.findIndex((planet) => planet.name === selectedPlanet) + 1;
   const strongestPlanet = rankedPlanets[0];
-  const maxRupas = Math.max(...planets.map((planet) => numericValue(planet.total_rupas)), 1);
+  const maxRequiredRatio = Math.max(...planets.map((planet) => numericValue(planet.required_ratio)), 1);
 
   const gradeTreatment = (grade) => {
-    if (grade === 'Excellent') return { foreground: colors.success, background: colors.successSoft || colors.surfaceMuted };
-    if (grade === 'Good') return { foreground: colors.info, background: colors.infoSoft || colors.surfaceMuted };
+    if (['High', 'Excellent'].includes(grade)) return { foreground: colors.success, background: colors.successSoft || colors.surfaceMuted };
+    if (['Meets requirement', 'Good'].includes(grade)) return { foreground: colors.info, background: colors.infoSoft || colors.surfaceMuted };
     if (grade === 'Average') return { foreground: colors.warning, background: colors.warningSoft || colors.surfaceMuted };
     return { foreground: colors.error, background: colors.errorSoft || colors.surfaceMuted };
   };
@@ -164,8 +166,8 @@ const ShadbalaScreen = ({ route, navigation }) => {
       <View style={styles.comparisonList}>
         {rankedPlanets.map((planet, index) => {
           const active = selectedPlanet === planet.name;
-          const treatment = gradeTreatment(planet.grade);
-          const barWidth = `${Math.max((numericValue(planet.total_rupas) / maxRupas) * 100, 4)}%`;
+          const treatment = gradeTreatment(planet.classical_status || planet.grade);
+          const barWidth = `${Math.max((numericValue(planet.required_ratio) / maxRequiredRatio) * 100, 4)}%`;
           return (
             <TouchableOpacity key={planet.name} onPress={() => setSelectedPlanet(planet.name)} activeOpacity={0.75} style={[styles.comparisonRow, active && { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
               <View style={[styles.planetGlyphSmall, { backgroundColor: active ? colors.selectionControl : colors.surfaceMuted }]}>
@@ -174,7 +176,7 @@ const ShadbalaScreen = ({ route, navigation }) => {
               <View style={styles.comparisonContent}>
                 <View style={styles.comparisonHeading}>
                   <Text style={[styles.comparisonName, { color: colors.text }]}>{translatePlanet(planet.name)}</Text>
-                  <Text style={[styles.comparisonValue, { color: treatment.foreground }]}>{displayNumber(planet.total_rupas, 2)}</Text>
+                  <Text style={[styles.comparisonValue, { color: treatment.foreground }]}>{displayNumber(planet.required_ratio, 2)}×</Text>
                 </View>
                 <View style={[styles.comparisonTrack, { backgroundColor: colors.surfaceMuted }]}>
                   <View style={[styles.comparisonFill, { backgroundColor: active ? colors.primary : treatment.foreground, width: barWidth }]} />
@@ -241,6 +243,59 @@ const ShadbalaScreen = ({ route, navigation }) => {
     );
   };
 
+  const renderClassicalStandard = () => (
+    <View style={[styles.contentCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
+      <Text style={[styles.cardEyebrow, { color: colors.primaryStrong }]}>{t('premiumUi.shadbala.classicalStandard', 'CLASSICAL STANDARD')}</Text>
+      <Text style={[styles.cardTitle, { color: colors.text }]}>{t('premiumUi.shadbala.requirementComparison', 'Requirement comparison')}</Text>
+      <Text style={[styles.cardIntro, { color: colors.textSecondary }]}>{t('premiumUi.shadbala.requirementExplanation', 'Parashara assigns a different minimum to each planet. Rank is based on the ratio to that minimum, not the largest raw total.')}</Text>
+      <View style={styles.standardGrid}>
+        <View style={[styles.standardCell, { backgroundColor: colors.surfaceMuted }]}>
+          <Text style={[styles.standardLabel, { color: colors.textSecondary }]}>{t('premiumUi.shadbala.minimum', 'Minimum')}</Text>
+          <Text style={[styles.standardValue, { color: colors.text }]}>{displayNumber(selected.minimum_required_points, 0)}</Text>
+          <Text style={[styles.standardNote, { color: colors.textTertiary }]}>{displayNumber(selected.minimum_required_rupas, 2)} {t('rupas', 'Rupas')}</Text>
+        </View>
+        <View style={[styles.standardCell, { backgroundColor: colors.surfaceMuted }]}>
+          <Text style={[styles.standardLabel, { color: colors.textSecondary }]}>{t('premiumUi.shadbala.requiredRatio', 'Required ratio')}</Text>
+          <Text style={[styles.standardValue, { color: gradeTreatment(selected.classical_status || selected.grade).foreground }]}>{displayNumber(selected.required_ratio, 2)}×</Text>
+          <Text style={[styles.standardNote, { color: colors.textTertiary }]}>{displayNumber(selected.required_percent, 1)}%</Text>
+        </View>
+        <View style={[styles.standardCell, { backgroundColor: colors.surfaceMuted }]}>
+          <Text style={[styles.standardLabel, { color: colors.textSecondary }]}>{t('premiumUi.shadbala.relativeRank', 'Relative rank')}</Text>
+          <Text style={[styles.standardValue, { color: colors.text }]}>#{selectedRank}</Text>
+          <Text style={[styles.standardNote, { color: colors.textTertiary }]}>{t('premiumUi.shadbala.ofSeven', 'of 7 planets')}</Text>
+        </View>
+      </View>
+      <View style={[styles.phalaRow, { borderTopColor: colors.cardBorder }]}>
+        <View style={styles.phalaCell}>
+          <Text style={[styles.standardLabel, { color: colors.textSecondary }]}>{t('premiumUi.shadbala.ishtaPhala')}</Text>
+          <Text style={[styles.phalaValue, { color: colors.success }]}>{displayNumber(selected.ishta_phala, 2)}</Text>
+          <Text style={[styles.standardNote, { color: colors.textTertiary }]}>{t('premiumUi.shadbala.ishtaMeaning', 'Agreeable result-giving capacity')}</Text>
+        </View>
+        <View style={[styles.phalaDivider, { backgroundColor: colors.cardBorder }]} />
+        <View style={styles.phalaCell}>
+          <Text style={[styles.standardLabel, { color: colors.textSecondary }]}>{t('premiumUi.shadbala.kashtaPhala')}</Text>
+          <Text style={[styles.phalaValue, { color: colors.warning }]}>{displayNumber(selected.kashta_phala, 2)}</Text>
+          <Text style={[styles.standardNote, { color: colors.textTertiary }]}>{t('premiumUi.shadbala.kashtaMeaning', 'Difficult result-giving capacity')}</Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderMethodNotice = () => {
+    const validation = shadbalaData?.validation;
+    if (!validation) return null;
+    return (
+      <View style={[styles.methodCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
+        <View style={[styles.methodIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="information-circle-outline" size={20} color={colors.primaryStrong} /></View>
+        <View style={styles.methodCopy}>
+          <Text style={[styles.methodTitle, { color: colors.text }]}>{t('premiumUi.shadbala.methodLimits', 'Method and limits')}</Text>
+          <Text style={[styles.methodBody, { color: colors.textSecondary }]}>{validation.note}</Text>
+          <Text style={[styles.methodMeta, { color: colors.textTertiary }]}>{t('premiumUi.shadbala.conventionDependent', 'Convention-dependent')}: {(validation.convention_dependent_rows || []).join(', ')}</Text>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} />
@@ -266,10 +321,33 @@ const ShadbalaScreen = ({ route, navigation }) => {
             </View>
           </View>
 
-          {renderPlanetComparison()}
+          <View style={[styles.tabBar, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]} accessibilityRole="tablist">
+            {[
+              ['planetary', t('premiumUi.shadbala.planetaryPower', 'Planetary Shadbala')],
+              ['bhava', t('premiumUi.shadbala.bhavaBala', 'Classical Bhava Bala')],
+              ['supplementary', t('premiumUi.shadbala.houseScore', 'App house score')],
+            ].map(([key, label]) => {
+              const active = activeTab === key;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() => setActiveTab(key)}
+                  style={[styles.tabButton, active && { backgroundColor: colors.selectionControl }]}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text style={[styles.tabText, { color: active ? colors.selectionText : colors.textSecondary }]} numberOfLines={2}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
-          {selected ? (
+          {activeTab === 'planetary' ? (
             <>
+              {renderPlanetComparison()}
+
+              {selected ? (
+                <>
               <View style={[styles.selectedCard, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
                 <View style={[styles.planetGlyph, { backgroundColor: colors.selectionControl, borderColor: colors.selectionBorder }]}>
                   <Text style={[styles.planetGlyphText, { color: colors.selectionText }]}>{PLANET_ICONS[selectedPlanet]}</Text>
@@ -277,8 +355,8 @@ const ShadbalaScreen = ({ route, navigation }) => {
                 <View style={styles.selectedCopy}>
                   <Text style={[styles.selectedEyebrow, { color: colors.selectionTextMuted }]}>{t('premiumUi.shadbala.selectedRank', { rank: selectedRank })}</Text>
                   <Text style={[styles.selectedName, { color: colors.selectionText }]}>{translatePlanet(selectedPlanet)}</Text>
-                  <View style={[styles.gradeBadge, { backgroundColor: gradeTreatment(selected.grade).background }]}>
-                    <Text style={[styles.gradeText, { color: gradeTreatment(selected.grade).foreground }]}>{t(`grades.${selected.grade}`, selected.grade)}</Text>
+                  <View style={[styles.gradeBadge, { backgroundColor: gradeTreatment(selected.classical_status || selected.grade).background }]}>
+                    <Text style={[styles.gradeText, { color: gradeTreatment(selected.classical_status || selected.grade).foreground }]}>{displayNumber(selected.required_percent, 0)}%</Text>
                   </View>
                 </View>
                 <View style={styles.selectedScore}>
@@ -288,6 +366,7 @@ const ShadbalaScreen = ({ route, navigation }) => {
                 </View>
               </View>
 
+              {renderClassicalStandard()}
               {renderComponents()}
               {selected.detailed_breakdown ? (
                 <View style={styles.breakdownSection}>
@@ -299,19 +378,65 @@ const ShadbalaScreen = ({ route, navigation }) => {
                   {renderBreakdown('kala', t('kalaBalaBreakdown', 'Kala Bala'), selected.detailed_breakdown.kala_components)}
                 </View>
               ) : null}
+                </>
+              ) : null}
+
+              {renderMethodNotice()}
             </>
           ) : null}
 
-          {Object.keys(bhavBala).length > 0 ? (
+          {activeTab === 'bhava' && Object.keys(bhavaBala).length > 0 ? (
             <View style={styles.houseSection}>
               <View style={styles.sectionHeading}>
-                <Text style={[styles.sectionEyebrow, { color: colors.primaryStrong }]}>{t('premiumUi.shadbala.twelveAreas')}</Text>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('bhavBala', 'Bhav Bala')}</Text>
-                <Text style={[styles.sectionIntro, { color: colors.textSecondary }]}>{t('bhavBalaDescription', 'Strength of each house based on its lord, occupants, aspects and position.')}</Text>
+                <Text style={[styles.sectionEyebrow, { color: colors.primaryStrong }]}>{t('premiumUi.shadbala.bhavaSource', 'BPHS 27.26–31')}</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('premiumUi.shadbala.bhavaBala', 'Classical Bhava Bala')}</Text>
+                <Text style={[styles.sectionIntro, { color: colors.textSecondary }]}>{t('premiumUi.shadbala.bhavaBalaDescription', 'House strength from the lord’s Shadbala, direction, degree-based aspects, occupants and birth phase. Values are Virupas.')}</Text>
+              </View>
+              {HOUSE_NUMBERS.map((number) => {
+                const data = bhavaBala[String(number)];
+                if (!data) return null;
+                return (
+                  <View key={number} style={[styles.bhavaClassicalCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
+                    <View style={styles.bhavaClassicalHeader}>
+                      <View>
+                        <Text style={[styles.bhavHouseNum, { color: colors.primaryStrong }]}>H{number} · {data.sign_name}</Text>
+                        <Text style={[styles.bhavaLord, { color: colors.text }]}>{t('premiumUi.shadbala.lord', 'Lord')}: {translatePlanet(data.lord)}</Text>
+                      </View>
+                      <View style={styles.bhavaTotal}>
+                        <Text style={[styles.bhavaTotalValue, { color: colors.text }]}>{displayNumber(data.total_rupas, 2)}</Text>
+                        <Text style={[styles.bhavaTotalUnit, { color: colors.textSecondary }]}>{t('rupas', 'Rupas')} · #{data.relative_rank}</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.bhavaComponents, { borderTopColor: colors.cardBorder }]}>
+                      {[
+                        [t('premiumUi.shadbala.fromLord', 'From lord'), data.from_lord],
+                        [t('premiumUi.shadbala.bhavaDig', 'Dig Bala'), data.dig_bala],
+                        [t('premiumUi.shadbala.bhavaDrishti', 'Drishti'), data.drishti_bala],
+                        [t('premiumUi.shadbala.planetsIn', 'Planets in'), data.planets_in_bala],
+                        [t('premiumUi.shadbala.dayNight', 'Day/Night'), data.day_night_bala],
+                      ].map(([label, value]) => (
+                        <View key={label} style={styles.bhavaComponent}>
+                          <Text style={[styles.bhavaComponentLabel, { color: colors.textSecondary }]}>{label}</Text>
+                          <Text style={[styles.bhavaComponentValue, { color: colors.text }]}>{displayNumber(value, 1)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
+
+          {activeTab === 'supplementary' && Object.keys(supplementaryHouseStrength).length > 0 ? (
+            <View style={styles.houseSection}>
+              <View style={styles.sectionHeading}>
+                <Text style={[styles.sectionEyebrow, { color: colors.primaryStrong }]}>{t('premiumUi.shadbala.supplementary', 'SUPPLEMENTARY')}</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('premiumUi.shadbala.houseScore', 'App house-strength score')}</Text>
+                <Text style={[styles.sectionIntro, { color: colors.textSecondary }]}>{t('premiumUi.shadbala.houseScoreDescription', 'A separate weighted diagnostic. It is not the classical Parashara Bhava Bala worksheet.')}</Text>
               </View>
               <View style={styles.bhavGrid}>
                 {HOUSE_NUMBERS.map((number) => {
-                  const data = bhavBala[String(number)];
+                  const data = supplementaryHouseStrength[String(number)];
                   if (!data) return null;
                   const grade = data.grade || '—';
                   const treatment = houseGradeTreatment(grade);
@@ -364,6 +489,9 @@ const styles = StyleSheet.create({
   heroMetricLabel: { ...typographyTokens.eyebrow, fontSize: 9, marginBottom: 5 },
   heroMetricValue: { ...typographyTokens.sectionTitle, fontSize: 20 },
   heroDivider: { width: StyleSheet.hairlineWidth, marginHorizontal: 16 },
+  tabBar: { flexDirection: 'row', borderRadius: 18, borderWidth: 1, padding: 4, marginBottom: 16 },
+  tabButton: { flex: 1, minHeight: 48, borderRadius: 14, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
+  tabText: { fontSize: 10, lineHeight: 14, fontWeight: '800', textAlign: 'center' },
   comparisonCard: { borderRadius: 22, borderWidth: 1, padding: 18, marginBottom: 16 },
   cardEyebrow: { ...typographyTokens.eyebrow, fontSize: 9, marginBottom: 5 },
   cardTitle: { ...typographyTokens.sectionTitle, fontSize: 23, marginBottom: 5 },
@@ -392,6 +520,15 @@ const styles = StyleSheet.create({
   selectedScoreLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.7 },
   selectedPoints: { fontSize: 10, marginTop: 6 },
   contentCard: { borderRadius: 22, borderWidth: 1, padding: 18, marginBottom: 22 },
+  standardGrid: { flexDirection: 'row', gap: 8, marginTop: 15 },
+  standardCell: { flex: 1, minHeight: 92, borderRadius: 14, padding: 10 },
+  standardLabel: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.45 },
+  standardValue: { ...typographyTokens.sectionTitle, fontSize: 20, marginTop: 7 },
+  standardNote: { fontSize: 9, lineHeight: 13, marginTop: 3 },
+  phalaRow: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, marginTop: 15, paddingTop: 15 },
+  phalaCell: { flex: 1 },
+  phalaDivider: { width: StyleSheet.hairlineWidth, marginHorizontal: 14 },
+  phalaValue: { ...typographyTokens.sectionTitle, fontSize: 22, marginTop: 5 },
   componentList: { marginTop: 11 },
   componentRow: { paddingVertical: 12 },
   componentHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 },
@@ -414,7 +551,23 @@ const styles = StyleSheet.create({
   detailRow: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   detailName: { flex: 1, fontSize: 12 },
   detailValue: { fontSize: 13, fontWeight: '800' },
+  methodCard: { borderRadius: 18, borderWidth: 1, padding: 14, flexDirection: 'row', gap: 11, marginBottom: 19 },
+  methodIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  methodCopy: { flex: 1 },
+  methodTitle: { ...typographyTokens.sectionTitle, fontSize: 16, marginBottom: 4 },
+  methodBody: { fontSize: 11, lineHeight: 17 },
+  methodMeta: { fontSize: 9, lineHeight: 14, marginTop: 6 },
   houseSection: { marginTop: 3 },
+  bhavaClassicalCard: { borderRadius: 18, borderWidth: 1, padding: 14, marginBottom: 10 },
+  bhavaClassicalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
+  bhavaLord: { ...typographyTokens.sectionTitle, fontSize: 16, marginTop: 5 },
+  bhavaTotal: { alignItems: 'flex-end' },
+  bhavaTotalValue: { ...typographyTokens.sectionTitle, fontSize: 23 },
+  bhavaTotalUnit: { fontSize: 10, marginTop: 2 },
+  bhavaComponents: { flexDirection: 'row', flexWrap: 'wrap', borderTopWidth: StyleSheet.hairlineWidth, marginTop: 12, paddingTop: 10 },
+  bhavaComponent: { width: '33.33%', marginBottom: 8 },
+  bhavaComponentLabel: { fontSize: 9, lineHeight: 13 },
+  bhavaComponentValue: { fontSize: 12, fontWeight: '800', marginTop: 2 },
   bhavGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
   bhavCell: { width: '47.2%', minHeight: 102, marginHorizontal: '1.4%', marginBottom: 10, padding: 12, borderRadius: 17, borderWidth: 1 },
   houseHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },

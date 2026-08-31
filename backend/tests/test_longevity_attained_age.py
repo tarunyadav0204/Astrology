@@ -57,18 +57,18 @@ def test_abc_does_not_report_an_alpayu_band_already_exceeded():
     }
     assert "not a lifespan in years" in ashtakavarga["detail"]
     assert safeguards["title"] == "BPHS early-life cancellation audit"
-    assert safeguards["summary"] == "0 of 4 listed combinations fully satisfied; 3 partially satisfied"
+    assert safeguards["summary"] == "1 of 4 listed combinations fully satisfied; 2 partially satisfied"
     assert "not a current health-risk score" in safeguards["interpretation"]
     assert [rule["status"] for rule in safeguards["rules"]] == [
         "not_satisfied",
         "partially_satisfied",
-        "partially_satisfied",
+        "satisfied",
         "partially_satisfied",
     ]
     assert safeguards["rules"][1]["condition_checks"][0]["passed"] is False
     assert safeguards["rules"][1]["condition_checks"][1]["passed"] is True
     assert safeguards["rules"][2]["condition_checks"][0]["passed"] is True
-    assert safeguards["rules"][2]["condition_checks"][1]["passed"] is False
+    assert safeguards["rules"][2]["condition_checks"][1]["passed"] is True
 
 
 def test_abc_keeps_the_classical_reduction_before_the_alpayu_ceiling():

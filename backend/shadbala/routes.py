@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Dict, List, Any
 from calculators.classical_shadbala import calculate_classical_shadbala
+from calculators.classical_bhava_bala import calculate_classical_bhava_bala
 
 router = APIRouter()
 
@@ -9,8 +10,13 @@ class ShadbalaRequest(BaseModel):
     birth_data: Dict[str, Any]
     chart_data: Dict[str, Any]
 
-def _compute_bhav_bala(chart_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Compute Bhav Bala (house strength) for all 12 houses. Returns dict keyed by house number '1'..'12'."""
+def _compute_supplementary_house_strength(chart_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Return the app's general house score.
+
+    This weighted diagnostic is intentionally not called classical Bhava Bala:
+    Parashara's worksheet uses Bhavadhipati, Bhava Dig and Bhava Drishti Bala,
+    which are a different calculation.
+    """
     bhav_bala = {}
     if not chart_data or not isinstance(chart_data.get("houses"), list) or len(chart_data.get("houses", [])) != 12:
         return bhav_bala
@@ -44,27 +50,42 @@ async def calculate_classical_shadbala_endpoint(request: ShadbalaRequest):
             print(f"\n✅ chart_data['divisions'] populated with {len(chart_data['divisions'])} vargas")
         
         results = calculate_classical_shadbala(request.birth_data, chart_data)
+        bhava_bala = calculate_classical_bhava_bala(request.birth_data, chart_data, results)
         
         if not results:
             raise HTTPException(status_code=400, detail="No valid planets found for calculation")
         
         # Sort by total strength
-        sorted_results = dict(sorted(results.items(), key=lambda x: x[1]['total_rupas'], reverse=True))
+        sorted_results = dict(sorted(results.items(), key=lambda x: x[1]['relative_rank']))
         
-        # Bhav Bala (house strength) for all 12 houses
-        bhav_bala = _compute_bhav_bala(chart_data)
+        supplementary_house_strength = _compute_supplementary_house_strength(chart_data)
         
         response = {
             "shadbala": sorted_results,
+            "bhava_bala": bhava_bala,
             "summary": {
-                "strongest": max(results.items(), key=lambda x: x[1]['total_rupas']),
-                "weakest": min(results.items(), key=lambda x: x[1]['total_rupas'])
+                "strongest": min(results.items(), key=lambda x: x[1]['relative_rank']),
+                "weakest": max(results.items(), key=lambda x: x[1]['relative_rank'])
             },
-            "calculation_method": "Classical Brihat Parashara Hora Shastra",
-            "authenticity": "Complete 6-fold calculation with all sub-components"
+            "calculation_method": "BPHS Ch. 26–27 with Sripati/Kedarnath-Dutt conventions",
+            "bhava_bala_method": "BPHS Ch. 27.26–31: lord, direction, aspect, occupation and day/twilight/night",
+            "validation": {
+                "reference": "Parashara's Light 7.0.3 public Chennai sample",
+                "exact_rows": ["Sthana Bala", "Dig Bala", "Drik Bala"],
+                "bounded_rows": ["Kala Bala"],
+                "convention_dependent_rows": ["Chesta Bala", "Ishta/Kashta Phala"],
+                "note": (
+                    "Totals include the selected classical Chesta mean-longitude convention. "
+                    "Do not treat Shadbala as a health, lifespan, or event-probability score."
+                ),
+                "bhava_bala_note": (
+                    "Bhava Bala is a house-strength worksheet, not an outcome probability. "
+                    "The BPHS twilight adjustment uses a disclosed one-ghati Sandhya convention."
+                ),
+            },
         }
-        if bhav_bala:
-            response["bhav_bala"] = bhav_bala
+        if supplementary_house_strength:
+            response["supplementary_house_strength"] = supplementary_house_strength
         return response
     except HTTPException:
         raise
