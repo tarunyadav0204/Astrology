@@ -1,0 +1,28 @@
+{
+  "schema_version": "rectification.event-source-audit.v1",
+  "dataset_id": "replace-with-source-seed-dataset-id",
+  "audited_dataset_id": "replace-with-versioned-audited-dataset-id",
+  "events": [
+    {
+      "case_id": "replace-with-anonymous-case-id",
+      "event_id": "event-1",
+      "status": "verified_exact",
+      "audited_event_type": "marriage",
+      "audited_date_start": "2008-11-12",
+      "audited_precision": "exact_day",
+      "sources": [
+        {
+          "publisher": "Independent public archive",
+          "url": "https://example.test/source"
+        }
+      ],
+      "review_note": "The source confirms both the date and event meaning."
+    },
+    {
+      "case_id": "replace-with-anonymous-case-id",
+      "event_id": "event-2",
+      "status": "semantic_mismatch",
+      "review_note": "The cited milestone is not the event type assigned by the seed."
+    }
+  ]
+}

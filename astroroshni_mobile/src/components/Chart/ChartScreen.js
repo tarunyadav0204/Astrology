@@ -30,6 +30,7 @@ import { chartAPI, creditAPI } from '../../services/api';
 import { refreshWebShellHeight } from '../../platform/webSafeArea';
 import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
+import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 
@@ -115,6 +116,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
 
   const chartTypes = [
     { id: 'lagna', name: t('chartTypes.lagna.name'), icon: '🏠', description: t('chartTypes.lagna.description') },
+    { id: 'bhav_chalit', name: t('chartTypes.bhavChalit.name', 'Bhava Chalit'), icon: '▦', description: t('chartTypes.bhavChalit.description', 'Planets placed by calculated house cusps') },
     { id: 'navamsa', name: t('chartTypes.navamsa.name'), icon: '💎', description: t('chartTypes.navamsa.description') },
     { id: 'transit', name: t('chartTypes.transit.name'), icon: '🪐', description: t('chartTypes.transit.description') },
     { id: 'karkamsa', name: t('chartTypes.karkamsa.name'), icon: '🎯', description: t('chartTypes.karkamsa.description') },
@@ -364,6 +366,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     const cachedChart = chartPreloader.getChart(birthData, chartType);
     if (cachedChart) return cachedChart;
     if (chartType === 'lagna') return chartData;
+    if (chartType === 'bhav_chalit') return buildBhavChalitChart(chartData);
     return null;
   }, [birthData, chartData]);
 

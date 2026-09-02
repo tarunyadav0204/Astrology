@@ -9,6 +9,7 @@ import AshtakavargaModal from '../Ashtakavarga/AshtakavargaModal';
 import ShadbalaModal from '../Shadbala/ShadbalaModal';
 import './ChartMaximizedModal.css';
 import './ChartToolModal.css';
+import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
 
 const ChartWidget = ({
   title,
@@ -179,6 +180,8 @@ const ChartWidget = ({
     switch (chartType) {
       case 'lagna':
         return chartData;
+      case 'bhav_chalit':
+        return buildBhavChalitChart(chartData);
       case 'navamsa':
       case 'divisional':
       case 'karkamsa':
@@ -458,9 +461,9 @@ const ChartWidget = ({
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', color: '#666' }}>
             Calculating divisional chart...
           </div>
-        ) : !divisionalData && (chartType === 'navamsa' || chartType === 'divisional' || chartType === 'karkamsa' || chartType === 'swamsa') ? (
+        ) : ((chartType === 'bhav_chalit' && !processedData) || (!divisionalData && (chartType === 'navamsa' || chartType === 'divisional' || chartType === 'karkamsa' || chartType === 'swamsa'))) ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', color: '#e91e63' }}>
-            Failed to load divisional chart
+            Failed to load chart
           </div>
         ) : chartStyle === 'north' ? (
           <NorthIndianChart 
@@ -1070,9 +1073,9 @@ const ChartWidget = ({
                 <div className="chart-maximized-modal__state">
                   Calculating divisional chart...
                 </div>
-              ) : !divisionalData && (chartType === 'navamsa' || chartType === 'divisional' || chartType === 'karkamsa' || chartType === 'swamsa') ? (
+              ) : ((chartType === 'bhav_chalit' && !processedData) || (!divisionalData && (chartType === 'navamsa' || chartType === 'divisional' || chartType === 'karkamsa' || chartType === 'swamsa'))) ? (
                 <div className="chart-maximized-modal__state chart-maximized-modal__state--error">
-                  Failed to load divisional chart
+                  Failed to load chart
                 </div>
               ) : chartStyle === 'north' ? (
                 <div className="chart-maximized-modal__chart-frame">

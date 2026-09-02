@@ -18,9 +18,9 @@ class KPChartService:
             # If timezone is empty or None, calculate it from coordinates
             if not timezone:
                 # Use the timezone service to get offset
-                tz_offset = parse_timezone_offset("", latitude, longitude)
+                tz_offset = parse_timezone_offset("", latitude, longitude, for_date=birth_date)
             else:
-                tz_offset = parse_timezone_offset(timezone, latitude, longitude)
+                tz_offset = parse_timezone_offset(timezone, latitude, longitude, for_date=birth_date)
             
             utc_hour = hour - tz_offset
             

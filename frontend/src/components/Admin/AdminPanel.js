@@ -392,6 +392,21 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [planBenefitsDraft, setPlanBenefitsDraft] = useState({});
   const [savingPlanBenefitsId, setSavingPlanBenefitsId] = useState(null);
   const [promoCodes, setPromoCodes] = useState([]);
+  const [purchasePromos, setPurchasePromos] = useState([]);
+  const [newPurchasePromo, setNewPurchasePromo] = useState({
+    name: '',
+    code: '',
+    percent: 20,
+    channels: 'web',
+    starts_at: '',
+    ends_at: '',
+    user_created_after: '',
+    max_uses: '',
+    max_uses_per_user: 1,
+    is_active: true,
+  });
+  const [editingPurchasePromoId, setEditingPurchasePromoId] = useState(null);
+  const [purchasePromoForm, setPurchasePromoForm] = useState({});
   const [creditStats, setCreditStats] = useState({});
   const [newPromoCode, setNewPromoCode] = useState({ code: '', credits: 100, max_uses: 1, max_uses_per_user: 1 });
   const [creditSettings, setCreditSettings] = useState(() =>
@@ -734,6 +749,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     } else if (activeTab === 'credits') {
       if (activeSubTab === 'management') {
         fetchPromoCodes();
+        fetchPurchasePromos();
         fetchCreditStats();
         fetchCreditSettings();
         fetchSubscriptionPlans();
@@ -2641,6 +2657,154 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setPromoCodes(data.promo_codes || []);
     } catch (error) {
       console.error('Error fetching promo codes:', error);
+    }
+  };
+
+  const fetchPurchasePromos = async () => {
+    try {
+      const response = await fetch('/api/credits/admin/purchase-promos', {
+        headers: getAdminAuthHeaders(),
+      });
+      const data = await response.json();
+      setPurchasePromos(data.promos || []);
+    } catch (error) {
+      console.error('Error fetching purchase promos:', error);
+    }
+  };
+
+  const purchasePromoPayload = (form) => ({
+    name: String(form.name || '').trim(),
+    code: String(form.code || '').trim().toUpperCase(),
+    percent: parseInt(form.percent, 10),
+    channels: form.channels || 'web',
+    starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null,
+    ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
+    user_created_after: form.user_created_after
+      ? `${String(form.user_created_after).slice(0, 10)}T00:00:00`
+      : null,
+    max_uses: form.max_uses === '' || form.max_uses == null ? null : parseInt(form.max_uses, 10),
+    max_uses_per_user: parseInt(form.max_uses_per_user, 10) || 1,
+    is_active: form.is_active !== false,
+  });
+
+  const handleCreatePurchasePromo = async () => {
+    try {
+      const response = await fetch('/api/credits/admin/purchase-promos', {
+        method: 'POST',
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(purchasePromoPayload(newPurchasePromo)),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.detail || 'Failed to create purchase promo');
+        return;
+      }
+      setNewPurchasePromo({
+        name: '',
+        code: '',
+        percent: 20,
+        channels: 'web',
+        starts_at: '',
+        ends_at: '',
+        user_created_after: '',
+        max_uses: '',
+        max_uses_per_user: 1,
+        is_active: true,
+      });
+      fetchPurchasePromos();
+    } catch (error) {
+      console.error('Error creating purchase promo:', error);
+      alert('Error creating purchase promo');
+    }
+  };
+
+  const isoToDatetimeLocal = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const startEditingPurchasePromo = (promo) => {
+    setEditingPurchasePromoId(promo.id);
+    setPurchasePromoForm({
+      name: promo.name || '',
+      code: promo.code || '',
+      percent: promo.percent,
+      channels: promo.channels || 'web',
+      starts_at: isoToDatetimeLocal(promo.starts_at),
+      ends_at: isoToDatetimeLocal(promo.ends_at),
+      user_created_after: promo.user_created_after
+        ? String(promo.user_created_after).slice(0, 10)
+        : '',
+      max_uses: promo.max_uses ?? '',
+      max_uses_per_user: promo.max_uses_per_user || 1,
+      is_active: promo.is_active !== false,
+    });
+  };
+
+  const handleUpdatePurchasePromo = async (promoId) => {
+    try {
+      const response = await fetch(`/api/credits/admin/purchase-promos/${promoId}`, {
+        method: 'PUT',
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(purchasePromoPayload(purchasePromoForm)),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.detail || 'Failed to update purchase promo');
+        return;
+      }
+      setEditingPurchasePromoId(null);
+      setPurchasePromoForm({});
+      fetchPurchasePromos();
+    } catch (error) {
+      console.error('Error updating purchase promo:', error);
+      alert('Error updating purchase promo');
+    }
+  };
+
+  const handleStopPurchasePromo = async (promoId) => {
+    try {
+      const response = await fetch(`/api/credits/admin/purchase-promos/${promoId}/stop`, {
+        method: 'POST',
+        headers: getAdminAuthHeaders(),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.detail || 'Failed to stop purchase promo');
+        return;
+      }
+      fetchPurchasePromos();
+    } catch (error) {
+      console.error('Error stopping purchase promo:', error);
+    }
+  };
+
+  const handleResumePurchasePromo = async (promo) => {
+    try {
+      const response = await fetch(`/api/credits/admin/purchase-promos/${promo.id}`, {
+        method: 'PUT',
+        headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(purchasePromoPayload({
+          ...promo,
+          starts_at: isoToDatetimeLocal(promo.starts_at),
+          ends_at: isoToDatetimeLocal(promo.ends_at),
+          user_created_after: promo.user_created_after
+            ? String(promo.user_created_after).slice(0, 10)
+            : '',
+          is_active: true,
+        })),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.detail || 'Failed to resume purchase promo');
+        return;
+      }
+      fetchPurchasePromos();
+    } catch (error) {
+      console.error('Error resuming purchase promo:', error);
     }
   };
 
@@ -4722,6 +4886,215 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   <h4>Credits Distributed</h4>
                   <p>{creditStats.total_credits_distributed || 0}</p>
                 </div>
+              </div>
+            </div>
+
+            <div className="promo-code-creation">
+              <h3>Purchase promo (% extra on buy)</h3>
+              <p className="credit-settings-hint">
+                    Users enter this code when they buy a pack on the website, the mobile PWA, or Android. Extra credits are the percent you set, and they <strong>replace</strong> the usual purchase extras (web 10%, first-purchase bonus, campaigns) instead of stacking. Google Play prices stay the same; a Play code adds credits after payment. Website and PWA both use Razorpay. Existing “redeem for free credits” codes below are unchanged.
+              </p>
+              <div className="create-form">
+                <div className="form-field">
+                  <label>Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Diwali 20%"
+                    value={newPurchasePromo.name}
+                    onChange={(e) => setNewPurchasePromo({ ...newPurchasePromo, name: e.target.value })}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Code</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. DIWALI20"
+                    value={newPurchasePromo.code}
+                    onChange={(e) => setNewPurchasePromo({ ...newPurchasePromo, code: e.target.value.toUpperCase() })}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Extra credits %</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={newPurchasePromo.percent}
+                    onChange={(e) => setNewPurchasePromo({ ...newPurchasePromo, percent: e.target.value })}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Where it applies</label>
+                  <select
+                    value={newPurchasePromo.channels}
+                    onChange={(e) => setNewPurchasePromo({ ...newPurchasePromo, channels: e.target.value })}
+                  >
+                    <option value="web">Website and PWA (Razorpay)</option>
+                    <option value="play">Android app (Google Play)</option>
+                    <option value="both">Website, PWA, and Android app</option>
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label>Start</label>
+                  <input
+                    type="datetime-local"
+                    value={newPurchasePromo.starts_at}
+                    onChange={(e) => setNewPurchasePromo({ ...newPurchasePromo, starts_at: e.target.value })}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>End</label>
+                  <input
+                    type="datetime-local"
+                    value={newPurchasePromo.ends_at}
+                    onChange={(e) => setNewPurchasePromo({ ...newPurchasePromo, ends_at: e.target.value })}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Only users created on/after</label>
+                  <input
+                    type="date"
+                    value={newPurchasePromo.user_created_after}
+                    onChange={(e) => setNewPurchasePromo({ ...newPurchasePromo, user_created_after: e.target.value })}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Max uses (blank = unlimited)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="Unlimited"
+                    value={newPurchasePromo.max_uses}
+                    onChange={(e) => setNewPurchasePromo({ ...newPurchasePromo, max_uses: e.target.value })}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Max uses per user</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newPurchasePromo.max_uses_per_user}
+                    onChange={(e) => setNewPurchasePromo({ ...newPurchasePromo, max_uses_per_user: e.target.value })}
+                  />
+                </div>
+                <div className="form-buttons">
+                  <button type="button" onClick={handleCreatePurchasePromo} className="create-btn">
+                    Create purchase promo
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="promo-codes-list">
+              <h3>Purchase promos</h3>
+              <div className="codes-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Code</th>
+                      <th>%</th>
+                      <th>Channel</th>
+                      <th>Window</th>
+                      <th>New users from</th>
+                      <th>Used</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {purchasePromos.length === 0 ? (
+                      <tr><td colSpan={9} className="users-table-empty">No purchase promos yet.</td></tr>
+                    ) : (
+                      purchasePromos.map((promo) => {
+                        const editing = editingPurchasePromoId === promo.id;
+                        const form = editing ? purchasePromoForm : promo;
+                        return (
+                          <tr key={promo.id}>
+                            <td>
+                              {editing ? (
+                                <input value={form.name} onChange={(e) => setPurchasePromoForm({ ...form, name: e.target.value })} />
+                              ) : (
+                                promo.name
+                              )}
+                            </td>
+                            <td>
+                              {editing ? (
+                                <input value={form.code} onChange={(e) => setPurchasePromoForm({ ...form, code: e.target.value.toUpperCase() })} />
+                              ) : (
+                                <strong>{promo.code}</strong>
+                              )}
+                            </td>
+                            <td>
+                              {editing ? (
+                                <input type="number" min={1} max={500} value={form.percent} onChange={(e) => setPurchasePromoForm({ ...form, percent: e.target.value })} style={{ width: 70 }} />
+                              ) : (
+                                `${promo.percent}%`
+                              )}
+                            </td>
+                            <td>
+                              {editing ? (
+                                <select value={form.channels} onChange={(e) => setPurchasePromoForm({ ...form, channels: e.target.value })}>
+                                  <option value="web">Website and PWA</option>
+                                  <option value="play">Play</option>
+                                  <option value="both">Website, PWA, and Play</option>
+                                </select>
+                              ) : (
+                                promo.channels === 'web'
+                                  ? 'Website and PWA'
+                                  : promo.channels === 'play'
+                                    ? 'Android Play'
+                                    : promo.channels === 'both'
+                                      ? 'Website, PWA, and Play'
+                                      : promo.channels
+                              )}
+                            </td>
+                            <td>
+                              {editing ? (
+                                <>
+                                  <input type="datetime-local" value={form.starts_at || ''} onChange={(e) => setPurchasePromoForm({ ...form, starts_at: e.target.value })} />
+                                  <input type="datetime-local" value={form.ends_at || ''} onChange={(e) => setPurchasePromoForm({ ...form, ends_at: e.target.value })} />
+                                </>
+                              ) : (
+                                `${promo.starts_at ? new Date(promo.starts_at).toLocaleString() : 'now'} → ${promo.ends_at ? new Date(promo.ends_at).toLocaleString() : 'open'}`
+                              )}
+                            </td>
+                            <td>
+                              {editing ? (
+                                <input type="date" value={form.user_created_after || ''} onChange={(e) => setPurchasePromoForm({ ...form, user_created_after: e.target.value })} />
+                              ) : (
+                                promo.user_created_after ? String(promo.user_created_after).slice(0, 10) : 'All accounts'
+                              )}
+                            </td>
+                            <td>{promo.used_count}{promo.max_uses ? ` / ${promo.max_uses}` : ''}</td>
+                            <td>
+                              <span className={`status ${promo.live ? 'active' : 'inactive'}`}>
+                                {promo.live ? 'Live' : (promo.is_active ? 'Scheduled/ended' : 'Stopped')}
+                              </span>
+                            </td>
+                            <td>
+                              {editing ? (
+                                <div>
+                                  <button type="button" className="save-btn" onClick={() => handleUpdatePurchasePromo(promo.id)}>Save</button>
+                                  <button type="button" className="cancel-btn" onClick={() => { setEditingPurchasePromoId(null); setPurchasePromoForm({}); }}>Cancel</button>
+                                </div>
+                              ) : (
+                                <div>
+                                  <button type="button" className="edit-btn" onClick={() => startEditingPurchasePromo(promo)}>Edit</button>
+                                  {promo.is_active ? (
+                                    <button type="button" className="delete-btn" onClick={() => handleStopPurchasePromo(promo.id)}>Stop</button>
+                                  ) : (
+                                    <button type="button" className="save-btn" onClick={() => handleResumePurchasePromo(promo)}>Resume</button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 

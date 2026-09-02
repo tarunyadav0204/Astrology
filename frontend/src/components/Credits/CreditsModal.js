@@ -44,6 +44,10 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
     const [promoCode, setPromoCode] = useState('');
     const [promoLoading, setPromoLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [purchasePromoInput, setPurchasePromoInput] = useState('');
+    const [purchasePromoLoading, setPurchasePromoLoading] = useState(false);
+    const [purchasePromoMessage, setPurchasePromoMessage] = useState('');
+    const [appliedPurchasePromo, setAppliedPurchasePromo] = useState(null);
 
     const [razorpayCatalog, setRazorpayCatalog] = useState(null);
     const [razorpayCatalogLoading, setRazorpayCatalogLoading] = useState(false);
@@ -68,6 +72,7 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
         if (!isOpen) {
             setPurchaseMessage('');
             setPurchasingCredits(null);
+            setPurchasePromoMessage('');
         }
     }, [isOpen]);
 
@@ -186,6 +191,36 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
         }
     };
 
+    const handleApplyPurchasePromo = async (e) => {
+        e.preventDefault();
+        const code = purchasePromoInput.trim();
+        if (!code) return;
+        setPurchasePromoLoading(true);
+        setPurchasePromoMessage('');
+        try {
+            const response = await fetch('/api/credits/purchase-promo/preview', {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify({ code, channel: 'web' }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.ok) {
+                setAppliedPurchasePromo(null);
+                setPurchasePromoMessage(data.message || data.detail || 'This code cannot be used at checkout');
+                return;
+            }
+            setAppliedPurchasePromo(data.promo);
+            setPurchasePromoMessage(
+                `${data.promo.name}: ${data.promo.percent}% extra credits on this purchase.`
+            );
+        } catch (_) {
+            setAppliedPurchasePromo(null);
+            setPurchasePromoMessage('Could not apply this code');
+        } finally {
+            setPurchasePromoLoading(false);
+        }
+    };
+
     const reportPaymentFailure = (payload) => {
         fetch('/api/credits/payment-failure/report', {
             method: 'POST',
@@ -204,6 +239,9 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
         let orderId = null;
         try {
             const orderBody = { credits: creditsAmount };
+            if (appliedPurchasePromo?.code && Number(creditsAmount) !== 24) {
+                orderBody.purchase_promo_code = appliedPurchasePromo.code;
+            }
             const mainOrderRequest = () => fetch('/api/credits/razorpay/create-order', {
                 method: 'POST',
                 headers: authHeaders(),
@@ -348,8 +386,61 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                         <div className="credits-modal-message credits-modal-message--err">{razorpayCatalogError}</div>
                     )}
                     {isLoggedIn && razorpayCatalog && razorpayCatalog.packs && (
+                        <>
+                        <form onSubmit={handleApplyPurchasePromo} className="credits-modal-form-row credits-modal-form-row--inline" style={{ marginBottom: '1rem' }}>
+                            <ThemeInput
+                                type="text"
+                                value={purchasePromoInput}
+                                onChange={(e) => setPurchasePromoInput(e.target.value)}
+                                placeholder="Purchase promo code"
+                                className="credits-modal-input"
+                                disabled={purchasePromoLoading}
+                                autoComplete="off"
+                            />
+                            <ThemeButton
+                                type="submit"
+                                disabled={purchasePromoLoading || !purchasePromoInput.trim()}
+                                size="md"
+                                className="credits-modal-btn-primary"
+                            >
+                                {purchasePromoLoading ? 'Checking…' : appliedPurchasePromo ? 'Update code' : 'Apply at checkout'}
+                            </ThemeButton>
+                            {appliedPurchasePromo ? (
+                                <ThemeButton
+                                    type="button"
+                                    size="md"
+                                    onClick={() => {
+                                        setAppliedPurchasePromo(null);
+                                        setPurchasePromoInput('');
+                                        setPurchasePromoMessage('');
+                                    }}
+                                >
+                                    Remove
+                                </ThemeButton>
+                            ) : null}
+                        </form>
+                        {purchasePromoMessage ? (
+                            <div
+                                className={`credits-modal-message ${
+                                    appliedPurchasePromo ? 'credits-modal-message--ok' : 'credits-modal-message--err'
+                                }`}
+                            >
+                                {purchasePromoMessage}
+                            </div>
+                        ) : null}
                         <div className="credits-modal-pack-grid">
-                            {razorpayCatalog.packs.map((pack, index) => (
+                            {razorpayCatalog.packs.map((pack, index) => {
+                                const isStarter = Number(pack.credits) === 24;
+                                const promoPercent = (!isStarter && appliedPurchasePromo)
+                                    ? Number(appliedPurchasePromo.percent) || 0
+                                    : 0;
+                                const promoBonus = promoPercent > 0
+                                    ? Math.floor(Number(pack.credits) * promoPercent / 100)
+                                    : 0;
+                                const displayCredits = promoBonus > 0
+                                    ? Number(pack.credits) + promoBonus
+                                    : Number(pack.total_credits || pack.credits);
+                                return (
                                 <button
                                     key={pack.credits}
                                     type="button"
@@ -366,21 +457,25 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                                     </span>
                                     <span className="credits-modal-pack-price">{pack.amount_display}</span>
                                     <span className="credits-modal-pack-credits">
-                                        {Number(pack.total_credits || pack.credits)} Credits
+                                        {displayCredits} Credits
                                     </span>
-                                    {pack.questions != null ? (
+                                    {pack.questions != null && promoBonus <= 0 ? (
                                         <span className="credits-modal-pack-questions">
                                             {pack.credits >= 999
                                                 ? `${pack.questions} Questions with Tara`
                                                 : `${pack.questions} Questions`}
                                         </span>
                                     ) : null}
-                                    {pack.pack_bonus_credits > 0 ? (
+                                    {promoBonus > 0 ? (
+                                        <span className="credits-modal-pack-save">
+                                            {pack.credits} + {promoBonus} promo ({promoPercent}%)
+                                        </span>
+                                    ) : pack.pack_bonus_credits > 0 ? (
                                         <span className="credits-modal-pack-save">
                                             {pack.credits} + {pack.pack_bonus_credits} bonus (5% extra)
                                         </span>
                                     ) : null}
-                                    {pack.credit_campaign ? (
+                                    {!promoBonus && pack.credit_campaign ? (
                                         <span className="credits-modal-pack-save">
                                             Special {Number(pack.credit_campaign.multiplier).toLocaleString(undefined, { maximumFractionDigits: 3 })}× offer · ends {new Date(pack.credit_campaign.ends_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                                         </span>
@@ -392,8 +487,10 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
                                         <span className="credits-modal-pack-busy">Opening…</span>
                                     )}
                                 </button>
-                            ))}
+                                );
+                            })}
                         </div>
+                        </>
                     )}
                     {isLoggedIn && !razorpayCatalogLoading && !razorpayCatalogError && razorpayCatalog && (
                         <p className="credits-modal-razorpay-badge" aria-hidden="true">
@@ -414,7 +511,7 @@ const CreditsModal = ({ isOpen, onClose, onLogin, firstPurchaseOfferMessageId = 
             <div className="credits-modal-lower-grid">
                 <section className="credits-modal-promo" aria-labelledby="credits-promo-heading">
                     <span className="credits-modal-kicker">Have a code?</span>
-                    <h3 id="credits-promo-heading" className="credits-modal-section-title">Redeem a promo</h3>
+                    <h3 id="credits-promo-heading" className="credits-modal-section-title">Redeem free credits</h3>
                     <form onSubmit={handleRedeemPromo} className="credits-modal-form-row credits-modal-form-row--inline">
                         <ThemeInput
                             type="text"

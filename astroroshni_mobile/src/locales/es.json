@@ -91,6 +91,10 @@
       "name": "Lagna (D1)",
       "description": "Carta Natal Principal"
     },
+    "bhavChalit": {
+      "name": "Bhava Chalit",
+      "description": "Planetas ubicados según las cúspides calculadas"
+    },
     "navamsa": {
       "name": "Navamsa (D9)",
       "description": "Matrimonio y Espiritualidad"

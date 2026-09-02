@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 import AppScrollView from '../../platform/AppScrollView';
+import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
 
 const isWeb = Platform.OS === 'web';
 
@@ -90,13 +91,14 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   }, [chartDataCache]);
 
   const chartTypes = [
-    'lagna', 'navamsa', 'transit', 'karkamsa', 'swamsa', 'saptamsa', 'dasamsa', 'dwadasamsa', 'shodasamsa',
+    'lagna', 'bhav_chalit', 'navamsa', 'transit', 'karkamsa', 'swamsa', 'saptamsa', 'dasamsa', 'dwadasamsa', 'shodasamsa',
     'vimshamsa', 'chaturvimshamsa', 'saptavimshamsa', 'trimshamsa',
     'khavedamsa', 'akshavedamsa', 'shashtyamsa'
   ];
 
   const chartTitles = {
     lagna: 'Birth Chart (Lagna)',
+    bhav_chalit: 'Bhava Chalit',
     navamsa: 'Navamsa (D9)',
     transit: 'Transit Chart',
     karkamsa: 'Karkamsa Chart',
@@ -194,6 +196,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     switch (currentChartType) {
       case 'lagna':
         return 'This is your Lagna (D1) birth chart. It shows how the 12 houses and zodiac signs were arranged at your birth, and where each planet was placed.';
+      case 'bhav_chalit':
+        return 'This is your Bhava Chalit chart. It keeps the D1 zodiac positions but shows the houses planets actually occupy after applying the calculated house cusps.';
       case 'navamsa':
         return 'This is your Navamsa (D9) chart. It refines your birth chart and is especially important for marriage, dharma, and the strength of planets.';
       case 'transit':
@@ -213,6 +217,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     switch (currentChartType) {
       case 'lagna':
         return 'Use this chart to understand your overall life pattern: personality, health, family, career foundations, relationships and major life themes across all 12 houses.';
+      case 'bhav_chalit':
+        return 'Use it with D1 to see whether a planet shifts into a neighbouring house. Its zodiac sign does not change; only its house placement may change.';
       case 'navamsa':
         return 'Use this chart to study deeper patterns in relationships, marriage, spiritual path and the true strength and maturity of planets over time.';
       case 'transit':
@@ -230,6 +236,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
 
   const getChartData = () => {
     if (currentChartType === 'lagna') return chartData || lagnaChartData || currentChartData;
+    if (currentChartType === 'bhav_chalit') {
+      return chartDataCache.bhav_chalit
+        || buildBhavChalitChart(lagnaChartData || chartData || chartDataCache.lagna)
+        || null;
+    }
     if (currentChartType === 'transit') return currentChartData || chartDataCache.transit;
     return chartDataCache[currentChartType] || currentChartData || null;
   };
@@ -290,10 +301,27 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           setCurrentChartData(data);
           setLoading(false);
         }
+      } else if (setCurrent) {
+        setCurrentChartData(null);
+        setLoading(false);
       }
       return;
     }
     if (!birthData) return;
+    if (type === 'bhav_chalit') {
+      const data = buildBhavChalitChart(lagnaChartData || chartData || chartDataCacheRef.current.lagna);
+      if (data) {
+        setChartDataCache((prev) => ({ ...prev, bhav_chalit: data }));
+        if (setCurrent) {
+          setCurrentChartData(data);
+          setLoading(false);
+        }
+      } else if (setCurrent) {
+        setCurrentChartData(null);
+        setLoading(false);
+      }
+      return;
+    }
     const cachedHit =
       chartDataCacheRef.current[type] && !(type === 'transit' && customDate)
         ? chartDataCacheRef.current[type]
@@ -396,6 +424,10 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
 
     if (type === 'transit') {
       loadChartData('transit', true);
+      return;
+    }
+    if (type === 'bhav_chalit') {
+      loadChartData(type, true);
       return;
     }
     if (type === 'karkamsa' || type === 'swamsa') {

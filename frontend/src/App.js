@@ -117,6 +117,7 @@ const BirthFormModal = lazy(() => import('./components/BirthForm/BirthFormModal'
 const BirthChartCreationPage = lazy(() => import('./components/BirthChart/BirthChartCreationPage'));
 const ChartsDashasWorkspacePage = lazy(() => import('./components/BirthChart/ChartsDashasWorkspacePage'));
 const ActivationExplorerPage = lazy(() => import('./components/BirthChart/ActivationExplorerPage'));
+const BirthTimeRectificationPage = lazy(() => import('./components/BirthChart/BirthTimeRectificationPage'));
 const KPDeskPage = lazy(() => import('./components/KP/KPDeskPage'));
 const NadiDeskPage = lazy(() => import('./components/Nadi/NadiDeskPage'));
 const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'));
@@ -746,6 +747,25 @@ function App() {
                   authView={authView}
                   setAuthView={setAuthView}
                   description="Sign in to inspect the deterministic activation ledger for your saved birth chart."
+                  onAuthenticated={handleLogin}
+                />
+              </>
+            } />
+            <Route path="/charts-dashas/rectification" element={
+              <>
+                <BirthTimeRectificationPage
+                  user={user}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to compare nearby birth times with dated events from your life."
                   onAuthenticated={handleLogin}
                 />
               </>

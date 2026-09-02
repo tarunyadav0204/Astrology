@@ -1,0 +1,12 @@
+{
+  "schema_version": "rectification.truth-vault.v1",
+  "dataset_id": "replace-with-versioned-cohort-id",
+  "truth": [
+    {
+      "id": "replace-with-anonymous-case-id",
+      "verified_local_time": "10:34:00",
+      "verification_source": "Describe the contemporaneous source without personal details",
+      "verification_rating": "documented"
+    }
+  ]
+}

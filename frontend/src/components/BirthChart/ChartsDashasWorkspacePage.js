@@ -81,7 +81,8 @@ const DIVISIONAL_CHART_OPTIONS = [
   { value: 60, shortLabel: 'D60', label: 'Shashtyamsa' },
 ];
 
-const JAIMINI_CHART_OPTIONS = [
+const SPECIAL_CHART_OPTIONS = [
+  { value: 'bhav_chalit', shortLabel: 'BC', label: 'Bhava Chalit' },
   { value: 'karkamsa', shortLabel: 'Ka', label: 'Kārkāṁśa' },
   { value: 'swamsa', shortLabel: 'Sw', label: 'Swāṁśa' },
 ];
@@ -169,13 +170,13 @@ const ChartsDashasWorkspacePage = ({
   }, [isMobileDesk]);
 
   const selectedDivisionalChart = useMemo(() => {
-    if (selectedDx === 'karkamsa' || selectedDx === 'swamsa') {
-      return JAIMINI_CHART_OPTIONS.find((o) => o.value === selectedDx);
+    if (typeof selectedDx === 'string') {
+      return SPECIAL_CHART_OPTIONS.find((o) => o.value === selectedDx);
     }
     return DIVISIONAL_CHART_OPTIONS.find((option) => option.value === selectedDx) || DIVISIONAL_CHART_OPTIONS[5];
   }, [selectedDx]);
 
-  const dxChartType = selectedDx === 'karkamsa' || selectedDx === 'swamsa'
+  const dxChartType = typeof selectedDx === 'string'
     ? selectedDx
     : 'divisional';
 
@@ -332,6 +333,9 @@ const ChartsDashasWorkspacePage = ({
           <button type="button" className="parashari-desk-chip" onClick={() => navigate('/charts-dashas/nadi')}>
             Nadi Desk
           </button>
+          <button type="button" className="parashari-desk-chip" onClick={() => navigate('/charts-dashas/rectification')}>
+            Rectify time
+          </button>
           {hasChart ? (
             <div className="parashari-desk-bar__tools" role="group" aria-label="Strength tools">
               {STRENGTH_TOOLS.map((tool) => (
@@ -392,7 +396,7 @@ const ChartsDashasWorkspacePage = ({
           selectedDx={selectedDx}
           onSelectedDxChange={setSelectedDx}
           divisionalOptions={DIVISIONAL_CHART_OPTIONS}
-          jaiminiOptions={JAIMINI_CHART_OPTIONS}
+          specialChartOptions={SPECIAL_CHART_OPTIONS}
           selectedDivisionalChart={selectedDivisionalChart}
           dxChartType={dxChartType}
           dashaSystem={dashaSystem}
@@ -473,7 +477,7 @@ const ChartsDashasWorkspacePage = ({
                     </button>
                   ))}
                   <span className="parashari-desk-pills__sep" aria-hidden="true" />
-                  {JAIMINI_CHART_OPTIONS.map((option) => (
+                  {SPECIAL_CHART_OPTIONS.map((option) => (
                     <button
                       key={option.value}
                       type="button"

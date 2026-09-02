@@ -95,6 +95,7 @@ export const PUBLIC_ROUTE_SEO_RULES = [
   { path: '/ai-kundli-generator', pageKey: 'birthChartCreation' },
   { path: '/birth-chart', pageKey: 'birthChartCreation' },
   { path: '/charts-dashas/activations', noIndex: true },
+  { path: '/charts-dashas/rectification', noIndex: true },
   { path: '/charts-dashas', pageKey: 'chartsDashasWorkspace' },
   { path: '/panchang', pageKey: 'panchang' },
   { path: '/muhurat-finder', pageKey: 'muhuratFinder' },

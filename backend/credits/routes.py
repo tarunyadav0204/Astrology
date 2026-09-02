@@ -747,6 +747,7 @@ class GooglePlayVerifyRequest(BaseModel):
     price_amount_micros: Optional[int] = None
     price_currency: Optional[str] = None
     localized_price: Optional[str] = None
+    purchase_promo_code: Optional[str] = None
 
 
 class GooglePlaySubscriptionVerifyRequest(BaseModel):
@@ -887,6 +888,7 @@ def _credit_verified_google_play_purchase(
     price_amount_micros: Optional[int] = None,
     price_currency: Optional[str] = None,
     localized_price: Optional[str] = None,
+    purchase_promo_code: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Verify one-time Play purchase, then credit user idempotently by order_id."""
     from utils.payment_failure_alerts import redact_payment_secrets
@@ -912,6 +914,8 @@ def _credit_verified_google_play_purchase(
             purchase_reference_id=order_id,
             product_id=product_id,
             exclude_promotional_extras=product_id == "credits_24",
+            purchase_promo_code=purchase_promo_code,
+            purchase_channel="play",
         )
         return {
             "success": True,
@@ -923,6 +927,8 @@ def _credit_verified_google_play_purchase(
             "bonus_credits_added": int(extras.get("bonus_credits_added") or 0),
             "first_purchase_bonus_credits_added": int(extras.get("first_purchase_bonus_credits_added") or 0),
             "discount_credits_added": int(extras.get("discount_credits_added") or 0),
+            "purchase_promo": extras.get("purchase_promo"),
+            "purchase_promo_credits_added": int(extras.get("purchase_promo_credits_added") or 0),
         }
 
     amount = _credits_from_product_id(product_id)
@@ -1095,6 +1101,8 @@ def _credit_verified_google_play_purchase(
         purchase_reference_id=order_id,
         product_id=product_id,
         exclude_promotional_extras=product_id == "credits_24",
+        purchase_promo_code=purchase_promo_code,
+        purchase_channel="play",
     )
     bonus_added = int(extras.get("bonus_credits_added") or 0)
     return {
@@ -1108,6 +1116,8 @@ def _credit_verified_google_play_purchase(
         "first_purchase_bonus": extras.get("first_purchase_bonus"),
         "purchase_discount": extras.get("purchase_discount"),
         "order_id": order_id,
+        "purchase_promo": extras.get("purchase_promo"),
+        "purchase_promo_credits_added": int(extras.get("purchase_promo_credits_added") or 0),
     }
 
 
@@ -1594,6 +1604,7 @@ async def verify_google_play_purchase(
         price_amount_micros=request.price_amount_micros,
         price_currency=request.price_currency,
         localized_price=request.localized_price,
+        purchase_promo_code=request.purchase_promo_code,
     )
     try:
         pending_summary = _process_pending_google_play_onetime_events_for_token(
@@ -4581,3 +4592,8 @@ async def get_question_cost_summary(
             f"and light {light_input_chars_per_question} chars/question ({light_input_tokens_per_question} tokens est) for lightweight turns."
         ),
     }
+
+
+from credits.purchase_promos import router as purchase_promo_router
+
+router.include_router(purchase_promo_router)

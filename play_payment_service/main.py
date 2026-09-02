@@ -49,6 +49,7 @@ from credits.razorpay_routes import (  # noqa: E402
     _product_id,
     _require_sellable_pack,
     _verify_payment_signature,
+    _checkout_purchase_promo_code,
     RAZORPAY_API_BASE,
     FIRST_PURCHASE_STARTER_CREDITS,
     razorpay_webhook,
@@ -138,6 +139,7 @@ def verify_google_play_purchase_direct(
         price_amount_micros=request.price_amount_micros,
         price_currency=request.price_currency,
         localized_price=request.localized_price,
+        purchase_promo_code=request.purchase_promo_code,
     )
     try:
         pending_summary = _process_pending_google_play_onetime_events_for_token(
@@ -174,6 +176,7 @@ def internal_verify_google_play_purchase(
         price_amount_micros=request.price_amount_micros,
         price_currency=request.price_currency,
         localized_price=request.localized_price,
+        purchase_promo_code=request.purchase_promo_code,
     )
     try:
         pending_summary = _process_pending_google_play_onetime_events_for_token(
@@ -296,6 +299,9 @@ def create_razorpay_order_direct(
         "credits": str(body.credits),
         "product_id": _product_id(body.credits),
     }
+    promo_code = _checkout_purchase_promo_code(current_user.userid, body)
+    if promo_code:
+        notes["purchase_promo_code"] = promo_code
     if body.credits == FIRST_PURCHASE_STARTER_CREDITS:
         notes["offer_type"] = "first_purchase_starter"
     gp_tok = (body.google_play_external_transaction_token or "").strip()

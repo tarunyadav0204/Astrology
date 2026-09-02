@@ -134,6 +134,7 @@ export async function payCreditPackUserChoiceRazorpay({
   credits,
   externalTransactionToken,
   description,
+  purchasePromoCode = null,
 }) {
   const t0 = Date.now();
   // Preload native module before network so open() is ready when order returns.
@@ -142,9 +143,12 @@ export async function payCreditPackUserChoiceRazorpay({
     credits,
     tokenLen: externalTransactionToken ? String(externalTransactionToken).length : 0,
   });
+  const extra = { google_play_external_transaction_token: externalTransactionToken };
+  const promo = String(purchasePromoCode || '').trim();
+  if (promo) extra.purchase_promo_code = promo;
   const { data } = await creditAPI.createRazorpayOrder(
     credits,
-    { google_play_external_transaction_token: externalTransactionToken },
+    extra,
     { preferMainApi: true }
   );
   userChoiceIapLog('credit_create_order_ok', {

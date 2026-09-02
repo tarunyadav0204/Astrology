@@ -251,11 +251,19 @@ const NorthIndianChart = ({
     const planets = chartData.planets || chartData;
     if (!planets || typeof planets !== 'object') return [];
     const rashiForThisHouse = getRashiForHouse(houseIndex);
+    const houseNumber = houseIndex + 1;
+    const useHousePlacement = chartData?._place_by_house === true;
     const planetsInHouse = [];
     const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Uranus', 'Neptune', 'Pluto', 'Gulika', 'Mandi'];
     planetNames.forEach(name => {
       const data = planets[name];
-      if (data && typeof data === 'object' && data.sign === rashiForThisHouse) {
+      if (
+        data
+        && typeof data === 'object'
+        && (useHousePlacement && typeof data.house === 'number'
+          ? data.house === houseNumber
+          : data.sign === rashiForThisHouse)
+      ) {
         planetsInHouse.push({
           symbol: t(`planets.${name}`, name.substring(0, 2)),
           name: name,
@@ -270,7 +278,12 @@ const NorthIndianChart = ({
         });
       }
     });
-    if (planets.InduLagna && planets.InduLagna.sign === rashiForThisHouse) {
+    if (
+      planets.InduLagna
+      && (useHousePlacement && typeof planets.InduLagna.house === 'number'
+        ? planets.InduLagna.house === houseNumber
+        : planets.InduLagna.sign === rashiForThisHouse)
+    ) {
       planetsInHouse.push({
         symbol: t('planets.InduLagna', 'IL'),
         name: 'InduLagna',

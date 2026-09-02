@@ -219,6 +219,15 @@ class CreditService:
                     used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            try:
+                from credits.purchase_promos import ensure_purchase_promo_tables
+
+                ensure_purchase_promo_tables(conn)
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
         
             execute(conn, '''
                 CREATE TABLE IF NOT EXISTS credit_settings (
@@ -3106,6 +3115,38 @@ class CreditService:
         meta = CREDIT_PACK_META.get(credits) or {}
         return max(0, int(meta.get("bonus_credits") or 0))
 
+    def _purchase_has_automatic_extras(
+        self,
+        userid: int,
+        purchase_source: str,
+        purchase_reference_id: str,
+    ) -> bool:
+        """True if this payment already received non-promo purchase extras."""
+        src = str(purchase_source or "")
+        ref = str(purchase_reference_id or "")
+        if not ref:
+            return False
+        prefix = f"{src}:{ref}"
+        checks = (
+            ("first_purchase_bonus", prefix),
+            ("purchase_discount", prefix),
+            ("pack_bonus", f"{prefix}:pack_bonus"),
+            ("web_topup_bonus", f"{prefix}:web_topup"),
+        )
+        if any(self.has_transaction_with_reference(userid, source, rid) for source, rid in checks):
+            return True
+        from db import get_conn, execute
+        with get_conn() as conn:
+            cursor = execute(
+                conn,
+                """
+                SELECT 1 FROM credit_transactions
+                WHERE userid = ? AND source = ? AND reference_id LIKE ? LIMIT 1
+                """,
+                (userid, "credit_campaign_bonus", f"{prefix}:credit_campaign:%"),
+            )
+            return cursor.fetchone() is not None
+
     def maybe_apply_pack_bonus(
         self,
         *,
@@ -3281,13 +3322,54 @@ class CreditService:
         exclude_web_topup_bonus: bool = False,
         exclude_promotional_extras: bool = False,
         purchase_at=None,
+        purchase_promo_code: Optional[str] = None,
+        purchase_channel: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Apply purchase extras, optionally excluding the web-only top-up bonus.
 
         Play User Choice payments are settled by Razorpay too, but they are not
         web/PWA purchases.  Callers must set ``exclude_web_topup_bonus`` for
         that channel so the Razorpay source alone cannot grant the web offer.
+        A valid purchase promo replaces automatic extras (web top-up, first-purchase,
+        pack bonus, purchase discount, campaigns) instead of stacking on them.
         """
+        promo_ok = False
+        promo_checked = None
+        starter_locked = bool(exclude_promotional_extras)
+        already_has_promo = self.has_transaction_with_reference(
+            userid,
+            "purchase_promo",
+            f"{purchase_source}:{purchase_reference_id}:purchase_promo",
+        )
+        if already_has_promo:
+            exclude_promotional_extras = True
+            exclude_web_topup_bonus = True
+        if purchase_promo_code and not starter_locked:
+            try:
+                from credits.purchase_promos import validate_purchase_promo
+
+                channel = str(purchase_channel or "").strip().lower() or (
+                    "play" if str(purchase_source or "").strip().lower() == "google_play" else "web"
+                )
+                promo_checked = validate_purchase_promo(userid, purchase_promo_code, channel)
+                promo_ok = bool(promo_checked.get("ok"))
+            except Exception:
+                logger.exception("purchase promo validate failed userid=%s", userid)
+                promo_ok = False
+        if promo_ok and self._purchase_has_automatic_extras(
+            userid, purchase_source, purchase_reference_id
+        ):
+            # Payment already settled with automatic extras; do not add promo on top.
+            promo_ok = False
+            promo_checked = {
+                "ok": False,
+                "message": "Purchase extras already applied for this payment",
+                "promo": (promo_checked or {}).get("promo"),
+            }
+        if promo_ok:
+            exclude_promotional_extras = True
+            exclude_web_topup_bonus = True
+
         excluded_result = {
             "applied": False,
             "eligible": False,
@@ -3382,6 +3464,45 @@ class CreditService:
             if campaign_result.get("applied")
             else 0
         )
+        promo_result = {
+            "applied": False,
+            "eligible": False,
+            "bonus_credits": 0,
+            "reason": "no_code" if not purchase_promo_code else (
+                "starter_pack" if starter_locked else (promo_checked or {}).get("message") or "not_applied"
+            ),
+        }
+        promo_added = 0
+        if promo_ok:
+            try:
+                from credits.purchase_promos import maybe_apply_purchase_promo
+
+                channel = str(purchase_channel or "").strip().lower() or (
+                    "play" if str(purchase_source or "").strip().lower() == "google_play" else "web"
+                )
+                promo_result = maybe_apply_purchase_promo(
+                    self,
+                    userid=userid,
+                    purchased_credits=purchased_credits,
+                    purchase_source=purchase_source,
+                    purchase_reference_id=purchase_reference_id,
+                    product_id=product_id,
+                    purchase_promo_code=purchase_promo_code,
+                    purchase_channel=channel,
+                )
+            except Exception:
+                logger.exception(
+                    "purchase promo award failed userid=%s payment=%s",
+                    userid,
+                    purchase_reference_id,
+                )
+                promo_result = {
+                    "applied": False,
+                    "eligible": False,
+                    "bonus_credits": 0,
+                    "reason": "promo_apply_failed",
+                }
+            promo_added = int(promo_result.get("bonus_credits") or 0) if promo_result.get("applied") else 0
         try:
             from credits.free_answer_funnel import mark_converted_after_purchase
 
@@ -3400,12 +3521,14 @@ class CreditService:
             "purchase_discount": discount_result,
             "web_topup_bonus": web_result,
             "credit_campaign": campaign_result,
+            "purchase_promo": promo_result,
             "pack_bonus_credits_added": pack_added,
             "first_purchase_bonus_credits_added": first_added,
             "discount_credits_added": discount_added,
             "web_topup_bonus_credits_added": web_added,
             "credit_campaign_bonus_credits_added": campaign_added,
-            "bonus_credits_added": standard_bonus_added + campaign_added,
+            "purchase_promo_credits_added": promo_added,
+            "bonus_credits_added": standard_bonus_added + campaign_added + promo_added,
         }
 
     def add_credits(self, userid: int, amount: int, source: str, reference_id: str = None, description: str = None, metadata: str = None) -> bool:

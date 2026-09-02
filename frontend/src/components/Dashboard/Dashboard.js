@@ -42,6 +42,7 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
   const isMobile = window.innerWidth <= 768;
   
   const divisionalCharts = [
+    { value: 'bhav_chalit', label: 'Bhava Chalit', shortLabel: 'BC', division: null },
     { value: 'hora', label: 'Hora (D2)', division: 2 },
     { value: 'drekkana', label: 'Drekkana (D3)', division: 3 },
     { value: 'chaturthamsa', label: 'Chaturthamsa (D4)', division: 4 },
@@ -63,7 +64,9 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
   
 
   
-  const titleWithDropdown = `Divisional Chart (D${currentChart?.division || 9})`;
+  const titleWithDropdown = currentChart?.value === 'bhav_chalit'
+    ? 'Bhava Chalit Chart'
+    : `Divisional Chart (D${currentChart?.division || 9})`;
   
   if (isMobile) {
     return (
@@ -136,10 +139,10 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
         <div style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', flexDirection: 'column' }}>
           <ChartWidget
             title={titleWithDropdown}
-            chartType="divisional"
+            chartType={currentChart?.value === 'bhav_chalit' ? 'bhav_chalit' : 'divisional'}
             chartData={chartData}
             birthData={birthData}
-            division={currentChart?.division || 9}
+            division={currentChart?.division || undefined}
             defaultStyle={defaultStyle}
             chartRefHighlight={chartRefHighlight}
             embedInDashboard={embedInDashboard}
@@ -152,7 +155,7 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
   // Desktop: Use original ChartWidget with title dropdown
   const titleWithDesktopDropdown = (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
-      <span>Divisional</span>
+      <span>{currentChart?.value === 'bhav_chalit' ? 'Bhava Chalit' : 'Divisional'}</span>
       <select 
         value={selectedChart} 
         onChange={(e) => setSelectedChart(e.target.value)}
@@ -168,7 +171,7 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
       >
         {divisionalCharts.map(chart => (
           <option key={chart.value} value={chart.value}>
-            D{chart.division}
+            {chart.shortLabel || `D${chart.division}`}
           </option>
         ))}
       </select>
@@ -178,10 +181,10 @@ const DivisionalChartSelector = ({ chartData, birthData, defaultStyle, chartRefH
   return (
     <ChartWidget
       title={titleWithDesktopDropdown}
-      chartType="divisional"
+      chartType={currentChart?.value === 'bhav_chalit' ? 'bhav_chalit' : 'divisional'}
       chartData={chartData}
       birthData={birthData}
-      division={currentChart?.division || 9}
+      division={currentChart?.division || undefined}
       defaultStyle={defaultStyle}
       chartRefHighlight={chartRefHighlight}
       embedInDashboard={embedInDashboard}

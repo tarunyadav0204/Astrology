@@ -135,5 +135,8 @@ backend/gcp_key.json
 !backend/longevity/classical_rule_registry.json
 !backend/longevity/validation_data/
 !backend/longevity/validation_data/*.json
+!backend/rectification/benchmark_data/
+!backend/rectification/benchmark_data/*.example.json
+backend/rectification/benchmark_data/*.private.json
 !frontend/public/.well-known/
 !frontend/public/.well-known/assetlinks.json

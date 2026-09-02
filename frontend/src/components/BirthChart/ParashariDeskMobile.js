@@ -77,7 +77,7 @@ export default function ParashariDeskMobile({
   selectedDx,
   onSelectedDxChange,
   divisionalOptions,
-  jaiminiOptions,
+  specialChartOptions,
   selectedDivisionalChart,
   dxChartType,
   dashaSystem,
@@ -135,11 +135,11 @@ export default function ParashariDeskMobile({
         40: '🍀', 45: '🎭', 60: '⏳',
       }[option.value] || '◇',
     }));
-    const jaimini = (jaiminiOptions || []).map((option) => ({
+    const specialCharts = (specialChartOptions || []).map((option) => ({
       ...option,
       id: `division-${option.value}`,
       mode: 'divisional',
-      icon: option.value === 'karkamsa' ? '🎯' : '🕉️',
+      icon: option.value === 'bhav_chalit' ? '▦' : option.value === 'karkamsa' ? '🎯' : '🕉️',
     }));
     const navamsa = divisionals.find((option) => option.value === 9);
     const otherDivisionals = divisionals.filter((option) => option.value !== 9);
@@ -147,10 +147,10 @@ export default function ParashariDeskMobile({
       { id: 'lagna', shortLabel: 'D1', label: 'Lagna', mode: 'lagna', icon: '🏠' },
       ...(navamsa ? [navamsa] : []),
       { id: 'transit', shortLabel: 'Tr', label: 'Transit', mode: 'transit', icon: '🪐' },
-      ...jaimini,
+      ...specialCharts,
       ...otherDivisionals,
     ];
-  }, [divisionalOptions, jaiminiOptions]);
+  }, [divisionalOptions, specialChartOptions]);
 
   useEffect(() => {
     if (hubTab !== 'chart') return;
@@ -231,6 +231,7 @@ export default function ParashariDeskMobile({
           </button>
           <button type="button" className="pdm__link" onClick={() => navigate('/charts-dashas/kp')}>KP</button>
           <button type="button" className="pdm__link" onClick={() => navigate('/charts-dashas/nadi')}>Nadi</button>
+          <button type="button" className="pdm__link" onClick={() => navigate('/charts-dashas/rectification')}>Rectify</button>
         </div>
 
         <div className="pdm__profile" aria-label="Chart viewing standard">

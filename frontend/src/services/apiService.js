@@ -291,6 +291,48 @@ export const apiService = {
     return response.data;
   },
 
+  getRectificationEventTypes: async () => {
+    const response = await apiClient.get(getEndpoint('/rectification/event-types'));
+    return response.data;
+  },
+
+  createRectificationCase: async (payload) => {
+    const response = await apiClient.post(getEndpoint('/rectification/cases'), payload);
+    return response.data;
+  },
+
+  getRectificationCase: async (caseId) => {
+    const response = await apiClient.get(getEndpoint(`/rectification/cases/${caseId}`));
+    return response.data;
+  },
+
+  addRectificationEvent: async (caseId, payload) => {
+    const response = await apiClient.post(getEndpoint(`/rectification/cases/${caseId}/events`), payload);
+    return response.data;
+  },
+
+  deleteRectificationEvent: async (eventId) => {
+    const response = await apiClient.delete(getEndpoint(`/rectification/events/${eventId}`));
+    return response.data;
+  },
+
+  startRectificationRun: async (caseId, minuteStep = 1) => {
+    const response = await apiClient.post(getEndpoint(`/rectification/cases/${caseId}/runs`), {
+      minute_step: minuteStep,
+    });
+    return response.data;
+  },
+
+  getRectificationRun: async (runId) => {
+    const response = await apiClient.get(getEndpoint(`/rectification/runs/${runId}`));
+    return response.data;
+  },
+
+  getRectificationResults: async (runId) => {
+    const response = await apiClient.get(getEndpoint(`/rectification/runs/${runId}/results`));
+    return response.data;
+  },
+
   getNadiDesk: async ({ birthData, chartData, asOf, transitPlanets }) => {
     const response = await apiClient.post(getEndpoint('/nadi-desk'), {
       birth_data: birthData,

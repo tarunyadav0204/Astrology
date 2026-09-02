@@ -91,6 +91,10 @@
       "name": "本命盘 (D1)",
       "description": "主要出生星盘"
     },
+    "bhavChalit": {
+      "name": "宫位移动盘",
+      "description": "按计算出的宫位界线排列行星"
+    },
     "navamsa": {
       "name": "九分盘 (D9)",
       "description": "婚姻与灵性"

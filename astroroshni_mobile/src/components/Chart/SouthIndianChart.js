@@ -100,10 +100,13 @@ const SouthIndianChart = ({
   const getPlanetStatus = (planetName, signIndex) => {
     if (!chartData || !chartData.planets) return 'normal';
     if (['Rahu', 'Ketu', 'Gulika', 'Mandi', 'InduLagna'].includes(planetName)) return 'normal';
+    const dignitySign = chartData?._place_by_house === true
+      ? chartData.planets?.[planetName]?.sign
+      : signIndex;
     const exaltationSigns = { Sun: 0, Moon: 1, Mars: 9, Mercury: 5, Jupiter: 3, Venus: 11, Saturn: 6 };
     const debilitationSigns = { Sun: 6, Moon: 7, Mars: 3, Mercury: 11, Jupiter: 9, Venus: 5, Saturn: 0 };
-    if (exaltationSigns[planetName] === signIndex) return 'exalted';
-    if (debilitationSigns[planetName] === signIndex) return 'debilitated';
+    if (exaltationSigns[planetName] === dignitySign) return 'exalted';
+    if (debilitationSigns[planetName] === dignitySign) return 'debilitated';
     return 'normal';
   };
 
@@ -118,10 +121,17 @@ const SouthIndianChart = ({
   const getPlanetsInSign = (signIndex) => {
     if (!chartData || !chartData.planets || signIndex === -1) return [];
     const planetsInSign = [];
+    const useHousePlacement = chartData?._place_by_house === true;
+    const houseForSign = getHouseNumber(signIndex);
 
     // Add regular planets (exclude InduLagna as it's handled separately)
     Object.entries(chartData.planets)
-      .filter(([name, data]) => data.sign === signIndex && name !== 'InduLagna')
+      .filter(([name, data]) => (
+        name !== 'InduLagna'
+        && (useHousePlacement && typeof data?.house === 'number'
+          ? data.house === houseForSign
+          : data?.sign === signIndex)
+      ))
       .forEach(([name, data]) => {
         let symbol = t(`planets.${name}`, name.substring(0, 2));
 
@@ -161,7 +171,12 @@ const SouthIndianChart = ({
       });
 
     // Add InduLagna if it's in this sign
-    if (chartData.planets?.InduLagna && chartData.planets.InduLagna.sign === signIndex) {
+    if (
+      chartData.planets?.InduLagna
+      && (useHousePlacement && typeof chartData.planets.InduLagna.house === 'number'
+        ? chartData.planets.InduLagna.house === houseForSign
+        : chartData.planets.InduLagna.sign === signIndex)
+    ) {
       planetsInSign.push({
         symbol: t('planets.InduLagna', 'IL'),
         name: 'InduLagna',

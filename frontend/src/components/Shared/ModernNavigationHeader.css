@@ -530,7 +530,9 @@
 .ar-modern-nav .mh-native-bar__subject > span { min-width: 0; display: flex; align-items: baseline; gap: 10px; }
 .ar-modern-nav .mh-native-bar__subject strong { font-family: var(--font-display); font-size: 14px; font-weight: 400; }
 .ar-modern-nav .mh-native-bar__subject small { max-width: 420px; overflow: hidden; color: var(--color-header-text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.ar-modern-nav .mh-native-bar__change { margin-left: auto; padding: 5px 0; display: flex; gap: 12px; color: var(--color-accent-soft); background: transparent; border: 0; cursor: pointer; font-size: 10px; }
+.ar-modern-nav .mh-native-bar__change { margin-left: auto; padding: 5px 0; display: flex; gap: 12px; color: var(--color-header-text); background: transparent; border: 0; cursor: pointer; font-size: 10px; }
+.ar-modern-nav .mh-native-bar__change:hover,
+.ar-modern-nav .mh-native-bar__change:focus-visible { color: var(--color-accent); }
 
 @media (max-width: 1250px) {
   .ar-modern-nav .mh-nav__links { display: none; }

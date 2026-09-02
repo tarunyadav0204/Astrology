@@ -354,6 +354,10 @@ class CreateOrderBody(BaseModel):
         default=None,
         description="User Choice billing token from Play Billing; stored on the order for Play reporting after payment.",
     )
+    purchase_promo_code: Optional[str] = Field(
+        default=None,
+        description="Optional purchase promo code. Extra credits replace automatic purchase bonuses.",
+    )
 
 
 class VerifyPaymentBody(BaseModel):
@@ -363,6 +367,19 @@ class VerifyPaymentBody(BaseModel):
     google_play_external_transaction_token: Optional[str] = Field(
         default=None,
         description="Optional override; otherwise read from Razorpay order/payment notes (gp_external_tx_token).",
+    )
+
+
+def _checkout_purchase_promo_code(userid: int, body: CreateOrderBody) -> Optional[str]:
+    from credits.purchase_promos import require_checkout_promo_code
+
+    channel = "play" if (body.google_play_external_transaction_token or "").strip() else "web"
+    return require_checkout_promo_code(
+        userid,
+        body.purchase_promo_code,
+        channel,
+        body.credits,
+        starter_credits=FIRST_PURCHASE_STARTER_CREDITS,
     )
 
 
@@ -460,6 +477,8 @@ def _process_captured_payment(
     credits_raw = str(notes.get("credits") or "").strip()
     product_id = str(notes.get("product_id") or "").strip()
     offer_type = str(notes.get("offer_type") or "").strip()
+    purchase_promo_code = str(notes.get("purchase_promo_code") or "").strip() or None
+    purchase_channel = "play" if is_play_alternative_billing else "web"
     purchase_at = None
     try:
         if payment.get("created_at") is not None:
@@ -519,6 +538,8 @@ def _process_captured_payment(
             exclude_web_topup_bonus=is_play_alternative_billing,
             exclude_promotional_extras=credits == FIRST_PURCHASE_STARTER_CREDITS,
             purchase_at=purchase_at,
+            purchase_promo_code=purchase_promo_code,
+            purchase_channel=purchase_channel,
         )
         return {
             "success": True,
@@ -530,6 +551,8 @@ def _process_captured_payment(
             "purchase_discount": extras.get("purchase_discount"),
             "credit_campaign": extras.get("credit_campaign"),
             "credit_campaign_bonus_credits_added": int(extras.get("credit_campaign_bonus_credits_added") or 0),
+            "purchase_promo": extras.get("purchase_promo"),
+            "purchase_promo_credits_added": int(extras.get("purchase_promo_credits_added") or 0),
             "message": "Already credited",
             "userid": userid,
         }
@@ -574,6 +597,8 @@ def _process_captured_payment(
         exclude_web_topup_bonus=is_play_alternative_billing,
         exclude_promotional_extras=credits == FIRST_PURCHASE_STARTER_CREDITS,
         purchase_at=purchase_at,
+        purchase_promo_code=purchase_promo_code,
+        purchase_channel=purchase_channel,
     )
     bonus_added = int(extras.get("bonus_credits_added") or 0)
     return {
@@ -589,6 +614,8 @@ def _process_captured_payment(
         "web_topup_bonus": extras.get("web_topup_bonus"),
         "credit_campaign": extras.get("credit_campaign"),
         "credit_campaign_bonus_credits_added": int(extras.get("credit_campaign_bonus_credits_added") or 0),
+        "purchase_promo": extras.get("purchase_promo"),
+        "purchase_promo_credits_added": int(extras.get("purchase_promo_credits_added") or 0),
         "message": "Credits added",
         "userid": userid,
     }
@@ -691,6 +718,9 @@ async def razorpay_create_order(body: CreateOrderBody, current_user: User = Depe
         "credits": str(body.credits),
         "product_id": _product_id(body.credits),
     }
+    promo_code = _checkout_purchase_promo_code(current_user.userid, body)
+    if promo_code:
+        notes["purchase_promo_code"] = promo_code
     if body.credits == FIRST_PURCHASE_STARTER_CREDITS:
         notes["offer_type"] = "first_purchase_starter"
         notes["starter_price_paise"] = str(amount)

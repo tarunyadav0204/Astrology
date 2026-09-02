@@ -1024,15 +1024,26 @@ export const creditAPI = {
       headers: { 'Content-Type': 'application/json' },
       ...GLOBAL_ERROR_CONFIG,
     }),
+  previewPurchasePromo: (code, channel = 'web', credits = null) =>
+    api.post(
+      getEndpoint('/credits/purchase-promo/preview'),
+      {
+        code: String(code || '').trim(),
+        channel,
+        ...(credits != null ? { credits } : {}),
+      },
+      GLOBAL_ERROR_CONFIG,
+    ),
   spendCredits: (amount, feature, description) => 
     api.post(getEndpoint('/credits/spend'), { amount, feature, description }, GLOBAL_ERROR_CONFIG),
   getEventTimelineCost: () => api.get(getEndpoint('/credits/settings/event-timeline-cost')),
-  verifyGooglePlayPurchase: (purchaseToken, productId, orderId, pricing = null) => {
+  verifyGooglePlayPurchase: (purchaseToken, productId, orderId, pricing = null, purchasePromoCode = null) => {
     const body = {
       purchase_token: purchaseToken,
       product_id: productId,
       order_id: orderId,
       ...(pricing || {}),
+      ...(purchasePromoCode ? { purchase_promo_code: String(purchasePromoCode).trim() } : {}),
     };
     return tryDirectPaymentThenFallback(
       '/google-play/verify',

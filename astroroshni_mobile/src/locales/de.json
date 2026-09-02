@@ -91,6 +91,10 @@
       "name": "Lagna (D1)",
       "description": "Haupt-Geburtshoroskop"
     },
+    "bhavChalit": {
+      "name": "Bhava Chalit",
+      "description": "Planeten nach berechneten Häuserspitzen"
+    },
     "navamsa": {
       "name": "Navamsa (D9)",
       "description": "Ehe & Spiritualität"

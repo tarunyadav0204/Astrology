@@ -131,6 +131,7 @@ function normalizePendingCreditPurchase(entry) {
       : null,
     price_currency: entry.price_currency || null,
     localized_price: entry.localized_price || null,
+    purchasePromoCode: String(entry.purchasePromoCode || '').trim() || null,
     savedAt: entry.savedAt || new Date().toISOString(),
   };
 }
@@ -261,6 +262,23 @@ function formatFirstPurchaseBonusLabel(bonus) {
   return `${bonus.bonusCredits} bonus credits`;
 }
 
+const STARTER_PACK_CREDITS = 24;
+
+function packAcceptsPurchasePromo(creditsOrProductId) {
+  const raw = String(creditsOrProductId || '').trim();
+  if (!raw) return true;
+  if (raw.toLowerCase() === `credits_${STARTER_PACK_CREDITS}`) return false;
+  const n = Number(raw);
+  return !Number.isFinite(n) || n !== STARTER_PACK_CREDITS;
+}
+
+function purchasePromoBonusCredits(baseCredits, percent) {
+  const base = Number(baseCredits) || 0;
+  const pct = Number(percent) || 0;
+  if (base <= 0 || pct <= 0) return 0;
+  return Math.floor((base * pct) / 100);
+}
+
 // Lazy-load IAP only on Android to avoid iOS/build issues
 let RNIap = null;
 if (Platform.OS === 'android') {
@@ -362,6 +380,10 @@ const CreditScreen = ({ navigation, route }) => {
   );
 
   const [promoCode, setPromoCode] = useState('');
+  const [checkoutPromoInput, setCheckoutPromoInput] = useState('');
+  const [checkoutPromo, setCheckoutPromo] = useState(null);
+  const [checkoutPromoMessage, setCheckoutPromoMessage] = useState('');
+  const [checkoutPromoLoading, setCheckoutPromoLoading] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
   const [history, setHistory] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -569,17 +591,22 @@ const CreditScreen = ({ navigation, route }) => {
         price_currency: pricingOverride?.price_currency ?? oneTimeOffer.priceCurrencyCode ?? null,
         localized_price: pricingOverride?.localized_price ?? iapProduct?.localizedPrice ?? iapProduct?.price ?? null,
       };
+      const promoToSend = packAcceptsPurchasePromo(productId)
+        ? (checkoutPromo?.code || pricingOverride?.purchasePromoCode || null)
+        : null;
       await savePendingGooglePlayCreditPurchase({
         purchaseToken,
         productId,
         orderId,
         ...pricingPayload,
+        purchasePromoCode: promoToSend,
       });
       const { data } = await creditAPI.verifyGooglePlayPurchase(
         purchaseToken,
         productId,
         orderId,
-        pricingPayload
+        pricingPayload,
+        promoToSend
       );
       await removePendingGooglePlayCreditPurchase({ purchaseToken, productId, orderId });
       if (data?.terminal && Number(data?.purchase_state) === 1) {
@@ -856,6 +883,7 @@ const CreditScreen = ({ navigation, route }) => {
       astrologerSubscriptionDetails,
       subscriptionTierName,
       creditAPI,
+      checkoutPromo,
       t,
       fetchBalance,
       fetchHistory,
@@ -1031,6 +1059,9 @@ const CreditScreen = ({ navigation, route }) => {
                   credits,
                   externalTransactionToken,
                   description: desc,
+                  purchasePromoCode: packAcceptsPurchasePromo(credits)
+                    ? C.checkoutPromo?.code || null
+                    : null,
                 });
                 C.setPurchasingProductId?.(null);
                 await C.fetchBalance();
@@ -1496,6 +1527,36 @@ const CreditScreen = ({ navigation, route }) => {
     }
   };
 
+  const checkoutPromoChannel = Platform.OS === 'android' ? 'play' : 'web';
+
+  const handleApplyCheckoutPromo = async () => {
+    const code = checkoutPromoInput.trim();
+    if (!code) {
+      Alert.alert(t('credits.page.alertError'), t('credits.page.enterPromoCode'));
+      return;
+    }
+    setCheckoutPromoLoading(true);
+    setCheckoutPromoMessage('');
+    try {
+      const { data } = await creditAPI.previewPurchasePromo(code, checkoutPromoChannel);
+      if (!data?.ok) {
+        setCheckoutPromo(null);
+        setCheckoutPromoMessage(data?.message || data?.detail || 'This code cannot be used at checkout');
+        return;
+      }
+      setCheckoutPromo(data.promo);
+      setCheckoutPromoMessage(
+        `${data.promo.name}: ${data.promo.percent}% extra credits on this purchase.`
+      );
+    } catch (error) {
+      setCheckoutPromo(null);
+      const detail = error?.response?.data?.detail || error?.response?.data?.message || error?.message;
+      setCheckoutPromoMessage(detail || 'Could not apply this code');
+    } finally {
+      setCheckoutPromoLoading(false);
+    }
+  };
+
   const handleRedeemCode = async () => {
     if (!promoCode.trim()) {
       Alert.alert(t('credits.page.alertError'), t('credits.page.enterPromoCode'));
@@ -1589,9 +1650,13 @@ const CreditScreen = ({ navigation, route }) => {
     setPurchasingRazorpayCredits(creditsAmount);
     try {
       // Same path as frontend: main API create-order → Checkout.js → verify (no Play / Cloud Run hop).
+      const extra = {};
+      if (checkoutPromo?.code && packAcceptsPurchasePromo(creditsAmount)) {
+        extra.purchase_promo_code = checkoutPromo.code;
+      }
       const { data: orderData } = await creditAPI.createRazorpayOrder(
         creditsAmount,
-        {},
+        extra,
         { preferMainApi: true }
       );
       razorpayOrderId = orderData?.order_id || null;
@@ -1980,6 +2045,55 @@ const CreditScreen = ({ navigation, route }) => {
                     </TouchableOpacity>
                   </View>
                 ) : null}
+                <View style={[styles.promoCard, androidGlassFixStyle, { backgroundColor: promoCardBg, borderWidth: 1, borderColor: colors.cardBorder, marginBottom: 16 }]}>
+                  <Text style={[styles.creditPackQuestions, { color: colors.text, marginBottom: 8 }]}>
+                    Extra credits on this purchase. Play prices stay the same; the extra is added after payment.
+                  </Text>
+                  <View style={[styles.promoInputContainer, { backgroundColor: promoInputBg, borderColor: colors.cardBorder }]}>
+                    <Ionicons name="pricetag" size={20} color={colors.primary} style={styles.promoIcon} />
+                    <TextInput
+                      style={[styles.promoInput, { color: colors.text }]}
+                      placeholder="Purchase promo code"
+                      placeholderTextColor={colors.textTertiary}
+                      value={checkoutPromoInput}
+                      onChangeText={setCheckoutPromoInput}
+                      autoCapitalize="characters"
+                    />
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.redeemButton, { flex: 1 }, checkoutPromoLoading && styles.buttonDisabled]}
+                      onPress={handleApplyCheckoutPromo}
+                      disabled={checkoutPromoLoading}
+                    >
+                      <LinearGradient
+                        colors={checkoutPromoLoading ? [colors.textTertiary, colors.textSecondary] : [colors.primary, colors.secondary]}
+                        style={styles.redeemGradient}
+                      >
+                        <Text style={[styles.redeemText, { color: colors.onPrimary }]}>
+                          {checkoutPromoLoading ? 'Checking…' : checkoutPromo ? 'Update code' : 'Apply at checkout'}
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                    {checkoutPromo ? (
+                      <TouchableOpacity
+                        style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, justifyContent: 'center', paddingHorizontal: 12 }]}
+                        onPress={() => {
+                          setCheckoutPromo(null);
+                          setCheckoutPromoInput('');
+                          setCheckoutPromoMessage('');
+                        }}
+                      >
+                        <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>Remove</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                  {checkoutPromoMessage ? (
+                    <Text style={[styles.creditPackBonus, { color: checkoutPromo ? colors.primary : (colors.error || '#dc2626'), marginTop: 8 }]}>
+                      {checkoutPromoMessage}
+                    </Text>
+                  ) : null}
+                </View>
                 {productsLoading ? (
                   <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>{t('credits.page.loadingProducts')}</Text>
                 ) : googlePlayProducts.length === 0 ? (
@@ -1988,7 +2102,7 @@ const CreditScreen = ({ navigation, route }) => {
                   <>
                     {(() => {
                       const firstEligible = googlePlayProducts.map(getFirstPurchaseBonus).find((b) => b.eligible);
-                      return firstEligible ? (
+                      return firstEligible && !checkoutPromo ? (
                         <View style={[styles.firstPurchaseBonusBanner, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
                           <Ionicons name="flash-outline" size={18} color={colors.primary} />
                           <Text style={[styles.firstPurchaseBonusText, { color: colors.text }]}>
@@ -2014,12 +2128,19 @@ const CreditScreen = ({ navigation, route }) => {
                         const packBonusCredits = Number(meta.bonusCredits ?? product.pack_bonus_credits) || 0;
                         const displayPrice = getCreditPackDisplayPrice(product, iapProducts);
                         const isPopular = Boolean(badge);
-                        const totalCredits =
-                          Number(product.total_credits) ||
-                          (bonus.eligible
-                            ? bonus.totalCredits
-                            : product.credits + packBonusCredits);
-                        const showPackBonus = packBonusCredits > 0 && !bonus.eligible;
+                        const promoApplies = Boolean(checkoutPromo?.percent) && packAcceptsPurchasePromo(product.credits);
+                        const promoBonus = promoApplies
+                          ? purchasePromoBonusCredits(product.credits, checkoutPromo.percent)
+                          : 0;
+                        const totalCredits = promoBonus > 0
+                          ? product.credits + promoBonus
+                          : (
+                            Number(product.total_credits) ||
+                            (bonus.eligible
+                              ? bonus.totalCredits
+                              : product.credits + packBonusCredits)
+                          );
+                        const showPackBonus = packBonusCredits > 0 && !bonus.eligible && promoBonus <= 0;
                         return (
                           <TouchableOpacity
                             key={product.product_id}
@@ -2061,6 +2182,11 @@ const CreditScreen = ({ navigation, route }) => {
                                       : t('credits.page.questionsCount', { count: questions })}
                                   </Text>
                                 ) : null}
+                                {promoBonus > 0 ? (
+                                  <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
+                                    {product.credits} + {promoBonus} promo ({checkoutPromo.percent}%)
+                                  </Text>
+                                ) : null}
                                 {showPackBonus ? (
                                   <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
                                     {t('credits.page.packBonusLine', {
@@ -2069,7 +2195,7 @@ const CreditScreen = ({ navigation, route }) => {
                                     })}
                                   </Text>
                                 ) : null}
-                                {bonus.eligible ? (
+                                {bonus.eligible && promoBonus <= 0 ? (
                                   <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
                                     {product.credits} + {bonus.bonusCredits} bonus
                                   </Text>
@@ -2106,6 +2232,55 @@ const CreditScreen = ({ navigation, route }) => {
                 <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary, marginBottom: 12 }]}>
                   Secure checkout (UPI, cards, netbanking). Web purchases include 10% extra credits.
                 </Text>
+                <View style={[styles.promoCard, { backgroundColor: promoCardBg, borderWidth: 1, borderColor: colors.cardBorder, marginBottom: 16 }]}>
+                  <Text style={[styles.creditPackQuestions, { color: colors.text, marginBottom: 8 }]}>
+                    Extra credits on this purchase.
+                  </Text>
+                  <View style={[styles.promoInputContainer, { backgroundColor: promoInputBg, borderColor: colors.cardBorder }]}>
+                    <Ionicons name="pricetag" size={20} color={colors.primary} style={styles.promoIcon} />
+                    <TextInput
+                      style={[styles.promoInput, { color: colors.text }]}
+                      placeholder="Purchase promo code"
+                      placeholderTextColor={colors.textTertiary}
+                      value={checkoutPromoInput}
+                      onChangeText={setCheckoutPromoInput}
+                      autoCapitalize="characters"
+                    />
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.redeemButton, { flex: 1 }, checkoutPromoLoading && styles.buttonDisabled]}
+                      onPress={handleApplyCheckoutPromo}
+                      disabled={checkoutPromoLoading}
+                    >
+                      <LinearGradient
+                        colors={checkoutPromoLoading ? [colors.textTertiary, colors.textSecondary] : [colors.primary, colors.secondary]}
+                        style={styles.redeemGradient}
+                      >
+                        <Text style={[styles.redeemText, { color: colors.onPrimary }]}>
+                          {checkoutPromoLoading ? 'Checking…' : checkoutPromo ? 'Update code' : 'Apply at checkout'}
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                    {checkoutPromo ? (
+                      <TouchableOpacity
+                        style={[styles.manageSubscriptionLink, { borderColor: colors.cardBorder, justifyContent: 'center', paddingHorizontal: 12 }]}
+                        onPress={() => {
+                          setCheckoutPromo(null);
+                          setCheckoutPromoInput('');
+                          setCheckoutPromoMessage('');
+                        }}
+                      >
+                        <Text style={[styles.manageSubscriptionLinkText, { color: colors.primary }]}>Remove</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                  {checkoutPromoMessage ? (
+                    <Text style={[styles.creditPackBonus, { color: checkoutPromo ? colors.primary : (colors.error || '#dc2626'), marginTop: 8 }]}>
+                      {checkoutPromoMessage}
+                    </Text>
+                  ) : null}
+                </View>
                 {razorpayCatalogLoading ? (
                   <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>
                     {t('credits.page.loadingProducts')}
@@ -2135,9 +2310,16 @@ const CreditScreen = ({ navigation, route }) => {
                         Number(pack.pack_bonus_credits ?? meta.bonusCredits) || 0;
                       const webBonusCredits = Number(pack.web_topup_bonus_credits) || 0;
                       const webBonusPercent = Number(pack.web_topup_bonus_percent) || 0;
-                      const totalCredits =
-                        Number(pack.total_credits) ||
-                        pack.credits + packBonusCredits + webBonusCredits;
+                      const promoApplies = Boolean(checkoutPromo?.percent) && packAcceptsPurchasePromo(pack.credits);
+                      const promoBonus = promoApplies
+                        ? purchasePromoBonusCredits(pack.credits, checkoutPromo.percent)
+                        : 0;
+                      const totalCredits = promoBonus > 0
+                        ? pack.credits + promoBonus
+                        : (
+                          Number(pack.total_credits) ||
+                          pack.credits + packBonusCredits + webBonusCredits
+                        );
                       const isPopular = Boolean(badge);
                       return (
                         <TouchableOpacity
@@ -2183,7 +2365,11 @@ const CreditScreen = ({ navigation, route }) => {
                                     : t('credits.page.questionsCount', { count: questions })}
                                 </Text>
                               ) : null}
-                              {webBonusCredits > 0 ? (
+                              {promoBonus > 0 ? (
+                                <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
+                                  {pack.credits} + {promoBonus} promo ({checkoutPromo.percent}%)
+                                </Text>
+                              ) : webBonusCredits > 0 ? (
                                 <Text style={[styles.creditPackBonus, { color: colors.primary }]}>
                                   {webBonusPercent > 0
                                     ? `${pack.credits} + ${webBonusCredits} web bonus (${webBonusPercent}%)`
@@ -2198,7 +2384,7 @@ const CreditScreen = ({ navigation, route }) => {
                                   })}
                                 </Text>
                               ) : null}
-                              {creditCampaign ? (
+                              {creditCampaign && promoBonus <= 0 ? (
                                 <Text style={[styles.creditPackBonus, { color: colors.success || colors.primary }]}>
                                   Special {Number(creditCampaign.multiplier).toLocaleString(undefined, { maximumFractionDigits: 3 })}× offer · {totalCredits} total credits
                                 </Text>
@@ -2493,6 +2679,9 @@ const CreditScreen = ({ navigation, route }) => {
             <View style={styles.promoSection}>
               <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>HAVE A CODE?</Text>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('credits.page.promoHeading')}</Text>
+              <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary, textAlign: 'left', paddingVertical: 0, marginBottom: 10 }]}>
+                Instant free credits. This is separate from purchase promos above.
+              </Text>
               <View style={[styles.promoCard, androidGlassFixStyle, { backgroundColor: promoCardBg, borderWidth: (isDark || Platform.OS === 'android') ? 1 : 0, borderColor: colors.cardBorder }]}>
                 <View style={[styles.promoInputContainer, { backgroundColor: promoInputBg, borderColor: colors.cardBorder }]}>
                   <Ionicons name="ticket" size={20} color={colors.primary} style={styles.promoIcon} />

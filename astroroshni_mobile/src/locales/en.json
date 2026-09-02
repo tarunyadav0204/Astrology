@@ -331,6 +331,10 @@
       "name": "Lagna (D1)",
       "description": "Main Birth Chart"
     },
+    "bhavChalit": {
+      "name": "Bhava Chalit",
+      "description": "Planets placed by calculated house cusps"
+    },
     "navamsa": {
       "name": "Navamsa (D9)",
       "description": "Marriage & Spirituality"
