@@ -11,6 +11,7 @@ from utils.admin_settings import get_parallel_branch_word_limit
 
 from chat.system_instruction_config import (
     ASHTAKAVARGA_FILTER,
+    AVAYOGI_CHAT_DOCTRINE,
     BHAVAM_BHAVESH_RULES,
     CAREER_SUTRAS,
     CLASSICAL_CITATIONS,
@@ -65,10 +66,10 @@ Return a single JSON object only (no markdown fences, no prose before or after).
 }}
 Aim to keep "analysis" within about {word_limit} words. Use ONLY the variable JSON in the same message.
 If `special_points.yogi_points` is present in VARIABLE_DATA_JSON (non-empty / populated), the markdown inside "analysis" MUST include a distinct subsection titled exactly #### Yogi & Avayogi Karma in which you explicitly list and interpret all four: **Yogi**, **Avayogi**, **Dagdha Rashi**, and **Tithi Shunya Rashi** (lords and signs as given), each in relation to the user's question and relevant houses. Do not skip any of the four when the payload provides them—do not answer with Avayogi alone or a partial subset.
-If `special_points.yogi_points.avayogi_tithi_shunya_overlap.is_active=true`, treat that planet as a benefic override: Avayogi being the Tithi Shunya Adhipati modifies the obstruction and can give good results. Say this explicitly in the Yogi & Avayogi Karma subsection and apply it to the relevant houses/significations; do not interpret that Avayogi planet as purely harmful.
+Apply the shared Avayogi effect policy below exactly. Use `special_points.yogi_points.avayogi_effect_policy` when supplied and do not overwrite its resolved polarity.
 ACCURACY MANDATE: Be strictly technical and evidence-based. Do not invent or soften conclusions for politeness. Do not use motivational filler.
 DASHA MANDATE: If dasha period labels/windows are present, explicitly cite them in the analysis.
-"""
+""" + "\n" + AVAYOGI_CHAT_DOCTRINE
 
 
 def _branch_json_footer(branch_id: str) -> str:
@@ -220,7 +221,7 @@ def build_parashari_final_answer_static(intent_category: str, death_analysis_unl
         "For marriage/spouse timing questions, explicitly separate **Promise -> Timing -> Manifestation -> Continuity**. Do not treat attraction, proposal, legal marriage, and stable married life as the same thing.",
         "For career/profession/field questions, explicitly separate **Aptitude -> Field Selection -> Work Function -> Status/Visibility -> Timing of Entry/Change**. Do not answer 'what career will I pick?' with a vague basket of unrelated professions unless the chart is genuinely mixed.",
         health_prompt_line,
-        "When `special_points` is present, use `gandanta_analysis` if flagged. If `special_points.yogi_points` is present, include a distinct subsection titled exactly `#### Yogi & Avayogi Karma` and explicitly cover **Yogi**, **Avayogi**, **Dagdha Rashi**, and **Tithi Shunya Rashi** in relation to the user's question. If `special_points.yogi_points.avayogi_tithi_shunya_overlap.is_active=true`, state that this modifies the obstruction and can give good results.",
+        "When `special_points` is present, use `gandanta_analysis` if flagged. If `special_points.yogi_points` is present, include a distinct subsection titled exactly `#### Yogi & Avayogi Karma` and explicitly cover **Yogi**, **Avayogi**, **Dagdha Rashi**, and **Tithi Shunya Rashi** in relation to the user's question. Apply `avayogi_effect_policy` exactly: cancellation is neutral, while a House 3/6/8/12 placement or aspect reversal is supportive for the applicable house. Keep other conditions separate.",
         "Be strictly technical and evidence-based. Do not use motivational filler. If dasha period labels or windows are present, explicitly cite them.",
         "When LIFESPAN_TIMING_EVIDENCE_JSON is present in the user packet: follow its candidate_windows rank order exactly; claim Full Double Transit only when that window's double_transit is full; never invent Full DT; never use 'final trigger required' / guarantee language.",
     ]

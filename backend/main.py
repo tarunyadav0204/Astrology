@@ -148,6 +148,7 @@ from chat_history.local_task_queue import ensure_local_chat_task_queue_table
 from birth_charts.routes import router as birth_charts_router
 from prediction_engine.routes import router as prediction_engine_router
 from rectification.routes import router as rectification_router
+from sutra_rules.admin_routes import router as sutra_rules_admin_router
 from karma_analysis.routes import router as karma_router
 from astrovastu.routes import router as astrovastu_router
 from reddit.routes import router as reddit_router
@@ -1033,6 +1034,7 @@ app.include_router(charts_router, prefix="/api")
 app.include_router(birth_charts_router, prefix="/api")
 app.include_router(prediction_engine_router, prefix="/api")
 app.include_router(rectification_router, prefix="/api")
+app.include_router(sutra_rules_admin_router, prefix="/api")
 app.include_router(wealth_router, prefix="/api")
 app.include_router(longevity_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")

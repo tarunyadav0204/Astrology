@@ -103,6 +103,7 @@ def generate_content_rest_v1beta_result(
     prompt: str,
     api_key: str,
     thinking_level: Optional[str] = None,
+    system_prompt: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Modern Gemini generateContent transport used by latency-sensitive calls.
 
@@ -126,6 +127,8 @@ def generate_content_rest_v1beta_result(
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": generation_config,
     }
+    if str(system_prompt or "").strip():
+        body["systemInstruction"] = {"parts": [{"text": str(system_prompt).strip()}]}
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{mid}:generateContent"
     response = requests.post(url, params={"key": api_key}, json=body, timeout=120)
     if not response.ok:
@@ -159,6 +162,7 @@ def generate_content_rest_v1beta_stream_result(
     prompt: str,
     api_key: str,
     thinking_level: Optional[str] = None,
+    system_prompt: Optional[str] = None,
     on_text_delta: Optional[Callable[[str, str], None]] = None,
 ) -> Dict[str, Any]:
     """Stream visible Gemini text over the REST SSE endpoint.
@@ -183,6 +187,8 @@ def generate_content_rest_v1beta_stream_result(
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": generation_config,
     }
+    if str(system_prompt or "").strip():
+        body["systemInstruction"] = {"parts": [{"text": str(system_prompt).strip()}]}
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{mid}:streamGenerateContent"
     response = requests.post(
         url,
@@ -456,6 +462,7 @@ class GeminiChatAnalyzer:
         model_id: str,
         stream_callback: Optional[Callable[[str, str], None]] = None,
         deepseek_thinking_enabled: Optional[bool] = None,
+        system_prompt: Optional[str] = None,
     ) -> Dict[str, Any]:
         """DeepSeek chat via OpenAI-compatible API."""
         try:
@@ -475,9 +482,13 @@ class GeminiChatAnalyzer:
         client = AsyncOpenAI(api_key=api_key, base_url=f"{base_url}/v1", timeout=600.0)
 
         # DeepSeek API allows max_tokens in [1, 8192] only (not Gemini/OpenAI-sized limits).
+        messages = []
+        if str(system_prompt or "").strip():
+            messages.append({"role": "system", "content": str(system_prompt).strip()})
+        messages.append({"role": "user", "content": prompt})
         request_args = {
             "model": model_clean,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "temperature": 0.0,
             "max_tokens": 8192,
         }
@@ -543,6 +554,19 @@ class GeminiChatAnalyzer:
                 "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
                 "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
             }
+            prompt_details = getattr(usage_obj, "prompt_tokens_details", None)
+            cached = int(
+                getattr(prompt_details, "cached_tokens", 0)
+                or getattr(usage_obj, "prompt_cache_hit_tokens", 0)
+                or 0
+            )
+            cache_miss = getattr(usage_obj, "prompt_cache_miss_tokens", None)
+            usage["cached_tokens"] = cached
+            usage["non_cached_input_tokens"] = (
+                int(cache_miss)
+                if cache_miss is not None
+                else max(0, usage["input_tokens"] - cached)
+            )
             total = getattr(usage_obj, "total_tokens", None)
             if total is not None:
                 usage["total_tokens"] = int(total or 0)
@@ -560,10 +584,18 @@ class GeminiChatAnalyzer:
             "output_tokens": int(getattr(usage_obj, "completion_tokens", 0) or 0),
         }
         ptd = getattr(usage_obj, "prompt_tokens_details", None)
-        if ptd is not None:
-            c = getattr(ptd, "cached_tokens", None)
-            if c is not None:
-                usage["cached_tokens"] = int(c)
+        cached = int(
+            getattr(ptd, "cached_tokens", 0)
+            or getattr(usage_obj, "prompt_cache_hit_tokens", 0)
+            or 0
+        )
+        cache_miss = getattr(usage_obj, "prompt_cache_miss_tokens", None)
+        usage["cached_tokens"] = cached
+        usage["non_cached_input_tokens"] = (
+            int(cache_miss)
+            if cache_miss is not None
+            else max(0, usage["input_tokens"] - cached)
+        )
         tt = getattr(usage_obj, "total_tokens", None)
         if tt is not None:
             usage["total_tokens"] = int(tt)
@@ -584,6 +616,7 @@ class GeminiChatAnalyzer:
         gemini_thinking_level: Optional[str] = None,
         deepseek_thinking_enabled: Optional[bool] = None,
         stream_callback: Optional[Callable[[str, str], None]] = None,
+        system_prompt: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Single LLM completion for an arbitrary prompt (parallel chat branches + merge).
@@ -635,6 +668,21 @@ class GeminiChatAnalyzer:
         response_text: Optional[str] = None
 
         def _finish(out: Dict[str, Any]) -> Dict[str, Any]:
+            usage = dict(out.get("token_usage") or {})
+            input_tokens = int(usage.get("input_tokens") or 0)
+            cached_tokens = int(usage.get("cached_tokens") or 0)
+            usage["cached_tokens"] = cached_tokens
+            usage["non_cached_input_tokens"] = int(
+                usage.get("non_cached_input_tokens")
+                if usage.get("non_cached_input_tokens") is not None
+                else max(0, input_tokens - cached_tokens)
+            )
+            usage["cache_hit_pct"] = (
+                round((cached_tokens / input_tokens) * 100.0, 1)
+                if input_tokens
+                else 0.0
+            )
+            out["token_usage"] = usage
             if llm_log_tag:
                 from ai.llm_roundtrip_log import log_llm_roundtrip
                 is_parallel_tag = str(llm_log_tag).startswith("parallel_")
@@ -643,7 +691,11 @@ class GeminiChatAnalyzer:
                     tag=llm_log_tag,
                     provider=str(llm_provider),
                     model=out.get("chat_llm_model"),
-                    prompt=prompt,
+                    prompt=(
+                        f"SYSTEM PROMPT:\n{str(system_prompt).strip()}\n\nUSER PROMPT:\n{prompt}"
+                        if str(system_prompt or "").strip()
+                        else prompt
+                    ),
                     response_text=out.get("response"),
                     success=bool(out.get("success")),
                     error=out.get("error"),
@@ -675,6 +727,7 @@ class GeminiChatAnalyzer:
                         model_name,
                         stream_callback,
                         deepseek_thinking_enabled,
+                        system_prompt,
                     ),
                     timeout=timeout_s,
                 )
@@ -724,7 +777,7 @@ class GeminiChatAnalyzer:
                         if stream_callback is not None
                         else generate_content_rest_v1beta_result
                     )
-                    rest_args = [model_name, prompt, api_key, gemini_thinking_level]
+                    rest_args = [model_name, prompt, api_key, gemini_thinking_level, system_prompt]
                     if stream_callback is not None:
                         rest_args.append(stream_callback)
                     rest_result = await asyncio.wait_for(

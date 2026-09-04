@@ -73,7 +73,7 @@ PROFILES: Dict[str, PredictionProfile] = {
             ("benefic_malefic_association", "1.0.0"),
             ("conflict_house", "1.0.0"),
             ("badhaka", "1.0.0"),
-            ("yogi_avayogi", "1.0.0"),
+            ("yogi_avayogi", "1.1.0"),
             ("gandanta", "1.1.0"),
             ("dagdha_tithi", "1.0.0"),
         ),

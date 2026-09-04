@@ -11,6 +11,7 @@ from calculators.house_analyzer import HouseAnalyzer
 from calculators.transit_calculator import TransitCalculator
 from calculators.yoga_calculator import YogaCalculator
 from calculators.yogi_calculator import YogiCalculator
+from calculators.avayogi_policy import avayogi_effect
 from shared.dasha_calculator import DashaCalculator
 
 
@@ -370,6 +371,44 @@ def _collect_house_factors(
     yogi_lord = yogi_data.get("yogi", {}).get("lord")
     avayogi_lord = yogi_data.get("avayogi", {}).get("lord")
     dagdha_lord = yogi_data.get("dagdha_rashi", {}).get("lord")
+    avayogi_overlap = bool(
+        (yogi_data.get("avayogi_tithi_shunya_overlap") or {}).get("is_active")
+    )
+
+    def append_avayogi_factor(
+        planet: str,
+        placement_house: Any,
+        relation: str,
+        *,
+        subject: str,
+    ) -> str:
+        resolution = avayogi_effect(
+            placement_house=placement_house,
+            target_house=house_num,
+            relation=relation,
+            tithi_shunya_overlap=avayogi_overlap,
+        )
+        if resolution["rule"] == "avayogi_placement_reversal":
+            support.append(_factor(
+                f"{subject} is Avayogi but its placement in House {resolution['placement_house']} reverses that contribution supportively.",
+                "good",
+                "special",
+            ))
+        elif resolution["rule"] == "avayogi_aspect_reversal":
+            support.append(_factor(
+                f"{planet} aspects House {house_num} as Avayogi; for House {house_num}, that contribution is supportive.",
+                "good",
+                "special",
+            ))
+        elif resolution["rule"] == "avayogi_tithi_shunya_cancellation":
+            activation.append(_factor(
+                f"{subject} is both Avayogi and Tithi Shunya lord, so its ordinary Avayogi obstruction is cancelled.",
+                "neutral",
+                "special",
+            ))
+        else:
+            stress.append(_factor(f"{subject} is the Avayogi lord.", "warn", "special"))
+        return resolution["polarity"]
 
     if lord_dignity in {"own_sign", "exalted", "moolatrikona", "favorable"}:
         support.append(_factor(f"{lord} is {lord_dignity.replace('_', ' ')}.", "good", "dignity"))
@@ -388,7 +427,12 @@ def _collect_house_factors(
     if lord_special.get("is_yogi_lord"):
         support.append(_factor(f"{lord} is the Yogi lord.", "good", "special"))
     if lord_special.get("is_avayogi_lord"):
-        stress.append(_factor(f"{lord} is the Avayogi lord.", "warn", "special"))
+        append_avayogi_factor(
+            lord,
+            lord_house,
+            "house_lord",
+            subject=f"{lord}, the house lord",
+        )
     if lord_special.get("is_dagdha_lord"):
         stress.append(_factor(f"{lord} is functioning as a Dagdha lord.", "warn", "special"))
 
@@ -419,8 +463,6 @@ def _collect_house_factors(
 
     if lord == yogi_lord:
         support.append(_factor(f"{lord} is the Yogi lord for this chart.", "good", "special"))
-    if lord == avayogi_lord:
-        stress.append(_factor(f"{lord} is the Avayogi lord for this chart.", "warn", "special"))
     if lord == dagdha_lord:
         stress.append(_factor(f"{lord} is the Dagdha lord for this chart.", "warn", "special"))
 
@@ -486,8 +528,14 @@ def _collect_house_factors(
             added_specific_support = True
             occupant_roles[planet].append("Yogi lord")
         if planet == avayogi_lord:
-            stress.append(_factor(f"{planet} occupies this house as the Avayogi lord.", "warn", "special"))
-            added_specific_stress = True
+            avayogi_polarity = append_avayogi_factor(
+                planet,
+                house_num,
+                "occupant",
+                subject=f"{planet}, occupying this house",
+            )
+            added_specific_support = avayogi_polarity == "supportive"
+            added_specific_stress = avayogi_polarity == "challenging"
             occupant_roles[planet].append("Avayogi lord")
         if planet == dagdha_lord:
             stress.append(_factor(f"{planet} occupies this house as the Dagdha lord.", "warn", "special"))
@@ -579,11 +627,19 @@ def _collect_house_factors(
         rules_trikona = any(h in {1, 5, 9} for h in ruled_houses)
         sits_in_dusthana = aspect_house in {6, 8, 12}
 
+        avayogi_aspect_handled = bool(
+            planet == avayogi_lord or aspect_special.get("is_avayogi_lord")
+        )
+        if avayogi_aspect_handled:
+            append_avayogi_factor(
+                planet,
+                aspect_house,
+                "aspector",
+                subject=f"{planet}, aspecting this house",
+            )
+
         if (
-            planet == avayogi_lord
-            or planet == dagdha_lord
-            or
-            aspect_special.get("is_avayogi_lord")
+            planet == dagdha_lord
             or aspect_special.get("is_dagdha_lord")
             or aspect_special.get("is_badhaka_lord")
             or sits_in_dusthana
@@ -599,6 +655,10 @@ def _collect_house_factors(
                 ))
             else:
                 stress.append(_factor(f"{planet} aspects this house with pressure.", "warn", "aspect"))
+        elif avayogi_aspect_handled:
+            # Avoid classifying the same Avayogi contribution a second time
+            # through the generic natural-benefic/malefic aspect branch.
+            pass
         elif "supports" in effect.lower() or "enhances" in effect.lower() or planet in BENEFICS:
             if planet == yogi_lord:
                 support.append(_factor(f"{planet} aspects this house as the Yogi lord.", "good", "aspect"))

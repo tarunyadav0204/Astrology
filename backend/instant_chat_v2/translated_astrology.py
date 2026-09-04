@@ -95,6 +95,8 @@ def _path_score(path: str, text: str) -> int:
     score = 10
     lower = path.lower()
     for marker, weight in (
+        ("answer_evidence_contract", 135), ("requested_window_assessment", 132),
+        ("immutable_fact_contract", 130), ("timing_synthesis", 125),
         ("route_synthesis", 100), ("required_visible_facts", 95),
         ("supporting_factors", 85), ("cautions", 82), ("ranked_windows", 78),
         ("primary_drivers", 75), ("why", 72), ("reason", 68),
@@ -129,6 +131,7 @@ def build_translated_astrology_contract(
     query_plan = context.get("query_plan") if isinstance(context.get("query_plan"), Mapping) else {}
     answer_contract = context.get("answer_contract") if isinstance(context.get("answer_contract"), Mapping) else {}
     graph_policy = answer_contract.get("knowledge_graph_policy") if isinstance(answer_contract.get("knowledge_graph_policy"), Mapping) else {}
+    graph_domain = str(graph_policy.get("domain") or "").strip().lower()
     answer_mode = str(query_plan.get("answer_mode") or "").strip().lower()
     claim_permission = str(graph_policy.get("claim_permission") or "").lower()
     exempt = bool(
@@ -168,7 +171,37 @@ def build_translated_astrology_contract(
             }
             if planet not in candidates or score > int(candidates[planet].get("score") or 0):
                 candidates[planet] = row
-    anchors = sorted(candidates.values(), key=lambda row: (-int(row["score"]), PLANETS.index(row["planet"])))[:4]
+    anchor_limit = len(PLANETS) if technical_requested else 4
+    anchors = sorted(
+        candidates.values(),
+        key=lambda row: (-int(row["score"]), PLANETS.index(row["planet"])),
+    )[:anchor_limit]
+    evidence_body = evidence.get("evidence") if isinstance(evidence.get("evidence"), Mapping) else {}
+    remedy_blueprint = (
+        evidence_body.get("remedy_blueprint")
+        if isinstance(evidence_body.get("remedy_blueprint"), Mapping)
+        else {}
+    )
+    top_remedy = (
+        remedy_blueprint.get("top_recommendation")
+        if isinstance(remedy_blueprint.get("top_recommendation"), Mapping)
+        else {}
+    )
+    top_remedy_planet = str(top_remedy.get("planet") or "").strip().title()
+    if (
+        answer_mode == "remedy_action"
+        and str(remedy_blueprint.get("selection_mode") or "") == "single_top"
+        and top_remedy_planet in PLANETS
+    ):
+        reason = str(top_remedy.get("astrological_reason") or "").strip()
+        anchors = [{
+            "planet": top_remedy_planet,
+            "display_name": HINDI_NAMES[top_remedy_planet] if str(language).lower().startswith("hi") else top_remedy_planet,
+            "polarity": "qualifying",
+            "plain_meaning_range": PLANET_MEANINGS[top_remedy_planet],
+            "source_fact": reason or f"{top_remedy_planet} is the top calculated remedy driver.",
+            "evidence_path": "evidence.remedy_blueprint.top_recommendation.astrological_reason",
+        }]
     for row in anchors:
         row.pop("score", None)
     required = bool(anchors and not exempt)
@@ -178,6 +211,7 @@ def build_translated_astrology_contract(
         for key in ("direction", "confidence", "status", "scope")
         if verdict.get(key) not in (None, "", [], {})
     }
+    simple_maximum = len(anchors) if graph_domain == "home_property" else 2
     return {
         "schema_version": "instant-visible-astrology/v1",
         "required": required,
@@ -185,7 +219,10 @@ def build_translated_astrology_contract(
         "response_style": selected_style or ("technical" if technical_requested else "simple"),
         "technical_detail_allowed": technical_requested,
         "minimum_planet_reasons": 1 if required else 0,
-        "maximum_planet_reasons": 2,
+        # Technical is allowed to name every evidence-bearing planet required
+        # by its D1/divisional/KP/dasha/transit explanation. The two-planet
+        # ceiling belongs only to the concise Simple rendering.
+        "maximum_planet_reasons": len(anchors) if technical_requested else simple_maximum,
         "allowed_planets": [row["planet"] for row in anchors],
         "reason_anchors": anchors,
         "verdict_snapshot": verdict_snapshot,
@@ -223,8 +260,13 @@ def translated_astrology_prompt_rule(contract: Mapping[str, Any] | None) -> str:
             + " "
             + str(contract.get("technical_terms_rule") or "")
         )
+    planet_count_rule = (
+        "Mention only the evidence-bearing planets needed for the supplied technical explanation from "
+        if contract.get("technical_detail_allowed") else
+        f"Mention only the evidence-bearing planets needed for this route, up to {int(contract.get('maximum_planet_reasons') or 2)}, from "
+    )
     return (
-        "- VISIBLE ASTROLOGY CONTRACT: Mention one or two planets from "
+        "- VISIBLE ASTROLOGY CONTRACT: " + planet_count_rule +
         f"`answer_contract.visible_astrology.reason_anchors` ({', '.join(contract.get('allowed_planets') or [])}). "
         "For each named planet, immediately translate its supplied source fact into the user's lived experience. "
         "Use the structure: direct answer -> planetary reason -> human meaning -> useful action. "

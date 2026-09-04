@@ -90,8 +90,8 @@ def test_supported_domains_receive_authoritative_pre_generation_graph_policy(
 
 
 def test_non_graph_domain_remains_unchanged() -> None:
-    packet = _packet("property", "topic_reading")
-    assert apply_live_graph_policy(packet, intent={"category": "property"}, context={}) == packet
+    packet = _packet("spirituality", "topic_reading")
+    assert apply_live_graph_policy(packet, intent={"category": "spirituality"}, context={}) == packet
 
 
 def test_exact_day_contract_cannot_be_overwritten_by_static_domain_graph() -> None:
@@ -413,7 +413,8 @@ def test_spouse_temperament_does_not_fall_back_to_seventh_house_when_layers_are_
         language="english",
     )
     assert "Mercury" not in safe
-    assert "seventh house alone would be speculation" in safe
+    assert "Standard or Premium mode" in safe
+    assert "seventh house" not in safe
 
 
 def test_spouse_appearance_answers_physical_facet_without_temperament_fallback() -> None:
@@ -486,7 +487,8 @@ def test_spouse_appearance_missing_layers_cannot_be_replaced_with_personality() 
         "They will be intelligent, practical, reliable and quietly warm.", result, language="english"
     )
     assert "quietly warm" not in safe
-    assert "Replacing physical evidence with personality traits would be speculation" in safe
+    assert "Standard or Premium mode" in safe
+    assert "physical evidence" not in safe
 
 
 def test_spouse_location_requires_direct_distance_links_not_generic_placement_folklore() -> None:
@@ -752,7 +754,8 @@ def test_incomplete_timing_route_fails_closed_before_and_after_generation() -> N
         "August 2027 is your strongest marriage window.", result, language="english"
     )
     assert "August 2027" not in safe
-    assert "missing required timing evidence" in safe
+    assert "Standard or Premium mode" in safe
+    assert "missing required" not in safe
 
 
 def test_live_answer_corrects_pd_sub_period_terminology() -> None:
@@ -779,7 +782,8 @@ def test_incomplete_comparison_route_cannot_select_a_winner() -> None:
     assert result["verdict"]["direction"] == "insufficient_option_evidence"
     safe = enforce_live_graph_answer("A job change is more likely.", result, language="english")
     assert "job change is more likely" not in safe.lower()
-    assert safe.endswith("?")
+    assert "Standard or Premium mode" in safe
+    assert not safe.endswith("?")
 
 
 def test_comparison_graph_reads_both_option_house_sets_from_fused_verdict() -> None:
@@ -837,4 +841,5 @@ def test_missing_health_body_area_is_hard_gated_after_generation() -> None:
     )
     assert "8th house" not in safe
     assert "September 2026" not in safe
-    assert safe.endswith("?")
+    assert "Standard or Premium mode" in safe
+    assert not safe.endswith("?")

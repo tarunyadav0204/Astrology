@@ -453,15 +453,22 @@ def _d1_natal_factor_lines(value: Any, event_key: str) -> tuple[List[str], List[
             return f"{planet} is the Yogi lord" + (f" for {sign}" if sign else "") + f" and supports D1 House {house}."
         if source == "avayogi_lord":
             sign = facts.get("special_sign_name")
-            overlap = facts.get("avayogi_tithi_shunya_overlap")
-            if overlap:
-                return f"{planet} is both the Avayogi and Tithi Shunya lord; the declared overlap rule makes its effect on D1 House {house} mixed rather than purely obstructive."
+            effect = facts.get("avayogi_effect") if isinstance(facts.get("avayogi_effect"), dict) else {}
+            rule = effect.get("rule")
+            if rule == "avayogi_placement_reversal":
+                return f"{planet} is the Avayogi lord but is placed in House {effect.get('placement_house')}; its Avayogi contribution reverses and supports D1 House {house}."
+            if rule == "avayogi_aspect_reversal":
+                return f"{planet} is the Avayogi lord but aspects House {house}, one of Houses 3, 6, 8 and 12; its Avayogi contribution to this house is supportive."
+            if rule == "avayogi_tithi_shunya_cancellation" or facts.get("avayogi_tithi_shunya_overlap"):
+                return f"{planet} is both the Avayogi and Tithi Shunya lord; the ordinary Avayogi obstruction is cancelled for D1 House {house}."
             return f"{planet} is the Avayogi lord" + (f" for {sign}" if sign else "") + f" and adds obstruction to D1 House {house}."
         if source == "dagdha_rashi_lord":
             sign = facts.get("special_sign_name")
             return f"{planet} rules the Dagdha Rashi" + (f" {sign}" if sign else "") + f" and adds pressure to D1 House {house}."
         if source == "tithi_shunya_lord":
             sign = facts.get("special_sign_name")
+            if facts.get("avayogi_tithi_shunya_overlap") and str(polarity) == "neutral":
+                return f"{planet} is also the Tithi Shunya lord; together with its Avayogi role, the ordinary Avayogi obstruction is cancelled for D1 House {house}."
             return f"{planet} rules the Tithi Shunya Rashi" + (f" {sign}" if sign else "") + f" and restricts D1 House {house}."
         if source == "planet_in_dagdha_rashi":
             sign = facts.get("dagdha_sign_name") or facts.get("special_sign_name")

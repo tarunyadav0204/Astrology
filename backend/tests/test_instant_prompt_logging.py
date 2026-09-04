@@ -2,11 +2,13 @@ import json
 import logging
 
 from chat.instant_chat_pipeline import (
+    _build_budgeted_instant_prompt,
     _build_instant_composer_context,
     _build_instant_prompt,
     _build_period_topic_forecast,
     _log_instant_llm_request,
     _log_instant_llm_response,
+    _split_instant_prompt_for_cache,
 )
 
 
@@ -93,7 +95,7 @@ def test_instant_response_log_records_sent_and_received_characters(caplog):
             result={
                 "success": True,
                 "response": response,
-                "token_usage": {"input_tokens": 4, "output_tokens": 3},
+                "token_usage": {"input_tokens": 4, "output_tokens": 3, "cached_tokens": 3},
             },
             elapsed_s=0.25,
         )
@@ -104,7 +106,66 @@ def test_instant_response_log_records_sent_and_received_characters(caplog):
     assert metadata[0]["received_chars"] == len(response)
     assert metadata[0]["input_tokens"] == 4
     assert metadata[0]["output_tokens"] == 3
+    assert metadata[0]["cached_tokens"] == 3
+    assert metadata[0]["non_cached_input_tokens"] == 1
+    assert metadata[0]["cache_hit_pct"] == 75.0
     assert metadata[0]["elapsed_ms"] == 250.0
+
+
+def test_instant_prompt_cache_split_keeps_changing_evidence_out_of_system_prefix():
+    base = {
+        "context_profile": "instant_composer_v3",
+        "query_plan": {"category": "career", "answer_mode": "topic_reading"},
+        "verdict": {"direction": "supported"},
+        "answer_contract": {
+            "visible_astrology": {
+                "required": True,
+                "allowed_planets": ["Saturn"],
+            }
+        },
+        "evidence": {"career_foundation": {"marker": "first-user-evidence"}},
+    }
+    changed = json.loads(json.dumps(base))
+    changed["answer_contract"]["visible_astrology"]["allowed_planets"] = ["Venus"]
+    changed["evidence"]["career_foundation"]["marker"] = "second-user-evidence"
+
+    first_system, first_user = _split_instant_prompt_for_cache(
+        _build_budgeted_instant_prompt("Will my career improve?", base, "english")
+    )
+    second_system, second_user = _split_instant_prompt_for_cache(
+        _build_budgeted_instant_prompt("Should I change jobs?", changed, "english")
+    )
+
+    assert first_system == second_system
+    assert len(first_system) > 2_000
+    assert "first-user-evidence" not in first_system
+    assert "allowed_planets" not in first_system
+    assert "first-user-evidence" in first_user
+    assert "second-user-evidence" in second_user
+    assert "EVIDENCE-SPECIFIC OUTPUT RULES" in first_user
+
+
+def test_split_request_log_records_both_provider_messages(monkeypatch, caplog):
+    monkeypatch.setenv("INSTANT_CHAT_LOG_FULL_LLM_REQUEST", "true")
+    with caplog.at_level(logging.INFO, logger="chat.instant_chat_pipeline"):
+        _log_instant_llm_request(
+            stage="instant_answer",
+            model_name="models/gemini-test",
+            system_prompt="stable rules",
+            prompt="USER QUESTION:\nquestion\n\nevidence",
+            context={"evidence": True},
+            answer_mode="topic_reading",
+            speech_mode=False,
+            compacted=True,
+        )
+
+    metadata = _payloads(caplog, "INSTANT_LLM_REQUEST_META ")[0]
+    system_chunks = _payloads(caplog, "INSTANT_LLM_REQUEST_SYSTEM_PROMPT ")
+    user_chunks = _payloads(caplog, "INSTANT_LLM_REQUEST_USER_PROMPT ")
+    assert metadata["separate_system_prompt"] is True
+    assert metadata["cacheable_prefix_chars"] == len("stable rules")
+    assert "".join(row["content"] for row in system_chunks) == "stable rules"
+    assert "".join(row["content"] for row in user_chunks).startswith("USER QUESTION:")
 
 
 def test_full_instant_request_log_can_be_disabled(monkeypatch, caplog):

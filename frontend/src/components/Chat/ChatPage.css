@@ -449,11 +449,6 @@ button.chat-header-credits.credits-display:active {
     display: none;
 }
 
-.chat-page--instant-focus .chat-container,
-.chat-page--instant-focus .chat-input-area {
-    margin-left: 0;
-}
-
 .chat-page--instant-focus .chat-thread {
     max-width: 64rem;
 }
@@ -3156,10 +3151,13 @@ button.chat-header-credits.credits-display:focus-visible {
     padding: var(--space-6) clamp(var(--space-4), 4vw, var(--space-7));
     background: transparent;
     scrollbar-color: var(--color-border-strong) transparent;
+    scrollbar-gutter: stable;
 }
 
 .chat-thread {
     max-width: 56rem;
+    width: 100%;
+    margin-inline: auto;
     display: flex;
     flex-direction: column;
     gap: var(--space-5);
@@ -3363,6 +3361,7 @@ button.chat-header-credits.credits-display:focus-visible {
     border-top: 1px solid var(--color-border);
     box-shadow: none;
     backdrop-filter: blur(18px);
+    scrollbar-gutter: stable;
 }
 
 .chat-page > .chat-composer > * { max-width: 56rem; margin-inline: auto; }
@@ -3419,6 +3418,24 @@ button.chat-header-credits.credits-display:focus-visible {
     border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
+}
+
+/* Instant hides the rail; collapse the two-column grid so the thread and
+   composer sit on the full page instead of in column 2 next to empty space.
+   These rules must follow the workspace grid so they win on specificity. */
+.chat-page.chat-page--instant-focus {
+    --chat-rail-width: 0px;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.chat-page.chat-page--instant-focus > .chat-container,
+.chat-page.chat-page--instant-focus > .chat-composer {
+    grid-column: 1 / -1;
+}
+
+.chat-page.chat-page--instant-focus > .chat-composer > *,
+.chat-page.chat-page--instant-focus .chat-input-form {
+    max-width: 64rem;
 }
 
 .chat-page .chat-input {

@@ -10,6 +10,7 @@ turn a house into a guaranteed event.
 from typing import Any, Dict, Iterable, List, Sequence, Set, Tuple
 
 from calculators.badhaka_calculator import BadhakaCalculator
+from calculators.avayogi_policy import avayogi_effect
 from calculators.friendship_calculator import FriendshipCalculator
 
 from .contracts import Polarity
@@ -853,11 +854,17 @@ def build_natal_promises(
                         **gandanta_planets[planet],
                     },
                 })
+            avayogi_resolution = avayogi_effect(
+                placement_house=placement.get("house"),
+                target_house=house,
+                relation=role_names,
+                tithi_shunya_overlap=overlap and planet == avayogi_lord,
+            )
             for source, special_lord, polarity, details in (
                 ("yogi_lord", yogi_lord, Polarity.SUPPORTIVE, yogi_points.get("yogi") or {}),
-                ("avayogi_lord", avayogi_lord, Polarity.MIXED if overlap else Polarity.CHALLENGING, yogi_points.get("avayogi") or {}),
+                ("avayogi_lord", avayogi_lord, Polarity(avayogi_resolution["polarity"]), yogi_points.get("avayogi") or {}),
                 ("dagdha_rashi_lord", dagdha.get("lord"), Polarity.CHALLENGING, dagdha),
-                ("tithi_shunya_lord", tithi_shunya.get("lord"), Polarity.MIXED if overlap and planet == avayogi_lord else Polarity.CHALLENGING, tithi_shunya),
+                ("tithi_shunya_lord", tithi_shunya.get("lord"), Polarity.NEUTRAL if overlap and planet == avayogi_lord else Polarity.CHALLENGING, tithi_shunya),
             ):
                 if special_lord and planet == special_lord:
                     factors.append({
@@ -872,6 +879,7 @@ def build_natal_promises(
                             "special_sign": details.get("sign"),
                             "special_sign_name": details.get("sign_name"),
                             "avayogi_tithi_shunya_overlap": overlap,
+                            "avayogi_effect": avayogi_resolution if source == "avayogi_lord" else None,
                         },
                     })
             if dagdha.get("sign") is not None and int(placement["sign"]) == int(dagdha["sign"]):

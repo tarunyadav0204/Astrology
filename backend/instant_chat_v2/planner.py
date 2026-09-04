@@ -241,6 +241,7 @@ def build_query_plan(
             else query_context.get("education_options") or []
         ),
         "children_subtype": intent.get("children_subtype") or query_context.get("children_subtype"),
+        "home_subtype": intent.get("home_subtype") or query_context.get("home_subtype"),
         "prior_marriage_context": extracted.get("prior_marriage_context"),
         "answer_mode": str(answer_mode or "topic_reading"),
         "route_action": route_action,

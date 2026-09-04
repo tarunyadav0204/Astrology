@@ -1,4 +1,5 @@
 from .base_calculator import BaseCalculator
+from .avayogi_policy import avayogi_effect
 
 class PlanetAnalyzer(BaseCalculator):
     """Comprehensive planet analyzer - reusable for any planet analysis"""
@@ -229,6 +230,14 @@ class PlanetAnalyzer(BaseCalculator):
         is_dagdha = self.yogi_data.get('dagdha_rashi', {}).get('lord') == planet_name
         is_tithi_shunya = self.yogi_data.get('tithi_shunya_rashi', {}).get('lord') == planet_name
         is_avayogi_tithi_shunya_benefic = is_avayogi and is_tithi_shunya
+        placement_house = (self.chart_data.get('planets', {}).get(planet_name) or {}).get('house')
+        resolved_avayogi_effect = (
+            avayogi_effect(
+                placement_house=placement_house,
+                tithi_shunya_overlap=is_avayogi_tithi_shunya_benefic,
+            )
+            if is_avayogi else None
+        )
         
         # Badhaka analysis
         is_badhaka = planet_name in self.badhaka_data['badhaka_lords']
@@ -242,7 +251,7 @@ class PlanetAnalyzer(BaseCalculator):
         if is_tithi_shunya:
             special_roles.append('Tithi Shunya Lord')
         if is_avayogi_tithi_shunya_benefic:
-            special_roles.append('Avayogi-Tithi Shunya Benefic Override')
+            special_roles.append('Avayogi-Tithi Shunya Cancellation')
         if is_badhaka:
             special_roles.append('Badhaka Lord')
         
@@ -252,9 +261,10 @@ class PlanetAnalyzer(BaseCalculator):
             'is_dagdha_lord': is_dagdha,
             'is_tithi_shunya_lord': is_tithi_shunya,
             'is_avayogi_tithi_shunya_benefic': is_avayogi_tithi_shunya_benefic,
+            'avayogi_effect': resolved_avayogi_effect,
             'is_badhaka_lord': is_badhaka,
             'avayogi_tithi_shunya_rule': (
-                'Avayogi planet is also Tithi Shunya Adhipati; its obstruction is modified and it can give good results.'
+                'Avayogi planet is also Tithi Shunya Adhipati; its ordinary Avayogi obstruction is cancelled.'
                 if is_avayogi_tithi_shunya_benefic else None
             ),
             'special_roles': special_roles

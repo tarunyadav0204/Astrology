@@ -2029,7 +2029,9 @@ body.modern-homepage-active {
 @media (max-width: 980px) {
   body.modern-homepage-active { overflow: auto; }
   .mh-page { height: auto; min-height: 100svh; overflow: visible; }
-  .mh-nav { position: sticky; top: 0; height: 64px; }
+  .mh-page .ar-modern-nav-shell--pin { height: 64px; }
+  .mh-page .ar-modern-nav-shell--pin.ar-modern-nav-shell--with-native { height: 116px; }
+  .mh-nav { height: 64px; }
   .mh-page--with-native .mh-nav { height: 116px; }
   .mh-page--with-native .mh-nav__inner { height: 64px; }
   .mh-nav__actions .mh-text-button { display: none; }

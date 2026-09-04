@@ -15,6 +15,26 @@
   z-index: var(--z-header, 100);
 }
 
+/* Mobile overflow on html/body/page shells breaks position:sticky, so pin the
+   bar to the viewport and keep a same-height spacer in document flow. */
+@media (max-width: 980px) {
+  .ar-modern-nav-shell--pin {
+    height: 78px;
+  }
+
+  .ar-modern-nav-shell--pin.ar-modern-nav-shell--with-native {
+    height: 124px;
+  }
+
+  .ar-modern-nav-shell--pin > .mh-nav.ar-modern-nav.ar-modern-nav--sticky {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+  }
+}
+
 .ar-modern-nav .mh-nav__inner {
   width: min(var(--content-wide, 1440px), 100%);
   height: 100%;
@@ -547,6 +567,8 @@
 }
 
 @media (max-width: 640px) {
+  .ar-modern-nav-shell--pin { height: 68px; }
+  .ar-modern-nav-shell--pin.ar-modern-nav-shell--with-native { height: 120px; }
   .ar-modern-nav { height: 68px; }
   .ar-modern-nav .mh-nav__inner { padding: 0 16px; }
   .ar-modern-nav .mh-brand { gap: 10px; font-size: 21px; }

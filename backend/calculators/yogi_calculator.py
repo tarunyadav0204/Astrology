@@ -2,6 +2,7 @@
 
 import swisseph as swe
 from .base_calculator import BaseCalculator
+from .avayogi_policy import AVAYOGI_REVERSAL_HOUSES, avayogi_effect
 from utils.timezone_service import parse_timezone_offset, get_timezone_from_coordinates
 
 class YogiCalculator(BaseCalculator):
@@ -100,6 +101,17 @@ class YogiCalculator(BaseCalculator):
         avayogi_lord = self.get_sign_lord(avayogi_sign)
         tithi_shunya_lord = self.get_sign_lord(tithi_shunya_sign)
         avayogi_tithi_shunya_overlap = avayogi_lord == tithi_shunya_lord
+        avayogi_placement_house = (
+            (self.chart_data.get('planets', {}).get(avayogi_lord) or {}).get('house')
+        )
+        avayogi_aspected_reversal_houses = [
+            house for house in sorted(AVAYOGI_REVERSAL_HOUSES)
+            if self._planet_aspects_house(avayogi_lord, house)
+        ] if avayogi_lord in self.chart_data.get('planets', {}) else []
+        avayogi_natal_effect = avayogi_effect(
+            placement_house=avayogi_placement_house,
+            tithi_shunya_overlap=avayogi_tithi_shunya_overlap,
+        )
 
         return {
             "yogi": {
@@ -135,11 +147,23 @@ class YogiCalculator(BaseCalculator):
                 "planet": avayogi_lord if avayogi_tithi_shunya_overlap else None,
                 "interpretation": (
                     "When the Avayogi planet is also the Tithi Shunya Adhipati, "
-                    "its obstructive role is modified and it can give good results."
+                    "its ordinary Avayogi obstruction is cancelled."
                     if avayogi_tithi_shunya_overlap
                     else None
                 )
-            }
+            },
+            "avayogi_effect_policy": {
+                "version": "1.0.0",
+                "reversal_houses": sorted(AVAYOGI_REVERSAL_HOUSES),
+                "placement_house": avayogi_placement_house,
+                "aspected_reversal_houses": avayogi_aspected_reversal_houses,
+                "natal_effect": avayogi_natal_effect,
+                "rules": [
+                    "Avayogi plus Tithi Shunya lord cancels the ordinary Avayogi penalty.",
+                    "Avayogi placed in House 3, 6, 8 or 12 gives a supportive Avayogi contribution.",
+                    "Avayogi aspecting House 3, 6, 8 or 12 gives a supportive Avayogi contribution to that house.",
+                ],
+            },
         }
     
     def analyze_yogi_impact_on_house(self, house_num, yogi_data):
@@ -154,9 +178,26 @@ class YogiCalculator(BaseCalculator):
         yogi_impact = self._calculate_planet_impact_on_house(yogi_lord, house_num)
         impact_score += yogi_impact * 0.4  # 40% weight for Yogi
         
-        # Avayogi lord impact (obstructive)
+        # Avayogi contribution follows the shared cancellation/reversal policy.
         avayogi_impact = self._calculate_planet_impact_on_house(avayogi_lord, house_num)
-        impact_score -= avayogi_impact * 0.3  # 30% negative weight for Avayogi
+        avayogi_planet = self.chart_data.get('planets', {}).get(avayogi_lord) or {}
+        relation = (
+            'occupant' if int(avayogi_planet.get('house') or 0) == int(house_num)
+            else 'aspector' if self._planet_aspects_house(avayogi_lord, house_num)
+            else 'house_lord'
+        )
+        avayogi_resolution = avayogi_effect(
+            placement_house=avayogi_planet.get('house'),
+            target_house=house_num,
+            relation=relation,
+            tithi_shunya_overlap=bool(
+                (yogi_data.get('avayogi_tithi_shunya_overlap') or {}).get('is_active')
+            ),
+        )
+        if avayogi_resolution['polarity'] == 'supportive':
+            impact_score += avayogi_impact * 0.3
+        elif avayogi_resolution['polarity'] == 'challenging':
+            impact_score -= avayogi_impact * 0.3
         
         # Dagdha lord impact (destructive)
         dagdha_impact = self._calculate_planet_impact_on_house(dagdha_lord, house_num)
@@ -169,6 +210,7 @@ class YogiCalculator(BaseCalculator):
             'dagdha_lord': dagdha_lord,
             'yogi_impact': yogi_impact,
             'avayogi_impact': avayogi_impact,
+            'avayogi_effect': avayogi_resolution,
             'dagdha_impact': dagdha_impact
         }
     

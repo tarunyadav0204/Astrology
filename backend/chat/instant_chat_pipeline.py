@@ -16,6 +16,7 @@ import time
 from ai.parallel_chat.parallel_agent_payloads import build_parashari_agent_payload
 from ai.response_parser import ResponseParser
 from calculators import RemedyEngine
+from calculators.avayogi_policy import AVAYOGI_CHAT_DOCTRINE
 from calculators.chart_calculator import ChartCalculator
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.gandanta_calculator import GandantaCalculator
@@ -62,6 +63,8 @@ from instant_chat_v2.children import (
     normalize_children_subtype,
 )
 from instant_chat_v2.children_calculation import build_children_foundation
+from instant_chat_v2.home import TIMING_HOME_SUBTYPES, home_profile, is_home_category, is_home_timing, normalize_home_subtype
+from instant_chat_v2.home_calculation import build_home_foundation
 from instant_chat_v2.marriage_timeline import (
     apply_timeline_intent_guard,
     build_phase_action,
@@ -114,17 +117,20 @@ def _instant_thinking_level(model_name: str) -> Optional[str]:
 
 def _build_instant_usage_stage(stage: str, model_name: str, prompt_chars: int, response_chars: int, token_usage: Dict[str, Any] | None, success: bool, elapsed_s: float | None = None) -> Dict[str, Any]:
     tu = token_usage or {}
+    input_tokens = int(tu.get("input_tokens") or 0)
+    cached_tokens = int(tu.get("cached_tokens") or 0)
     row = {
         "stage": stage,
         "llm_model": model_name or "",
         "input_chars": int(prompt_chars or 0),
         "output_chars": int(response_chars or 0),
-        "input_tokens": int(tu.get("input_tokens") or 0),
+        "input_tokens": input_tokens,
         "output_tokens": int(tu.get("output_tokens") or 0),
-        "cached_tokens": int(tu.get("cached_tokens") or 0),
+        "cached_tokens": cached_tokens,
+        "cache_hit_pct": round((cached_tokens / input_tokens) * 100.0, 1) if input_tokens else 0.0,
         "non_cached_input_tokens": int(
             tu.get("non_cached_input_tokens")
-            or max(0, int(tu.get("input_tokens") or 0) - int(tu.get("cached_tokens") or 0))
+            or max(0, input_tokens - cached_tokens)
         ),
         "success": bool(success),
     }
@@ -384,8 +390,9 @@ PARASHARI_TOPIC_MAP = {
     "mental_wellbeing": "health",
     "accident": "health",
     "recovery": "health",
-    "property": "wealth",
-    "relocation": "career",
+    "property": "property",
+    "vehicle": "vehicles",
+    "vehicles": "vehicles",
     "visa": "career",
     "travel": "career",
     "litigation": "health",
@@ -412,6 +419,8 @@ EVENT_CATEGORY_ALIASES = {
     "real_estate": "property",
     "home": "property",
     "house": "property",
+    "vehicle": "property",
+    "vehicles": "property",
     "shift": "relocation",
     "move": "relocation",
     "moving": "relocation",
@@ -1271,6 +1280,7 @@ def _slim_event_prediction_payload(
     wealth_subtype: Any = None,
     education_subtype: Any = None,
     children_subtype: Any = None,
+    home_subtype: Any = None,
     question: str,
     chart_data: Dict[str, Any],
     house_lordships: Dict[str, List[int]],
@@ -1455,6 +1465,10 @@ def _slim_event_prediction_payload(
             and bool(row.get("peak_activation_windows"))
         ]
         retrospective_children = bool(is_children_category(category))
+        retrospective_home = bool(
+            is_home_category(category)
+            and normalize_home_subtype(home_subtype) == "retrospective_property_timing"
+        )
         event_timing_verdict = {
             "event_category": category,
             "answer_event_label": EVENT_ANSWER_LABELS.get(_normalize_event_category(category), "past life event"),
@@ -1467,6 +1481,9 @@ def _slim_event_prediction_payload(
                 "probable_peak_windows as narrower astrological concentrations. Never call a peak the known "
                 "conception or birth date. Ask the user whether a phase is close or to enter the actual date."
                 if retrospective_children else
+                "Present up to three ranked probable past property-acquisition periods with their supplied transit peaks. "
+                "Never call a peak the known purchase date; ask the user which period matches."
+                if retrospective_home else
                 "Present each MD-AD range as a broad probable past phase and its supplied probable_peak_windows "
                 "as narrower astrological concentrations. Never call a peak the known marriage date. Ask the user "
                 "whether a phase is close or to enter the actual date."
@@ -1481,6 +1498,8 @@ def _slim_event_prediction_payload(
                 (
                     "Do not claim that a probable period is the actual conception or birth date."
                     if retrospective_children else
+                    "Do not claim that a probable period is the actual property purchase date."
+                    if retrospective_home else
                     "Do not claim that a probable period is the actual marriage date."
                 ),
                 "Do not include a future or current period.",
@@ -1647,6 +1666,7 @@ def _slim_event_prediction_payload(
         "wealth_foundation",
         "education_foundation",
         "children_foundation",
+        "home_foundation",
     ):
         if (normalized_evidence or {}).get(evidence_key) not in (None, "", [], {}):
             slim_normalized[evidence_key] = (normalized_evidence or {}).get(evidence_key)
@@ -1715,6 +1735,10 @@ def _slim_event_prediction_payload(
             "children_subtype": (
                 normalize_children_subtype(children_subtype)
                 if is_children_category(category) else None
+            ),
+            "home_subtype": (
+                normalize_home_subtype(home_subtype)
+                if is_home_category(category) else None
             ),
             "mode": "LIFESPAN_EVENT_TIMING",
             "answer_mode": "event_prediction",
@@ -1789,17 +1813,13 @@ def _log_instant_llm_request(
     stage: str,
     model_name: str,
     prompt: str,
+    system_prompt: Optional[str] = None,
     context: Any,
     answer_mode: str,
     speech_mode: bool,
     compacted: bool,
 ) -> Optional[str]:
-    """Log the exact Instant Chat model input without Cloud Logging truncation.
-
-    The model receives one prompt string rather than separate system/user
-    messages. Prompt and serialized context are emitted independently in
-    ordered chunks so an operator can reconstruct the complete request.
-    """
+    """Log the exact Instant Chat model input without Cloud Logging truncation."""
     if not _env_flag("INSTANT_CHAT_LOG_FULL_LLM_REQUEST", True):
         return None
     try:
@@ -1817,6 +1837,8 @@ def _log_instant_llm_request(
         separators=(",", ":"),
     )
     prompt_text = str(prompt or "")
+    system_text = str(system_prompt or "")
+    sent_chars = len(system_text) + len(prompt_text)
     logger.info(
         "INSTANT_LLM_REQUEST_META %s",
         json.dumps({
@@ -1827,13 +1849,25 @@ def _log_instant_llm_request(
             "speech_mode": bool(speech_mode),
             "compacted_context": bool(compacted),
             "context_chars": len(context_json),
-            "prompt_chars": len(prompt_text),
-            "sent_chars": len(prompt_text),
-            "separate_system_prompt": False,
-            "note": "Gemini receives the logged prompt as one complete prompt string.",
+            "prompt_chars": sent_chars,
+            "system_prompt_chars": len(system_text),
+            "user_prompt_chars": len(prompt_text),
+            "sent_chars": sent_chars,
+            "separate_system_prompt": bool(system_text),
+            "cacheable_prefix_chars": len(system_text),
+            "note": (
+                "Stable instructions are sent as a system prefix; the question and evidence are sent as user content."
+                if system_text
+                else "The model receives one complete user prompt string."
+            ),
         }, ensure_ascii=False, separators=(",", ":")),
     )
-    for payload_name, payload in (("CONTEXT", context_json), ("PROMPT", prompt_text)):
+    payloads = [("CONTEXT", context_json)]
+    if system_text:
+        payloads.extend((("SYSTEM_PROMPT", system_text), ("USER_PROMPT", prompt_text)))
+    else:
+        payloads.append(("PROMPT", prompt_text))
+    for payload_name, payload in payloads:
         chunks = [payload[i:i + chunk_chars] for i in range(0, len(payload), chunk_chars)] or [""]
         for index, chunk in enumerate(chunks, start=1):
             logger.info(
@@ -1855,6 +1889,7 @@ def _log_instant_llm_response(
     stage: str,
     model_name: str,
     prompt: str,
+    system_prompt: Optional[str] = None,
     result: Optional[Dict[str, Any]],
     elapsed_s: float,
 ) -> None:
@@ -1862,6 +1897,8 @@ def _log_instant_llm_response(
     payload = result or {}
     response_text = str(payload.get("response") or "")
     usage = payload.get("token_usage") if isinstance(payload.get("token_usage"), dict) else {}
+    input_tokens = int((usage or {}).get("input_tokens") or 0)
+    cached_tokens = int((usage or {}).get("cached_tokens") or 0)
     logger.info(
         "INSTANT_LLM_RESPONSE_META %s",
         json.dumps({
@@ -1869,15 +1906,32 @@ def _log_instant_llm_response(
             "stage": stage,
             "model": payload.get("chat_llm_model") or model_name,
             "success": bool(payload.get("success")),
-            "sent_chars": len(str(prompt or "")),
+            "sent_chars": len(str(system_prompt or "")) + len(str(prompt or "")),
             "received_chars": len(response_text),
-            "input_tokens": int((usage or {}).get("input_tokens") or 0),
+            "input_tokens": input_tokens,
             "output_tokens": int((usage or {}).get("output_tokens") or 0),
-            "cached_tokens": int((usage or {}).get("cached_tokens") or 0),
+            "cached_tokens": cached_tokens,
+            "non_cached_input_tokens": int(
+                (usage or {}).get("non_cached_input_tokens")
+                or max(0, input_tokens - cached_tokens)
+            ),
+            "cache_hit_pct": round((cached_tokens / input_tokens) * 100.0, 1) if input_tokens else 0.0,
             "elapsed_ms": round(max(0.0, float(elapsed_s or 0.0)) * 1000.0, 1),
             "error": str(payload.get("error") or "")[:500] or None,
         }, ensure_ascii=False, separators=(",", ":")),
     )
+
+
+def _split_instant_prompt_for_cache(prompt: str) -> tuple[str, str]:
+    """Separate stable instructions from the per-request question and evidence."""
+    prompt_text = str(prompt or "").strip()
+    marker = "\n\nUSER QUESTION:\n"
+    if marker not in prompt_text:
+        return "", prompt_text
+    stable, dynamic = prompt_text.split(marker, 1)
+    return stable.strip(), f"USER QUESTION:\n{dynamic.strip()}"
+
+
 _MONTH_NAME_TO_NUM = {
     "january": 1,
     "february": 2,
@@ -2263,11 +2317,12 @@ def _instant_route_response(
     message = str(body or "").strip()
     if not message:
         # This is an exceptional degraded-router fallback, not semantic routing.
-        message = (
-            "Please ask one clear question at a time so I can calculate it accurately."
-            if route_action == "clarify"
-            else "Please open the dedicated Partnership experience for this two-chart reading."
-        )
+        if route_action == "clarify":
+            message = "Please ask one clear question at a time so I can calculate it accurately."
+        elif answer_mode == "dedicated_partnership_flow":
+            message = "Please open the dedicated Partnership experience for this two-chart reading."
+        else:
+            message = "This question needs a deeper reading. Please ask it in Standard or Premium mode."
     response = _conversational_ack_response(language, speech_mode=speech_mode)
     response.update({
         "response": message,
@@ -2815,13 +2870,16 @@ def _is_retrospective_event_request(
         return False
     normalized_category = _normalize_event_category(category)
     children_event = is_children_category(category)
-    if normalized_category not in {"marriage", "relationship", "love"} and not children_event:
+    home_event = is_home_category(category)
+    if normalized_category not in {"marriage", "relationship", "love", "property"} and not children_event and not home_event:
         return False
     payload = intent if isinstance(intent, dict) else {}
     if (
         children_event
         and normalize_children_subtype(payload.get("children_subtype")) == "retrospective_child_timing"
     ):
+        return True
+    if home_event and normalize_home_subtype(payload.get("home_subtype")) == "retrospective_property_timing":
         return True
     relation = str(payload.get("time_relation") or "").strip().lower()
     if is_past_value(relation):
@@ -3126,7 +3184,6 @@ def _build_forward_event_dasha_scan(
                         activated_native_focus.add(fh)
                         activated_focus.add(displayed)
                         reasons.append(f"{lvl.upper()} {p} aspects {house_frame_label} house {displayed} from natal")
-                        break
             if p in karakas:
                 score += int(round(_planet_priority_weight(cat, p)))
                 reasons.append(f"{lvl.upper()} {p} is a category significator")
@@ -3221,6 +3278,15 @@ def _build_forward_event_dasha_scan(
         "horizon_days": max(0, (end_local - range_start).days),
         "horizon_start": range_start.strftime("%Y-%m-%d"),
         "horizon_end": end_local.strftime("%Y-%m-%d"),
+        # A completed calculation is distinct from a positive activation.
+        # Zero qualifying rows means "no supported window found", not that
+        # dasha/transit evidence was unavailable.
+        "dasha_evaluation_complete": bool(raw_rows),
+        "transit_evaluation_complete": bool(
+            raw_rows and transit_calc is not None and ascendant_longitude is not None
+        ),
+        "evaluated_dasha_period_count": len(raw_rows),
+        "qualifying_period_count": len(periods),
         "time_direction": str(time_direction or "future"),
         "focus_houses": sorted(display_map.values()) if display_map else list(focus_houses),
         "native_calculation_houses": sorted(focus) if display_map else list(focus_houses),
@@ -4201,7 +4267,6 @@ def _window_dasha_segments_for_period(
                         activated_native_focus.add(fh)
                         activated_focus.add(displayed)
                         reasons.append(f"{lvl.upper()} {p} aspects {house_frame_label} house {displayed} from natal")
-                        break
             if p in karakas:
                 score += int(round(_planet_priority_weight(cat, p)))
                 reasons.append(f"{lvl.upper()} {p} is a category significator")
@@ -5337,6 +5402,12 @@ def _looks_like_open_ended_life_event_when(question: str, intent: Optional[Dict[
         "recover",
         "buy a house",
         "buy house",
+        "buy a vehicle",
+        "buy vehicle",
+        "buy a car",
+        "buy car",
+        "vehicle",
+        "automobile",
         "property",
         "visa",
         "travel abroad",
@@ -5699,6 +5770,16 @@ def _mode_selection_from_intent(
         question or str(intent.get("original_question") or ""),
     )
     mode = _apply_llm_chart_fact_mode_guard(mode, intent)
+    # The multilingual router has already made the semantic decision here.
+    # Keep typed Home timing routes on the event pipeline even when a provider
+    # returns a generic decision-support label for wording such as "now or
+    # wait".  Do not inspect the user's text: that would be brittle across the
+    # supported languages and dialects.
+    if (
+        is_home_category(intent.get("category"))
+        and normalize_home_subtype(intent.get("home_subtype")) in TIMING_HOME_SUBTYPES
+    ):
+        mode = "event_prediction"
     target_key = _normalize_relationship_target_key(intent.get("target_subject_key") or "")
     target_subject: Optional[Dict[str, Any]] = None
     if target_key in TARGET_SUBJECTS:
@@ -6424,6 +6505,20 @@ def _normalize_instant_evidence(
     current_topic_support = (divisional_support.get("current_topic") or {}).get("support")
     topic_support = (divisional_support.get("topic") or {}).get("support")
     period_window = instant_parashari.get("period_window") if isinstance(instant_parashari.get("period_window"), dict) else {}
+    typed_graph_timing = bool(
+        (
+            is_education_category(category)
+            and is_education_timing(instant_parashari.get("education_subtype"), answer_mode)
+        )
+        or (
+            is_children_category(category)
+            and is_children_timing(instant_parashari.get("children_subtype"), answer_mode)
+        )
+        or (
+            is_home_category(category)
+            and is_home_timing(instant_parashari.get("home_subtype"), answer_mode)
+        )
+    )
     hi_for_area_ranking = instant_parashari.get("house_activation") or {}
     if answer_mode == "timing_window" and str(category or "").lower() in {"general", "timing"}:
         hi_for_area_ranking = _all_house_activation_from_levels(instant_parashari.get("active_dashas") or {})
@@ -6521,7 +6616,7 @@ def _normalize_instant_evidence(
         contradiction_flags.append("Do not narrate the whole month from a one-day Sun or Moon snapshot; use MD/AD/PD first and treat only slow-planet transits as month-wide anchors.")
     horizon_lines: List[str] = []
     horizon_segment_lines: List[str] = []
-    if answer_mode == "event_prediction":
+    if answer_mode == "event_prediction" or typed_graph_timing:
         historical_scan = instant_parashari.get("historical_event_dasha_scan") or {}
         retrospective = bool(historical_scan.get("periods"))
         fd_scan = historical_scan if retrospective else (instant_parashari.get("forward_event_dasha_scan") or {})
@@ -6631,7 +6726,7 @@ def _normalize_instant_evidence(
             current_dashas_context=current_dashas_context,
             target_chart_context=target_chart_context,
         )
-    if answer_mode == "event_prediction":
+    if answer_mode == "event_prediction" or typed_graph_timing:
         normalized["timing_policy"] = instant_parashari.get("timing_policy") or {}
         if instant_parashari.get("historical_event_dasha_scan"):
             normalized["historical_event_dasha_scan"] = instant_parashari.get("historical_event_dasha_scan") or {}
@@ -6639,7 +6734,7 @@ def _normalize_instant_evidence(
             normalized["forward_event_dasha_scan"] = instant_parashari.get("forward_event_dasha_scan") or {}
             normalized["horizon_dasha_segments"] = horizon_dasha_segments
             normalized["horizon_transit_anchors"] = instant_parashari.get("horizon_transit_anchors") or {}
-    if answer_mode in {"event_prediction", "timing_window"}:
+    if answer_mode in {"event_prediction", "timing_window"} or typed_graph_timing:
         normalized["window_dasha_segments"] = window_dasha_segments
     return normalized
 
@@ -6878,6 +6973,7 @@ def _instant_parashari_instruction_block(
     if answer_mode == "remedy_action":
         remedy_blueprint = (normalized_evidence or {}).get("remedy_blueprint") if isinstance((normalized_evidence or {}).get("remedy_blueprint"), dict) else {}
         single_top = str(remedy_blueprint.get("selection_mode") or "") == "single_top"
+        classical_property_remedy = str(remedy_blueprint.get("schema_version") or "").startswith("classical-property-remedy/")
         primary = ", ".join(str(v) for v in (contract.get("primary_evidence") or [])) or "remedy blueprint and active pressure"
         secondary = ", ".join(str(v) for v in (contract.get("secondary_evidence") or [])) or "supporting modifiers"
         avoid = "; ".join(str(v) for v in (contract.get("avoid_drift") or [])) or "generic remedy dump"
@@ -6893,6 +6989,10 @@ def _instant_parashari_instruction_block(
                 "CRITICAL: This is a remedy-only answer, not a full predictive reading.",
                 "CRITICAL: Do not give all astrological schools or a generic upaya list. Build remedies only from the remedy blueprint and the strongest active chart pressure.",
                 "CRITICAL: Keep the remedy language practical, layered, and non-dramatic.",
+                (
+                    "CRITICAL: This is a classical Home/Property remedy. Use only the supplied Navagraha practice and optional dana. Do not add behavioral exercises, budgeting, coaching, modern rituals, gemstones, Vastu claims, dasha, transit, or dates."
+                    if classical_property_remedy else ""
+                ),
                 "CRITICAL: Answer the request immediately. Do not replace remedies with forecasts, favorable dates, diagnosis, or advice such as merely work harder / be disciplined.",
                 (
                     "CRITICAL: The user asked which remedy is most relevant. Give exactly one: copy `remedy_blueprint.top_recommendation`, including its action, frequency, and astrological_reason."
@@ -7565,6 +7665,12 @@ def _requested_charts_from_intent(intent: Optional[Dict[str, Any]], *, answer_mo
             for code in children_charts:
                 if code not in requested:
                     requested.append(code)
+    if is_home_category(category):
+        home_subtype = normalize_home_subtype(intent.get("home_subtype"))
+        home_charts = ("D1", "D4", "D16") if home_subtype.startswith("vehicle_") else ("D1", "D4")
+        for code in home_charts:
+            if code not in requested:
+                requested.append(code)
     if requested:
         return requested
     if str(answer_mode or "").strip() != "factual_chart_lookup":
@@ -8350,7 +8456,7 @@ def _compact_natal_topic_factors(
                         "target_house", "special_sign", "special_sign_name",
                         "dagdha_sign", "dagdha_sign_name", "tithi_shunya_sign",
                         "tithi_shunya_sign_name", "avayogi_tithi_shunya_overlap",
-                        "avayogi_overlap", "gandanta_name", "gandanta_type",
+                        "avayogi_overlap", "avayogi_effect", "gandanta_name", "gandanta_type",
                         "intensity", "distance_from_junction", "statuses",
                     )
                     if facts.get(key) not in (None, "", [], (), {})
@@ -10062,6 +10168,7 @@ def _compact_wealth_foundation(
                     "avayogi_tithi_shunya_benefic_override": bool(
                         special.get("is_avayogi_tithi_shunya_benefic")
                     ),
+                    "avayogi_effect": special.get("avayogi_effect"),
                     "overlap_rule": special.get("avayogi_tithi_shunya_rule"),
                     "roles": list(special.get("special_roles") or []),
                 },
@@ -10563,13 +10670,14 @@ def _compact_wealth_foundation(
         flags: List[str] = []
         if gandanta.get("is_gandanta"):
             flags.append("gandanta")
-        if special.get("is_avayogi_lord"):
+        resolved_avayogi = special.get("avayogi_effect") if isinstance(special.get("avayogi_effect"), dict) else {}
+        if special.get("is_avayogi_lord") and resolved_avayogi.get("polarity") in {None, "", "challenging"}:
             flags.append("avayogi_lord")
         if special.get("is_dagdha_lord"):
             flags.append("dagdha_lord")
         if special.get("is_tithi_shunya_lord"):
             flags.append("tithi_shunya_lord")
-        if special.get("avayogi_tithi_shunya_benefic_override"):
+        if special.get("avayogi_tithi_shunya_benefic_override") and resolved_avayogi.get("polarity") == "neutral":
             flags.append("avayogi_tithi_shunya_override")
         if any(
             str(item.get("type") or "").lower() in {"malefic", "mixed"}
@@ -10758,7 +10866,7 @@ def _compact_wealth_foundation(
                     + ", ".join(fifth_condition_labels)
                 )
                 if "avayogi_tithi_shunya_override" in fifth_flags:
-                    fifth_condition_text += "; its Avayogi–Tithi-Shunya overlap mitigates part of the obstruction but does not erase the other cautions"
+                    fifth_condition_text += "; its Avayogi–Tithi-Shunya overlap cancels the Avayogi obstruction, while the other listed cautions remain independent"
 
                 def division_caution_text(row: Mapping[str, Any]) -> str:
                     planet = str(row.get("planet") or "a carrier")
@@ -11610,6 +11718,9 @@ def _build_instant_context(
     if is_children_category(category):
         children_route = children_profile(category, (intent or {}).get("children_subtype"))
         focus = {**focus, "houses": children_route["houses"], "planets": children_route["planets"]}
+    if is_home_category(category):
+        home_route = home_profile(category, (intent or {}).get("home_subtype"))
+        focus = {**focus, "houses": home_route["houses"], "planets": home_route["planets"]}
     focus_planets = set(focus["planets"]) | {"Moon"}
 
     query_context = (intent or {}).get("query_context") if isinstance((intent or {}).get("query_context"), dict) else None
@@ -11639,6 +11750,14 @@ def _build_instant_context(
             "label": now_local.strftime("%d %B %Y"),
             "use_pd": True,
             "use_sk_pr": False,
+            # The date is the scan anchor, not a period the user asked us to
+            # judge.  Calculators must answer with the next qualifying event
+            # window for an open-ended "when will I" question.
+            "request_semantics": (
+                "next_event_window"
+                if _looks_like_open_ended_life_event_when(question, intent)
+                else "requested_period"
+            ),
         }
     if retrospective_event:
         birth_start = _parse_birth_date_only(birth_data)
@@ -11879,11 +11998,14 @@ def _build_instant_context(
                 instant_parashari[key] = {}
     
     # Refine an untyped legacy category from compact evidence, but never let
-    # the legacy text classifier overwrite a structured Children graph route.
-    # Remedy wording is especially easy for that classifier to label general,
-    # which previously skipped children_foundation after a remedy had already
-    # been calculated.
-    if not is_children_category(category):
+    # the legacy text classifier overwrite a structured live-graph route.
+    # These routes already carry their typed subtype and exact evidence profile;
+    # replacing them here silently drops their required divisional/focus data.
+    if not (
+        is_children_category(category)
+        or is_education_category(category)
+        or is_home_category(category)
+    ):
         category = instant_parashari.get("category") or category
     focus = CATEGORY_FOCUS.get(category, CATEGORY_FOCUS["general"])
     marriage_subtype = str((intent or {}).get("marriage_subtype") or "").lower()
@@ -11912,6 +12034,11 @@ def _build_instant_context(
         focus = {**focus, "houses": children_route["houses"], "planets": children_route["planets"]}
         instant_parashari["focus_houses"] = list(focus["houses"])
         instant_parashari["children_subtype"] = children_route["subtype"]
+    if is_home_category(category):
+        home_route = home_profile(category, (intent or {}).get("home_subtype"))
+        focus = {**focus, "houses": home_route["houses"], "planets": home_route["planets"]}
+        instant_parashari["focus_houses"] = list(focus["houses"])
+        instant_parashari["home_subtype"] = home_route["subtype"]
     if (
         answer_mode == "remedy_action"
         and str(category or "").lower() in {"marriage", "relationship", "love", "partner", "spouse"}
@@ -11929,7 +12056,16 @@ def _build_instant_context(
         is_education_category(category)
         and is_education_timing((intent or {}).get("education_subtype"), answer_mode)
     )
-    if (answer_mode == "event_prediction" or education_event_timing) and authoritative_event_prediction_dashas:
+    children_event_timing = bool(
+        is_children_category(category)
+        and is_children_timing((intent or {}).get("children_subtype"), answer_mode)
+    )
+    home_event_timing = bool(
+        is_home_category(category)
+        and is_home_timing((intent or {}).get("home_subtype"), answer_mode)
+    )
+    typed_event_timing = education_event_timing or children_event_timing or home_event_timing
+    if (answer_mode == "event_prediction" or typed_event_timing) and authoritative_event_prediction_dashas:
         instant_parashari["active_dashas_formatted"] = authoritative_event_prediction_dashas
         instant_parashari["active_dasha_source"] = "dasha_calculator_authoritative_event_prediction"
     elif authoritative_dasha_context:
@@ -11948,7 +12084,7 @@ def _build_instant_context(
     birth_dt_for_age = _parse_birth_date_only(birth_data)
     age_years = _compute_age_years(birth_dt_for_age, now_local)
     life_stage = _life_stage_from_age(age_years)
-    if (answer_mode == "event_prediction" or education_event_timing) and not retrospective_event:
+    if (answer_mode == "event_prediction" or typed_event_timing) and not retrospective_event:
         instant_parashari["timing_policy"] = _timing_policy_for_instant_event(
             age_years=age_years,
             life_stage=life_stage,
@@ -12003,6 +12139,10 @@ def _build_instant_context(
             is_children_category(category)
             and normalize_children_subtype((intent or {}).get("children_subtype")) == "retrospective_child_timing"
         )
+        retrospective_home = bool(
+            is_home_category(category)
+            and normalize_home_subtype((intent or {}).get("home_subtype")) == "retrospective_property_timing"
+        )
         instant_parashari["timing_policy"] = {
             "time_direction": "retrospective",
             "claim_type": "probable_past_periods_only",
@@ -12011,6 +12151,9 @@ def _build_instant_context(
                 "dasha carriers and historical transit reinforcement. Never claim an actual conception or birth "
                 "date without user confirmation."
                 if retrospective_children else
+                "Rank past property-acquisition-capable periods from D1/D4 property promise, houses 2/4/9/11, "
+                "dasha carriers, KP and historical transit reinforcement. Never claim the actual purchase date without user confirmation."
+                if retrospective_home else
                 "Rank past marriage-capable periods from natal promise, D9, dasha carriers and historical "
                 "transit reinforcement. Never claim the actual marriage date without user confirmation."
             ),
@@ -12040,13 +12183,16 @@ def _build_instant_context(
             time_direction="past",
             limit=max(1, len(historical_raw_periods)),
         )
-        candidate_builder = (
-            _historical_children_candidate_pool
-            if retrospective_children else _historical_marriage_candidate_pool
-        )
-        historical_candidates = candidate_builder(
-            list(natal_candidates.get("periods") or []), dict(house_lordships)
-        )
+        if retrospective_home:
+            historical_candidates = [dict(row) for row in natal_candidates.get("periods") or [] if isinstance(row, dict)]
+        else:
+            candidate_builder = (
+                _historical_children_candidate_pool
+                if retrospective_children else _historical_marriage_candidate_pool
+            )
+            historical_candidates = candidate_builder(
+                list(natal_candidates.get("periods") or []), dict(house_lordships)
+            )
         historical_scan = _build_forward_event_dasha_scan(
             birth_data=birth_data,
             now_local=now_local,
@@ -12077,22 +12223,35 @@ def _build_instant_context(
                 min(start, current[0]) if current else start,
                 max(end, current[1]) if current else end,
             )
-        historical_scan["periods"] = _rank_historical_event_periods(
-            list(historical_scan.get("periods") or []),
-            dict(house_lordships),
-            limit=12,
-            phase_bounds=phase_bounds,
-            event_kind="children" if retrospective_children else "marriage",
-        )
+        if retrospective_home:
+            historical_scan["periods"] = sorted(
+                (dict(row) for row in historical_scan.get("periods") or [] if isinstance(row, dict)),
+                key=lambda row: (
+                    0 if int(row.get("transit_trigger_score") or 0) > 0 and row.get("peak_activation_windows") else 1,
+                    -int(row.get("relevance_score") or 0),
+                    str(row.get("start") or ""),
+                ),
+            )[:12]
+        else:
+            historical_scan["periods"] = _rank_historical_event_periods(
+                list(historical_scan.get("periods") or []),
+                dict(house_lordships),
+                limit=12,
+                phase_bounds=phase_bounds,
+                event_kind="children" if retrospective_children else "marriage",
+            )
         historical_scan["candidate_pool_size"] = len(historical_candidates)
         historical_scan["ranking_method"] = (
             "children_2_5_11_jupiter_d7_then_historical_transit"
-            if retrospective_children else "marriage_evidence_then_historical_transit"
+            if retrospective_children else "property_2_4_9_11_d4_then_historical_transit"
+            if retrospective_home else "marriage_evidence_then_historical_transit"
         )
         historical_scan["claim_rule"] = (
             "These are ranked probable child-event periods, not a known or proven conception or birth date. "
             "Ask the user which period matches."
             if retrospective_children else
+            "These are ranked probable property-acquisition periods, not the known or proven purchase date. Ask the user which period matches."
+            if retrospective_home else
             "These are ranked probable periods, not the known or proven marriage date. Ask the user which period matches."
         )
         historical_scan["minimum_age"] = 16
@@ -12127,7 +12286,7 @@ def _build_instant_context(
         )
     except Exception:
         pass
-    if answer_mode == "event_prediction":
+    if answer_mode == "event_prediction" or typed_event_timing:
         event_divisional = _requested_event_divisional_support(
             birth_data=birth_data,
             question=question,
@@ -12311,6 +12470,28 @@ def _build_instant_context(
             period_window=period_window,
             kp_evidence=_instant_real_kp_evidence(birth_data),
         )
+    if is_home_category(category):
+        normalized_evidence["home_foundation"] = build_home_foundation(
+            chart_data=chart_data,
+            normalized_evidence=normalized_evidence,
+            category=category,
+            answer_mode=answer_mode,
+            home_subtype=(intent or {}).get("home_subtype"),
+            kp_evidence=_instant_real_kp_evidence(birth_data),
+            natal_topic_factors=evidence_instant_parashari.get("natal_topic_factors") or {},
+            period_window=period_window,
+        )
+        if str((intent or {}).get("home_subtype") or "") == "property_remedy":
+            property_remedy = normalized_evidence["home_foundation"].get("remedy_blueprint")
+            if isinstance(property_remedy, dict) and property_remedy.get("top_recommendation"):
+                # The Home graph owns remedy selection for this route. Replace
+                # the earlier generic packet so every downstream composer and
+                # graph validator sees the same classical calculation.
+                normalized_evidence["remedy_blueprint"] = property_remedy
+                normalized_evidence["primary_drivers"] = list(property_remedy.get("candidate_planets") or [])
+                normalized_evidence["top_risks"] = list(property_remedy.get("priority_order") or [])
+                normalized_evidence["remedy_sections"] = property_remedy.get("remedy_sections") or {}
+                normalized_evidence["caution"] = property_remedy.get("caution") or ""
 
     location_evidence = _instant_real_location_evidence(
         birth_data=birth_data,
@@ -12606,6 +12787,8 @@ def _build_instant_context(
             career_subtype=(intent or {}).get("career_subtype"),
             wealth_subtype=(intent or {}).get("wealth_subtype"),
             education_subtype=(intent or {}).get("education_subtype"),
+            children_subtype=(intent or {}).get("children_subtype"),
+            home_subtype=(intent or {}).get("home_subtype"),
             question=question,
             chart_data=chart_data,
             house_lordships=house_lordships,
@@ -12866,6 +13049,10 @@ def _build_instant_context(
         recent_history = recent_history[-1:]
     if answer_mode == "remedy_action":
         marriage_remedy = str(category or "").lower() in {"marriage", "relationship", "love", "partner", "spouse"}
+        property_remedy = (
+            is_home_category(category)
+            and str((intent or {}).get("home_subtype") or "").strip().lower() == "property_remedy"
+        )
         prompt_instant_parashari = {
             k: v
             for k, v in prompt_instant_parashari.items()
@@ -12909,9 +13096,10 @@ def _build_instant_context(
                 "option_comparison",
                 "wealth_foundation",
                 "children_foundation",
+                "home_foundation",
             }
         }
-        if marriage_remedy:
+        if marriage_remedy or property_remedy:
             prompt_instant_parashari.pop("active_dashas_formatted", None)
             prompt_instant_parashari.pop("period_window", None)
             prompt_instant_parashari.pop("time_relation", None)
@@ -12962,6 +13150,7 @@ def _build_instant_context(
             "wealth_subtype": (intent or {}).get("wealth_subtype"),
             "education_subtype": (intent or {}).get("education_subtype"),
             "children_subtype": (intent or {}).get("children_subtype"),
+            "home_subtype": (intent or {}).get("home_subtype"),
             "mode": (intent or {}).get("mode") or "birth",
             "answer_mode": instant_parashari.get("answer_mode") or "topic_reading",
             "period_window": period_window,
@@ -13766,10 +13955,21 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
         if isinstance(source_evidence.get("children_foundation"), dict)
         else {}
     )
+    source_home = (
+        source_evidence.get("home_foundation")
+        if isinstance(source_evidence.get("home_foundation"), dict)
+        else {}
+    )
     if source_wealth:
         # Wealth needs nested D1 house/lord rows, D2 placements and the Indu
         # chain. A slightly larger bounded brief is safer than flattening those
         # facts into generic financial prose.
+        target_chars = max(target_chars, 13500)
+    if source_home:
+        # Home comparisons and property timing need an H4 identity ledger plus
+        # the selected route's nested D1/D4 branches.  Dropping those branches
+        # leaves the writer with a verdict but no reliable lord/occupant/aspect
+        # roles, which is precisely where fluent factual substitutions occur.
         target_chars = max(target_chars, 13500)
     source_vocation = (
         source_career.get("vocation_synthesis")
@@ -13794,6 +13994,11 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
     source_query_plan = context.get("query_plan") if isinstance(context.get("query_plan"), dict) else {}
     source_verdict = context.get("verdict") if isinstance(context.get("verdict"), dict) else {}
     source_contract = context.get("answer_contract") if isinstance(context.get("answer_contract"), dict) else {}
+    source_personal_presence = (
+        source_contract.get("personal_presence")
+        if isinstance(source_contract.get("personal_presence"), dict)
+        else {}
+    )
     source_event_rules = (
         source_contract.get("event_rules")
         if isinstance(source_contract.get("event_rules"), dict)
@@ -13900,6 +14105,68 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
                 if value not in (None, "", [], {})
             }
 
+    def restore_home(payload: Dict[str, Any]) -> None:
+        """Preserve the active Home route and immutable D1/D4 identities."""
+        if not source_home:
+            return
+        compact_foundation = {
+            "home_subtype": source_home.get("home_subtype"),
+            "focus_houses": source_home.get("focus_houses"),
+            # This ledger is already compact and its exact strings/markers are
+            # validation data. Never truncate or depth-limit it.
+            "immutable_fact_contract": dict(source_home.get("immutable_fact_contract") or {}),
+            "fourth_house_evidence": _limit_composer_value(
+                source_home.get("fourth_house_evidence") or {},
+                max_depth=8, list_limit=12, string_limit=220,
+            ),
+            "focus_house_evidence": _limit_composer_value(
+                source_home.get("focus_house_evidence") or [],
+                max_depth=8, list_limit=14, string_limit=220,
+            ),
+            "route_synthesis": _limit_composer_value(
+                source_home.get("route_synthesis") or {},
+                max_depth=10, list_limit=14, string_limit=220,
+            ),
+            "ownership_capacity_synthesis": _limit_composer_value(
+                source_home.get("ownership_capacity_synthesis") or {},
+                max_depth=5, list_limit=8, string_limit=220,
+            ),
+            "living_arrangement_synthesis": _limit_composer_value(
+                source_home.get("living_arrangement_synthesis") or {},
+                max_depth=10, list_limit=14, string_limit=220,
+            ),
+            "comparison_synthesis": _limit_composer_value(
+                source_home.get("comparison_synthesis") or {},
+                max_depth=10, list_limit=14, string_limit=220,
+            ),
+            "finance_synthesis": _limit_composer_value(
+                source_home.get("finance_synthesis") or {},
+                max_depth=9, list_limit=12, string_limit=220,
+            ),
+            "obstacle_synthesis": _limit_composer_value(
+                source_home.get("obstacle_synthesis") or {},
+                max_depth=9, list_limit=12, string_limit=220,
+            ),
+            "timing_synthesis": _limit_composer_value(
+                {
+                    "answer_evidence_contract": (
+                        (source_home.get("timing_synthesis") or {}).get("answer_evidence_contract") or {}
+                    ),
+                }
+                if isinstance(source_home.get("timing_synthesis"), dict)
+                else {},
+                max_depth=9, list_limit=10, string_limit=220,
+            ),
+            "availability": source_home.get("availability"),
+            "interpretation_rules": list(source_home.get("interpretation_rules") or [])[:8],
+        }
+        payload_evidence = payload.setdefault("evidence", {})
+        if isinstance(payload_evidence, dict):
+            payload_evidence["home_foundation"] = {
+                key: value for key, value in compact_foundation.items()
+                if value not in (None, "", [], {})
+            }
+
     def restore_career_decision(payload: Dict[str, Any]) -> None:
         """Keep the calculated cause of every stay/change verdict.
 
@@ -13990,16 +14257,26 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
             source_event_rules.get("required_material_windows"), limit=3
         )
 
+    def restore_personal_presence(payload: Dict[str, Any]) -> None:
+        """The ethical personalization boundary must survive prompt fitting."""
+        if not source_personal_presence:
+            return
+        payload_contract = payload.setdefault("answer_contract", {})
+        if isinstance(payload_contract, dict):
+            payload_contract["personal_presence"] = source_personal_presence
+
     compact = _limit_composer_value(context)
     compact = compact if isinstance(compact, dict) else {}
     restore_vocation(compact)
     restore_wealth(compact)
     restore_education(compact)
     restore_children(compact)
+    restore_home(compact)
     restore_career_decision(compact)
     restore_career_target(compact)
     restore_option_comparison(compact)
     restore_retrospective_windows(compact)
+    restore_personal_presence(compact)
     if _json_size(compact) <= target_chars:
         return compact
 
@@ -14014,10 +14291,12 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
     restore_wealth(tighter)
     restore_education(tighter)
     restore_children(tighter)
+    restore_home(tighter)
     restore_career_decision(tighter)
     restore_career_target(tighter)
     restore_option_comparison(tighter)
     restore_retrospective_windows(tighter)
+    restore_personal_presence(tighter)
 
     # The shallow emergency pass above intentionally drops nested collections.
     # Constitutional-health cause facts live one level deeper than each zone
@@ -14173,6 +14452,7 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
             "spouse_location_rules", "missing_location_layers",
             "marriage_remedy_rules",
             "wealth_answer_rules", "wealth_adjudication", "financial_safety_rules",
+            "home_timing_synthesis",
         )
         if graph_policy.get(key) not in (None, "", [], {})
     }
@@ -14203,6 +14483,7 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
         "marriage_remedy_rules": answer_spec.get("marriage_remedy_rules"),
         "wealth_answer_rules": answer_spec.get("wealth_answer_rules"),
         "financial_safety_rules": answer_spec.get("financial_safety_rules"),
+        "home_timing_rules": answer_spec.get("home_timing_rules"),
         "event_rules": compact_event_rules,
         "forbidden": answer_spec.get("forbidden"),
         "answer_order": answer_spec.get("answer_order"),
@@ -14563,6 +14844,80 @@ def _build_instant_answer_blueprint(
     }
 
 
+def _build_personal_presence_contract(
+    *,
+    birth: Dict[str, Any],
+    intent: Dict[str, Any],
+    query_plan: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Bound personalization to supplied context without changing astrology.
+
+    This contract is deliberately about *presence*, not persuasion.  It gives
+    the writer enough guidance to sound attentive and continuous while making
+    the verdict, confidence and calculated evidence immutable.  In
+    particular, it must never become a licence to invent a biography or use a
+    vulnerable moment merely to prolong a session.
+    """
+    full_name = str(birth.get("name") or "").strip()
+    first_name = full_name.split()[0] if full_name else ""
+    answer_mode = str(
+        intent.get("answer_mode") or query_plan.get("answer_mode") or ""
+    ).strip().lower()
+    category = str(
+        intent.get("category") or query_plan.get("category") or "general"
+    ).strip().lower()
+    name_use = (
+        "avoid"
+        if answer_mode in {"factual_chart_lookup", "safety_refusal", "handoff"}
+        or category in {"small_talk", "meta", "safety"}
+        else "optional_once"
+    )
+
+    contract: Dict[str, Any] = {
+        "purpose": "make the answer feel personally attentive without changing the calculated result",
+        "name_use": name_use,
+        "required": [
+            "answer the actual question before inviting further conversation",
+            "include one chart-specific human bridge tied to the supplied verdict or evidence",
+            "translate the supported astrology into a likely lived experience without claiming hidden knowledge",
+            "preserve the user's agency and distinguish possibility, pressure, delay, or support accurately",
+            "when a closing question is useful, tie it to the user's real decision or concern",
+        ],
+        "allowed_sources": [
+            "the current user question",
+            "the supplied user_goal and target",
+            "explicitly supplied recent conversation context that is relevant to this question",
+            "the adjudicated verdict and calculated evidence",
+        ],
+        "continuity_rule": (
+            "Acknowledge relevant continuity only when it is explicitly present in the supplied context; "
+            "never pretend to remember or infer an unstated life event."
+        ),
+        "verdict_fidelity": (
+            "Personalization may change tone and explanation only. It must never change the verdict, "
+            "confidence, timing window, option ranking, remedy, or chart facts."
+        ),
+        "privacy_rule": (
+            "Do not unexpectedly surface birth details, coordinates, unrelated profile data, or a sensitive "
+            "fact from another topic merely to sound personal."
+        ),
+        "forbidden": [
+            "invented emotions, motives, biography, relationships, symptoms, or financial circumstances",
+            "canned flattery or repeatedly addressing the user by name",
+            "fake urgency, fear, scarcity, guilt, or vulnerability targeting",
+            "withholding or weakening the answer in order to prolong the chat",
+            "claiming Tara uniquely understands the user or encouraging emotional dependency",
+            "generic psychology presented as if it were calculated astrology",
+        ],
+    }
+    if first_name and name_use != "avoid":
+        contract["first_name"] = first_name
+        contract["first_name_rule"] = (
+            "May be used at most once and only when it adds natural warmth; do not automatically open with it."
+        )
+    return contract
+
+
 def _build_instant_composer_context(
     instant_context: Dict[str, Any],
     instant_v2_packet: Dict[str, Any],
@@ -14626,6 +14981,7 @@ def _build_instant_composer_context(
             "education_target_traits",
             "education_options",
             "children_subtype",
+            "home_subtype",
             "answer_mode",
             "user_goal",
             "interpretation_frame",
@@ -14726,6 +15082,17 @@ def _build_instant_composer_context(
     )
     if is_children_category(category):
         compact_query_plan["children_subtype"] = children_subtype
+    home_foundation = (
+        normalized.get("home_foundation")
+        if isinstance(normalized.get("home_foundation"), dict) else {}
+    )
+    home_subtype = normalize_home_subtype(
+        home_foundation.get("home_subtype")
+        or intent.get("home_subtype")
+        or query_plan.get("home_subtype")
+    )
+    if is_home_category(category):
+        compact_query_plan["home_subtype"] = home_subtype
     if career_decision_question:
         compact_query_plan["forecast_shape"] = "career_decision"
     exact_day = bool(time_scope.get("is_exact_day"))
@@ -14765,6 +15132,11 @@ def _build_instant_composer_context(
         compact_query_plan["forecast_shape"] = "daily_forecast"
 
     compact_answer_contract = _compact_answer_spec_for_composer(answer_spec)
+    compact_answer_contract["personal_presence"] = _build_personal_presence_contract(
+        birth=birth,
+        intent=intent,
+        query_plan=query_plan,
+    )
     if exact_day:
         # The temporal contract owns this turn. Static domain/profile
         # contracts remain useful upstream for natal eligibility but must not
@@ -14884,6 +15256,7 @@ def _build_instant_composer_context(
         "wealth_foundation": normalized.get("wealth_foundation"),
         "education_foundation": normalized.get("education_foundation"),
         "children_foundation": normalized.get("children_foundation"),
+        "home_foundation": normalized.get("home_foundation"),
         "risk_specifics": list(normalized.get("risk_specifics") or [])[:3],
         "health_body_area": normalized.get("health_body_area"),
         "option_comparison": normalized.get("option_comparison"),
@@ -14917,6 +15290,9 @@ def _build_instant_composer_context(
     )
     is_children_graph = bool(
         live_graph_policy.get("live") and live_graph_policy.get("domain") == "children"
+    )
+    is_home_graph = bool(
+        live_graph_policy.get("live") and live_graph_policy.get("domain") == "home_property"
     )
     wealth_rules = (
         compact_answer_contract.get("wealth_answer_rules")
@@ -15066,6 +15442,82 @@ def _build_instant_composer_context(
             "current_timing": None if static_children else evidence.get("current_timing"),
             "transit_activation_timeline": None if static_children else evidence.get("transit_activation_timeline"),
             "_children_rules": children_rules,
+        }
+    if is_home_graph:
+        static_home = not is_home_timing(home_subtype, answer_mode)
+        home_rules = {
+            "subtype": home_subtype,
+            "static_route": static_home,
+            "controlling_source": "home_foundation",
+            "d4_status": (
+                "calculated_and_used"
+                if isinstance(evidence.get("home_foundation"), dict)
+                and (evidence["home_foundation"].get("availability") or {}).get("d4")
+                else "unavailable"
+            ),
+            "d16_status": (
+                "calculated_and_used"
+                if isinstance(evidence.get("home_foundation"), dict)
+                and (evidence["home_foundation"].get("availability") or {}).get("d16")
+                else "not_required" if not home_subtype.startswith("vehicle_") else "unavailable"
+            ),
+            "required_order": [
+                "direct answer to the exact vehicle question" if home_subtype.startswith("vehicle_") else "direct answer to the home/property question",
+                "House 4 lord placement and dignity as the primary natal reason; for vehicles, interpret it specifically as conveyance/comfort promise",
+                "House 4 occupants and received aspects as support or pressure",
+                "for vehicles, use D16 House 4 and Venus as the concrete vehicle/comfort confirmation and D4 only as an additional qualifier; for other routes use D4 House 4",
+                "only then the route-specific supporting houses from focus_house_evidence",
+                "any materially relevant supplied dignity, Yogi, Avayogi, Tithi-Shunya, Dagdha, Gandanta, combustion, dispositor, nakshatra or yoga condition",
+                "one practical implication",
+            ],
+            "minimum_evidence_standard": {
+                "all_home_routes": [
+                    "one actual D1 House 4 lord/placement/dignity fact",
+                    "one actual D1 House 4 occupant or aspect fact when supplied",
+                    "one actual D4 House 4 lord/placement/aspect fact",
+                    "one actual route-specific supporting-house fact from focus_house_evidence",
+                ],
+                "vehicle_routes": "Require an actual D16 House 4/Venus condition in addition to D1; do not relabel D4 property evidence as vehicle-specific evidence.",
+                "special_conditions": "Interpret every materially relevant special condition supplied for the House 4 lord or route-controlling lord. Omit a condition only when the evidence does not supply it; never invent one.",
+                "comparison_routes": "Build separate evidence-led arguments for both options before selecting a winner.",
+            },
+            "route_synthesis_rule": "Use home_foundation.route_synthesis as the controlling conclusion for this subtype. For vehicle_selection use route_synthesis.recommended_colors; for option comparisons use comparison_synthesis; for finance use finance_synthesis; for timing use timing_synthesis. Do not replace these with a generic H4 reading.",
+            "direct_decision_rules": [
+                "For property_potential, answer ownership capacity from ownership_capacity_synthesis and do not introduce timing unless the user asked when or named a period.",
+                "For joint_property, answer the favourability of joint ownership from comparison_synthesis.asked_option_assessment before comparing it with sole ownership. Preserve its scope boundary: this single chart cannot judge the spouse or family member.",
+                "For every Home timing subtype, answer the exact requested event from timing_synthesis.now_vs_wait_synthesis before explaining the evidence. Never substitute purchase or ownership language for a sale, possession, construction, relocation or vehicle question.",
+                "For an open-ended vehicle question such as 'When will I buy a vehicle?', lead with timing_synthesis.next_window and never call the current scan-anchor day a requested period.",
+            ],
+            "forbidden": [
+                "Do not make a generic stability statement without naming the actual supplied House 4 or its lord condition.",
+                "Do not lead with House 2, 8, 11 or a current dasha for a home-life or ownership question; they only qualify House 4.",
+                "Static Home/Property routes must not mention current dasha, transit, active period, or dates.",
+                "D4 must be used as a concrete confirmation or qualification, not merely named.",
+                "Vehicle routes must use D16 as vehicle-and-comfort confirmation and must never call D4 the property-specific proof of a vehicle purchase.",
+                "If d4_status is calculated_and_used, never say D4, divisional evidence, planetary strength, or a deeper layer is unavailable, needed, or required for a better answer.",
+                "Use fourth_house_evidence and focus_house_evidence as the only source for H4, aspects, dignity, Yogi, Avayogi, Tithi-Shunya, Dagdha, Gandanta, combustion, dispositor, nakshatra, yoga or other special-condition claims.",
+                "Do not reduce a Home/Property answer to one occupant. If the minimum_evidence_standard is present, satisfy it before giving the practical interpretation.",
+                "A positive timing window is permitted only when timing_synthesis contains complete KP fructification plus a route-filtered dasha window with transit confirmation. If the horizon was fully evaluated but no window passed, clearly say no fully triangulated window was found in that horizon; do not call the calculations missing. Never promote the current date, a dasha boundary, or an unfiltered transit into the answer.",
+                "For living_arrangement, use living_arrangement_synthesis as the required comparison: explain the separate family-living and independent-living scores and give its calculated verdict; never say that the comparison is unavailable when that synthesis is supplied.",
+                "For living_arrangement, cite at least one actual non-H4 condition from each option's evidence_ledger, plus the shared D1 H4-lord/occupant/aspect synthesis and D4 H4 condition. Moon in H4 alone is never a sufficient explanation. Do not give the practical recommendation until both option ledgers have been interpreted.",
+                "Do not predict legal outcomes, title entitlement, Vastu compliance, foreign settlement, inheritance ownership, or a guaranteed financial result.",
+            ],
+        }
+        compact_answer_contract["home_answer_rules"] = home_rules
+        compact_verdict = {
+            key: value for key, value in {
+                "direction": "synthesize_from_calculated_home_foundation",
+                "confidence": verdict.get("confidence"),
+                "ranked_windows": compact_verdict.get("ranked_windows") if not static_home else None,
+                "missing_required_capabilities": verdict.get("missing_required_capabilities"),
+                "scope": f"calculated home/property route: {home_subtype}",
+            }.items() if value not in (None, "", [], {})
+        }
+        evidence = {
+            "home_foundation": evidence.get("home_foundation"),
+            "current_timing": None if static_home else evidence.get("current_timing"),
+            "transit_activation_timeline": None if static_home else evidence.get("transit_activation_timeline"),
+            "_home_rules": home_rules,
         }
     if career_decision_question:
         career_rules = (
@@ -15454,15 +15906,39 @@ def _instant_relational_voice_contract() -> str:
     """Shared user-facing voice for every Instant LLM answer path."""
     return """RELATIONAL VOICE CONTRACT:
 - Sound like a warm, emotionally perceptive and honest personal guide. The user should feel understood as a person, not processed as a question.
+- Follow `answer_contract.personal_presence` as a strict ethical personalization boundary. Personalize from the current question, its supplied goal, relevant explicit conversation context, and calculated astrology only.
+- Use the supplied first name selectively, at most once, and only when it sounds natural. Do not automatically begin with the name and do not use it as a substitute for genuine relevance.
+- Include one chart-specific human sentence that connects the actual calculated reason to how this particular pattern may show up in life. Keep the astrology visible in translated, understandable language; never replace it with generic psychology.
+- Acknowledge continuity only when the supplied context explicitly supports it. Do not invent memory, biography, emotions, motives, relationships, symptoms, or financial circumstances.
+- Personalization may improve framing only. It must never alter the supplied verdict, confidence, dates, ranking, remedy, or chart facts, and it must never expose unrelated stored profile or birth data.
+- Give the complete useful answer before the closing question. Never withhold clarity, manufacture urgency or fear, target vulnerability, or prolong the conversation for engagement.
+- When the supplied Instant contract says `fallback_to_deeper_mode: true`, do not attempt a partial, generic, or cross-domain answer. In the same language and script as the user’s question, briefly say that this needs a deeper Standard or Premium reading. Never expose internal evidence names, missing calculations, routing labels, or irrelevant examples.
+- Apply that same graceful Standard-or-Premium escalation whenever the available evidence cannot reliably answer the user’s actual question, even when no domain graph is attached. Do not replace uncertainty with a different-domain answer or a generic self-help paragraph.
 - Infer the human need behind the question—uncertainty, hope, fear, validation, direction, reassurance or self-understanding—and respond to it naturally without naming or announcing that inference.
 - Answer directly first, then translate the supported result into lived experience: what the pattern may feel like, how it may show up, and why it matters to this person.
+- After the direct verdict, include one brief HUMAN BRIDGE before the technical proof: explain what the verdict does and does not mean for the person. For example, when the evidence supports the underlying promise but not the requested period, translate that as a timing mismatch rather than personal failure or permanent denial. Use the actual verdict; never force reassurance when the promise itself is weak or unavailable.
+- Give the person an emotionally useful orientation, not only a prediction: help them distinguish patience from passivity, caution from fear, pressure from incapacity, or delay from denial when that distinction is supported. Keep this to one or two natural sentences and do not turn the answer into therapy or generic self-help.
 - Make empathy specific through the substance of the answer. Never add canned lines such as "I understand how you feel", "that must be difficult", or "the universe has a plan".
 - Preserve emotional nuance. Explain mixed evidence as competing needs or pressures rather than calling it merely unclear. Make difficult indications illuminating, not frightening; make supportive indications encouraging, not guaranteed.
 - Use psychologically perceptive language without diagnosing mental-health conditions, inventing motives, claiming to know hidden feelings, or presenting astrology as fixed identity or fate. Protect the user's agency and include a useful reflection or next step when appropriate.
 - Match the user's emotional intensity. Be gentle for vulnerable subjects, energizing for opportunities, grounding for anxiety and direct for decisions. Do not make every answer dramatic.
 - Use natural modern conversation, not forced youth slang, excessive emojis, therapy-speak, mystical theatre, pet names or manufactured intimacy.
-- End with one specific, emotionally meaningful question that helps reveal the user's real concern or lived situation; never use a generic continuation or sales question.
+- End with one specific, emotionally meaningful question that helps reveal the user's real concern, decision pressure or lived situation. Prefer questions such as what is creating the urgency, what the hoped-for outcome represents, or which real option is becoming concrete. Never use a generic continuation, evidence-menu or sales question.
 - Never encourage dependency or imply Tara is conscious, uniquely understands the user, replaces people or professionals, or is the only guidance they need."""
+
+
+def _instant_personal_presence_rewrite_rule(contract: Any) -> str:
+    """Keep personal delivery intact when a fact validator requests a rewrite."""
+    personal = contract if isinstance(contract, dict) else {}
+    return f"""PERSONAL PRESENCE MUST SURVIVE THIS REWRITE:
+- Follow this contract: {json.dumps(personal, ensure_ascii=False, separators=(",", ":"))}
+- Required visible order: direct verdict; one or two natural human-bridge sentences; calculated proof; timing or practical implication; one genuinely relevant question.
+- The human bridge is mandatory and separate from the technical proof. Translate what the verdict means for this person's decision without inventing feelings or circumstances.
+- When the chart supports eventual ownership but the requested period is weaker, distinguish timing resistance from permanent denial or personal failure. Do not force this reassurance when the supplied promise is weak.
+- Acknowledge uncertainty or pressure in a grounded way and preserve agency. Do not use canned empathy, therapy language, fear, fake urgency, emotional dependency, or generic psychology.
+- If the supplied first name is allowed, it may appear naturally at most once; never force it into the opening.
+- The final question must explore the real decision, urgency, security, or concrete option suggested by the user's question. A generic question about property type, another calculation, or whether they want more detail is invalid unless that detail would materially change the verdict.
+- Personal language may frame the facts but must never alter, omit, soften, or strengthen the calculated verdict, dates, confidence, remedy, or immutable chart facts."""
 
 
 def _build_budgeted_instant_prompt(
@@ -15489,7 +15965,7 @@ def _build_budgeted_instant_prompt(
 Answer the user's astrology question from the supplied adjudicated context only.
 {_instant_composer_language_rule(language)}
 {_instant_relational_voice_contract()}
-{visible_astrology_rule}
+{AVAYOGI_CHAT_DOCTRINE}
 - Lead with the direct real-world answer. Stay under the contract word limit and end with one natural question.
 - Treat query_plan, verdict, answer_contract, and evidence as strict. Never invent a date, body area, option winner, chart fact, activated house, or causal factor.
 {education_fact_rule}- A live knowledge_graph_policy is authoritative. Obey its exclusions, required sections, guardrails, claim_permission, and limitation_instruction. Missing required factors mean the dependent conclusion is unavailable.
@@ -15508,7 +15984,10 @@ USER QUESTION:
 {question}
 
 ADJUDICATED CONTEXT:
-{context_json}""".strip()
+{context_json}
+
+EVIDENCE-SPECIFIC OUTPUT RULES:
+{visible_astrology_rule}""".strip()
 
 
 def _build_retrospective_budget_context(context: Dict[str, Any]) -> Dict[str, Any]:
@@ -15857,6 +16336,177 @@ def _strip_constitutional_health_validation_markers(answer: str) -> str:
     return re.sub(r"\s*\[\[HEALTH_EVIDENCE_\d+:[^\]]*\]\]", "", str(answer or "")).strip()
 
 
+def _resolve_home_fact_contract(
+    prompt_context: Optional[Dict[str, Any]],
+    instant_v2_packet: Optional[Dict[str, Any]],
+    instant_context: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Find the immutable Home/Property role ledger after context compaction."""
+    # A property-remedy response is validated against the remedy blueprint's
+    # single calculated graha and reason. Requiring the general H4 identity
+    # markers here would force an unrelated full property reading into a
+    # concise remedy answer.
+    for container in (prompt_context, instant_v2_packet, instant_context):
+        if not isinstance(container, dict):
+            continue
+        plan = container.get("query_plan") if isinstance(container.get("query_plan"), dict) else {}
+        summary = container.get("intent_summary") if isinstance(container.get("intent_summary"), dict) else {}
+        if str(plan.get("home_subtype") or summary.get("home_subtype") or "").strip().lower() == "property_remedy":
+            return {}
+    candidates: List[Any] = []
+    for container in (prompt_context, instant_v2_packet, instant_context):
+        if not isinstance(container, dict):
+            continue
+        for evidence_key in ("evidence", "normalized_evidence"):
+            evidence = container.get(evidence_key)
+            if not isinstance(evidence, dict):
+                continue
+            foundation = evidence.get("home_foundation")
+            if isinstance(foundation, dict):
+                contract = foundation.get("immutable_fact_contract")
+                if isinstance(contract, dict):
+                    contract = dict(contract)
+                    timing = foundation.get("timing_synthesis") if isinstance(foundation.get("timing_synthesis"), dict) else {}
+                    timing_contract = (
+                        timing.get("answer_evidence_contract")
+                        if isinstance(timing.get("answer_evidence_contract"), dict)
+                        else {}
+                    )
+                    timing_markers = list(timing_contract.get("validation_markers") or [])
+                    if timing_markers:
+                        contract["validation_markers"] = list(dict.fromkeys(
+                            list(contract.get("validation_markers") or []) + timing_markers
+                        ))
+                        contract["timing_answer_evidence_contract"] = timing_contract
+                    candidates.append(contract)
+        composer_brief = container.get("composer_brief")
+        if isinstance(composer_brief, dict):
+            evidence = composer_brief.get("evidence")
+            foundation = evidence.get("home_foundation") if isinstance(evidence, dict) else None
+            if isinstance(foundation, dict):
+                contract = foundation.get("immutable_fact_contract")
+                if isinstance(contract, dict):
+                    contract = dict(contract)
+                    timing = foundation.get("timing_synthesis") if isinstance(foundation.get("timing_synthesis"), dict) else {}
+                    timing_contract = (
+                        timing.get("answer_evidence_contract")
+                        if isinstance(timing.get("answer_evidence_contract"), dict)
+                        else {}
+                    )
+                    timing_markers = list(timing_contract.get("validation_markers") or [])
+                    if timing_markers:
+                        contract["validation_markers"] = list(dict.fromkeys(
+                            list(contract.get("validation_markers") or []) + timing_markers
+                        ))
+                        contract["timing_answer_evidence_contract"] = timing_contract
+                    candidates.append(contract)
+    for candidate in candidates:
+        if isinstance(candidate, dict) and candidate.get("validation_markers"):
+            return candidate
+    return {}
+
+
+def _validate_home_fact_markers(answer: str, fact_contract: Mapping[str, Any]) -> List[str]:
+    """Require language-neutral acknowledgement of every core H4 fact row."""
+    visible = str(answer or "").split("NEXT_ACTION_META:", 1)[0]
+    errors = [
+        f"missing immutable Home/Property fact binding: {marker}"
+        for marker in fact_contract.get("validation_markers") or []
+        if str(marker or "").strip() and str(marker) not in visible
+    ]
+    # These are implementation-field leaks, not language heuristics. Catch the
+    # exact schema labels our prompt exposes so they can never become a visible
+    # user-facing heading even when every astrology marker is otherwise valid.
+    internal_heading = re.compile(
+        r"(?im)^\s*(?:#{1,6}\s*)?(?:\*\*)?"
+        r"(?:route synthesis|runtime key|graph policy|evidence status|selected mode|primary interpretation)"
+        r"(?:\*\*)?\s*:",
+    )
+    if internal_heading.search(visible):
+        errors.append("visible answer exposes an internal implementation heading")
+    return errors
+
+
+def _strip_home_fact_markers(answer: str) -> str:
+    """Remove temporary D1/D4 role markers before the answer reaches the UI."""
+    visible = re.sub(
+        r"\s*\[\[HOME_(?:D(?:1|4|16)_H4|TIMING_(?:KP|DASHA|TRANSIT)):[^\]]*\]\]",
+        "",
+        str(answer or ""),
+    )
+    # Some small composers copy a compaction ellipsis into the middle of a
+    # word (for example, ``s…upportive``). It is transport damage rather than
+    # user-facing punctuation, so repair only that language-agnostic pattern.
+    return re.sub(r"(?<=\w)…(?=\w)", "", visible).strip()
+
+
+def _attach_missing_home_fact_markers(answer: str, fact_contract: Mapping[str, Any]) -> str:
+    """Attach transport markers after a fact-plan rewrite.
+
+    Providers occasionally omit opaque machine strings even while following
+    the factual rewrite. Their absence must not make an otherwise valid Live
+    answer fail nondeterministically. This helper is used only after the
+    dedicated Home correction prompt has supplied the immutable fact plan.
+    """
+    text = str(answer or "").strip()
+    missing = [
+        str(marker)
+        for marker in fact_contract.get("validation_markers") or []
+        if str(marker or "").strip() and str(marker) not in text
+    ]
+    if not missing:
+        return text
+    parts = text.split("NEXT_ACTION_META:", 1)
+    visible = parts[0].rstrip()
+    tail = f"NEXT_ACTION_META:{parts[1]}" if len(parts) > 1 else ""
+    marker_block = "\n".join(missing)
+    return f"{visible}\n{marker_block}\n{tail}".rstrip()
+
+
+def _align_home_visible_astrology_contract(
+    visible_contract: Mapping[str, Any],
+    home_fact_contract: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Allow every planet the immutable Home fact plan requires."""
+    aligned = dict(visible_contract or {})
+    if not home_fact_contract:
+        return aligned
+    required: List[str] = []
+
+    def add(value: Any) -> None:
+        name = str(value or "").strip()
+        if name in _HEALTH_FACT_PLANETS and name not in required:
+            required.append(name)
+
+    for key in ("d1_fourth_house", "d4_fourth_house", "d16_fourth_house"):
+        row = home_fact_contract.get(key)
+        if not isinstance(row, Mapping):
+            continue
+        add(row.get("lord"))
+        for field in ("occupants", "house_aspectors"):
+            for planet in row.get(field) or []:
+                add(planet)
+    timing = home_fact_contract.get("timing_answer_evidence_contract")
+    if isinstance(timing, Mapping):
+        kp = timing.get("kp_fructification")
+        if isinstance(kp, Mapping):
+            for row in kp.get("cusp_judgments") or []:
+                if isinstance(row, Mapping):
+                    add(row.get("sub_lord"))
+        dasha = timing.get("dasha_activation")
+        if isinstance(dasha, Mapping):
+            for field in ("mahadasha", "antardasha", "pratyantardasha"):
+                add(dasha.get(field))
+        for row in timing.get("transit_confirmation") or []:
+            if isinstance(row, Mapping):
+                add(row.get("planet"))
+    allowed = list(dict.fromkeys([*(aligned.get("allowed_planets") or []), *required]))
+    aligned["allowed_planets"] = allowed
+    if not aligned.get("technical_detail_allowed"):
+        aligned["maximum_planet_reasons"] = len(allowed)
+    return aligned
+
+
 def _build_instant_composer_prompt_v3(
     question: str,
     composer_context: Dict[str, Any],
@@ -15925,7 +16575,7 @@ You are Tara in AstroRoshni Instant Chat. Write one natal constitutional-health 
 
 {_instant_composer_language_rule(language)}
 {_instant_relational_voice_contract()}
-{visible_astrology_rule}
+{AVAYOGI_CHAT_DOCTRINE}
 
 Required answer:
 0. Follow the language and script of the USER QUESTION. The app-language fallback or internal English evidence must not override the user's actual language.
@@ -15957,6 +16607,9 @@ USER QUESTION:
 
 NATAL-ONLY HEALTH EVIDENCE:
 {natal_health_json}
+
+EVIDENCE-SPECIFIC OUTPUT RULES:
+{visible_astrology_rule}
 """.strip()
     is_chart_fact = (
         str((composer_context.get("query_plan") or {}).get("forecast_shape") or "") == "chart_fact_reading"
@@ -16168,6 +16821,9 @@ USER QUESTION:
 
 AUTHORITATIVE COMPOSER BRIEF:
 {context_json}
+
+EVIDENCE-SPECIFIC OUTPUT RULES:
+{visible_astrology_rule}
 """.strip()
     period_forecast_rules = ""
     if answer_mode == "potential_capacity":
@@ -16186,6 +16842,7 @@ AUTHORITATIVE COMPOSER BRIEF:
             else {}
         )
         single_top_remedy = str(composer_remedy_blueprint.get("selection_mode") or "") == "single_top"
+        classical_property_remedy = str(composer_remedy_blueprint.get("schema_version") or "").startswith("classical-property-remedy/")
         remedy_delivery_line = (
             "- The user asks which remedy is most relevant. Give exactly one remedy: copy `evidence.remedy_blueprint.top_recommendation` and state its action, frequency, and astrological_reason. Do not add two alternatives."
             if single_top_remedy
@@ -16195,6 +16852,7 @@ AUTHORITATIVE COMPOSER BRIEF:
 - This is an explicit remedy request. Give remedies, not another diagnosis, forecast, favorable date, or lecture about discipline and patience.
 - `evidence.remedy_blueprint` is the authoritative remedy plan. If it is absent or empty, say that the chart-specific remedy plan could not be prepared and ask one precise clarification; never improvise generic advice as a remedy.
 {remedy_delivery_line}
+- When `evidence.remedy_blueprint.schema_version` begins `classical-property-remedy/`, use only its traditional Navagraha practice and optional dana. Do not add modern behavioral exercises, budgeting, coaching, gemstones, Vastu claims, dasha, transit, or dates.{" This classical-only rule is active for this answer." if classical_property_remedy else ""}
 - Start by naming the remedy itself, not by retelling the marital-conflict diagnosis or current planetary period.
 - Prefer constructive house expression first, then the strongest suitable mantra, seva/charity, nakshatra, biological/tree, or behavioral action. Do not dump every available remedy layer.
 - Ordinary career advice such as work consistently, improve communication, seek training, avoid shortcuts, or plan carefully is not a remedy unless it is a concrete `house_expression` or `behavioral` action from the supplied blueprint and its chart connection is stated.
@@ -16266,6 +16924,40 @@ AUTHORITATIVE COMPOSER BRIEF:
 - Never diagnose infertility or pregnancy risk, predict miscarriage or fetal sex, promise an exact number of children or twins, or use the parent's chart as the child's own fate chart.
 - Follow `route_synthesis.verdict`, `timing_verdict`, KP adjudication, requested horizon and claim boundaries exactly. A supportive period is not a guaranteed event.
 """
+    home_rules = ""
+    if composer_graph_policy.get("domain") == "home_property":
+        home_rules = """
+- PERSONAL DELIVERY IS MANDATORY: after the direct verdict and before the factual proof, write one or two natural sentences explaining what the result means for this person's actual decision. This human bridge cannot be replaced by more chart facts.
+- For a weaker requested purchase period with an independently supported ownership promise, make clear that the result concerns timing rather than a permanent denial of homeownership. Preserve uncertainty and never manufacture reassurance when the promise is weak.
+- End with a question about the real stake, urgency, security need, or concrete property decision. A generic “What property type?” or “Would you like more details?” question is invalid unless that missing detail materially changes the calculated verdict.
+- HOME/PROPERTY FACT CHECK: `evidence.home_foundation.immutable_fact_contract` is the authoritative identity ledger. Do not infer a lord, occupant, aspector, dignity, placement or divisional fact from general astrology or from another evidence row.
+- Keep the roles separate. `d1_fourth_house.lord` is the D1 House 4 lord; `occupants` only occupy House 4; `house_aspectors` is the complete allowed list of planets aspecting House 4. `lord_aspects_received` applies to the lord planet and must never be described as an aspect on House 4. Never merge D1, D4, or D16.
+- When `d1_ascendant_lord` matches a House 4 occupant, describe that planet as the ascendant lord occupying House 4, not as the House 4 lord, unless `d1_fourth_house.lord` independently names it.
+- Interpret the D1 House 4 lord first, then its occupants and exact house aspectors. For vehicle routes, interpret D16 as the vehicle-and-comfort confirmation and D4 only as an additional qualifier; never describe D4 as the vehicle-specific chart. For other Home routes, use D4 as the divisional confirmation. Follow `home_answer_rules.required_order` and the selected `route_synthesis`; one planet in House 4 is never a complete answer.
+- For every marker in `immutable_fact_contract.validation_markers`, write one factually consistent explanation clause for its exact D1/D4/D16 fact or timing evidence row and copy the marker unchanged after that clause. When `timing_answer_evidence_contract` is present, its KP, dasha and transit clauses are mandatory. Markers are mandatory in every language and are removed before display. Do not translate or alter them.
+- In Simple style, translate the supplied roles into ordinary language but preserve their identities exactly. Interpret a D4 placement inside the property context: for example, its House 10 means established responsibility, status and visible stability. Do not call it the "career sphere" or turn it into a career prediction. More generally, do not import another life domain merely because a generic house label mentions it. In Technical style, name only the supplied chart details. Never add a benefic or malefic aspect absent from `house_aspectors`.
+"""
+        if composer_graph_policy.get("runtime_key") == "vehicle_selection":
+            home_rules += """
+- VEHICLE SELECTION OVERRIDE: this is a static colour-family recommendation, not ownership potential and not purchase timing. Begin with `route_synthesis.required_visible_conclusion`, preserve the order in `route_synthesis.recommended_colors`, and explain only the supplied D1/D16 carrier links.
+- Do not mention a purchase window, requested period, KP, dasha, transit, whether the user will acquire a car, or whether timing is supportive. Do not ask why the purchase is urgent. If a final question is useful, ask only about a real-world colour constraint such as visibility, maintenance, climate, or resale preference.
+"""
+    graph_timing_rules = ""
+    if (
+        composer_graph_policy.get("live")
+        and answer_mode in {
+            "event_prediction", "event_timing", "timing_window",
+            "lifetime_event_timing", "month_timing",
+        }
+    ):
+        graph_timing_rules = """
+- LIVE TIMING EVIDENCE CHECK: natal promise answers whether an event is possible; it cannot answer when. A current dasha label by itself also cannot prove that the requested period is supportive.
+- Before giving any positive timing verdict, use the supplied chain in this order: natal/divisional promise, KP materialisation when the route requires it, MD-AD-PD activation of the route's actual event houses, then a dated transit delivery to those houses.
+- When naming a dasha, explain which supplied event houses its planets activate and whether the mechanism is lordship, occupation or aspect. When naming a transit, identify the supplied transit planet, its date band and the event houses it delivers. Do not merely say "the houses are activated" or "transits support it."
+- Keep the requested period separate from a later peak. A future peak elsewhere in the same dasha never proves that today or this month is supportive. Never turn the as-of date, scan boundary, dasha boundary or first sampled transit date into an event date.
+- In Simple style, translate numbered houses into their life meanings while retaining the responsible planets. In Technical style, preserve the supplied house numbers and mechanisms. The evidentiary depth must be the same in both styles.
+- Never expose internal implementation vocabulary in the visible answer. Forbidden visible labels include "Route synthesis", "runtime key", "graph policy", "evidence status", "selected mode", "primary interpretation", and calculator field names.
+"""
     speech_rules = ""
     if speech_mode:
         speech_rules = f"""
@@ -16303,7 +16995,7 @@ You are Tara in AstroRoshni Instant Chat. The astrology has already been calcula
 Hard rules:
 {_instant_composer_language_rule(language)}
 {_instant_relational_voice_contract()}
-{visible_astrology_rule}
+{AVAYOGI_CHAT_DOCTRINE}
 - Answer the real-life question in the first sentence. Never open with planets, dashas, dates, evidence IDs, or house numbers.
 - Treat `verdict` and `answer_contract` as authoritative. Use `evidence` only to explain them; never invent a stronger conclusion.
 - If `query_plan.confirmed_life_event` is present, its date is a fact supplied by the user. Acknowledge it as confirmed, do not present competing probable windows, and never claim astrology discovered or proved that date. Use calculated exact-day evidence only to explain what was active around the confirmed event.
@@ -16321,13 +17013,15 @@ Hard rules:
 - For a constitutional health question, name every ranked zone in `health_rules.allowed_zone_evidence` in exact order; `required_zone_count` is mandatory, not a maximum. Do not reorder or omit the fourth region to shorten the answer. Explain each zone only from its own row. The composer brief intentionally contains no current timing: never add a dasha, transit, or "currently active" statement from general astrology knowledge.
 - For a derived person, keep ownership explicit: these are the native chart's indications for that person, not that person's own chart or dasha.
 - An MD-AD-PD sequence is a dasha chain. MD is the major period, AD the sub-period, and PD the sub-sub-period; never rename a level.
-- No HTML, tables, JSON except required metadata, internal tags, evidence IDs, decorative headings, disclaimers, or hidden reasoning.
+- No HTML, tables, JSON except required metadata, evidence IDs, decorative headings, disclaimers, or hidden reasoning. Do not emit internal tags except the exact mandatory validation markers explicitly supplied by a domain fact contract; those markers are removed before display.
 {period_forecast_rules}
 {constitutional_health_rules}
 {career_rules}
 {marriage_rules}
 {education_rules}
 {children_rules}
+{home_rules}
+{graph_timing_rules}
 {speech_rules}
 
 USER QUESTION:
@@ -16335,6 +17029,9 @@ USER QUESTION:
 
 AUTHORITATIVE COMPOSER BRIEF:
 {context_json}
+
+EVIDENCE-SPECIFIC OUTPUT RULES:
+{visible_astrology_rule}
 """.strip()
 
 
@@ -16659,7 +17356,7 @@ Astrological method:
 Style rules:
 {_instant_composer_language_rule(language)}
 {_instant_relational_voice_contract()}
-{legacy_visible_astrology_rule}
+{AVAYOGI_CHAT_DOCTRINE}
 {length_rule}
 - Use daily-use language, not consultant language. Prefer phrases such as "right now", "this phase", "work pressure", "money matters", or "relationship tension" over abstract phrases such as "current energetic configuration", "professional materialization", or "relational dynamics".
 - Keep astrology credible but easy to follow: give the result in normal language first, then one compact chart reason. Do not make the user decode jargon.
@@ -16718,6 +17415,8 @@ USER QUESTION:
 
 ASTROLOGY CONTEXT:
 {context_json}
+EVIDENCE-SPECIFIC OUTPUT RULES:
+{legacy_visible_astrology_rule}
 {followup_tail}
 """.strip()
 
@@ -17032,6 +17731,7 @@ async def generate_instant_chat_response(
     _finish_local_stage("prompt_build", prompt_started)
     model_name = get_instant_chat_model()
     instant_provider = get_instant_chat_llm_provider()
+    system_prompt, user_prompt = _split_instant_prompt_for_cache(prompt)
     if instant_v2_packet:
         instant_v2_packet["composer_brief"] = prompt_context
         instant_v2_packet["composer_metrics"] = {
@@ -17041,6 +17741,9 @@ async def generate_instant_chat_response(
                 for key, value in (prompt_context or {}).items()
             },
             "prompt_chars": len(prompt),
+            "system_prompt_chars": len(system_prompt),
+            "user_prompt_chars": len(user_prompt),
+            "cacheable_prefix_chars": len(system_prompt),
             "prompt_budget_chars": prompt_budget,
             "within_prompt_budget": len(prompt) <= prompt_budget,
             "generation_calls": 1,
@@ -17049,7 +17752,8 @@ async def generate_instant_chat_response(
     answer_request_id = _log_instant_llm_request(
         stage="instant_answer",
         model_name=model_name,
-        prompt=prompt,
+        prompt=user_prompt,
+        system_prompt=system_prompt,
         context=prompt_context,
         answer_mode=answer_mode,
         speech_mode=speech_mode,
@@ -17085,6 +17789,20 @@ async def generate_instant_chat_response(
         if isinstance(authoritative_prompt_context, dict)
         else {}
     )
+    home_fact_contract = _resolve_home_fact_contract(
+        prompt_context,
+        instant_v2_packet,
+        instant_context,
+    )
+    if home_fact_contract:
+        visible_astrology_contract = _align_home_visible_astrology_contract(
+            visible_astrology_contract,
+            home_fact_contract,
+        )
+        if isinstance(instant_v2_packet, dict):
+            answer_spec = instant_v2_packet.get("answer_spec")
+            if isinstance(answer_spec, dict):
+                answer_spec["visible_astrology"] = visible_astrology_contract
     if response_health_rules:
         logger.info(
             "INSTANT_HEALTH_FACT_GATE active rows=%s sources=%s",
@@ -17108,12 +17826,12 @@ async def generate_instant_chat_response(
     buffer_translated_delivery = bool(visible_astrology_contract.get("required"))
     generation_stream_callback = (
         None
-        if constitutional_health_rows or buffer_graph_delivery or buffer_translated_delivery
+        if constitutional_health_rows or home_fact_contract or buffer_graph_delivery or buffer_translated_delivery
         else stream_callback
     )
     started_at = datetime.utcnow()
     llm_result = await analyzer.generate_text_from_prompt(
-        prompt,
+        user_prompt,
         premium_analysis=False,
         model_override=None,
         model_name_override=model_name,
@@ -17125,6 +17843,7 @@ async def generate_instant_chat_response(
         gemini_thinking_level=(thinking_level if instant_provider == CHAT_LLM_GEMINI else None),
         deepseek_thinking_enabled=(False if instant_provider == CHAT_LLM_DEEPSEEK else None),
         stream_callback=generation_stream_callback,
+        system_prompt=system_prompt,
     )
     elapsed_s = max(0.0, (datetime.utcnow() - started_at).total_seconds())
     pipeline_elapsed_s = max(0.0, time.perf_counter() - pipeline_started)
@@ -17134,7 +17853,8 @@ async def generate_instant_chat_response(
         request_id=answer_request_id,
         stage="instant_answer",
         model_name=model_name,
-        prompt=prompt,
+        prompt=user_prompt,
+        system_prompt=system_prompt,
         result=llm_result,
         elapsed_s=elapsed_s,
     )
@@ -17178,6 +17898,369 @@ async def generate_instant_chat_response(
         }
 
     raw_response = _repair_common_utf8_mojibake(llm_result.get("response")).strip()
+    home_fact_validation_errors = (
+        _validate_home_fact_markers(raw_response, home_fact_contract)
+        if home_fact_contract
+        else []
+    )
+    if home_fact_contract:
+        if language_error := _instant_answer_language_error(raw_response, language):
+            home_fact_validation_errors.append(language_error)
+    home_fact_correction_attempted = False
+    home_fact_correction_applied = False
+    home_required_fact_plan = ""
+    if home_fact_validation_errors:
+        home_fact_correction_attempted = True
+        logger.error(
+            "INSTANT_HOME_FACT_REJECTED errors=%s answer=%r contract=%s",
+            home_fact_validation_errors,
+            raw_response[:1200],
+            json.dumps(home_fact_contract, ensure_ascii=False, default=str),
+        )
+        correction_decision: Dict[str, Any] = {}
+        source_home: Dict[str, Any] = {}
+        source_home_timing_rules: Dict[str, Any] = {}
+        # Use the full calculated source before the prompt-sized brief. Reading
+        # a compacted string here can leak its truncation ellipsis into the
+        # user's direct verdict or discard comparison details.
+        for container in (instant_context, instant_v2_packet, prompt_context):
+            if not isinstance(container, dict):
+                continue
+            correction_evidence = container.get("evidence") if isinstance(container.get("evidence"), dict) else {}
+            candidate_home = correction_evidence.get("home_foundation") if isinstance(correction_evidence.get("home_foundation"), dict) else {}
+            if candidate_home and not source_home:
+                source_home = candidate_home
+            source_answer_contract = container.get("answer_contract") if isinstance(container.get("answer_contract"), dict) else {}
+            candidate_timing = source_answer_contract.get("home_timing_rules") if isinstance(source_answer_contract.get("home_timing_rules"), dict) else {}
+            if candidate_timing and not source_home_timing_rules:
+                source_home_timing_rules = candidate_timing
+        if source_home:
+            comparison = source_home.get("comparison_synthesis") if isinstance(source_home.get("comparison_synthesis"), dict) else {}
+            timing = source_home.get("timing_synthesis") if isinstance(source_home.get("timing_synthesis"), dict) else {}
+            correction_decision = {
+                "home_subtype": source_home.get("home_subtype"),
+                "route_required_visible_conclusion": (
+                    (source_home.get("route_synthesis") or {}).get("required_visible_conclusion")
+                    if isinstance(source_home.get("route_synthesis"), dict) else None
+                ),
+                "recommended_vehicle_colors": (
+                    (source_home.get("route_synthesis") or {}).get("recommended_colors")
+                    if isinstance(source_home.get("route_synthesis"), dict) else []
+                ),
+                "ownership_capacity_synthesis": source_home.get("ownership_capacity_synthesis") or {},
+                "asked_option_assessment": comparison.get("asked_option_assessment") or {},
+                "comparison_direction": comparison.get("direction"),
+                "favored_option": comparison.get("favored_option"),
+                "comparison_ranked_options": comparison.get("ranked_options") or [],
+                "now_vs_wait_synthesis": (
+                    timing.get("now_vs_wait_synthesis")
+                    or source_home_timing_rules.get("now_vs_wait_synthesis")
+                    or {}
+                ),
+            }
+        correction_subtype = str(correction_decision.get("home_subtype") or "").strip().lower()
+        correction_static = correction_subtype not in TIMING_HOME_SUBTYPES
+        correction_style_rule = (
+            "SIMPLE STYLE: mention the responsible planet names, but translate houses into ordinary meanings such as home, resources, partnership, shared liability and gains. Do not print D1, D4, numbered houses, dignity labels, KP, MD/AD/PD abbreviations or specialist Sanskrit terms. The hidden validation markers are the only technical strings allowed."
+            if response_style == "simple"
+            else "TECHNICAL STYLE: preserve the current technical depth and use only supplied chart, house, dignity, KP, dasha and transit facts."
+        )
+        correction_timing_rule = (
+            "STATIC ROUTE: do not add a Timing section, current period, dasha, transit, date, imminent-event claim, 'timing/circumstances matter', 'not immediate', or advice to watch a planet's future period. This answer establishes capacity or suitability only."
+            if correction_static
+            else "TIMING ROUTE: answer the requested period from now_vs_wait_synthesis and use only the dated window in timing_answer_evidence_contract."
+        )
+        correction_marker_block = "\n".join(
+            str(marker)
+            for marker in home_fact_contract.get("validation_markers") or []
+            if str(marker or "").strip()
+        )
+        house_meanings = {
+            1: "identity and personal foundation",
+            2: "resources and accumulated money", 3: "documents and execution",
+            4: "home and property", 6: "debt and obstacles", 7: "partnership",
+            8: "shared liability and transition", 9: "support and opportunity",
+            11: "realisation and gains", 12: "expense and release",
+        }
+        d4_house_meanings = {
+            1: "personal control and foundational stability",
+            2: "family assets and available resources",
+            3: "property effort, movement and documentation",
+            4: "rootedness, residence and inner security",
+            5: "property planning and continuity",
+            6: "property obligations and practical friction",
+            7: "shared residence and agreements",
+            8: "property transfer, shared title and major change",
+            9: "support, opportunity and distance",
+            10: "established responsibility, status and visible stability",
+            11: "property fulfilment and realised gains",
+            12: "distance, expense and release",
+        }
+        if correction_subtype == "property_sale_timing":
+            house_meanings.update({
+                3: "sale documents and execution",
+                8: "transfer and change of ownership",
+                11: "completion and realised proceeds",
+            })
+        def plain_houses(values: Any) -> str:
+            labels: List[str] = []
+            for value in values or []:
+                try:
+                    house = int(value)
+                except (TypeError, ValueError):
+                    continue
+                label = house_meanings.get(house, f"life area {house}")
+                if label not in labels:
+                    labels.append(label)
+            return ", ".join(labels) or "the required property areas"
+
+        d1_fact = home_fact_contract.get("d1_fourth_house") if isinstance(home_fact_contract.get("d1_fourth_house"), dict) else {}
+        d4_fact = home_fact_contract.get("d4_fourth_house") if isinstance(home_fact_contract.get("d4_fourth_house"), dict) else {}
+        d16_fact = home_fact_contract.get("d16_fourth_house") if isinstance(home_fact_contract.get("d16_fourth_house"), dict) else {}
+        is_vehicle_correction = correction_subtype.startswith("vehicle_")
+        if is_vehicle_correction:
+            house_meanings.update({
+                2: "available resources for the vehicle",
+                4: "vehicles, conveyance and comfort",
+                11: "successful acquisition",
+                12: "purchase expense and ongoing outflow",
+            })
+        timing_contract = home_fact_contract.get("timing_answer_evidence_contract") if isinstance(home_fact_contract.get("timing_answer_evidence_contract"), dict) else {}
+        dasha_fact = timing_contract.get("dasha_activation") if isinstance(timing_contract.get("dasha_activation"), dict) else {}
+        transit_facts = timing_contract.get("transit_confirmation") if isinstance(timing_contract.get("transit_confirmation"), list) else []
+        transit_fact = transit_facts[0] if transit_facts and isinstance(transit_facts[0], dict) else {}
+        kp_fact = timing_contract.get("kp_fructification") if isinstance(timing_contract.get("kp_fructification"), dict) else {}
+        kp_planets = [
+            str(row.get("sub_lord"))
+            for row in kp_fact.get("cusp_judgments") or []
+            if isinstance(row, dict) and row.get("sub_lord")
+        ]
+        transit_date_suffix = (
+            f" to {transit_fact.get('end')}"
+            if transit_fact.get("end") and transit_fact.get("end") != transit_fact.get("start")
+            else ""
+        )
+        next_timing_window = (
+            (correction_decision.get("now_vs_wait_synthesis") or {}).get("next_window")
+            if isinstance(correction_decision.get("now_vs_wait_synthesis"), dict)
+            else {}
+        )
+        next_timing_window = next_timing_window if isinstance(next_timing_window, dict) else {}
+        dasha_date_prefix = (
+            f"broad window {next_timing_window.get('start') or dasha_fact.get('start')} to {next_timing_window.get('end') or dasha_fact.get('end')}; "
+            if (next_timing_window.get("start") or dasha_fact.get("start"))
+            and (next_timing_window.get("end") or dasha_fact.get("end"))
+            else ""
+        )
+        now_decision = correction_decision.get("now_vs_wait_synthesis") if isinstance(correction_decision.get("now_vs_wait_synthesis"), dict) else {}
+        asked_decision = correction_decision.get("asked_option_assessment") if isinstance(correction_decision.get("asked_option_assessment"), dict) else {}
+        capacity_decision = correction_decision.get("ownership_capacity_synthesis") if isinstance(correction_decision.get("ownership_capacity_synthesis"), dict) else {}
+        direct_conclusion = (
+            now_decision.get("required_visible_conclusion")
+            or asked_decision.get("required_visible_conclusion")
+            or capacity_decision.get("required_visible_conclusion")
+            or correction_decision.get("route_required_visible_conclusion")
+            or ""
+        )
+        timing_event_label = str(now_decision.get("event") or "property event").strip()
+        comparison_rows = [
+            row for row in correction_decision.get("comparison_ranked_options") or []
+            if isinstance(row, dict)
+        ]
+        vehicle_color_rows = [
+            row for row in correction_decision.get("recommended_vehicle_colors") or []
+            if isinstance(row, dict) and row.get("color")
+        ]
+        comparison_direction = str(correction_decision.get("comparison_direction") or "").strip()
+        favored_option = str(correction_decision.get("favored_option") or "").strip()
+        if not direct_conclusion and comparison_rows:
+            if comparison_direction == "close_or_hybrid":
+                direct_conclusion = "The calculated comparison is close; neither option has a decisive chart advantage."
+            elif comparison_direction == "leans_to_option" and favored_option:
+                favored_name = next(
+                    (str(row.get("name") or favored_option) for row in comparison_rows if row.get("option") == favored_option),
+                    favored_option.replace("_", " "),
+                )
+                direct_conclusion = f"The calculated comparison gives {favored_name} the stronger fit."
+            elif comparison_direction == "not_established":
+                direct_conclusion = "The supplied Home/Property evidence does not establish a reliable comparison."
+        comparison_branch_lines = []
+        for row in comparison_rows:
+            comparison_branch_lines.append(
+                f"{row.get('name') or str(row.get('option') or 'option').replace('_', ' ')} is {row.get('verdict')}; "
+                f"its primary factors are {plain_houses(row.get('primary_houses'))}, qualified by "
+                f"{plain_houses(row.get('supporting_houses'))}."
+            )
+        comparison_fact_line = (
+            "Separate option ledgers: " + " ".join(comparison_branch_lines)
+            if comparison_branch_lines else ""
+        )
+        joint_comparison_line = ""
+        if correction_subtype == "joint_property" and asked_decision:
+            joint_comparison_line = (
+                f"Joint-versus-sole comparison: the joint branch is {asked_decision.get('verdict')} "
+                f"and is {asked_decision.get('relative_to_alternative')}; the overall comparison is "
+                f"{correction_decision.get('comparison_direction')} with favored option "
+                f"{correction_decision.get('favored_option') or 'none'}. The joint branch must weigh home/property, "
+                f"partnership, shared assets/liability, resources and gains. Scope boundary: "
+                f"{asked_decision.get('scope_boundary')}"
+            )
+        fact_plan = [
+            f"Direct verdict: {direct_conclusion}" if direct_conclusion else "",
+            (
+                "Ranked vehicle colours: " + "; ".join(
+                    f"{row.get('color')} from {', '.join(row.get('carriers') or [])}"
+                    for row in vehicle_color_rows
+                )
+            ) if vehicle_color_rows else "",
+            comparison_fact_line,
+            joint_comparison_line,
+            (
+                f"Birth-chart {'vehicle and comfort' if is_vehicle_correction else 'home foundation'}: {d1_fact.get('lord') or 'the supplied lord'} rules {'vehicles/comfort' if is_vehicle_correction else 'home/property'} and is placed in "
+                f"the area of {house_meanings.get(_safe_int(d1_fact.get('lord_house')), 'its supplied placement')}. Separately, "
+                f"{', '.join(d1_fact.get('occupants') or []) or 'no planet'} sits directly in the {'vehicle/comfort' if is_vehicle_correction else 'home/property'} area; exact aspectors are "
+                f"{', '.join(d1_fact.get('house_aspectors') or []) or 'none'}."
+            ) if d1_fact else "",
+            (
+                f"{'Additional D4 comfort/property qualification' if is_vehicle_correction else 'Property-specific confirmation'}: {d4_fact.get('lord') or 'the supplied lord'} rules its home/property area from "
+                f"the area of {d4_house_meanings.get(_safe_int(d4_fact.get('lord_house')), 'its supplied property-chart placement')}; exact aspectors are "
+                f"{', '.join(d4_fact.get('house_aspectors') or []) or 'none'}."
+            ) if d4_fact else "",
+            (
+                f"Vehicle-specific D16 confirmation: {d16_fact.get('lord') or 'the supplied lord'} rules its vehicle/comfort area from "
+                f"house {d16_fact.get('lord_house') or 'the supplied placement'}; occupants are "
+                f"{', '.join(d16_fact.get('occupants') or []) or 'none'} and exact aspectors are "
+                f"{', '.join(d16_fact.get('house_aspectors') or []) or 'none'}."
+            ) if d16_fact and is_vehicle_correction else "",
+            (
+                f"Fine event check: {', '.join(dict.fromkeys(kp_planets))} connect the {timing_event_label} to the required result areas; "
+                f"its verdict is {kp_fact.get('verdict')}."
+            ) if kp_fact else "",
+            (
+                f"Planet-period delivery: {dasha_date_prefix}major planet {dasha_fact.get('mahadasha')}, "
+                f"sub-period planet {dasha_fact.get('antardasha')}, deeper sub-period planet {dasha_fact.get('pratyantardasha')} "
+                f"activates {plain_houses(dasha_fact.get('activated_houses'))}."
+            ) if dasha_fact else "",
+            (
+                f"Dated transit delivery: {transit_fact.get('planet')} on {transit_fact.get('start')}"
+                f"{transit_date_suffix} "
+                f"delivers {plain_houses(transit_fact.get('activated_focus_houses'))}."
+            ) if transit_fact else "",
+        ]
+        correction_fact_plan = "\n".join(f"- {row}" for row in fact_plan if row)
+        home_required_fact_plan = correction_fact_plan
+        correction_personal_presence = (
+            ((authoritative_prompt_context or {}).get("answer_contract") or {}).get("personal_presence")
+            if isinstance((authoritative_prompt_context or {}).get("answer_contract"), dict)
+            else {}
+        )
+        personal_rewrite_rule = _instant_personal_presence_rewrite_rule(
+            correction_personal_presence
+        )
+        correction_prompt = f"""
+Rewrite the rejected answer once and return only the complete replacement answer.
+
+{_instant_composer_language_rule(language)}
+{_instant_relational_voice_contract()}
+{personal_rewrite_rule}
+{correction_style_rule}
+{correction_timing_rule}
+The immutable fact contract below is authoritative:
+- `d1_fourth_house.lord` alone is the D1 House 4 lord.
+- `occupants` are occupants, never lords unless the lord field independently says so.
+- `house_aspectors` is the complete list of planets aspecting that house. Add no other aspector.
+- `lord_aspects_received` applies to the lord planet, not to House 4.
+- Keep D1, D4 and D16 distinct. D16 is the vehicle-and-comfort chart; never call D4 vehicle-specific.
+- If `d1_ascendant_lord` is an occupant of House 4, call it the ascendant lord occupying House 4, not the House 4 lord.
+
+MANDATORY FACT PLAN — express every line below in the answer. In Simple style use the supplied life meanings instead of chart codes, house numbers or abbreviations; do not delete a line:
+{correction_fact_plan}
+
+Give the direct answer first and preserve DIRECT DECISION exactly. The first fact-plan line is the controlling conclusion and no later sentence may contradict it. The mandatory human bridge must follow that conclusion before the factual proof. For every comparison route, explain each supplied option ledger separately before giving practical advice; do not explain only the winning option. For joint property, preserve `relative_to_alternative`, `comparison_direction`, and `favored_option`: close/none means neither joint nor sole is better, and must never become “together rather than alone.” A supportive capacity is not a guaranteed purchase. Explain the actual birth-chart House 4 lord, occupants and exact aspectors, then the relevant divisional confirmation. For vehicle routes, D16 is mandatory vehicle-specific evidence and D4 is only an additional comfort/property qualifier. Keep a lord's placement and the house occupants in two independent sentences. The phrases “same area”, “same sphere”, and “there/also” are forbidden for connecting them because they can falsely relocate a planet. In Simple style translate these roles without printing chart codes or house numbers, while Technical may name D1/D4/D16/H4. If `timing_answer_evidence_contract` is present, also explain its fine event result, planet-period activation and one dated named-planet transit; in Simple style translate these mechanisms without abbreviations or numbered houses. State both start and end of the broad phase before its narrower transit peak. Do not repeat prompt instructions such as 'keep this period separate'. Never print internal implementation headings. Preserve material cautions, but never treat an empty occupants list as positive or negative and never turn general planetary pressure into an unsupported authority struggle, visibility issue, legal dispute, structural defect, family conflict, price increase, loan problem or transaction outcome. Stay within 150-230 visible words so the human bridge is not squeezed out by the required facts. End with one personal, decision-relevant question. Immediately after that question, paste the REQUIRED MARKER BLOCK exactly, then append the exact metadata line shown below. The markers and metadata are removed before display.
+For Simple Home/Property answers, keep every D4 placement inside the property context. In particular, translate D4 House 10 as established responsibility, status and visible stability—not as a career sphere or a career prediction.
+
+VALIDATION FAILURES:
+{json.dumps(home_fact_validation_errors, ensure_ascii=False)}
+
+IMMUTABLE HOME/PROPERTY FACT CONTRACT:
+{json.dumps(home_fact_contract, ensure_ascii=False, separators=(",", ":"))}
+
+DIRECT DECISION:
+{json.dumps(correction_decision, ensure_ascii=False, separators=(",", ":"))}
+
+USER QUESTION:
+{question}
+
+REJECTED ANSWER:
+{raw_response}
+
+REQUIRED MARKER BLOCK — COPY EXACTLY:
+{correction_marker_block}
+
+NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}}
+""".strip()
+        correction_request_id = _log_instant_llm_request(
+            stage="instant_home_fact_correction",
+            model_name=model_name,
+            prompt=correction_prompt,
+            context={"immutable_fact_contract": home_fact_contract},
+            answer_mode=answer_mode,
+            speech_mode=speech_mode,
+            compacted=True,
+        )
+        correction_started = datetime.utcnow()
+        corrected_result = await analyzer.generate_text_from_prompt(
+            correction_prompt,
+            premium_analysis=False,
+            model_override=None,
+            model_name_override=model_name,
+            llm_log_tag="instant_chat_home_fact_correction",
+            request_timeout_s=answer_timeout_s,
+            force_gemini=False,
+            provider_override=instant_provider,
+            use_gemini_rest=instant_provider == CHAT_LLM_GEMINI,
+            gemini_thinking_level=(thinking_level if instant_provider == CHAT_LLM_GEMINI else None),
+            deepseek_thinking_enabled=(False if instant_provider == CHAT_LLM_DEEPSEEK else None),
+            stream_callback=None,
+        )
+        correction_elapsed_s = max(0.0, (datetime.utcnow() - correction_started).total_seconds())
+        _log_instant_llm_response(
+            request_id=correction_request_id,
+            stage="instant_home_fact_correction",
+            model_name=model_name,
+            prompt=correction_prompt,
+            result=corrected_result,
+            elapsed_s=correction_elapsed_s,
+        )
+        corrected_raw = _repair_common_utf8_mojibake(corrected_result.get("response")).strip()
+        if corrected_result.get("success"):
+            corrected_raw = _attach_missing_home_fact_markers(corrected_raw, home_fact_contract)
+        corrected_errors = (
+            _validate_home_fact_markers(corrected_raw, home_fact_contract)
+            if corrected_result.get("success")
+            else [str(corrected_result.get("error") or "correction generation failed")]
+        )
+        if corrected_result.get("success"):
+            if language_error := _instant_answer_language_error(corrected_raw, language):
+                corrected_errors.append(language_error)
+        if corrected_errors:
+            logger.error(
+                "INSTANT_HOME_FACT_CORRECTION_REJECTED errors=%s answer=%r",
+                corrected_errors,
+                corrected_raw[:1200],
+            )
+            raw_response = (
+                "I could not produce a reliable Home/Property explanation from the calculated chart facts. "
+                "Please try this question again.\n\n"
+                'NEXT_ACTION_META: {"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}'
+            )
+            home_fact_validation_errors = corrected_errors
+        else:
+            raw_response = corrected_raw
+            llm_result = corrected_result
+            elapsed_s += correction_elapsed_s
+            home_fact_validation_errors = []
+            home_fact_correction_applied = True
     strict_health_fact_binding = bool(
         str(language or "english").strip().lower() in {"english", "en"}
         and not re.search(r"[^\x00-\x7F]", str(question or ""))
@@ -17299,7 +18382,7 @@ NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","fol
     if constitutional_health_rows:
         raw_response = _strip_constitutional_health_validation_markers(raw_response)
     translated_astrology_errors = validate_translated_astrology_answer(
-        raw_response,
+        _strip_home_fact_markers(raw_response) if home_fact_contract else raw_response,
         visible_astrology_contract,
     )
     translated_astrology_correction_attempted = False
@@ -17312,22 +18395,41 @@ NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","fol
             raw_response[:1200],
             visible_astrology_contract.get("allowed_planets"),
         )
+        home_translated_rule = ""
+        if home_fact_contract:
+            home_translated_rule = (
+                "HOME FACTS MUST SURVIVE THE REWRITE: express every applicable line in the mandatory fact plan below. "
+                "Keep the visible answer between 150 and 230 words. Preserve the direct conclusion, its human bridge, and the personal decision-relevant final question. Do not replace the human bridge with additional chart facts. Do not infer authority struggles, family conflict, legal or structural problems, pricing, paperwork, financing, urgency, or a transaction outcome unless the fact plan explicitly supplies that claim. General planetary pressure may only become a need for care, patience, boundaries, or clear agreement.\n"
+                "MANDATORY HOME FACT PLAN:\n" + home_required_fact_plan
+            )
+            if isinstance(home_fact_contract.get("timing_answer_evidence_contract"), dict) and home_fact_contract.get("timing_answer_evidence_contract"):
+                home_translated_rule += (
+                    "\nHOME TIMING MUST SURVIVE THE REWRITE: include the supplied fine event/materialisation result, "
+                    "the named planet-period chain with its complete broad start and end dates and exact property meanings, "
+                    "and one named transit planet with its supplied peak date. In Simple style omit KP/MD/AD/PD and numbered "
+                    "houses, but retain the responsible planet names, life meanings, broad window and peak date."
+                )
         correction_prompt = f"""
 You are correcting one AstroRoshni Instant answer. Preserve its direct verdict, dates, cautions, safety boundaries and final question. Do not add a new claim.
 
 {_instant_composer_language_rule(language)}
 {_instant_relational_voice_contract()}
 {translated_astrology_prompt_rule(visible_astrology_contract)}
+{home_translated_rule}
 
 Rewrite the complete answer so its visible astrology follows this exact pattern:
-direct answer -> one or two allowed planet reasons -> lived human meaning -> one useful action.
-Use only the supplied source facts. A planet name alone is not an explanation. Do not mention chart codes, numbered houses, degrees, dasha-level abbreviations or specialist Sanskrit conditions unless `technical_detail_allowed` is true. Preserve the rejected answer's machine-readable tail exactly—either NEXT_ACTION_META or the speech follow-up markers—and do not introduce the other format.
+direct answer -> the required evidence-bound allowed planet reasons, without exceeding `maximum_planet_reasons` -> lived human meaning -> one useful action.
+Use only the supplied source facts. A planet name alone is not an explanation. Do not mention chart codes, numbered houses, degrees, dasha-level abbreviations or specialist Sanskrit conditions unless `technical_detail_allowed` is true. For a Home/Property answer, the mandatory fact plan overrides any urge to generalize or invent lived manifestations. Preserve the rejected answer's machine-readable tail exactly—either NEXT_ACTION_META or the speech follow-up markers—and do not introduce the other format.
 
 VALIDATION FAILURES:
 {json.dumps(translated_astrology_errors, ensure_ascii=False)}
 
 VISIBLE ASTROLOGY CONTRACT:
 {json.dumps(visible_astrology_contract, ensure_ascii=False, separators=(",", ":"))}
+
+IMMUTABLE HOME/PROPERTY FACT CONTRACT (when non-empty):
+{json.dumps(home_fact_contract, ensure_ascii=False, separators=(",", ":"))}
+If this contract is non-empty, preserve every lord/occupant/aspector role exactly and preserve every validation marker unchanged after its corresponding factual sentence.
 
 USER QUESTION:
 {question}
@@ -17369,14 +18471,21 @@ REJECTED ANSWER:
             elapsed_s=correction_elapsed_s,
         )
         corrected_raw = _repair_common_utf8_mojibake(corrected_result.get("response")).strip()
+        if corrected_result.get("success") and home_fact_contract:
+            corrected_raw = _attach_missing_home_fact_markers(corrected_raw, home_fact_contract)
         corrected_errors = (
-            validate_translated_astrology_answer(corrected_raw, visible_astrology_contract)
+            validate_translated_astrology_answer(
+                _strip_home_fact_markers(corrected_raw) if home_fact_contract else corrected_raw,
+                visible_astrology_contract,
+            )
             if corrected_result.get("success")
             else [str(corrected_result.get("error") or "correction generation failed")]
         )
         if corrected_result.get("success"):
             if language_error := _instant_answer_language_error(corrected_raw, language):
                 corrected_errors.append(language_error)
+            if home_fact_contract:
+                corrected_errors.extend(_validate_home_fact_markers(corrected_raw, home_fact_contract))
         if corrected_errors:
             logger.error(
                 "INSTANT_TRANSLATED_ASTROLOGY_CORRECTION_REJECTED errors=%s answer=%r",
@@ -17390,7 +18499,17 @@ REJECTED ANSWER:
             elapsed_s += correction_elapsed_s
             translated_astrology_errors = []
             translated_astrology_correction_applied = True
-    if (constitutional_health_rows or buffer_translated_delivery) and stream_callback is not None:
+    if home_fact_contract and not speech_mode:
+        # Home corrections must never leak malformed model-authored metadata
+        # or accidentally trigger the generic missing-follow-up fallback.
+        visible_home = str(raw_response or "").split("NEXT_ACTION_META:", 1)[0].rstrip()
+        raw_response = (
+            visible_home
+            + '\nNEXT_ACTION_META: {"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}'
+        )
+    if home_fact_contract:
+        raw_response = _strip_home_fact_markers(raw_response)
+    if (constitutional_health_rows or home_fact_contract or buffer_translated_delivery) and stream_callback is not None:
         # Publish only the validated/corrected answer; no incorrect partial
         # placement or generic horoscope prose reaches the processing message.
         stream_callback(raw_response, raw_response)
@@ -17403,6 +18522,7 @@ REJECTED ANSWER:
     parsed_response = ResponseParser.parse_images_in_chat_response(response_text)
     response_content = parsed_response.get("content") or response_text
     response_content, prediction_anchor_meta = ResponseParser.parse_prediction_anchor_metadata(response_content)
+    graph_fallback_error: Dict[str, Any] | None = None
     if instant_v2_packet:
         pre_enforcement_content = response_content
         response_content = enforce_live_graph_answer(
@@ -17411,6 +18531,23 @@ REJECTED ANSWER:
             language=language,
         )
         graph_policy = ((instant_v2_packet.get("answer_spec") or {}).get("knowledge_graph_policy") or {})
+        if graph_policy.get("live") and graph_policy.get("fallback_to_deeper_mode"):
+            graph_fallback_error = {
+                "error_type": "InstantGraphEvidenceIncomplete",
+                "domain": graph_policy.get("domain"),
+                "runtime_key": graph_policy.get("runtime_key"),
+                "question_type": graph_policy.get("question_type"),
+                "expected_answer_mode": graph_policy.get("expected_answer_mode"),
+                "missing_required_factors": list(graph_policy.get("missing_required_factors") or []),
+                "timing_missing_factors": list(graph_policy.get("timing_missing_factors") or []),
+                "evidence_status": graph_policy.get("evidence_status"),
+            }
+            logger.error(
+                "INSTANT_GRAPH_EVIDENCE_INCOMPLETE domain=%s runtime_key=%s missing=%s",
+                graph_fallback_error.get("domain"),
+                graph_fallback_error.get("runtime_key"),
+                graph_fallback_error.get("missing_required_factors"),
+            )
         if response_content != pre_enforcement_content:
             logger.info(
                 "INSTANT_GRAPH_ANSWER_REPLACED domain=%s runtime_key=%s before_chars=%s after_chars=%s",
@@ -17419,7 +18556,11 @@ REJECTED ANSWER:
                 len(str(pre_enforcement_content or "")),
                 len(str(response_content or "")),
             )
-        if graph_policy.get("live") and not str(response_content or "").rstrip().endswith("?"):
+        if (
+            graph_policy.get("live")
+            and not graph_policy.get("fallback_to_deeper_mode")
+            and not str(response_content or "").rstrip().endswith("?")
+        ):
             domain = str(graph_policy.get("domain") or "").lower()
             if str(language or "").lower().startswith("hi"):
                 follow_up = (
@@ -17451,9 +18592,11 @@ REJECTED ANSWER:
     # latency, can distort multilingual wording, and makes the experience no
     # longer instant.
     contract_enforcement = {
-        "applied": health_fact_correction_applied or translated_astrology_correction_applied,
+        "applied": home_fact_correction_applied or health_fact_correction_applied or translated_astrology_correction_applied,
         "reason": (
-            "health_fact_validation_and_correction"
+            "home_fact_validation_and_correction"
+            if home_fact_correction_attempted
+            else "health_fact_validation_and_correction"
             if health_fact_correction_attempted
             else "translated_astrology_validation_and_correction"
             if translated_astrology_correction_attempted
@@ -17461,11 +18604,14 @@ REJECTED ANSWER:
         ),
         "generation_calls": (
             1
+            + int(home_fact_correction_attempted)
             + int(health_fact_correction_attempted)
             + int(translated_astrology_correction_attempted)
         ),
         "health_fact_validation_passed": not health_fact_validation_errors,
         "health_fact_validation_errors": health_fact_validation_errors,
+        "home_fact_validation_passed": not home_fact_validation_errors,
+        "home_fact_validation_errors": home_fact_validation_errors,
         "translated_astrology_validation_passed": not translated_astrology_errors,
         "translated_astrology_validation_errors": translated_astrology_errors,
     } if instant_v2_packet else None
@@ -17590,6 +18736,7 @@ REJECTED ANSWER:
         "analysis_steps": [],
         "faq_metadata": None,
         "raw_response": raw_response,
+        "graph_fallback_error": graph_fallback_error,
         "instant_context_summary": instant_context.get("intent_summary") or {},
         "instant_evidence_debug": (
             ({**instant_v2_packet, "contract_enforcement": contract_enforcement} if instant_v2_packet else None)

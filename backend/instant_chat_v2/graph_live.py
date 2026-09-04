@@ -47,9 +47,44 @@ from .children_graph_runtime import (
     is_children_category,
     resolve_children_graph_inputs,
 )
+from .home_graph_runtime import (
+    build_home_graph_route, compare_home_graph_policy, is_home_category,
+    resolve_home_graph_inputs,
+)
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _deeper_mode_fallback(language: str) -> str:
+    """Localized fail-closed copy for an incomplete Live evidence contract."""
+    key = str(language or "english").strip().lower().replace("_", "-")
+    key = key.split("-", 1)[0]
+    messages = {
+        "en": "I can’t answer this reliably in Live mode with the depth this question needs. Please ask it in Standard or Premium mode so Tara can use the complete analysis.",
+        "hi": "इस प्रश्न का विश्वसनीय उत्तर देने के लिए Live mode में पर्याप्त गहराई उपलब्ध नहीं है। कृपया इसे Standard या Premium mode में पूछें, ताकि Tara पूरा विश्लेषण इस्तेमाल कर सके।",
+        "mr": "या प्रश्नाचे विश्वासार्ह उत्तर देण्यासाठी Live mode मध्ये पुरेशी सखोल माहिती उपलब्ध नाही. कृपया हा प्रश्न Standard किंवा Premium mode मध्ये विचारा, म्हणजे Tara संपूर्ण विश्लेषण वापरू शकेल.",
+        "gu": "આ પ્રશ્નનો વિશ્વસનીય જવાબ આપવા માટે Live modeમાં પૂરતી ઊંડાણભરી માહિતી ઉપલબ્ધ નથી. કૃપા કરીને તેને Standard અથવા Premium modeમાં પૂછો, જેથી Tara સંપૂર્ણ વિશ્લેષણ વાપરી શકે.",
+        "ta": "இந்தக் கேள்விக்கு நம்பகமாக பதிலளிக்க Live mode-ல் தேவையான ஆழமான தகவல் இல்லை. Tara முழுமையான ஆய்வைப் பயன்படுத்த Standard அல்லது Premium mode-ல் கேளுங்கள்.",
+        "te": "ఈ ప్రశ్నకు నమ్మకంగా సమాధానం ఇవ్వడానికి Live modeలో అవసరమైన లోతైన సమాచారం లేదు. Tara పూర్తి విశ్లేషణను ఉపయోగించేందుకు Standard లేదా Premium modeలో అడగండి.",
+        "bn": "এই প্রশ্নের নির্ভরযোগ্য উত্তর দেওয়ার জন্য Live mode-এ প্রয়োজনীয় গভীর তথ্য নেই। Tara-কে সম্পূর্ণ বিশ্লেষণ ব্যবহার করতে দিতে Standard বা Premium mode-এ প্রশ্নটি করুন।",
+        "kn": "ಈ ಪ್ರಶ್ನೆಗೆ ವಿಶ್ವಾಸಾರ್ಹವಾಗಿ ಉತ್ತರಿಸಲು Live modeನಲ್ಲಿ ಅಗತ್ಯವಾದ ಆಳವಾದ ಮಾಹಿತಿ ಇಲ್ಲ. Tara ಸಂಪೂರ್ಣ ವಿಶ್ಲೇಷಣೆಯನ್ನು ಬಳಸಲು Standard ಅಥವಾ Premium modeನಲ್ಲಿ ಕೇಳಿ.",
+        "ml": "ഈ ചോദ്യത്തിന് വിശ്വസനീയമായി മറുപടി നൽകാൻ Live mode-ൽ ആവശ്യമായ ആഴത്തിലുള്ള വിവരങ്ങൾ ലഭ്യമല്ല. Tara പൂർണ്ണ വിശകലനം ഉപയോഗിക്കാൻ Standard അല്ലെങ്കിൽ Premium mode-ൽ ചോദിക്കുക.",
+        "pa": "ਇਸ ਸਵਾਲ ਦਾ ਭਰੋਸੇਯੋਗ ਜਵਾਬ ਦੇਣ ਲਈ Live mode ਵਿੱਚ ਲੋੜੀਂਦੀ ਡੂੰਘਾਈ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। Tara ਨੂੰ ਪੂਰਾ ਵਿਸ਼ਲੇਸ਼ਣ ਵਰਤਣ ਲਈ ਇਹ ਸਵਾਲ Standard ਜਾਂ Premium mode ਵਿੱਚ ਪੁੱਛੋ।",
+        "ur": "اس سوال کا قابلِ اعتماد جواب دینے کے لیے Live mode میں مطلوبہ گہرائی دستیاب نہیں ہے۔ براہِ کرم اسے Standard یا Premium mode میں پوچھیں تاکہ Tara مکمل تجزیہ استعمال کر سکے۔",
+        "es": "No puedo responder esto de forma fiable en el modo Live con la profundidad que requiere. Pregúntalo en el modo Standard o Premium para que Tara pueda usar el análisis completo.",
+        "fr": "Je ne peux pas répondre de façon fiable en mode Live avec la profondeur nécessaire. Posez cette question en mode Standard ou Premium afin que Tara puisse utiliser l’analyse complète.",
+        "de": "Im Live-Modus kann ich diese Frage nicht mit der nötigen Tiefe zuverlässig beantworten. Bitte stelle sie im Standard- oder Premium-Modus, damit Tara die vollständige Analyse nutzen kann.",
+        "ru": "В режиме Live недостаточно данных для надёжного и глубокого ответа. Задайте этот вопрос в режиме Standard или Premium, чтобы Tara могла использовать полный анализ.",
+        "zh": "Live 模式目前没有足够的深度来可靠回答这个问题。请在 Standard 或 Premium 模式中提问，以便 Tara 使用完整分析。",
+    }
+    aliases = {
+        "english": "en", "hindi": "hi", "marathi": "mr", "gujarati": "gu",
+        "tamil": "ta", "telugu": "te", "bengali": "bn", "kannada": "kn",
+        "malayalam": "ml", "punjabi": "pa", "urdu": "ur", "spanish": "es",
+        "french": "fr", "german": "de", "russian": "ru", "chinese": "zh",
+    }
+    return messages.get(aliases.get(key, key), messages["en"])
 
 
 def _output_sections(graph_tree: Any) -> list[dict[str, str]]:
@@ -80,6 +115,7 @@ def _output_sections(graph_tree: Any) -> list[dict[str, str]]:
 
 
 def _live_contract(domain: str, comparison: Mapping[str, Any], review: Mapping[str, Any]) -> dict[str, Any]:
+    incomplete = not bool(comparison.get("match"))
     return {
         "live": True,
         "enforcement": "authoritative_pre_generation",
@@ -90,7 +126,8 @@ def _live_contract(domain: str, comparison: Mapping[str, Any], review: Mapping[s
         "question_type": comparison.get("question_label"),
         "expected_answer_mode": comparison.get("expected_answer_mode"),
         "mode_match": bool(comparison.get("mode_match")),
-        "evidence_status": "complete" if comparison.get("match") else "incomplete_or_conflicting",
+        "evidence_status": "complete" if not incomplete else "incomplete_or_conflicting",
+        "fallback_to_deeper_mode": incomplete,
         "required_factors": list(comparison.get("required_factors") or []),
         "observed_factors": list(comparison.get("observed_factors") or []),
         "missing_required_factors": list(comparison.get("missing_required_factors") or []),
@@ -105,7 +142,13 @@ def _live_contract(domain: str, comparison: Mapping[str, Any], review: Mapping[s
         "instruction": (
             "This compiled graph route is authoritative. Follow its decision rules, guardrails and output "
             "sections; never use default-excluded factors. Treat missing required factors as unavailable "
-            "evidence and do not make a conclusion that depends on them."
+            "evidence and do not make a conclusion that depends on them. "
+            + (
+                "The route cannot support a reliable Live answer. In the same language and script as the user, "
+                "briefly say that this needs a deeper Standard or Premium reading. Do not name another domain, "
+                "invent a comparison, expose missing-factor names, or ask an unrelated follow-up."
+                if incomplete else ""
+            )
         ),
         "route": dict(review),
     }
@@ -168,6 +211,10 @@ def resolve_live_graph_policy(
     elif is_children_category(category):
         domain, resolver, comparator, reviewer = (
             "children", resolve_children_graph_inputs, compare_children_graph_policy, build_children_graph_route,
+        )
+    elif is_home_category(category):
+        domain, resolver, comparator, reviewer = (
+            "home_property", resolve_home_graph_inputs, compare_home_graph_policy, build_home_graph_route,
         )
     else:
         return None
@@ -252,6 +299,13 @@ def apply_live_graph_policy(
             "assisted_conception_timing", "adoption_timing", "parenthood_vs_career_timing",
             "parent_child_reconciliation_timing", "retrospective_child_timing",
         }
+    ) or bool(
+        policy.get("domain") == "home_property"
+        and str(policy.get("runtime_key") or "") in {
+            "property_purchase_timing", "property_sale_timing", "construction_timing",
+            "relocation_timing", "vehicle_timing", "possession_documentation_timing",
+            "retrospective_property_timing",
+        }
     )
     love_arranged_route = bool(
         policy.get("domain") == "marriage"
@@ -276,6 +330,10 @@ def apply_live_graph_policy(
     marriage_remedy_route = bool(
         policy.get("domain") == "marriage"
         and policy.get("runtime_key") == "marriage_remedies"
+    )
+    property_remedy_route = bool(
+        policy.get("domain") == "home_property"
+        and policy.get("runtime_key") == "property_remedy"
     )
     wealth_route = policy.get("domain") == "wealth"
     # Career option comparisons use calculated future option windows.  Love
@@ -422,6 +480,212 @@ def apply_live_graph_policy(
             "D7 independently confirms or qualifies it. Use the exact route synthesis; first and later children, "
             "conception and childbirth, assisted conception and adoption are not interchangeable routes."
         )
+    if bool(policy.get("live")) and policy.get("domain") == "home_property":
+        runtime_key = str(policy.get("runtime_key") or "home_life")
+        normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
+        foundation = normalized.get("home_foundation") if isinstance(normalized.get("home_foundation"), Mapping) else {}
+        timing = foundation.get("timing_synthesis") if isinstance(foundation.get("timing_synthesis"), Mapping) else {}
+        timing_route = runtime_key in {
+            "property_purchase_timing", "property_sale_timing", "construction_timing",
+            "relocation_timing", "vehicle_timing", "possession_documentation_timing",
+            "retrospective_property_timing",
+        }
+        def compact_home_transit(row: Mapping[str, Any] | None) -> dict[str, Any]:
+            value = row if isinstance(row, Mapping) else {}
+            return {
+                key: value.get(key)
+                for key in (
+                    "start", "end", "planet", "strength", "trigger_score",
+                    "transit_native_house", "natal_placement_house",
+                    "delivered_event_houses", "activated_focus_houses", "why",
+                )
+                if value.get(key) not in (None, "", [], {})
+            }
+
+        def compact_home_window(row: Mapping[str, Any] | None) -> dict[str, Any]:
+            value = row if isinstance(row, Mapping) else {}
+            activation = value.get("dasha_activation") if isinstance(value.get("dasha_activation"), Mapping) else {}
+            transits = value.get("transit_confirmation") or value.get("route_peak_windows") or []
+            return {
+                key: item
+                for key, item in {
+                    "start": value.get("start"),
+                    "end": value.get("end"),
+                    "mahadasha": value.get("mahadasha"),
+                    "antardasha": value.get("antardasha"),
+                    "pratyantardasha": value.get("pratyantardasha"),
+                    "route_success_coverage": value.get("route_success_coverage") or value.get("activated_focus_houses"),
+                    "transit_confirmed": value.get("transit_confirmed"),
+                    "dasha_activation": {
+                        key: activation.get(key)
+                        for key in ("mahadasha", "antardasha", "pratyantardasha", "activated_houses", "mechanism")
+                        if activation.get(key) not in (None, "", [], {})
+                    },
+                    "transit_confirmation": [
+                        compact_home_transit(item)
+                        for item in transits[:2]
+                        if isinstance(item, Mapping)
+                    ],
+                }.items()
+                if item not in (None, "", [], {})
+            }
+
+        compact_windows = [
+            compact_home_window(row)
+            for row in list(timing.get("timing_windows") or [])[:2]
+            if isinstance(row, Mapping)
+        ]
+        requested = timing.get("requested_window_assessment") if isinstance(timing.get("requested_window_assessment"), Mapping) else {}
+        compact_requested = {
+            key: requested.get(key)
+            for key in (
+                "question_scope", "kind", "start", "end", "dasha_window_matches_requested_period",
+                "transit_confirmation_overlaps_requested_period", "supportive_now", "verdict", "rule",
+            )
+            if requested.get(key) not in (None, "", [], {})
+        }
+        home_timing_rules = {
+            "runtime_key": runtime_key,
+            "timing_route": timing_route,
+            "primary_evidence": "evidence.home_foundation.timing_synthesis",
+            "requested_window_assessment": compact_requested,
+            "now_vs_wait_synthesis": timing.get("now_vs_wait_synthesis") or {},
+            "kp_fructification": timing.get("kp_fructification") or {},
+            "allowed_timing_windows": compact_windows,
+            "next_window": compact_home_window(timing.get("next_window")),
+            "strongest_window": compact_home_window(timing.get("strongest_window")),
+            "required_answer_order": [
+                "for an open-ended when question, lead with the next supported window from now_vs_wait_synthesis; otherwise give the direct verdict for the period the user actually asked about",
+                "one brief human bridge explaining what that verdict means emotionally and what it does not mean; when natal promise is supported but the requested period is not, frame this as timing rather than permanent denial or personal failure",
+                (
+                    "one concise D1 vehicle-promise qualification followed by actual D16 vehicle-and-comfort confirmation; use D4 only as an additional comfort/property layer"
+                    if runtime_key == "vehicle_timing"
+                    else "one concise natal D1 and D4 property-promise qualification"
+                ),
+                "KP cusp/sub-lord materialisation result",
+                "the relevant MD-AD-PD planets and the exact property houses each activates by lordship, occupation or aspect",
+                "the named transit planet, dated transit band and exact delivered property houses",
+                "the next or stronger calculated window when it differs from the requested period",
+                "one practical and psychologically grounding orientation without guaranteeing a transaction or replacing financial/legal judgment",
+                "one emotionally relevant question about the user's urgency, hoped-for security, family pressure or actual competing timeframe",
+            ],
+            "human_bridge_rules": {
+                "required": True,
+                "length": "one or two natural sentences",
+                "language": "same language, script and conversational register as the user's question",
+                "grounding": "derive only from promise_verdict, requested_window_assessment and now_vs_wait_synthesis",
+                "allowed_distinctions": [
+                    "timing mismatch versus permanent denial when natal promise is supported",
+                    "careful waiting versus passive avoidance",
+                    "transaction caution versus lack of personal capacity",
+                ],
+                "forbidden": [
+                    "canned empathy",
+                    "invented feelings or family circumstances",
+                    "therapy language or psychological diagnosis",
+                    "fear, scarcity, fake urgency or dependency",
+                    "withholding the calculated answer to provoke another message",
+                ],
+            },
+            "claim_gates": [
+                "Natal promise establishes capacity only; it never proves that the requested period is good.",
+                "A dasha name alone is not timing evidence. State its supplied activated houses and mechanism.",
+                "KP completeness is not the same as support. An affirmative window requires kp_fructification.verdict=supported; qualified must be described as conditional and pressured cannot produce a positive window.",
+                "A transit is confirmation only when its supplied dated row names the transit planet and delivered event houses.",
+                "A present-period yes is allowed only when requested_window_assessment.supportive_now is true.",
+                "When requested_window_assessment.question_scope is next_event_window, never call the scan-anchor day a requested or supportive period; lead with next_window.",
+                "For a now-versus-wait question, copy the direction of now_vs_wait_synthesis.decision and required_visible_conclusion; never leave the user to infer it from dates.",
+                "A future transit peak elsewhere in the same dasha cannot be presented as proof that today is supportive.",
+                "Never invent a date from the as-of date, scan boundary, current dasha boundary or first sampled transit date.",
+                "Never print internal schema or workflow labels such as route synthesis, runtime key, graph policy, evidence status, selected mode or source.",
+                "Do not end with a generic offer to compare timeframes when a more human question can clarify why buying now matters to the user.",
+            ],
+        }
+        if timing_route:
+            compact_policy["home_timing_rules"] = home_timing_rules
+            answer_spec["home_timing_rules"] = home_timing_rules
+            compact_policy["instruction"] = (
+                "Use the calculated Home foundation as the sole answer-bearing source. "
+                + (
+                    "For vehicles, D1 establishes the base promise and D16 confirms vehicles and comforts; D4 is only an additional qualification. Never call D16 a property chart or describe the vehicle event as a home/property purchase. "
+                    if runtime_key == "vehicle_timing" else
+                    "D1 and D4 establish and qualify property promise; "
+                )
+                + "Only KP fructification, route-filtered dasha-house activation and a dated transit "
+                "delivery can establish timing. Follow home_timing_rules and never expose internal field names as headings."
+            )
+        else:
+            compact_policy["instruction"] = (
+                (
+                    "Use the calculated static D1 and D16 vehicle foundation and the active route synthesis. For vehicle_selection, return only the ranked colour families supplied by route_synthesis with their actual carriers; never invent a lucky colour, purchase window, dasha, transit, KP or date."
+                    if runtime_key == "vehicle_selection" else
+                    "Use the calculated static D1, D4 and D16 vehicle foundation and the active route synthesis. Do not introduce dasha, transit, KP or dates on this non-timing vehicle route."
+                    if runtime_key.startswith("vehicle_") else
+                    "Use the calculated static D1 and D4 Home foundation and the active route synthesis. Do not introduce dasha, transit, KP or dates on this non-timing route."
+                )
+            )
+        if property_remedy_route:
+            blueprint = normalized.get("remedy_blueprint") if isinstance(normalized.get("remedy_blueprint"), Mapping) else {}
+            top = blueprint.get("top_recommendation") if isinstance(blueprint.get("top_recommendation"), Mapping) else {}
+            remedy_rules = {
+                "scope": "classical property remedy selected from static D1 and D4 obstruction evidence",
+                "selection_mode": "single_top",
+                "required_count": 1,
+                "top_recommendation": dict(top),
+                "primary_evidence": "evidence.remedy_blueprint.top_recommendation",
+                "required_fields": ["planet", "action", "frequency", "dana", "astrological_reason"],
+                "required_answer_order": [
+                    "name the single calculated graha-shanti remedy immediately",
+                    "state the practice and repetition",
+                    "state its traditional dana as optional and according to means",
+                    "explain the exact D1 or D4 property pressure that selected this graha",
+                    "state that a remedy supports effort and does not guarantee a transaction",
+                ],
+                "forbidden_moves": [
+                    "Do not substitute budgeting, journaling, communication advice or a modern behavioral exercise.",
+                    "Do not select the remedy from current dasha, transit or a favorable date.",
+                    "Do not prescribe a gemstone without a separate suitability analysis.",
+                    "Do not make a Vastu claim without the actual property plan and orientation.",
+                    "Do not give another property-delay diagnosis without delivering the remedy.",
+                    "Do not guarantee purchase, sale, possession or legal success.",
+                ],
+            }
+            compact_policy["property_remedy_rules"] = remedy_rules
+            answer_spec["property_remedy_rules"] = remedy_rules
+            compact_policy["instruction"] = (
+                "Deliver the single classical property remedy exactly from remedy_blueprint.top_recommendation. "
+                "Translate it into the user's language without changing the mantra, count, practice or chart reason."
+            )
+            verdict = dict(result.get("verdict") or {})
+            verdict["missing_required_capabilities"] = [
+                value for value in verdict.get("missing_required_capabilities") or []
+                if not any(token in str(value).lower() for token in ("dasha", "transit", "kp"))
+            ]
+            result["verdict"] = verdict
+            if not top:
+                compact_policy["fallback_to_deeper_mode"] = True
+                compact_policy["instruction"] = (
+                    "A calculated D1/D4 property obstruction and classical remedy are unavailable. Do not improvise "
+                    "a generic or modern remedy; use the same-language Standard or Premium fallback."
+                )
+        if timing_route and timing:
+            # home_timing_rules already carries the same compact adjudication.
+            # Duplicating it inside the graph policy previously pushed the
+            # primary prompt past its budget and made the writer drop facts.
+            event_rules = dict(answer_spec.get("event_rules") or {})
+            event_rules["allowed_timing_windows"] = compact_windows
+            event_rules["required_material_windows"] = compact_windows[:2]
+            event_rules["window_answer_rule"] = (
+                "For next_event_window scope, answer with next_window first. Otherwise judge the requested period from requested_window_assessment first. Then mention next_window or "
+                "strongest_window only as a distinct later/alternate window. Every positive timing statement must "
+                "name its dasha-house activation and dated transit confirmation."
+            )
+            answer_spec["event_rules"] = event_rules
+            verdict = dict(result.get("verdict") or {})
+            verdict["direction"] = (timing.get("requested_window_assessment") or {}).get("verdict") or timing.get("verdict")
+            verdict["ranked_windows"] = compact_windows
+            verdict["requested_window_assessment"] = compact_requested
+            result["verdict"] = verdict
     if bool(policy.get("live")) and wealth_route:
         runtime_key = str(policy.get("runtime_key") or "")
         normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
@@ -1102,9 +1366,11 @@ def apply_live_graph_policy(
             result["verdict"] = verdict
     if bool(policy.get("live")) and comparison_mode and missing:
         compact_policy["claim_permission"] = "no_option_winner"
+        compact_policy["fallback_to_deeper_mode"] = True
         compact_policy["instruction"] = (
             "Required option-comparison factors are missing. Do not favor, recommend, or call either option "
-            "more likely. State that the options cannot be reliably distinguished from the available evidence."
+            "more likely. In the same language and script as the user, briefly say this needs a deeper Standard "
+            "or Premium reading. Do not name missing factors or ask an unrelated follow-up."
         )
         verdict = dict(result.get("verdict") or {})
         verdict["direction"] = "insufficient_option_evidence"
@@ -1230,6 +1496,21 @@ def enforce_live_graph_answer(
             "A chart cannot guarantee custody or a court outcome. This needs the Legal flow and advice from a "
             "qualified lawyer; the Children graph can only discuss your parent-child relationship pattern."
         )
+    home_key = str(policy.get("runtime_key") or "")
+    if home_key == "property_dispute_handoff":
+        return "A property dispute needs the dedicated Legal, Competition and Conflict analysis. I can discuss only the non-legal home/property pattern here; I cannot predict a court win, settlement, title outcome, or another party’s conduct."
+    if home_key == "muhurat_handoff":
+        return "Choosing a property-registration, possession, construction-start, griha-pravesh, or vehicle-purchase date requires the dedicated Muhurat flow with Panchang and location details. A natal Property reading cannot rank exact dates."
+    if home_key == "foreign_handoff":
+        return "Foreign relocation, immigration and permanent-settlement questions need the dedicated Foreign Life analysis. The Home and Property graph can discuss domestic stability, but should not turn that into a settlement claim."
+    if home_key == "inheritance_handoff":
+        return "Inheritance, title ownership and estate entitlement belong to the Wealth and Inheritance analysis. A Home and Property reading cannot determine ownership or legal entitlement."
+    if home_key == "vastu_handoff":
+        return "A Vastu assessment needs the home’s actual plan, orientation, entrance and room placement. A birth-chart Property reading cannot certify a building as Vastu compliant."
+    if home_key == "property_business_handoff":
+        return "A real-estate business question needs the Career and Wealth analysis, including business aptitude and financial-risk evidence. The Home and Property graph only assesses personal home and property themes."
+    if policy.get("fallback_to_deeper_mode"):
+        return _deeper_mode_fallback(language)
     if policy.get("claim_permission") == "no_specific_meeting_story":
         if str(language or "").lower().startswith("hi"):
             return (
@@ -1623,7 +1904,7 @@ def enforce_live_graph_answer(
                     "avayogi_lord": "Avayogi lordship",
                     "dagdha_lord": "Dagdha lordship",
                     "tithi_shunya_lord": "Tithi-Shunya lordship",
-                    "avayogi_tithi_shunya_override": "the Avayogi–Tithi-Shunya mitigating overlap",
+                    "avayogi_tithi_shunya_override": "the Avayogi–Tithi-Shunya cancellation",
                     "mixed_or_malefic_conjunctions": "mixed or difficult conjunctions",
                 }
                 flags = [flag_labels.get(str(flag), str(flag).replace("_", " ")) for flag in fifth_lord.get("caution_flags") or []]
@@ -2052,17 +2333,6 @@ def enforce_live_graph_answer(
             "care, routine check-ups, and professional advice for persistent symptoms are the safest guidance. "
             "Is there a specific health concern you want me to keep in view?"
         )
-    if policy.get("claim_permission") == "no_option_winner":
-        domain = str(policy.get("domain") or "these options").replace("_", " ")
-        if str(language or "").lower().startswith("hi"):
-            return (
-                f"उपलब्ध {domain} साक्ष्य इन दोनों विकल्पों में विश्वसनीय रूप से अंतर नहीं करते। "
-                "इसलिए किसी एक को अधिक संभावित बताना अनुमान होगा। वास्तविक जीवन में अभी कौन-सा विकल्प ठोस रूप से सामने आ रहा है?"
-            )
-        return (
-            "The available career evidence does not reliably distinguish these two options, so choosing promotion "
-            "or job change as more likely would be speculation. Which option is already becoming concrete in real life?"
-        )
     if policy.get("claim_permission") == "no_complete_wealth_verdict":
         missing = ", ".join(
             str(value).split(":")[-1]
@@ -2079,17 +2349,4 @@ def enforce_live_graph_answer(
         )
     if policy.get("claim_permission") != "directional_only_no_timing":
         return clean_answer
-    domain = str(policy.get("domain") or "this topic").replace("_", " ")
-    missing = list(policy.get("timing_missing_factors") or [])
-    missing_labels = ", ".join(value.split(":")[-1] for value in missing[:3])
-    if str(language or "").lower().startswith("hi"):
-        return (
-            f"मैं अभी {domain} के लिए विश्वसनीय समय नहीं बता सकता, क्योंकि ग्राफ में आवश्यक "
-            f"समय-साक्ष्य ({missing_labels}) पूरे नहीं हैं। उपलब्ध संकेत केवल सामान्य दिशा बताते हैं; "
-            "किसी तारीख या अवधि को चुनना अनुमान होगा। क्या आप बिना समय-निर्धारण के सामान्य संकेत जानना चाहेंगे?"
-        )
-    return (
-        f"I can’t give a reliable {domain} timing result because the live graph is missing required "
-        f"timing evidence ({missing_labels}). The available chart evidence supports only a general "
-        "direction; choosing a date would be speculation. Would you like the supported non-timing reading instead?"
-    )
+    return _deeper_mode_fallback(language)

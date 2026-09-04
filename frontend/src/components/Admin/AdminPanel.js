@@ -42,6 +42,7 @@ import AdminWhatsAppCampaigns from './AdminWhatsAppCampaigns';
 import AdminIssues from './AdminIssues';
 import AdminPandits from './AdminPandits';
 import AdminGooglePlayTestimonials from './AdminGooglePlayTestimonials';
+import AdminSutraAuthoring from './AdminSutraAuthoring';
 import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import './AdminPanel.css';
 
@@ -3607,7 +3608,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         >
           Expenses
         </button>
-        <button 
+        <button
           className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
           onClick={() => {
             setActiveTab('settings');
@@ -3615,6 +3616,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           }}
         >
           Settings
+        </button>
+        <button className={`tab ${activeTab === 'sutras' ? 'active' : ''}`} onClick={() => setActiveTab('sutras')}>
+          Sutras
         </button>
       </div>
 
@@ -8498,6 +8502,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             )}
           </div>
         )}
+        {activeTab === 'sutras' && <AdminSutraAuthoring />}
           {showApprovalModal && selectedRequest && (
         <div style={{
           position: 'fixed',

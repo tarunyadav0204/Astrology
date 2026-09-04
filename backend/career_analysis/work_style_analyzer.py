@@ -1,6 +1,7 @@
 from calculators.planet_analyzer import PlanetAnalyzer
 from calculators.yogi_calculator import YogiCalculator
 from calculators.badhaka_calculator import BadhakaCalculator
+from calculators.avayogi_policy import avayogi_effect
 
 class WorkStyleAnalyzer:
     def __init__(self, chart_data):
@@ -238,7 +239,11 @@ class WorkStyleAnalyzer:
         if yogi_significance['is_yogi_lord']:
             final_score *= 1.40
         elif yogi_significance['is_avayogi_lord']:
-            final_score *= 0.75
+            polarity = (yogi_significance.get('avayogi_effect') or {}).get('polarity')
+            if polarity == 'supportive':
+                final_score *= 1.25
+            elif polarity == 'challenging':
+                final_score *= 0.75
         elif yogi_significance['is_dagdha_lord']:
             final_score *= 0.65
         elif yogi_significance['is_tithi_shunya_lord']:
@@ -315,11 +320,20 @@ class WorkStyleAnalyzer:
     
     def _analyze_planet_yogi_significance(self, planet, yogi_data):
         """Analyze planet's Yogi significance using existing logic"""
+        is_avayogi = planet == yogi_data['avayogi']['lord']
         return {
             'is_yogi_lord': planet == yogi_data['yogi']['lord'],
-            'is_avayogi_lord': planet == yogi_data['avayogi']['lord'],
+            'is_avayogi_lord': is_avayogi,
             'is_dagdha_lord': planet == yogi_data['dagdha_rashi']['lord'],
-            'is_tithi_shunya_lord': planet == yogi_data['tithi_shunya_rashi']['lord']
+            'is_tithi_shunya_lord': planet == yogi_data['tithi_shunya_rashi']['lord'],
+            'avayogi_effect': (
+                avayogi_effect(
+                    placement_house=(self.planets.get(planet) or {}).get('house'),
+                    tithi_shunya_overlap=bool(
+                        (yogi_data.get('avayogi_tithi_shunya_overlap') or {}).get('is_active')
+                    ),
+                ) if is_avayogi else None
+            ),
         }
     
     def _analyze_planet_badhaka_impact(self, planet):

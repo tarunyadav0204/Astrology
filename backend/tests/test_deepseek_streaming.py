@@ -34,7 +34,12 @@ async def test_deepseek_stream_batches_provider_tokens(monkeypatch):
     chunks.append(
         SimpleNamespace(
             choices=[],
-            usage=SimpleNamespace(prompt_tokens=10, completion_tokens=20, total_tokens=30),
+            usage=SimpleNamespace(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+                prompt_tokens_details=SimpleNamespace(cached_tokens=6),
+            ),
         )
     )
 
@@ -61,6 +66,8 @@ async def test_deepseek_stream_batches_provider_tokens(monkeypatch):
     assert published[-1][1] == text
     assert 2 <= len(published) <= 5
     assert all(len(full) >= len(delta) for delta, full in published)
+    assert result["usage"]["cached_tokens"] == 6
+    assert result["usage"]["non_cached_input_tokens"] == 4
 
 
 @pytest.mark.asyncio
@@ -86,10 +93,15 @@ async def test_deepseek_instant_can_disable_thinking(monkeypatch):
         "prompt",
         "deepseek-v4-flash",
         deepseek_thinking_enabled=False,
+        system_prompt="stable system rules",
     )
 
     assert result["text"] == "answer"
     assert captured["extra_body"] == {"thinking": {"type": "disabled"}}
+    assert captured["messages"] == [
+        {"role": "system", "content": "stable system rules"},
+        {"role": "user", "content": "prompt"},
+    ]
 
 
 @pytest.mark.asyncio

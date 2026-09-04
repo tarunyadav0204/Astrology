@@ -388,6 +388,7 @@ def weighted_outcome(
         "planet_in_dagdha_rashi",
         "planet_in_tithi_shunya_rashi",
         "avayogi_lord_active",
+        "avayogi_aspect_reversal",
         "planet_in_dagdha_rashi",
         "planet_in_tithi_shunya_rashi",
     }

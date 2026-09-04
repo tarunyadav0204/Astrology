@@ -2,6 +2,8 @@ import swisseph as swe
 from datetime import datetime, timedelta
 from .house_significations import SIGN_LORDS, NATURAL_BENEFICS, NATURAL_MALEFICS, EXALTATION_SIGNS, DEBILITATION_SIGNS
 from utils.timezone_service import parse_timezone_offset
+from calculators.yogi_calculator import YogiCalculator
+from calculators.avayogi_policy import avayogi_effect
 
 class YogiAnalyzer:
     """Analyzes Yogi/Avayogi impact on houses"""
@@ -9,7 +11,7 @@ class YogiAnalyzer:
     def __init__(self, birth_data, chart_data):
         self.birth_data = birth_data
         self.chart_data = chart_data
-        self.yogi_data = self._calculate_yogi_points()
+        self.yogi_data = YogiCalculator(chart_data).calculate_yogi_points(birth_data)
         
     def _calculate_yogi_points(self):
         """Calculate Yogi, Avayogi, and Dagdha Rashi points"""
@@ -74,9 +76,26 @@ class YogiAnalyzer:
         yogi_impact = self._calculate_planet_impact_on_house(yogi_lord, house_num)
         impact_score += yogi_impact * 0.4  # 40% weight for Yogi
         
-        # Avayogi lord impact (obstructive)
+        # Avayogi contribution follows the shared cancellation/reversal policy.
         avayogi_impact = self._calculate_planet_impact_on_house(avayogi_lord, house_num)
-        impact_score -= avayogi_impact * 0.3  # 30% negative weight for Avayogi
+        placement_house = self._get_planet_house(avayogi_lord)
+        relation = (
+            'occupant' if placement_house == house_num
+            else 'aspector' if self._planet_aspects_house(avayogi_lord, house_num)
+            else 'house_lord'
+        )
+        avayogi_resolution = avayogi_effect(
+            placement_house=placement_house,
+            target_house=house_num,
+            relation=relation,
+            tithi_shunya_overlap=bool(
+                (self.yogi_data.get('avayogi_tithi_shunya_overlap') or {}).get('is_active')
+            ),
+        )
+        if avayogi_resolution['polarity'] == 'supportive':
+            impact_score += avayogi_impact * 0.3
+        elif avayogi_resolution['polarity'] == 'challenging':
+            impact_score -= avayogi_impact * 0.3
         
         # Dagdha lord impact (destructive)
         dagdha_impact = self._calculate_planet_impact_on_house(dagdha_lord, house_num)
@@ -89,6 +108,7 @@ class YogiAnalyzer:
             'dagdha_lord': dagdha_lord,
             'yogi_impact': yogi_impact,
             'avayogi_impact': avayogi_impact,
+            'avayogi_effect': avayogi_resolution,
             'dagdha_impact': dagdha_impact
         }
     

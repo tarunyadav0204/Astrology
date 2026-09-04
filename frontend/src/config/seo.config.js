@@ -23,7 +23,7 @@ export const SEO_CONFIG = {
     logoPngFallback: "/images/astroroshni-icon-96.png",
     ogDefault: "/images/astroroshni-og-image.jpg",
     twitterDefault: "/images/astroroshni-twitter-image.jpg",
-    favicon: "/favicon.ico",
+    favicon: "/favicon.png",
     /** Responsive WebP built from source banner; PNG fallbacks for non‑WebP browsers. */
     homeLifePathBanner: "/images/homepage-life-path-banner-1200.webp",
     homeLifePathBannerSrcSetWebp:

@@ -35,7 +35,7 @@ def block_for(ttl: str, resource: str) -> str:
 
 def objects(block: str, predicate: str) -> list[str]:
     match = re.search(rf"(?ms)\b{re.escape(predicate)}\s+(.+?)(?=\s*;|\s*\.\s*$)", block)
-    return re.findall(r"(?:career|health|marriage|wealth|education|children|domain|ar):[A-Za-z0-9_]+", match.group(1)) if match else []
+    return re.findall(r"(?:career|health|marriage|wealth|education|children|home|domain|ar):[A-Za-z0-9_]+", match.group(1)) if match else []
 
 
 def literal(block: str, predicate: str) -> str | None:
@@ -121,7 +121,7 @@ def expect_members(actual: list[str], expected: list[str], label: str) -> None:
 
 
 def declared_resources(ttl: str) -> set[str]:
-    return set(re.findall(r"(?m)^\s*((?:career|health|marriage|wealth|education|children|domain|ar):[A-Za-z0-9_]+)\s+", ttl))
+    return set(re.findall(r"(?m)(?:^|\.\s*)((?:career|health|marriage|wealth|education|children|home|domain|ar):[A-Za-z0-9_]+)\s+", ttl))
 
 
 def ontology_version(ttl: str) -> str:
@@ -164,7 +164,7 @@ def validate_integrity(ttl: str, question_resources: list[str]) -> None:
                 for factor in factors:
                     if factor not in declared:
                         raise AssertionError(f"{stage} references undeclared factor {factor}")
-            for reference in re.findall(r"(?:career|health|marriage|wealth|education|children|domain):[A-Za-z0-9_]+", block):
+            for reference in re.findall(r"(?:career|health|marriage|wealth|education|children|home|domain):[A-Za-z0-9_]+", block):
                 if reference not in declared:
                     raise AssertionError(f"{resource} references undeclared {reference}")
 
@@ -175,7 +175,7 @@ def validate_integrity(ttl: str, question_resources: list[str]) -> None:
     if duplicates:
         raise AssertionError(f"Duplicate QuestionType runtimeKey(s): {', '.join(sorted(duplicates))}")
 
-    capability_resources = re.findall(r"(?m)^\s*((?:career|health|marriage|wealth|education|children):[A-Za-z0-9_]+)\s+a\s+ar:CalculatorCapability\b", ttl)
+    capability_resources = re.findall(r"(?m)(?:^|\.\s*)((?:career|health|marriage|wealth|education|children|home):[A-Za-z0-9_]+)\s+a\s+ar:CalculatorCapability\b", ttl)
     for resource in capability_resources:
         if not literal(block_for(ttl, resource), "ar:calculatorBinding"):
             raise AssertionError(f"{resource} has no executable calculatorBinding")
@@ -189,6 +189,7 @@ def main() -> int:
         "wealth_poc": "Wealth and Finance",
         "education_poc": "Education, Exams and Research",
         "children_poc": "Children, Parenthood and Progeny",
+        "home_property_poc": "Home, Property and Vehicles",
     }.get(POC.name, POC.name)
     source_ttl = TTL_PATH.read_text(encoding="utf-8")
     core_ttl = CORE_PATH.read_text(encoding="utf-8")
@@ -207,6 +208,7 @@ def main() -> int:
         "wealth_poc": "wealth",
         "education_poc": "education",
         "children_poc": "children",
+        "home_property_poc": "home",
     }.get(POC.name)
     if not domain_prefix:
         raise AssertionError(f"Unsupported ontology module: {POC.name}")

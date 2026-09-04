@@ -25,6 +25,7 @@ class _FakeStreamResponse:
                 "usageMetadata": {
                     "promptTokenCount": 7,
                     "candidatesTokenCount": 2,
+                    "cachedContentTokenCount": 5,
                     "totalTokenCount": 9,
                 },
             },
@@ -45,6 +46,7 @@ class GeminiRestStreamTests(unittest.TestCase):
             "answer briefly",
             "test-key",
             thinking_level="low",
+            system_prompt="stable system rules",
             on_text_delta=lambda delta, full: progress.append((delta, full)),
         )
 
@@ -52,9 +54,19 @@ class GeminiRestStreamTests(unittest.TestCase):
         self.assertEqual(progress, [("Hello", "Hello"), (" world", "Hello world")])
         self.assertEqual(result["usage"]["input_tokens"], 7)
         self.assertEqual(result["usage"]["output_tokens"], 2)
+        self.assertEqual(result["usage"]["cached_tokens"], 5)
+        self.assertEqual(result["usage"]["non_cached_input_tokens"], 2)
         self.assertEqual(result["transport"], "genai_rest_stream")
         self.assertTrue(post.call_args.kwargs["stream"])
         self.assertEqual(post.call_args.kwargs["params"]["alt"], "sse")
+        self.assertEqual(
+            post.call_args.kwargs["json"]["systemInstruction"],
+            {"parts": [{"text": "stable system rules"}]},
+        )
+        self.assertEqual(
+            post.call_args.kwargs["json"]["contents"],
+            [{"role": "user", "parts": [{"text": "answer briefly"}]}],
+        )
         self.assertEqual(post.return_value.iter_lines_chunk_size, 1)
 
 

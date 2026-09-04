@@ -31,21 +31,8 @@
 
 /* General mobile fixes */
 @media (max-width: 768px) {
-  /* Prevent horizontal scroll */
+  /* Prevent horizontal scroll without creating a sticky containing block. */
   body {
-    overflow-x: hidden;
-  }
-  
-  /* Smooth scrolling for touch devices */
-  * {
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  /* Fix for sticky elements on mobile */
-  .sticky-mobile {
-    position: -webkit-sticky;
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    overflow-x: clip;
   }
 }

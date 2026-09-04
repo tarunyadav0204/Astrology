@@ -397,6 +397,7 @@ CRITICAL: You MUST respond ONLY with valid JSON format. Do not include any text 
         special_points = {
             'yogi_lords': [],
             'avayogi_lords': [],
+            'avayogi_effects': {},
             'dagdha_lords': [],
             'tithi_shunya_lords': [],
             'badhaka_lords': []
@@ -412,6 +413,7 @@ CRITICAL: You MUST respond ONLY with valid JSON format. Do not include any text 
                     special_points['yogi_lords'].append(planet)
                 if special_lordships['is_avayogi_lord']:
                     special_points['avayogi_lords'].append(planet)
+                    special_points['avayogi_effects'][planet] = special_lordships.get('avayogi_effect')
                 if special_lordships['is_dagdha_lord']:
                     special_points['dagdha_lords'].append(planet)
                 if special_lordships['is_tithi_shunya_lord']:

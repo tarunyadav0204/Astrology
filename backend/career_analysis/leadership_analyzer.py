@@ -2,6 +2,7 @@ from calculators.amatyakaraka_analyzer import AmatyakarakaAnalyzer
 from calculators.yogi_calculator import YogiCalculator
 from calculators.badhaka_calculator import BadhakaCalculator
 from calculators.planet_analyzer import PlanetAnalyzer
+from calculators.avayogi_policy import avayogi_effect
 
 class LeadershipAnalyzer:
     def __init__(self, chart_data):
@@ -539,6 +540,8 @@ class LeadershipAnalyzer:
         yogi_impact = {
             'yogi_enhanced_planets': [],
             'avayogi_obstructed_planets': [],
+            'avayogi_reversed_planets': [],
+            'avayogi_neutralized_planets': [],
             'dagdha_damaged_planets': [],
             'tithi_shunya_affected_planets': [],
             'overall_impact_score': 50
@@ -551,8 +554,20 @@ class LeadershipAnalyzer:
                 yogi_impact['yogi_enhanced_planets'].append(planet)
                 impact_score += 20
             elif planet == avayogi_lord:
-                yogi_impact['avayogi_obstructed_planets'].append(planet)
-                impact_score -= 15
+                resolution = avayogi_effect(
+                    placement_house=(self.planets.get(planet) or {}).get('house'),
+                    tithi_shunya_overlap=bool(
+                        (yogi_data.get('avayogi_tithi_shunya_overlap') or {}).get('is_active')
+                    ),
+                )
+                if resolution['polarity'] == 'supportive':
+                    yogi_impact['avayogi_reversed_planets'].append(planet)
+                    impact_score += 15
+                elif resolution['polarity'] == 'neutral':
+                    yogi_impact['avayogi_neutralized_planets'].append(planet)
+                else:
+                    yogi_impact['avayogi_obstructed_planets'].append(planet)
+                    impact_score -= 15
             elif planet == dagdha_lord:
                 yogi_impact['dagdha_damaged_planets'].append(planet)
                 impact_score -= 25
@@ -611,6 +626,14 @@ class LeadershipAnalyzer:
             planets = ', '.join(yogi_impact['avayogi_obstructed_planets'])
             interpretations.append(f"Leadership obstructed by Avayogi lord: {planets}")
             interpretations.append("Leadership potential faces internal obstacles and self-doubt")
+
+        if yogi_impact['avayogi_reversed_planets']:
+            planets = ', '.join(yogi_impact['avayogi_reversed_planets'])
+            interpretations.append(f"Avayogi contribution reverses supportively by placement in House 3, 6, 8 or 12: {planets}")
+
+        if yogi_impact['avayogi_neutralized_planets']:
+            planets = ', '.join(yogi_impact['avayogi_neutralized_planets'])
+            interpretations.append(f"Ordinary Avayogi obstruction is cancelled because the same planet is Tithi Shunya lord: {planets}")
         
         if yogi_impact['dagdha_damaged_planets']:
             planets = ', '.join(yogi_impact['dagdha_damaged_planets'])
@@ -668,7 +691,17 @@ class LeadershipAnalyzer:
         if planet == yogi_data['yogi']['lord']:
             return 'yogi'
         elif planet == yogi_data['avayogi']['lord']:
-            return 'avayogi'
+            resolution = avayogi_effect(
+                placement_house=(self.planets.get(planet) or {}).get('house'),
+                tithi_shunya_overlap=bool(
+                    (yogi_data.get('avayogi_tithi_shunya_overlap') or {}).get('is_active')
+                ),
+            )
+            return (
+                'avayogi_supportive' if resolution['polarity'] == 'supportive'
+                else 'avayogi_neutralized' if resolution['polarity'] == 'neutral'
+                else 'avayogi'
+            )
         elif planet == yogi_data['dagdha_rashi']['lord']:
             return 'dagdha'
         elif planet == yogi_data['tithi_shunya_rashi']['lord']:
@@ -704,6 +737,11 @@ class LeadershipAnalyzer:
         elif yogi_status == 'avayogi':
             behavior_suffix += " but faces internal obstacles"
             reason_suffix += f", complicated because {planet} IS the Avayogi lord creating self-sabotaging patterns"
+        elif yogi_status == 'avayogi_supportive':
+            behavior_suffix += " with a constructive reversal of its Avayogi role"
+            reason_suffix += f", supported because {planet} is Avayogi but placed in House 3, 6, 8 or 12"
+        elif yogi_status == 'avayogi_neutralized':
+            reason_suffix += f", with no ordinary Avayogi penalty because {planet} is also the Tithi Shunya lord"
         elif yogi_status == 'dagdha':
             behavior_suffix += " with destructive intensity"
             reason_suffix += f", intensified because {planet} IS the Dagdha lord bringing transformative destruction"

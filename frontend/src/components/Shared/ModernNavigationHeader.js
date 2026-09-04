@@ -135,6 +135,9 @@ const ModernNavigationHeader = ({
 
   return (
     <>
+      <div
+        className={`ar-modern-nav-shell${sticky ? ' ar-modern-nav-shell--pin' : ''}${user && showNativeBar ? ' ar-modern-nav-shell--with-native' : ''}`}
+      >
       <header className={`mh-nav ar-modern-nav ${sticky ? 'ar-modern-nav--sticky' : ''} ${user && showNativeBar ? 'ar-modern-nav--with-native' : ''}`} aria-label="Primary navigation">
         <div className="mh-nav__inner">
           <Link className="mh-brand" to="/" aria-label="AstroRoshni home" onClick={onHomeClick ? goHome : undefined}>
@@ -299,6 +302,7 @@ const ModernNavigationHeader = ({
           </div>
         )}
       </header>
+      </div>
 
       <BirthFormModal
         isOpen={showBirthFormModal}

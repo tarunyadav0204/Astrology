@@ -4615,6 +4615,31 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 response_style=response_style,
                 stream_callback=_persist_instant_stream_delta,
             )
+            graph_fallback_error = result.get("graph_fallback_error")
+            if isinstance(graph_fallback_error, dict) and graph_fallback_error:
+                try:
+                    from utils.error_logger import log_chat_error
+                    graph_error = RuntimeError(
+                        "Instant graph could not satisfy the selected route: "
+                        + json.dumps(graph_fallback_error, ensure_ascii=False, default=str, sort_keys=True)
+                    )
+                    log_chat_error(
+                        user_id,
+                        (birth_details or {}).get("name", "Unknown"),
+                        "",
+                        graph_error,
+                        question,
+                        birth_details,
+                        "backend",
+                        error_type=str(graph_fallback_error.get("error_type") or "InstantGraphEvidenceIncomplete"),
+                    )
+                except Exception as graph_log_error:
+                    logger.warning(
+                        "failed to persist Instant graph fallback error message_id=%s user_id=%s: %s",
+                        message_id,
+                        user_id,
+                        graph_log_error,
+                    )
             logger.info(
                 "SPEECH_DEBUG instant_result message_id=%s success=%s response_chars=%s response_preview=%r followups=%r",
                 message_id,

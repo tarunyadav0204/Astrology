@@ -78,6 +78,7 @@ def _compact_result(question: str, intent: Dict[str, Any], result: Dict[str, Any
         "router": {
             "status": intent.get("status"),
             "category": intent.get("category"),
+            "home_subtype": intent.get("home_subtype"),
             "answer_mode": intent.get("answer_mode"),
             "needs_clarification": intent.get("needs_clarification"),
             "target_subject": intent.get("target_subject") or (intent.get("extracted_context") or {}).get("target_subject"),
@@ -91,6 +92,9 @@ def _compact_result(question: str, intent: Dict[str, Any], result: Dict[str, Any
             "prompt_chars": result.get("llm_prompt_chars"),
             "response_chars": len(result.get("response") or ""),
             "composer_metrics": packet.get("composer_metrics"),
+            "contract_enforcement": packet.get("contract_enforcement"),
+            "visible_style": (spec.get("visible_astrology") or {}).get("response_style"),
+            "technical_detail_allowed": (spec.get("visible_astrology") or {}).get("technical_detail_allowed"),
         },
         "composer_brief": packet.get("composer_brief"),
         "query_plan": {
@@ -207,12 +211,13 @@ async def run(
     *,
     judge: bool = True,
     birth_data: Dict[str, Any] | None = None,
+    questions: list[str] | None = None,
 ) -> list[Dict[str, Any]]:
     logging.disable(logging.CRITICAL)
     router = IntentRouter()
     analyzer = GeminiChatAnalyzer()
     rows: list[Dict[str, Any]] = []
-    selected = [QUESTIONS[index] for index in question_indexes] if question_indexes else QUESTIONS
+    selected = questions or ([QUESTIONS[index] for index in question_indexes] if question_indexes else QUESTIONS)
     for question in selected:
         # Several legacy calculators still print diagnostics directly. Keep the
         # evaluator's stdout machine-readable while exercising the real path.
@@ -243,7 +248,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pretty", action="store_true")
     parser.add_argument("--details", action="store_true")
+    parser.add_argument(
+        "--answers-only",
+        action="store_true",
+        help="Print only routing, final answer and compact generation diagnostics.",
+    )
     parser.add_argument("--index", type=int, action="append", choices=range(len(QUESTIONS)))
+    parser.add_argument(
+        "--question",
+        action="append",
+        help="Evaluate an exact question. Repeat the flag to run a focused acceptance set.",
+    )
     parser.add_argument("--no-judge", action="store_true")
     parser.add_argument(
         "--synthetic-chart",
@@ -255,8 +270,21 @@ def main() -> int:
         args.index,
         judge=not args.no_judge,
         birth_data=SYNTHETIC_QA_CHART if args.synthetic_chart else REFERENCE_CHART,
+        questions=args.question,
     ))
-    if not args.details:
+    if args.answers_only:
+        rows = [{
+            "question": row.get("question"),
+            "router": {
+                key: (row.get("router") or {}).get(key)
+                for key in ("status", "category", "home_subtype", "answer_mode", "needs_clarification")
+            },
+            "answer": row.get("answer"),
+            "generation": row.get("generation"),
+            "graph": ((row.get("verification") or {}).get("knowledge_graph") or {}),
+            "query_plan_answer_mode": (row.get("query_plan") or {}).get("answer_mode"),
+        } for row in rows]
+    elif not args.details:
         rows = [_summary(row) for row in rows]
     print(json.dumps(rows, ensure_ascii=False, indent=2 if args.pretty else None, default=str))
     return 0
