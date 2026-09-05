@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ChartWidget from '../Charts/ChartWidget';
+import HouseInsightPopup from '../Charts/HouseInsightPopup';
+import ChartOverviewPopup from '../Charts/ChartOverviewPopup';
 import DeskDateNavigator from './DeskDateNavigator';
 import DeskDashaPanel from './DeskDashaPanel';
 import DeskActivationsPanel from './DeskActivationsPanel';
@@ -15,6 +17,7 @@ import DeskBirthPanchang from './DeskBirthPanchang';
 import DeskSpecialPoints from './DeskSpecialPoints';
 import DeskConditionStrip from './DeskConditionStrip';
 import DeskSpecialLagnas from './DeskSpecialLagnas';
+import DeskKarakasPanel from './DeskKarakasPanel';
 import ChartActivationKey from './ChartActivationKey';
 import './ParashariDeskMobile.css';
 
@@ -65,6 +68,22 @@ function buildHouseSelection(chartData, houseNumber, chartId = 'lagna') {
   };
 }
 
+function occupantsForHouse(chartData, houseNumber) {
+  if (!chartData?.planets || !houseNumber) return [];
+  const lagnaSign = chartData.houses?.[0]?.sign
+    ?? (typeof chartData.ascendant === 'number'
+      ? Math.floor((((chartData.ascendant % 360) + 360) % 360) / 30)
+      : 0);
+  return Object.entries(chartData.planets)
+    .filter(([name, data]) => {
+      if (!data || name === 'InduLagna') return false;
+      if (typeof data.house === 'number') return data.house === houseNumber;
+      if (typeof data.sign !== 'number' || typeof lagnaSign !== 'number') return false;
+      return ((data.sign - lagnaSign + 12) % 12) + 1 === houseNumber;
+    })
+    .map(([name, data]) => ({ name, ...data }));
+}
+
 /**
  * Phone Parashari desk — ChartsHub-style tabs (Chart / Dasha / Act / More).
  */
@@ -109,6 +128,7 @@ export default function ParashariDeskMobile({
   const [chartPill, setChartPill] = useState('lagna');
   const [metaOpen, setMetaOpen] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const chartNavRef = useRef(null);
   const moreNavRef = useRef(null);
 
@@ -202,6 +222,16 @@ export default function ParashariDeskMobile({
 
   const openAct = () => setHubTab('act');
 
+  const openOverview = () => {
+    setOverviewOpen(true);
+    setSheetOpen(false);
+  };
+
+  const openHouseFromOverview = (houseNumber) => {
+    pickHouse(houseNumber, { openSheet: true });
+    setOverviewOpen(false);
+  };
+
   const housePicker = (
     <div className="pdm__house-pick" role="group" aria-label="Select house">
       {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
@@ -287,12 +317,19 @@ export default function ParashariDeskMobile({
         {hubTab === 'chart' ? (
           <section className="pdm__pane pdm__pane--chart">
             {(chartPill === 'lagna' || chartPill === 'transit') ? (
-              <ChartActivationKey
-                enabled={showChartActivations}
-                onToggle={onShowChartActivationsChange}
-                loading={activationLoading}
-                compact
-              />
+              <div className="pdm__chart-tools">
+                <ChartActivationKey
+                  enabled={showChartActivations}
+                  onToggle={onShowChartActivationsChange}
+                  loading={activationLoading}
+                  compact
+                />
+                {chartPill === 'lagna' ? (
+                  <button type="button" className="pdm__overview-chip" onClick={openOverview}>
+                    Read chart
+                  </button>
+                ) : null}
+              </div>
             ) : null}
             <div className="pdm__chart">
               <ChartWidget
@@ -317,8 +354,18 @@ export default function ParashariDeskMobile({
               />
             </div>
 
+            {chartPill === 'lagna' ? (
+              <button type="button" className="pdm__act-cta" onClick={openOverview}>
+                <span>
+                  <strong>Read this chart</strong>
+                  <em>Houses, pillars, gandanta, special points</em>
+                </span>
+                <i aria-hidden>→</i>
+              </button>
+            ) : null}
+
             {(chartPill === 'lagna' || chartPill === 'navamsa') ? (
-              <button type="button" className="pdm__act-cta" onClick={openAct}>
+              <button type="button" className="pdm__act-cta pdm__act-cta--ghost" onClick={openAct}>
                 <span>
                   <strong>What is activated now?</strong>
                   <em>Active houses, reasons, timing</em>
@@ -341,6 +388,11 @@ export default function ParashariDeskMobile({
                 <DeskSpecialPoints birthData={birthData} chartData={chartData} variant="strip" />
                 <DeskConditionStrip birthData={birthData} chartData={chartData} />
                 <DeskSpecialLagnas birthData={birthData} chartData={chartData} />
+                <DeskKarakasPanel
+                  birthData={birthData}
+                  chartData={chartData}
+                  onOpenTool={onOpenTool}
+                />
               </div>
             ) : null}
 
@@ -447,7 +499,7 @@ export default function ParashariDeskMobile({
                   />
                 </>
               ) : analysisTab === 'positions' ? (
-                <DeskPositionsTable chartData={chartData} />
+                <DeskPositionsTable chartData={chartData} birthData={birthData} />
               ) : analysisTab === 'yogas' ? (
                 <DeskYogasPanel birthData={birthData} />
               ) : analysisTab === 'friends' ? (
@@ -466,6 +518,11 @@ export default function ParashariDeskMobile({
                     label="Planetary conditions"
                   />
                   <DeskSpecialLagnas birthData={birthData} chartData={chartData} />
+                  <DeskKarakasPanel
+                    birthData={birthData}
+                    chartData={chartData}
+                    onOpenTool={onOpenTool}
+                  />
                 </div>
               )}
             </div>
@@ -498,45 +555,31 @@ export default function ParashariDeskMobile({
         ) : null}
       </div>
 
-      {sheetOpen && houseSelection ? (
-        <div className="pdm__sheet" role="dialog" aria-label="House insight">
-          <button
-            type="button"
-            className="pdm__sheet-backdrop"
-            aria-label="Close"
-            onClick={() => setSheetOpen(false)}
-          />
-          <div className="pdm__sheet-card">
-            <header>
-              <strong>
-                House {houseSelection.houseNumber}
-                {houseSelection.signName ? ` · ${houseSelection.signName}` : ''}
-              </strong>
-              <button type="button" onClick={() => setSheetOpen(false)}>Close</button>
-            </header>
-            <div className="pdm__sheet-body">
-              <DeskHouseInsight
-                birthData={birthData}
-                chartData={chartData}
-                selection={houseSelection}
-                asOfDate={asOfDate}
-                chartId={houseSelection?.chartId || 'lagna'}
-              />
-            </div>
-            <button
-              type="button"
-              className="pdm__sheet-more"
-              onClick={() => {
-                setSheetOpen(false);
-                setHubTab('more');
-                onAnalysisTabChange?.('house');
-              }}
-            >
-              Open in More
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <ChartOverviewPopup
+        isOpen={overviewOpen}
+        onClose={() => setOverviewOpen(false)}
+        birthData={birthData}
+        transitDate={formatAsOfIso(asOfDate)}
+        onOpenHouse={openHouseFromOverview}
+        onOpenYogas={() => {
+          setOverviewOpen(false);
+          setHubTab('more');
+          onAnalysisTabChange?.('yogas');
+        }}
+      />
+
+      <HouseInsightPopup
+        isOpen={sheetOpen && !!houseSelection?.houseNumber}
+        onClose={() => setSheetOpen(false)}
+        houseNumber={houseSelection?.houseNumber}
+        signName={houseSelection?.signName}
+        rashiIndex={houseSelection?.rashiIndex}
+        chartData={viewChartData || chartData}
+        birthData={birthData}
+        chartId={houseSelection?.chartId || 'lagna'}
+        transitDate={formatAsOfIso(asOfDate)}
+        planetsInHouse={occupantsForHouse(viewChartData || chartData, houseSelection?.houseNumber)}
+      />
     </div>
   );
 }

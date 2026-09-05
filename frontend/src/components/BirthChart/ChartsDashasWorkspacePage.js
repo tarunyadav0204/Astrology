@@ -9,6 +9,7 @@ import DeskSpecialPoints from './DeskSpecialPoints';
 import DeskBirthPanchang from './DeskBirthPanchang';
 import DeskConditionStrip from './DeskConditionStrip';
 import DeskSpecialLagnas from './DeskSpecialLagnas';
+import DeskKarakasPanel from './DeskKarakasPanel';
 import DeskPositionsTable from './DeskPositionsTable';
 import DeskYogasPanel from './DeskYogasPanel';
 import DeskFriendshipPanel from './DeskFriendshipPanel';
@@ -20,6 +21,8 @@ import DeskActivationsPanel from './DeskActivationsPanel';
 import DeskToolModals from './DeskToolModals';
 import ParashariDeskMobile from './ParashariDeskMobile';
 import ChartActivationKey from './ChartActivationKey';
+import ChartOverviewPopup from '../Charts/ChartOverviewPopup';
+import HouseInsightPopup from '../Charts/HouseInsightPopup';
 import { useAstrology } from '../../context/AstrologyContext';
 import { generatePageSEO } from '../../config/seo.config';
 import { apiService } from '../../services/apiService';
@@ -104,6 +107,42 @@ function formatAsOfIso(date) {
   return `${y}-${m}-${d}`;
 }
 
+const SIGN_NAMES = [
+  'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+  'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
+];
+
+function buildHouseSelection(chartData, houseNumber, chartId = 'lagna') {
+  const lagnaSign = chartData?.houses?.[0]?.sign
+    ?? (typeof chartData?.ascendant === 'number'
+      ? Math.floor((((chartData.ascendant % 360) + 360) % 360) / 30)
+      : 0);
+  const rashiIndex = chartData?.houses?.[houseNumber - 1]?.sign
+    ?? ((Number(lagnaSign) + houseNumber - 1) % 12);
+  return {
+    houseNumber,
+    rashiIndex,
+    signName: SIGN_NAMES[rashiIndex] || '',
+    chartId,
+  };
+}
+
+function occupantsForHouse(chartData, houseNumber) {
+  if (!chartData?.planets || !houseNumber) return [];
+  const lagnaSign = chartData.houses?.[0]?.sign
+    ?? (typeof chartData.ascendant === 'number'
+      ? Math.floor((((chartData.ascendant % 360) + 360) % 360) / 30)
+      : 0);
+  return Object.entries(chartData.planets)
+    .filter(([name, data]) => {
+      if (!data || name === 'InduLagna') return false;
+      if (typeof data.house === 'number') return data.house === houseNumber;
+      if (typeof data.sign !== 'number' || typeof lagnaSign !== 'number') return false;
+      return ((data.sign - lagnaSign + 12) % 12) + 1 === houseNumber;
+    })
+    .map(([name, data]) => ({ name, ...data }));
+}
+
 const ChartsDashasWorkspacePage = ({
   user,
   onLogin,
@@ -128,6 +167,8 @@ const ChartsDashasWorkspacePage = ({
   const [activationsFocus, setActivationsFocus] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
   const [houseSelection, setHouseSelection] = useState(null);
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [houseSheetOpen, setHouseSheetOpen] = useState(false);
   const [viewProfile, setViewProfile] = useState(loadParashariProfile);
   const [viewChartData, setViewChartData] = useState(null);
   const [viewProfileLoading, setViewProfileLoading] = useState(false);
@@ -258,6 +299,20 @@ const ChartsDashasWorkspacePage = ({
     setHouseSelection(sel);
     setActivationsFocus(false);
     setAnalysisTab('house');
+  };
+
+  const openOverview = () => {
+    setOverviewOpen(true);
+    setHouseSheetOpen(false);
+  };
+
+  const openHouseFromOverview = (houseNumber) => {
+    const sel = buildHouseSelection(renderedChartData || chartData, houseNumber, 'lagna');
+    setHouseSelection(sel);
+    setAnalysisTab('house');
+    setActivationsFocus(false);
+    setOverviewOpen(false);
+    setHouseSheetOpen(true);
   };
 
   useEffect(() => {
@@ -459,6 +514,9 @@ const ChartsDashasWorkspacePage = ({
               onToggle={setShowChartActivations}
               loading={activationLoading}
             />
+            <button type="button" className="parashari-desk-overview-cta" onClick={openOverview}>
+              Read this chart
+            </button>
             {!activationsFocus ? (
               <div className="parashari-desk-tools__divs" aria-label="Divisional chart">
                 <span className="parashari-desk-tools__label">
@@ -496,6 +554,11 @@ const ChartsDashasWorkspacePage = ({
             <div className="parashari-desk-tools__meta">
               <DeskConditionStrip birthData={birthData} chartData={chartData} />
               <DeskSpecialLagnas birthData={birthData} chartData={chartData} />
+              <DeskKarakasPanel
+                birthData={birthData}
+                chartData={chartData}
+                onOpenTool={setActiveTool}
+              />
             </div>
           </div>
 
@@ -506,7 +569,9 @@ const ChartsDashasWorkspacePage = ({
                   <h2>D1</h2>
                   <span>Lagna</span>
                 </div>
-                <em className="parashari-desk-panel__hint">Click a house for insight dock</em>
+                <button type="button" className="parashari-desk-panel__cta" onClick={openOverview}>
+                  Read this chart
+                </button>
               </header>
               <div className="parashari-desk-chart">
                 <ChartWidget
@@ -715,7 +780,7 @@ const ChartsDashasWorkspacePage = ({
                       chartId={houseSelection?.chartId || 'lagna'}
                     />
                   ) : analysisTab === 'positions' ? (
-                    <DeskPositionsTable chartData={chartData} />
+                    <DeskPositionsTable chartData={chartData} birthData={birthData} />
                   ) : analysisTab === 'yogas' ? (
                     <DeskYogasPanel birthData={birthData} />
                   ) : analysisTab === 'friends' ? (
@@ -745,6 +810,34 @@ const ChartsDashasWorkspacePage = ({
           description="Create a new chart or choose a saved one for the desk."
           prefilledData={birthData}
         />
+      ) : null}
+
+      {hasChart ? (
+        <>
+          <ChartOverviewPopup
+            isOpen={overviewOpen}
+            onClose={() => setOverviewOpen(false)}
+            birthData={birthData}
+            transitDate={formatAsOfIso(asOfDate)}
+            onOpenHouse={openHouseFromOverview}
+            onOpenYogas={() => {
+              setOverviewOpen(false);
+              setAnalysisTab('yogas');
+            }}
+          />
+          <HouseInsightPopup
+            isOpen={houseSheetOpen && !!houseSelection?.houseNumber}
+            onClose={() => setHouseSheetOpen(false)}
+            houseNumber={houseSelection?.houseNumber}
+            signName={houseSelection?.signName}
+            rashiIndex={houseSelection?.rashiIndex}
+            chartData={renderedChartData}
+            birthData={birthData}
+            chartId="lagna"
+            transitDate={formatAsOfIso(asOfDate)}
+            planetsInHouse={occupantsForHouse(renderedChartData, houseSelection?.houseNumber)}
+          />
+        </>
       ) : null}
 
       {hasChart ? (

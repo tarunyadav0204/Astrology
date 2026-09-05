@@ -158,6 +158,13 @@ def build_query_plan(
                 requested.append(value)
     resolved_period = intent.get("period_window") if isinstance(intent.get("period_window"), dict) else {}
     resolved_period_kind = str(resolved_period.get("kind") or "").strip().lower()
+    next_event_window = bool(
+        resolved_period_kind == "current"
+        and str(resolved_period.get("request_semantics") or "").strip().lower() == "next_event_window"
+        and str(answer_mode or "").strip().lower() in {
+            "event_prediction", "event_timing", "lifetime_event_timing", "timing_window",
+        }
+    )
     exact_day = bool(
         resolved_period_kind == "day"
         or str(intent.get("mode") or "").strip().upper() == "PREDICT_DAILY"
@@ -183,12 +190,19 @@ def build_query_plan(
     rolling_duration_kinds = {"bounded_future", "rolling_window"}
     if retrospective:
         horizon_end = as_of_day
+    elif next_event_window:
+        # The one-day current period is only the scan anchor for an open-ended
+        # "when will I" request. Treating it as a hard answer horizon forbids
+        # every future window that the event scanner correctly calculated.
+        horizon_end = None
     elif duration_months is not None and semantic_kind in rolling_duration_kinds:
         horizon_end = _add_months(as_of_day, duration_months)
     else:
         horizon_end = resolved_horizon_end or _add_months(as_of_day, duration_months)
     if retrospective:
         relation = "past"
+    elif next_event_window:
+        relation = "current_to_future"
     elif retrospective_signal and _is_retrospective_semantic_value(relation):
         # Preserve grammatical/semantic past tense for static readings without
         # promoting them into historical event calculations.
@@ -242,6 +256,7 @@ def build_query_plan(
         ),
         "children_subtype": intent.get("children_subtype") or query_context.get("children_subtype"),
         "home_subtype": intent.get("home_subtype") or query_context.get("home_subtype"),
+        "foreign_subtype": intent.get("foreign_subtype") or query_context.get("foreign_subtype"),
         "prior_marriage_context": extracted.get("prior_marriage_context"),
         "answer_mode": str(answer_mode or "topic_reading"),
         "route_action": route_action,

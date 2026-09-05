@@ -38,6 +38,16 @@ export const debilitationSigns = {
   'Sun': 6, 'Jupiter': 9, 'Saturn': 0 
 };
 
+export const moolatrikonaRanges = {
+  Sun: { sign: 4, start: 0, end: 20 },
+  Moon: { sign: 1, start: 4, end: 30 },
+  Mars: { sign: 0, start: 0, end: 12 },
+  Mercury: { sign: 5, start: 16, end: 20 },
+  Jupiter: { sign: 8, start: 0, end: 10 },
+  Venus: { sign: 6, start: 0, end: 15 },
+  Saturn: { sign: 10, start: 0, end: 20 },
+};
+
 export const houseLords = ['Mars', 'Venus', 'Mercury', 'Moon', 'Sun', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Saturn', 'Jupiter'];
 
 export const getPlanetStatus = (planet, rashiIndex, lordships) => {
@@ -72,9 +82,20 @@ export const getPlanetStatus = (planet, rashiIndex, lordships) => {
   }
 };
 
-export const getPlanetDignity = (planet, sign) => {
+export const getPlanetDignity = (planet, sign, degree) => {
   if (sign === exaltationSigns[planet]) return 'Exalted';
   if (sign === debilitationSigns[planet]) return 'Debilitated';
+  const moola = moolatrikonaRanges[planet];
+  if (
+    moola
+    && sign === moola.sign
+    && degree != null
+    && !Number.isNaN(Number(degree))
+    && Number(degree) >= moola.start
+    && Number(degree) <= moola.end
+  ) {
+    return 'Moolatrikona';
+  }
   if (ownSigns[planet]?.includes(sign)) return 'Own';
   return 'Neutral';
 };

@@ -96,7 +96,8 @@
 .pdm__more-tabs button,
 .pdm__sheet-card header button,
 .pdm__sheet-more,
-.pdm__act-cta {
+.pdm__act-cta,
+.pdm__overview-chip {
   border: 1px solid transparent;
   background: transparent;
   color: inherit;
@@ -452,6 +453,30 @@
   margin: 0 0.15rem;
 }
 
+.pdm__chart-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.pdm__chart-tools .chart-act-key {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pdm__overview-chip {
+  min-height: 28px;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 28%, transparent);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .pdm__chart {
   aspect-ratio: 1;
   width: 100%;
@@ -516,6 +541,16 @@
   font-weight: 800;
 }
 
+.pdm__act-cta--ghost {
+  background: var(--color-surface-raised);
+  color: var(--pdm-ink);
+  border-color: var(--pdm-line);
+}
+
+.pdm__act-cta--ghost em {
+  opacity: 0.75;
+}
+
 .pdm__meta-toggle {
   width: 100%;
   margin-top: 0.45rem;
@@ -563,7 +598,7 @@
   background: transparent;
 }
 
-.pdm__meta--overview :is(.desk-bp--strip, .desk-sp--strip, .desk-cond--strip, .desk-lag--strip) {
+.pdm__meta--overview :is(.desk-bp--strip, .desk-sp--strip, .desk-cond--strip, .desk-lag--strip, .desk-ck--strip) {
   display: block;
   width: 100%;
   margin: 0;
@@ -573,7 +608,7 @@
   background: var(--pdm-panel);
 }
 
-.pdm__meta--overview :is(.desk-bp__strip-label, .desk-sp__strip-label, .desk-cond__label, .desk-lag__label) {
+.pdm__meta--overview :is(.desk-bp__strip-label, .desk-sp__strip-label, .desk-cond__label, .desk-lag__label, .desk-ck__label) {
   display: block;
   margin: 0 0 0.4rem;
   color: var(--pdm-ink);
@@ -582,7 +617,7 @@
   letter-spacing: 0.08em;
 }
 
-.pdm__meta--overview :is(.desk-bp__chips, .desk-sp__chips, .desk-cond__chips, .desk-lag__chips) {
+.pdm__meta--overview :is(.desk-bp__chips, .desk-sp__chips, .desk-cond__chips, .desk-lag__chips, .desk-ck__chips) {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
@@ -590,7 +625,7 @@
   overflow: visible;
 }
 
-.pdm__meta--overview :is(.desk-bp__chip, .desk-sp__chip, .desk-cond__chip, .desk-lag__chip) {
+.pdm__meta--overview :is(.desk-bp__chip, .desk-sp__chip, .desk-cond__chip, .desk-lag__chip, .desk-ck__chip) {
   display: flex;
   min-width: 0;
   min-height: 43px;
@@ -604,7 +639,7 @@
   white-space: normal;
 }
 
-.pdm__meta--overview :is(.desk-bp__chip, .desk-sp__chip, .desk-cond__chip, .desk-lag__chip) em {
+.pdm__meta--overview :is(.desk-bp__chip, .desk-sp__chip, .desk-cond__chip, .desk-lag__chip, .desk-ck__chip) em {
   width: 100%;
   overflow: hidden;
   color: var(--pdm-muted);
@@ -614,7 +649,7 @@
   white-space: nowrap;
 }
 
-.pdm__meta--overview :is(.desk-bp__chip, .desk-sp__chip, .desk-cond__chip, .desk-lag__chip) strong {
+.pdm__meta--overview :is(.desk-bp__chip, .desk-sp__chip, .desk-cond__chip, .desk-lag__chip, .desk-ck__chip) strong {
   max-width: 100%;
   font-size: 0.73rem;
   line-height: 1.15;
@@ -622,7 +657,7 @@
 }
 
 @media (max-width: 359px) {
-  .pdm__meta--overview :is(.desk-bp__chips, .desk-sp__chips, .desk-cond__chips, .desk-lag__chips) {
+  .pdm__meta--overview :is(.desk-bp__chips, .desk-sp__chips, .desk-cond__chips, .desk-lag__chips, .desk-ck__chips) {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

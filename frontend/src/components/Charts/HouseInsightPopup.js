@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/apiService';
@@ -25,21 +25,18 @@ const HOUSE_META = {
   12: { title: '12th House: Loss & Spirituality', desc: 'Governs isolation, expenses, foreign lands, and spiritual liberation.' },
 };
 
-const RELATED_CHART_HINT = {
-  d9: 'D9 Navamsa',
-  d10: 'D10 Dasamsa',
-  d7: 'D7 Saptamsa',
-  d12: 'D12 Dwadasamsa',
-  d4: 'D4 Chaturthamsa',
-  d2: 'D2 Hora',
-  d3: 'D3 Drekkana',
-  d16: 'D16 Shodasamsa',
-  d20: 'D20 Vimshamsa',
-  d24: 'D24 Chaturvimshamsa',
-  d27: 'D27 Saptavimshamsa',
-  d30: 'D30 Trimshamsa',
-  d60: 'D60 Shashtyamsa',
-};
+const JUMP_LINKS = [
+  { id: 'hi-reading', label: 'Reading' },
+  { id: 'hi-lord', label: 'Lord' },
+  { id: 'hi-occupants', label: 'Occupants' },
+  { id: 'hi-argala', label: 'Argala' },
+  { id: 'hi-timing', label: 'Timing' },
+];
+
+function prettyDignity(value) {
+  if (!value) return '—';
+  return String(value).replace(/_/g, ' ');
+}
 
 function HouseInsightPopup({
   isOpen,
@@ -52,6 +49,7 @@ function HouseInsightPopup({
   chartId = 'lagna',
   planetsInHouse = [],
   onMakeAscendant,
+  transitDate,
 }) {
   const navigate = useNavigate();
   const [insight, setInsight] = useState(null);
@@ -59,6 +57,7 @@ function HouseInsightPopup({
   const [mudakku, setMudakku] = useState(null);
   const [gandanta, setGandanta] = useState(null);
   const [error, setError] = useState('');
+  const bodyRef = useRef(null);
 
   const meta = HOUSE_META[houseNumber] || { title: `House ${houseNumber}`, desc: '' };
   const houseLord = SIGN_LORDS[rashiIndex] || insight?.house_lord || '—';
@@ -78,7 +77,7 @@ function HouseInsightPopup({
     setLoading(true);
     setError('');
     apiService
-      .getHouseInsight({ birthData, houseNum: houseNumber, chartId })
+      .getHouseInsight({ birthData, houseNum: houseNumber, chartId, transitDate })
       .then((data) => {
         if (!cancelled) setInsight(data);
       })
@@ -94,7 +93,7 @@ function HouseInsightPopup({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, birthData, houseNumber, chartId]);
+  }, [isOpen, birthData, houseNumber, chartId, transitDate]);
 
   useEffect(() => {
     if (!isOpen || !chartData) {
@@ -119,7 +118,17 @@ function HouseInsightPopup({
   if (!isOpen || !houseNumber) return null;
 
   const ava = insight?.raw?.ashtakavarga;
-  const related = insight?.related_chart || insight?.relatedChart;
+  const lordSheet = insight?.lord_worksheet;
+  const argala = insight?.argala;
+  const savGivers = insight?.sav_givers?.givers || ava?.givers || [];
+  const pointsInHouse = insight?.points_in_house || [];
+  const karakasHere = insight?.chara_karakas_here || [];
+  const naturalKarakas = insight?.natural_karakas || [];
+  const relatedVarga = insight?.related_varga;
+  const timing = insight?.timing || {};
+  const scrollToSection = (id) => {
+    bodyRef.current?.querySelector(`#${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const mudakkuHere = mudakku?.mudakku_point?.sign === rashiIndex;
   const planetaryGandanta = gandanta?.planetary_gandanta
     || gandanta?.planets_in_gandanta
@@ -154,8 +163,15 @@ function HouseInsightPopup({
           </div>
           <button type="button" className="house-insight-close" onClick={onClose} aria-label="Close">×</button>
         </header>
+        <nav className="house-insight-jump" aria-label="Jump to section">
+          {JUMP_LINKS.map((link) => (
+            <button key={link.id} type="button" onClick={() => scrollToSection(link.id)}>
+              {link.label}
+            </button>
+          ))}
+        </nav>
 
-        <div className="house-insight-body">
+        <div className="house-insight-body" ref={bodyRef}>
           <section className="house-insight-sec">
             <h3>Significance</h3>
             <p>{insight?.significance || meta.desc}</p>
@@ -211,7 +227,7 @@ function HouseInsightPopup({
           {error ? <div className="house-insight-status house-insight-status--err">{error}</div> : null}
 
           {insight ? (
-            <section className="house-insight-sec house-insight-sec--read">
+            <section className="house-insight-sec house-insight-sec--read" id="hi-reading">
               <div className="house-insight-verdict-row">
                 <h3>Chart reading</h3>
                 <em className={`verdict-${insight.verdict?.key || 'quiet'}`}>{insight.verdict?.label || '—'}</em>
@@ -253,15 +269,18 @@ function HouseInsightPopup({
             </section>
           ) : null}
 
-          {ava?.sav ? (
+          {(ava?.sav || savGivers.length) ? (
             <section className="house-insight-sec">
               <h3>Ashtakavarga</h3>
               <div className="house-insight-grid">
                 <div>
                   <em>SAV</em>
-                  <strong>{ava.sav.house_points ?? '—'} · {ava.sav.classification || '—'}</strong>
+                  <strong>
+                    {ava?.sav?.house_points ?? insight?.sav_givers?.total ?? '—'}
+                    {ava?.sav?.classification ? ` · ${ava.sav.classification}` : ''}
+                  </strong>
                 </div>
-                {ava.lord_bav ? (
+                {ava?.lord_bav ? (
                   <div>
                     <em>{ava.lord_bav.planet} BAV</em>
                     <strong>{ava.lord_bav.house_points ?? '—'} · {ava.lord_bav.classification || '—'}</strong>
@@ -278,10 +297,19 @@ function HouseInsightPopup({
                   Weakest {ava.lord_bav.planet} BAV houses: {ava.lord_bav.weakest_houses.join(', ')}
                 </p>
               ) : null}
+              {savGivers.length ? (
+                <div className="house-insight-givers">
+                  {savGivers.map((row) => (
+                    <span key={row.planet}>
+                      {row.planet === 'Lagna' ? 'Lg' : row.planet.slice(0, 2)} {row.bindus}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </section>
           ) : null}
 
-          <section className="house-insight-sec">
+          <section className="house-insight-sec" id="hi-occupants">
             <h3>Occupant planets</h3>
             {planetsInHouse.length ? (
               planetsInHouse.map((planet) => {
@@ -327,19 +355,150 @@ function HouseInsightPopup({
             )}
           </section>
 
-          <section className="house-insight-sec">
+          <section className="house-insight-sec" id="hi-lord">
             <h3>House lord</h3>
-            <p>Lord of {signName} is {houseLord}.</p>
+            {lordSheet ? (
+              <>
+                <p>
+                  {lordSheet.planet} in {lordSheet.sign_name || signName}
+                  {lordSheet.house != null ? ` · H${lordSheet.house}` : ''}
+                  {lordSheet.dignity ? ` · ${prettyDignity(lordSheet.dignity)}` : ''}
+                </p>
+                <div className="house-insight-grid">
+                  <div>
+                    <em>Nakshatra</em>
+                    <strong>
+                      {lordSheet.nakshatra || '—'}
+                      {lordSheet.nakshatra_lord ? ` · ${lordSheet.nakshatra_lord}` : ''}
+                    </strong>
+                  </div>
+                  <div>
+                    <em>Shadbala</em>
+                    <strong>
+                      {lordSheet.shadbala_rupas != null ? `${lordSheet.shadbala_rupas} / ${lordSheet.required_rupas ?? '—'} rupas` : '—'}
+                      {lordSheet.meets_minimum === false ? ' · below' : lordSheet.meets_minimum ? ' · meets' : ''}
+                    </strong>
+                  </div>
+                  <div>
+                    <em>Condition</em>
+                    <strong>
+                      {[
+                        lordSheet.retrograde ? 'Retrograde' : null,
+                        lordSheet.combust ? 'Combust' : null,
+                        lordSheet.cazimi ? 'Cazimi' : null,
+                      ].filter(Boolean).join(' · ') || 'Direct'}
+                    </strong>
+                  </div>
+                  <div>
+                    <em>Also lords</em>
+                    <strong>
+                      {(lordSheet.other_lordships || []).length
+                        ? lordSheet.other_lordships.map((h) => `H${h}`).join(', ')
+                        : '—'}
+                    </strong>
+                  </div>
+                </div>
+                {(lordSheet.special_roles || []).length ? (
+                  <p className="house-insight-note">{lordSheet.special_roles.join(' · ')}</p>
+                ) : null}
+              </>
+            ) : (
+              <p>Lord of {signName} is {houseLord}.</p>
+            )}
           </section>
 
-          {related && chartId === 'lagna' ? (
-            <section className="house-insight-sec house-insight-sec--related">
-              <h3>Related chart</h3>
-              <p>
-                {(RELATED_CHART_HINT[related.id] || related.name || related.id)} is often used to validate this house theme more deeply.
-              </p>
+          <section className="house-insight-sec" id="hi-argala">
+            <h3>Argala</h3>
+            {argala && (argala.support?.length || argala.obstruction?.length) ? (
+              <>
+                <p className="house-insight-note">{argala.grade}</p>
+                {argala.support?.map((row) => (
+                  <div key={`a-${row.planet}-${row.from_house}`} className="house-insight-chip-row">
+                    <strong>{row.planet}</strong>
+                    <span>Argala from H{row.from_house} ({row.label})</span>
+                  </div>
+                ))}
+                {argala.obstruction?.map((row) => (
+                  <div key={`v-${row.planet}-${row.from_house}`} className="house-insight-chip-row">
+                    <strong>{row.planet}</strong>
+                    <span>Virodha from H{row.from_house} ({row.label})</span>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <p className="house-insight-empty">No argala or virodha from occupied houses.</p>
+            )}
+          </section>
+
+          {(pointsInHouse.length || karakasHere.length) ? (
+            <section className="house-insight-sec">
+              <h3>Points in this house</h3>
+              {pointsInHouse.map((point) => (
+                <div key={point.key} className="house-insight-chip-row">
+                  <strong>{point.label}</strong>
+                  <span>
+                    {point.sign_name}
+                    {point.detail ? ` · ${point.detail}` : ''}
+                  </span>
+                </div>
+              ))}
+              {karakasHere.map((row) => (
+                <div key={row.karaka} className="house-insight-chip-row">
+                  <strong>{row.abbr}</strong>
+                  <span>{row.planet} · {row.title}</span>
+                </div>
+              ))}
             </section>
           ) : null}
+
+          <details className="house-insight-sec house-insight-sec--fold" id="hi-timing">
+            <summary>Timing, karaka, related varga</summary>
+            {timing.current_transits?.length ? (
+              <p>Transiting here now: {timing.current_transits.join(', ')}</p>
+            ) : (
+              <p className="house-insight-empty">No natal-sign transits flagged for the as-of date.</p>
+            )}
+            {timing.windows?.length ? (
+              timing.windows.map((row) => (
+                <div key={`${row.mahadasha}-${row.antardasha}-${row.start}`} className="house-insight-chip-row">
+                  <strong>{row.current ? 'Now' : 'Next'}</strong>
+                  <span>
+                    {row.mahadasha}/{row.antardasha}
+                    {row.start ? ` · ${row.start}` : ''}
+                    {row.end ? `–${row.end}` : ''}
+                    {row.why ? ` · ${row.why}` : ''}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="house-insight-empty">No upcoming MD/AD of the lord, occupants, or aspectors in the current cycle.</p>
+            )}
+            {naturalKarakas.length ? (
+              <>
+                <h3>Natural karaka</h3>
+                {naturalKarakas.map((row) => (
+                  <div key={row.planet} className="house-insight-chip-row">
+                    <strong>{row.planet}</strong>
+                    <span>
+                      {row.sign_name || '—'}
+                      {row.house != null ? ` · H${row.house}` : ''}
+                      {row.retrograde ? ' · R' : ''}
+                    </span>
+                  </div>
+                ))}
+              </>
+            ) : null}
+            {relatedVarga ? (
+              <>
+                <h3>Related varga</h3>
+                <p>
+                  {relatedVarga.name}: same house is {relatedVarga.sign_name || '—'}, lord {relatedVarga.lord || '—'}
+                  {relatedVarga.lord_house != null ? ` in H${relatedVarga.lord_house}` : ''}
+                  {relatedVarga.occupants?.length ? ` · occupants ${relatedVarga.occupants.join(', ')}` : ' · empty'}
+                </p>
+              </>
+            ) : null}
+          </details>
         </div>
 
         <footer className="house-insight-actions">

@@ -117,6 +117,27 @@ def _birth_obj(birth_data: Dict[str, Any]) -> SimpleNamespace:
     )
 
 
+SHADBALA_VARGA_KEYS = ("D1", "D2", "D3", "D7", "D9", "D12", "D30")
+
+
+def _attach_shadbala_vargas(natal_chart: Dict[str, Any]) -> Dict[str, Any]:
+    """Put the Shadbala vargas on D1 so PlanetAnalyzer can compute classical strength."""
+    divisions = natal_chart.get("divisions")
+    if not isinstance(divisions, dict) or any(key not in divisions for key in SHADBALA_VARGA_KEYS):
+        natal_chart["divisions"] = DivisionalChartCalculator(natal_chart).calculate_all_divisional_charts()
+    missing = [key for key in SHADBALA_VARGA_KEYS if key not in (natal_chart.get("divisions") or {})]
+    if missing:
+        raise ValueError(
+            f"Shadbala requires {', '.join(SHADBALA_VARGA_KEYS)}; missing {', '.join(missing)}"
+        )
+    return natal_chart
+
+
+def _natal_chart_for_shadbala(birth_obj: SimpleNamespace) -> Dict[str, Any]:
+    natal_chart = ChartCalculator({}).calculate_chart(birth_obj)
+    return _attach_shadbala_vargas(natal_chart)
+
+
 def _normalize_chart_data(chart_data: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(chart_data, dict) and isinstance(chart_data.get("divisional_chart"), dict):
         return chart_data["divisional_chart"]
@@ -336,11 +357,19 @@ def _collect_house_factors(
     house_num: int,
     chart_id: str,
     transit_date: Optional[str],
+    shadbala_chart_data: Optional[Dict[str, Any]] = None,
+    analyzer: Optional[HouseAnalyzer] = None,
+    include_worksheets: bool = True,
 ) -> Dict[str, Any]:
     birth_obj = _birth_obj(birth_data)
-    analyzer = HouseAnalyzer(chart_data, birth_obj)
+    natal_for_shadbala = shadbala_chart_data or (
+        _attach_shadbala_vargas(chart_data)
+        if chart_id == "lagna"
+        else _natal_chart_for_shadbala(birth_obj)
+    )
+    analyzer = analyzer or HouseAnalyzer(chart_data, birth_obj, shadbala_chart_data=natal_for_shadbala)
     analysis = analyzer.analyze_house(house_num)
-    yogi_data = YogiCalculator(chart_data).calculate_yogi_points(birth_data)
+    yogi_data = getattr(analyzer, "yogi_data", None) or YogiCalculator(chart_data).calculate_yogi_points(birth_data)
 
     support: List[Dict[str, str]] = []
     stress: List[Dict[str, str]] = []
@@ -810,6 +839,7 @@ def _collect_house_factors(
     except Exception:
         pass
 
+    current_transits: List[str] = []
     if chart_id != "transit":
         try:
             transit_chart = TransitCalculator({}).calculate_transits(
@@ -822,6 +852,7 @@ def _collect_house_factors(
                 sign = data.get("sign")
                 if sign == target_sign:
                     transit_hits.append(planet)
+            current_transits = transit_hits
             if transit_hits:
                 activation.append(_factor(f"Current transits through this sign include {', '.join(transit_hits[:3])}.", "good", "transit"))
         except Exception:
@@ -838,6 +869,42 @@ def _collect_house_factors(
         timing,
     )
 
+    worksheets: Dict[str, Any] = {}
+    if include_worksheets:
+        from charts.house_insight_worksheets import build_house_worksheets
+        worksheets = build_house_worksheets(
+            birth_data=birth_data,
+            chart_data=chart_data,
+            natal_chart=natal_for_shadbala,
+            house_num=house_num,
+            house_sign=house_sign,
+            chart_id=chart_id,
+            lord=lord,
+            lord_analysis=lord_analysis,
+            residents=residents,
+            aspects_received=analysis.get("aspects_received") or [],
+            yogi_data=yogi_data,
+            shadbala_data=getattr(analyzer.planet_analyzer, "shadbala_data", {}) or {},
+            transit_date=transit_date,
+            current_transits=current_transits,
+        )
+    sav_givers = worksheets.get("sav_givers") or {}
+    if ashtakavarga_summary is None and sav_givers.get("total") is not None:
+        ashtakavarga_summary = {
+            "sav": {
+                "house_points": sav_givers.get("total"),
+                "classification": (
+                    "strong" if sav_givers.get("total", 0) >= 34
+                    else "weak" if sav_givers.get("total", 0) <= 25
+                    else "moderate"
+                ),
+            }
+        }
+    elif ashtakavarga_summary and sav_givers.get("givers"):
+        ashtakavarga_summary["givers"] = sav_givers.get("givers")
+        if ashtakavarga_summary.get("sav") is None and sav_givers.get("total") is not None:
+            ashtakavarga_summary["sav"] = {"house_points": sav_givers.get("total")}
+
     return {
         "house_num": house_num,
         "chart_id": chart_id,
@@ -853,6 +920,14 @@ def _collect_house_factors(
         "activation_factors": _prioritize_factors(activation),
         "reasons": [item["label"] for item in (support[:3] + stress[:2] + activation[:2])],
         "related_chart": RELATED_CHARTS.get(house_num) if chart_id == "lagna" else None,
+        "lord_worksheet": worksheets.get("lord_worksheet"),
+        "argala": worksheets.get("argala"),
+        "points_in_house": worksheets.get("points_in_house") or [],
+        "chara_karakas_here": worksheets.get("chara_karakas_here") or [],
+        "natural_karakas": worksheets.get("natural_karakas") or [],
+        "related_varga": worksheets.get("related_varga"),
+        "sav_givers": sav_givers,
+        "timing": worksheets.get("timing") or {},
         "raw": {
             "classical_grade": classical_grade,
             "lord_dignity": lord_dignity,
@@ -873,7 +948,7 @@ def build_house_insight(
     transit_date: Optional[str] = None,
 ) -> Dict[str, Any]:
     birth_obj = _birth_obj(birth_data)
-    natal_chart = ChartCalculator({}).calculate_chart(birth_obj)
+    natal_chart = _natal_chart_for_shadbala(birth_obj)
 
     if chart_id == "transit":
         transit_raw = TransitCalculator({}).calculate_transits(
@@ -895,6 +970,7 @@ def build_house_insight(
         house_num=house_num,
         chart_id=chart_id,
         transit_date=transit_date,
+        shadbala_chart_data=natal_chart,
     )
 
 
@@ -1013,11 +1089,11 @@ def build_chart_preview_insights(
     transit_date: Optional[str] = None,
     limit: int = 6,
 ) -> List[Dict[str, Any]]:
+    birth_obj = _birth_obj(birth_data)
+    natal_chart = _natal_chart_for_shadbala(birth_obj)
     normalized_chart = _normalize_chart_data(chart_data or {})
     if not isinstance(normalized_chart, dict) or not isinstance(normalized_chart.get("planets"), dict):
-        birth_obj = _birth_obj(birth_data)
-        natal_chart = ChartCalculator({}).calculate_chart(birth_obj)
-        normalized_chart = _normalize_chart_data(natal_chart)
+        normalized_chart = natal_chart
     ranked: List[Dict[str, Any]] = []
 
     for house_num in range(1, 13):
@@ -1028,6 +1104,7 @@ def build_chart_preview_insights(
                 house_num=house_num,
                 chart_id=chart_id,
                 transit_date=transit_date,
+                shadbala_chart_data=natal_chart,
             )
         except Exception:
             continue

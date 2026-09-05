@@ -65,6 +65,8 @@ from instant_chat_v2.children import (
 from instant_chat_v2.children_calculation import build_children_foundation
 from instant_chat_v2.home import TIMING_HOME_SUBTYPES, home_profile, is_home_category, is_home_timing, normalize_home_subtype
 from instant_chat_v2.home_calculation import build_home_foundation
+from instant_chat_v2.foreign import FOREIGN_CATEGORIES, TIMING_SUBTYPES, foreign_profile, is_foreign_category, normalize_foreign_subtype
+from instant_chat_v2.foreign_calculation import build_foreign_foundation
 from instant_chat_v2.marriage_timeline import (
     apply_timeline_intent_guard,
     build_phase_action,
@@ -208,6 +210,12 @@ for _education_category in ("education", "learning", "exams", "research"):
         "houses": list(_education_policy["houses"]),
         "planets": list(_education_policy["planets"]),
     }
+for _foreign_category in FOREIGN_CATEGORIES:
+    _foreign_policy = foreign_profile(_foreign_category)
+    CATEGORY_FOCUS[_foreign_category] = {
+        "houses": list(_foreign_policy["houses"]),
+        "planets": list(_foreign_policy["planets"]),
+    }
 
 EVENT_CATEGORY_PRIORITIES = {
     "career": {"house_weights": {10: 3.0, 6: 2.5, 11: 2.0, 2: 1.5}, "planet_weights": {"Saturn": 2.0, "Sun": 1.8, "Mercury": 1.8, "Jupiter": 1.4}},
@@ -259,6 +267,18 @@ for _education_category in ("education", "learning", "exams", "research"):
         "planet_weights": {
             planet: max(1.2, 2.0 - (index * 0.18))
             for index, planet in enumerate(_education_policy["planets"])
+        },
+    }
+for _foreign_category in FOREIGN_CATEGORIES:
+    _foreign_policy = foreign_profile(_foreign_category)
+    EVENT_CATEGORY_PRIORITIES[_foreign_category] = {
+        "house_weights": {
+            house: max(1.2, 3.0 - (index * 0.35))
+            for index, house in enumerate(_foreign_policy["houses"])
+        },
+        "planet_weights": {
+            planet: max(1.2, 2.0 - (index * 0.18))
+            for index, planet in enumerate(_foreign_policy["planets"])
         },
     }
 
@@ -1281,6 +1301,7 @@ def _slim_event_prediction_payload(
     education_subtype: Any = None,
     children_subtype: Any = None,
     home_subtype: Any = None,
+    foreign_subtype: Any = None,
     question: str,
     chart_data: Dict[str, Any],
     house_lordships: Dict[str, List[int]],
@@ -1667,6 +1688,7 @@ def _slim_event_prediction_payload(
         "education_foundation",
         "children_foundation",
         "home_foundation",
+        "foreign_foundation",
     ):
         if (normalized_evidence or {}).get(evidence_key) not in (None, "", [], {}):
             slim_normalized[evidence_key] = (normalized_evidence or {}).get(evidence_key)
@@ -1739,6 +1761,10 @@ def _slim_event_prediction_payload(
             "home_subtype": (
                 normalize_home_subtype(home_subtype)
                 if is_home_category(category) else None
+            ),
+            "foreign_subtype": (
+                normalize_foreign_subtype(foreign_subtype)
+                if is_foreign_category(category) else None
             ),
             "mode": "LIFESPAN_EVENT_TIMING",
             "answer_mode": "event_prediction",
@@ -5780,6 +5806,11 @@ def _mode_selection_from_intent(
         and normalize_home_subtype(intent.get("home_subtype")) in TIMING_HOME_SUBTYPES
     ):
         mode = "event_prediction"
+    if (
+        is_foreign_category(intent.get("category"))
+        and normalize_foreign_subtype(intent.get("foreign_subtype")) in TIMING_SUBTYPES
+    ):
+        mode = "event_prediction"
     target_key = _normalize_relationship_target_key(intent.get("target_subject_key") or "")
     target_subject: Optional[Dict[str, Any]] = None
     if target_key in TARGET_SUBJECTS:
@@ -6517,6 +6548,10 @@ def _normalize_instant_evidence(
         or (
             is_home_category(category)
             and is_home_timing(instant_parashari.get("home_subtype"), answer_mode)
+        )
+        or (
+            is_foreign_category(category)
+            and normalize_foreign_subtype(instant_parashari.get("foreign_subtype")) in TIMING_SUBTYPES
         )
     )
     hi_for_area_ranking = instant_parashari.get("house_activation") or {}
@@ -7669,6 +7704,11 @@ def _requested_charts_from_intent(intent: Optional[Dict[str, Any]], *, answer_mo
         home_subtype = normalize_home_subtype(intent.get("home_subtype"))
         home_charts = ("D1", "D4", "D16") if home_subtype.startswith("vehicle_") else ("D1", "D4")
         for code in home_charts:
+            if code not in requested:
+                requested.append(code)
+    if is_foreign_category(category):
+        foreign_route = foreign_profile(category, intent.get("foreign_subtype"))
+        for code in foreign_route["charts"]:
             if code not in requested:
                 requested.append(code)
     if requested:
@@ -11721,6 +11761,9 @@ def _build_instant_context(
     if is_home_category(category):
         home_route = home_profile(category, (intent or {}).get("home_subtype"))
         focus = {**focus, "houses": home_route["houses"], "planets": home_route["planets"]}
+    if is_foreign_category(category):
+        foreign_route = foreign_profile(category, (intent or {}).get("foreign_subtype"))
+        focus = {**focus, "houses": foreign_route["houses"], "planets": foreign_route["planets"]}
     focus_planets = set(focus["planets"]) | {"Moon"}
 
     query_context = (intent or {}).get("query_context") if isinstance((intent or {}).get("query_context"), dict) else None
@@ -12005,6 +12048,7 @@ def _build_instant_context(
         is_children_category(category)
         or is_education_category(category)
         or is_home_category(category)
+        or is_foreign_category(category)
     ):
         category = instant_parashari.get("category") or category
     focus = CATEGORY_FOCUS.get(category, CATEGORY_FOCUS["general"])
@@ -12039,6 +12083,11 @@ def _build_instant_context(
         focus = {**focus, "houses": home_route["houses"], "planets": home_route["planets"]}
         instant_parashari["focus_houses"] = list(focus["houses"])
         instant_parashari["home_subtype"] = home_route["subtype"]
+    if is_foreign_category(category):
+        foreign_route = foreign_profile(category, (intent or {}).get("foreign_subtype"))
+        focus = {**focus, "houses": foreign_route["houses"], "planets": foreign_route["planets"]}
+        instant_parashari["focus_houses"] = list(focus["houses"])
+        instant_parashari["foreign_subtype"] = foreign_route["subtype"]
     if (
         answer_mode == "remedy_action"
         and str(category or "").lower() in {"marriage", "relationship", "love", "partner", "spouse"}
@@ -12064,7 +12113,11 @@ def _build_instant_context(
         is_home_category(category)
         and is_home_timing((intent or {}).get("home_subtype"), answer_mode)
     )
-    typed_event_timing = education_event_timing or children_event_timing or home_event_timing
+    foreign_event_timing = bool(
+        is_foreign_category(category)
+        and normalize_foreign_subtype((intent or {}).get("foreign_subtype")) in TIMING_SUBTYPES
+    )
+    typed_event_timing = education_event_timing or children_event_timing or home_event_timing or foreign_event_timing
     if (answer_mode == "event_prediction" or typed_event_timing) and authoritative_event_prediction_dashas:
         instant_parashari["active_dashas_formatted"] = authoritative_event_prediction_dashas
         instant_parashari["active_dasha_source"] = "dasha_calculator_authoritative_event_prediction"
@@ -12143,6 +12196,10 @@ def _build_instant_context(
             is_home_category(category)
             and normalize_home_subtype((intent or {}).get("home_subtype")) == "retrospective_property_timing"
         )
+        retrospective_foreign = bool(
+            is_foreign_category(category)
+            and normalize_foreign_subtype((intent or {}).get("foreign_subtype")) == "retrospective_travel"
+        )
         instant_parashari["timing_policy"] = {
             "time_direction": "retrospective",
             "claim_type": "probable_past_periods_only",
@@ -12154,6 +12211,8 @@ def _build_instant_context(
                 "Rank past property-acquisition-capable periods from D1/D4 property promise, houses 2/4/9/11, "
                 "dasha carriers, KP and historical transit reinforcement. Never claim the actual purchase date without user confirmation."
                 if retrospective_home else
+                "Rank past travel-capable periods from D1/D3/D9 movement and distance promise, houses 3/9/11/12, dasha carriers, KP and historical transit reinforcement. Never claim an actual journey date without user confirmation."
+                if retrospective_foreign else
                 "Rank past marriage-capable periods from natal promise, D9, dasha carriers and historical "
                 "transit reinforcement. Never claim the actual marriage date without user confirmation."
             ),
@@ -12183,7 +12242,7 @@ def _build_instant_context(
             time_direction="past",
             limit=max(1, len(historical_raw_periods)),
         )
-        if retrospective_home:
+        if retrospective_home or retrospective_foreign:
             historical_candidates = [dict(row) for row in natal_candidates.get("periods") or [] if isinstance(row, dict)]
         else:
             candidate_builder = (
@@ -12223,7 +12282,7 @@ def _build_instant_context(
                 min(start, current[0]) if current else start,
                 max(end, current[1]) if current else end,
             )
-        if retrospective_home:
+        if retrospective_home or retrospective_foreign:
             historical_scan["periods"] = sorted(
                 (dict(row) for row in historical_scan.get("periods") or [] if isinstance(row, dict)),
                 key=lambda row: (
@@ -12242,17 +12301,20 @@ def _build_instant_context(
             )
         historical_scan["candidate_pool_size"] = len(historical_candidates)
         historical_scan["ranking_method"] = (
-            "children_2_5_11_jupiter_d7_then_historical_transit"
-            if retrospective_children else "property_2_4_9_11_d4_then_historical_transit"
-            if retrospective_home else "marriage_evidence_then_historical_transit"
+                "children_2_5_11_jupiter_d7_then_historical_transit"
+                if retrospective_children else "property_2_4_9_11_d4_then_historical_transit"
+                if retrospective_home else "travel_3_9_11_12_d3_d9_then_historical_transit"
+                if retrospective_foreign else "marriage_evidence_then_historical_transit"
         )
         historical_scan["claim_rule"] = (
             "These are ranked probable child-event periods, not a known or proven conception or birth date. "
             "Ask the user which period matches."
             if retrospective_children else
-            "These are ranked probable property-acquisition periods, not the known or proven purchase date. Ask the user which period matches."
-            if retrospective_home else
-            "These are ranked probable periods, not the known or proven marriage date. Ask the user which period matches."
+                "These are ranked probable property-acquisition periods, not the known or proven purchase date. Ask the user which period matches."
+                if retrospective_home else
+                "These are ranked probable travel periods, not a known or proven journey date. Ask the user which period matches."
+                if retrospective_foreign else
+                "These are ranked probable periods, not the known or proven marriage date. Ask the user which period matches."
         )
         historical_scan["minimum_age"] = 16
         instant_parashari["historical_event_dasha_scan"] = historical_scan
@@ -12492,6 +12554,16 @@ def _build_instant_context(
                 normalized_evidence["top_risks"] = list(property_remedy.get("priority_order") or [])
                 normalized_evidence["remedy_sections"] = property_remedy.get("remedy_sections") or {}
                 normalized_evidence["caution"] = property_remedy.get("caution") or ""
+    if is_foreign_category(category):
+        normalized_evidence["foreign_foundation"] = build_foreign_foundation(
+            chart_data=chart_data,
+            normalized_evidence=normalized_evidence,
+            category=category,
+            answer_mode=answer_mode,
+            foreign_subtype=(intent or {}).get("foreign_subtype"),
+            kp_evidence=_instant_real_kp_evidence(birth_data),
+            period_window=period_window,
+        )
 
     location_evidence = _instant_real_location_evidence(
         birth_data=birth_data,
@@ -12789,6 +12861,7 @@ def _build_instant_context(
             education_subtype=(intent or {}).get("education_subtype"),
             children_subtype=(intent or {}).get("children_subtype"),
             home_subtype=(intent or {}).get("home_subtype"),
+            foreign_subtype=(intent or {}).get("foreign_subtype"),
             question=question,
             chart_data=chart_data,
             house_lordships=house_lordships,
@@ -13053,6 +13126,10 @@ def _build_instant_context(
             is_home_category(category)
             and str((intent or {}).get("home_subtype") or "").strip().lower() == "property_remedy"
         )
+        foreign_remedy = (
+            is_foreign_category(category)
+            and normalize_foreign_subtype((intent or {}).get("foreign_subtype")) == "foreign_remedy"
+        )
         prompt_instant_parashari = {
             k: v
             for k, v in prompt_instant_parashari.items()
@@ -13097,9 +13174,10 @@ def _build_instant_context(
                 "wealth_foundation",
                 "children_foundation",
                 "home_foundation",
+                "foreign_foundation",
             }
         }
-        if marriage_remedy or property_remedy:
+        if marriage_remedy or property_remedy or foreign_remedy:
             prompt_instant_parashari.pop("active_dashas_formatted", None)
             prompt_instant_parashari.pop("period_window", None)
             prompt_instant_parashari.pop("time_relation", None)
@@ -13151,6 +13229,7 @@ def _build_instant_context(
             "education_subtype": (intent or {}).get("education_subtype"),
             "children_subtype": (intent or {}).get("children_subtype"),
             "home_subtype": (intent or {}).get("home_subtype"),
+            "foreign_subtype": (intent or {}).get("foreign_subtype"),
             "mode": (intent or {}).get("mode") or "birth",
             "answer_mode": instant_parashari.get("answer_mode") or "topic_reading",
             "period_window": period_window,
@@ -13960,6 +14039,11 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
         if isinstance(source_evidence.get("home_foundation"), dict)
         else {}
     )
+    source_foreign = (
+        source_evidence.get("foreign_foundation")
+        if isinstance(source_evidence.get("foreign_foundation"), dict)
+        else {}
+    )
     if source_wealth:
         # Wealth needs nested D1 house/lord rows, D2 placements and the Indu
         # chain. A slightly larger bounded brief is safer than flattening those
@@ -13970,6 +14054,12 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
         # the selected route's nested D1/D4 branches.  Dropping those branches
         # leaves the writer with a verdict but no reliable lord/occupant/aspect
         # roles, which is precisely where fluent factual substitutions occur.
+        target_chars = max(target_chars, 13500)
+    if source_foreign:
+        # Foreign Life answers must retain the actual D1/D3/D4/D9/D12
+        # house-lord rows. A bare route verdict is not enough to identify the
+        # native ascendant, lords, occupants or aspects and invites the writer
+        # to fill those facts from generic astrological associations.
         target_chars = max(target_chars, 13500)
     source_vocation = (
         source_career.get("vocation_synthesis")
@@ -14167,6 +14257,134 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
                 if value not in (None, "", [], {})
             }
 
+    def restore_foreign(payload: Dict[str, Any]) -> None:
+        """Preserve the active Foreign Life route's calculated chart ledger."""
+        if not source_foreign:
+            return
+        compact_charts: Dict[str, Any] = {}
+        source_charts = source_foreign.get("charts")
+        if isinstance(source_charts, dict):
+            for chart_name, chart_rows in source_charts.items():
+                if not isinstance(chart_rows, list):
+                    continue
+                compact_charts[str(chart_name)] = [
+                    {
+                        key: row.get(key)
+                        for key in (
+                            "chart", "house", "lord", "lord_house", "lord_sign",
+                            "lord_dignity", "occupants", "house_aspects", "support",
+                            "cautions", "score",
+                        )
+                        if row.get(key) not in (None, "", [], {})
+                    }
+                    for row in chart_rows
+                    if isinstance(row, dict)
+                ][:12]
+        source_timing = (
+            source_foreign.get("timing_synthesis")
+            if isinstance(source_foreign.get("timing_synthesis"), dict)
+            else {}
+        )
+
+        def compact_foreign_window(value: Any) -> Dict[str, Any]:
+            row = value if isinstance(value, dict) else {}
+            peaks = row.get("route_peak_windows") or row.get("transit_confirmation") or []
+            return {
+                key: item for key, item in {
+                    "start": row.get("start"),
+                    "end": row.get("end"),
+                    "mahadasha": row.get("mahadasha"),
+                    "antardasha": row.get("antardasha"),
+                    "pratyantardasha": row.get("pratyantardasha"),
+                    "activated_focus_houses": list(row.get("activated_focus_houses") or [])[:8],
+                    "route_success_coverage": list(row.get("route_success_coverage") or [])[:8],
+                    "transit_confirmed": row.get("transit_confirmed"),
+                    "why": _truncate(str(row.get("why") or ""), 420),
+                    "transit_confirmation": [
+                        {
+                            key: peak.get(key)
+                            for key in (
+                                "start", "end", "planet", "strength",
+                                "activated_focus_houses", "why",
+                            )
+                            if peak.get(key) not in (None, "", [], {})
+                        }
+                        for peak in list(peaks)[:2]
+                        if isinstance(peak, dict)
+                    ],
+                    "claim_rule": row.get("claim_rule"),
+                }.items() if item not in (None, "", [], {})
+            }
+
+        compact_timing_windows = [
+            compact_foreign_window(row)
+            for row in list(source_timing.get("timing_windows") or [])[:3]
+            if isinstance(row, dict)
+        ]
+        source_kp = source_timing.get("kp_fructification") if isinstance(source_timing.get("kp_fructification"), dict) else {}
+        compact_timing = {
+            "verdict": source_timing.get("verdict"),
+            "dasha_evaluation_complete": source_timing.get("dasha_evaluation_complete"),
+            "transit_evaluation_complete": source_timing.get("transit_evaluation_complete"),
+            "kp_fructification": {
+                key: source_kp.get(key)
+                for key in (
+                    "complete", "verdict", "supported_cusps", "required_cusps",
+                    "cusp_judgments", "rule",
+                )
+                if source_kp.get(key) not in (None, "", [], {})
+            },
+            "timing_windows": compact_timing_windows,
+            "next_window": compact_timing_windows[0] if compact_timing_windows else {},
+        }
+        compact_route_synthesis = dict(source_foreign.get("route_synthesis") or {})
+        # Exact rows already live in compact_foundation.charts. Keeping the
+        # enforcement copy here duplicates several kilobytes in the composer.
+        compact_route_synthesis.pop("fact_contract", None)
+        if str(source_foreign.get("foreign_subtype") or "") in TIMING_SUBTYPES:
+            compact_route_synthesis.pop("planet_contributions", None)
+            compact_route_synthesis.pop("explanation_plan", None)
+        else:
+            compact_route_synthesis["planet_contributions"] = [
+                {
+                    "planet": row.get("planet"),
+                    "net_direction": row.get("net_direction"),
+                    "activations": list(row.get("activations") or [])[:3],
+                }
+                for row in list(compact_route_synthesis.get("planet_contributions") or [])[:6]
+                if isinstance(row, dict)
+            ]
+        compact_foundation = {
+            "foreign_subtype": source_foreign.get("foreign_subtype"),
+            "focus_houses": source_foreign.get("focus_houses"),
+            "houses_available": source_foreign.get("houses_available"),
+            "charts": compact_charts,
+            "route_synthesis": _limit_composer_value(
+                compact_route_synthesis,
+                max_depth=9, list_limit=14, string_limit=220,
+            ),
+            "comparison_synthesis": _limit_composer_value(
+                source_foreign.get("comparison_synthesis") or {},
+                max_depth=9, list_limit=12, string_limit=220,
+            ),
+            "pathway_synthesis": _limit_composer_value(
+                source_foreign.get("pathway_synthesis") or {},
+                max_depth=9, list_limit=12, string_limit=220,
+            ),
+            "remedy_blueprint": _limit_composer_value(
+                source_foreign.get("remedy_blueprint") or {},
+                max_depth=8, list_limit=10, string_limit=220,
+            ),
+            "timing_synthesis": compact_timing,
+            "availability": source_foreign.get("availability"),
+        }
+        payload_evidence = payload.setdefault("evidence", {})
+        if isinstance(payload_evidence, dict):
+            payload_evidence["foreign_foundation"] = {
+                key: value for key, value in compact_foundation.items()
+                if value not in (None, "", [], {})
+            }
+
     def restore_career_decision(payload: Dict[str, Any]) -> None:
         """Keep the calculated cause of every stay/change verdict.
 
@@ -14272,6 +14490,7 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
     restore_education(compact)
     restore_children(compact)
     restore_home(compact)
+    restore_foreign(compact)
     restore_career_decision(compact)
     restore_career_target(compact)
     restore_option_comparison(compact)
@@ -14292,6 +14511,7 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
     restore_education(tighter)
     restore_children(tighter)
     restore_home(tighter)
+    restore_foreign(tighter)
     restore_career_decision(tighter)
     restore_career_target(tighter)
     restore_option_comparison(tighter)
@@ -14432,6 +14652,32 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
         }
         compact_health_rules["allowed_zone_evidence"] = zone_rows
 
+    foreign_rules = answer_spec.get("foreign_answer_rules")
+    foreign_rules = foreign_rules if isinstance(foreign_rules, dict) else {}
+    compact_foreign_rules: Dict[str, Any] = {}
+    if foreign_rules:
+        route = foreign_rules.get("route_synthesis") if isinstance(foreign_rules.get("route_synthesis"), dict) else {}
+        fact_contract = foreign_rules.get("fact_contract") if isinstance(foreign_rules.get("fact_contract"), dict) else {}
+        compact_foreign_rules = {
+            key: foreign_rules.get(key)
+            for key in (
+                "runtime_key", "timing_route", "native_ascendant", "allowed_special_claim_terms",
+                "primary_evidence", "timing_synthesis", "required_order", "forbidden_moves",
+                "human_bridge_rules", "technical_output_contract", "fact_gate",
+            )
+            if foreign_rules.get(key) not in (None, "", [], {})
+        }
+        compact_foreign_rules["route_synthesis"] = {
+            key: route.get(key) for key in (
+                "verdict", "evidence_complete", "primary_houses", "chart_confirmation_scores", "rule",
+            ) if route.get(key) not in (None, "", [], {})
+        }
+        compact_foreign_rules["fact_contract"] = {
+            key: fact_contract.get(key) for key in (
+                "route", "controlling_houses", "allowed_houses", "excluded_direct_houses", "settlement_rule", "rule",
+            ) if fact_contract.get(key) not in (None, "", [], {})
+        }
+
     graph_policy = answer_spec.get("knowledge_graph_policy")
     graph_policy = graph_policy if isinstance(graph_policy, dict) else {}
     compact_graph_policy = {
@@ -14484,6 +14730,7 @@ def _compact_answer_spec_for_composer(answer_spec: Any) -> Dict[str, Any]:
         "wealth_answer_rules": answer_spec.get("wealth_answer_rules"),
         "financial_safety_rules": answer_spec.get("financial_safety_rules"),
         "home_timing_rules": answer_spec.get("home_timing_rules"),
+        "foreign_answer_rules": compact_foreign_rules,
         "event_rules": compact_event_rules,
         "forbidden": answer_spec.get("forbidden"),
         "answer_order": answer_spec.get("answer_order"),
@@ -14572,6 +14819,66 @@ def _build_instant_answer_blueprint(
         if isinstance(evidence.get("wealth_foundation"), dict)
         else {}
     )
+    foreign_rules = (
+        evidence.get("_foreign_rules")
+        if isinstance(evidence.get("_foreign_rules"), dict)
+        else {}
+    )
+    foreign_foundation = (
+        evidence.get("foreign_foundation")
+        if isinstance(evidence.get("foreign_foundation"), dict)
+        else {}
+    )
+    if foreign_rules and foreign_foundation:
+        slots = [
+            {
+                "slot": "direct route-specific travel, relocation or foreign-life verdict",
+                "source": "evidence.foreign_foundation.route_synthesis",
+            },
+            {
+                "slot": "actual D1 route promise",
+                "source": "evidence.foreign_foundation.charts.D1; cite a supplied house, lord, dignity, occupant or aspect",
+            },
+            {
+                "slot": "required divisional confirmation or qualification",
+                "source": "evidence.foreign_foundation.charts using only the selected route's D3, D4, D9 and D12 rows",
+            },
+        ]
+        if foreign_foundation.get("comparison_synthesis"):
+            slots.append({
+                "slot": "separate comparison of the named options before choosing",
+                "source": "evidence.foreign_foundation.comparison_synthesis",
+            })
+        if foreign_foundation.get("pathway_synthesis"):
+            slots.append({
+                "slot": "calculated pathway distinction",
+                "source": "evidence.foreign_foundation.pathway_synthesis",
+            })
+        if foreign_rules.get("timing_route"):
+            slots.append({
+                "slot": "allowed timing result",
+                "source": "evidence.foreign_foundation.timing_synthesis only; require KP, route-filtered dasha and dated transit confirmation",
+            })
+        slots.extend([
+            {
+                "slot": "brief human meaning",
+                "source": "the calculated verdict's implications for movement, continuity, belonging or adjustment; do not invent feelings",
+            },
+            {
+                "slot": "one grounded practical implication",
+                "source": "the same calculated route evidence",
+            },
+        ])
+        return {
+            "purpose": "semantic slots for the selected live Foreign Life graph route; not a generic foreign-life reading",
+            "slots": slots,
+            "fact_gate": (
+                "Every ascendant, lord, dignity, occupant, aspect and special-condition claim must appear exactly in "
+                "evidence.foreign_foundation.charts. Never infer a missing chart fact from generic astrology."
+            ),
+            "forbidden_content": list(foreign_rules.get("forbidden_moves") or []),
+            "user_goal": query_plan.get("user_goal"),
+        }
     if wealth_rules and wealth_foundation:
         static_route = bool(wealth_rules.get("static_route"))
         investment_family = str(wealth_rules.get("runtime_key") or "") in {
@@ -14982,6 +15289,7 @@ def _build_instant_composer_context(
             "education_options",
             "children_subtype",
             "home_subtype",
+            "foreign_subtype",
             "answer_mode",
             "user_goal",
             "interpretation_frame",
@@ -15093,6 +15401,17 @@ def _build_instant_composer_context(
     )
     if is_home_category(category):
         compact_query_plan["home_subtype"] = home_subtype
+    foreign_foundation = (
+        normalized.get("foreign_foundation")
+        if isinstance(normalized.get("foreign_foundation"), dict) else {}
+    )
+    foreign_subtype = normalize_foreign_subtype(
+        foreign_foundation.get("foreign_subtype")
+        or intent.get("foreign_subtype")
+        or query_plan.get("foreign_subtype")
+    )
+    if is_foreign_category(category):
+        compact_query_plan["foreign_subtype"] = foreign_subtype
     if career_decision_question:
         compact_query_plan["forecast_shape"] = "career_decision"
     exact_day = bool(time_scope.get("is_exact_day"))
@@ -15257,6 +15576,7 @@ def _build_instant_composer_context(
         "education_foundation": normalized.get("education_foundation"),
         "children_foundation": normalized.get("children_foundation"),
         "home_foundation": normalized.get("home_foundation"),
+        "foreign_foundation": normalized.get("foreign_foundation"),
         "risk_specifics": list(normalized.get("risk_specifics") or [])[:3],
         "health_body_area": normalized.get("health_body_area"),
         "option_comparison": normalized.get("option_comparison"),
@@ -15293,6 +15613,9 @@ def _build_instant_composer_context(
     )
     is_home_graph = bool(
         live_graph_policy.get("live") and live_graph_policy.get("domain") == "home_property"
+    )
+    is_foreign_graph = bool(
+        live_graph_policy.get("live") and live_graph_policy.get("domain") == "foreign_life"
     )
     wealth_rules = (
         compact_answer_contract.get("wealth_answer_rules")
@@ -15519,6 +15842,35 @@ def _build_instant_composer_context(
             "transit_activation_timeline": None if static_home else evidence.get("transit_activation_timeline"),
             "_home_rules": home_rules,
         }
+    if is_foreign_graph:
+        static_foreign = foreign_subtype not in {
+            "short_travel_timing", "long_travel_timing", "retrospective_travel",
+            "domestic_relocation_timing", "foreign_travel_timing", "foreign_residence_timing",
+            "settlement_timing", "visa_timing", "return_home_timing",
+        }
+        foreign_rules = (
+            compact_answer_contract.get("foreign_answer_rules")
+            if isinstance(compact_answer_contract.get("foreign_answer_rules"), dict)
+            else {}
+        )
+        compact_verdict = {
+            key: value for key, value in {
+                "direction": "synthesize_from_calculated_foreign_foundation",
+                "confidence": verdict.get("confidence"),
+                "ranked_windows": compact_verdict.get("ranked_windows") if not static_foreign else None,
+                "missing_required_capabilities": verdict.get("missing_required_capabilities"),
+                "scope": f"calculated travel/relocation/foreign-life route: {foreign_subtype}",
+            }.items() if value not in (None, "", [], {})
+        }
+        evidence = {
+            "foreign_foundation": evidence.get("foreign_foundation"),
+            # Foreign timing_synthesis already contains the selected route's
+            # compact dasha/transit result. Parallel generic timing branches
+            # add tens of kilobytes and can contradict that adjudication.
+            "current_timing": None,
+            "transit_activation_timeline": None,
+            "_foreign_rules": foreign_rules,
+        }
     if career_decision_question:
         career_rules = (
             answer_spec.get("career_rules")
@@ -15736,6 +16088,8 @@ def _build_instant_composer_context(
             "_education_rules": evidence.get("_education_rules") if is_education_graph else None,
             "children_foundation": evidence.get("children_foundation") if is_children_graph else None,
             "_children_rules": evidence.get("_children_rules") if is_children_graph else None,
+            "foreign_foundation": evidence.get("foreign_foundation") if is_foreign_graph else None,
+            "_foreign_rules": evidence.get("_foreign_rules") if is_foreign_graph else None,
         }
     if exact_day:
         # Exact-day forecasts have their own authoritative calculation spine.
@@ -15751,6 +16105,8 @@ def _build_instant_composer_context(
             "_education_rules": evidence.get("_education_rules") if is_education_graph else None,
             "children_foundation": evidence.get("children_foundation") if is_children_graph else None,
             "_children_rules": evidence.get("_children_rules") if is_children_graph else None,
+            "foreign_foundation": evidence.get("foreign_foundation") if is_foreign_graph else None,
+            "_foreign_rules": evidence.get("_foreign_rules") if is_foreign_graph else None,
         }
     if is_chart_fact:
         compact_charts: Dict[str, Any] = {}
@@ -15808,6 +16164,8 @@ def _build_instant_composer_context(
             "_education_rules": evidence.get("_education_rules") if is_education_graph else None,
             "children_foundation": normalized.get("children_foundation") if is_children_graph else None,
             "_children_rules": evidence.get("_children_rules") if is_children_graph else None,
+            "foreign_foundation": normalized.get("foreign_foundation") if is_foreign_graph else None,
+            "_foreign_rules": evidence.get("_foreign_rules") if is_foreign_graph else None,
         }
     evidence = {key: value for key, value in evidence.items() if value not in (None, "", [], {})}
 
@@ -15819,6 +16177,10 @@ def _build_instant_composer_context(
     answer_blueprint = {
         key: value for key, value in answer_blueprint.items() if value not in (None, "", [], {})
     }
+    if is_foreign_graph:
+        # Used to construct the blueprint above; the same rules already live
+        # in answer_contract and need not be duplicated as answer evidence.
+        evidence.pop("_foreign_rules", None)
 
     context = {
         "context_profile": "instant_composer_v3",
@@ -15851,6 +16213,7 @@ def _build_instant_composer_context(
                 if is_education_category(category) else None
             ),
             "children_subtype": children_subtype if is_children_category(category) else None,
+            "foreign_subtype": foreign_subtype if is_foreign_category(category) else None,
         },
         "query_plan": compact_query_plan,
         "verdict": compact_verdict,
@@ -16144,6 +16507,33 @@ def _instant_answer_language_error(answer: str, response_language: str) -> str |
     if language in {"hindi", "hi"} and latin_count >= 40 and devanagari_count == 0:
         return "answer language mismatch: expected Hindi from the latest user question, received Latin-only text"
     return None
+
+
+def _validate_foreign_technical_explanation(answer: str, *, technical: bool) -> List[str]:
+    """Reject ledger dumps while allowing concise, reasoned technical prose."""
+    if not technical:
+        return []
+    text=str(answer or "")
+    errors: List[str]=[]
+    catalog_rows=re.findall(r"\bD(?:1|3|4|9|10|12)\s*:\s*H(?:ouse)?\s*\d+",text,re.IGNORECASE)
+    if len(catalog_rows)>=3:
+        errors.append("foreign technical answer is a chart-row catalogue; synthesize at most three decisive facts into prose")
+    if re.search(r"\bthese links show activation and its direction\b",text,re.IGNORECASE):
+        errors.append("foreign technical answer exposes internal activation methodology instead of interpreting it")
+    standalone_dignities=re.findall(
+        r"\bD(?:1|3|4|9|10|12)\s*:\s*H(?:ouse)?\s*\d+[^.!?]{0,90}\b(?:own|friendly|friend|neutral)\s+sign\s*[.!?]",
+        text,re.IGNORECASE,
+    )
+    if standalone_dignities:
+        errors.append("foreign technical answer states dignity as a standalone fact without explaining its route meaning")
+    has_causal_explanation=bool(re.search(
+        r"\b(?:because|therefore|which\s+(?:links|connects|strengthens|qualifies)|linking|connecting|"
+        r"this\s+(?:links|connects|means|supports|qualifies)|while|however|but)\b",
+        text,re.IGNORECASE,
+    ))
+    if not has_causal_explanation:
+        errors.append("foreign technical answer lacks a causal explanation connecting chart facts to the requested outcome")
+    return errors
 
 
 _HEALTH_FACT_PLANETS = (
@@ -16924,6 +17314,23 @@ EVIDENCE-SPECIFIC OUTPUT RULES:
 - Never diagnose infertility or pregnancy risk, predict miscarriage or fetal sex, promise an exact number of children or twins, or use the parent's chart as the child's own fate chart.
 - Follow `route_synthesis.verdict`, `timing_verdict`, KP adjudication, requested horizon and claim boundaries exactly. A supportive period is not a guaranteed event.
 """
+    foreign_rules = ""
+    if composer_graph_policy.get("domain") == "foreign_life":
+        foreign_rules = """
+- FOREIGN LIFE EVIDENCE CHECK: use only `evidence.foreign_foundation`. Use `route_synthesis.planet_contributions` to distinguish whether each exact planetary link activates the route supportively, challengingly or in a mixed way. Do not equate activation with support, and do not build the verdict from generic Rahu, House 12, foreign-sign, Yogi, Gandanta or ascendant folklore.
+- Preserve the native ascendant in `native.ascendant` and `foreign_answer_rules.native_ascendant`. Never name another ascendant.
+- Give the exact selected route verdict first. Keep short travel, long travel, domestic relocation, foreign travel, foreign residence and permanent settlement as separate conclusions; evidence for one does not prove another.
+- Explain the D1 route promise from actual rows in `foreign_foundation.charts.D1`, then confirm or qualify it only with the required D3 movement, D4 residence, D9 long-distance and D12 rootedness/separation rows supplied for this route.
+- Every named lord, placement, dignity, occupant and aspect must be copied from its own chart row. Never infer an absent planet or special condition from general astrology.
+- Every planet presented as a reason must name its exact supplied chart, house and role (lord, placement, occupant or aspect). Do not translate Rahu into "foreign hunger" or the Sun into confidence, recognition or authority unless that exact meaning is calculated and supplied.
+- For `permanent_settlement`, the controlling proof is D1 H4 residence + H11 realization + H12 foreign residence/separation, qualified by D4 residence and D12 rootedness. H7 partnership/away-from-origin and H9 distance are secondary contributors when their supplied rows actually connect; do not either promote or exclude them categorically.
+- When Technical style is selected, visibly structure the proof as D1 natal promise followed by divisional confirmation. Name at least one actual D1 house/lord/placement condition and the actual supplied divisional conditions, including their chart codes and house numbers; for the broad foreign-overview route, name at least two relevant divisional charts. Technical mode must not collapse into a purely emotional or psychological narrative.
+- Technical does not mean listing the ledger. Follow `foreign_answer_rules.technical_output_contract` and `route_synthesis.explanation_plan`: select no more than three decisive facts and turn them into a connected explanation of why the house-lord relationship supports or pressures the requested outcome. Combine related facts in natural sentences; do not write a sequence of `D1: H4...`, `D1: H11...`, `D4: H7...` statements.
+- A dignity such as own sign or friendly sign is supporting strength, not a complete reason. Explain what the planet rules, where it is placed, which two life functions that connects, and then how the relevant divisional chart confirms or qualifies that mechanism.
+- When Simple style is selected, translate the same evidence into ordinary language while retaining the responsible planets and the same verdict strength.
+- For a static route, never mention current dasha, transit, activation, dates or a current period. For timing routes, use only `timing_synthesis` and its complete KP, route-filtered dasha and dated transit chain.
+- Personal meaning may explain adjustment, continuity, belonging or distance only as a restrained implication of the supplied verdict. Never claim the native will feel more authentic abroad, carries two homes, hungers for the unfamiliar, or has an emotional experience unless the evidence explicitly supplies it.
+"""
     home_rules = ""
     if composer_graph_policy.get("domain") == "home_property":
         home_rules = """
@@ -17020,6 +17427,7 @@ Hard rules:
 {marriage_rules}
 {education_rules}
 {children_rules}
+{foreign_rules}
 {home_rules}
 {graph_timing_rules}
 {speech_rules}
@@ -17551,6 +17959,7 @@ async def generate_instant_chat_response(
         "post_selection_changed": str((mode_selection or {}).get("raw_answer_mode") or answer_mode) != answer_mode,
         "response_language": language,
         "app_language_fallback": requested_app_language,
+        "response_style": response_style,
     }
     target_subject = (mode_selection or {}).get("target_subject") if isinstance(mode_selection, dict) else None
     if (
@@ -17649,6 +18058,7 @@ async def generate_instant_chat_response(
             response_style=response_style,
         )
         prompt_context = dict(prompt_context)
+        prompt_context["presentation_style"] = response_style
         prompt_answer_contract = dict(prompt_context.get("answer_contract") or {})
         prompt_answer_contract["visible_astrology"] = visible_astrology
         prompt_context["answer_contract"] = prompt_answer_contract
@@ -18385,6 +18795,17 @@ NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","fol
         _strip_home_fact_markers(raw_response) if home_fact_contract else raw_response,
         visible_astrology_contract,
     )
+    has_foreign_foundation = bool(
+        isinstance(authoritative_prompt_context, dict)
+        and isinstance(authoritative_prompt_context.get("evidence"), dict)
+        and isinstance((authoritative_prompt_context.get("evidence") or {}).get("foreign_foundation"), dict)
+        and (authoritative_prompt_context.get("evidence") or {}).get("foreign_foundation")
+    )
+    if has_foreign_foundation:
+        translated_astrology_errors.extend(_validate_foreign_technical_explanation(
+            raw_response,
+            technical=bool(visible_astrology_contract.get("technical_detail_allowed")),
+        ))
     translated_astrology_correction_attempted = False
     translated_astrology_correction_applied = False
     if translated_astrology_errors:
@@ -18409,6 +18830,25 @@ NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","fol
                     "and one named transit planet with its supplied peak date. In Simple style omit KP/MD/AD/PD and numbered "
                     "houses, but retain the responsible planet names, life meanings, broad window and peak date."
                 )
+        foreign_correction_foundation = (
+            ((authoritative_prompt_context.get("evidence") or {}).get("foreign_foundation") or {})
+            if isinstance(authoritative_prompt_context, dict)
+            and isinstance(authoritative_prompt_context.get("evidence"), dict)
+            else {}
+        )
+        foreign_translated_rule = ""
+        if foreign_correction_foundation:
+            foreign_translated_rule = (
+                "FOREIGN LIFE FACTS MUST SURVIVE THE REWRITE: use the supplied foreign foundation below as the only "
+                "source for ascendant, chart, house, lord, placement, dignity, occupant and aspect claims. In Technical "
+                "style, include a visible D1 natal-promise explanation and the route-required D3/D4/D9/D12 confirmation "
+                "or qualification. In Simple style, translate the same facts without specialist labels. Never substitute "
+                "generic planetary folklore. Preserve exact calculated activations and their supportive, challenging "
+                "or mixed direction; activation alone is not support. In Technical style, do not serialize chart rows. "
+                "Use route_synthesis.explanation_plan to choose at most three decisive facts and explain how their house "
+                "functions connect, how opposing evidence qualifies them, and what the divisional result adds. A sequence "
+                "of standalone `D-chart: H-house fact` sentences is invalid.\n"
+            )
         correction_prompt = f"""
 You are correcting one AstroRoshni Instant answer. Preserve its direct verdict, dates, cautions, safety boundaries and final question. Do not add a new claim.
 
@@ -18416,6 +18856,7 @@ You are correcting one AstroRoshni Instant answer. Preserve its direct verdict, 
 {_instant_relational_voice_contract()}
 {translated_astrology_prompt_rule(visible_astrology_contract)}
 {home_translated_rule}
+{foreign_translated_rule}
 
 Rewrite the complete answer so its visible astrology follows this exact pattern:
 direct answer -> the required evidence-bound allowed planet reasons, without exceeding `maximum_planet_reasons` -> lived human meaning -> one useful action.
@@ -18430,6 +18871,10 @@ VISIBLE ASTROLOGY CONTRACT:
 IMMUTABLE HOME/PROPERTY FACT CONTRACT (when non-empty):
 {json.dumps(home_fact_contract, ensure_ascii=False, separators=(",", ":"))}
 If this contract is non-empty, preserve every lord/occupant/aspector role exactly and preserve every validation marker unchanged after its corresponding factual sentence.
+
+CALCULATED FOREIGN LIFE FOUNDATION (when non-empty):
+{json.dumps(foreign_correction_foundation, ensure_ascii=False, separators=(",", ":"))}
+If this foundation is non-empty, use only its chart rows and selected-route synthesis; do not infer an absent chart fact.
 
 USER QUESTION:
 {question}
@@ -18481,6 +18926,11 @@ REJECTED ANSWER:
             if corrected_result.get("success")
             else [str(corrected_result.get("error") or "correction generation failed")]
         )
+        if corrected_result.get("success") and has_foreign_foundation:
+            corrected_errors.extend(_validate_foreign_technical_explanation(
+                corrected_raw,
+                technical=bool(visible_astrology_contract.get("technical_detail_allowed")),
+            ))
         if corrected_result.get("success"):
             if language_error := _instant_answer_language_error(corrected_raw, language):
                 corrected_errors.append(language_error)
@@ -18580,6 +19030,8 @@ REJECTED ANSWER:
                     if domain == "career"
                     else "Which financial area would you like to examine next—income, business, investments, or debt?"
                     if domain == "wealth"
+                    else "Which practical route abroad are you considering—work, study, partnership, or family?"
+                    if domain == "foreign_life"
                     else "Would you like the supported non-timing indications instead?"
                 )
             response_content = f"{str(response_content or '').rstrip()}\n\n{follow_up}"

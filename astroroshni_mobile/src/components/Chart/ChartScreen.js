@@ -30,6 +30,7 @@ import { chartAPI, creditAPI } from '../../services/api';
 import { refreshWebShellHeight } from '../../platform/webSafeArea';
 import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
+import ChartOverviewSheet from './ChartOverviewSheet';
 import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
@@ -54,6 +55,12 @@ import { useCredits } from '../../credits/CreditContext';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 
 const { width, height } = Dimensions.get('window');
+
+const SIGN_NAMES = [
+  'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+  'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
+];
+const PLANET_NAMES = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'];
 
 const CHART_CODES = {
   lagna: 'D1', navamsa: 'D9', transit: 'NOW', karkamsa: 'AK', swamsa: 'AL',
@@ -106,6 +113,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const [showAstrologerLicenseModal, setShowAstrologerLicenseModal] = useState(false);
   const [astrologerLicensePrice, setAstrologerLicensePrice] = useState('₹100/month');
   const [checkingAstrologerLicense, setCheckingAstrologerLicense] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const [chartGuideVideoUrl, setChartGuideVideoUrl] = useState(route.params?.chartGuideVideoUrl || '');
   const drawerAnim = useRef(new Animated.Value(height)).current;
   const houseInsightRequestKeyRef = useRef(null);
@@ -484,6 +492,43 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const closeHouseDrawer = () => {
     setSelectedHouse(null);
   };
+
+  const buildLagnaHouseSelection = useCallback((houseNum) => {
+    const data = getChartDataForType('lagna') || chartData;
+    const lagnaSign = data?.houses?.[0]?.sign
+      ?? (typeof data?.ascendant === 'number'
+        ? Math.floor((((data.ascendant % 360) + 360) % 360) / 30)
+        : 0);
+    const rashiIndex = data?.houses?.[houseNum - 1]?.sign
+      ?? ((Number(lagnaSign) + houseNum - 1) % 12);
+    const planets = PLANET_NAMES
+      .map((name) => {
+        const planet = data?.planets?.[name];
+        if (!planet) return null;
+        const house = typeof planet.house === 'number'
+          ? planet.house
+          : ((planet.sign - lagnaSign + 12) % 12) + 1;
+        if (house !== houseNum) return null;
+        return { name, ...planet };
+      })
+      .filter(Boolean);
+    return {
+      houseNum,
+      rashiIndex,
+      signName: SIGN_NAMES[rashiIndex] || '',
+      planets,
+      chartData: data,
+    };
+  }, [chartData, getChartDataForType]);
+
+  const openHouseFromOverview = useCallback((houseNum) => {
+    const lagnaIndex = chartTypes.findIndex((chart) => chart.id === 'lagna');
+    if (lagnaIndex >= 0 && currentChartIndex !== lagnaIndex) {
+      changeChart(lagnaIndex);
+    }
+    setOverviewOpen(false);
+    openHouseDrawer(buildLagnaHouseSelection(houseNum));
+  }, [buildLagnaHouseSelection, changeChart, chartTypes, currentChartIndex]);
 
   const houseDrawerAspects = useMemo(() => {
     if (!selectedHouse?.chartData || selectedHouse.rashiIndex == null) return [];
@@ -1043,7 +1088,35 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                   </View>
 
                   {activationEligible && (
-                    <TouchableOpacity
+                    <View style={styles.chartCtaStack}>
+                      <TouchableOpacity
+                          style={[styles.activationExplorerCta, styles.chartOverviewCta, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
+                          onPress={() => setOverviewOpen(true)}
+                          activeOpacity={0.88}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('premiumUi.common.chartOverviewTitle', 'Read this chart')}
+                        >
+                          <View
+                            style={[
+                              styles.activationExplorerCtaGradient,
+                              { backgroundColor: colors.accent },
+                            ]}
+                          >
+                            <View style={styles.activationExplorerCtaIcon}>
+                              <Ionicons name="book-outline" size={20} color={colors.onAccent || colors.textInverse} />
+                            </View>
+                            <View style={styles.activationExplorerCtaCopy}>
+                              <Text style={[styles.activationExplorerCtaTitle, { color: colors.onAccent || colors.textInverse }]}>
+                                {t('premiumUi.common.chartOverviewTitle', 'Read this chart')}
+                              </Text>
+                              <Text style={[styles.activationExplorerCtaSubtitle, { color: colors.onAccent || colors.textInverseMuted }]}>
+                                {t('premiumUi.common.chartOverviewBody', 'Houses, pillars, gandanta, special points')}
+                              </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={22} color={colors.onAccent || colors.textInverse} />
+                          </View>
+                        </TouchableOpacity>
+                      <TouchableOpacity
                       style={[styles.activationExplorerCta, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
                       onPress={openActivationExplorer}
                       activeOpacity={0.88}
@@ -1070,6 +1143,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                           : <Ionicons name="chevron-forward" size={22} color={colors.accent} />}
                       </View>
                     </TouchableOpacity>
+                    </View>
                   )}
                 </View>
 
@@ -1153,6 +1227,17 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
             )}
           </View>
         </Modal>
+
+        <ChartOverviewSheet
+          visible={overviewOpen}
+          onClose={() => setOverviewOpen(false)}
+          birthData={birthData}
+          onOpenHouse={openHouseFromOverview}
+          onOpenYogas={() => {
+            setOverviewOpen(false);
+            navigation.navigate('Yogas');
+          }}
+        />
 
         {/* House Insights Drawer */}
         <Modal
@@ -1482,6 +1567,15 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                             })}
                           </Text>
                         )}
+                        {(houseInsight.sav_givers?.givers || houseInsight.raw?.ashtakavarga?.givers || []).length > 0 && (
+                          <View style={styles.giverRow}>
+                            {(houseInsight.sav_givers?.givers || houseInsight.raw.ashtakavarga.givers).map((row) => (
+                              <Text key={row.planet} style={[styles.giverChip, { color: colors.text, borderColor: colors.cardBorder }]}>
+                                {row.planet === 'Lagna' ? 'Lg' : row.planet.slice(0, 2)} {row.bindus}
+                              </Text>
+                            ))}
+                          </View>
+                        )}
                       </View>
                     )}
 
@@ -1588,37 +1682,125 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                         {t('chartScreen.houseDrawer.houseLord', 'House Lord')}
                       </Text>
-                      <View style={styles.lordContainer}>
-                        <Ionicons name="key-outline" size={20} color={colors.primary} />
-                        <Text style={[styles.lordText, { color: colors.text }]}>
-                          {t('chartScreen.houseDrawer.lordOf', {
-                            sign: t(`signs.${selectedHouse.signName}`, selectedHouse.signName),
-                            lord: t(
-                              `home.planet_names.${getHouseLord(selectedHouse.rashiIndex)}`,
-                              getHouseLord(selectedHouse.rashiIndex),
-                            ),
-                            defaultValue: 'Lord of {{sign}} is {{lord}}',
-                          })}
-                        </Text>
-                      </View>
+                      {houseInsight?.lord_worksheet ? (
+                        <>
+                          <Text style={[styles.lordText, { color: colors.text }]}>
+                            {t(`home.planet_names.${houseInsight.lord_worksheet.planet}`, houseInsight.lord_worksheet.planet)}
+                            {houseInsight.lord_worksheet.sign_name ? ` · ${t(`signs.${houseInsight.lord_worksheet.sign_name}`, houseInsight.lord_worksheet.sign_name)}` : ''}
+                            {houseInsight.lord_worksheet.house != null ? ` · H${houseInsight.lord_worksheet.house}` : ''}
+                            {houseInsight.lord_worksheet.dignity ? ` · ${String(houseInsight.lord_worksheet.dignity).replace(/_/g, ' ')}` : ''}
+                          </Text>
+                          <Text style={[styles.sectionDesc, { color: colors.textSecondary, marginTop: 8 }]}>
+                            {houseInsight.lord_worksheet.shadbala_rupas != null
+                              ? `${houseInsight.lord_worksheet.shadbala_rupas} / ${houseInsight.lord_worksheet.required_rupas ?? '—'} rupas`
+                              : ''}
+                            {houseInsight.lord_worksheet.meets_minimum === false ? ' · below requirement' : houseInsight.lord_worksheet.meets_minimum ? ' · meets requirement' : ''}
+                          </Text>
+                          <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
+                            {[
+                              houseInsight.lord_worksheet.retrograde ? t('chartScreen.houseDrawer.retrograde', 'Retrograde') : null,
+                              houseInsight.lord_worksheet.combust ? 'Combust' : null,
+                              (houseInsight.lord_worksheet.other_lordships || []).length
+                                ? `Also H${houseInsight.lord_worksheet.other_lordships.join(', H')}`
+                                : null,
+                            ].filter(Boolean).join(' · ') || t('chartScreen.houseDrawer.direct', 'Direct')}
+                          </Text>
+                        </>
+                      ) : (
+                        <View style={styles.lordContainer}>
+                          <Ionicons name="key-outline" size={20} color={colors.primary} />
+                          <Text style={[styles.lordText, { color: colors.text }]}>
+                            {t('chartScreen.houseDrawer.lordOf', {
+                              sign: t(`signs.${selectedHouse.signName}`, selectedHouse.signName),
+                              lord: t(
+                                `home.planet_names.${getHouseLord(selectedHouse.rashiIndex)}`,
+                                getHouseLord(selectedHouse.rashiIndex),
+                              ),
+                              defaultValue: 'Lord of {{sign}} is {{lord}}',
+                            })}
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
-                    {(houseInsight?.related_chart || houseInsight?.relatedChart) && currentChartIndex === 0 && (
-                      <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(37, 99, 235, 0.05)' }]}>
+                    {(houseInsight?.argala?.support?.length || houseInsight?.argala?.obstruction?.length) ? (
+                      <View style={styles.drawerSection}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-                          {t('chartScreen.houseDrawer.relatedChart', 'Related chart')}
+                          {t('chartScreen.houseDrawer.argala', 'Argala')}
                         </Text>
-                        <Text style={[styles.sectionDesc, { color: colors.text }]}>
-                          {t('chartScreen.houseDrawer.relatedChartDesc', {
-                            name: t(
-                              `chartScreen.chartNames.${(houseInsight.related_chart || houseInsight.relatedChart).id}`,
-                              (houseInsight.related_chart || houseInsight.relatedChart).name,
-                            ),
-                            defaultValue: '{{name}} is often used to validate this house theme more deeply.',
-                          })}
+                        <Text style={[styles.sectionDesc, { color: colors.text, marginBottom: 8 }]}>
+                          {houseInsight.argala.grade}
                         </Text>
+                        {(houseInsight.argala.support || []).map((row) => (
+                          <View key={`a-${row.planet}-${row.from_house}`} style={styles.reasonRow}>
+                            <View style={[styles.reasonDot, { backgroundColor: '#22c55e' }]} />
+                            <Text style={[styles.reasonText, { color: colors.text }]}>
+                              {row.planet} from H{row.from_house} ({row.label})
+                            </Text>
+                          </View>
+                        ))}
+                        {(houseInsight.argala.obstruction || []).map((row) => (
+                          <View key={`v-${row.planet}-${row.from_house}`} style={styles.reasonRow}>
+                            <View style={[styles.reasonDot, { backgroundColor: '#ef4444' }]} />
+                            <Text style={[styles.reasonText, { color: colors.text }]}>
+                              {row.planet} virodha from H{row.from_house} ({row.label})
+                            </Text>
+                          </View>
+                        ))}
                       </View>
-                    )}
+                    ) : null}
+
+                    {(houseInsight?.points_in_house?.length || houseInsight?.chara_karakas_here?.length) ? (
+                      <View style={styles.drawerSection}>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                          {t('chartScreen.houseDrawer.pointsHere', 'Points in this house')}
+                        </Text>
+                        {(houseInsight.points_in_house || []).map((point) => (
+                          <Text key={point.key} style={[styles.reasonText, { color: colors.text, marginBottom: 6 }]}>
+                            {point.label}: {point.sign_name}{point.detail ? ` · ${point.detail}` : ''}
+                          </Text>
+                        ))}
+                        {(houseInsight.chara_karakas_here || []).map((row) => (
+                          <Text key={row.karaka} style={[styles.reasonText, { color: colors.text, marginBottom: 6 }]}>
+                            {row.abbr} · {row.planet} · {row.title}
+                          </Text>
+                        ))}
+                      </View>
+                    ) : null}
+
+                    {(houseInsight?.timing?.windows?.length || houseInsight?.timing?.current_transits?.length || houseInsight?.natural_karakas?.length || houseInsight?.related_varga) ? (
+                      <View style={styles.drawerSection}>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                          {t('chartScreen.houseDrawer.timingKaraka', 'Timing, karaka, related varga')}
+                        </Text>
+                        {houseInsight.timing?.current_transits?.length ? (
+                          <Text style={[styles.sectionDesc, { color: colors.text, marginBottom: 8 }]}>
+                            Transiting here now: {houseInsight.timing.current_transits.join(', ')}
+                          </Text>
+                        ) : null}
+                        {(houseInsight.timing?.windows || []).map((row) => (
+                          <Text key={`${row.mahadasha}-${row.antardasha}-${row.start}`} style={[styles.reasonText, { color: colors.text, marginBottom: 6 }]}>
+                            {row.current ? 'Now' : 'Next'} · {row.mahadasha}/{row.antardasha}
+                            {row.start ? ` · ${row.start}` : ''}{row.end ? `–${row.end}` : ''}
+                            {row.why ? ` · ${row.why}` : ''}
+                          </Text>
+                        ))}
+                        {(houseInsight.natural_karakas || []).map((row) => (
+                          <Text key={row.planet} style={[styles.reasonText, { color: colors.text, marginBottom: 6 }]}>
+                            Karaka {row.planet}: {row.sign_name || '—'}{row.house != null ? ` · H${row.house}` : ''}
+                          </Text>
+                        ))}
+                        {houseInsight.related_varga ? (
+                          <Text style={[styles.sectionDesc, { color: colors.text }]}>
+                            {houseInsight.related_varga.name}: {houseInsight.related_varga.sign_name || '—'}, lord {houseInsight.related_varga.lord || '—'}
+                            {houseInsight.related_varga.lord_house != null ? ` in H${houseInsight.related_varga.lord_house}` : ''}
+                            {houseInsight.related_varga.occupants?.length
+                              ? ` · ${houseInsight.related_varga.occupants.join(', ')}`
+                              : ' · empty'}
+                          </Text>
+                        ) : null}
+                      </View>
+                    ) : null}
 
                     {/* Extra padding for scroll */}
                     <View style={{ height: 40 }} />
@@ -1894,8 +2076,8 @@ const styles = StyleSheet.create({
   },
   activationExplorerCta: {
     marginHorizontal: 14,
-    marginTop: 16,
-    marginBottom: 24,
+    marginTop: 0,
+    marginBottom: 0,
     borderRadius: 22,
     borderWidth: 1,
     overflow: 'hidden',
@@ -1905,6 +2087,15 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.16,
     shadowRadius: 10,
+  },
+  chartCtaStack: {
+    marginHorizontal: 0,
+    marginTop: 16,
+    marginBottom: 24,
+    gap: 10,
+  },
+  chartOverviewCta: {
+    marginHorizontal: 14,
   },
   activationExplorerCtaGradient: {
     minHeight: 72,
@@ -2207,6 +2398,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: 8,
+  },
+  giverRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
+  giverChip: {
+    fontSize: 12,
+    fontWeight: '700',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    overflow: 'hidden',
   },
   mudakkuDetailGrid: {
     flexDirection: 'row',

@@ -81,7 +81,7 @@ def _iter_evidence(value: Any, path: str = ""):
         # Graph metadata is implementation detail, not answer-bearing evidence.
         for key, child in value.items():
             token = str(key)
-            if token in {"knowledge_graph_policy", "graph_tree", "charts", "calculator_bindings"}:
+            if token in {"knowledge_graph_policy", "graph_tree", "calculator_bindings"}:
                 continue
             yield from _iter_evidence(child, f"{path}.{token}" if path else token)
     elif isinstance(value, list):
@@ -177,6 +177,9 @@ def build_translated_astrology_contract(
         key=lambda row: (-int(row["score"]), PLANETS.index(row["planet"])),
     )[:anchor_limit]
     evidence_body = evidence.get("evidence") if isinstance(evidence.get("evidence"), Mapping) else {}
+    technical_reference_count = len(_TECHNICAL_RE.findall(
+        json.dumps(evidence_body, ensure_ascii=False, default=str)
+    ))
     remedy_blueprint = (
         evidence_body.get("remedy_blueprint")
         if isinstance(evidence_body.get("remedy_blueprint"), Mapping)
@@ -218,6 +221,8 @@ def build_translated_astrology_contract(
         "exempt": exempt,
         "response_style": selected_style or ("technical" if technical_requested else "simple"),
         "technical_detail_allowed": technical_requested,
+        "technical_evidence_available": technical_reference_count > 0,
+        "minimum_technical_references": 2 if technical_requested and technical_reference_count > 1 else 1 if technical_requested and technical_reference_count else 0,
         "minimum_planet_reasons": 1 if required else 0,
         # Technical is allowed to name every evidence-bearing planet required
         # by its D1/divisional/KP/dasha/transit explanation. The two-planet
@@ -239,10 +244,12 @@ def build_translated_astrology_contract(
             "A planet name is not permission to add generic folklore; every effect must remain tied to its source_fact."
         ),
         "technical_terms_rule": (
-            "TECHNICAL STYLE IS SELECTED. Explain the same verdict with the relevant supplied houses, lords, "
+            "TECHNICAL STYLE IS SELECTED. A visibly technical explanation is mandatory, not optional. Explain the "
+            "same verdict with the relevant supplied houses, lords, "
             "nakshatras, divisional charts, dasha levels, KP significators and transits. Define or briefly translate "
             "specialist terms as you use them. Use only details present in the supplied evidence. Do not expose graph "
-            "names, ontology versions, internal IDs, scores, JSON, routing rules or hidden calculation machinery. "
+            "names, ontology versions, internal IDs, scores, JSON, routing rules or hidden calculation machinery. Include "
+            "at least the required number of visible technical references from the supplied evidence. "
             "This style instruction overrides generic requests elsewhere in the prompt to hide specialist terms."
             if technical_requested else
             "SIMPLE STYLE IS SELECTED. Keep chart codes, dasha-level names, house numbers, degrees and specialist "
@@ -304,6 +311,13 @@ def validate_translated_astrology_answer(answer: str, contract: Mapping[str, Any
         errors.append(f"too many planet reasons: {len(mentioned)} (maximum {maximum})")
     if not contract.get("technical_detail_allowed") and _TECHNICAL_RE.search(visible):
         errors.append("technical astrology leaked into the main answer")
+    if contract.get("technical_detail_allowed") and contract.get("technical_evidence_available"):
+        technical_references = _TECHNICAL_RE.findall(visible)
+        minimum = int(contract.get("minimum_technical_references") or 1)
+        if len(technical_references) < minimum:
+            errors.append(
+                f"technical style missing supplied technical explanation: {len(technical_references)} reference(s), minimum {minimum}"
+            )
     return errors
 
 

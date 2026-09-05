@@ -13,7 +13,7 @@
   width: min(520px, 100%);
   max-height: min(88vh, 820px);
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   background: #fffcf8;
   border-radius: 18px 18px 0 0;
   box-shadow: 0 -12px 40px rgba(40, 20, 10, 0.22);
@@ -34,8 +34,67 @@
   grid-template-columns: auto 1fr auto;
   gap: 0.65rem;
   align-items: center;
-  padding: 0.55rem 0.9rem 0.7rem;
+  padding: 0.55rem 0.9rem 0.45rem;
   border-bottom: 1px solid rgba(70, 45, 35, 0.1);
+}
+
+.house-insight-jump {
+  display: flex;
+  gap: 0.3rem;
+  overflow-x: auto;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid rgba(70, 45, 35, 0.08);
+  background: #fff8f1;
+}
+
+.house-insight-jump button {
+  flex: 0 0 auto;
+  border: 1px solid rgba(70, 45, 35, 0.12);
+  background: #fff;
+  color: #5c4a42;
+  font-size: 0.68rem;
+  font-weight: 750;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.house-insight-givers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  margin-top: 0.4rem;
+}
+
+.house-insight-givers span {
+  font-size: 0.62rem;
+  font-weight: 750;
+  padding: 0.12rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(70, 45, 35, 0.1);
+}
+
+.house-insight-sec--fold summary {
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b5c54;
+  list-style: none;
+}
+
+.house-insight-sec--fold summary::-webkit-details-marker {
+  display: none;
+}
+
+.house-insight-sec--fold[open] summary {
+  margin-bottom: 0.4rem;
+}
+
+.house-insight-sec--fold h3 {
+  margin-top: 0.55rem;
 }
 
 .house-insight-badge {
@@ -84,6 +143,7 @@
   padding: 0.55rem 0.65rem;
   border-radius: 12px;
   background: rgba(70, 45, 35, 0.035);
+  scroll-margin-top: 0.4rem;
 }
 
 .house-insight-sec--warn { background: rgba(249, 115, 22, 0.08); }

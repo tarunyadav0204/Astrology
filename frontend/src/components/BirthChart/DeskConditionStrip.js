@@ -173,9 +173,14 @@ export default function DeskConditionStrip({ birthData, chartData, label = 'Cond
       if (gan) tags.push(ganNak ? `Gan · ${nakshatraShort(ganNak)}` : 'Gan');
       const d9Sign = d9?.planets?.[name]?.sign;
       if (typeof d9Sign === 'number' && d9Sign === data.sign) tags.push('VG');
-      const dig = getPlanetDignity(name, data.sign);
+      const dig = getPlanetDignity(
+        name,
+        data.sign,
+        typeof data.degree === 'number' ? data.degree : (Number(data.longitude) % 30)
+      );
       if (dig === 'Exalted') tags.push('Ex');
       if (dig === 'Debilitated') tags.push('Deb');
+      if (dig === 'Moolatrikona') tags.push('MT');
       const av = baladiShort(
         typeof data.degree === 'number' ? data.degree : (Number(data.longitude) % 30),
         data.sign
@@ -200,7 +205,7 @@ export default function DeskConditionStrip({ birthData, chartData, label = 'Cond
         title: titleParts.filter(Boolean).join(' · '),
         tone: combustSet.has(name) || dig === 'Debilitated' || av === 'Mrit' || gan
           ? 'warn'
-          : dig === 'Exalted' || tags.includes('VG')
+          : dig === 'Exalted' || dig === 'Moolatrikona' || tags.includes('VG')
             ? 'good'
             : 'neutral',
       });

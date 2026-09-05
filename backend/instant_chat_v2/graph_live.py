@@ -51,6 +51,10 @@ from .home_graph_runtime import (
     build_home_graph_route, compare_home_graph_policy, is_home_category,
     resolve_home_graph_inputs,
 )
+from .foreign_graph_runtime import (
+    build_foreign_graph_route, compare_foreign_graph_policy,
+    is_foreign_category, resolve_foreign_graph_inputs,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -212,6 +216,10 @@ def resolve_live_graph_policy(
         domain, resolver, comparator, reviewer = (
             "children", resolve_children_graph_inputs, compare_children_graph_policy, build_children_graph_route,
         )
+    elif is_foreign_category(category):
+        domain, resolver, comparator, reviewer = (
+            "foreign_life", resolve_foreign_graph_inputs, compare_foreign_graph_policy, build_foreign_graph_route,
+        )
     elif is_home_category(category):
         domain, resolver, comparator, reviewer = (
             "home_property", resolve_home_graph_inputs, compare_home_graph_policy, build_home_graph_route,
@@ -298,6 +306,13 @@ def apply_live_graph_policy(
             "conception_timing", "childbirth_timing", "first_child", "subsequent_child",
             "assisted_conception_timing", "adoption_timing", "parenthood_vs_career_timing",
             "parent_child_reconciliation_timing", "retrospective_child_timing",
+        }
+    ) or bool(
+        policy.get("domain") == "foreign_life"
+        and str(policy.get("runtime_key") or "") in {
+            "short_travel_timing", "long_travel_timing", "retrospective_travel",
+            "domestic_relocation_timing", "foreign_travel_timing", "foreign_residence_timing",
+            "settlement_timing", "visa_timing", "return_home_timing",
         }
     ) or bool(
         policy.get("domain") == "home_property"
@@ -686,6 +701,170 @@ def apply_live_graph_policy(
             verdict["ranked_windows"] = compact_windows
             verdict["requested_window_assessment"] = compact_requested
             result["verdict"] = verdict
+    if bool(policy.get("live")) and policy.get("domain") == "foreign_life":
+        runtime_key=str(policy.get("runtime_key") or "foreign_overview")
+        normalized=context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"),Mapping) else {}
+        foundation=normalized.get("foreign_foundation") if isinstance(normalized.get("foreign_foundation"),Mapping) else {}
+        timing=foundation.get("timing_synthesis") if isinstance(foundation.get("timing_synthesis"),Mapping) else {}
+        birth_summary=context.get("birth_summary") if isinstance(context.get("birth_summary"),Mapping) else {}
+        ascendant_value=birth_summary.get("ascendant")
+        if isinstance(ascendant_value,Mapping):
+            native_ascendant=str(ascendant_value.get("sign") or ascendant_value.get("name") or "").strip()
+        else:
+            native_ascendant=str(ascendant_value or "").strip()
+        zodiac_match=re.search(
+            r"\b(Aries|Taurus|Gemini|Cancer|Leo|Virgo|Libra|Scorpio|Sagittarius|Capricorn|Aquarius|Pisces)\b",
+            native_ascendant,
+            re.IGNORECASE,
+        )
+        native_ascendant=zodiac_match.group(1).title() if zodiac_match else ""
+        foundation_text=str(foundation).lower()
+        allowed_special_claim_terms=[
+            term for term in ("yogi", "avayogi", "gandanta", "tithi-shunya", "dagdha")
+            if term in foundation_text
+        ]
+        def compact_foreign_window(value: Mapping[str,Any] | None) -> dict[str,Any]:
+            row=value if isinstance(value,Mapping) else {}
+            raw_peaks=row.get("route_peak_windows") or row.get("transit_confirmation") or []
+            peaks=[]
+            for peak in list(raw_peaks)[:2]:
+                if not isinstance(peak,Mapping):
+                    continue
+                peaks.append({
+                    key:peak.get(key) for key in (
+                        "start","end","planet","strength","activated_focus_houses","why",
+                    ) if peak.get(key) not in (None,"",[],{})
+                })
+            return {
+                key:item for key,item in {
+                    "start":row.get("start"),"end":row.get("end"),
+                    "mahadasha":row.get("mahadasha"),"antardasha":row.get("antardasha"),
+                    "pratyantardasha":row.get("pratyantardasha"),
+                    "activated_focus_houses":list(row.get("activated_focus_houses") or [])[:8],
+                    "route_success_coverage":list(row.get("route_success_coverage") or [])[:8],
+                    "transit_confirmed":row.get("transit_confirmed"),
+                    "why":str(row.get("why") or "")[:500],
+                    "transit_confirmation":peaks,
+                    "claim_rule":row.get("claim_rule"),
+                }.items() if item not in (None,"",[],{})
+            }
+        compact_windows=[
+            compact_foreign_window(row)
+            for row in list(timing.get("timing_windows") or [])[:3]
+            if isinstance(row,Mapping)
+        ]
+        raw_kp=timing.get("kp_fructification") if isinstance(timing.get("kp_fructification"),Mapping) else {}
+        compact_timing={
+            "verdict":timing.get("verdict"),
+            "dasha_evaluation_complete":timing.get("dasha_evaluation_complete"),
+            "transit_evaluation_complete":timing.get("transit_evaluation_complete"),
+            "kp_fructification":{
+                key:raw_kp.get(key) for key in (
+                    "complete","verdict","supported_cusps","required_cusps","cusp_judgments","rule",
+                ) if raw_kp.get(key) not in (None,"",[],{})
+            },
+            "timing_windows":compact_windows,
+            "next_window":compact_windows[0] if compact_windows else {},
+        }
+        timing_route=runtime_key in {
+            "short_travel_timing","long_travel_timing","retrospective_travel","domestic_relocation_timing",
+            "foreign_travel_timing","foreign_residence_timing","settlement_timing","visa_timing","return_home_timing",
+        }
+        boundary_permissions={
+            "location_recommendation_handoff":"foreign_location_handoff",
+            "legal_immigration_handoff":"foreign_legal_handoff",
+            "muhurat_handoff":"foreign_muhurat_handoff",
+            "travel_safety_handoff":"foreign_safety_handoff",
+            "other_person_handoff":"foreign_other_person_handoff",
+        }
+        if runtime_key in boundary_permissions:
+            compact_policy["claim_permission"]=boundary_permissions[runtime_key]
+        foreign_rules={
+            "runtime_key":runtime_key,
+            "timing_route":timing_route,
+            "native_ascendant":native_ascendant,
+            "allowed_special_claim_terms":allowed_special_claim_terms,
+            "primary_evidence":"evidence.foreign_foundation",
+            "route_synthesis":foundation.get("route_synthesis") or {},
+            "fact_contract":(
+                (foundation.get("route_synthesis") or {}).get("fact_contract")
+                if isinstance(foundation.get("route_synthesis"), Mapping) else {}
+            ) or {},
+            "technical_output_contract":{
+                "form":"connected explanatory prose, not a chart-fact inventory",
+                "maximum_core_facts":3,
+                "required_flow":[
+                    "give the real-world verdict in plain language",
+                    "explain one decisive D1 mechanism by connecting the supplied lord/placement to the life meanings of both houses",
+                    "weigh one materially different support or pressure so the reader understands why the verdict is supportive, qualified or pressured",
+                    "synthesize the required divisional chart as confirmation or qualification; do not report its rows as a list",
+                    "translate the combined evidence into what it means for the requested travel, residence or settlement question",
+                ],
+                "forbidden_forms":[
+                    "three or more consecutive sentences shaped as 'D-chart: H-house fact'",
+                    "a standalone dignity statement without explaining why that dignity matters to the route",
+                    "listing every relevant house, planet, aspect or divisional chart",
+                    "internal methodology language such as 'these links show activation and its direction'",
+                    "ending the proof without a synthesis of how the factors combine",
+                ],
+            },
+            "timing_synthesis":compact_timing if timing_route else {},
+            "required_order":[
+                "answer the exact travel, relocation, residence, visa or settlement question",
+                "add one brief human bridge about what the result means for belonging, disruption, uncertainty or readiness, without inventing the user's feelings",
+                "state the D1 route promise from the required house combination",
+                "use D3 for movement, D4 for residence, D9 for long distance and D12 for rootedness/separation only where the selected route requires them",
+                "state how the required divisional charts confirm or qualify the route",
+                "for timing only, use complete KP fructification, route-filtered dasha activation and dated transit confirmation",
+                "give one grounded practical implication without promising an official or life outcome",
+            ],
+            "forbidden_moves":[
+                "Never establish foreign travel, residence or settlement from House 12 or Rahu alone.",
+                "Never convert evidence for travel into evidence for residence or permanent settlement.",
+                "Never call a chart supportive merely because it was calculated.",
+                "Never guarantee a visa, immigration approval, permanent settlement, safety or legal outcome.",
+                "Never introduce timing, dasha, transit or dates on a static route.",
+                "Never use a date absent from timing_synthesis.timing_windows.",
+                "Never answer a foreign-career, foreign-study or foreign-spouse question as a generic settlement question.",
+            ],
+            "human_bridge_rules":{
+                "required":True,
+                "length":"one or two natural sentences",
+                "grounding":"derive only from the route verdict, residence continuity, movement pressure and timing result",
+                "allowed":"acknowledge the emotional weight of leaving, belonging, waiting, restarting or maintaining roots",
+                "forbidden":"invented emotions, family pressure, trauma, psychological diagnosis, canned empathy or dependency language",
+            },
+            "fact_gate":(
+                "Every ascendant, lord, dignity, occupant, aspect and special-condition claim must exactly match "
+                "foreign_foundation.charts. Every causal planet claim must name its supplied chart, house and role; "
+                "omit any fact or inferred trait that is not supplied there."
+            ),
+        }
+        compact_policy["foreign_answer_rules"]=foreign_rules
+        answer_spec["foreign_answer_rules"]=foreign_rules
+        compact_policy["instruction"]=(
+            "Use the calculated Foreign Life foundation as the sole answer-bearing source. Keep movement, domestic "
+            "relocation, foreign travel, residence and permanent settlement distinct. D3 confirms movement, D4 "
+            "residence, D9 long distance and D12 rootedness/separation; no one chart or Rahu alone proves the result."
+        )
+        if timing_route:
+            # Keep only route-filtered calculated windows in the composer
+            # contract; the full scan remains in the audit packet.
+            windows=compact_windows
+            event_rules=dict(answer_spec.get("event_rules") or {})
+            event_rules["allowed_timing_windows"]=windows
+            event_rules["required_material_windows"]=windows[:2]
+            event_rules["window_answer_rule"]=(
+                "Lead with timing_synthesis.next_window. If KP is supported, call it the next supported window. If "
+                "KP is pressured or unsupported, still give its dates as the strongest conditional calculated window "
+                "and immediately state that KP does not fully confirm departure. Never replace the requested dates "
+                "with the current dasha or preparation advice."
+            )
+            answer_spec["event_rules"]=event_rules
+            verdict=dict(result.get("verdict") or {})
+            verdict["direction"]=timing.get("verdict") or (foundation.get("route_synthesis") or {}).get("verdict")
+            verdict["ranked_windows"]=windows
+            result["verdict"]=verdict
     if bool(policy.get("live")) and wealth_route:
         runtime_key = str(policy.get("runtime_key") or "")
         normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
@@ -1509,6 +1688,202 @@ def enforce_live_graph_answer(
         return "A Vastu assessment needs the home’s actual plan, orientation, entrance and room placement. A birth-chart Property reading cannot certify a building as Vastu compliant."
     if home_key == "property_business_handoff":
         return "A real-estate business question needs the Career and Wealth analysis, including business aptitude and financial-risk evidence. The Home and Property graph only assesses personal home and property themes."
+    foreign_boundary = str(policy.get("claim_permission") or "")
+    if foreign_boundary == "foreign_location_handoff":
+        return "An open-ended best-country or best-city recommendation needs the dedicated Location flow with an explicit scope and comparable places. This chart route can compare named options, but it should not invent a destination from the whole world."
+    if foreign_boundary == "foreign_legal_handoff":
+        return "A birth chart cannot determine legal eligibility or guarantee a visa or immigration approval. Please verify the current rules and your documents with the relevant immigration authority or a qualified adviser; I can discuss only the chart's non-legal timing and relocation themes."
+    if foreign_boundary == "foreign_muhurat_handoff":
+        return "Choosing an exact departure, filing or relocation date requires the dedicated Muhurat flow with the actual location, timezone and Panchang conditions. A natal Foreign Life reading alone cannot rank exact dates."
+    if foreign_boundary == "foreign_safety_handoff":
+        return "A birth chart cannot guarantee that a trip will be safe or replace official travel, weather, health or security guidance. Use current advisories and practical precautions; I can discuss only non-safety travel themes."
+    if foreign_boundary == "foreign_other_person_handoff":
+        return "Your chart cannot reliably determine another adult's travel, residence or settlement outcome. That question needs their own birth chart and consent; this reading can only discuss how their move may affect your experience."
+    foreign_rules = (
+        policy.get("foreign_answer_rules")
+        if isinstance(policy.get("foreign_answer_rules"), Mapping)
+        else {}
+    )
+    if policy.get("domain") == "foreign_life" and foreign_rules:
+        # The Foreign Life writer is allowed to interpret only the calculated
+        # route ledger. Drop a sentence rather than cosmetically replacing a
+        # wrong sign: a sentence that says "Mercury for Virgo ascendant" still
+        # contains a false lordship after Virgo is changed to Cancer.
+        zodiac_pattern = re.compile(
+            r"\b(Aries|Taurus|Gemini|Cancer|Leo|Virgo|Libra|Scorpio|Sagittarius|Capricorn|Aquarius|Pisces)\b",
+            re.IGNORECASE,
+        )
+        expected_ascendant = str(foreign_rules.get("native_ascendant") or "").strip().lower()
+        allowed_special = {
+            str(value).strip().lower()
+            for value in foreign_rules.get("allowed_special_claim_terms") or []
+        }
+        unsupported_special_pattern = re.compile(
+            r"\b(Yogi|Avayogi|Gandanta|Tithi[- ]Shunya|Dagdha)\b",
+            re.IGNORECASE,
+        )
+        static_timing_pattern = re.compile(
+            r"\b(dasha|mahadasha|antardasha|pratyantardasha|transit|currently active|active period|"
+            r"current\b.{0,80}\bperiod|"
+            r"(?:Sun|Moon|Mars|Mercury|Jupiter|Venus|Saturn|Rahu|Ketu)\s*[-–—]\s*"
+            r"(?:Sun|Moon|Mars|Mercury|Jupiter|Venus|Saturn|Rahu|Ketu)(?:\s*[-–—]\s*"
+            r"(?:Sun|Moon|Mars|Mercury|Jupiter|Venus|Saturn|Rahu|Ketu))?)\b",
+            re.IGNORECASE,
+        )
+        planet_pattern = re.compile(
+            r"\b(Sun|Moon|Mars|Mercury|Jupiter|Venus|Saturn|Rahu|Ketu)\b",
+            re.IGNORECASE,
+        )
+        explicit_planet_fact_pattern = re.compile(
+            r"\bD(?:1|3|4|9|10|12)\b.{0,100}\b(?:H(?:ouse)?\s*\d+|\d+(?:st|nd|rd|th)\s+house)\b"
+            r"|\b(?:H(?:ouse)?\s*\d+|\d+(?:st|nd|rd|th)\s+house)\b.{0,100}\bD(?:1|3|4|9|10|12)\b",
+            re.IGNORECASE,
+        )
+        invented_planet_meaning_pattern = re.compile(
+            r"\b(?:hunger|pull|urge)\s+(?:toward|towards|for)\s+(?:the\s+)?(?:foreign|unfamiliar|distant)"
+            r"|\b(?:confidence|recognition|authority)\b",
+            re.IGNORECASE,
+        )
+        fact_contract = (
+            foreign_rules.get("fact_contract")
+            if isinstance(foreign_rules.get("fact_contract"), Mapping) else {}
+        )
+        route_synthesis = (
+            foreign_rules.get("route_synthesis")
+            if isinstance(foreign_rules.get("route_synthesis"), Mapping) else {}
+        )
+        planet_directions = {
+            str(row.get("planet") or "").lower():str(row.get("net_direction") or "")
+            for row in route_synthesis.get("planet_contributions") or []
+            if isinstance(row, Mapping) and row.get("planet")
+        }
+        visible_rules = spec.get("visible_astrology") if isinstance(spec.get("visible_astrology"), Mapping) else {}
+        technical_answer = bool(visible_rules.get("technical_detail_allowed"))
+        excluded_direct_houses = {
+            int(value) for value in fact_contract.get("excluded_direct_houses") or []
+            if str(value).isdigit()
+        }
+        fact_contract_violated = False
+        retained_sentences = []
+        for sentence in re.split(r"(?<=[.!?])\s+", clean_answer):
+            if not sentence.strip():
+                continue
+            if re.search(r"\bascendant\b", sentence, re.IGNORECASE) and expected_ascendant:
+                named_signs = {match.group(1).lower() for match in zodiac_pattern.finditer(sentence)}
+                if named_signs and (expected_ascendant not in named_signs or any(
+                    sign != expected_ascendant for sign in named_signs
+                )):
+                    continue
+            unsupported_terms = {
+                match.group(1).lower().replace(" ", "-")
+                for match in unsupported_special_pattern.finditer(sentence)
+            }
+            if any(term not in allowed_special for term in unsupported_terms):
+                continue
+            if not foreign_rules.get("timing_route") and static_timing_pattern.search(sentence):
+                continue
+            if not foreign_rules.get("timing_route") and planet_pattern.search(sentence):
+                named_planets={match.group(1).lower() for match in planet_pattern.finditer(sentence)}
+                missing_planets={planet for planet in named_planets if planet not in planet_directions}
+                positive_claim=bool(re.search(r"\b(?:support|supportive|favour|favor|help|strengthen|promise)\w*\b",sentence,re.IGNORECASE))
+                unqualified_mixed=any(
+                    planet_directions.get(planet)=="mixed" for planet in named_planets
+                ) and positive_claim and not re.search(r"\b(?:mixed|qualified|but|however|also|while)\b",sentence,re.IGNORECASE)
+                direction_conflict=any(
+                    planet_directions.get(planet)=="challenging" for planet in named_planets
+                ) and positive_claim
+                # Technical prose must expose the exact chart/house binding.
+                # Simple prose may translate it, but the planet must exist in
+                # the route ledger and its direction cannot be reversed.
+                if (
+                    invented_planet_meaning_pattern.search(sentence)
+                    or missing_planets
+                    or direction_conflict
+                    or unqualified_mixed
+                    or (technical_answer and not explicit_planet_fact_pattern.search(sentence))
+                ):
+                    fact_contract_violated = True
+                    continue
+            if excluded_direct_houses and any(
+                re.search(rf"\b(?:H(?:ouse)?\s*{house}|{house}(?:st|nd|rd|th)\s+house)\b", sentence, re.IGNORECASE)
+                for house in excluded_direct_houses
+            ):
+                fact_contract_violated = True
+                continue
+            retained_sentences.append(sentence)
+        filtered_answer = " ".join(retained_sentences).strip()
+        if filtered_answer:
+            clean_answer = filtered_answer
+        if foreign_rules.get("timing_route"):
+            timing = foreign_rules.get("timing_synthesis") if isinstance(foreign_rules.get("timing_synthesis"), Mapping) else {}
+            next_window = timing.get("next_window") if isinstance(timing.get("next_window"), Mapping) else {}
+            if next_window.get("start") and next_window.get("end"):
+                def format_foreign_date(value: Any) -> str:
+                    try:
+                        return datetime.strptime(str(value)[:10], "%Y-%m-%d").strftime("%d %B %Y").lstrip("0")
+                    except (TypeError, ValueError):
+                        return str(value or "")
+
+                start_text = format_foreign_date(next_window.get("start"))
+                end_text = format_foreign_date(next_window.get("end"))
+                expected_year = str(next_window.get("start") or "")[:4]
+                start_month = start_text.split()[1] if len(start_text.split()) >= 2 else ""
+                end_month = end_text.split()[1] if len(end_text.split()) >= 2 else ""
+                names_window = bool(
+                    expected_year
+                    and expected_year in clean_answer
+                    and start_month.lower() in clean_answer.lower()
+                    and end_month.lower() in clean_answer.lower()
+                )
+                evades_timing = bool(re.search(
+                    r"\b(?:no (?:clear|specific|dated) (?:window|timing)|cannot (?:give|identify)|"
+                    r"doesn['’]?t yet show (?:the )?(?:clear|dated)|green light not fully)\b",
+                    clean_answer,
+                    re.IGNORECASE,
+                ))
+                if not names_window or evades_timing:
+                    labels = {
+                        "short_travel_timing": "short-distance travel",
+                        "long_travel_timing": "long-distance travel",
+                        "retrospective_travel": "past travel",
+                        "domestic_relocation_timing": "domestic relocation",
+                        "foreign_travel_timing": "foreign travel",
+                        "foreign_residence_timing": "foreign residence",
+                        "settlement_timing": "permanent settlement",
+                        "visa_timing": "visa-related progress",
+                        "return_home_timing": "returning home",
+                    }
+                    event_label = labels.get(str(foreign_rules.get("runtime_key") or ""), "the requested foreign-life event")
+                    kp = timing.get("kp_fructification") if isinstance(timing.get("kp_fructification"), Mapping) else {}
+                    conditional = str(kp.get("verdict") or "").lower() != "supported"
+                    peak_rows = next_window.get("transit_confirmation") if isinstance(next_window.get("transit_confirmation"), list) else []
+                    peak = peak_rows[0] if peak_rows and isinstance(peak_rows[0], Mapping) else {}
+                    peak_text = ""
+                    if peak.get("start") and peak.get("end"):
+                        peak_text = (
+                            f" The sharpest transit concentration inside it is {format_foreign_date(peak.get('start'))} "
+                            f"to {format_foreign_date(peak.get('end'))}."
+                        )
+                    technical = spec.get("visible_astrology") if isinstance(spec.get("visible_astrology"), Mapping) else {}
+                    chain = "–".join(
+                        str(next_window.get(key) or "")
+                        for key in ("mahadasha", "antardasha", "pratyantardasha")
+                        if next_window.get(key)
+                    )
+                    houses = ", ".join(f"H{value}" for value in next_window.get("activated_focus_houses") or [])
+                    if technical.get("technical_detail_allowed") and chain:
+                        mechanism = f" Technically, the {chain} MD–AD–PD chain activates {houses or 'the route houses'} with dated transit reinforcement."
+                    else:
+                        mechanism = " The dasha and transit calculations converge most strongly in that period."
+                    qualification = (
+                        " This is the strongest conditional window, not a confirmed departure prediction, because the KP cusp test does not fully support fructification."
+                        if conditional else
+                        " This is the next fully supported calculated window, though it is not a guaranteed real-world outcome."
+                    )
+                    clean_answer = (
+                        f"The strongest calculated window for {event_label} is {start_text} to {end_text}."
+                        f"{peak_text}{qualification}{mechanism} What concrete opportunity, application, or deadline are you working toward?"
+                    )
     if policy.get("fallback_to_deeper_mode"):
         return _deeper_mode_fallback(language)
     if policy.get("claim_permission") == "no_specific_meeting_story":

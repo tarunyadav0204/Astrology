@@ -359,7 +359,8 @@
   margin-top: 0;
 }
 
-.parashari-desk-tools__meta .desk-lag--strip {
+.parashari-desk-tools__meta .desk-lag--strip,
+.parashari-desk-tools__meta .desk-ck--strip {
   flex: 0 1 auto;
   border-left: 1px solid var(--pd-line);
   padding-left: 0.55rem;
@@ -578,6 +579,24 @@
   flex-shrink: 1;
   min-width: 0;
   opacity: 0.9;
+}
+
+.parashari-desk-panel__cta,
+.parashari-desk-overview-cta {
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 28%, transparent);
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.parashari-desk-overview-cta {
+  align-self: center;
 }
 
 .parashari-desk-chart {

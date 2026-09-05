@@ -3,9 +3,13 @@ from .base_calculator import BaseCalculator
 class HouseAnalyzer(BaseCalculator):
     """Comprehensive house analyzer - reusable for any house analysis"""
     
-    def __init__(self, chart_data=None, birth_data=None):
+    def __init__(self, chart_data=None, birth_data=None, *, shadbala_chart_data=None):
         super().__init__(chart_data or {})
         self.birth_data = birth_data
+        # Classical Shadbala is always a D1 + varga worksheet. When the house
+        # being read is D9/transit, keep that slice for occupancy and pass natal
+        # D1 with D2/D3/D7/D9/D12/D30 as shadbala_chart_data.
+        self.shadbala_chart_data = shadbala_chart_data if shadbala_chart_data is not None else chart_data
         
         # Initialize existing calculators
         from .planet_analyzer import PlanetAnalyzer
@@ -15,7 +19,11 @@ class HouseAnalyzer(BaseCalculator):
         from .aspect_calculator import AspectCalculator
         from .gandanta_calculator import GandantaCalculator
         
-        self.planet_analyzer = PlanetAnalyzer(chart_data, birth_data)
+        self.planet_analyzer = PlanetAnalyzer(
+            chart_data,
+            birth_data,
+            shadbala_chart_data=self.shadbala_chart_data,
+        )
         self.house_strength_calc = HouseStrengthCalculator(chart_data)
         self.yogi_calc = YogiCalculator(chart_data)
         self.badhaka_calc = BadhakaCalculator(chart_data)
@@ -193,7 +201,7 @@ class HouseAnalyzer(BaseCalculator):
         from .shadbala_calculator import ShadbalaCalculator
         from .argala_calculator import ArgalaCalculator
         
-        shadbala_calc = ShadbalaCalculator(self.chart_data, self.birth_data)
+        shadbala_calc = ShadbalaCalculator(self.shadbala_chart_data, self.birth_data)
         argala_calc = ArgalaCalculator(self.chart_data, self.birth_data)
         
         # Get real Shadbala data

@@ -285,6 +285,12 @@ class HouseInsightRequest(BaseModel):
     transit_date: Optional[str] = None
 
 
+class ChartOverviewRequest(BaseModel):
+    birth_data: Dict[str, Any]
+    chart_id: str = "lagna"
+    transit_date: Optional[str] = None
+
+
 def _birth_hash_from_dict(birth_data: Dict[str, Any]) -> Optional[str]:
     return birth_hash_from_parts(
         birth_data.get("date"),
@@ -527,6 +533,30 @@ async def chart_house_insight(
         raise
     except Exception as e:
         print(f"❌ chart_house_insight failed: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/chart-overview")
+async def chart_overview(
+    request: ChartOverviewRequest,
+    http_request: Request,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """Build a calculator-backed whole-chart comparison payload. Public for guest chart viewing."""
+    try:
+        if current_user is None:
+            _enforce_guest_chart_only_rate_limit(http_request)
+        from charts.chart_overview_service import build_chart_overview
+        return build_chart_overview(
+            birth_data=request.birth_data,
+            chart_id=request.chart_id,
+            transit_date=request.transit_date,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ chart_overview failed: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 

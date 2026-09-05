@@ -721,6 +721,17 @@ export const chartAPI = {
         throw error;
       });
   },
+  getChartOverview: (birthData, chartId = 'lagna', transitDate = new Date().toISOString().split('T')[0]) => {
+    return api.post(getEndpoint('/chart-overview'), {
+      birth_data: birthData,
+      chart_id: chartId,
+      transit_date: transitDate,
+    }).then((response) => response)
+      .catch((error) => {
+        console.error('getChartOverview error:', error?.response?.data || error);
+        throw error;
+      });
+  },
   getSadeSatiPeriods: (birthData) => {
     const transitDate = new Date().toISOString().split('T')[0];
     return api.post(getEndpoint('/transits/sade-sati-periods'), { birth_data: birthData, transit_date: transitDate })

@@ -28,6 +28,12 @@ from instant_chat_v2.children import (
     is_children_category,
 )
 from instant_chat_v2.home import BOUNDARY_HOME_SUBTYPES, TIMING_HOME_SUBTYPES, home_profile, is_home_category, normalize_home_subtype
+from instant_chat_v2.foreign import (
+    BOUNDARY_SUBTYPES as BOUNDARY_FOREIGN_SUBTYPES,
+    TIMING_SUBTYPES as TIMING_FOREIGN_SUBTYPES,
+    foreign_profile,
+    is_foreign_category,
+)
 from utils.admin_settings import (
     CHAT_LLM_DEEPSEEK,
     get_instant_chat_llm_provider,
@@ -126,6 +132,9 @@ _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY: dict[str, list[str]] = {
     "travel": ["D1", "D3", "D9"],
     "foreign": ["D1", "D9", "D12"],
     "visa": ["D1", "D9", "D12"],
+    "immigration": ["D1", "D4", "D9", "D12"],
+    "location": ["D1", "D4", "D9", "D10", "D12"],
+    "relocation": ["D1", "D3", "D4"],
     "wealth": ["D1", "D9", "D10"],
     "money": ["D1", "D9", "D10"],
     "finance": ["D1", "D9", "D10"],
@@ -274,6 +283,20 @@ def apply_home_routing_guards(result: Dict[str, Any]) -> None:
         result["divisional_charts"] = ["D1", "D2", "D8"]
         result["required_divisional_charts"] = ["D1", "D2", "D8"]
         return
+    if normalized_subtype == "foreign_handoff":
+        # Compatibility transfer for older/stored router output. New prompts
+        # select a typed Foreign Life subtype directly, but this prevents a
+        # legacy Home handoff from producing the old generic refusal.
+        result["category"] = "foreign"
+        result["home_subtype"] = None
+        result["foreign_subtype"] = result.get("foreign_subtype") or "foreign_residence"
+        result["answer_mode"] = "potential_capacity"
+        result["route_action"] = "answer"
+        profile = foreign_profile("foreign", result["foreign_subtype"])
+        result["focus_houses"] = list(profile["houses"])
+        result["divisional_charts"] = list(profile["charts"])
+        result["required_divisional_charts"] = list(profile["charts"])
+        return
     # The multilingual semantic router and the Remedies CTA provide a
     # structured remedy flag. It takes precedence over a diagnosis subtype;
     # no backend keyword or language matching is needed here.
@@ -340,6 +363,81 @@ def apply_home_routing_guards(result: Dict[str, Any]) -> None:
         charts = ["D1", "D4", "D16"] if profile["subtype"].startswith("vehicle_") else ["D1", "D4"]
         result["divisional_charts"] = charts
         result["required_divisional_charts"] = charts
+
+
+def apply_foreign_routing_guards(result: Dict[str, Any]) -> None:
+    """Normalize the model-selected travel/relocation/foreign-life route."""
+    category = str(result.get("category") or "").strip().lower()
+    subtype = result.get("foreign_subtype")
+    if not is_foreign_category(category) and not subtype:
+        return
+    profile = foreign_profile(category, subtype)
+    raw_mode = str(result.get("answer_mode") or "").strip().lower()
+    timing_requested = raw_mode in {
+        "event_prediction", "event_timing", "lifetime_event_timing", "month_timing",
+        "timing_window", "daily_forecast",
+    } or bool(result.get("needs_transits") and not raw_mode)
+    if timing_requested:
+        timed = {
+            "short_travel": "short_travel_timing",
+            "long_travel": "long_travel_timing",
+            "domestic_relocation": "domestic_relocation_timing",
+            "foreign_travel": "foreign_travel_timing",
+            "foreign_residence": "foreign_residence_timing",
+            "permanent_settlement": "settlement_timing",
+            "visa_support": "visa_timing",
+            "return_home": "return_home_timing",
+        }.get(profile["subtype"])
+        if timed:
+            profile = foreign_profile(category, timed)
+    subtype = profile["subtype"]
+    result["category"] = (
+        "travel" if subtype.startswith(("short_travel", "long_travel", "travel_", "retrospective_travel"))
+        else "visa" if subtype.startswith("visa_")
+        else "location" if subtype.startswith("location_")
+        else "relocation" if subtype.startswith("domestic_relocation") or subtype in {"stay_vs_relocate", "temporary_vs_permanent"}
+        else "foreign"
+    )
+    result["foreign_subtype"] = subtype
+    result["focus_houses"] = list(profile["houses"])
+    canonical_mode = {
+        "foreign_overview": "topic_reading", "travel_tendency": "potential_capacity",
+        "short_travel": "potential_capacity", "long_travel": "potential_capacity",
+        "travel_purpose": "topic_reading", "travel_obstacles": "problem_diagnosis",
+        "domestic_relocation": "potential_capacity", "stay_vs_relocate": "comparison_choice",
+        "temporary_vs_permanent": "comparison_choice", "foreign_travel": "potential_capacity",
+        "foreign_residence": "potential_capacity", "permanent_settlement": "potential_capacity",
+        "visa_support": "potential_capacity", "migration_pathway": "topic_reading",
+        "return_home": "potential_capacity", "foreign_life_adjustment": "topic_reading",
+        "foreign_obstacles": "problem_diagnosis", "foreign_remedy": "remedy_action",
+        "location_comparison": "comparison_choice",
+    }.get(subtype)
+    if canonical_mode:
+        result["answer_mode"] = canonical_mode
+        result["needs_transits"] = False
+        # Static follow-ups must not inherit dates or timing requirements from
+        # a previous travel/settlement turn.
+        result.pop("period_window", None)
+        result.pop("transit_request", None)
+        result["required_evidence"] = [
+            value for value in result.get("required_evidence") or []
+            if not any(token in str(value).lower() for token in ("dasha", "transit", "timing_window"))
+        ]
+    if subtype in TIMING_FOREIGN_SUBTYPES:
+        result["needs_transits"] = True
+        if raw_mode not in {
+            "event_prediction", "event_timing", "lifetime_event_timing", "month_timing",
+            "timing_window", "daily_forecast",
+        }:
+            result["answer_mode"] = "event_prediction"
+    if subtype in BOUNDARY_FOREIGN_SUBTYPES:
+        result["answer_mode"] = "handoff"
+        result["route_action"] = "handoff"
+        result["divisional_charts"] = []
+        result["required_divisional_charts"] = []
+    else:
+        result["divisional_charts"] = list(profile["charts"])
+        result["required_divisional_charts"] = list(profile["charts"])
 
 
 _CHART_FOCUS_SYNONYMS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -1641,6 +1739,7 @@ class IntentRouter:
         apply_career_routing_guards(result)
         apply_education_routing_guards(result)
         apply_children_routing_guards(result)
+        apply_foreign_routing_guards(result)
         apply_home_routing_guards(result)
         if 'divisional_charts' not in result or not isinstance(result.get('divisional_charts'), list):
             result['divisional_charts'] = self._get_default_divisional_charts(result.get('category', 'general'))
@@ -1833,6 +1932,7 @@ class IntentRouter:
         apply_career_routing_guards(result)
         apply_education_routing_guards(result)
         apply_children_routing_guards(result)
+        apply_foreign_routing_guards(result)
         apply_home_routing_guards(result)
         apply_daily_micro_intent_guards(result)
 
@@ -1900,6 +2000,7 @@ class IntentRouter:
             apply_career_routing_guards(result)
             apply_education_routing_guards(result)
             apply_children_routing_guards(result)
+            apply_foreign_routing_guards(result)
             apply_home_routing_guards(result)
             if not isinstance(result.get("divisional_charts"), list):
                 result["divisional_charts"] = self._get_default_divisional_charts(result.get("category", "general"))
@@ -2071,7 +2172,8 @@ Calibration:
 - "Does my chart support completing a PhD?" -> category research, education_subtype research, answer_mode potential_capacity, education_target PhD.
 - An explicit education/exam/research remedy request -> category education, education_subtype education_remedies, answer_mode remedy_action, even when the named problem is concentration or exam anxiety.
 - For every children, conception, pregnancy, childbirth, adoption or parenthood question, set category progeny and set children_subtype semantically: children_overview, parenthood_capacity, conception_capacity, conception_timing, childbirth_timing, first_child_capacity, first_child, subsequent_child_capacity, subsequent_child, family_size_tendency, children_delay_diagnosis, assisted_conception, assisted_conception_timing, adoption_pathway, adoption_timing, step_parenthood, parenthood_decision, parenthood_vs_career, parenthood_vs_career_timing, parent_child_relationship, parent_child_reconciliation_timing, retrospective_child_timing, children_remedy, two_chart_children_handoff, child_chart_required_handoff, medical_safety_handoff, muhurat_handoff, legal_custody_handoff, or fetal_sex_refusal. Keep conception and childbirth as separate events. Static promise/capacity excludes timing; a when/month/year question uses the matching timing subtype. First-child and later-child promise use their capacity subtypes; their timing questions use first_child or subsequent_child. Joint-parent questions require two_chart_children_handoff; detailed claims about the child require child_chart_required_handoff; pregnancy symptoms, fertility diagnosis, miscarriage or pregnancy-health prediction require medical_safety_handoff; shortlisted electional dates require muhurat_handoff; custody outcomes require legal_custody_handoff; son/daughter or fetal-sex questions require fetal_sex_refusal. Never route a medical, fetal-sex, child-chart, custody or Muhurat boundary into ordinary progeny analysis.
-- For every home, property or vehicle question, set home_subtype semantically in every language: home_overview, living_arrangement, property_potential, property_purchase, property_purchase_timing, property_sale_decision, property_sale_timing, property_finance, property_comparison, property_type_fit, joint_property, rental_income, possession_documentation_timing, retrospective_property_timing, property_portfolio_comparison, property_obstacles, construction_renovation, construction_timing, relocation_home, relocation_timing, vehicle_potential, vehicle_selection, vehicle_timing, property_remedy, property_dispute_handoff, muhurat_handoff, foreign_handoff, vastu_handoff, or property_business_handoff. Vehicle ownership/capacity is vehicle_potential; a colour/colour-family recommendation is vehicle_selection with comparison_choice and no timing evidence; purchase timing is vehicle_timing only when the user asks when or names a period. Never carry vehicle_timing, needs_transits or a prior timing window into a new vehicle-selection request. A property dispute, court case, title/boundary/tenant/builder conflict, settlement or win/loss question is property_dispute_handoff: do not answer its legal outcome from the Property route. Electional property or vehicle dates are muhurat_handoff. Inheritance belongs to the Wealth graph: set category=inheritance and home_subtype=null; never route inheritance to Partnership or a Home UI handoff. An undated question such as "Will I inherit property?" is potential_capacity, while "When will I inherit?" uses timing. Foreign settlement/immigration is foreign_handoff. "Does my chart support relocation?" is the static domestic relocation_home route with comparison_choice; it is not foreign_handoff and does not request timing. Static property potential, home comfort and vehicle suitability never request timing. An undated capacity question such as "Will I be able to buy my first home?" or its equivalent in any language is property_potential/potential_capacity, not timing. Only a question asking when, now, this month/year, or naming a period selects the matching timing subtype and requests dasha, KP and transit evidence. Sell-versus-hold without a timeframe is property_sale_decision; repeated delays without a requested date are property_obstacles.
+- For every home, property or vehicle question, set home_subtype semantically in every language: home_overview, living_arrangement, property_potential, property_purchase, property_purchase_timing, property_sale_decision, property_sale_timing, property_finance, property_comparison, property_type_fit, joint_property, rental_income, possession_documentation_timing, retrospective_property_timing, property_portfolio_comparison, property_obstacles, construction_renovation, construction_timing, vehicle_potential, vehicle_selection, vehicle_timing, property_remedy, property_dispute_handoff, muhurat_handoff, foreign_handoff, vastu_handoff, or property_business_handoff. Domestic relocation now belongs to the Foreign Life domain, not Home. Vehicle ownership/capacity is vehicle_potential; a colour/colour-family recommendation is vehicle_selection with comparison_choice and no timing evidence; purchase timing is vehicle_timing only when the user asks when or names a period. Never carry vehicle_timing, needs_transits or a prior timing window into a new vehicle-selection request. A property dispute, court case, title/boundary/tenant/builder conflict, settlement or win/loss question is property_dispute_handoff. Electional property or vehicle dates are muhurat_handoff. Inheritance belongs to the Wealth graph. Static property potential, home comfort and vehicle suitability never request timing. Only a question asking when, now, this month/year, or naming a period selects the matching timing subtype and requests dasha, KP and transit evidence.
+- For every travel, relocation, visa, immigration, foreign-residence or settlement question, set foreign_subtype semantically in every language: foreign_overview, travel_tendency, short_travel, short_travel_timing, long_travel, long_travel_timing, travel_purpose, travel_obstacles, retrospective_travel, domestic_relocation, domestic_relocation_timing, stay_vs_relocate, temporary_vs_permanent, foreign_travel, foreign_travel_timing, foreign_residence, foreign_residence_timing, permanent_settlement, settlement_timing, visa_support, visa_timing, migration_pathway, return_home, return_home_timing, foreign_life_adjustment, foreign_obstacles, foreign_remedy, location_comparison, location_recommendation_handoff, legal_immigration_handoff, muhurat_handoff, travel_safety_handoff, or other_person_handoff. Keep travel, residence and permanent settlement distinct. Static support/capacity never requests timing; only an explicit when/period question uses a timing subtype. Country/city comparison with named options uses location_comparison; an open-ended best-country/city request uses location_recommendation_handoff. Legal eligibility, approval guarantees and application advice use legal_immigration_handoff; accident/safety guarantees use travel_safety_handoff; exact electional departure dates use muhurat_handoff; claims about another person's chart use other_person_handoff. Foreign career, foreign study and foreign spouse remain in their Career, Education and Marriage domains; use migration_pathway only when the question asks whether that pathway produces travel, residence or settlement.
 - Questions about living independently, living with family, domestic privacy, moving out, or the home arrangement that best supports the user are Home questions, never Career questions. Use category=property and home_subtype=living_arrangement; purchase/rental remains property_comparison.
 - "Should I take a loan to expand my business this year?" (and the same meaning in any language) -> READY, category debt, wealth_subtype loan_decision, answer_mode event_prediction, needs_transits true, timeframe this year. This asks whether new debt is advisable for a productive use; it is neither a static debt tendency nor merely loan-approval timing.
 - "Did I have a love or arranged marriage?" and the same meaning in any language -> READY, category marriage, marriage_subtype love_vs_arranged, answer_mode comparison_choice, route_action answer. This asks which natal pathway better matches an already-past marriage; it is not retrospective marriage-date discovery and must not request historical dasha or transit windows.
@@ -2122,6 +2224,7 @@ Return exactly this JSON shape:
   "education_subtype": "overall" or "education_timing" or "learning_style" or "subject_fit" or "course_comparison" or "higher_education" or "higher_education_timing" or "exam_capacity" or "exam_timing" or "admission_capacity" or "admission_timing" or "scholarship" or "research" or "research_timing" or "foreign_study" or "foreign_study_timing" or "education_obstacles" or "education_resume" or "education_vs_work" or "education_remedies" or null,
   "children_subtype": "children_overview" or "parenthood_capacity" or "conception_capacity" or "conception_timing" or "childbirth_timing" or "first_child_capacity" or "first_child" or "subsequent_child_capacity" or "subsequent_child" or "family_size_tendency" or "children_delay_diagnosis" or "assisted_conception" or "assisted_conception_timing" or "adoption_pathway" or "adoption_timing" or "step_parenthood" or "parenthood_decision" or "parenthood_vs_career" or "parenthood_vs_career_timing" or "parent_child_relationship" or "parent_child_reconciliation_timing" or "retrospective_child_timing" or "children_remedy" or "two_chart_children_handoff" or "child_chart_required_handoff" or "medical_safety_handoff" or "muhurat_handoff" or "legal_custody_handoff" or "fetal_sex_refusal" or null,
   "home_subtype": "home_overview" or "living_arrangement" or "property_potential" or "property_purchase" or "property_purchase_timing" or "property_sale_decision" or "property_sale_timing" or "property_finance" or "property_comparison" or "property_type_fit" or "joint_property" or "rental_income" or "possession_documentation_timing" or "retrospective_property_timing" or "property_portfolio_comparison" or "property_obstacles" or "construction_renovation" or "construction_timing" or "relocation_home" or "relocation_timing" or "vehicle_potential" or "vehicle_selection" or "vehicle_timing" or "property_remedy" or "property_dispute_handoff" or "muhurat_handoff" or "foreign_handoff" or "inheritance_handoff" or "vastu_handoff" or "property_business_handoff" or null,
+  "foreign_subtype": "foreign_overview" or "travel_tendency" or "short_travel" or "short_travel_timing" or "long_travel" or "long_travel_timing" or "travel_purpose" or "travel_obstacles" or "retrospective_travel" or "domestic_relocation" or "domestic_relocation_timing" or "stay_vs_relocate" or "temporary_vs_permanent" or "foreign_travel" or "foreign_travel_timing" or "foreign_residence" or "foreign_residence_timing" or "permanent_settlement" or "settlement_timing" or "visa_support" or "visa_timing" or "migration_pathway" or "return_home" or "return_home_timing" or "foreign_life_adjustment" or "foreign_obstacles" or "foreign_remedy" or "location_comparison" or "location_recommendation_handoff" or "legal_immigration_handoff" or "muhurat_handoff" or "travel_safety_handoff" or "other_person_handoff" or null,
   "education_target": "concise user-named subject, course, exam, degree or research area; null when none",
   "education_target_traits": ["0-4 of analytical_quantitative, language_communication, technical_engineering, creative_design, biological_care, legal_social, commercial_management, research_depth, disciplined_memory, practical_applied"],
   "education_options": [{{"label":"every explicitly named course/subject/degree choice", "traits":["0-4 allowed education_target_traits describing this option's actual demands"]}}],
@@ -2311,7 +2414,8 @@ Rules:
 - "Does my chart support completing a PhD?" -> category research, education_subtype research, answer_mode potential_capacity, education_target PhD.
 - Explicit education/exam/research remedies always use education_subtype education_remedies and answer_mode remedy_action.
 - For children, conception, pregnancy, childbirth, adoption and parenthood, use category progeny and choose the exact children_subtype. Keep static promise separate from timing; keep conception separate from childbirth; keep first-child analysis separate from subsequent-child analysis. Use two_chart_children_handoff for joint-couple claims, child_chart_required_handoff for the child's detailed fate, medical_safety_handoff for fertility/pregnancy diagnosis, symptoms or loss prediction, muhurat_handoff for electional dates, legal_custody_handoff for custody outcomes, and fetal_sex_refusal for son/daughter or fetal-sex prediction. Assisted conception and adoption are distinct pathways, not fallback labels for weak biological promise.
-- For home, property and vehicle questions, set home_subtype semantically: home_overview, living_arrangement, property_potential, property_purchase, property_purchase_timing, property_sale_decision, property_sale_timing, property_finance, property_comparison, property_type_fit, joint_property, rental_income, possession_documentation_timing, retrospective_property_timing, property_portfolio_comparison, property_obstacles, construction_renovation, construction_timing, relocation_home, relocation_timing, vehicle_potential, vehicle_selection, vehicle_timing, property_remedy, property_dispute_handoff, muhurat_handoff, foreign_handoff, vastu_handoff or property_business_handoff. Vehicle ownership/capacity is vehicle_potential; vehicle colour selection is vehicle_selection/comparison_choice with no timing; only a when/period purchase question is vehicle_timing. A self-contained colour question is a new request and must discard prior timing state. Property disputes and legal outcomes must use property_dispute_handoff; electional dates use muhurat_handoff; foreign settlement uses foreign_handoff. Inheritance is category=inheritance on the Wealth graph with home_subtype=null, never Partnership or a Home handoff; undated "Will I inherit property?" is potential_capacity and explicit "When will I inherit?" is timing. "Does my chart support relocation?" is relocation_home/comparison_choice; only explicit foreign settlement or immigration uses foreign_handoff. An undated "will I ever/can I" ownership question is property_potential/potential_capacity. Questions asking when/now/this month/this year or naming a period use the matching timing route; undated capacity, diagnosis and comparison routes stay static.
+- For home, property and vehicle questions, set the exact home_subtype. Domestic relocation now belongs to the Foreign Life domain and must use foreign_subtype domestic_relocation or domestic_relocation_timing. Vehicle colour selection is vehicle_selection/comparison_choice with no timing; only a when/period vehicle-purchase question is vehicle_timing. Property disputes use property_dispute_handoff; electional dates use muhurat_handoff; inheritance belongs to Wealth. Undated ownership questions are static property capacity; explicit when/period questions use timing.
+- For travel, domestic relocation, visa, immigration, foreign residence and settlement, choose the exact foreign_subtype from the foreign route list in the JSON schema. Distinguish short travel, long travel, domestic relocation, foreign travel, foreign residence and permanent settlement. Use timing variants only for explicit when/period questions. Named location options use location_comparison; open-ended best-place requests, legal immigration advice/approval, exact Muhurat dates, travel-safety guarantees and another person's fate use their dedicated handoff subtype. Career abroad, study abroad and spouse abroad remain owned by Career, Education and Marriage unless the actual question is whether that pathway leads to residence or settlement.
 - Living independently versus with family, domestic privacy, moving out and home-arrangement questions are category=property and home_subtype=living_arrangement, never Career questions.
 - "Should I take a loan to expand my business this year?" -> category debt, wealth_subtype loan_decision, answer_mode event_prediction, timeframe this year, needs_transits true.
 - "Did I have a love or arranged marriage?" and the same meaning in any language -> READY, category marriage, marriage_subtype love_vs_arranged, answer_mode comparison_choice, route_action answer. It is a static natal-pathway comparison about a past marriage, not retrospective date discovery; do not request historical dasha or transit evidence.
@@ -2440,6 +2544,7 @@ Return ONLY this JSON shape:
   "education_subtype": "overall" or "education_timing" or "learning_style" or "subject_fit" or "course_comparison" or "higher_education" or "higher_education_timing" or "exam_capacity" or "exam_timing" or "admission_capacity" or "admission_timing" or "scholarship" or "research" or "research_timing" or "foreign_study" or "foreign_study_timing" or "education_obstacles" or "education_resume" or "education_vs_work" or "education_remedies" or null,
   "children_subtype": "children_overview" or "parenthood_capacity" or "conception_capacity" or "conception_timing" or "childbirth_timing" or "first_child_capacity" or "first_child" or "subsequent_child_capacity" or "subsequent_child" or "family_size_tendency" or "children_delay_diagnosis" or "assisted_conception" or "assisted_conception_timing" or "adoption_pathway" or "adoption_timing" or "step_parenthood" or "parenthood_decision" or "parenthood_vs_career" or "parenthood_vs_career_timing" or "parent_child_relationship" or "parent_child_reconciliation_timing" or "retrospective_child_timing" or "children_remedy" or "two_chart_children_handoff" or "child_chart_required_handoff" or "medical_safety_handoff" or "muhurat_handoff" or "legal_custody_handoff" or "fetal_sex_refusal" or null,
   "home_subtype": "home_overview" or "living_arrangement" or "property_potential" or "property_purchase" or "property_purchase_timing" or "property_sale_decision" or "property_sale_timing" or "property_finance" or "property_comparison" or "property_type_fit" or "joint_property" or "rental_income" or "possession_documentation_timing" or "retrospective_property_timing" or "property_portfolio_comparison" or "property_obstacles" or "construction_renovation" or "construction_timing" or "relocation_home" or "relocation_timing" or "vehicle_potential" or "vehicle_selection" or "vehicle_timing" or "property_remedy" or "property_dispute_handoff" or "muhurat_handoff" or "foreign_handoff" or "inheritance_handoff" or "vastu_handoff" or "property_business_handoff" or null,
+  "foreign_subtype": "foreign_overview" or "travel_tendency" or "short_travel" or "short_travel_timing" or "long_travel" or "long_travel_timing" or "travel_purpose" or "travel_obstacles" or "retrospective_travel" or "domestic_relocation" or "domestic_relocation_timing" or "stay_vs_relocate" or "temporary_vs_permanent" or "foreign_travel" or "foreign_travel_timing" or "foreign_residence" or "foreign_residence_timing" or "permanent_settlement" or "settlement_timing" or "visa_support" or "visa_timing" or "migration_pathway" or "return_home" or "return_home_timing" or "foreign_life_adjustment" or "foreign_obstacles" or "foreign_remedy" or "location_comparison" or "location_recommendation_handoff" or "legal_immigration_handoff" or "muhurat_handoff" or "travel_safety_handoff" or "other_person_handoff" or null,
   "education_target": "concise user-named subject, course, exam, degree or research area; null when none",
   "education_target_traits": ["0-4 of analytical_quantitative, language_communication, technical_engineering, creative_design, biological_care, legal_social, commercial_management, research_depth, disciplined_memory, practical_applied"],
   "education_options": [{{"label":"every explicitly named course/subject/degree choice", "traits":["0-4 allowed education_target_traits describing this option's actual demands"]}}],

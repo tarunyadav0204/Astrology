@@ -323,10 +323,25 @@ def _timing_windows(
         activated.discard(None)
         coverage = sorted(int(item) for item in activated & success_houses)
         transit_peaks = []
-        for peak in value.get("peak_activation_windows") or value.get("transit_trigger_windows") or []:
+        for peak in value.get("transit_trigger_windows") or value.get("peak_activation_windows") or []:
             if not isinstance(peak, Mapping):
                 continue
-            if not ({_as_int(item) for item in peak.get("activated_focus_houses") or []} & success_houses):
+            delivered_rows = peak.get("delivered_event_houses")
+            if isinstance(delivered_rows, list):
+                delivered_houses = {
+                    _as_int(item.get("house") if isinstance(item, Mapping) else item)
+                    for item in delivered_rows
+                }
+                delivered_houses.discard(None)
+                route_transit_houses = delivered_houses & success_houses
+            else:
+                # Compatibility for older scan rows that predate the explicit
+                # delivery ledger. New rows must deliver to a route house; a
+                # natal sign/nakshatra return alone is not event confirmation.
+                route_transit_houses = {
+                    _as_int(item) for item in peak.get("activated_focus_houses") or []
+                } & success_houses
+            if not route_transit_houses:
                 continue
             peak_start = _date(peak.get("start"))
             peak_end = _date(peak.get("end")) or peak_start
@@ -334,7 +349,14 @@ def _timing_windows(
                 continue
             if requested_end and peak_start and peak_start > requested_end:
                 continue
-            transit_peaks.append(dict(peak))
+            transit_peaks.append({**dict(peak), "route_transit_houses": sorted(route_transit_houses)})
+        transit_peaks.sort(
+            key=lambda peak: (
+                -len(peak.get("route_transit_houses") or []),
+                -int(peak.get("trigger_score") or 0),
+                str(peak.get("start") or ""),
+            )
+        )
         if len(coverage) < 2 or not required_event_houses.issubset(activated) or not transit_peaks:
             continue
         ranked.append({
@@ -367,7 +389,7 @@ def _timing_windows(
                 }
                 for peak in transit_peaks[:4]
             ],
-            "claim_rule": "This is a supportive property/home activation window, not a guaranteed transaction, approval, possession or legal outcome.",
+            "claim_rule": "This is a calculated event-activation window, not a guaranteed event, approval, transaction, possession or legal outcome.",
         })
     return sorted(
         ranked,

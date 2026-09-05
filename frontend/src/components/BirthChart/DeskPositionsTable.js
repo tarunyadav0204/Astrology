@@ -1,4 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { apiService } from '../../services/apiService';
+import { getPlanetDignity } from '../../utils/planetAnalyzer';
 import './DeskPositionsTable.css';
 
 const SIGN_NAMES = [
@@ -24,8 +26,16 @@ const NAKSHATRAS = [
   'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati',
 ];
 
-const EXALTATION = { Sun: 0, Moon: 1, Mars: 9, Mercury: 5, Jupiter: 3, Venus: 11, Saturn: 6 };
-const DEBILITATION = { Sun: 6, Moon: 7, Mars: 3, Mercury: 11, Jupiter: 9, Venus: 5, Saturn: 0 };
+const KARAKA_ABBR = {
+  Atmakaraka: 'AK',
+  Amatyakaraka: 'AmK',
+  Bhratrukaraka: 'BK',
+  Matrukaraka: 'MK',
+  Pitrikaraka: 'PiK',
+  Putrakaraka: 'PK',
+  Gnatikaraka: 'GK',
+  Darakaraka: 'DK',
+};
 
 function normLon(lon) {
   return ((Number(lon) % 360) + 360) % 360;
@@ -50,16 +60,47 @@ function houseOf(sign, lagnaSign) {
   return ((sign - lagnaSign + 12) % 12) + 1;
 }
 
-function dignityOf(name, sign) {
-  if (EXALTATION[name] === sign) return { key: 'ex', label: 'Exalted' };
-  if (DEBILITATION[name] === sign) return { key: 'db', label: 'Debilitated' };
+function dignityOf(name, sign, degree) {
+  const label = getPlanetDignity(name, sign, degree);
+  if (label === 'Exalted') return { key: 'ex', label };
+  if (label === 'Debilitated') return { key: 'db', label };
+  if (label === 'Moolatrikona') return { key: 'mt', label };
+  if (label === 'Own') return { key: 'own', label };
   return null;
 }
 
 /**
  * Dense planetary positions table for the Parashari desk.
  */
-export default function DeskPositionsTable({ chartData }) {
+export default function DeskPositionsTable({ chartData, birthData }) {
+  const [karakaByPlanet, setKarakaByPlanet] = useState({});
+
+  useEffect(() => {
+    if (!birthData?.date || !chartData?.planets) {
+      setKarakaByPlanet({});
+      return undefined;
+    }
+    let cancelled = false;
+    apiService.calculateCharaKarakas(chartData, birthData)
+      .then((data) => {
+        if (cancelled) return;
+        const rows = data?.chara_karakas && typeof data.chara_karakas === 'object'
+          ? data.chara_karakas
+          : {};
+        const map = {};
+        Object.entries(rows).forEach(([karaka, info]) => {
+          if (info?.planet) map[info.planet] = KARAKA_ABBR[karaka] || karaka;
+        });
+        setKarakaByPlanet(map);
+      })
+      .catch(() => {
+        if (!cancelled) setKarakaByPlanet({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [birthData, chartData]);
+
   const rows = useMemo(() => {
     if (!chartData?.planets) return [];
     const lagnaSign = chartData.houses?.[0]?.sign
@@ -91,7 +132,8 @@ export default function DeskPositionsTable({ chartData }) {
       const data = chartData.planets[name];
       if (!data || typeof data.sign !== 'number') return;
       const lon = typeof data.longitude === 'number' ? data.longitude : (data.sign * 30 + (data.degree || 0));
-      const dig = dignityOf(name, data.sign);
+      const degree = typeof data.degree === 'number' ? data.degree : (normLon(lon) % 30);
+      const dig = dignityOf(name, data.sign, degree);
       out.push({
         name,
         abbr: name === 'InduLagna' ? 'IL' : name.slice(0, 2),
@@ -119,6 +161,7 @@ export default function DeskPositionsTable({ chartData }) {
         <thead>
           <tr>
             <th>Pl</th>
+            <th>CK</th>
             <th>Sign</th>
             <th>H</th>
             <th>Deg</th>
@@ -134,6 +177,7 @@ export default function DeskPositionsTable({ chartData }) {
                 <strong>{row.abbr}</strong>
                 {row.retro ? <i title="Retrograde">R</i> : null}
               </td>
+              <td className="desk-pos__ck">{karakaByPlanet[row.name] || '—'}</td>
               <td>{row.signName.slice(0, 3)}</td>
               <td>{row.house}</td>
               <td>{row.degree}</td>

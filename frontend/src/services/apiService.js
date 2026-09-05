@@ -780,23 +780,37 @@ export const apiService = {
     return response.data;
   },
 
-  getHouseInsight: async ({ birthData, houseNum, chartId = 'lagna', transitDate }) => {
+  _chartInsightBirth(birthData) {
     const dateStr = String(birthData?.date || '').includes('T')
       ? String(birthData.date).split('T')[0]
       : birthData?.date;
     let timeStr = String(birthData?.time || '');
     if (timeStr.includes('T')) timeStr = timeStr.split('T')[1]?.slice(0, 5) || timeStr;
     else timeStr = timeStr.slice(0, 5);
+    return {
+      name: birthData?.name || 'Native',
+      date: dateStr,
+      time: timeStr,
+      latitude: parseFloat(birthData?.latitude),
+      longitude: parseFloat(birthData?.longitude),
+      place: birthData?.place || 'Unknown',
+      timezone: birthData?.timezone,
+    };
+  },
+
+  getHouseInsight: async ({ birthData, houseNum, chartId = 'lagna', transitDate }) => {
     const response = await apiClient.post(getEndpoint('/chart-house-insight'), {
-      birth_data: {
-        name: birthData?.name || 'Native',
-        date: dateStr,
-        time: timeStr,
-        latitude: parseFloat(birthData?.latitude),
-        longitude: parseFloat(birthData?.longitude),
-        place: birthData?.place || 'Unknown',
-      },
+      birth_data: apiService._chartInsightBirth(birthData),
       house_num: houseNum,
+      chart_id: chartId,
+      transit_date: transitDate || new Date().toISOString().split('T')[0],
+    });
+    return response.data;
+  },
+
+  getChartOverview: async ({ birthData, chartId = 'lagna', transitDate }) => {
+    const response = await apiClient.post(getEndpoint('/chart-overview'), {
+      birth_data: apiService._chartInsightBirth(birthData),
       chart_id: chartId,
       transit_date: transitDate || new Date().toISOString().split('T')[0],
     });

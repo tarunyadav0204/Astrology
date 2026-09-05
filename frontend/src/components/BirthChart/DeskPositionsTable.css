@@ -60,10 +60,21 @@
   color: var(--color-success);
 }
 
+.desk-pos__table tr.is-mt td,
+.desk-pos__table tr.is-own td {
+  color: var(--color-success);
+}
+
 .desk-pos__table tr.is-db td {
   color: var(--color-brand);
 }
 
 .desk-pos__table tbody tr:hover td {
   background: color-mix(in srgb, var(--color-brand) 4%, transparent);
+}
+
+.desk-pos__ck {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--color-brand);
 }
