@@ -557,6 +557,11 @@ export default function ChatScreen({ navigation, route }) {
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showChatModeIntro, setShowChatModeIntro] = useState(false);
   const [isInstantAnalysis, setIsInstantAnalysis] = useState(false);
+  // Standard/Premium render the Quick Actions bar below the composer, and that
+  // bar owns the bottom safe-area padding. Live hides it, so the composer must
+  // own the inset or it falls into the home-indicator/navigation-gesture area.
+  const liveComposerBottomInset =
+    Platform.OS !== 'web' && isInstantAnalysis ? Math.max(8, insets.bottom || 0) : 0;
   const [answerStyle, setAnswerStyle] = useState('simple');
   const [answerStylePreferenceKnown, setAnswerStylePreferenceKnown] = useState(false);
   const [answerStylePreferenceHydrated, setAnswerStylePreferenceHydrated] = useState(false);
@@ -7029,7 +7034,7 @@ export default function ChatScreen({ navigation, route }) {
             keyboardBottomInset > 0
               // Web overlap already equals covered pixels; native needs a little extra.
               ? (Platform.OS === 'web' ? keyboardBottomInset : keyboardBottomInset + 20)
-              : (Platform.OS === 'web' ? webBottomInset : 0),
+              : (Platform.OS === 'web' ? webBottomInset : liveComposerBottomInset),
         }}
         >
         {/* Topic idea chips — opt-in so the message list keeps most of the screen */}

@@ -229,7 +229,8 @@ function ChartOverviewPopup({
           ) : null}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body
   );
 }
 
