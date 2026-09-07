@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { chartAPI } from '../../services/api';
 import AppScrollView from '../../platform/AppScrollView';
-import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
+import { DISPLAY_FONT_FAMILY, withAlpha } from '../../theme/tokens';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 const { height } = Dimensions.get('window');
@@ -31,7 +31,7 @@ function ChartOverviewSheet({
   onOpenYogas,
 }) {
   const { t } = useTranslation();
-  const { theme, colors } = useTheme();
+  const { colors } = useTheme();
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -74,13 +74,13 @@ function ChartOverviewSheet({
   const pillars = overview?.pillars || [];
   const now = overview?.now || {};
   const marks = overview?.special_marks || [];
-  const sectionBg = theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)';
+  const sectionBg = colors.surfaceMuted;
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable
-          style={[StyleSheet.absoluteFill, styles.backdrop]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }]}
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel={t('common.close', 'Close')}
@@ -125,7 +125,7 @@ function ChartOverviewSheet({
                   </Text>
                 </View>
               ) : null}
-              {error ? <Text style={[styles.statusText, { color: colors.danger || '#ef4444' }]}>{error}</Text> : null}
+              {error ? <Text style={[styles.statusText, { color: colors.error }]}>{error}</Text> : null}
 
               {overview?.summary ? (
                 <View style={[styles.section, { backgroundColor: sectionBg, borderColor: colors.cardBorder }]}>
@@ -150,9 +150,9 @@ function ChartOverviewSheet({
                       style={[
                         styles.houseChip,
                         { borderColor: colors.cardBorder, backgroundColor: colors.surface },
-                        row.tone === 'support' && styles.houseSupport,
-                        row.tone === 'pressure' && styles.housePressure,
-                        row.tone === 'mixed' && styles.houseMixed,
+                        row.tone === 'support' && { backgroundColor: withAlpha(colors.success, '22') },
+                        row.tone === 'pressure' && { backgroundColor: withAlpha(colors.error, '22') },
+                        row.tone === 'mixed' && { backgroundColor: withAlpha(colors.warning, '24') },
                         row.active && { borderColor: colors.accent },
                       ]}
                       onPress={() => onOpenHouse?.(row.house)}
@@ -250,7 +250,7 @@ function ChartOverviewSheet({
                   </View>
                 ) : (
                   <Text style={[styles.body, { color: colors.textSecondary }]}>
-                    {t('chartScreen.overview.noMarks', 'No gandanta, mūlatrikona, or special-point hits are marked.')}
+                    {t('chartScreen.overview.noMarks', 'No gandanta, mūlatrikona, vargottama, or special-point hits are marked.')}
                   </Text>
                 )}
               </View>
@@ -282,7 +282,6 @@ function ChartOverviewSheet({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: {
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
@@ -321,9 +320,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 8,
   },
-  houseSupport: { backgroundColor: 'rgba(34, 197, 94, 0.12)' },
-  housePressure: { backgroundColor: 'rgba(239, 68, 68, 0.12)' },
-  houseMixed: { backgroundColor: 'rgba(245, 158, 11, 0.14)' },
   houseNum: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase' },
   houseSign: { fontSize: 13, fontWeight: '800', marginTop: 2 },
   houseLabel: { fontSize: 11, lineHeight: 14, marginTop: 2 },

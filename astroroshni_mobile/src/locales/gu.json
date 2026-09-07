@@ -172,7 +172,35 @@
     "transit": "ગોચર",
     "dasha": "દશા",
     "karakas": "કારકો",
-    "positions": "સ્થિતિ"
+    "positions": "સ્થિતિ",
+    "overview": {
+      "loadError": "કુંડળી વાંચન લોડ થઈ શક્યું નહીં",
+      "loading": "બાર ભાવની સરખામણી થઈ રહી છે…",
+      "verdict": "નિષ્કર્ષ",
+      "houses": "ભાવ",
+      "tapHouse": "સંપૂર્ણ વાંચન માટે ભાવ પર ટૅપ કરો.",
+      "pillars": "સ્તંભ",
+      "now": "હમણાં",
+      "marks": "વિશેષ ચિહ્નો",
+      "noMarks": "ગંડાંત, મૂળત્રિકોણ, વર્ગોત્તમ કે વિશેષ બિંદુઓ અંકિત નથી.",
+      "yogas": "યોગ",
+      "openYogas": "આ કુંડળીની સંપૂર્ણ યોગ યાદી ખોલો."
+    },
+    "houseDrawer": {
+      "argala": "અર્ગલા",
+      "argalaFromHouse": "{{planet}} H{{house}} થી ({{label}})",
+      "argalaVirodhaFromHouse": "{{planet}} વિરોધ H{{house}} થી ({{label}})",
+      "pointsHere": "આ ભાવમાં બિંદુઓ",
+      "timingKaraka": "સમય, કારક, સંબંધિત વર્ગ",
+      "transitingHereNow": "હમણાં અહીં ગોચર: {{planets}}",
+      "karakaLine": "કારક {{planet}}: {{sign}}{{house}}",
+      "relatedVargaLine": "{{name}}: {{sign}}, સ્વામી {{lord}}{{lordHouse}}{{occupants}}",
+      "inHouseShort": " H{{house}}માં",
+      "vargaEmpty": " · ખાલી",
+      "timingNow": "હમણાં",
+      "timingNext": "આગળ",
+      "houseMark": " · H{{house}}"
+    }
   },
   "planets": {
     "Sun": "સૂર્ય",

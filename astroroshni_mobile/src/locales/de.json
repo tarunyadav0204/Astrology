@@ -172,7 +172,35 @@
     "transit": "Transit",
     "dasha": "Dasha",
     "karakas": "Karakas",
-    "positions": "Positionen"
+    "positions": "Positionen",
+    "overview": {
+      "loadError": "Horoskop-Deutung konnte nicht geladen werden",
+      "loading": "Die zwölf Häuser werden verglichen…",
+      "verdict": "Urteil",
+      "houses": "Häuser",
+      "tapHouse": "Tippe ein Haus für die vollständige Deutung.",
+      "pillars": "Pfeiler",
+      "now": "Jetzt",
+      "marks": "Sonderzeichen",
+      "noMarks": "Kein Gandanta, Mūlatrikona, Vargottama oder Sonderpunkt ist markiert.",
+      "yogas": "Yogas",
+      "openYogas": "Die vollständige Yoga-Liste dieser Kundli öffnen."
+    },
+    "houseDrawer": {
+      "argala": "Argala",
+      "argalaFromHouse": "{{planet}} von H{{house}} ({{label}})",
+      "argalaVirodhaFromHouse": "{{planet}} Virodha von H{{house}} ({{label}})",
+      "pointsHere": "Punkte in diesem Haus",
+      "timingKaraka": "Timing, Karaka, zugehörige Varga",
+      "transitingHereNow": "Jetzt hier im Transit: {{planets}}",
+      "karakaLine": "Karaka {{planet}}: {{sign}}{{house}}",
+      "relatedVargaLine": "{{name}}: {{sign}}, Herrscher {{lord}}{{lordHouse}}{{occupants}}",
+      "inHouseShort": " in H{{house}}",
+      "vargaEmpty": " · leer",
+      "timingNow": "Jetzt",
+      "timingNext": "Als Nächstes",
+      "houseMark": " · H{{house}}"
+    }
   },
   "planets": {
     "Sun": "So",

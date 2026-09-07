@@ -172,7 +172,35 @@
     "transit": "Транзит",
     "dasha": "Даша",
     "karakas": "Караки",
-    "positions": "Позиции"
+    "positions": "Позиции",
+    "overview": {
+      "loadError": "Не удалось загрузить чтение карты",
+      "loading": "Сравниваем двенадцать домов…",
+      "verdict": "Вывод",
+      "houses": "Дома",
+      "tapHouse": "Нажмите дом для полного разбора.",
+      "pillars": "Опоры",
+      "now": "Сейчас",
+      "marks": "Особые отметки",
+      "noMarks": "Ганданта, мулатрикона, варготтама и особые точки не отмечены.",
+      "yogas": "Йоги",
+      "openYogas": "Открыть полный список йог этой кундали."
+    },
+    "houseDrawer": {
+      "argala": "Аргала",
+      "argalaFromHouse": "{{planet}} из H{{house}} ({{label}})",
+      "argalaVirodhaFromHouse": "{{planet}} виродха из H{{house}} ({{label}})",
+      "pointsHere": "Точки в этом доме",
+      "timingKaraka": "Время, карака, связанная варга",
+      "transitingHereNow": "Сейчас здесь в транзите: {{planets}}",
+      "karakaLine": "Карака {{planet}}: {{sign}}{{house}}",
+      "relatedVargaLine": "{{name}}: {{sign}}, управитель {{lord}}{{lordHouse}}{{occupants}}",
+      "inHouseShort": " в H{{house}}",
+      "vargaEmpty": " · пусто",
+      "timingNow": "Сейчас",
+      "timingNext": "Далее",
+      "houseMark": " · H{{house}}"
+    }
   },
   "planets": {
     "Sun": "Со",

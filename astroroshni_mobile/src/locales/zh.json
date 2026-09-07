@@ -172,7 +172,35 @@
     "transit": "流年",
     "dasha": "大运",
     "karakas": "指标星 (Karakas)",
-    "positions": "位置"
+    "positions": "位置",
+    "overview": {
+      "loadError": "无法加载星盘解读",
+      "loading": "正在比较十二宫…",
+      "verdict": "结论",
+      "houses": "宫位",
+      "tapHouse": "点按宫位查看完整解读。",
+      "pillars": "支柱",
+      "now": "当下",
+      "marks": "特殊标记",
+      "noMarks": "未标记甘丹塔、本星座、分盘同位或特殊点。",
+      "yogas": "瑜伽",
+      "openYogas": "打开此命盘的完整瑜伽分类列表。"
+    },
+    "houseDrawer": {
+      "argala": "Argala",
+      "argalaFromHouse": "{{planet}} 来自 H{{house}}（{{label}}）",
+      "argalaVirodhaFromHouse": "{{planet}} 障碍来自 H{{house}}（{{label}}）",
+      "pointsHere": "此宫中的点",
+      "timingKaraka": "时机、代表星、相关分盘",
+      "transitingHereNow": "当前流经此处：{{planets}}",
+      "karakaLine": "Karaka {{planet}}：{{sign}}{{house}}",
+      "relatedVargaLine": "{{name}}：{{sign}}，主星 {{lord}}{{lordHouse}}{{occupants}}",
+      "inHouseShort": " 在 H{{house}}",
+      "vargaEmpty": " · 空",
+      "timingNow": "现在",
+      "timingNext": "接下来",
+      "houseMark": " · H{{house}}"
+    }
   },
   "planets": {
     "Sun": "日",

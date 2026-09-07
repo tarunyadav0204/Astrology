@@ -25,7 +25,67 @@ from chat.instant_chat_pipeline import (
     _compact_career_foundation,
     _instant_compact_profession_evidence,
     _requested_charts_from_intent,
+    _validate_career_chart_frame_answer,
 )
+
+
+def test_career_chart_frame_validator_separates_native_and_d10_lagna_lords():
+    foundation = {
+        "chart_identities": {
+            "D1": {
+                "ascendant_sign": "Cancer",
+                "ascendant_lord": "Moon",
+                "ascendant_lord_house_in_same_chart": 4,
+            },
+            "D10": {
+                "ascendant_sign": "Sagittarius",
+                "ascendant_lord": "Jupiter",
+                "ascendant_lord_house_in_same_chart": 11,
+            },
+        }
+    }
+    reported = (
+        "Jupiter, your lagna lord (the planet ruling your ascendant), occupies the 2nd house. "
+        "Ketu aspects your lagna lord Jupiter."
+    )
+    hybrid = "Jupiter, the D10 lagna lord, occupies the 2nd house."
+    correct = (
+        "Moon, your lagna lord, is placed in the 4th house. "
+        "Jupiter, the D10 lagna lord, is placed in the 11th house."
+    )
+
+    reported_errors = _validate_career_chart_frame_answer(reported, foundation)
+    hybrid_errors = _validate_career_chart_frame_answer(hybrid, foundation)
+    assert any("calculated lord is Moon" in error for error in reported_errors)
+    assert any("calculated D10 placement is house 11" in error for error in hybrid_errors)
+    assert _validate_career_chart_frame_answer(correct, foundation) == []
+
+
+def test_career_foundation_publishes_chart_scoped_lagna_identities():
+    d1 = {
+        "lagna": {
+            "sign_name": "Cancer", "lord": "Moon", "lord_house": 4,
+            "lord_sign": "Libra", "lord_dignity": "neutral_sign",
+        },
+        "planets": {"Moon": {"house": 4}},
+        "houses": [{"house": 10, "lord": "Mars", "occupants": []}],
+    }
+    d10 = {
+        "lagna": {
+            "sign_name": "Sagittarius", "lord": "Jupiter", "lord_house": 11,
+            "lord_sign": "Libra", "lord_dignity": "enemy_sign",
+        },
+        "planets": {"Jupiter": {"house": 11}},
+        "houses": [{"house": 10, "lord": "Mercury", "occupants": []}],
+    }
+    packet = _compact_career_foundation(
+        "career", "general", {}, {}, {"charts": {"D1": d1, "D10": d10}}, {}, {},
+    )
+
+    assert packet["chart_identities"]["D1"]["ascendant_lord"] == "Moon"
+    assert packet["chart_identities"]["D1"]["ascendant_lord_house_in_same_chart"] == 4
+    assert packet["chart_identities"]["D10"]["ascendant_lord"] == "Jupiter"
+    assert packet["chart_identities"]["D10"]["ascendant_lord_house_in_same_chart"] == 11
 
 
 def test_profession_evidence_passes_birth_record_to_time_dependent_calculator(monkeypatch):

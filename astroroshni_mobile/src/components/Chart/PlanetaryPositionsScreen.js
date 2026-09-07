@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ActivityIndicator, Platform, ScrollView } from 'react-native';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
-import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
+import { DISPLAY_FONT_FAMILY, withAlpha } from '../../theme/tokens';
+import { buildHouseRows, buildNakshatraRows, buildPlanetRows } from '../../utils/positionTables';
 
 const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const { colors } = useTheme();
@@ -105,6 +106,13 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       setSpecialLoaded(true);
     }
   };
+
+  const planetRows = React.useMemo(
+    () => buildPlanetRows(chartData, karakas),
+    [chartData, karakas],
+  );
+  const houseRows = React.useMemo(() => buildHouseRows(chartData), [chartData]);
+  const nakshatraRows = React.useMemo(() => buildNakshatraRows(planetRows), [planetRows]);
 
   if (!birthData?.name) return null;
 
@@ -238,41 +246,188 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     </TouchableOpacity>
   );
 
-  // Planet Card Component
-  const PlanetCard = ({ planet }) => (
-    <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
-        <View style={styles.cardHeader}>
-          <View style={styles.planetInfo}>
-            <View style={[styles.planetSeal, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
-              <Text style={[styles.planetEmoji, { color: colors.selectionText }]}>{planetEmojis[planet.name]}</Text>
+  const noteTone = (row) => {
+    if (row.dignity?.key === 'db' || row.combust) return colors.error;
+    if (row.dignity?.key === 'ex' || row.dignity?.key === 'mt' || row.dignity?.key === 'own') return colors.success;
+    if (row.vargottama) return colors.info;
+    return colors.text;
+  };
+
+  const rowTint = (row) => {
+    if (row.dignity?.key === 'db') return withAlpha(colors.error, '14');
+    if (row.dignity?.key === 'ex' || row.dignity?.key === 'mt' || row.dignity?.key === 'own') {
+      return withAlpha(colors.success, '14');
+    }
+    return 'transparent';
+  };
+
+  const Cell = ({ width, children, last, style }) => (
+    <View style={[styles.tableCellWrap, { width, borderRightColor: last ? 'transparent' : colors.cardBorder }, style]}>
+      {typeof children === 'string' || typeof children === 'number'
+        ? <Text style={[styles.tableCell, { color: colors.text }]} numberOfLines={1}>{children}</Text>
+        : children}
+    </View>
+  );
+
+  const HeaderCell = ({ width, label, last }) => (
+    <View style={[styles.tableCellWrap, { width, borderRightColor: last ? 'transparent' : colors.cardBorder }]}>
+      <Text style={[styles.tableHeader, { color: colors.textSecondary }]} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+
+  const planetNote = (row) => {
+    const marks = [];
+    if (row.retro) marks.push(t('premiumUi.planetaryPositions.notes.retrograde', 'R'));
+    if (row.combust) marks.push(t('premiumUi.planetaryPositions.notes.combust', 'C'));
+    if (row.vargottama) marks.push(t('premiumUi.planetaryPositions.notes.vargottama', 'VG'));
+    if (row.dignity?.key === 'ex') marks.push(t('premiumUi.planetaryPositions.notes.exalted', 'Ex'));
+    if (row.dignity?.key === 'mt') marks.push(t('premiumUi.planetaryPositions.notes.moolatrikona', 'MT'));
+    if (row.dignity?.key === 'own') marks.push(t('premiumUi.planetaryPositions.notes.own', 'Own'));
+    if (row.dignity?.key === 'db') marks.push(t('premiumUi.planetaryPositions.notes.debilitated', 'Db'));
+    return marks.join(' ') || '—';
+  };
+
+  const PlanetTable = () => (
+    <View style={styles.tableSection}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={[styles.tableCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+            <View style={[styles.tableRow, styles.tableHeadingRow, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}>
+              <HeaderCell width={44} label={t('premiumUi.planetaryPositions.cols.planet', 'Pl')} />
+              <HeaderCell width={40} label={t('premiumUi.planetaryPositions.cols.ck', 'CK')} />
+              <HeaderCell width={40} label={t('premiumUi.planetaryPositions.cols.sign', 'Sign')} />
+              <HeaderCell width={28} label={t('premiumUi.planetaryPositions.cols.house', 'H')} />
+              <HeaderCell width={52} label={t('premiumUi.planetaryPositions.cols.degree', 'Deg')} />
+              <HeaderCell width={78} label={t('premiumUi.planetaryPositions.cols.nakshatra', 'Nak')} />
+              <HeaderCell width={28} label={t('premiumUi.planetaryPositions.cols.pada', 'Pd')} />
+              <HeaderCell width={36} label={t('premiumUi.planetaryPositions.cols.lord', 'Lord')} />
+              <HeaderCell width={88} label={t('premiumUi.planetaryPositions.cols.note', 'Note')} last />
             </View>
-            <View>
-              <Text style={[styles.planetName, { color: colors.text }]}>{planet.name}</Text>
-              {planet.retrograde && <Text style={[styles.retrogradeTag, { color: colors.error }]}>{t('premiumUi.planetaryPositions.retrograde', 'Retrograde')}</Text>}
+            {planetRows.map((row, index) => (
+              <View
+                key={row.name}
+                style={[
+                  styles.tableRow,
+                  { borderBottomColor: colors.cardBorder, backgroundColor: index % 2 === 0 ? rowTint(row) : (rowTint(row) === 'transparent' ? colors.backgroundSecondary : rowTint(row)) },
+                ]}
+              >
+                <Cell width={44}><Text style={[styles.tableCellStrong, { color: colors.text }]}>{row.abbr}</Text></Cell>
+                <Cell width={40}><Text style={[styles.tableCell, { color: colors.primary }]}>{row.ck}</Text></Cell>
+                <Cell width={40}>{row.signAbbr}</Cell>
+                <Cell width={28}>{row.house}</Cell>
+                <Cell width={52}>{row.degree}</Cell>
+                <Cell width={78}>{row.nakAbbr}</Cell>
+                <Cell width={28}>{row.pada}</Cell>
+                <Cell width={36}>{row.lordAbbr}</Cell>
+                <Cell width={88} last>
+                  <Text style={[styles.tableCell, { color: noteTone(row), fontWeight: '800' }]} numberOfLines={1}>
+                    {planetNote(row)}
+                  </Text>
+                </Cell>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      <Text style={[styles.tableLegend, { color: colors.textSecondary }]}>
+        {t('premiumUi.planetaryPositions.tables.legend', 'R retrograde · C combust · VG vargottama · Ex exalted · MT mūlatrikona · Own · Db debilitated')}
+      </Text>
+    </View>
+  );
+
+  const HouseTable = () => (
+    <View style={styles.tableSection}>
+      <View style={[styles.tableCard, styles.tableCardFull, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+          <View style={[styles.tableRow, styles.tableHeadingRow, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}>
+            <HeaderCell width={28} label={t('premiumUi.planetaryPositions.cols.house', 'H')} />
+            <HeaderCell width={40} label={t('premiumUi.planetaryPositions.cols.sign', 'Sign')} />
+            <HeaderCell width={40} label={t('premiumUi.planetaryPositions.cols.lord', 'Lord')} />
+            <HeaderCell width={36} label={t('premiumUi.planetaryPositions.cols.inHouse', 'In')} />
+            <HeaderCell width={40} label={t('premiumUi.planetaryPositions.cols.dignity', 'Dig')} />
+            <View style={styles.tableCellFlex}>
+              <Text style={[styles.tableHeader, { color: colors.textSecondary }]}>
+                {t('premiumUi.planetaryPositions.cols.occupants', 'Occupants')}
+              </Text>
             </View>
           </View>
-          <View style={[styles.houseTag, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
-            <Text style={[styles.houseText, { color: colors.selectionText }]}>{t('premiumUi.planetaryPositions.house', 'House {{number}}', { number: planet.house })}</Text>
-          </View>
-        </View>
-        <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
-        <View style={styles.detailsGrid}>
-          <View style={styles.detailItem}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.rashi', 'Rashi')}</Text>
-            <View style={styles.rashiContainer}>
-              <Text style={styles.rashiIcon}>{rashiIcons[planet.sign]}</Text>
-              <Text style={[styles.detailValue, { color: colors.text }]}>{rashiNames[planet.sign]}</Text>
+          {houseRows.map((row, index) => (
+            <View
+              key={row.house}
+              style={[
+                styles.tableRow,
+                {
+                  borderBottomColor: colors.cardBorder,
+                  backgroundColor: index % 2 === 0 ? colors.backgroundSecondary : 'transparent',
+                },
+              ]}
+            >
+              <Cell width={28}><Text style={[styles.tableCellStrong, { color: colors.text }]}>{row.house}</Text></Cell>
+              <Cell width={40}>{row.signAbbr}</Cell>
+              <Cell width={40}>{row.lordAbbr}</Cell>
+              <Cell width={36}>{row.lordHouse === '—' ? '—' : `H${row.lordHouse}`}</Cell>
+              <Cell width={40}>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    {
+                      color: row.dignity?.key === 'db'
+                        ? colors.error
+                        : (row.dignity ? colors.success : colors.text),
+                      fontWeight: row.dignity ? '800' : '600',
+                    },
+                  ]}
+                >
+                  {row.dignity?.short || '—'}
+                </Text>
+              </Cell>
+              <View style={styles.tableCellFlex}>
+                <Text style={[styles.tableCell, { color: colors.text }]} numberOfLines={1}>
+                  {row.occupants || '—'}
+                </Text>
+              </View>
+            </View>
+          ))}
+      </View>
+    </View>
+  );
+
+  const NakshatraTable = () => (
+    <View style={styles.tableSection}>
+      <View style={[styles.tableCard, styles.tableCardFull, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+          <View style={[styles.tableRow, styles.tableHeadingRow, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}>
+            <HeaderCell width={96} label={t('premiumUi.planetaryPositions.nakshatra', 'Nakshatra')} />
+            <HeaderCell width={44} label={t('premiumUi.planetaryPositions.cols.nakLord', 'Lord')} />
+            <View style={styles.tableCellFlex}>
+              <Text style={[styles.tableHeader, { color: colors.textSecondary }]}>
+                {t('premiumUi.planetaryPositions.cols.occupants', 'Occupants')}
+              </Text>
             </View>
           </View>
-          <View style={styles.detailItem}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.degree', 'Degree')}</Text>
-            <Text style={[styles.detailValue, { color: colors.text }]}>{planet.degree.toFixed(2)}°</Text>
-          </View>
-          <View style={styles.detailItemFull}>
-            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.nakshatra', 'Nakshatra')}</Text>
-            <Text style={[styles.detailValue, styles.detailValueWide, { color: colors.text }]}>{planet.nakshatra} · {t('premiumUi.planetaryPositions.pada', 'Pada {{number}}', { number: planet.pada })}</Text>
-          </View>
-        </View>
+          {nakshatraRows.length === 0 ? (
+            <View style={[styles.tableRow, { borderBottomColor: 'transparent' }]}>
+              <View style={styles.tableCellFlex}>
+                <Text style={[styles.tableCell, { color: colors.textSecondary }]}>—</Text>
+              </View>
+            </View>
+          ) : nakshatraRows.map((row, index) => (
+            <View
+              key={row.nakshatra}
+              style={[
+                styles.tableRow,
+                {
+                  borderBottomColor: colors.cardBorder,
+                  backgroundColor: index % 2 === 0 ? colors.backgroundSecondary : 'transparent',
+                },
+              ]}
+            >
+              <Cell width={96}>{row.nakAbbr}</Cell>
+              <Cell width={44}>{row.lordAbbr}</Cell>
+              <View style={styles.tableCellFlex}>
+                <Text style={[styles.tableCell, { color: colors.text }]} numberOfLines={2}>
+                  {row.occupants.join('  ')}
+                </Text>
+              </View>
+            </View>
+          ))}
+      </View>
     </View>
   );
 
@@ -318,19 +473,29 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     </View>
   );
 
+  const chartUnavailable = (
+    <View style={styles.loadingContainer}>
+      <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+        Chart data is still loading or unavailable. Open your chart first, then try again.
+      </Text>
+    </View>
+  );
+
   // Render Tab Content
   const renderTabContent = () => {
     if (activeTab === 'planets') {
-      if (!planetsPayload || planets.length === 0) {
-        return (
-          <View style={styles.loadingContainer}>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Chart data is still loading or unavailable. Open your chart first, then try again.
-            </Text>
-          </View>
-        );
-      }
-      return planets.map((planet) => <PlanetCard key={planet.name} planet={planet} />);
+      if (!planetsPayload || planets.length === 0) return chartUnavailable;
+      return <PlanetTable />;
+    }
+
+    if (activeTab === 'houses') {
+      if (!planetsPayload || houseRows.length === 0) return chartUnavailable;
+      return <HouseTable />;
+    }
+
+    if (activeTab === 'nakshatras') {
+      if (!planetsPayload || planets.length === 0) return chartUnavailable;
+      return <NakshatraTable />;
     }
 
     if (activeTab === 'karakas') {
@@ -517,13 +682,15 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
           <View style={[styles.tabBar, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
             <GHScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
               <TabButton label={t('premiumUi.planetaryPositions.tabs.planets', 'Planets')} emoji="🪐" value="planets" active={activeTab === 'planets'} />
+              <TabButton label={t('premiumUi.planetaryPositions.tabs.houses', 'Houses')} emoji="🏠" value="houses" active={activeTab === 'houses'} />
+              <TabButton label={t('premiumUi.planetaryPositions.tabs.nakshatras', 'Nakshatras')} emoji="⭐" value="nakshatras" active={activeTab === 'nakshatras'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.karakas', 'Karakas')} emoji="🔱" value="karakas" active={activeTab === 'karakas'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.lagnas', 'Lagnas')} emoji="🎯" value="lagnas" active={activeTab === 'lagnas'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.special', 'Special')} emoji="✨" value="special" active={activeTab === 'special'} />
             </GHScrollView>
           </View>
 
-          <GHScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <GHScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
             <View style={[styles.hero, { backgroundColor: colors.surfaceInverse, borderColor: colors.cosmicLine }]}>
               <View pointerEvents="none" style={styles.heroLinework}>
                 <View style={[styles.heroOrbit, styles.heroOrbitLarge, { borderColor: colors.onSurfaceInverseMuted }]} />
@@ -531,7 +698,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
               </View>
               <Text style={[styles.heroEyebrow, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.skyMap', 'YOUR CELESTIAL MAP')}</Text>
               <Text style={[styles.heroTitle, { color: colors.onSurfaceInverse }]}>{t('premiumUi.planetaryPositions.heroTitle', 'The sky at your birth.')}</Text>
-              <Text style={[styles.heroBody, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.heroBody', 'Read each planet through its sign, house, exact degree and nakshatra placement.')}</Text>
+              <Text style={[styles.heroBody, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.heroBody', 'Scan planet, house, and nakshatra tables the way a desk astrologer would.')}</Text>
               <View style={[styles.heroMeta, { borderTopColor: colors.onSurfaceInverseMuted }]}>
                 <Text style={[styles.heroMetaText, { color: colors.onSurfaceInverse }]}>{t('premiumUi.planetaryPositions.positionCount', '{{count}} planetary positions', { count: planets.length })}</Text>
                 <Text style={[styles.heroMetaText, { color: colors.onSurfaceInverseMuted }]}>{t('premiumUi.planetaryPositions.sidereal', 'Sidereal · Lahiri')}</Text>
@@ -755,6 +922,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingHorizontal: 40,
+  },
+  tableSection: {
+    marginBottom: 22,
+  },
+  tableTitle: {
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 20,
+    lineHeight: 24,
+    marginBottom: 10,
+  },
+  tableLegend: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  tableCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    alignSelf: 'flex-start',
+    minWidth: '100%',
+  },
+  tableCardFull: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 36,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tableHeadingRow: {
+    minHeight: 34,
+  },
+  tableCellWrap: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    justifyContent: 'center',
+  },
+  tableCellFlex: {
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    justifyContent: 'center',
+  },
+  tableHeader: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  tableCell: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tableCellStrong: {
+    fontSize: 12,
+    fontWeight: '800',
   },
 
   // Special Points Styles

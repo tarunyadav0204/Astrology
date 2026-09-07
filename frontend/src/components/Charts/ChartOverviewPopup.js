@@ -214,7 +214,7 @@ function ChartOverviewPopup({
           ) : (
             <section className="house-insight-sec" id="co-marks">
               <h3>Special marks</h3>
-              <p>No yogi, gandanta, mūlatrikona, or special-point hits are marked in this kundli.</p>
+              <p>No yogi, gandanta, mūlatrikona, vargottama, or special-point hits are marked in this kundli.</p>
             </section>
           )}
 

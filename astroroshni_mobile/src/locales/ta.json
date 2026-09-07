@@ -172,7 +172,35 @@
     "transit": "கோச்சாரம்",
     "dasha": "தசா",
     "karakas": "காரகங்கள்",
-    "positions": "நிலைகள்"
+    "positions": "நிலைகள்",
+    "overview": {
+      "loadError": "ஜாதக வாசிப்பை ஏற்ற முடியவில்லை",
+      "loading": "பன்னிரண்டு பாவங்களும் ஒப்பிடப்படுகின்றன…",
+      "verdict": "முடிவு",
+      "houses": "பாவங்கள்",
+      "tapHouse": "முழு வாசிப்புக்கு ஒரு பாவத்தைத் தட்டவும்.",
+      "pillars": "தூண்கள்",
+      "now": "இப்போது",
+      "marks": "சிறப்புக் குறிகள்",
+      "noMarks": "கண்டாந்தம், மூலத்திரிகோணம், வர்கோத்தமம் அல்லது சிறப்புப் புள்ளிகள் குறிக்கப்படவில்லை.",
+      "yogas": "யோகங்கள்",
+      "openYogas": "இந்த ஜாதகத்தின் முழு யோகப் பட்டியலைத் திறக்கவும்."
+    },
+    "houseDrawer": {
+      "argala": "அர்கலா",
+      "argalaFromHouse": "{{planet}} H{{house}} இலிருந்து ({{label}})",
+      "argalaVirodhaFromHouse": "{{planet}} விரோதம் H{{house}} இலிருந்து ({{label}})",
+      "pointsHere": "இந்தப் பாவத்தில் உள்ள புள்ளிகள்",
+      "timingKaraka": "காலம், காரகன், தொடர்புடைய வர்க்கம்",
+      "transitingHereNow": "இப்போது இங்குக் கோச்சாரம்: {{planets}}",
+      "karakaLine": "காரகன் {{planet}}: {{sign}}{{house}}",
+      "relatedVargaLine": "{{name}}: {{sign}}, அதிபதி {{lord}}{{lordHouse}}{{occupants}}",
+      "inHouseShort": " H{{house}} இல்",
+      "vargaEmpty": " · காலி",
+      "timingNow": "இப்போது",
+      "timingNext": "அடுத்தது",
+      "houseMark": " · H{{house}}"
+    }
   },
   "planets": {
     "Sun": "சூரி",

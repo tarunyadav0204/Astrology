@@ -214,6 +214,23 @@ def _collect_special_marks(
             f"{planet} in mūlatrikona",
         ))
 
+    d9_planets = ((natal.get("divisions") or {}).get("D9") or {})
+    for planet, data in (natal.get("planets") or {}).items():
+        if planet in SKIP_PLANETS or not isinstance(data, dict):
+            continue
+        d1_sign = data.get("sign")
+        d9_sign = (d9_planets.get(planet) or {}).get("sign")
+        if d1_sign is None or d9_sign is None or int(d1_sign) != int(d9_sign):
+            continue
+        chips.append(_special_chip(
+            f"vg-{planet}",
+            "Vargottama",
+            f"{planet} · {_sign_name(d1_sign) or '—'}",
+            "vargo",
+            _planet_house(natal, planet),
+            f"{planet} vargottama in D1 and D9",
+        ))
+
     badhaka = BadhakaCalculator(natal)
     badhaka_house = _safe_call(lambda: badhaka.get_badhaka_house(lagna))
     badhaka_lord = _safe_call(lambda: badhaka.get_badhaka_lord(lagna))
@@ -475,6 +492,7 @@ def build_chart_overview(
             short = {
                 "Gandanta": "Gan",
                 "Mūlatrikona": "MT",
+                "Vargottama": "VG",
                 "Yogi": "Yogi",
                 "Avayogi": "Ava",
                 "Dagdha": "Dag",

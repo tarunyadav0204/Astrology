@@ -23,18 +23,16 @@ import DateNavigator from '../Common/DateNavigator';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
-import AppScrollView from '../../platform/AppScrollView';
 import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
 
 const isWeb = Platform.OS === 'web';
 
-const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, onOpenChartGuide, division, navigation, onHousePress }, ref) => {
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(false);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
-  const supportsAshtakavarga = currentChartType === 'lagna' || currentChartType === 'transit';
   const [rotatedAscendant, setRotatedAscendant] = useState(null);
   const [showKarakas, setShowKarakas] = useState(false);
   const [karakas, setKarakas] = useState(null);
@@ -537,10 +535,13 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         <View style={[styles.quickActionIcon, { backgroundColor: primary ? colors.primary : active ? colors.accentSoft : colors.surfaceMuted }]}>
           <Ionicons name={icon} size={18} color={iconColor} />
         </View>
-        <Text style={[
-          styles.quickActionText,
-          { color: textColor },
-        ]}>
+        <Text
+          style={[
+            styles.quickActionText,
+            { color: textColor },
+          ]}
+          numberOfLines={2}
+        >
           {label}
         </Text>
       </TouchableOpacity>
@@ -651,16 +652,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       {cosmicTheme && (
         <View style={styles.advancedToolsSection}>
           <Text style={[styles.advancedToolsLabel, { color: colors.textSecondary }]}>{t('premiumUi.common.professionalTools')}</Text>
-          <AppScrollView
-            horizontal
-            nestedScrollEnabled
-            directionalLockEnabled
-            showsHorizontalScrollIndicator={false}
-            style={styles.horizontalRail}
-            contentContainerStyle={styles.advancedToolsRow}
-          >
+          <View style={styles.advancedToolsRow}>
             {[
-              ...(supportsAshtakavarga ? [['grid-outline', 'Ashtakvarga', () => navigation?.navigate('AshtakvargaOracle')]] : []),
               ['compass-outline', 'KP system', () => navigation?.navigate('KPSystem', { birthDetails: birthData })],
               ['shield-outline', 'Kota Chakra', () => navigation?.navigate('KotaChakra', { birthChartId: birthData?.id })],
               ...(onOpenChartGuide ? [['play-circle-outline', 'Chart guide', onOpenChartGuide]] : []),
@@ -672,24 +665,22 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 activeOpacity={0.8}
               >
                 <Ionicons name={icon} size={16} color={colors.primary} />
-                <Text style={[styles.advancedToolText, { color: colors.text }]}>{label}</Text>
+                <Text
+                  style={[styles.advancedToolText, { color: colors.text }]}
+                  numberOfLines={2}
+                >
+                  {label}
+                </Text>
               </TouchableOpacity>
             ))}
-          </AppScrollView>
+          </View>
         </View>
       )}
 
       {cosmicTheme && (
         <View style={styles.quickActionsGrid}>
           <Text style={[styles.advancedToolsLabel, { color: colors.textSecondary }]}>{t('premiumUi.common.readChart')}</Text>
-          <AppScrollView
-            horizontal
-            nestedScrollEnabled
-            directionalLockEnabled
-            showsHorizontalScrollIndicator={false}
-            style={styles.horizontalRail}
-            contentContainerStyle={styles.quickActionsRow}
-          >
+          <View style={styles.quickActionsRow}>
             {currentChartType !== 'transit' && (
               <QuickActionButton
                 icon="planet-outline"
@@ -698,11 +689,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 active={false}
               />
             )}
-            <QuickActionButton
-              icon="time-outline"
-              label={t('chartScreen.dasha', 'Dasha')}
-              onPress={onOpenDasha}
-            />
             <QuickActionButton
               icon="star-outline"
               label={t('chartScreen.karakas', 'Karakas')}
@@ -736,7 +722,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 navigation?.navigate('Home', { startChat: true, initialMessage: prompt });
               }}
             />
-          </AppScrollView>
+          </View>
         </View>
       )}
 
@@ -908,10 +894,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quickActionsGrid: { marginTop: 22 },
-  quickActionsRow: { paddingHorizontal: 16, paddingRight: 28, gap: 18 },
+  quickActionsGrid: { marginTop: 22, width: '100%' },
+  quickActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-evenly',
+    width: '100%',
+    paddingHorizontal: 8,
+  },
   quickActionButton: {
-    width: 58,
+    flex: 1,
+    minWidth: 0,
     minHeight: 62,
     alignItems: 'center',
     justifyContent: 'flex-start',
@@ -927,11 +920,8 @@ const styles = StyleSheet.create({
   quickActionText: { fontSize: 10, lineHeight: 13, fontWeight: '700', textAlign: 'center' },
   advancedToolsSection: {
     marginTop: 20,
+    width: '100%',
   },
-  horizontalRail: Platform.select({
-    web: { width: '100%', overflow: 'auto', touchAction: 'pan-x' },
-    default: { width: '100%' },
-  }),
   advancedToolsLabel: {
     paddingHorizontal: 16,
     marginBottom: 8,
@@ -940,20 +930,28 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
   },
   advancedToolsRow: {
-    paddingHorizontal: 16,
-    paddingRight: 28,
-    gap: 8,
-  },
-  advancedTool: {
-    minHeight: 32,
-    paddingHorizontal: 2,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-evenly',
+    width: '100%',
+    paddingHorizontal: 8,
+  },
+  advancedTool: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 32,
+    paddingHorizontal: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
   },
   advancedToolText: {
     fontSize: 11,
+    lineHeight: 14,
     fontWeight: '700',
+    textAlign: 'center',
+    flexShrink: 1,
   },
   rotationBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.accent, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginVertical: 12, alignSelf: 'center', gap: 12 },
   rotationBadgeCosmic: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },

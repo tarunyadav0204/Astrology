@@ -172,7 +172,35 @@
     "transit": "गोचर",
     "dasha": "दशा",
     "karakas": "कारक",
-    "positions": "स्थिती"
+    "positions": "स्थिती",
+    "overview": {
+      "loadError": "कुंडली वाचन लोड होऊ शकले नाही",
+      "loading": "बारा भावांची तुलना सुरू आहे…",
+      "verdict": "निष्कर्ष",
+      "houses": "भाव",
+      "tapHouse": "पूर्ण वाचनासाठी भावावर टॅप करा.",
+      "pillars": "स्तंभ",
+      "now": "आता",
+      "marks": "विशेष चिन्हे",
+      "noMarks": "गंडांत, मूलत्रिकोण, वर्गोत्तम किंवा विशेष बिंदू अंकित नाहीत.",
+      "yogas": "योग",
+      "openYogas": "या कुंडलीची पूर्ण वर्गीकृत योग यादी उघडा."
+    },
+    "houseDrawer": {
+      "argala": "अर्गला",
+      "argalaFromHouse": "{{planet}} H{{house}} पासून ({{label}})",
+      "argalaVirodhaFromHouse": "{{planet}} विरोध H{{house}} पासून ({{label}})",
+      "pointsHere": "या भावातील बिंदू",
+      "timingKaraka": "वेळ, कारक, संबंधित वर्ग",
+      "transitingHereNow": "आता येथे गोचर: {{planets}}",
+      "karakaLine": "कारक {{planet}}: {{sign}}{{house}}",
+      "relatedVargaLine": "{{name}}: {{sign}}, स्वामी {{lord}}{{lordHouse}}{{occupants}}",
+      "inHouseShort": " H{{house}} मध्ये",
+      "vargaEmpty": " · रिकामे",
+      "timingNow": "आता",
+      "timingNext": "पुढे",
+      "houseMark": " · H{{house}}"
+    }
   },
   "planets": {
     "Sun": "रवि",

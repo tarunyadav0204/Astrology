@@ -172,7 +172,35 @@
     "transit": "గోచారం",
     "dasha": "దశ",
     "karakas": "కారకాలు",
-    "positions": "స్థానాలు"
+    "positions": "స్థానాలు",
+    "overview": {
+      "loadError": "జాతక పఠనం లోడ్ కాలేదు",
+      "loading": "పన్నెండు భావాలను పోలుస్తున్నాం…",
+      "verdict": "నిర్ణయం",
+      "houses": "భావాలు",
+      "tapHouse": "పూర్తి పఠనం కోసం భావాన్ని నొక్కండి.",
+      "pillars": "స్తంభాలు",
+      "now": "ఇప్పుడు",
+      "marks": "ప్రత్యేక గుర్తులు",
+      "noMarks": "గండాంతం, మూలత్రికోణం, వర్గోత్తమం లేదా ప్రత్యేక బిందువులు గుర్తించబడలేదు.",
+      "yogas": "యోగాలు",
+      "openYogas": "ఈ జాతకం యొక్క పూర్తి యోగ జాబితాను తెరవండి."
+    },
+    "houseDrawer": {
+      "argala": "అర్గల",
+      "argalaFromHouse": "{{planet}} H{{house}} నుండి ({{label}})",
+      "argalaVirodhaFromHouse": "{{planet}} విరోధం H{{house}} నుండి ({{label}})",
+      "pointsHere": "ఈ భావంలోని బిందువులు",
+      "timingKaraka": "సమయం, కారకుడు, సంబంధిత వర్గం",
+      "transitingHereNow": "ఇప్పుడు ఇక్కడ గోచారం: {{planets}}",
+      "karakaLine": "కారకుడు {{planet}}: {{sign}}{{house}}",
+      "relatedVargaLine": "{{name}}: {{sign}}, అధిపతి {{lord}}{{lordHouse}}{{occupants}}",
+      "inHouseShort": " H{{house}}లో",
+      "vargaEmpty": " · ఖాళీ",
+      "timingNow": "ఇప్పుడు",
+      "timingNext": "తర్వాత",
+      "houseMark": " · H{{house}}"
+    }
   },
   "planets": {
     "Sun": "రవి",

@@ -1113,6 +1113,14 @@ function hexLuminance(value) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+/** Append 8-bit hex alpha to a #RRGGBB token so tints follow the active theme. */
+export function withAlpha(color, alpha = '22') {
+  const value = String(color || '').trim();
+  if (value.startsWith('#') && value.length === 7) return `${value}${alpha}`;
+  if (value.startsWith('#') && value.length === 9) return `${value.slice(0, 7)}${alpha}`;
+  return value || color;
+}
+
 /** Body-text greens/reds for chat sentiment. Follow the bubble surface, not the app chrome. */
 export function chatSentimentColors(palette) {
   const surface = palette?.cardBackground || palette?.surface || palette?.background;

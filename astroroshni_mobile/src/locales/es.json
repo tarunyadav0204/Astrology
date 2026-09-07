@@ -172,7 +172,35 @@
     "transit": "Tránsito",
     "dasha": "Dasha",
     "karakas": "Karakas",
-    "positions": "Posiciones"
+    "positions": "Posiciones",
+    "overview": {
+      "loadError": "No se pudo cargar la lectura de la carta",
+      "loading": "Comparando las doce casas…",
+      "verdict": "Veredicto",
+      "houses": "Casas",
+      "tapHouse": "Toca una casa para la lectura completa.",
+      "pillars": "Pilares",
+      "now": "Ahora",
+      "marks": "Marcas especiales",
+      "noMarks": "No hay gandanta, mūlatrikona, vargottama ni puntos especiales marcados.",
+      "yogas": "Yogas",
+      "openYogas": "Abre la lista completa de yogas de esta kundli."
+    },
+    "houseDrawer": {
+      "argala": "Argala",
+      "argalaFromHouse": "{{planet}} desde H{{house}} ({{label}})",
+      "argalaVirodhaFromHouse": "{{planet}} virodha desde H{{house}} ({{label}})",
+      "pointsHere": "Puntos en esta casa",
+      "timingKaraka": "Tiempo, karaka, varga relacionada",
+      "transitingHereNow": "En tránsito aquí ahora: {{planets}}",
+      "karakaLine": "Karaka {{planet}}: {{sign}}{{house}}",
+      "relatedVargaLine": "{{name}}: {{sign}}, señor {{lord}}{{lordHouse}}{{occupants}}",
+      "inHouseShort": " en H{{house}}",
+      "vargaEmpty": " · vacío",
+      "timingNow": "Ahora",
+      "timingNext": "Siguiente",
+      "houseMark": " · H{{house}}"
+    }
   },
   "planets": {
     "Sun": "So",

@@ -32,7 +32,6 @@ import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
 import ChartOverviewSheet from './ChartOverviewSheet';
 import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
-import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 
 import { useTheme } from '../../context/ThemeContext';
@@ -52,7 +51,7 @@ import GuideVideoPlayer from '../../platform/GuideVideoPlayer';
 import AppAlertModal from '../Common/AppAlertModal';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import { useCredits } from '../../credits/CreditContext';
-import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
+import { DISPLAY_FONT_FAMILY, withAlpha } from '../../theme/tokens';
 
 const { width, height } = Dimensions.get('window');
 
@@ -82,13 +81,17 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
   const isWhiteTheme = !isDark;
+  const sectionSurface = { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder };
+  const nestedCard = { backgroundColor: colors.surface };
+  const warningSurface = { backgroundColor: withAlpha(colors.warning, '22'), borderColor: colors.cardBorder };
+  const dangerSurface = { backgroundColor: withAlpha(colors.error, '22'), borderColor: colors.cardBorder };
+  const accentSurface = { backgroundColor: colors.accentSoft, borderColor: colors.cardBorder };
   const { requireAuthForPaid } = useAuthGate();
   const { isAstrologerLicensed } = useCredits();
   const embedded = !!route?.params?.embedded;
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [showDashaBrowser, setShowDashaBrowser] = useState(false);
   const [currentChartIndex, setCurrentChartIndex] = useState(0);
   const bottomNavScrollRef = useRef(null);
   const lastSwipeTime = useRef(0);
@@ -770,23 +773,6 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     return unsubscribe;
   }, [navigation]);
 
-  useEffect(() => {
-    if (!route.params?.reopenDashaBrowser) return;
-    const selectedBirthData = route.params?.birthData || route.params?.birthDetails;
-    navigation.setParams({
-      reopenDashaBrowser: undefined,
-      birthData: undefined,
-      birthDetails: undefined,
-      birthChartId: undefined,
-    });
-    if (selectedBirthData?.name) {
-      setBirthData(selectedBirthData);
-    }
-    setTimeout(() => setShowDashaBrowser(true), 100);
-  }, [navigation, route.params?.reopenDashaBrowser]);
-
-
-
   const loadBirthData = async () => {
     try {
       setLoading(true);
@@ -883,7 +869,6 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
               hideHeader={true}
               cosmicTheme={true}
               chartType={chartTypes[currentChartIndex].id}
-              onOpenDasha={() => setShowDashaBrowser(true)}
               onOpenChartGuide={() => {
                 setGuidePlayerStatus('loading');
                 setShowGuidePlayer(true);
@@ -1181,8 +1166,6 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           );
         })()}
 
-        <CascadingDashaBrowser visible={showDashaBrowser} onClose={() => setShowDashaBrowser(false)} birthData={birthData} onRequireBirthData={() => navigation.replace('BirthProfileIntro', { returnTo: 'Chart' })} selectNativeReturnTo="Chart" />
-
         <Modal
           visible={showGuidePlayer}
           transparent
@@ -1248,7 +1231,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
         >
           <View style={styles.drawerOverlay}>
             <Pressable
-              style={[StyleSheet.absoluteFill, styles.drawerBackdrop]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }]}
               onPress={closeHouseDrawer}
               accessibilityRole="button"
               accessibilityLabel={t('common.close', 'Close')}
@@ -1291,7 +1274,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     </View>
 
                     {/* Significance Description */}
-                    <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}>
+                    <View style={[styles.drawerSection, sectionSurface]}>
                       <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                         {t('chartScreen.houseDrawer.significance', 'Significance')}
                       </Text>
@@ -1301,7 +1284,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     </View>
 
                     {mudakkuAnalysis && selectedHouse.rashiIndex === mudakkuAnalysis?.mudakku_point?.sign && (
-                      <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249, 115, 22, 0.08)' }]}>
+                      <View style={[styles.drawerSection, warningSurface]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                           {t('chartScreen.houseDrawer.mudakku', 'Mudakku / Modakku')}
                         </Text>
@@ -1310,7 +1293,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         </Text>
 
                         <View style={styles.mudakkuDetailGrid}>
-                          <View style={[styles.mudakkuDetailCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15, 23, 42, 0.04)' }]}>
+                          <View style={[styles.mudakkuDetailCard, nestedCard]}>
                             <Text style={[styles.mudakkuDetailLabel, { color: colors.textSecondary }]}>
                               {t('chartScreen.houseDrawer.sunNakshatra', 'Sun Nakshatra')}
                             </Text>
@@ -1319,7 +1302,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                             </Text>
                           </View>
 
-                          <View style={[styles.mudakkuDetailCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15, 23, 42, 0.04)' }]}>
+                          <View style={[styles.mudakkuDetailCard, nestedCard]}>
                             <Text style={[styles.mudakkuDetailLabel, { color: colors.textSecondary }]}>
                               {t('chartScreen.houseDrawer.countToMula', 'Count to Mula')}
                             </Text>
@@ -1345,7 +1328,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     )}
 
                     {(gandantaHouseMatches.planets.length > 0 || (selectedHouse.houseNum === 1 && gandantaAnalysis?.lagna_gandanta?.is_gandanta) || (selectedHouse.houseNum === 1 && gandantaHouseMatches.lagna?.is_gandanta)) && (
-                      <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(220, 38, 38, 0.08)' }]}>
+                      <View style={[styles.drawerSection, dangerSurface]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                           {t('chartScreen.houseDrawer.gandamoola', 'Gandamoola (Gandanta)')}
                         </Text>
@@ -1363,7 +1346,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         {gandantaHouseMatches.planets.length > 0 && (
                           <View style={styles.mudakkuDetailGrid}>
                             {gandantaHouseMatches.planets.map(({ planet, gandanta_info }, idx) => (
-                              <View key={`${planet?.name || 'planet'}-${idx}`} style={[styles.mudakkuDetailCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15, 23, 42, 0.04)' }]}>
+                              <View key={`${planet?.name || 'planet'}-${idx}`} style={[styles.mudakkuDetailCard, nestedCard]}>
                                 <Text style={[styles.mudakkuDetailLabel, { color: colors.textSecondary }]}>
                                   {planet?.name
                                     ? t(`home.planet_names.${planet.name}`, planet.name)
@@ -1411,7 +1394,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     )}
 
                     {houseInsight && (
-                      <View style={[styles.drawerSection, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(249, 115, 22, 0.06)' }]}>
+                      <View style={[styles.drawerSection, accentSurface]}>
                         <View style={styles.insightHeaderRow}>
                           <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>
                             {t('chartScreen.houseDrawer.chartReading', 'Chart reading')}
@@ -1419,17 +1402,26 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                           <View
                             style={[
                               styles.verdictBadge,
-                              houseInsight.verdict.key === 'strong' && styles.verdictBadgeStrong,
-                              houseInsight.verdict.key === 'mixed' && styles.verdictBadgeMixed,
-                              houseInsight.verdict.key === 'active' && styles.verdictBadgeActive,
-                              houseInsight.verdict.key === 'quiet' && styles.verdictBadgeQuiet,
-                              { borderColor: colors.primary + '35' },
+                              {
+                                backgroundColor:
+                                  houseInsight.verdict.key === 'strong' ? withAlpha(colors.success, '28')
+                                  : houseInsight.verdict.key === 'mixed' ? withAlpha(colors.warning, '28')
+                                  : houseInsight.verdict.key === 'active' ? withAlpha(colors.info, '28')
+                                  : colors.surfaceMuted,
+                                borderColor: colors.cardBorder,
+                              },
                             ]}
                           >
                             <Text
                               style={[
                                 styles.verdictBadgeText,
-                                { color: theme === 'dark' ? '#fff7ed' : '#7c2d12' },
+                                {
+                                  color:
+                                    houseInsight.verdict.key === 'strong' ? colors.success
+                                    : houseInsight.verdict.key === 'mixed' ? colors.warning
+                                    : houseInsight.verdict.key === 'active' ? colors.info
+                                    : colors.textSecondary,
+                                },
                               ]}
                             >
                               {translateHouseVerdictLabel(t, houseInsight.verdict?.label)}
@@ -1450,13 +1442,13 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     )}
 
                     {houseInsight?.support_factors?.length > 0 && (
-                      <View style={styles.drawerSection}>
+                      <View style={[styles.drawerSection, sectionSurface]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                           {t('chartScreen.houseDrawer.supports', 'What supports this house')}
                         </Text>
                         {houseInsight.support_factors.map((item, idx) => (
                           <View key={`${selectedHouse.houseNum}-reason-${idx}`} style={styles.reasonRow}>
-                            <View style={[styles.reasonDot, { backgroundColor: '#22c55e' }]} />
+                            <View style={[styles.reasonDot, { backgroundColor: colors.success }]} />
                             <Text style={[styles.reasonText, { color: colors.text }]}>
                               {translateHouseInsightFactor(t, item.label)}
                             </Text>
@@ -1466,13 +1458,13 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     )}
 
                     {houseInsight?.stress_factors?.length > 0 && (
-                      <View style={styles.drawerSection}>
+                      <View style={[styles.drawerSection, sectionSurface]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                           {t('chartScreen.houseDrawer.pressure', 'What adds pressure')}
                         </Text>
                         {houseInsight.stress_factors.map((item, idx) => (
                           <View key={`${selectedHouse.houseNum}-stress-${idx}`} style={styles.reasonRow}>
-                            <View style={[styles.reasonDot, { backgroundColor: '#ef4444' }]} />
+                            <View style={[styles.reasonDot, { backgroundColor: colors.error }]} />
                             <Text style={[styles.reasonText, { color: colors.text }]}>
                               {translateHouseInsightFactor(t, item.label)}
                             </Text>
@@ -1482,7 +1474,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     )}
 
                     {houseInsight?.activation_factors?.length > 0 && (
-                      <View style={styles.drawerSection}>
+                      <View style={[styles.drawerSection, sectionSurface]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                           {t('chartScreen.houseDrawer.activating', 'What is activating it now')}
                         </Text>
@@ -1498,12 +1490,12 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     )}
 
                     {houseInsight?.raw?.ashtakavarga?.sav && (
-                      <View style={styles.drawerSection}>
+                      <View style={[styles.drawerSection, sectionSurface]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                           {t('chartScreen.houseDrawer.ashtakavarga', 'Ashtakavarga')}
                         </Text>
                         <View style={styles.ashtakavargaGrid}>
-                          <View style={[styles.ashtakavargaCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)' }]}>
+                          <View style={[styles.ashtakavargaCard, nestedCard]}>
                             <Text style={[styles.ashtakavargaLabel, { color: colors.textSecondary }]}>{t('premiumUi.chart.sav')}</Text>
                             <Text style={[styles.ashtakavargaValue, { color: colors.text }]}>
                               {houseInsight.raw.ashtakavarga.sav?.house_points ?? '-'}
@@ -1517,7 +1509,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                           </View>
 
                           {houseInsight.raw.ashtakavarga.lord_bav && (
-                            <View style={[styles.ashtakavargaCard, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)' }]}>
+                            <View style={[styles.ashtakavargaCard, nestedCard]}>
                               <Text style={[styles.ashtakavargaLabel, { color: colors.textSecondary }]}>
                                 {t(
                                   `home.planet_names.${houseInsight.raw.ashtakavarga.lord_bav.planet}`,
@@ -1580,7 +1572,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     )}
 
                     {/* Occupant Planets */}
-                    <View style={styles.drawerSection}>
+                    <View style={[styles.drawerSection, sectionSurface]}>
                       <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                         {t('chartScreen.houseDrawer.occupantPlanets', 'Occupant Planets')}
                       </Text>
@@ -1590,7 +1582,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                           const showRetrograde = planet.retrograde && planet.name !== 'Rahu' && planet.name !== 'Ketu';
                           return (
                           <View key={idx} style={styles.planetRow}>
-                            <View style={[styles.planetIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                            <View style={[styles.planetIconContainer, { backgroundColor: withAlpha(colors.primary, '15') }]}>
                               <Text style={[styles.planetEmoji, { color: colors.primary, fontWeight: 'bold' }]}>{planet.symbol}</Text>
                             </View>
                             <View style={styles.planetInfo}>
@@ -1602,7 +1594,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                                   <View
                                     style={[
                                       styles.retrogradeChip,
-                                      { backgroundColor: theme === 'dark' ? 'rgba(245, 158, 11, 0.18)' : 'rgba(245, 158, 11, 0.12)' },
+                                      { backgroundColor: withAlpha(colors.warning, '28') },
                                     ]}
                                   >
                                     <Text style={[styles.retrogradeChipText, { color: colors.text }]}>
@@ -1617,8 +1609,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                                       styles.occupantRoleChip,
                                       {
                                         backgroundColor: role === 'Yogi lord'
-                                          ? (theme === 'dark' ? 'rgba(34, 197, 94, 0.18)' : 'rgba(34, 197, 94, 0.12)')
-                                          : (theme === 'dark' ? 'rgba(239, 68, 68, 0.16)' : 'rgba(239, 68, 68, 0.10)'),
+                                          ? withAlpha(colors.success, '28')
+                                          : withAlpha(colors.error, '22'),
                                       },
                                     ]}
                                   >
@@ -1649,7 +1641,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       )}
                     </View>
 
-                    <View style={styles.drawerSection}>
+                    <View style={[styles.drawerSection, sectionSurface]}>
                       <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                         {t('chartScreen.grahaDrishti', 'Graha drishti')}
                       </Text>
@@ -1678,7 +1670,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     </View>
 
                     {/* House Lord */}
-                    <View style={styles.drawerSection}>
+                    <View style={[styles.drawerSection, sectionSurface]}>
                       <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                         {t('chartScreen.houseDrawer.houseLord', 'House Lord')}
                       </Text>
@@ -1724,7 +1716,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     </View>
 
                     {(houseInsight?.argala?.support?.length || houseInsight?.argala?.obstruction?.length) ? (
-                      <View style={styles.drawerSection}>
+                      <View style={[styles.drawerSection, sectionSurface]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                           {t('chartScreen.houseDrawer.argala', 'Argala')}
                         </Text>
@@ -1733,17 +1725,25 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         </Text>
                         {(houseInsight.argala.support || []).map((row) => (
                           <View key={`a-${row.planet}-${row.from_house}`} style={styles.reasonRow}>
-                            <View style={[styles.reasonDot, { backgroundColor: '#22c55e' }]} />
+                            <View style={[styles.reasonDot, { backgroundColor: colors.success }]} />
                             <Text style={[styles.reasonText, { color: colors.text }]}>
-                              {row.planet} from H{row.from_house} ({row.label})
+                              {t('chartScreen.houseDrawer.argalaFromHouse', {
+                                planet: row.planet,
+                                house: row.from_house,
+                                label: row.label,
+                              })}
                             </Text>
                           </View>
                         ))}
                         {(houseInsight.argala.obstruction || []).map((row) => (
                           <View key={`v-${row.planet}-${row.from_house}`} style={styles.reasonRow}>
-                            <View style={[styles.reasonDot, { backgroundColor: '#ef4444' }]} />
+                            <View style={[styles.reasonDot, { backgroundColor: colors.error }]} />
                             <Text style={[styles.reasonText, { color: colors.text }]}>
-                              {row.planet} virodha from H{row.from_house} ({row.label})
+                              {t('chartScreen.houseDrawer.argalaVirodhaFromHouse', {
+                                planet: row.planet,
+                                house: row.from_house,
+                                label: row.label,
+                              })}
                             </Text>
                           </View>
                         ))}
@@ -1751,7 +1751,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     ) : null}
 
                     {(houseInsight?.points_in_house?.length || houseInsight?.chara_karakas_here?.length) ? (
-                      <View style={styles.drawerSection}>
+                      <View style={[styles.drawerSection, sectionSurface]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                           {t('chartScreen.houseDrawer.pointsHere', 'Points in this house')}
                         </Text>
@@ -1769,34 +1769,53 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     ) : null}
 
                     {(houseInsight?.timing?.windows?.length || houseInsight?.timing?.current_transits?.length || houseInsight?.natural_karakas?.length || houseInsight?.related_varga) ? (
-                      <View style={styles.drawerSection}>
+                      <View style={[styles.drawerSection, sectionSurface]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                           {t('chartScreen.houseDrawer.timingKaraka', 'Timing, karaka, related varga')}
                         </Text>
                         {houseInsight.timing?.current_transits?.length ? (
                           <Text style={[styles.sectionDesc, { color: colors.text, marginBottom: 8 }]}>
-                            Transiting here now: {houseInsight.timing.current_transits.join(', ')}
+                            {t('chartScreen.houseDrawer.transitingHereNow', {
+                              planets: houseInsight.timing.current_transits.join(', '),
+                            })}
                           </Text>
                         ) : null}
                         {(houseInsight.timing?.windows || []).map((row) => (
                           <Text key={`${row.mahadasha}-${row.antardasha}-${row.start}`} style={[styles.reasonText, { color: colors.text, marginBottom: 6 }]}>
-                            {row.current ? 'Now' : 'Next'} · {row.mahadasha}/{row.antardasha}
+                            {row.current
+                              ? t('chartScreen.houseDrawer.timingNow', 'Now')
+                              : t('chartScreen.houseDrawer.timingNext', 'Next')}
+                            {' · '}{row.mahadasha}/{row.antardasha}
                             {row.start ? ` · ${row.start}` : ''}{row.end ? `–${row.end}` : ''}
                             {row.why ? ` · ${row.why}` : ''}
                           </Text>
                         ))}
                         {(houseInsight.natural_karakas || []).map((row) => (
                           <Text key={row.planet} style={[styles.reasonText, { color: colors.text, marginBottom: 6 }]}>
-                            Karaka {row.planet}: {row.sign_name || '—'}{row.house != null ? ` · H${row.house}` : ''}
+                            {t('chartScreen.houseDrawer.karakaLine', {
+                              planet: row.planet,
+                              sign: row.sign_name || '—',
+                              house: row.house != null
+                                ? t('chartScreen.houseDrawer.houseMark', { house: row.house })
+                                : '',
+                            })}
                           </Text>
                         ))}
                         {houseInsight.related_varga ? (
                           <Text style={[styles.sectionDesc, { color: colors.text }]}>
-                            {houseInsight.related_varga.name}: {houseInsight.related_varga.sign_name || '—'}, lord {houseInsight.related_varga.lord || '—'}
-                            {houseInsight.related_varga.lord_house != null ? ` in H${houseInsight.related_varga.lord_house}` : ''}
-                            {houseInsight.related_varga.occupants?.length
-                              ? ` · ${houseInsight.related_varga.occupants.join(', ')}`
-                              : ' · empty'}
+                            {t('chartScreen.houseDrawer.relatedVargaLine', {
+                              name: houseInsight.related_varga.name,
+                              sign: houseInsight.related_varga.sign_name || '—',
+                              lord: houseInsight.related_varga.lord || '—',
+                              lordHouse: houseInsight.related_varga.lord_house != null
+                                ? t('chartScreen.houseDrawer.inHouseShort', {
+                                    house: houseInsight.related_varga.lord_house,
+                                  })
+                                : '',
+                              occupants: houseInsight.related_varga.occupants?.length
+                                ? ` · ${houseInsight.related_varga.occupants.join(', ')}`
+                                : t('chartScreen.houseDrawer.vargaEmpty'),
+                            })}
                           </Text>
                         ) : null}
                       </View>
@@ -1846,7 +1865,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
 
                     {(houseInsight?.related_chart || houseInsight?.relatedChart) && currentChartIndex === 0 && (
                       <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: theme === 'dark' ? 'rgba(59,130,246,0.2)' : 'rgba(37,99,235,0.12)' }]}
+                        style={[styles.actionButton, { backgroundColor: colors.accentSoft }]}
                         onPress={() => {
                           const related = houseInsight.related_chart || houseInsight.relatedChart;
                           const relatedIndex = chartTypes.findIndex((chart) => chart.id === related.id);
@@ -2221,9 +2240,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
-  drawerBackdrop: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
   drawerContent: {
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
@@ -2244,7 +2260,6 @@ const styles = StyleSheet.create({
   drawerHandle: {
     width: 40,
     height: 5,
-    backgroundColor: 'rgba(128,128,128,0.3)',
     borderRadius: 3,
     alignSelf: 'center',
     marginTop: 12,
@@ -2268,7 +2283,6 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   houseNumberText: {
-    color: 'white',
     fontSize: 20,
     fontWeight: 'bold',
   },
@@ -2295,7 +2309,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(128,128,128,0.14)',
     marginBottom: 16,
   },
   sectionTitle: {
@@ -2323,18 +2336,6 @@ const styles = StyleSheet.create({
     minHeight: 30,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  verdictBadgeStrong: {
-    backgroundColor: 'rgba(34, 197, 94, 0.22)',
-  },
-  verdictBadgeMixed: {
-    backgroundColor: 'rgba(245, 158, 11, 0.24)',
-  },
-  verdictBadgeActive: {
-    backgroundColor: 'rgba(59, 130, 246, 0.22)',
-  },
-  verdictBadgeQuiet: {
-    backgroundColor: 'rgba(100, 116, 139, 0.22)',
   },
   verdictBadgeText: {
     fontSize: 12,
@@ -2459,7 +2460,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(128,128,128,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,

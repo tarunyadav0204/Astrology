@@ -21,6 +21,7 @@ from chat.instant_chat_pipeline import (  # noqa: E402
     _normalize_instant_evidence,
     _build_instant_composer_context,
     _build_instant_composer_prompt_v3,
+    _normalize_event_category,
 )
 
 
@@ -415,6 +416,73 @@ def test_spouse_temperament_does_not_fall_back_to_seventh_house_when_layers_are_
     assert "Mercury" not in safe
     assert "Standard or Premium mode" in safe
     assert "seventh house" not in safe
+
+
+def test_spouse_alias_uses_marriage_focus_and_placeholder_layers_are_incomplete() -> None:
+    assert _normalize_event_category("spouse") == "marriage"
+    assert _normalize_event_category("partner") == "marriage"
+    assert _normalize_event_category("relationship") == "marriage"
+
+    chart = {
+        "planets": {
+            "Mars": {"house": 2, "longitude": 122.0},
+            "Venus": {"house": 11, "longitude": 34.0},
+        },
+    }
+    temperament = _compact_spouse_temperament_evidence(
+        chart,
+        {"houses": [{"house": 2, "lord": "Sun"}]},
+        {"chara_karakas": {"Darakaraka": {"planet": "Mars"}}},
+        {"topic": {"charts": {"D9": {"support": "supportive"}}}},
+    )
+
+    assert temperament["evidence_complete"] is False
+    assert "seventh_house" in temperament["missing_layers"]
+    assert "seventh_lord_rashi_nakshatra" in temperament["missing_layers"]
+    assert temperament["layers"]["seventh_house"] == {}
+    assert temperament["layers"]["seventh_lord_rashi_nakshatra"] == {}
+
+
+def test_spouse_profile_composer_excludes_unrelated_global_natal_notes() -> None:
+    temperament = {
+        "evidence_complete": True,
+        "missing_layers": [],
+        "layers": {
+            "seventh_house": {"house": 7, "lord": "Saturn"},
+            "seventh_lord_rashi_nakshatra": {
+                "planet": "Saturn", "house": 2, "rashi": "Leo", "nakshatra": "Uttara Phalguni",
+            },
+            "darakaraka_rashi_nakshatra": {
+                "planet": "Mars", "house": 2, "rashi": "Leo", "nakshatra": "Magha",
+            },
+            "venus_rashi_nakshatra": {
+                "planet": "Venus", "house": 11, "rashi": "Taurus", "nakshatra": "Krittika",
+            },
+            "d9_confirmation": {"support": "supportive", "rows": [{"h": 7, "lord": "Mercury"}]},
+        },
+    }
+    packet = _packet("spouse", "relationship_person")
+    packet["user_derivation"] = {
+        "natal_promise": {
+            "d1_house_factors": [{
+                "house": 2,
+                "special_caution_notes": ["Mars is in a Gandanta zone and rules a Dagdha sign."],
+            }],
+        },
+    }
+    context = {
+        "intent_summary": {"category": "spouse", "answer_mode": "relationship_person"},
+        "normalized_evidence": {"spouse_temperament_context": temperament},
+    }
+    result = apply_live_graph_policy(packet, intent={"category": "spouse"}, context=context)
+    composer = _build_instant_composer_context(context, result)
+
+    assert "special_natal_factors" not in composer["evidence"]
+    assert "natal_promise" not in composer["evidence"]
+    spouse_evidence = composer["evidence"]["spouse_temperament_context"]
+    assert spouse_evidence["evidence_complete"] is True
+    assert spouse_evidence["layers"]["seventh_lord_rashi_nakshatra"]["planet"] == "Saturn"
+    assert spouse_evidence["layers"]["d9_confirmation"]["support"] == "supportive"
 
 
 def test_spouse_appearance_answers_physical_facet_without_temperament_fallback() -> None:
