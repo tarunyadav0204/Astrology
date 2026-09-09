@@ -18101,7 +18101,14 @@ def _instant_composer_language_rule(language: str) -> str:
         "If this turn is a short clarification answer, keep the language of the original question in USER QUESTION or recent_history. "
         "Chart evidence and this brief are English internally; never switch the user-facing answer to English because of that. "
         f"The app language setting `{fallback}` is only a fallback when the conversation language is truly unclear. "
-        "If the user mixes languages or writes a regional language in Latin letters, mirror that mix instead of switching to English or a more formal script."
+        "If the user mixes languages or writes a regional language in Latin letters, mirror that natural register instead of switching to English or a more formal script. "
+        "LEXICAL CONSISTENCY: express each concept once in one language form. Do not write bilingual synonym pairs such as "
+        "`Cancer (Karka)`, `Moon (Chandra)`, `fourth house (chautha bhav)`, or the reverse forms. Parentheses may add "
+        "new information such as a chart code, date, degree, or abbreviation, but must not repeat the same word or concept "
+        "as a translation. For Hinglish/Roman Hindi, prefer natural Roman Hindi astrology terms consistently (for example "
+        "`Karka Lagna`, `Chandra`, `chautha bhav`) while retaining a conventional English technical term only when that is "
+        "the form naturally used in the sentence. For Devanagari Hindi, use Devanagari terms without an English duplicate. "
+        "Apply the same one-form-per-concept rule to every other language and to both Simple and Technical styles."
     )
 
 

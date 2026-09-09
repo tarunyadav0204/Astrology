@@ -171,6 +171,9 @@ const createWebHtmlSound = (url) => {
       audio.pause();
       audio.removeAttribute('src');
       try { audio.load(); } catch (_) {}
+      if (String(url || '').startsWith('blob:')) {
+        try { URL.revokeObjectURL(url); } catch (_) {}
+      }
       return Promise.resolve();
     },
     setVolumeAsync: (v) => {
@@ -196,6 +199,13 @@ const createWebHtmlSound = (url) => {
       statusCb = cb;
     },
   };
+};
+
+const createPlaybackSound = (uri, initialStatus = {}) => {
+  if (isWebPlatform()) {
+    return Promise.resolve({ sound: createWebHtmlSound(uri) });
+  }
+  return Audio.Sound.createAsync({ uri }, initialStatus);
 };
 
 const attachPodcastStatus = (sound, { onDone, onProgress }) => {
@@ -359,14 +369,16 @@ const synthesizeServerTtsToCache = async (
   if (!spoken) return null;
   const key = getServerTtsCacheKey(spoken, { language, voiceName, cacheKey, prepareSpoken });
   const uri = getServerTtsCacheUri(key);
-  try {
-    const info = await FileSystem.getInfoAsync(uri);
-    if (info?.exists && Number(info?.size || 0) > 0) {
-      console.log('[TTS] cache hit', { key, uri, size: info.size || null });
-      return { uri, key, cached: true };
+  if (!isWebPlatform()) {
+    try {
+      const info = await FileSystem.getInfoAsync(uri);
+      if (info?.exists && Number(info?.size || 0) > 0) {
+        console.log('[TTS] cache hit', { key, uri, size: info.size || null });
+        return { uri, key, cached: true };
+      }
+    } catch {
+      // Continue to synthesize if cache inspection fails.
     }
-  } catch {
-    // Continue to synthesize if cache inspection fails.
   }
 
   if (serverTtsInflight.has(key)) {
@@ -387,6 +399,13 @@ const synthesizeServerTtsToCache = async (
     const base64Audio = response?.data?.audio;
     if (!base64Audio || typeof base64Audio !== 'string') {
       throw new Error('Google TTS: missing audio from server');
+    }
+    if (isWebPlatform()) {
+      return {
+        uri: base64ToBlobUrl(base64Audio),
+        key,
+        cached: false,
+      };
     }
     await FileSystem.writeAsStringAsync(uri, base64Audio, {
       encoding: FileSystem.EncodingType.Base64,
@@ -526,15 +545,17 @@ export const textToSpeech = {
           startedCallbackSent = true;
           if (onStart) onStart();
         };
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          allowsRecordingIOS: false,
-          playThroughEarpieceAndroid: false,
-          shouldDuckAndroid: false,
-          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-          interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-        });
+        if (!isWebPlatform()) {
+          await Audio.setAudioModeAsync({
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: false,
+            allowsRecordingIOS: false,
+            playThroughEarpieceAndroid: false,
+            shouldDuckAndroid: false,
+            interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+            interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+          });
+        }
         let nextAudioPromise = synthesizeServerTtsToCache(streamedChunks[0], {
           language,
           voiceName,
@@ -581,8 +602,8 @@ export const textToSpeech = {
               if (error) reject(error);
               else resolve();
             };
-            const { sound } = await Audio.Sound.createAsync(
-              { uri: cachedAudio.uri },
+            const { sound } = await createPlaybackSound(
+              cachedAudio.uri,
               { progressUpdateIntervalMillis: 500 }
             );
             currentSound = sound;
@@ -644,15 +665,17 @@ export const textToSpeech = {
       }
       speechTempUri = null;
 
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        allowsRecordingIOS: false,
-        playThroughEarpieceAndroid: false,
-        shouldDuckAndroid: false,
-        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-      });
+      if (!isWebPlatform()) {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          allowsRecordingIOS: false,
+          playThroughEarpieceAndroid: false,
+          shouldDuckAndroid: false,
+          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+          interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+        });
+      }
 
       await new Promise(async (resolve, reject) => {
         let settled = false;
@@ -685,8 +708,8 @@ export const textToSpeech = {
           }
         };
 
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: cachedAudio.uri },
+        const { sound } = await createPlaybackSound(
+          cachedAudio.uri,
           { progressUpdateIntervalMillis: 500 }
         );
         currentSound = sound;

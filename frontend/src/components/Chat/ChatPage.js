@@ -3389,10 +3389,10 @@ const ChatPage = ({ onLogin }) => {
                             <button
                                 type="button"
                                 className="chat-header-btn"
-                                title="Talk with Tara (voice chat)"
+                                title="Talk To Tara"
                                 onClick={() => navigate('/speech-chat')}
                             >
-                                <span className="chat-header-btn__full">Voice</span>
+                                <span className="chat-header-btn__full">Talk To Tara</span>
                                 <span className="chat-header-btn__icon" aria-hidden="true">🎤</span>
                             </button>
                             )}

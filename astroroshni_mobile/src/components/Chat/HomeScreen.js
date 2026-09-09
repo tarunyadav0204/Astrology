@@ -354,6 +354,7 @@ export function getHomeBottomTabMetrics(bottomInset = 0) {
 export default function HomeScreen({
   birthData,
   onOptionSelect,
+  onTalkToTara,
   navigation,
   setShowDashaBrowser,
   infoModalPayload,
@@ -2285,6 +2286,7 @@ const loadHomeData = async (nativeData = null) => {
           onSelectNative={() => navigation.navigate('SelectNative', { returnTo: 'Home', returnParams: { stayOnGreeting: true } })}
           onCreateChart={() => navigation.navigate('BirthForm', { returnTo: 'Home' })}
           onAsk={() => onOptionSelect({ action: 'question' })}
+          onTalkToTara={onTalkToTara}
           onOpenCharts={() => requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data }))}
           onOpenDasha={() => requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data, tab: 'dasha' }))}
           onOpenNakshatra={() => requireBirthChart((data) => navigation.navigate('NakshatraCalendar', { birthData: data }))}

@@ -2467,7 +2467,7 @@ async def start_speech_billing_session(current_user: User = Depends(get_current_
             status_code=402,
             detail={
                 "message": (
-                    f"Speech chat requires at least {required_start_credits} credits "
+                    f"Talk To Tara requires at least {required_start_credits} credits "
                     f"for {SPEECH_BILLING_MIN_START_MINUTES} minutes."
                 ),
                 "required_credits": required_start_credits,
@@ -2617,7 +2617,7 @@ async def end_speech_billing_session(
                 current_user.userid,
                 -charge,
                 new_balance,
-                f"Speech chat call: {minutes} minute(s), {elapsed_seconds}s ({reason})",
+                f"Talk To Tara call: {minutes} minute(s), {elapsed_seconds}s ({reason})",
             ),
         )
         execute(

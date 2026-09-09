@@ -23,6 +23,7 @@ from chat.instant_chat_pipeline import (
     _instant_real_chart_facts,
     _is_retrospective_event_request,
     _instant_answer_language_error,
+    _instant_composer_language_rule,
     _instant_relational_voice_contract,
     _instant_response_language,
     _mode_selection_from_intent,
@@ -245,6 +246,15 @@ def test_instant_health_language_gate_does_not_parse_visible_language():
     hindi = "आपकी कुंडली के अनुसार मुख्य स्वास्थ्य संवेदनशीलता नाक और हृदय से जुड़ी है।"
     assert _instant_answer_language_error(hindi, "english") is None
     assert _instant_answer_language_error("Your chart highlights the nose and upper back.", "english") is None
+
+
+def test_instant_language_contract_forbids_redundant_bilingual_glosses():
+    rule = _instant_composer_language_rule("hinglish")
+    assert "one-form-per-concept" in rule
+    assert "Cancer (Karka)" in rule
+    assert "Moon (Chandra)" in rule
+    assert "Parentheses may add new information" in rule
+    assert "For Devanagari Hindi" in rule
 
 
 def test_health_evidence_ledger_preserves_late_anatomy_causes():

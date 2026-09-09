@@ -51,6 +51,8 @@ export const storage = {
   // Language preference
   setLanguage: (language) => AsyncStorage.setItem('language', language),
   getLanguage: () => AsyncStorage.getItem('language'),
+  setSpeechLanguage: (language) => AsyncStorage.setItem('speechLanguage', language),
+  getSpeechLanguage: () => AsyncStorage.getItem('speechLanguage'),
   
   // Chat history
   setChatHistory: (history) => AsyncStorage.setItem('chatHistory', JSON.stringify(history)),

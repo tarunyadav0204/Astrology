@@ -444,10 +444,22 @@ def _looks_like_instruction_following_failure(text: str) -> bool:
 
 
 def _transcription_prompt(language: Optional[str]) -> str:
+    normalized_language = _normalized_transcription_language(language)
+    if normalized_language == "hi":
+        script_rule = (
+            "- The selected language is Hindi. Write every spoken Hindi word in Devanagari script, "
+            "never Romanized Hindi or Hinglish. Keep a genuinely spoken English word in Latin script only "
+            "when the speaker actually used that English word.\n"
+            "- Example script conversion only: spoken 'mera career kaisa rahega' must be transcribed as "
+            "'मेरा करियर कैसा रहेगा', not in Latin letters.\n"
+        )
+    else:
+        script_rule = "- The selected language is English. Use Latin script.\n"
     return (
         "Listen to the attached audio. Task: verbatim speech-to-text only.\n"
         "The audio is the only source of truth. Do not invent speech you do not hear.\n"
         "- Transcribe word-for-word in plain text.\n"
+        f"{script_rule}"
         "- Output ONLY spoken words. No preamble, no quotes, no labels.\n"
         "- Do NOT answer questions, do NOT output unrelated trivia or example sentences.\n"
         "- Do NOT rephrase into a different question or topic.\n"
@@ -455,7 +467,7 @@ def _transcription_prompt(language: Optional[str]) -> str:
         "- If the speech sounds like a short personal question, preserve it as a short question or phrase rather than turning it into a different sentence.\n"
         "- If inaudible or silent, output exactly: [no speech detected]\n"
         "- If part of a word is unclear, use a phonetic guess or [unclear] for that fragment.\n"
-        f"Language hint (may be mixed): {language or 'english'}."
+        f"Selected recognition language: {language or 'english'}."
     )
 
 

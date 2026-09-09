@@ -35,7 +35,7 @@ const MAX_POLLS = 90;
 const SPEECH_TTS_MAX_CHARS = 820;
 const USE_BACKEND_SPEECH_TRANSCRIPTION = true;
 const ALLOW_NATIVE_RUNTIME_BACKEND_FALLBACK = false;
-const PREFER_NATIVE_SPEECH_RECOGNITION = Platform.OS === 'ios';
+const PREFER_NATIVE_SPEECH_RECOGNITION = Platform.OS === 'ios' || Platform.OS === 'web';
 const REQUIRE_NATIVE_SPEECH_FOR_WEBSOCKET = Platform.OS === 'ios';
 const USE_SPEECH_WEBSOCKET = true;
 const HANDS_FREE_AUTO_STOP_MS = 45 * 1000;
@@ -62,7 +62,7 @@ const SPEECH_RECORDING_OPTIONS = {
 
 const normalizeLanguageCode = (language) => {
   const raw = String(language || 'english').toLowerCase();
-  return raw.startsWith('hi') ? 'hindi' : language || 'english';
+  return raw.startsWith('hi') ? 'hindi' : 'english';
 };
 
 const inferSpeechTurnLanguage = (text, fallback = 'english') => {
@@ -136,6 +136,10 @@ const THINKING_HANDOFF_DEFAULTS = [
 ];
 const SPEECH_CHAT_TTS_PROVIDER = 'google';
 const SPEECH_GREETING_CACHE_VERSION = 'v3';
+const SPEECH_LANGUAGE_OPTIONS = [
+  { key: 'english', labelKey: 'speechChat.languageEnglish', fallback: 'English' },
+  { key: 'hindi', labelKey: 'speechChat.languageHindi', fallback: 'हिंदी' },
+];
 
 const hashGreetingText = (value) => {
   const text = String(value || '');
@@ -185,7 +189,7 @@ const buildSpeechAfterAnswerPrompt = (turnLanguage, followUpQuestion, translate)
 
 export default function SpeechChatScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { colors } = useTheme();
   const { requireAuthForPaid } = useAuthGate();
   const [userName, setUserName] = useState('');
@@ -211,8 +215,9 @@ export default function SpeechChatScreen({ navigation, route }) {
   const [billingSession, setBillingSession] = useState(null);
   const [callElapsedSeconds, setCallElapsedSeconds] = useState(0);
   const [callRemainingSeconds, setCallRemainingSeconds] = useState(null);
-  const [speechTtsProvider, setSpeechTtsProvider] = useState('local');
-  const [speechTtsReady, setSpeechTtsReady] = useState(false);
+  const [speechTtsProvider, setSpeechTtsProvider] = useState(SPEECH_CHAT_TTS_PROVIDER);
+  const [speechTtsReady, setSpeechTtsReady] = useState(true);
+  const [speechContextReady, setSpeechContextReady] = useState(false);
   const [avatarSpeech, setAvatarSpeech] = useState({
     active: false,
     text: '',
@@ -250,6 +255,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const startListeningInFlightRef = useRef(false);
   const activeTurnSerialRef = useRef(0);
   const activeTurnLanguageRef = useRef(normalizeLanguageCode(route.params?.language || 'english'));
+  const speechLanguageLockedRef = useRef(Boolean(route.params?.language));
   const speechSocketRef = useRef(null);
   const speechSocketConnectPromiseRef = useRef(null);
   const speechSocketPendingTurnsRef = useRef(new Map());
@@ -272,18 +278,23 @@ export default function SpeechChatScreen({ navigation, route }) {
     Array.from({ length: 8 }, () => new Animated.Value(0))
   ).current;
 
+  const getSpeechTranslator = (selectedLanguage = language) => (
+    i18n.getFixedT(normalizeLanguageCode(selectedLanguage) === 'hindi' ? 'hindi' : 'english')
+  );
+
   const buildGreetingText = () => {
+    const speechT = getSpeechTranslator();
     const chartName = String(birthData?.name || '').trim();
     const trimmedUserName = String(userName || '').trim();
     if (!chartName) return '';
     return trimmedUserName
-      ? t('speechChat.greetingWithUser', {
+      ? speechT('speechChat.greetingWithUser', {
           userName: trimmedUserName,
           chartName,
           defaultValue:
             `${trimmedUserName}, ${chartName}'s chart is ready. What would you like to explore?`,
         })
-      : t('speechChat.greetingAnonymous', {
+      : speechT('speechChat.greetingAnonymous', {
           chartName,
           defaultValue:
             `${chartName}'s chart is ready. What would you like to explore?`,
@@ -358,14 +369,14 @@ export default function SpeechChatScreen({ navigation, route }) {
     stopSpeechUiImmediately();
     await releaseSpeechRecognizer();
     setStatus('idle');
-    setErrorText(t('speechChat.creditFinished', 'Speech chat ended because your available talk credits finished.'));
+    setErrorText(t('speechChat.creditFinished', 'Talk To Tara ended because your available talk credits finished.'));
     await endSpeechBillingSession('credit_finished');
   };
 
   const startSpeechBillingSession = async () => {
     if (billingSessionRef.current?.session_id) return true;
     const authOk = await requireAuthForPaid({
-      feature: t('speechChat.title', 'speech chat'),
+      feature: t('speechChat.title', 'Talk To Tara'),
       message: t('authGate.messageSpeech'),
       resume: { resumeRoute: 'SpeechChat', resumeParams: route?.params || {} },
     });
@@ -410,7 +421,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       const balance = detail?.balance;
       const perMinute = detail?.per_minute_cost || speechPerMinuteCost || 1;
       const message = detail?.message
-        || `Speech chat needs at least ${SPEECH_BILLING_MIN_START_MINUTES * perMinute} credits to start.`;
+        || `Talk To Tara needs at least ${SPEECH_BILLING_MIN_START_MINUTES * perMinute} credits to start.`;
       Alert.alert(
         t('credits.insufficient', 'Insufficient Credits'),
         required != null && balance != null
@@ -462,15 +473,24 @@ export default function SpeechChatScreen({ navigation, route }) {
     });
 
     const loadContext = async () => {
-      const [storedBirthData, storedLanguage, storedUser] = await Promise.all([
-        storage.getBirthDetails(),
-        storage.getLanguage(),
-        storage.getUserData(),
-      ]);
-      if (mountedRef.current) {
-        if (!birthData && storedBirthData) setBirthData(storedBirthData);
-        if (!route.params?.language && storedLanguage) setLanguage(storedLanguage);
-        setUserName(String(storedUser?.name || storedUser?.full_name || '').trim());
+      try {
+        const [storedBirthData, storedLanguage, storedSpeechLanguage, storedUser] = await Promise.all([
+          storage.getBirthDetails(),
+          storage.getLanguage(),
+          storage.getSpeechLanguage(),
+          storage.getUserData(),
+        ]);
+        if (mountedRef.current) {
+          if (!birthData && storedBirthData) setBirthData(storedBirthData);
+          if (!route.params?.language && (storedSpeechLanguage || storedLanguage)) {
+            const nextLanguage = normalizeLanguageCode(storedSpeechLanguage || storedLanguage);
+            setLanguage(nextLanguage);
+            activeTurnLanguageRef.current = nextLanguage;
+          }
+          setUserName(String(storedUser?.name || storedUser?.full_name || '').trim());
+        }
+      } finally {
+        if (mountedRef.current) setSpeechContextReady(true);
       }
     };
 
@@ -684,7 +704,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   }, [birthData?.id]);
 
   useEffect(() => {
-    if (!birthData?.name || !speechTtsReady) return;
+    if (!speechContextReady || !birthData?.name || !speechTtsReady) return;
     const greeting = buildGreetingText();
     if (!greeting) return;
     const cacheKey = getGreetingCacheKey();
@@ -702,17 +722,16 @@ export default function SpeechChatScreen({ navigation, route }) {
         uri: result?.uri || null,
       });
     });
-  }, [birthData?.id, birthData?.name, language, speechTtsReady, userName, t]);
+  }, [birthData?.id, birthData?.name, language, speechContextReady, speechTtsReady, userName, i18n]);
 
   useEffect(() => {
     if (greetedRef.current || !birthData?.name || status !== 'idle') return;
-    if (!speechTtsReady) return;
+    if (!speechContextReady || !speechTtsReady) return;
 
     const greet = async () => {
-      const billingOk = await startSpeechBillingSession();
-      if (!billingOk || !mountedRef.current) return;
       greetedRef.current = true;
       const greeting = buildGreetingText();
+      if (!greeting || !mountedRef.current) return;
       const cacheKey = getGreetingCacheKey();
       setStatus('speaking');
       await speakWithAvatar(greeting, {
@@ -733,14 +752,14 @@ export default function SpeechChatScreen({ navigation, route }) {
     };
 
     greet();
-  }, [birthData?.name, language, speechTtsReady, status, t, userName, speechPerMinuteCost]);
+  }, [birthData?.name, language, speechContextReady, speechTtsReady, status, userName, i18n]);
 
   const ensureSession = async () => {
     if (sessionId) return sessionId;
     if (!birthData?.id) {
       Alert.alert(
         t('speechChat.profileRequired', 'Birth chart required'),
-        t('speechChat.profileRequiredBody', 'Please select or create a birth chart before using speech chat.')
+        t('speechChat.profileRequiredBody', 'Please select or create a birth chart before you Talk To Tara.')
       );
       return null;
     }
@@ -862,7 +881,7 @@ export default function SpeechChatScreen({ navigation, route }) {
     if (!birthData) {
       Alert.alert(
         t('speechChat.profileRequired', 'Birth chart required'),
-        t('speechChat.profileRequiredBody', 'Please select or create a birth chart before using speech chat.')
+        t('speechChat.profileRequiredBody', 'Please select or create a birth chart before you Talk To Tara.')
       );
       return;
     }
@@ -907,7 +926,7 @@ export default function SpeechChatScreen({ navigation, route }) {
               throw new Error(
                 t(
                   'speechChat.nativeSpeechRequired',
-                  'Voice chat needs the native speech recognizer in this Android build. Rebuild/reinstall the development app, or test on a device with Google Speech Services enabled.'
+                  'Talk To Tara needs the native speech recognizer in this build. Rebuild/reinstall the app, or test on a device with Google Speech Services enabled.'
                 )
               );
             }
@@ -1135,6 +1154,15 @@ export default function SpeechChatScreen({ navigation, route }) {
     if (!mountedRef.current || !handsFreeEnabledRef.current) return;
     setErrorText('');
     try {
+      // The welcome itself is free. Start metered time only when the live
+      // microphone conversation is about to begin.
+      if (!billingSessionRef.current?.session_id) {
+        const billingOk = await startSpeechBillingSession();
+        if (!billingOk || !mountedRef.current) {
+          setStatus('idle');
+          return;
+        }
+      }
       await wait(POST_TTS_LISTEN_DELAY_MS);
       await startListening({ source: 'handsFreeAfterGreeting', stopCurrentSpeech: false });
     } catch (error) {
@@ -1266,7 +1294,8 @@ export default function SpeechChatScreen({ navigation, route }) {
     await releaseSpeechRecognizer();
     const i = thinkingLeadInIndexRef.current % THINKING_HANDOFF_KEYS.length;
     thinkingLeadInIndexRef.current += 1;
-    const phrase = t(THINKING_HANDOFF_KEYS[i], THINKING_HANDOFF_DEFAULTS[i]);
+    const speechT = getSpeechTranslator(activeTurnLanguageRef.current || language);
+    const phrase = speechT(THINKING_HANDOFF_KEYS[i], THINKING_HANDOFF_DEFAULTS[i]);
     try {
       await speakWithAvatar(phrase, { language });
     } catch {
@@ -1749,7 +1778,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       throw new Error('Speech websocket disabled');
     }
     let activeSessionId = await ensureSession();
-    if (!activeSessionId) throw new Error(t('speechChat.sessionError', 'Could not start a speech chat session.'));
+    if (!activeSessionId) throw new Error(t('speechChat.sessionError', 'Could not start Talk To Tara.'));
     const socketClient = await ensureSpeechSocket();
     const turnId = `turn_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const clientRequestId = `speech_ws_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -1796,7 +1825,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       }
     }
     let activeSessionId = await ensureSession();
-    if (!activeSessionId) throw new Error(t('speechChat.sessionError', 'Could not start a speech chat session.'));
+    if (!activeSessionId) throw new Error(t('speechChat.sessionError', 'Could not start Talk To Tara.'));
     const buildAskBody = (sid) => ({
       session_id: sid,
       question,
@@ -1880,7 +1909,11 @@ export default function SpeechChatScreen({ navigation, route }) {
     const nextFollowUps = Array.isArray(data.follow_up_questions)
       ? data.follow_up_questions.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
       : [];
-    const closingLine = buildSpeechAfterAnswerPrompt(turnLanguage, nextFollowUps[0], t);
+    const closingLine = buildSpeechAfterAnswerPrompt(
+      turnLanguage,
+      nextFollowUps[0],
+      getSpeechTranslator(turnLanguage)
+    );
     const spokenAnswer = trimForSpeechPlayback(`${answer} ${closingLine}`);
     setFollowUps(nextFollowUps);
     setTurns((prev) => [...prev, { question, answer, followUps: nextFollowUps }]);
@@ -1919,7 +1952,9 @@ export default function SpeechChatScreen({ navigation, route }) {
     const turnSerial = activeTurnSerialRef.current + 1;
     activeTurnSerialRef.current = turnSerial;
     resetStreamSpeech(turnSerial);
-    const turnLanguage = inferSpeechTurnLanguage(spokenQuestion, language);
+    const turnLanguage = speechLanguageLockedRef.current
+      ? normalizeLanguageCode(language)
+      : inferSpeechTurnLanguage(spokenQuestion, language);
     activeTurnLanguageRef.current = turnLanguage;
     if (turnLanguage !== normalizeLanguageCode(language)) {
       setLanguage(turnLanguage);
@@ -1967,6 +2002,7 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const askFollowUp = async (question) => {
     if (status !== 'idle') return;
+    if (Platform.OS === 'web') getTextToSpeech().unlockWebAudio?.();
     setCurrentTranscript(question);
     setFollowUps([]);
     setErrorText('');
@@ -2043,6 +2079,9 @@ export default function SpeechChatScreen({ navigation, route }) {
   };
 
   const handleMicPress = async () => {
+    // This must run synchronously inside Chrome's click gesture. Awaiting
+    // permission, billing, or generation first loses autoplay authorization.
+    if (Platform.OS === 'web') getTextToSpeech().unlockWebAudio?.();
     try {
       logSpeechDebug('micPress', {
         status,
@@ -2067,6 +2106,20 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
   };
 
+  const handleSpeechLanguageChange = (nextLanguage) => {
+    const normalized = normalizeLanguageCode(nextLanguage);
+    if (statusRef.current !== 'idle' || normalized === normalizeLanguageCode(language)) return;
+    speechLanguageLockedRef.current = true;
+    activeTurnLanguageRef.current = normalized;
+    greetingPrefetchKeyRef.current = '';
+    // Before the first question, replay the welcome in the newly selected language.
+    greetedRef.current = turns.length > 0;
+    setFollowUps([]);
+    setErrorText('');
+    setLanguage(normalized);
+    storage.setSpeechLanguage(normalized).catch(() => {});
+  };
+
   const speechPreparing = status === 'speaking' && avatarSpeech.active && !avatarSpeech.audioStarted;
   const nativeRecognizerStarting = status === 'listening'
     && nativeRecognizerPhase === 'starting'
@@ -2088,6 +2141,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   }[status] || '';
 
   const busy = ['transcribing', 'thinking'].includes(status) || speechPreparing || nativeRecognizerStarting;
+  const languageSwitchDisabled = status !== 'idle';
   const screenPalette = {
     background: colors.background,
     backgroundAlt: colors.backgroundSecondary || colors.background,
@@ -2226,15 +2280,15 @@ export default function SpeechChatScreen({ navigation, route }) {
           </TouchableOpacity>
           <View style={styles.headerTextWrap}>
             <Text style={[styles.title, { color: screenPalette.text }]}>
-              {t('speechChat.screenTitle', 'Tara')}
+              {t('chat.modeIntro.speech.name', 'Talk To Tara')}
             </Text>
             <Text style={[styles.subtitle, { color: screenPalette.textSecondary }]}>
               {birthData?.name
                 ? t('speechChat.screenSubtitleWithChart', {
                     name: birthData.name,
-                    defaultValue: `Speech consultation for ${birthData.name}`,
+                    defaultValue: `Voice consultation for ${birthData.name}`,
                   })
-                : t('speechChat.screenSubtitleDefault', 'Talk naturally with Tara')}
+                : t('speechChat.screenSubtitleDefault', 'A live voice conversation with Tara')}
             </Text>
           </View>
           <View style={[
@@ -2246,7 +2300,7 @@ export default function SpeechChatScreen({ navigation, route }) {
           ]}>
             <View style={[styles.liveDot, { backgroundColor: screenPalette.primary }]} />
             <Text style={[styles.liveBadgeText, { color: screenPalette.selectionText }]}>
-              {t('chat.modeIntro.speech.name', 'Speech')}
+              {t('speechChat.liveBadge', 'Live')}
             </Text>
           </View>
         </View>
@@ -2262,9 +2316,53 @@ export default function SpeechChatScreen({ navigation, route }) {
           <Text style={[styles.callMeterSubtext, { color: screenPalette.textSecondary }]}>
             {speechPerMinuteCost != null
               ? `${speechPerMinuteCost} credits/min`
-              : 'Speech billing'}
+              : 'Talk To Tara billing'}
             {callRemainingSeconds != null ? ` · ${formatCallTime(callRemainingSeconds)} left` : ''}
           </Text>
+        </View>
+
+        <View
+          style={[styles.languageBar, { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong }]}
+          accessibilityRole="radiogroup"
+          accessibilityLabel={t('speechChat.languageLabel', 'Conversation language')}
+        >
+          <View style={styles.languageLabelWrap}>
+            <Ionicons name="language-outline" size={16} color={screenPalette.primary} />
+            <Text style={[styles.languageLabel, { color: screenPalette.textSecondary }]}>
+              {t('speechChat.languageLabel', 'Conversation language')}
+            </Text>
+          </View>
+          <View style={[styles.languageToggle, { borderColor: screenPalette.border }]}>
+            {SPEECH_LANGUAGE_OPTIONS.map((option) => {
+              const selected = normalizeLanguageCode(language) === option.key;
+              const label = t(option.labelKey, option.fallback);
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  disabled={languageSwitchDisabled}
+                  onPress={() => handleSpeechLanguageChange(option.key)}
+                  style={[
+                    styles.languageOption,
+                    selected && {
+                      backgroundColor: screenPalette.selectionSurface,
+                      borderColor: screenPalette.selectionBorder,
+                    },
+                    languageSwitchDisabled && !selected && styles.optionDisabled,
+                  ]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected, checked: selected, disabled: languageSwitchDisabled }}
+                  accessibilityLabel={label}
+                >
+                  <Text style={[
+                    styles.languageOptionText,
+                    { color: selected ? screenPalette.selectionText : screenPalette.textSecondary },
+                  ]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         <View
@@ -2691,6 +2789,50 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: '700',
+  },
+  languageBar: {
+    minHeight: 44,
+    marginBottom: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexShrink: 0,
+  },
+  languageLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+  },
+  languageLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  languageToggle: {
+    padding: 2,
+    borderWidth: 1,
+    borderRadius: 999,
+    flexDirection: 'row',
+  },
+  languageOption: {
+    minWidth: 70,
+    minHeight: 34,
+    paddingHorizontal: 9,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  languageOptionText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  optionDisabled: {
+    opacity: 0.5,
   },
   answerStyleBar: {
     minHeight: 50,

@@ -96,6 +96,7 @@ export default function PremiumTodayOverview({
   onSelectNative,
   onCreateChart,
   onAsk,
+  onTalkToTara,
   onOpenCharts,
   onOpenDasha,
   onOpenNakshatra,
@@ -174,6 +175,38 @@ export default function PremiumTodayOverview({
           </TouchableOpacity>
         </View>
       </View>
+
+      {onTalkToTara ? (
+        <TouchableOpacity
+          onPress={onTalkToTara}
+          activeOpacity={0.84}
+          accessibilityRole="button"
+          accessibilityLabel={t('chat.modeIntro.speech.name', 'Talk To Tara')}
+          accessibilityHint={t('chat.speechChatCtaSubtext', 'Start a live voice conversation')}
+          style={[
+            styles.talkToTaraCard,
+            { backgroundColor: colors.surface, borderColor: colors.cardBorder },
+          ]}
+        >
+          <View style={[styles.talkToTaraIcon, { backgroundColor: colors.accentSoft }]}>
+            <Ionicons name="mic" size={22} color={colors.onAccent} />
+          </View>
+          <View style={styles.talkToTaraCopy}>
+            <Text style={[styles.talkToTaraEyebrow, typography.eyebrow, { color: colors.primary }]}>
+              {t('speechChat.liveBadge', 'Live')} · {t('speechChat.homeVoiceLabel', 'Voice conversation')}
+            </Text>
+            <Text style={[styles.talkToTaraTitle, { color: colors.text }]}>
+              {t('chat.modeIntro.speech.name', 'Talk To Tara')}
+            </Text>
+            <Text style={[styles.talkToTaraBody, { color: colors.textSecondary }]} numberOfLines={2}>
+              {t('chat.modeIntro.speech.benefit', 'Talk naturally with Tara and hear every reply.')}
+            </Text>
+          </View>
+          <View style={[styles.talkToTaraArrow, { borderColor: colors.cardBorder }]}>
+            <Ionicons name="arrow-forward" size={17} color={colors.primary} />
+          </View>
+        </TouchableOpacity>
+      ) : null}
 
       {hasChart ? (
         <View style={[styles.bigThree, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -479,6 +512,13 @@ const styles = StyleSheet.create({
   primaryActionText: { fontSize: 14, fontWeight: '900' },
   secondaryAction: { height: 48, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   secondaryActionText: { fontSize: 13, fontWeight: '800' },
+  talkToTaraCard: { minHeight: 104, borderWidth: 1, borderRadius: 22, padding: 14, flexDirection: 'row', alignItems: 'center' },
+  talkToTaraIcon: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', marginRight: 13 },
+  talkToTaraCopy: { flex: 1, minWidth: 0, paddingRight: 10 },
+  talkToTaraEyebrow: { fontSize: 9, marginBottom: 4 },
+  talkToTaraTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 21, lineHeight: 25, marginBottom: 3 },
+  talkToTaraBody: { fontSize: 11, lineHeight: 16, fontWeight: '500' },
+  talkToTaraArrow: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   bigThree: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 18, paddingVertical: 14 },
   bigThreeItem: { flex: 1, alignItems: 'center', paddingHorizontal: 5 },
   bigThreeDivider: { width: 1, height: 29 },

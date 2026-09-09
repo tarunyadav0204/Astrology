@@ -1561,6 +1561,16 @@
     }
   },
   "speechChat": {
+    "greetingWithUser": "{{userName}}, {{chartName}} की कुंडली तैयार है। आप क्या जानना चाहेंगे?",
+    "greetingAnonymous": "{{chartName}} की कुंडली तैयार है। आप क्या जानना चाहेंगे?",
+    "languageLabel": "बातचीत की भाषा",
+    "languageEnglish": "English",
+    "languageHindi": "हिंदी",
+    "screenTitle": "तारा से बात करें",
+    "liveBadge": "लाइव",
+    "homeVoiceLabel": "आवाज़ में बातचीत",
+    "screenSubtitleWithChart": "{{name}} के लिए लाइव बातचीत",
+    "screenSubtitleDefault": "तारा के साथ लाइव बातचीत",
     "afterAnswerPrompt": "अगर आप चाहें, तो तारा से एक और सवाल पूछ सकते हैं।",
     "thinkingHandoff1": "ठीक है, मुझे एक क्षण दीजिए।",
     "thinkingHandoff2": "ठीक है, मैं अभी इसे देख रही हूँ।",
@@ -1594,7 +1604,7 @@
     "featureEvents": "भविष्यवाणियाँ",
     "featureCredits": "क्रेडिट",
     "featureReports": "Reports Studio",
-    "messageSpeech": "स्पीच चैट उपयोग करने के लिए साइन इन करें। बातचीत के समय क्रेडिट लगते हैं।"
+    "messageSpeech": "तारा से बात करने के लिए साइन इन करें। बातचीत के समय क्रेडिट लगते हैं।"
   },
   "panditPractice": {
     "setupTitle": "प्रैक्टिस सेट करें",

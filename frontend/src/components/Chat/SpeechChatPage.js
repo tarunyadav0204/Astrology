@@ -209,8 +209,8 @@ const SpeechChatPage = () => {
     }, [birthData]);
 
     const headerSubtitle = useMemo(() => {
-        if (!birthData?.name) return 'Voice guide on AstroRoshni · Live spoken answers';
-        return `Voice guide on AstroRoshni · Live answers for ${birthData.name}`;
+        if (!birthData?.name) return 'Your live astrology conversation';
+        return `Live astrology conversation for ${birthData.name}`;
     }, [birthData?.name]);
 
     useEffect(() => {
@@ -611,11 +611,11 @@ const SpeechChatPage = () => {
     const startListening = () => {
         speechLeadInEpochRef.current += 1;
         if (!birthData) {
-            setErrorText('Select a birth chart before starting speech chat.');
+            setErrorText('Select a birth chart before starting Talk To Tara.');
             return;
         }
         if (!speechChatEnabled) {
-            setErrorText('Voice chat is not available for your account right now.');
+            setErrorText('Talk To Tara is not available for your account right now.');
             return;
         }
         if (!instantChatEnabled) {
@@ -623,7 +623,7 @@ const SpeechChatPage = () => {
             return;
         }
         if (credits < speechChatCost) {
-            setErrorText(`You need at least ${speechChatCost} credit${speechChatCost !== 1 ? 's' : ''} for speech chat.`);
+            setErrorText(`You need at least ${speechChatCost} credit${speechChatCost !== 1 ? 's' : ''} for Talk To Tara.`);
             return;
         }
 
@@ -806,12 +806,12 @@ const SpeechChatPage = () => {
             return;
         }
         if (!speechChatEnabled || !instantChatEnabled) {
-            setErrorText('Speech chat is not available right now.');
+            setErrorText('Talk To Tara is not available right now.');
             setStatus('idle');
             return;
         }
         if (credits < speechChatCost) {
-            setErrorText(`You need at least ${speechChatCost} credit${speechChatCost !== 1 ? 's' : ''} for speech chat.`);
+            setErrorText(`You need at least ${speechChatCost} credit${speechChatCost !== 1 ? 's' : ''} for Talk To Tara.`);
             setStatus('idle');
             return;
         }
@@ -891,7 +891,7 @@ const SpeechChatPage = () => {
 
             if (!response.ok) {
                 const text = await response.text().catch(() => '');
-                throw new Error(`Speech chat failed: ${response.status} ${text}`);
+                throw new Error(`Talk To Tara failed: ${response.status} ${text}`);
             }
 
             const result = await response.json();
@@ -912,7 +912,7 @@ const SpeechChatPage = () => {
                         : turn
                 )
             );
-            setErrorText(error?.message || 'Speech chat failed. Please try again.');
+            setErrorText(error?.message || 'Talk To Tara failed. Please try again.');
             setStatus('idle');
         }
     };
@@ -1090,12 +1090,12 @@ const SpeechChatPage = () => {
                     </button>
                     <div className="speech-chat-header__text">
                         <div className="speech-chat-title-row">
-                            <h1>Tara</h1>
+                            <h1>Talk To Tara</h1>
                             <span className="speech-chat-tara-badge" aria-hidden>✦</span>
                         </div>
                         <p className="speech-chat-header__subtitle">{headerSubtitle}</p>
                     </div>
-                    <div className="speech-chat-language" role="group" aria-label="Voice chat language">
+                    <div className="speech-chat-language" role="group" aria-label="Talk To Tara language">
                         <button
                             type="button"
                             className={speechLanguage === 'english' ? 'is-selected' : ''}
@@ -1131,7 +1131,7 @@ const SpeechChatPage = () => {
                     </section>
                 ) : !speechChatEnabled || !instantChatEnabled ? (
                     <section className="speech-chat-empty">
-                        <h2>Speech chat unavailable</h2>
+                        <h2>Talk To Tara unavailable</h2>
                         <p>
                             {!speechChatEnabled
                                 ? 'Voice features are not enabled for your account right now.'
@@ -1149,7 +1149,7 @@ const SpeechChatPage = () => {
                                     {turns.length === 0 && !currentTranscript ? (
                                         <div className="speech-chat-empty-card">
                                             <span className="speech-chat-empty-card-icon" aria-hidden>🎙</span>
-                                            <h2 className="speech-chat-empty-card-title">Ask by speaking</h2>
+                                            <h2 className="speech-chat-empty-card-title">Talk To Tara</h2>
                                             <p className="speech-chat-empty-card-body">
                                                 Keep questions short and natural. Tara answers aloud and suggests follow-ups.
                                             </p>
@@ -1232,7 +1232,7 @@ const SpeechChatPage = () => {
                                     {taraStatusLabels[status] || taraStatusLabels.idle}
                                 </p>
                                 <p className="speech-chat-meta">
-                                    Credits: {credits} · Speech chat (Tara): {speechChatCost} credit{speechChatCost !== 1 ? 's' : ''} per turn
+                                    Credits: {credits} · Talk To Tara: {speechChatCost} credit{speechChatCost !== 1 ? 's' : ''} per turn
                                 </p>
 
                                 <div className="speech-chat-mic-outer">

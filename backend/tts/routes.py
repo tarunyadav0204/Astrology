@@ -450,13 +450,31 @@ def _strip_followups_block(text: str) -> str:
   return raw
 
 
+def _strip_markdown_for_speech(text: str) -> str:
+  """Keep Markdown's readable text while removing syntax that TTS may verbalize."""
+  raw = str(text or "")
+  # Responses can contain either Markdown or JSON-escaped Markdown such as
+  # ``\*\*Moon\*\*``. Normalize escaped punctuation before removing markers.
+  raw = re.sub(r"\\([\\`*_{}\[\]()#+\-.!>|])", r"\1", raw)
+  raw = re.sub(r"```(?:[^\n`]*)\n?(.*?)```", r" \1 ", raw, flags=re.DOTALL)
+  raw = re.sub(r"`([^`]*)`", r"\1", raw)
+  raw = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", raw)
+  raw = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", raw)
+  raw = re.sub(r"\[\[[A-Z][A-Z0-9_:-]*\]\]", " ", raw)
+  raw = re.sub(r"^\s{0,3}(?:#{1,6}|>|[-+*])\s+", "", raw, flags=re.MULTILINE)
+  raw = re.sub(r"^\s{0,3}\d+[.)]\s+", "", raw, flags=re.MULTILINE)
+  raw = re.sub(r"<[^>]+>", " ", raw)
+  # Remove paired emphasis first, then any incomplete marker left by streamed
+  # chunk boundaries or malformed model output.
+  raw = re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", raw)
+  raw = re.sub(r"_{1,3}(.*?)_{1,3}", r"\1", raw)
+  raw = re.sub(r"[*_`]", "", raw)
+  return raw
+
+
 def _fallback_spoken_tts_text(text: str, lang: str) -> str:
   """Cheap cleanup so even fallback TTS sounds less like a report being read aloud."""
-  raw = _strip_followups_block(text)
-  raw = re.sub(r"<[^>]+>", " ", raw)
-  raw = re.sub(r"\*\*(.*?)\*\*", r"\1", raw)
-  raw = re.sub(r"\*(.*?)\*", r"\1", raw)
-  raw = re.sub(r"^#+\s*", "", raw, flags=re.MULTILINE)
+  raw = _strip_markdown_for_speech(_strip_followups_block(text))
   raw = re.sub(r"[-–—]{2,}", ". ", raw)
   raw = re.sub(r"\n+", " ", raw)
   raw = re.sub(r"\s{2,}", " ", raw).strip()

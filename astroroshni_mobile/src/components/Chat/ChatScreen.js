@@ -5333,7 +5333,7 @@ export default function ChatScreen({ navigation, route }) {
 
   const getChatModeName = (modeKey = getChatModeKey()) => {
     if (modeKey === 'premium') return t('chat.modeIntro.premium.name', 'Premium');
-    if (modeKey === 'speech') return t('chat.modeIntro.speech.name', 'Speech');
+    if (modeKey === 'speech') return t('chat.modeIntro.speech.name', 'Talk To Tara');
     if (modeKey === 'instant') return t('chat.modeIntro.instant.name', 'Live');
     return t('chat.modeIntro.standard.name', 'Standard');
   };
@@ -5385,6 +5385,7 @@ export default function ChatScreen({ navigation, route }) {
     keepChatOpenAfterAskEntryRef.current = true;
     setShowGreeting(false);
     if (modeKey === 'speech') {
+      if (Platform.OS === 'web') getTextToSpeech().unlockWebAudio?.();
       setShowModeSelector(false);
       modeIntroSuppressOpenUntilRef.current = Date.now() + 900;
       setShowChatModeIntro(false);
@@ -5466,7 +5467,7 @@ export default function ChatScreen({ navigation, route }) {
     ...(instantChatEnabled && speechChatEnabled && birthData ? [{
       key: 'speech',
       icon: 'mic',
-      name: t('chat.modeIntro.speech.name', 'Speech'),
+      name: t('chat.modeIntro.speech.name', 'Talk To Tara'),
       benefit: t('chat.modeIntro.speech.benefit', 'Talk naturally with Tara and hear each reply in a continuous voice conversation.'),
       bestFor: t('chat.modeIntro.speech.bestFor', 'Best when speaking feels easier than typing.'),
       features: [
@@ -6728,6 +6729,19 @@ export default function ChatScreen({ navigation, route }) {
             <HomeScreen
               birthData={birthData}
               onOptionSelect={handleGreetingOptionSelect}
+              onTalkToTara={instantChatEnabled && speechChatEnabled ? () => {
+                if (!birthData) {
+                  navigation.navigate('BirthForm', { returnTo: 'Home' });
+                  return;
+                }
+                if (Platform.OS === 'web') getTextToSpeech().unlockWebAudio?.();
+                navigation.navigate('SpeechChat', {
+                  birthData,
+                  language,
+                  responseStyle: answerStyle,
+                  sessionId,
+                });
+              } : null}
               navigation={navigation}
               setShowDashaBrowser={setShowDashaBrowser}
               infoModalPayload={homeInfoModalPayload}
@@ -7384,16 +7398,17 @@ export default function ChatScreen({ navigation, route }) {
               {!isInstantAnalysis && !partnershipMode && !isMundane && instantChatEnabled && speechChatEnabled && birthData && (
                 <TouchableOpacity
                   style={styles.speechMicButton}
-                  onPress={() =>
+                  onPress={() => {
+                    if (Platform.OS === 'web') getTextToSpeech().unlockWebAudio?.();
                     navigation.navigate('SpeechChat', {
                       birthData,
                       language,
                       responseStyle: answerStyle,
                       sessionId,
-                    })
-                  }
+                    });
+                  }}
                   accessibilityRole="button"
-                  accessibilityLabel={t('chat.speechChatCta', 'Speak your question')}
+                  accessibilityLabel={t('chat.speechChatCta', 'Talk To Tara')}
                   accessibilityHint={t('chat.speechChatCtaSubtext', 'Live spoken answers')}
                 >
                   <LinearGradient

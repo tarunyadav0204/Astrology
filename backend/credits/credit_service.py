@@ -439,8 +439,8 @@ class CreditService:
                 ("instant_chat_cost", 1, "Credits per instant chat answer"),
                 ("instant_chat_first_minute_cost", 1, "Credits for the first minute of Instant Chat"),
                 ("instant_chat_per_minute_cost", 1, "Credits per following started minute of Instant Chat"),
-                ("speech_chat_cost", 1, "Credits per speech chat turn (Tara / voice-first)"),
-                ("speech_chat_per_minute_cost", 1, "Credits per minute for live speech chat"),
+                ("speech_chat_cost", 1, "Credits per Talk To Tara turn"),
+                ("speech_chat_per_minute_cost", 1, "Credits per minute for Talk To Tara"),
                 ("wealth_analysis_cost", 5, "Credits per wealth analysis"),
                 ("marriage_analysis_cost", 3, "Credits per marriage analysis"),
                 ("health_analysis_cost", 3, "Credits per health analysis"),
@@ -4198,14 +4198,14 @@ class CreditService:
                         conn,
                         """
                         INSERT INTO credit_settings (setting_key, setting_value, description)
-                        VALUES ('speech_chat_cost', 1, 'Credits per speech chat turn (Tara / voice-first)')
+                        VALUES ('speech_chat_cost', 1, 'Credits per Talk To Tara turn')
                         """,
                     )
                     conn.commit()
                     settings.append({
                         "key": "speech_chat_cost",
                         "value": 1,
-                        "description": "Credits per speech chat turn (Tara / voice-first)",
+                        "description": "Credits per Talk To Tara turn",
                         "discount": None,
                     })
                 except Exception:
@@ -4217,14 +4217,14 @@ class CreditService:
                         conn,
                         """
                         INSERT INTO credit_settings (setting_key, setting_value, description)
-                        VALUES ('speech_chat_per_minute_cost', 1, 'Credits per minute for live speech chat')
+                        VALUES ('speech_chat_per_minute_cost', 1, 'Credits per minute for Talk To Tara')
                         """,
                     )
                     conn.commit()
                     settings.append({
                         "key": "speech_chat_per_minute_cost",
                         "value": 1,
-                        "description": "Credits per minute for live speech chat",
+                        "description": "Credits per minute for Talk To Tara",
                         "discount": None,
                     })
                 except Exception:

@@ -30,10 +30,17 @@ _stub_module(
     File=lambda *args, **kwargs: None,
     Form=lambda *args, **kwargs: None,
     HTTPException=Exception,
+    Request=object,
     UploadFile=object,
 )
 
-from speech.routes import _clean_transcript, _looks_like_instruction_following_failure, _normalized_mime_type, _normalized_transcription_language
+from speech.routes import (
+    _clean_transcript,
+    _looks_like_instruction_following_failure,
+    _normalized_mime_type,
+    _normalized_transcription_language,
+    _transcription_prompt,
+)
 
 
 def test_normalized_transcription_language():
@@ -41,6 +48,18 @@ def test_normalized_transcription_language():
     assert _normalized_transcription_language("hindi") == "hi"
     assert _normalized_transcription_language("en-US") == "en"
     assert _normalized_transcription_language("hi-IN") == "hi"
+
+
+def test_hindi_transcription_prompt_requires_devanagari_not_hinglish():
+    prompt = _transcription_prompt("hindi")
+
+    assert "Devanagari script" in prompt
+    assert "never Romanized Hindi or Hinglish" in prompt
+    assert "मेरा करियर कैसा रहेगा" in prompt
+
+
+def test_english_transcription_prompt_keeps_latin_script():
+    assert "Use Latin script" in _transcription_prompt("english")
 
 
 def test_clean_transcript_strips_labels_and_quotes():

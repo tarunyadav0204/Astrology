@@ -1911,10 +1911,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     if speech_chat_requested and not instant_chat_active:
         raise HTTPException(
             status_code=403,
-            detail="Speech chat requires instant chat to be available for your account.",
+            detail="Talk To Tara requires Live chat to be available for your account.",
         )
     if speech_chat_requested and not speech_chat_enabled_for_user(current_user.userid):
-        raise HTTPException(status_code=403, detail="Speech chat is not enabled for your account.")
+        raise HTTPException(status_code=403, detail="Talk To Tara is not enabled for your account.")
     speech_billing_requested = request.get("speech_billing", request.get("speechBilling", True))
     speech_chat_billing = bool(speech_chat_requested and instant_chat_active and speech_billing_requested is not False)
     effective_chat_tier = "instant" if instant_chat_active else ("premium" if premium_analysis else "standard")
@@ -2342,7 +2342,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         elif premium_analysis:
             analysis_type = "Premium Deep Analysis"
         elif instant_chat_active:
-            analysis_type = "Speech chat" if speech_chat_requested else "Instant Chat"
+            analysis_type = "Talk To Tara" if speech_chat_requested else "Instant Chat"
         else:
             analysis_type = "Standard Analysis"
         if speech_chat_billing or instant_chat_active:
@@ -4761,7 +4761,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     free_birth_hash = credit_service.create_free_question_birth_hash(birth_details)
                     credit_service.mark_free_chat_question_used(user_id, birth_hash=free_birth_hash)
                     if is_instant_chat:
-                        analysis_type = "Speech chat" if is_speech_chat else "Instant Chat"
+                        analysis_type = "Talk To Tara" if is_speech_chat else "Instant Chat"
                     else:
                         analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
                     credit_service.record_zero_cost_feature_usage(
@@ -4803,7 +4803,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 else:
                     amount_to_deduct = effective_cost if effective_cost is not None else chat_cost
                     if is_instant_chat:
-                        analysis_type = "Speech chat" if is_speech_chat else "Instant Chat"
+                        analysis_type = "Talk To Tara" if is_speech_chat else "Instant Chat"
                         spend_feature = "speech_chat" if is_speech_chat else "instant_chat"
                     else:
                         analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"

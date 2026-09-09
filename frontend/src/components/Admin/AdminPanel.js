@@ -544,10 +544,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     'नमस्ते, यह आपका कॉस्मिक रीडिंग है। मंगल दसवें भाव में मजबूत है।'
   );
   const [speechPreviewTextEn, setSpeechPreviewTextEn] = useState(
-    'Hi, I am Tara. This is how English speech chat will sound.'
+    'Hi, I am Tara. This is how Talk To Tara will sound in English.'
   );
   const [speechPreviewTextHi, setSpeechPreviewTextHi] = useState(
-    'नमस्ते, मैं तारा हूँ। हिंदी स्पीच चैट ऐसी सुनाई देगी।'
+    'नमस्ते, मैं तारा हूँ। हिंदी में Talk To Tara ऐसा सुनाई देगा।'
   );
   const [ttsPreviewBusyKey, setTtsPreviewBusyKey] = useState('');
   const ttsPreviewAudioRef = useRef(null);
@@ -1555,7 +1555,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           body: JSON.stringify({
             key: 'speech_allow_unvalidated_streaming',
             value: speechAllowUnvalidatedStreaming ? 'true' : 'false',
-            description: 'Allow provisional, not-yet-validated Instant answer chunks to be displayed and spoken in speech chat',
+            description: 'Allow provisional, not-yet-validated Instant answer chunks to be displayed and spoken in Talk To Tara',
           }),
         }),
       ]);
@@ -1908,7 +1908,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           body: JSON.stringify({
             key: 'speech_chat_user_allowlist',
             value: speechChatUserAllowlist,
-            description: 'Optional CSV user allowlist for speech chat. Empty = all users when enabled.',
+            description: 'Optional CSV user allowlist for Talk To Tara. Empty = all users when enabled.',
           }),
         }),
         fetch('/api/admin/settings/speech_tts_provider', {
@@ -1917,7 +1917,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           body: JSON.stringify({
             key: 'speech_tts_provider',
             value: speechTtsProvider,
-            description: 'Speech chat TTS provider: local device TTS or backend Google TTS.',
+            description: 'Talk To Tara TTS provider: local device TTS or backend Google TTS.',
           }),
         }),
         fetch('/api/admin/settings/speech_tts_voice_en', {
@@ -1926,7 +1926,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           body: JSON.stringify({
             key: 'speech_tts_voice_en',
             value: speechTtsVoiceEn,
-            description: 'Default Google TTS voice for English speech chat.',
+            description: 'Default Google TTS voice for English Talk To Tara conversations.',
           }),
         }),
         fetch('/api/admin/settings/speech_tts_voice_hi', {
@@ -1935,7 +1935,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           body: JSON.stringify({
             key: 'speech_tts_voice_hi',
             value: speechTtsVoiceHi,
-            description: 'Default Google TTS voice for Hindi speech chat.',
+            description: 'Default Google TTS voice for Hindi Talk To Tara conversations.',
           }),
         }),
       ]);
@@ -1946,16 +1946,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         const voiceEnErr = await voiceEnRes.json().catch(() => ({}));
         const voiceHiErr = await voiceHiRes.json().catch(() => ({}));
         alert(
-          'Failed to save speech chat settings: ' +
+          'Failed to save Talk To Tara settings: ' +
             (enabledErr.detail || allowlistErr.detail || providerErr.detail || voiceEnErr.detail || voiceHiErr.detail || 'check console')
         );
         return;
       }
-      alert('Speech chat settings saved. Clients pick this up on the next pricing/features fetch.');
+      alert('Talk To Tara settings saved. Clients pick this up on the next pricing/features fetch.');
       fetchAdminSettings();
     } catch (error) {
-      console.error('Error saving speech chat settings:', error);
-      alert('Failed to save speech chat settings.');
+      console.error('Error saving Talk To Tara settings:', error);
+      alert('Failed to save Talk To Tara settings.');
     } finally {
       setSpeechChatSaving(false);
     }
@@ -7683,15 +7683,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             </div>
 
             <div className="settings-section">
-              <h3>Speech input (mobile)</h3>
+              <h3>Talk To Tara</h3>
               <p className="settings-hint">
                 Controls the microphone entry point on the mobile chat screen and access to{' '}
                 <code>/api/speech/transcribe</code>. Speech answers use instant chat; keep instant chat enabled for
-                end-to-end speech flows. If the allowlist is empty, all users are eligible when this switch is on.
+                end-to-end Talk To Tara flows. If the allowlist is empty, all users are eligible when this switch is on.
               </p>
               <div className="setting-item">
                 <div className="setting-info">
-                  <strong>Enable speech input</strong>
+                  <strong>Enable Talk To Tara</strong>
                   <p>Master switch for the speak / transcribe flow on supported app builds.</p>
                 </div>
                 <label className="toggle-switch">
@@ -7720,7 +7720,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 <div className="setting-info">
                   <strong>Speech output provider</strong>
                   <p>
-                    Choose whether speech chat answers use local phone TTS or backend Google TTS.
+                    Choose whether Talk To Tara answers use local phone TTS or backend Google TTS.
                     Google TTS is required for the timed lip-sync path.
                   </p>
                 </div>
@@ -7747,7 +7747,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
               <AdminVoicePicker
                 label="English Google voice"
-                help="Default voice for English speech chat when Google TTS is selected."
+                help="Default English voice for Talk To Tara when Google TTS is selected."
                 value={speechTtsVoiceEn}
                 onChange={setSpeechTtsVoiceEn}
                 options={withSelectedVoiceOption(englishSpeechVoiceOptions, speechTtsVoiceEn)}
@@ -7776,7 +7776,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
               <AdminVoicePicker
                 label="Hindi Google voice"
-                help="Default voice for Hindi speech chat when Google TTS is selected."
+                help="Default Hindi voice for Talk To Tara when Google TTS is selected."
                 value={speechTtsVoiceHi}
                 onChange={setSpeechTtsVoiceHi}
                 options={withSelectedVoiceOption(hindiSpeechVoiceOptions, speechTtsVoiceHi)}

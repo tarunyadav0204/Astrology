@@ -1,96 +1,169 @@
 /**
- * Web Speech API adapter used by SpeechChatScreen on browsers.
+ * Web Speech API adapter used by SpeechChatScreen on Chrome/PWA.
+ * Its Promise contract matches the native module: resolve with the final
+ * transcript only after recognition stops, while publishing interim strings.
  */
 const getRecognitionCtor = () => {
   if (typeof window === 'undefined') return null;
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 };
 
-let activeRecognition = null;
+const toBrowserLanguage = (language) => {
+  const raw = String(language || 'english').trim().toLowerCase();
+  if (raw === 'hindi' || raw === 'hi' || raw.startsWith('hi-')) return 'hi-IN';
+  if (/^[a-z]{2}-[a-z]{2}$/i.test(raw)) return raw;
+  return 'en-IN';
+};
+
+const recognitionError = (code, fallback) => {
+  const error = new Error(fallback || 'Speech recognition failed.');
+  error.code = code || 'unknown';
+  return error;
+};
+
+let activeSession = null;
 let partialListener = null;
 let debugListener = null;
+
+const settleSession = (session, error) => {
+  if (!session || session.settled) return;
+  session.settled = true;
+  if (activeSession === session) activeSession = null;
+  if (error) session.reject(error);
+  else if (session.latestText.trim()) session.resolve(session.latestText.trim());
+  else session.reject(recognitionError('no_speech', 'I could not hear any speech. Please try again.'));
+};
 
 export const speechRecognition = {
   async isAvailable() {
     return Boolean(getRecognitionCtor());
   },
 
-  async startListening(language) {
+  startListening(language) {
     const Ctor = getRecognitionCtor();
     if (!Ctor) {
-      const error = new Error('Speech recognition is not available in this browser.');
-      error.code = 'not_available';
-      throw error;
+      return Promise.reject(recognitionError(
+        'not_available',
+        'Speech recognition is not available in this browser.'
+      ));
     }
-    if (activeRecognition) {
+
+    if (activeSession) {
+      const previous = activeSession;
+      previous.cancelled = true;
       try {
-        activeRecognition.abort();
+        previous.recognition.abort();
       } catch (_) {
-        /* ignore */
+        settleSession(previous, recognitionError('cancelled', 'Speech recognition was cancelled.'));
       }
     }
-    const recognition = new Ctor();
-    activeRecognition = recognition;
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = language || 'en-IN';
 
-    recognition.onresult = (event) => {
-      let interim = '';
-      let finalText = '';
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const transcript = event.results[i][0]?.transcript || '';
-        if (event.results[i].isFinal) finalText += transcript;
-        else interim += transcript;
+    return new Promise((resolve, reject) => {
+      const recognition = new Ctor();
+      const session = {
+        recognition,
+        resolve,
+        reject,
+        latestText: '',
+        settled: false,
+        cancelled: false,
+      };
+      activeSession = session;
+
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+      recognition.lang = toBrowserLanguage(language);
+
+      recognition.onstart = () => debugListener?.({ event: 'onReadyForSpeech' });
+      recognition.onaudiostart = () => debugListener?.({ event: 'onReadyForSpeech' });
+      recognition.onspeechstart = () => debugListener?.({ event: 'onBeginningOfSpeech' });
+      recognition.onresult = (event) => {
+        let transcript = '';
+        let hasFinalResult = false;
+        for (let i = 0; i < event.results.length; i += 1) {
+          transcript += `${event.results[i][0]?.transcript || ''} `;
+          if (event.results[i].isFinal) hasFinalResult = true;
+        }
+        const text = transcript.trim();
+        if (text) {
+          session.latestText = text;
+          partialListener?.(text);
+          debugListener?.({ event: hasFinalResult ? 'onResults' : 'onPartialResults' });
+        }
+        if (hasFinalResult) {
+          try {
+            recognition.stop();
+          } catch (_) {
+            settleSession(session);
+          }
+        }
+      };
+
+      recognition.onerror = (event) => {
+        const browserCode = String(event?.error || 'unknown');
+        const code = session.cancelled || browserCode === 'aborted'
+          ? 'cancelled'
+          : browserCode === 'no-speech'
+            ? 'no_speech'
+            : browserCode;
+        debugListener?.({ event: 'onError', code, message: event?.message || browserCode });
+        settleSession(
+          session,
+          recognitionError(
+            code,
+            code === 'not-allowed'
+              ? 'Microphone access is blocked in Chrome. Allow it in site settings and try again.'
+              : code === 'no_speech'
+                ? 'I could not hear any speech. Please try again.'
+                : 'Speech recognition stopped unexpectedly. Please try again.'
+          )
+        );
+      };
+
+      recognition.onend = () => {
+        debugListener?.({ event: 'resolveWithLatestTranscript' });
+        if (session.cancelled) {
+          settleSession(session, recognitionError('cancelled', 'Speech recognition was cancelled.'));
+          return;
+        }
+        settleSession(session);
+      };
+
+      try {
+        recognition.start();
+      } catch (error) {
+        settleSession(session, recognitionError(error?.name || 'start_failed', error?.message));
       }
-      const text = (finalText || interim || '').trim();
-      if (text && partialListener) {
-        partialListener({ text, isFinal: Boolean(finalText) });
-      }
-    };
-
-    recognition.onerror = (event) => {
-      debugListener?.({ type: 'error', error: event?.error || 'unknown' });
-    };
-
-    recognition.onend = () => {
-      if (activeRecognition === recognition) activeRecognition = null;
-      debugListener?.({ type: 'end' });
-    };
-
-    recognition.start();
-    return true;
+    });
   },
 
   stopListening() {
+    const session = activeSession;
+    if (!session) return;
     try {
-      activeRecognition?.stop?.();
+      session.recognition.stop();
     } catch (_) {
-      /* ignore */
+      settleSession(session);
     }
-    activeRecognition = null;
   },
 
   cancelListening() {
+    const session = activeSession;
+    if (!session) return;
+    session.cancelled = true;
     try {
-      activeRecognition?.abort?.();
+      session.recognition.abort();
     } catch (_) {
-      /* ignore */
+      settleSession(session, recognitionError('cancelled', 'Speech recognition was cancelled.'));
     }
-    activeRecognition = null;
   },
 
   addPartialListener(listener) {
-    partialListener = (payload) => {
-      try {
-        listener(payload);
-      } catch (_) {
-        /* ignore */
-      }
-    };
+    partialListener = listener;
     return {
       remove() {
-        if (partialListener) partialListener = null;
+        if (partialListener === listener) partialListener = null;
       },
     };
   },

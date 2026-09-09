@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 FEATURE_PRICING_ROWS: List[Tuple[str, str]] = [
     ("chat", "Standard chat"),
     ("instant_chat", "Instant chat"),
-    ("speech_chat", "Speech chat (Tara)"),
+    ("speech_chat", "Talk To Tara"),
     ("premium_chat", "Premium chat"),
     ("career", "Career analysis"),
     ("marriage", "Marriage analysis"),
