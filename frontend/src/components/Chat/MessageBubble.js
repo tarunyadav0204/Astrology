@@ -47,6 +47,57 @@ const whyTaraSaysThis = (language) => WHY_TARA_SAYS_THIS[
 ]
     || WHY_TARA_SAYS_THIS.english;
 
+export const splitInstantMessageParagraphs = (rawContent, role = 'assistant') => {
+    const cleaned = String(rawContent || '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/__(.*?)__/g, '$1')
+        .replace(/[`*_]+/g, '')
+        .replace(/(?:【|\[)(?:POS|NEG)_(?:START|END)(?:】|\])/gi, '')
+        .replace(/\n?\s*(?:NEXT_ACTION_META|FAQ_META|PREDICTION_ANCHOR_META)\s*:\s*\{[\s\S]*?\}\s*/gi, '\n')
+        .trim();
+    let paragraphs = cleaned
+        .split(/\n\s*\n/)
+        .map((part) => part.replace(/\s*\n\s*/g, ' ').trim())
+        .filter(Boolean);
+
+    // Older and some streamed Instant answers arrive as one long prose line.
+    // Keep user messages untouched, but make long assistant replies readable
+    // even when the model omitted Markdown blank lines.
+    if (role !== 'assistant' || paragraphs.length !== 1 || cleaned.length < 360) {
+        return paragraphs;
+    }
+    const sentences = cleaned
+        .replace(/\s*\n\s*/g, ' ')
+        .split(/(?<=[.!?।])\s+/)
+        .map((sentence) => sentence.trim())
+        .filter(Boolean);
+    if (sentences.length < 4) return paragraphs;
+
+    paragraphs = [];
+    let group = [];
+    let groupLength = 0;
+    const flush = () => {
+        if (group.length) paragraphs.push(group.join(' '));
+        group = [];
+        groupLength = 0;
+    };
+    sentences.forEach((sentence) => {
+        const isQuestion = /[?？]\s*$/.test(sentence);
+        if (isQuestion) {
+            flush();
+            paragraphs.push(sentence);
+            return;
+        }
+        if (group.length && (group.length >= 3 || groupLength + sentence.length > 430)) flush();
+        group.push(sentence);
+        groupLength += sentence.length + 1;
+    });
+    flush();
+    return paragraphs;
+};
+
 const InstantEvidenceModal = ({ evidence, onClose }) => {
     useEffect(() => {
         const handleKeyDown = (event) => {
@@ -1606,17 +1657,7 @@ const MessageBubble = ({
                 ? (message.loadingMessage || message.content || '')
                 : (message.content || ''),
         ).trim();
-        const paragraphs = content
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/^#{1,6}\s+/gm, '')
-            .replace(/\*\*(.*?)\*\*/g, '$1')
-            .replace(/__(.*?)__/g, '$1')
-            .replace(/[`*_]+/g, '')
-            .replace(/(?:【|\[)(?:POS|NEG)_(?:START|END)(?:】|\])/gi, '')
-            .replace(/\n?\s*(?:NEXT_ACTION_META|FAQ_META|PREDICTION_ANCHOR_META)\s*:\s*\{[\s\S]*?\}\s*/gi, '\n')
-            .split(/\n\s*\n/)
-            .map((part) => part.replace(/\s*\n\s*/g, ' ').trim())
-            .filter(Boolean);
+        const paragraphs = splitInstantMessageParagraphs(content, message.role);
         const time = message.timestamp
             ? new Date(message.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
             : '';

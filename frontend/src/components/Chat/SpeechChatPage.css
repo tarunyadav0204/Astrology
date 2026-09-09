@@ -2,7 +2,7 @@
     min-height: 100dvh;
     box-sizing: border-box;
     background: linear-gradient(180deg, #fffbf7 0%, #ffefe6 100%);
-    padding: 10px 18px 0;
+    padding: max(10px, env(safe-area-inset-top, 0px)) 18px 0;
 }
 
 .speech-chat-page--session {
@@ -97,6 +97,39 @@
     color: #64748b;
     font-size: 13px;
     line-height: 1.35;
+}
+
+.speech-chat-language {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.86);
+    flex-shrink: 0;
+}
+
+.speech-chat-language button {
+    border: 0;
+    border-radius: 999px;
+    padding: 6px 9px;
+    background: transparent;
+    color: #64748b;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.speech-chat-language button.is-selected {
+    background: rgba(249, 115, 22, 0.14);
+    color: #c2410c;
+}
+
+.speech-chat-language button:disabled {
+    cursor: default;
+    opacity: 0.65;
 }
 
 .speech-chat-live-badge {
@@ -222,6 +255,8 @@
     color: #111827;
     font-size: 15px;
     line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .speech-chat-live-card {
@@ -403,7 +438,8 @@
     animation: speech-glow-pulse 1.8s ease-in-out infinite;
 }
 
-.speech-chat-voice-stage--thinking .speech-chat-voice-glow {
+.speech-chat-voice-stage--thinking .speech-chat-voice-glow,
+.speech-chat-voice-stage--transcribing .speech-chat-voice-glow {
     opacity: 0.38;
     animation: speech-glow-think 1.4s ease-in-out infinite;
 }
@@ -461,7 +497,8 @@
     animation: speech-wave-dance 0.65s ease-in-out infinite alternate;
 }
 
-.speech-chat-voice-stage--thinking .speech-chat-wave-bar {
+.speech-chat-voice-stage--thinking .speech-chat-wave-bar,
+.speech-chat-voice-stage--transcribing .speech-chat-wave-bar {
     background: #93c5fd;
     opacity: 0.75;
     animation: speech-wave-dance 0.75s ease-in-out infinite alternate;
@@ -655,12 +692,29 @@
 
 @media (max-width: 640px) {
     .speech-chat-page {
-        padding: 8px 14px 0;
+        padding: max(8px, env(safe-area-inset-top, 0px)) 14px 0;
     }
 
     .speech-chat-controls-shell {
         margin: 0 -14px;
-        padding: 14px 14px 22px;
+        padding: 14px 14px max(22px, env(safe-area-inset-bottom, 0px));
+    }
+
+    .speech-chat-header {
+        gap: 8px;
+    }
+
+    .speech-chat-header__subtitle,
+    .speech-chat-live-badge-text {
+        display: none;
+    }
+
+    .speech-chat-live-badge {
+        padding: 6px;
+    }
+
+    .speech-chat-language button {
+        padding: 6px 8px;
     }
 
     .speech-turn__question {

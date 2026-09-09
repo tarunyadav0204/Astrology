@@ -9,7 +9,12 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from instant_chat_v2.graph_live import apply_live_graph_policy, enforce_live_graph_answer  # noqa: E402
+from instant_chat_v2.graph_live import (  # noqa: E402
+    _live_contract,
+    apply_live_graph_policy,
+    enforce_live_graph_answer,
+    required_divisional_codes_for_live_route,
+)
 from calculators.remedy_engine import RemedyEngine  # noqa: E402
 from chat.instant_chat_pipeline import (  # noqa: E402
     _compact_marriage_pathway_evidence,
@@ -32,6 +37,75 @@ def _packet(category: str, answer_mode: str, **query_values):
         "verification": {"passed": True},
         "user_derivation": {},
     }
+
+
+@pytest.mark.parametrize(
+    "domain",
+    ["career", "health", "marriage", "wealth", "education", "children", "home_property", "foreign_life"],
+)
+def test_excluded_workspace_evidence_never_becomes_a_deeper_mode_refusal(domain: str) -> None:
+    policy = _live_contract(domain, {
+        "match": False,
+        "runtime_key": "static_route",
+        "mode_match": True,
+        "required_factors": [f"{domain}:NatalPromise"],
+        "observed_factors": [f"{domain}:NatalPromise", f"{domain}:DashaActivation"],
+        "missing_required_factors": [],
+        "default_exclusions": [f"{domain}:DashaActivation"],
+        "unexpected_default_exclusions": [f"{domain}:DashaActivation"],
+    }, {})
+
+    assert policy["evidence_status"] == "complete"
+    assert policy["excluded_evidence_sanitized"] is True
+    assert policy["fallback_to_deeper_mode"] is False
+    assert policy["fallback_reason"] is None
+
+
+def test_career_fit_uses_d1_d10_when_only_jaimini_confirmation_is_missing() -> None:
+    policy = _live_contract("career", {
+        "match": False,
+        "runtime_key": "career_fit",
+        "mode_match": True,
+        "required_factors": [
+            "career:D1", "career:D10", "career:H2", "career:H6",
+            "career:H10", "career:H11", "career:Amatyakaraka", "career:Karakamsha",
+        ],
+        "observed_factors": [
+            "career:D1", "career:D10", "career:H2", "career:H6",
+            "career:H10", "career:H11",
+        ],
+        "missing_required_factors": ["career:Amatyakaraka", "career:Karakamsha"],
+        "default_exclusions": [],
+        "unexpected_default_exclusions": [],
+    }, {})
+
+    assert policy["evidence_status"] == "partial_confirmation"
+    assert policy["partial_confirmation"] is True
+    assert policy["fallback_to_deeper_mode"] is False
+    assert "Use the complete D1 and D10 career evidence" in policy["instruction"]
+
+
+@pytest.mark.parametrize(
+    ("intent", "answer_mode", "expected"),
+    [
+        ({"category": "career", "career_subtype": "general"}, "timing_window", {"D1", "D10", "KARAKAMSHA"}),
+        ({"category": "job", "career_subtype": "employment"}, "event_prediction", {"D1", "D10"}),
+        ({"category": "marriage", "marriage_subtype": "general"}, "event_prediction", {"D1", "D9"}),
+        ({"category": "health"}, "topic_reading", {"D1", "D6", "D8", "D30"}),
+        ({"category": "wealth", "wealth_subtype": "general"}, "timing_window", {"D1", "D2"}),
+        ({"category": "education", "education_subtype": "higher_education"}, "event_prediction", {"D1", "D24"}),
+        ({"category": "children", "children_subtype": "conception"}, "event_prediction", {"D1", "D7"}),
+        ({"category": "property", "home_subtype": "property_potential"}, "potential_capacity", {"D1", "D4"}),
+        ({"category": "travel", "foreign_subtype": "foreign_travel"}, "event_prediction", {"D1", "D3", "D9"}),
+    ],
+)
+def test_compiled_route_preflight_supplies_required_vargas_across_live_domains(
+    intent, answer_mode, expected,
+) -> None:
+    assert expected.issubset(set(required_divisional_codes_for_live_route(
+        intent=intent,
+        answer_mode=answer_mode,
+    )))
 
 
 @pytest.mark.parametrize(
@@ -90,6 +164,48 @@ def test_supported_domains_receive_authoritative_pre_generation_graph_policy(
     assert route["live"] is True
 
 
+def test_overall_career_period_uses_timing_override_without_deeper_mode_fallback() -> None:
+    packet = _packet(
+        "career",
+        "timing_window",
+        career_subtype="general",
+        time_scope={"requested": "this year", "relation": "future"},
+    )
+    context = {
+        "intent_summary": {
+            "category": "career",
+            "career_subtype": "general",
+            "answer_mode": "timing_window",
+        },
+        "instant_parashari": {"career_foundation": {
+            "career_subtype": "general",
+            "D1": {"houses": [{"house": house} for house in (2, 6, 10, 11)]},
+            "D10": {"calculated_chart": {"ascendant": 1}},
+            "amatyakaraka": {"planet": "Mercury"},
+            "KARAKAMSHA": {"ascendant": 8},
+        }},
+        "current_dashas": {"levels": {"MD": "Saturn"}},
+        "current_transits": {"planets": {"Saturn": {"house": 9}}},
+    }
+
+    result = apply_live_graph_policy(
+        packet,
+        intent={"category": "career", "career_subtype": "general"},
+        context=context,
+    )
+    policy = result["answer_spec"]["knowledge_graph_policy"]
+
+    assert policy["runtime_key"] == "general"
+    assert policy["period_outlook_override"] is True
+    assert policy["fallback_to_deeper_mode"] is False
+    assert policy["missing_required_factors"] == []
+    assert policy["claim_permission"] == "bounded_career_period_outlook"
+    assert "career:DashaActivation" in policy["required_factors"]
+    assert "career:TransitActivation" in policy["required_factors"]
+    assert "career:DashaActivation" not in policy["default_exclusions"]
+    assert "career:TransitActivation" not in policy["default_exclusions"]
+
+
 def test_non_graph_domain_remains_unchanged() -> None:
     packet = _packet("spirituality", "topic_reading")
     assert apply_live_graph_policy(packet, intent={"category": "spirituality"}, context={}) == packet
@@ -139,6 +255,102 @@ def test_static_live_policy_carries_authored_timing_exclusions() -> None:
     assert {"marriage:DashaActivation", "marriage:TransitConfirmation"}.issubset(exclusions)
 
 
+def test_current_relationship_state_uses_timing_and_cannot_claim_ex_private_mind() -> None:
+    packet = _packet(
+        "relationship",
+        "timing_window",
+        marriage_subtype="current_relationship_state",
+    )
+    packet["verdict"] = {"direction": "mixed_current_relationship_climate"}
+    context = {
+        "intent_summary": {"category": "relationship", "answer_mode": "timing_window"},
+        "normalized_evidence": {"natal_promise": {"status": "mixed"}},
+        "current_dashas": {"levels": {"MD": "Saturn"}},
+        "current_transits": {"planets": {"Venus": {"house": 7}}},
+    }
+    result = apply_live_graph_policy(
+        packet,
+        intent={"category": "relationship", "marriage_subtype": "current_relationship_state"},
+        context=context,
+    )
+    policy = result["answer_spec"]["knowledge_graph_policy"]
+    assert policy["runtime_key"] == "relationship_timing"
+    assert policy["claim_permission"] == "native_current_relationship_climate_only"
+    assert policy["fallback_to_deeper_mode"] is False
+
+    rules = policy["current_relationship_state_rules"]
+    assert "private state cannot be confirmed" in rules["required_answer_order"][0]
+    assert "private emotional state" in policy["instruction"]
+    marathi = "हा संबंध सध्या स्पष्टतेच्या टप्प्यात आहे."
+    assert enforce_live_graph_answer(marathi, result, language="marathi") == marathi
+
+
+def test_specific_partner_decision_cannot_claim_acceptance_date_or_use_generic_modifiers() -> None:
+    packet = _packet(
+        "relationship",
+        "event_prediction",
+        marriage_subtype="specific_partner_decision",
+        third_party_action="proposal_decision",
+    )
+    packet["verdict"] = {"direction": "mixed_relationship_opportunity"}
+    context = {
+        "intent_summary": {"category": "relationship", "answer_mode": "event_prediction"},
+        "normalized_evidence": {"natal_promise": {"status": "mixed"}},
+        "current_dashas": {"levels": {"MD": "Saturn"}},
+        "current_transits": {"planets": {"Venus": {"house": 7}}},
+    }
+    result = apply_live_graph_policy(
+        packet,
+        intent={"category": "relationship", "marriage_subtype": "specific_partner_decision"},
+        context=context,
+    )
+    policy = result["answer_spec"]["knowledge_graph_policy"]
+    assert policy["claim_permission"] == "native_current_relationship_climate_only"
+    assert policy["specific_partner_decision_rules"]
+
+    rules = policy["specific_partner_decision_rules"]
+    assert rules["requested_action"] == "proposal_decision"
+    assert "specific voluntary action actually asked about" in rules["required_answer_order"][0]
+    assert "the other person will accept or reject the proposal" in rules["forbidden_claims"]
+    tamil = "இந்த முடிவு மற்றவருடையது; உங்கள் உறவு காலத்தை மட்டும் பார்க்கலாம்."
+    assert enforce_live_graph_answer(tamil, result, language="tamil") == tamil
+
+
+@pytest.mark.parametrize(
+    "action",
+    [
+        "return_reconciliation",
+        "contact_response",
+        "commitment_marriage",
+    ],
+)
+def test_specific_partner_decision_passes_semantic_action_to_multilingual_contract(action: str) -> None:
+    packet = _packet(
+        "relationship",
+        "event_prediction",
+        marriage_subtype="specific_partner_decision",
+        third_party_action=action,
+    )
+    result = apply_live_graph_policy(
+        packet,
+        intent={
+            "category": "relationship",
+            "marriage_subtype": "specific_partner_decision",
+            "third_party_action": action,
+        },
+        context={
+            "intent_summary": {"category": "relationship", "answer_mode": "event_prediction"},
+            "normalized_evidence": {"natal_promise": {"status": "mixed"}},
+            "current_dashas": {"levels": {"MD": "Saturn"}},
+            "current_transits": {"planets": {"Venus": {"house": 7}}},
+        },
+    )
+
+    rules = result["answer_spec"]["knowledge_graph_policy"]["specific_partner_decision_rules"]
+    assert rules["requested_action"] == action
+    assert "Never mention a proposal unless the user actually asked" in result["answer_spec"]["knowledge_graph_policy"]["instruction"]
+
+
 @pytest.mark.parametrize(
     ("subtype", "answer_mode", "expected_route"),
     [
@@ -180,6 +392,12 @@ def test_past_love_arranged_route_uses_static_pathway_contract_not_timed_option_
         "normalized_evidence": {
             "natal_promise": {"status": "supported"},
             "divisional_specifics": {"d9": "supportive"},
+            # The shared workspace routinely contains timing material even
+            # for a static question. It is contamination to sanitize, not a
+            # reason to refuse Live mode when all route factors are present.
+            "current_timing": {"active_dashas": {"md": {"planet": "Saturn"}}},
+            "historical_event_dasha_scan": {"windows": [{"start": "2020-01-01"}]},
+            "risk_specifics": [{"effect": "current period pressure"}],
         },
     }
 
@@ -197,10 +415,21 @@ def test_past_love_arranged_route_uses_static_pathway_contract_not_timed_option_
         "marriage:H5", "marriage:H7", "marriage:D9",
     }
     assert "marriage:H2" in rules["family_mediated_pathway"]["required_factors"]
+    assert policy["missing_required_factors"] == []
+    assert policy["fallback_to_deeper_mode"] is False
+    assert policy["evidence_status"] == "complete"
+    assert policy["excluded_evidence_sanitized"] is True
+    assert "marriage:DashaActivation" in policy["unexpected_default_exclusions"]
     assert "ranked_windows" not in result["verdict"]
+    assert result["verdict"]["direction"] == "synthesize_from_marriage_pathway_comparison"
+    assert "missing_required_capabilities" not in result["verdict"]
     assert result["verdict"]["scope"].startswith("static love-led")
 
     composer = _build_instant_composer_context(context, result)
+    assert composer["evidence"].get("current_timing") is None
+    assert composer["evidence"].get("historical_event_dasha_scan") is None
+    assert not composer["evidence"].get("risk_specifics")
+    assert "missing_required_capabilities" not in composer["verdict"]
     prompt = _build_instant_composer_prompt_v3(
         "Did I have a love or arranged marriage?", composer, "english"
     )

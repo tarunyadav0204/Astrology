@@ -714,25 +714,57 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
             "limitations": _list(verdict.get("missing_required_capabilities")),
             "complete": bool(constitutional_lines and vulnerability_groups),
         }
+    married_life = _dict(normalized.get("married_life_foundation"))
+    if answer_mode == "topic_reading" and married_life:
+        return {
+            "schema_version": "instant-user-derivation/v2",
+            "married_life_reading": {
+                "scope": married_life.get("scope"),
+                "d1_house_roles": married_life.get("d1_house_roles"),
+                "d1_houses": _list(married_life.get("d1_houses")),
+                "d9_house_roles": married_life.get("d9_house_roles"),
+                "d9_houses": _list(married_life.get("d9_houses")),
+                "natural_significators": married_life.get("natural_significators"),
+                "jaimini": married_life.get("jaimini"),
+                "interpretation_order": married_life.get("interpretation_order"),
+            },
+            "conclusion": {
+                "direction": verdict.get("direction") or "synthesize_from_married_life_foundation",
+                "confidence": verdict.get("confidence"),
+            },
+            "limitations": [] if married_life.get("evidence_complete") else ["The complete D1-D9-Jaimini marriage foundation was unavailable."],
+            "complete": bool(married_life.get("evidence_complete")),
+        }
     chart_facts = _dict(normalized.get("chart_facts"))
     if answer_mode == "factual_chart_lookup" and chart_facts:
         charts = _dict(chart_facts.get("charts"))
         requested = [str(item) for item in _list(chart_facts.get("requested_charts")) if item]
+        requested_houses = [
+            number for number in (_house(item) for item in _list(chart_facts.get("requested_houses")))
+            if number
+        ]
+        single_house = _dict(chart_facts.get("single_house_analysis"))
+        single_house_rows = {
+            _house(row.get("house")): row
+            for row in _list(single_house.get("houses"))
+            if isinstance(row, dict) and _house(row.get("house"))
+        }
         fact_groups: List[Dict[str, Any]] = []
         for chart_name, raw_chart in charts.items():
             chart = _dict(raw_chart)
             domain = _dict(chart.get("domain"))
             lagna = _dict(chart.get("lagna"))
             lines: List[str] = []
-            sign_name = lagna.get("sign_name") or chart.get("ascendant")
-            if sign_name:
-                lines.append(f"{chart_name} ascendant is {sign_name}.")
-            if lagna.get("lord"):
-                placement = f" in House {lagna.get('lord_house')}" if lagna.get("lord_house") not in (None, "") else ""
-                dignity = f" ({str(lagna.get('lord_dignity')).replace('_', ' ')})" if lagna.get("lord_dignity") else ""
-                lines.append(f"Its ascendant lord {lagna.get('lord')} is placed{placement}{dignity}.")
-            lines.extend(str(item) for item in _list(chart.get("support_signals")) if item)
-            lines.extend(f"Caution: {item}" for item in _list(chart.get("caution_signals")) if item)
+            if not requested_houses:
+                sign_name = lagna.get("sign_name") or chart.get("ascendant")
+                if sign_name:
+                    lines.append(f"{chart_name} ascendant is {sign_name}.")
+                if lagna.get("lord"):
+                    placement = f" in House {lagna.get('lord_house')}" if lagna.get("lord_house") not in (None, "") else ""
+                    dignity = f" ({str(lagna.get('lord_dignity')).replace('_', ' ')})" if lagna.get("lord_dignity") else ""
+                    lines.append(f"Its ascendant lord {lagna.get('lord')} is placed{placement}{dignity}.")
+                lines.extend(str(item) for item in _list(chart.get("support_signals")) if item)
+                lines.extend(f"Caution: {item}" for item in _list(chart.get("caution_signals")) if item)
             focus_rows = [row for row in _list(chart.get("houses")) if isinstance(row, dict) and row.get("focus")]
             for row in focus_rows:
                 occupants = ", ".join(str(item) for item in _list(row.get("occupants"))) or "no occupants"
@@ -740,6 +772,49 @@ def build_user_derivation(*, query_plan: Dict[str, Any], verdict: Dict[str, Any]
                     f"House {row.get('house')} ({row.get('theme') or 'relevant area'}) is ruled by "
                     f"{row.get('lord') or 'an unavailable lord'} and has {occupants}."
                 )
+                deep = _dict(single_house_rows.get(_house(row.get("house"))))
+                if not deep:
+                    continue
+                structural = _dict(deep.get("structural_chain"))
+                lord_condition = _dict(structural.get("lord_condition"))
+                if lord_condition:
+                    lines.append(
+                        f"Its lord {structural.get('lord')} is in House {lord_condition.get('placement_house')} "
+                        f"in {lord_condition.get('placement_sign')} with "
+                        f"{str(lord_condition.get('dignity') or 'unclassified').replace('_', ' ')} dignity."
+                    )
+                aspectors = [
+                    f"{item.get('planet')} from House {item.get('from_house')}"
+                    for item in _list(structural.get("aspected_by"))
+                    if isinstance(item, dict) and item.get("planet")
+                ]
+                if aspectors:
+                    lines.append("Parashari aspects to this house: " + ", ".join(aspectors) + ".")
+                specials = [
+                    f"{str(item.get('source')).replace('_', ' ')}: {item.get('planet')} ({item.get('polarity')})"
+                    for item in _list(deep.get("special_conditions"))
+                    if isinstance(item, dict) and item.get("source") and item.get("planet")
+                ]
+                if specials:
+                    lines.append("Connected special conditions: " + "; ".join(specials) + ".")
+                jaimini = _dict(deep.get("jaimini"))
+                arudha = _dict(jaimini.get("house_arudha"))
+                if arudha:
+                    lines.append(f"Jaimini {arudha.get('name')} falls in {arudha.get('sign_name')}.")
+                chara = [
+                    f"{item.get('karaka')} {item.get('planet')}"
+                    for item in _list(jaimini.get("chara_karaka_connections"))
+                    if isinstance(item, dict) and item.get("karaka") and item.get("planet")
+                ]
+                rashi = [
+                    f"{item.get('planet')} from {item.get('from_sign')}"
+                    for item in _list(jaimini.get("rashi_aspects_to_house_sign"))
+                    if isinstance(item, dict) and item.get("planet")
+                ]
+                if chara:
+                    lines.append("Connected Jaimini Chara Karakas: " + ", ".join(chara) + ".")
+                if rashi:
+                    lines.append("Jaimini rashi drishti to the house sign: " + ", ".join(rashi) + ".")
             fact_groups.append({
                 "chart": str(chart_name),
                 "life_area": domain.get("life_area"),

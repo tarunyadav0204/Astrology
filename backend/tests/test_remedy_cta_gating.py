@@ -20,7 +20,7 @@ def test_clamp_remedy_modes_demotes_without_cta():
         "query_context": {},
     }
     clamp_remedy_modes_on_intent(result, "I have anxiety, what can I do?")
-    assert result["answer_mode"] == "problem_diagnosis"
+    assert result["answer_mode"] == "topic_reading"
     assert result["mode"] == "ANALYZE_ROOT_CAUSE"
 
 
@@ -46,9 +46,9 @@ def test_clamp_remedy_modes_keeps_unambiguous_direct_remedy_selection() -> None:
         result,
         "Which calculated remedy is most relevant for recurring marital conflict?",
     )
-    assert result["explicit_remedy_request"] is True
-    assert result["answer_mode"] == "remedy_action"
-    assert result["mode"] == "RECOMMEND_REMEDY_FOR_PROBLEM"
+    assert not result.get("explicit_remedy_request")
+    assert result["answer_mode"] == "problem_diagnosis"
+    assert result["mode"] == "ANALYZE_ROOT_CAUSE"
 
 
 def test_deep_dive_template_forbids_inline_remedies():
@@ -67,7 +67,7 @@ def test_no_inline_remedy_plan_rule_forbids_lifestyle_playbooks():
     assert "NEXT_ACTION_META" in NO_INLINE_REMEDY_PLAN_RULE
 
 
-def test_ensure_remedy_cta_next_action_fallback_for_health():
+def test_ensure_remedy_cta_does_not_invent_language_specific_fallback():
     from utils.query_context import ensure_remedy_cta_next_action
 
     out = ensure_remedy_cta_next_action(
@@ -77,15 +77,10 @@ def test_ensure_remedy_cta_next_action_fallback_for_health():
         question="How is my health?",
         remedy_followup_active=False,
     )
-    assert out is not None
-    assert out["type"] == "remedy"
-    assert out["source"] == "fallback"
-    assert out["title"]
-    assert out["reason"]
-    assert out["follow_up_questions"][0]
+    assert out is None
 
 
-def test_ensure_remedy_cta_hindi_fallback():
+def test_ensure_remedy_cta_has_no_hardcoded_hindi_branch():
     from utils.query_context import ensure_remedy_cta_next_action
 
     out = ensure_remedy_cta_next_action(
@@ -96,8 +91,7 @@ def test_ensure_remedy_cta_hindi_fallback():
         remedy_followup_active=False,
         language="hindi",
     )
-    assert out is not None
-    assert "उपाय" in out["follow_up_questions"][0] or "देखें" in out["follow_up_questions"][0]
+    assert out is None
 
 
 def test_complete_remedy_fomo_preserves_llm_copy():
@@ -169,8 +163,7 @@ def test_answer_mode_alone_does_not_hide_normal_remedy_card():
         question="How is my health?",
         remedy_followup_active=False,
     )
-    assert action is not None
-    assert action["type"] == "remedy"
+    assert action is None
 
 
 def test_parse_next_action_with_faq_after():
@@ -202,8 +195,8 @@ def test_resolve_remedy_followup_from_chain_text():
         "Issue: Health & Vitality Remedies\n"
         "Do not give a general chart reading. Give practical remedies only."
     )
-    assert is_remedy_chain_question(chain)
-    assert resolve_remedy_followup_active({"query_context": {}}, combined_question=f"All {chain}")
+    assert not is_remedy_chain_question(chain)
+    assert not resolve_remedy_followup_active({"query_context": {}}, combined_question=f"All {chain}")
 
 
 def test_fetal_sex_gate_skips_short_clarification_picks():
@@ -260,8 +253,7 @@ def test_strip_inline_remedy_sections_keeps_cta_eligible():
         remedy_followup_active=False,
     )
     assert "Remedy layers" not in cleaned
-    assert action is not None
-    assert action["type"] == "remedy"
+    assert action is None
 
 
 def test_constitutional_health_can_suppress_current_pressure_remedy_card():

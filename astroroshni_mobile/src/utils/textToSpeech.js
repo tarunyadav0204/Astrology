@@ -19,6 +19,11 @@ const serverTtsInflight = new Map();
 
 const SPEECH_PROVIDER_LOCAL = 'local';
 const SPEECH_PROVIDER_GOOGLE = 'google';
+export const normalizeAstrologyPronunciation = (text) => String(text || '')
+  .replace(/(^|[^\u0900-\u097F])मंगल(?![\u0900-\u097F]|\s*(?:ग्रह|दोष))/g, '$1मंगल ग्रह')
+  .replace(/(^|[^\u0900-\u097F])बुध(?![\u0900-\u097F]|\s*ग्रह)/g, '$1बुध ग्रह')
+  .replace(/\bMangal\b(?!\s+(?:graha|dosh|vaar|war)\b)/gi, (name) => `${name} graha`)
+  .replace(/\bBudh\b(?!\s+(?:graha|vaar|war)\b)/gi, (name) => `${name} graha`);
 const markHandledError = (error) => {
   if (error && typeof error === 'object') error.__ttsHandled = true;
   return error;
@@ -431,7 +436,7 @@ const speakLocally = async (text, { language = 'english', voiceName, onDone, onE
       else resolve(value);
     };
 
-    Speech.speak(text, {
+    Speech.speak(normalizeAstrologyPronunciation(text), {
       language: speechLanguage,
       voice: voice?.identifier,
       rate: lang === 'hi' ? 0.92 : 0.95,

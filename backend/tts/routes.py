@@ -308,6 +308,33 @@ _PRONUNCIATION_ALIASES: list[tuple[str, str]] = [
 ]
 
 
+def _disambiguate_hindi_planet_names(text: str) -> str:
+  """Keep Hindi/Hinglish planet names from being spoken as weekdays."""
+  spoken = str(text or "")
+  spoken = re.sub(
+    r"(^|[^\u0900-\u097F])मंगल(?![\u0900-\u097F]|\s*(?:ग्रह|दोष))",
+    r"\1मंगल ग्रह",
+    spoken,
+  )
+  spoken = re.sub(
+    r"(^|[^\u0900-\u097F])बुध(?![\u0900-\u097F]|\s*ग्रह)",
+    r"\1बुध ग्रह",
+    spoken,
+  )
+  spoken = re.sub(
+    r"\b(Mangal)\b(?!\s+(?:graha|dosh|vaar|war)\b)",
+    r"\1 graha",
+    spoken,
+    flags=re.IGNORECASE,
+  )
+  return re.sub(
+    r"\b(Budh)\b(?!\s+(?:graha|vaar|war)\b)",
+    r"\1 graha",
+    spoken,
+    flags=re.IGNORECASE,
+  )
+
+
 def _strip_literal_punctuation_words(text: str) -> str:
   """
   Gemini and Chirp3 sometimes introduce spoken punctuation ('comma', 'dot').
@@ -376,7 +403,7 @@ def _escape_ssml_text(text: str) -> str:
 
 def _apply_pronunciation_ssml(text: str) -> str:
   """Wrap known Sanskrit/astrology terms in <sub alias="..."> so Google TTS pronounces them better."""
-  text = _strip_literal_punctuation_words(text)
+  text = _disambiguate_hindi_planet_names(_strip_literal_punctuation_words(text))
   for term, alias in _PRONUNCIATION_ALIASES:
     if term in text:
       safe_alias = html.escape(alias, quote=False)
@@ -391,7 +418,7 @@ def _apply_pronunciation_ssml(text: str) -> str:
 
 def _apply_pronunciation_plain(text: str, *, compact_hyphens: bool = False) -> str:
   """Replace terms with phonetic spelling for plain-text TTS (no SSML). Used by /tts/synthesize."""
-  text = _strip_literal_punctuation_words(text)
+  text = _disambiguate_hindi_planet_names(_strip_literal_punctuation_words(text))
   for term, alias in _PRONUNCIATION_ALIASES:
     spoken = alias.replace("-", "") if compact_hyphens else alias
     text = text.replace(term, spoken)
@@ -1278,7 +1305,11 @@ async def synthesize(
     raise HTTPException(status_code=500, detail=f"TTS synthesis failed: {e}")
 
   audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
-  response = {"audio": audio_b64}
+  response = {
+    "audio": audio_b64,
+    "provider": "google",
+    "voice_name": resolved_voice_name,
+  }
   if include_timepoints:
     response["timing_mode_used"] = timing_mode_used
     response["timepoints"] = timepoints_payload

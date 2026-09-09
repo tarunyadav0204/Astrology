@@ -546,6 +546,7 @@ export default function ChatScreen({ navigation, route }) {
   const [instantChatCost, setInstantChatCost] = useState(1);
   const [instantChatPerMinuteCost, setInstantChatPerMinuteCost] = useState(1);
   const [instantChatFirstMinuteCost, setInstantChatFirstMinuteCost] = useState(1);
+  const [speechChatPerMinuteCost, setSpeechChatPerMinuteCost] = useState(1);
   const [premiumChatCost, setPremiumChatCost] = useState(3);
   const [chatCostOriginal, setChatCostOriginal] = useState(null);
   const [instantChatCostOriginal, setInstantChatCostOriginal] = useState(null);
@@ -2320,6 +2321,10 @@ export default function ChatScreen({ navigation, route }) {
       Number.isFinite(instantFirstMinuteVal) && instantFirstMinuteVal > 0
         ? instantFirstMinuteVal
         : (Number.isFinite(instantMinuteVal) && instantMinuteVal > 0 ? instantMinuteVal : 1)
+    );
+    const speechMinuteVal = Number(priceMap.speech_chat_per_minute);
+    setSpeechChatPerMinuteCost(
+      Number.isFinite(speechMinuteVal) && speechMinuteVal > 0 ? speechMinuteVal : 1
     );
     setInstantChatEnabled(Boolean(features.instant_chat_enabled));
     setSpeechChatEnabled(Boolean(features.speech_chat_enabled));
@@ -5328,12 +5333,14 @@ export default function ChatScreen({ navigation, route }) {
 
   const getChatModeName = (modeKey = getChatModeKey()) => {
     if (modeKey === 'premium') return t('chat.modeIntro.premium.name', 'Premium');
+    if (modeKey === 'speech') return t('chat.modeIntro.speech.name', 'Speech');
     if (modeKey === 'instant') return t('chat.modeIntro.instant.name', 'Live');
     return t('chat.modeIntro.standard.name', 'Standard');
   };
 
   const getChatModeCompactName = (modeKey = getChatModeKey()) => {
     if (modeKey === 'premium') return 'P';
+    if (modeKey === 'speech') return 'V';
     if (modeKey === 'instant') return 'L';
     return 'S';
   };
@@ -5377,7 +5384,18 @@ export default function ChatScreen({ navigation, route }) {
   const applyChatMode = (modeKey) => {
     keepChatOpenAfterAskEntryRef.current = true;
     setShowGreeting(false);
-    if (modeKey === 'instant') {
+    if (modeKey === 'speech') {
+      setShowModeSelector(false);
+      modeIntroSuppressOpenUntilRef.current = Date.now() + 900;
+      setShowChatModeIntro(false);
+      navigation.navigate('SpeechChat', {
+        birthData,
+        language,
+        responseStyle: pendingAnswerStyle || answerStyle,
+        sessionId,
+      });
+      return;
+    } else if (modeKey === 'instant') {
       setIsInstantAnalysis(true);
       setIsPremiumAnalysis(false);
     } else if (modeKey === 'premium') {
@@ -5443,6 +5461,20 @@ export default function ChatScreen({ navigation, route }) {
         t('chat.modeIntro.instant.feature3', 'Charged by conversation time'),
       ],
       cost: instantChatFirstMinuteCost,
+      originalCost: null,
+    }] : []),
+    ...(instantChatEnabled && speechChatEnabled && birthData ? [{
+      key: 'speech',
+      icon: 'mic',
+      name: t('chat.modeIntro.speech.name', 'Speech'),
+      benefit: t('chat.modeIntro.speech.benefit', 'Talk naturally with Tara and hear each reply in a continuous voice conversation.'),
+      bestFor: t('chat.modeIntro.speech.bestFor', 'Best when speaking feels easier than typing.'),
+      features: [
+        t('chat.modeIntro.speech.feature1', 'Uses the same fast chart reasoning as Live'),
+        t('chat.modeIntro.speech.feature2', 'Spoken replies with natural follow-up questions'),
+        t('chat.modeIntro.speech.feature3', 'Choose your conversation language and voice controls'),
+      ],
+      cost: speechChatPerMinuteCost,
       originalCost: null,
     }] : []),
     {
@@ -7357,6 +7389,7 @@ export default function ChatScreen({ navigation, route }) {
                       birthData,
                       language,
                       responseStyle: answerStyle,
+                      sessionId,
                     })
                   }
                   accessibilityRole="button"
@@ -7787,6 +7820,10 @@ export default function ChatScreen({ navigation, route }) {
                                     first: instantChatFirstMinuteCost,
                                     following: instantChatPerMinuteCost,
                                   })
+                                : option.key === 'speech'
+                                  ? t('instantBilling.rateShort', '{{cost}} credits/min', {
+                                      cost: speechChatPerMinuteCost,
+                                    })
                                 : t('chat.modeIntro.perQuestion', '{{cost}} per question', {
                                     cost: formatModeCost(option.cost),
                                   })}

@@ -31,7 +31,7 @@
 | `children_remedy` | Which calculated remedy is most relevant for delayed conception? | `children_remedy` | `ModeRemedy` | 7 | 3 | PASS |
 | `two_chart_children_handoff` | Do our charts jointly support having children? | `two_chart_children_handoff` | `ModeHandoff` | 1 | 1 | PASS |
 | `child_chart_required_handoff` | What career will my child choose? | `child_chart_required_handoff` | `ModeHandoff` | 1 | 1 | PASS |
-| `medical_safety_handoff` | Will my pregnancy be healthy and is this symptom dangerous? | `medical_safety_handoff` | `ModeHandoff` | 1 | 1 | PASS |
+| `medical_safety_handoff` | Will my pregnancy be healthy and is this symptom dangerous? | `medical_safety_handoff` | `ModeTopic` | 6 | 2 | PASS |
 | `muhurat_handoff` | Which shortlisted embryo-transfer date has the cleanest Panchang? | `muhurat_handoff` | `ModeHandoff` | 1 | 1 | PASS |
 | `legal_custody_handoff` | Will I get custody of my child? | `legal_custody_handoff` | `ModeHandoff` | 1 | 1 | PASS |
 | `fetal_sex_refusal` | Will I have a son or daughter? | `fetal_sex_refusal` | `ModeRefusal` | 1 | 1 | PASS |

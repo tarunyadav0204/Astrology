@@ -14,6 +14,31 @@ from utils.query_context import resolve_query_now
 
 logger = logging.getLogger(__name__)
 
+
+def resolve_openai_reasoning_effort(
+    model_id: str,
+    requested_effort: Optional[str],
+) -> Optional[str]:
+    """Return a model-supported effort, or None when reasoning is unsupported.
+
+    Live Chat requests ``none`` for latency, but older GPT-4 models do not
+    accept the reasoning field and Pro models require a higher minimum.
+    """
+    model = str(model_id or "").strip().lower()
+    requested = str(requested_effort or "").strip().lower()
+    if model.startswith("gpt-5.4-pro"):
+        return requested if requested in {"medium", "high", "xhigh"} else "medium"
+    if model.startswith("gpt-5.6") or model.startswith("gpt-5.4"):
+        return requested if requested in {"none", "low", "medium", "high", "xhigh", "max"} else "low"
+    if model.startswith("gpt-5"):
+        # Earlier GPT-5 models use ``minimal`` rather than ``none``.
+        if requested == "none":
+            return "minimal"
+        return requested if requested in {"minimal", "low", "medium", "high"} else "low"
+    # GPT-4 and legacy/o-series models are sent without this field. Their
+    # endpoint defaults remain authoritative.
+    return None
+
 # Load environment variables
 env_paths = [
     '.env',
@@ -354,12 +379,18 @@ class GeminiChatAnalyzer:
 
     @staticmethod
     def _openai_model_uses_responses_api(model_id: str) -> bool:
-        """GPT-5+ flagship models use /v1/responses, not /v1/chat/completions."""
+        """Reasoning families use Responses; GPT-4 text models use Chat Completions."""
         m = (model_id or "").strip().lower()
-        return m.startswith("gpt-5")
+        return m.startswith("gpt-5") or m.startswith("o")
 
     async def _openai_chat_completion(
-        self, prompt: str, model_id: str, premium_analysis: bool = False
+        self,
+        prompt: str,
+        model_id: str,
+        premium_analysis: bool = False,
+        stream_callback: Optional[Callable[[str, str], None]] = None,
+        system_prompt: Optional[str] = None,
+        reasoning_effort_override: Optional[str] = None,
     ) -> Dict[str, Any]:
         """OpenAI chat: Chat Completions (GPT-4 family) or Responses API (GPT-5 family)."""
         try:
@@ -379,29 +410,62 @@ class GeminiChatAnalyzer:
         client = AsyncOpenAI(api_key=api_key, timeout=600.0)
 
         if self._openai_model_uses_responses_api(model_clean):
-            # https://platform.openai.com/docs/guides/migrate-to-responses — GPT-5 series
-            # Prefer low effort for speed; gpt-5.4-pro only accepts medium | high | xhigh (not low).
-            if "-pro" in mid:
-                reasoning_effort = "medium"
-            else:
-                reasoning_effort = "low"
-            reasoning = {"effort": reasoning_effort}
+            # GPT-5 and o-series models use Responses. Capability resolution
+            # below prevents Luna-only effort values from leaking to other models.
+            reasoning_effort = resolve_openai_reasoning_effort(
+                model_clean,
+                reasoning_effort_override,
+            )
+            reasoning = {"effort": reasoning_effort} if reasoning_effort else None
             print(
                 f"🧠 OpenAI Responses API: model={model_clean} "
                 f"reasoning.effort={reasoning_effort}"
             )
 
-            resp = await client.responses.create(
-                model=model_clean,
-                input=prompt,
-                max_output_tokens=65536,
-                reasoning=reasoning,
-            )
+            request_args: Dict[str, Any] = {
+                "model": model_clean,
+                "input": prompt,
+                "max_output_tokens": 65536,
+            }
+            if reasoning is not None:
+                request_args["reasoning"] = reasoning
+            if str(system_prompt or "").strip():
+                request_args["instructions"] = str(system_prompt).strip()
+            streamed_content = ""
+            if stream_callback is not None:
+                content_parts: List[str] = []
+                published_text = ""
+                async with client.responses.stream(**request_args) as stream:
+                    async for event in stream:
+                        if getattr(event, "type", None) != "response.output_text.delta":
+                            continue
+                        delta = str(getattr(event, "delta", "") or "")
+                        if not delta:
+                            continue
+                        content_parts.append(delta)
+                        full_text = "".join(content_parts)
+                        if not published_text or len(full_text) - len(published_text) >= 48:
+                            await asyncio.to_thread(
+                                stream_callback,
+                                full_text[len(published_text):],
+                                full_text,
+                            )
+                            published_text = full_text
+                    resp = await stream.get_final_response()
+                streamed_content = "".join(content_parts).strip()
+                if streamed_content and streamed_content != published_text:
+                    await asyncio.to_thread(
+                        stream_callback,
+                        streamed_content[len(published_text):],
+                        streamed_content,
+                    )
+            else:
+                resp = await client.responses.create(**request_args)
             if getattr(resp, "error", None) is not None:
                 err = resp.error
                 msg = getattr(err, "message", None) or str(err)
                 raise RuntimeError(msg)
-            content = (resp.output_text or "").strip()
+            content = streamed_content or (resp.output_text or "").strip()
             if not content and getattr(resp, "output", None):
                 # Fallback: aggregate text from output items if property missed edge cases
                 parts = []
@@ -430,9 +494,13 @@ class GeminiChatAnalyzer:
 
         # Legacy Chat Completions (gpt-4o, gpt-4-turbo, etc.)
         temperature = 1.0 if mid.startswith("o") else 0.0
+        messages = []
+        if str(system_prompt or "").strip():
+            messages.append({"role": "system", "content": str(system_prompt).strip()})
+        messages.append({"role": "user", "content": prompt})
         resp = await client.chat.completions.create(
             model=model_clean,
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             temperature=temperature,
             max_tokens=16384,
         )
@@ -441,6 +509,8 @@ class GeminiChatAnalyzer:
         content = (resp.choices[0].message.content or "").strip()
         if not content:
             raise RuntimeError("Blank OpenAI response content")
+        if stream_callback is not None:
+            await asyncio.to_thread(stream_callback, content, content)
         usage_obj = getattr(resp, "usage", None)
         usage: Dict[str, Any] = {
             "input_tokens": int(getattr(usage_obj, "prompt_tokens", 0) or 0),
@@ -617,6 +687,7 @@ class GeminiChatAnalyzer:
         deepseek_thinking_enabled: Optional[bool] = None,
         stream_callback: Optional[Callable[[str, str], None]] = None,
         system_prompt: Optional[str] = None,
+        openai_reasoning_effort: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Single LLM completion for an arbitrary prompt (parallel chat branches + merge).
@@ -708,9 +779,20 @@ class GeminiChatAnalyzer:
 
         try:
             if llm_provider == CHAT_LLM_OPENAI:
-                model_name = get_openai_premium_model() if premium_analysis else get_openai_chat_model()
+                model_name = (
+                    str(model_name_override).strip()
+                    if model_name_override
+                    else (get_openai_premium_model() if premium_analysis else get_openai_chat_model())
+                )
                 oa = await asyncio.wait_for(
-                    self._openai_chat_completion(prompt, model_name, premium_analysis),
+                    self._openai_chat_completion(
+                        prompt,
+                        model_name,
+                        premium_analysis,
+                        stream_callback,
+                        system_prompt,
+                        openai_reasoning_effort,
+                    ),
                     timeout=timeout_s,
                 )
                 response_text = (oa or {}).get("text")

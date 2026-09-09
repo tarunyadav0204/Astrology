@@ -1,7 +1,7 @@
 """Shared provider pricing helpers used by admin cost estimates.
 
-DeepSeek V4 uses time-of-day pricing.  Keep this in one module so the Chat QA
-and Credits dashboards cannot silently diverge again.
+Provider pricing belongs here so the Chat QA and Credits dashboards cannot
+silently diverge.
 """
 
 from __future__ import annotations
@@ -17,6 +17,21 @@ _DEEPSEEK_FLASH_ALIASES = {
     "deepseek-chat-3.2",
     "deepseek-v4-flash",
 }
+
+
+def openai_rate_usd_per_million(model_name: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Return official token rates for supported OpenAI models."""
+
+    model = str(model_name or "").strip().lower()
+    if model == "gpt-5.6-luna":
+        return {
+            "input": 0.20,
+            "cached_input": 0.02,
+            "output": 1.20,
+            "tier": "openai_standard",
+            "resolved_model": "gpt-5.6-luna",
+        }
+    return None
 
 
 def _as_utc(value: Any) -> datetime:

@@ -90,7 +90,7 @@ def observed_children_factors(context: Mapping[str, Any], query_plan: Mapping[st
     factors: set[str] = set()
     plan = query_plan if isinstance(query_plan, Mapping) else {}
     runtime_key = children_graph_runtime_key(plan.get("category"), plan)
-    if runtime_key in BOUNDARY_CHILDREN_SUBTYPES:
+    if runtime_key in BOUNDARY_CHILDREN_SUBTYPES and runtime_key != "medical_safety_handoff":
         factors.add("children:ScopeBoundary")
         return factors
     normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}

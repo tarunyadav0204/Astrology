@@ -1,4 +1,4 @@
-from ai.intent_router import apply_career_routing_guards
+from ai.intent_router import IntentRouter, apply_career_routing_guards
 from instant_chat_v2.answer_spec import build_answer_spec
 from instant_chat_v2.career import (
     CAREER_PROFILES,
@@ -23,6 +23,7 @@ from chat.instant_chat_pipeline import (
     _build_instant_composer_context,
     _build_instant_composer_prompt_v3,
     _compact_career_foundation,
+    _career_profile_answer_from_evidence,
     _instant_compact_profession_evidence,
     _requested_charts_from_intent,
     _validate_career_chart_frame_answer,
@@ -86,6 +87,78 @@ def test_career_foundation_publishes_chart_scoped_lagna_identities():
     assert packet["chart_identities"]["D1"]["ascendant_lord_house_in_same_chart"] == 4
     assert packet["chart_identities"]["D10"]["ascendant_lord"] == "Jupiter"
     assert packet["chart_identities"]["D10"]["ascendant_lord_house_in_same_chart"] == 11
+
+
+def test_broad_career_renderer_returns_answer_instead_of_chart_frame_retry():
+    foundation = {
+        "career_subtype": "career_fit",
+        "D1": {"houses": [
+            {"house": 2, "lord": "Sun", "lord_placement_house": 9},
+            {"house": 11, "lord": "Venus", "lord_placement_house": 11},
+        ]},
+        "chart_identities": {
+            "D1": {
+                "ascendant_sign": "Cancer", "ascendant_lord": "Moon",
+                "ascendant_lord_house_in_same_chart": 4,
+                "ascendant_lord_sign_in_same_chart": "Libra",
+            },
+            "D10": {
+                "ascendant_sign": "Sagittarius", "ascendant_lord": "Jupiter",
+                "ascendant_lord_house_in_same_chart": 11,
+                "ascendant_lord_sign_in_same_chart": "Libra",
+            },
+        },
+        "vocation_synthesis": {
+            "primary_work_functions": [
+                {"name": "advanced technology and unconventional problem-solving"},
+                {"name": "technical architecture and strategic judgment"},
+            ],
+            "suitable_fields": [
+                {"name": "AI, software, automation and emerging technology"},
+                {"name": "technology consulting and solution architecture"},
+            ],
+            "preferred_environments": [{"name": "innovative technology environments"}],
+            "tenth_lord_signature": {
+                "planet": "Mars", "house": 2,
+                "conjunct_planets": ["Jupiter", "Saturn", "Rahu"],
+            },
+            "ranked_planets": [{
+                "planet": "Mercury",
+                "reasons": ["D10 House 10 lord", "Mercury occupies D10 House 10"],
+            }],
+            "work_structure": {"inclination": "job / structured employment"},
+        },
+    }
+    answer = _career_profile_answer_from_evidence(foundation, technical=True)
+
+    assert "native lagna lord is Moon" in answer
+    assert "Jupiter, the D10 lagna lord" in answer
+    assert "Mercury both rules and occupies D10 H10" in answer
+    assert "For earning potential within your chart" in answer
+    assert "D1 H2 is ruled by Sun from H9" in answer
+    assert "Please try this question again" not in answer
+    assert _validate_career_chart_frame_answer(answer, foundation) == []
+
+
+def test_compact_router_contract_keeps_strength_work_and_earnings_in_career_fit():
+    router = IntentRouter.__new__(IntentRouter)
+    prompt = router._build_compact_instant_router_prompt(
+        user_question="Analyze my whole chart and tell me my strengths and which work will bring most money",
+        latest_user_reply="Analyze my whole chart and tell me my strengths and which work will bring most money",
+        history_text="",
+        app_language="english",
+        current_date="2026-09-07",
+        current_year=2026,
+        current_month="September",
+        clarification_limit_text="",
+        force_ready_instruction="",
+        force_clarify_instruction="",
+        dialogue_state_text="{}",
+    )
+
+    assert "ONE coherent Career Fit request" in prompt
+    assert "category=career, career_subtype=career_fit" in prompt
+    assert "not a separate Wealth domain and not compound_plan" in prompt
 
 
 def test_profession_evidence_passes_birth_record_to_time_dependent_calculator(monkeypatch):
@@ -199,6 +272,41 @@ def test_named_career_target_keeps_vocation_chart_for_any_business_field():
     assert result["career_target"] == "software consulting"
     assert result["career_subtype"] == "business"
     assert result["required_divisional_charts"] == ["D1", "D10", "Karkamsa"]
+
+
+def test_static_career_fit_removes_competing_wealth_route_and_future_timing() -> None:
+    result = {
+        "category": "career",
+        "career_subtype": "career_fit",
+        "wealth_subtype": "source",
+        "answer_mode": "potential_capacity",
+        "needs_transits": True,
+        "evidence_plan": {
+            "question_parts": [{
+                "part_id": "p1", "life_domain": "career",
+                "event_profile": "general_event", "timeframe": {"kind": "open_future"},
+            }],
+            "evidence_needs": [
+                {
+                    "need_id": "n1", "topic": "career", "kind": "natal_topic_foundation",
+                    "params": {"event_profile": "general_event", "required_charts": ["D1", "D10", "D2"]},
+                },
+                {"need_id": "n2", "topic": "wealth", "kind": "natal_topic_foundation"},
+            ],
+        },
+    }
+
+    apply_career_routing_guards(result)
+
+    assert result["category"] == "career_fit"
+    assert "wealth_subtype" not in result
+    assert result["needs_transits"] is False
+    assert result["evidence_plan"]["question_parts"][0]["event_profile"] == "career_fit"
+    assert result["evidence_plan"]["question_parts"][0]["timeframe"] == {"kind": "none"}
+    assert [need["topic"] for need in result["evidence_plan"]["evidence_needs"]] == ["career"]
+    assert result["evidence_plan"]["evidence_needs"][0]["params"] == {
+        "event_profile": "career_fit", "required_charts": ["D1", "D10", "Karkamsa"],
+    }
 
 
 def test_query_plan_preserves_named_target_and_semantic_traits():
@@ -1023,3 +1131,24 @@ def test_event_timing_verdict_keeps_structured_career_subtype_and_stages():
     assert "role_change_execution" in codes
     assert "employment_joining" in codes
     assert all("does not guarantee" in row["certainty_rule"] for row in contract["manifestations"])
+
+
+def test_employment_timing_requests_d10_from_route_even_when_router_omits_chart_list():
+    requested = _requested_charts_from_intent(
+        {
+            "category": "job",
+            "career_subtype": "employment",
+            "answer_mode": "event_prediction",
+            "evidence_plan": {
+                "question_parts": [{
+                    "life_domain": "career",
+                    "event_profile": "first_job",
+                    "intent_families": ["event_timing"],
+                    "timeframe": {"kind": "open_future"},
+                }],
+            },
+        },
+        answer_mode="event_prediction",
+    )
+
+    assert {"D1", "D10"}.issubset(requested)

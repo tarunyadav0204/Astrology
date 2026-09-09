@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from auth import get_current_user
 from db import get_conn, execute
-from utils.llm_pricing import deepseek_rate_usd_per_million
+from utils.llm_pricing import deepseek_rate_usd_per_million, openai_rate_usd_per_million
 
 # YYYY-MM-DD for date filters (today / this month)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -658,6 +658,9 @@ def _resolve_model_rate(
     deepseek_rate = deepseek_rate_usd_per_million(m, priced_at=priced_at)
     if deepseek_rate is not None:
         return deepseek_rate
+    openai_rate = openai_rate_usd_per_million(m)
+    if openai_rate is not None:
+        return openai_rate
     if m in _CHAT_MODEL_RATE_USD_PER_1M:
         cfg = _CHAT_MODEL_RATE_USD_PER_1M[m]
         if "input_le_200k" not in cfg:
@@ -3014,6 +3017,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_gemini_instant_model,
             get_instant_chat_llm_provider,
             get_deepseek_instant_model,
+            get_openai_instant_model,
             get_event_timeline_model,
             get_parallel_branch_gemini_model,
             get_parallel_branch_planner_model,
@@ -3034,6 +3038,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_deepseek_chat_model,
             get_deepseek_premium_model,
             is_instant_chat_enabled,
+            is_instant_response_validation_enabled,
             is_chat_subject_gate_enabled,
             get_chat_subject_gate_user_allowlist,
             is_homepage_fomo_enabled,
@@ -3044,6 +3049,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_purchase_discount_user_allowlist,
             get_instant_chat_user_allowlist,
             is_speech_chat_enabled,
+            is_speech_unvalidated_streaming_enabled,
             get_speech_chat_user_allowlist,
             is_play_payment_service_enabled,
             get_play_payment_service_user_allowlist,
@@ -3082,6 +3088,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "gemini_instant_chat_model": get_gemini_instant_model(),
             "instant_chat_llm_provider": get_instant_chat_llm_provider(),
             "deepseek_instant_chat_model": get_deepseek_instant_model(),
+            "openai_instant_chat_model": get_openai_instant_model(),
             "event_timeline_model": get_event_timeline_model(),
             "parallel_branch_gemini_models": {
                 "parashari": get_parallel_branch_gemini_model("parashari"),
@@ -3127,6 +3134,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "speech_tts_voice_en": get_speech_tts_voice("en"),
             "speech_tts_voice_hi": get_speech_tts_voice("hi"),
             "instant_chat_enabled": is_instant_chat_enabled(),
+            "instant_response_validation_enabled": is_instant_response_validation_enabled(),
             "chat_subject_gate_enabled": is_chat_subject_gate_enabled(),
             "chat_subject_gate_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_chat_subject_gate_user_allowlist())
@@ -3149,6 +3157,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
                 str(uid) for uid in sorted(get_instant_chat_user_allowlist())
             ),
             "speech_chat_enabled": is_speech_chat_enabled(),
+            "speech_allow_unvalidated_streaming": is_speech_unvalidated_streaming_enabled(),
             "speech_chat_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_speech_chat_user_allowlist())
             ),

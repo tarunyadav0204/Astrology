@@ -478,8 +478,17 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             ),
         }
     answer_mode = str(query_plan.get("answer_mode") or "topic_reading")
+    special_flow = query_plan.get("special_flow") if isinstance(query_plan.get("special_flow"), dict) else {}
+    requested_houses = [
+        int(value)
+        for value in (special_flow.get("requested_houses") or [])
+        if str(value).isdigit() and 1 <= int(value) <= 12
+    ]
     if answer_mode == "factual_chart_lookup":
-        max_words, word_target = 280, "Predict from this named chart; usually 120-220 words."
+        if requested_houses:
+            max_words, word_target = 600, "Comprehensively analyze every requested house; usually 300-500 words in Technical style."
+        else:
+            max_words, word_target = 280, "Predict from this named chart; usually 120-220 words."
     elif answer_mode in {"event_prediction", "timing_window", "location_recommendation", "dedicated_muhurat_flow"}:
         max_words, word_target = 320, "Usually 140-260 words; preserve every material phase or ranked window."
     elif answer_mode in {"explanation_mechanism", "problem_diagnosis", "comparison_choice"}:
@@ -514,6 +523,52 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             ),
         }
     if answer_mode == "factual_chart_lookup":
+        if requested_houses:
+            return {
+                "schema_version": "instant-answer-spec/v1",
+                "tone": "clear, technical, conversational",
+                "max_words": max_words,
+                "composer_word_target": word_target,
+                "answer_order": [
+                    "requested house identity, sign and lord",
+                    "house lord's placement and complete condition",
+                    "each occupant's separate two-way impact and conjunction",
+                    "each exact Parashari aspector and its qualified effect",
+                    "connected yogas, Yogi/Avayogi and other supplied special conditions",
+                    "separate Jaimini Arudha, Chara Karaka and rashi-drishti analysis",
+                    "integrated concrete synthesis and one relevant follow-up",
+                ],
+                "presentation_contract": {
+                    "astrology_is_hidden_evidence": False,
+                    "opening": "Begin with the requested house's exact D1 identity, not the Lagna lord or a whole-chart summary.",
+                    "technical_detail_limit": (
+                        "Technical style must explain the complete supplied carrier chain in connected prose; "
+                        "Simple style translates the same chain without silently omitting a layer."
+                    ),
+                    "invalid_shape": (
+                        "A Lagna/Moon balancing paragraph; one compact proof; omission or substitution of an occupant; "
+                        "mixing Parashari graha drishti with Jaimini rashi drishti; or a raw placement ledger."
+                    ),
+                },
+                "chart_fact_rules": {
+                    "instruction": (
+                        "Read only evidence.chart_facts.single_house_analysis and its immutable fact_contract. "
+                        "Analyze only the requested houses. Preserve every house identity, lord condition, occupant, "
+                        "Parashari aspector, connected special condition and Jaimini layer."
+                    ),
+                    "requested_houses": requested_houses,
+                },
+                "claims": claims,
+                "forbidden": [
+                    "unrequested Lagna-lord or Moon explanation",
+                    "inventing or replacing an occupant",
+                    "omitting the supplied Jaimini layer in Technical style",
+                    "calling Jaimini rashi drishti a Parashari planetary aspect",
+                    "scores, weights, current dasha, transits or dates",
+                ],
+                "target_framing": "Analyze the requested house in the native's explicitly requested chart.",
+                "evidence_limitations": verdict.get("missing_required_capabilities") or [],
+            }
         return {
             "schema_version": "instant-answer-spec/v1",
             "tone": "clear, technical, conversational",
@@ -743,6 +798,7 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
         "event_rules": (
             {
                 "hard_horizon_end": (query_plan.get("time_scope") or {}).get("horizon_end"),
+                "operational_cadence": (query_plan.get("time_scope") or {}).get("operational_cadence"),
                 "retrospective": bool((query_plan.get("time_scope") or {}).get("retrospective")),
                 "window_comparison": timing_value.get("comparison"),
                 "window_score_delta": timing_value.get("score_delta"),
@@ -764,6 +820,10 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                         } if bool((query_plan.get("time_scope") or {}).get("retrospective")) else {}),
                         "chain": row.get("chain"),
                         "why": row.get("why"),
+                        **({
+                            "window_scope": row.get("window_scope"),
+                            "clipped_to_requested_horizon": True,
+                        } if row.get("clipped_to_requested_horizon") else {}),
                     }
                     for row in (verdict.get("ranked_windows") or [])
                     if isinstance(row, dict) and (row.get("start") or row.get("end"))
@@ -786,6 +846,10 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                         "chain": row.get("chain"),
                         "activated_focus_houses": row.get("activated_focus_houses") or [],
                         "why": row.get("why"),
+                        **({
+                            "window_scope": row.get("window_scope"),
+                            "clipped_to_requested_horizon": True,
+                        } if row.get("clipped_to_requested_horizon") else {}),
                     }
                     for row in (
                         (verdict.get("ranked_windows") or [])
@@ -822,7 +886,9 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                         "two supplied probable_peak_windows as narrower concentrations. Never label the whole MD-AD phase "
                         "with the winning PD planet. Ask which period matches the user's real history. "
                         if bool((query_plan.get("time_scope") or {}).get("retrospective")) else
-                        "Never state a date after hard_horizon_end. If a supplied window was clipped, use the clipped end. "
+                        "Never state a date after hard_horizon_end. If a supplied window was clipped, its start/end are "
+                        "the assessed intersection with the requested horizon—not the actual beginning/end of the dasha. "
+                        "Describe it as activity within the assessed interval and never claim the sub-period ends on the clipped date. "
                     )
                     +
                     "Obey window_answer_rule and window_score_delta when describing relative strength; a small gap must not become a definitive strongest-window claim. "
@@ -839,6 +905,16 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
                     "For career answers, prefer the supplied concrete manifestations over generic phrases such as "
                     "professional gains, responsibilities, stability, unconventional, or unsettled. Do not claim an "
                     "offer or joining date unless the contract explicitly supplies that layer."
+                    + (
+                        " This is an already-started operational process with a semantically implied short horizon. "
+                        "Answer only inside hard_horizon_end and use week/day-scale wording appropriate to operational_cadence. "
+                        "Lead with the current or earliest supported movement. If no sufficiently distinct window exists "
+                        "inside that horizon, say the short-range astrology cannot isolate a clearer date; never substitute "
+                        "a later multi-month or multi-year dasha window."
+                        if (query_plan.get("time_scope") or {}).get("operational_cadence")
+                        and not ((query_plan.get("time_scope") or {}).get("operational_cadence") or {}).get("explicit_timeframe")
+                        else ""
+                    )
                 ),
             }
                 if not exact_day and query_plan.get("answer_mode") == "event_prediction"

@@ -51,6 +51,24 @@ def test_multiple_keys_share_one_bulk_database_read(monkeypatch):
     assert reads == 1
 
 
+def test_instant_validation_flags_have_safe_defaults(monkeypatch):
+    monkeypatch.setattr(admin_settings, "get_setting", lambda _key: None)
+
+    assert admin_settings.is_instant_response_validation_enabled() is True
+    assert admin_settings.is_speech_unvalidated_streaming_enabled() is False
+
+
+def test_instant_validation_flags_parse_runtime_values(monkeypatch):
+    values = {
+        "instant_response_validation_enabled": "false",
+        "speech_allow_unvalidated_streaming": "true",
+    }
+    monkeypatch.setattr(admin_settings, "get_setting", lambda key: values.get(key))
+
+    assert admin_settings.is_instant_response_validation_enabled() is False
+    assert admin_settings.is_speech_unvalidated_streaming_enabled() is True
+
+
 def test_snapshot_refresh_is_single_flight_across_threads(monkeypatch):
     reads = 0
     count_lock = threading.Lock()

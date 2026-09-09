@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from ai.intent_router import IntentRouter, apply_education_routing_guards  # noqa: E402
+from ai.evidence_planner_schema import normalize_evidence_plan  # noqa: E402
 from calculators.chart_calculator import ChartCalculator  # noqa: E402
 from chat.instant_chat_pipeline import (  # noqa: E402
     _compact_education_foundation,
@@ -23,7 +25,7 @@ from instant_chat_v2.education_graph_runtime import (  # noqa: E402
     compare_education_graph_policy,
     education_graph_runtime_key,
 )
-from instant_chat_v2.graph_live import apply_live_graph_policy  # noqa: E402
+from instant_chat_v2.graph_live import apply_live_graph_policy, enforce_live_graph_answer  # noqa: E402
 from instant_chat_v2.planner import build_query_plan  # noqa: E402
 
 
@@ -296,6 +298,189 @@ def test_router_guard_preserves_target_options_and_requests_correct_charts() -> 
     assert _requested_charts_from_intent(intent, answer_mode="comparison_choice") == ["D1", "D24", "D9"]
 
 
+def test_course_comparison_plus_college_timing_becomes_one_two_part_calculation() -> None:
+    intent = {
+        "category": "education",
+        "education_subtype": "course_comparison",
+        "answer_mode": "comparison_choice",
+        "education_options": [
+            {"label": "MBBS", "traits": ["biological_care", "disciplined_memory"]},
+            {"label": "Chemical Engineering", "traits": ["technical_engineering", "analytical_quantitative"]},
+        ],
+        "evidence_plan": {
+            "question_parts": [
+                {
+                    "part_id": "choice",
+                    "life_domain": "education",
+                    "intent_families": ["comparison"],
+                    "event_profile": None,
+                },
+                {
+                    "part_id": "college-year",
+                    "life_domain": "education",
+                    "intent_families": ["event_timing"],
+                    "event_profile": "education_admission",
+                    "timeframe": {"kind": "open_future"},
+                },
+            ],
+            "evidence_needs": [{"kind": "natal_topic_foundation", "priority": "required"}],
+        },
+    }
+
+    apply_education_routing_guards(intent)
+
+    assert intent["education_subtype"] == "admission_timing"
+    assert intent["answer_mode"] == "event_prediction"
+    assert intent["needs_transits"] is True
+    assert intent["education_compound_parts"]["required_parts"] == [
+        "course_comparison", "admission_timing",
+    ]
+    need_kinds = {row["kind"] for row in intent["evidence_plan"]["evidence_needs"]}
+    assert {"future_dasha_event_windows", "transit_event_windows", "kp_cusp_analysis"}.issubset(need_kinds)
+
+    plan = build_query_plan(
+        question="Career MBBS or Chemical Engineering; which year will I go to college?",
+        intent=intent,
+        answer_mode=intent["answer_mode"],
+        target_subject={"key": "self", "label": "self"},
+        language="english",
+        as_of="2026-09-07",
+    )
+    assert plan["education_compound_parts"]["timing_subtype"] == "admission_timing"
+    assert len(plan["question_parts"]) == 2
+    normalized_plan = normalize_evidence_plan(intent["evidence_plan"])
+    assert normalized_plan["question_parts"][1]["event_profile"] == "education_admission"
+
+
+def test_education_parts_override_noisy_top_level_career_category() -> None:
+    """A leading word such as Career must not select the Career graph."""
+    intent = {
+        "category": "career",
+        "career_subtype": "general",
+        "education_options": [
+            {"label": "MBBS", "traits": ["biological_care", "disciplined_memory"]},
+            {"label": "Chemical Engineering", "traits": ["technical_engineering", "analytical_quantitative"]},
+        ],
+        "answer_mode": "event_prediction",
+        "needs_transits": True,
+        "evidence_plan": {
+            "question_parts": [
+                {
+                    "part_id": "choice",
+                    "life_domain": "education",
+                    "intent_families": ["comparison"],
+                    "event_profile": None,
+                },
+                {
+                    "part_id": "college-year",
+                    "life_domain": "education",
+                    "intent_families": ["event_timing"],
+                    "event_profile": "education_admission",
+                    "timeframe": {"kind": "open_future"},
+                },
+            ],
+            "evidence_needs": [],
+        },
+    }
+
+    # Production applies the guards in this order. Career may normalize the
+    # noisy summary first; Education must still win from the specific parts.
+    from ai.intent_router import apply_career_routing_guards
+    apply_career_routing_guards(intent)
+    apply_education_routing_guards(intent)
+
+    assert intent["category"] == "education"
+    assert intent["education_subtype"] == "admission_timing"
+    assert intent["answer_mode"] == "event_prediction"
+    assert intent["education_compound_parts"]["required_parts"] == [
+        "course_comparison", "admission_timing",
+    ]
+    assert intent["required_divisional_charts"] == ["D1", "D24", "D9"]
+
+
+def test_compound_education_guard_restores_missing_comparison_part() -> None:
+    """A collapsed router plan still retains both answer obligations."""
+    intent = {
+        "category": "career",
+        "education_options": ["MBBS", "Chemical Engineering"],
+        "answer_mode": "event_prediction",
+        "needs_transits": True,
+        "evidence_plan": {
+            "question_parts": [{
+                "part_id": "college-year",
+                "life_domain": "education",
+                "intent_families": ["event_timing"],
+                "event_profile": "education_admission",
+                "timeframe": {"kind": "open_future"},
+            }],
+            "evidence_needs": [],
+        },
+    }
+
+    apply_education_routing_guards(intent)
+    normalized = normalize_evidence_plan(intent["evidence_plan"])
+
+    assert intent["category"] == "education"
+    assert [part["intent_families"] for part in normalized["question_parts"]] == [
+        ["comparison"], ["event_timing"],
+    ]
+    assert normalized["question_parts"][1]["event_profile"] == "education_admission"
+
+
+def test_compound_education_enforcement_rejects_weak_folklore_and_missing_year() -> None:
+    option_rows = [
+        {
+            "option": "MBBS", "demand_traits": ["biological_care"],
+            "aggregate_score": 4.2, "verdict": "supported",
+            "trait_results": [{"carriers": [{"support": [
+                "D1: Jupiter rules focus house(s) 5", "D24: Jupiter participates in focus house 9",
+            ]}]}],
+        },
+        {
+            "option": "Chemical Engineering", "demand_traits": ["technical_engineering"],
+            "aggregate_score": 3.8, "verdict": "supported",
+            "trait_results": [{"carriers": [{"support": [
+                "D1: Mars participates in focus house 6", "D24: Mars rules focus house(s) 4",
+            ]}]}],
+        },
+    ]
+    policy = {
+        "live": True,
+        "domain": "education",
+        "runtime_key": "admission_timing",
+        "fallback_to_deeper_mode": False,
+        "education_answer_rules": {
+            "route_synthesis": {
+                "timing_verdict": "supportive_windows_found",
+                "compound_part_synthesis": {
+                    "course_comparison": {
+                        "options": option_rows, "ranked_options": option_rows,
+                        "direction": "close_call", "margin": 0.4, "winner": None,
+                    },
+                },
+            },
+            "timing_windows": [{"start": "2027-04-15", "end": "2027-10-04"}],
+        },
+    }
+    weak = (
+        "MBBS clearly wins because the Sun supports medicine and the Moon supports memory. "
+        "Chemical Engineering is possible, but deeper dasha analysis is needed for the college year."
+    )
+
+    repaired = enforce_live_graph_answer(
+        weak, {"answer_spec": {"knowledge_graph_policy": policy}}, language="english",
+    )
+
+    assert "does not establish a decisive astrological winner" in repaired
+    assert "D1: Jupiter rules focus house(s) 5" in repaired
+    assert "D24: Mars rules focus house(s) 4" in repaired
+    assert "2027-04-15" in repaired
+    assert "deeper dasha analysis" not in repaired
+    assert "scores" not in repaired
+    assert "margin" not in repaired
+    assert "biological_care" not in repaired
+
+
 def test_instant_finalizer_applies_education_guard_and_rejects_unknown_traits() -> None:
     raw = {
         "status": "READY", "mode": "ANALYZE_TOPIC_POTENTIAL",
@@ -453,6 +638,70 @@ def test_reference_chart_builds_real_d1_d24_and_individualized_field_signatures(
     rows = comparison["option_synthesis"]["options"]
     assert [row["option"] for row in rows] == ["MBA", "MS Data Science"]
     assert rows[0]["demand_traits"] != rows[1]["demand_traits"]
+
+    compound = _compact_education_foundation(
+        chart, birth, {"chart_facts": facts}, category="education",
+        answer_mode="event_prediction", education_subtype="admission_timing",
+        education_options=[
+            {"label": "MBBS", "traits": ["clinical_health", "disciplined_memory"]},
+            {"label": "Chemical Engineering", "traits": ["technical_engineering", "analytical_quantitative"]},
+        ],
+    )
+    compound_parts = compound["route_synthesis"]["compound_part_synthesis"]
+    assert compound_parts["required_answer_parts"] == ["course_comparison", "admission_timing"]
+    assert [row["option"] for row in compound_parts["course_comparison"]["options"]] == [
+        "MBBS", "Chemical Engineering",
+    ]
+    assert compound["admission_synthesis"]
+    assert compound["availability"]["option_evidence"] is True
+    mbbs_reasoning = compound_parts["course_comparison"]["options"][0]["technical_reasoning"]
+    assert mbbs_reasoning["moon_standalone_forbidden"] is True
+    assert "H5, H6, H8, H10 and H12" in mbbs_reasoning["combination_rule"]
+    assert len({row["planet"] for row in mbbs_reasoning["decisive_facts"]}) >= 2
+    assert {row["chart"] for row in mbbs_reasoning["decisive_facts"]} >= {"D1", "D24"}
+    technical_render = enforce_live_graph_answer(
+        "MBBS and Chemical Engineering are both supported by D1 and D24 in 2027.",
+        {"answer_spec": {
+            "visible_astrology": {"technical_detail_allowed": True},
+            "knowledge_graph_policy": {
+                "live": True,
+                "domain": "education",
+                "runtime_key": "admission_timing",
+                "fallback_to_deeper_mode": False,
+                "education_answer_rules": {
+                    "route_synthesis": compound["route_synthesis"],
+                    "timing_windows": compound["timing_windows"],
+                },
+            },
+        }},
+        language="english",
+    )
+    assert "score" not in technical_render.lower()
+    assert "margin" not in technical_render.lower()
+    assert "clinical_health" not in technical_render
+    assert "Moon may qualify patient care but cannot establish medicine by itself" in technical_render
+    assert "D1:" in technical_render and "D24:" in technical_render
+
+    simple_render = enforce_live_graph_answer(
+        "MBBS and Chemical Engineering are both possible, but the result is close.",
+        {"answer_spec": {
+            "visible_astrology": {"technical_detail_allowed": False},
+            "knowledge_graph_policy": {
+                "live": True,
+                "domain": "education",
+                "runtime_key": "admission_timing",
+                "fallback_to_deeper_mode": False,
+                "education_answer_rules": {
+                    "route_synthesis": compound["route_synthesis"],
+                    "timing_windows": compound["timing_windows"],
+                },
+            },
+        }},
+        language="english",
+    )
+    assert "MBBS" in simple_render and "Chemical Engineering" in simple_render
+    assert "Moon can add a caring or receptive quality" in simple_render
+    assert not re.search(r"\bD(?:1|24)\b|\bH\d{1,2}\b|\bdignity\b", simple_render)
 
     postgraduate = _compact_education_foundation(
         chart, birth, {"chart_facts": facts}, category="education",

@@ -18,12 +18,16 @@ from daily.daily_micro_intents import (
     build_daily_micro_intent_from_facets,
 )
 from utils.query_context import is_remedy_followup_request, normalize_query_context, resolve_query_now
-from ai.gemini_chat_analyzer import generate_content_rest_v1beta_result
+from ai.gemini_chat_analyzer import (
+    generate_content_rest_v1beta_result,
+    resolve_openai_reasoning_effort,
+)
 from instant_chat_v2.career import CAREER_ALIASES, CAREER_PROFILES, career_profile
 from instant_chat_v2.education import education_profile, is_education_category
 from instant_chat_v2.children import (
     BOUNDARY_CHILDREN_SUBTYPES,
     TIMING_CHILDREN_SUBTYPES,
+    child_order_house,
     children_profile,
     is_children_category,
 )
@@ -34,8 +38,15 @@ from instant_chat_v2.foreign import (
     foreign_profile,
     is_foreign_category,
 )
+from instant_chat_v2.nakshatra import (
+    NAKSHATRA_TOPICS,
+    is_nakshatra_category,
+    nakshatra_profile,
+    normalize_nakshatra_subtype,
+)
 from utils.admin_settings import (
     CHAT_LLM_DEEPSEEK,
+    CHAT_LLM_OPENAI,
     get_instant_chat_llm_provider,
     get_instant_chat_model,
 )
@@ -124,6 +135,9 @@ _DEFAULT_DIVISIONAL_CHARTS_BY_CATEGORY: dict[str, list[str]] = {
     "home": ["D1", "D4", "D9"],
     "mother": ["D1", "D4", "D9", "D12"],
     "father": ["D1", "D9", "D10", "D12"],
+    "nakshatra": ["D1", "D9"],
+    "birth_star": ["D1"],
+    "janma_nakshatra": ["D1"],
     "education": ["D1", "D9", "D24"],
     "learning": ["D1", "D9", "D24"],
     "exams": ["D1", "D9", "D24"],
@@ -188,26 +202,220 @@ def apply_career_routing_guards(result: Dict[str, Any]) -> None:
         divisionals.append("Karkamsa")
     result["divisional_charts"] = divisionals
     result["required_divisional_charts"] = divisionals
+    if (
+        profile["subtype"] == "career_fit"
+        and str(result.get("answer_mode") or "").strip() == "potential_capacity"
+    ):
+        # Career Fit already evaluates income viability through H2/H11. Some
+        # routers correctly choose Career Fit but also leave a parallel Wealth
+        # subtype/evidence need behind after seeing phrases such as "most
+        # money". That creates two competing graphs for one vocational ask.
+        # Normalize the structured route here without parsing user text.
+        result["category"] = "career_fit"
+        result["needs_transits"] = False
+        result.pop("wealth_subtype", None)
+        result.pop("transit_request", None)
+        result.pop("period_window", None)
+        evidence_plan = (
+            dict(result.get("evidence_plan"))
+            if isinstance(result.get("evidence_plan"), dict)
+            else {}
+        )
+        parts = [
+            dict(part) for part in evidence_plan.get("question_parts") or []
+            if isinstance(part, dict)
+        ]
+        for part in parts:
+            part["life_domain"] = "career"
+            part["event_profile"] = "career_fit"
+            part["timeframe"] = {"kind": "none"}
+        if parts:
+            evidence_plan["question_parts"] = parts
+        cleaned_needs = []
+        for raw_need in evidence_plan.get("evidence_needs") or []:
+            if not isinstance(raw_need, dict):
+                continue
+            need = dict(raw_need)
+            if str(need.get("topic") or "").strip().lower() in {
+                "wealth", "money", "finance", "income",
+            }:
+                continue
+            if str(need.get("topic") or "").strip().lower() == "career":
+                params = dict(need.get("params") or {})
+                if "required_charts" in params:
+                    params["required_charts"] = ["D1", "D10", "Karkamsa"]
+                if "event_profile" in params:
+                    params["event_profile"] = "career_fit"
+                need["params"] = params
+            cleaned_needs.append(need)
+        evidence_plan["evidence_needs"] = cleaned_needs
+        if evidence_plan:
+            result["evidence_plan"] = evidence_plan
+
+
+def apply_marriage_routing_guards(result: Dict[str, Any]) -> None:
+    """Make the LLM's marriage subtype authoritative across downstream stages."""
+    category = str(result.get("category") or "").strip().lower()
+    subtype = str(result.get("marriage_subtype") or "").strip().lower().replace("-", "_").replace(" ", "_")
+    evidence_plan = result.get("evidence_plan") if isinstance(result.get("evidence_plan"), dict) else {}
+    event_profiles = {
+        str(part.get("event_profile") or "").strip().lower()
+        for part in evidence_plan.get("question_parts") or []
+        if isinstance(part, dict)
+    }
+    if "love_vs_arranged_marriage" in event_profiles:
+        subtype = "love_vs_arranged"
+    if bool(result.get("third_party_decision_request")):
+        subtype = "specific_partner_decision"
+        allowed_actions = {
+            "proposal_decision", "return_reconciliation", "contact_response",
+            "commitment_marriage", "other_voluntary_action",
+        }
+        action = str(result.get("third_party_action") or "").strip().lower().replace("-", "_").replace(" ", "_")
+        result["third_party_action"] = action if action in allowed_actions else "other_voluntary_action"
+    valid_subtypes = {
+        "general", "love_vs_arranged", "remarriage", "engagement_vs_wedding",
+        "spouse_meeting", "spouse_details", "affair", "current_relationship_state",
+        "specific_partner_decision",
+    }
+    marriage_categories = {"marriage", "relationship", "love", "spouse", "partner"}
+    if category not in marriage_categories and subtype not in valid_subtypes:
+        return
+    result["marriage_subtype"] = subtype if subtype in valid_subtypes else "general"
+    if result["marriage_subtype"] in {"current_relationship_state", "specific_partner_decision"}:
+        # Present-state relationship questions need current delivery evidence.
+        # They are not static natal profiles, even when phrased in past-perfect
+        # language such as "has my ex moved on?". The native chart can describe
+        # the current relationship climate, never the other person's private mind.
+        result["category"] = "relationship"
+        third_party_decision = result["marriage_subtype"] == "specific_partner_decision"
+        result["answer_mode"] = "event_prediction" if third_party_decision else "timing_window"
+        result["mode"] = "LIFESPAN_EVENT_TIMING" if third_party_decision else "PREDICT_PERIOD_OUTLOOK"
+        result["needs_transits"] = True
+        result["divisional_charts"] = ["D1", "D9"]
+        result["required_divisional_charts"] = ["D1", "D9"]
+        extracted = result.get("extracted_context") if isinstance(result.get("extracted_context"), dict) else {}
+        extracted.setdefault(
+            "timeframe",
+            "open future relationship period" if third_party_decision else "current relationship period",
+        )
+        extracted["requested_fact"] = (
+            "native relationship opportunity and clarification periods; another person's acceptance, rejection, "
+            "choice and decision date are not knowable from the native chart"
+            if third_party_decision else
+            "current relationship climate; third-party private state is not directly knowable"
+        )
+        if third_party_decision:
+            extracted["third_party_action"] = result.get("third_party_action") or "other_voluntary_action"
+        result["extracted_context"] = extracted
+        parts = [
+            dict(part) for part in evidence_plan.get("question_parts") or []
+            if isinstance(part, dict)
+        ] or [{"part_id": "p1", "text": "", "subject": "partner"}]
+        for part in parts:
+            part["life_domain"] = "relationship"
+            part["event_profile"] = (
+                "specific_partner_decision" if third_party_decision else "relationship_current_state"
+            )
+            part["intent_families"] = ["event_timing" if third_party_decision else "period_outlook"]
+            part["timeframe"] = (
+                {"kind": "open_future"} if third_party_decision
+                else {"kind": "current", "value": "current relationship period"}
+            )
+        evidence_plan["question_parts"] = parts
+        timing_kinds = {
+            "natal_topic_foundation", "divisional_chart_context",
+            "current_dasha_stack", "transit_event_windows",
+        }
+        if third_party_decision:
+            timing_kinds.add("future_dasha_event_windows")
+        needs = [
+            dict(need) for need in evidence_plan.get("evidence_needs") or []
+            if isinstance(need, dict)
+        ]
+        existing = {str(need.get("kind") or "") for need in needs}
+        for kind in timing_kinds - existing:
+            needs.append({"kind": kind, "priority": "required"})
+        evidence_plan["evidence_needs"] = needs
+        result["evidence_plan"] = evidence_plan
+        return
+    if result["marriage_subtype"] != "love_vs_arranged":
+        return
+
+    # Love-versus-arranged is a natal pathway comparison. Future-tense
+    # wording ("will I have a love marriage?") does not make it a dated event
+    # request and must not inherit generic marriage windows.
+    result["category"] = "marriage"
+    result["answer_mode"] = "comparison_choice"
+    result["mode"] = "ANALYZE_TOPIC_POTENTIAL"
+    result["needs_transits"] = False
+    result.pop("period_window", None)
+    result.pop("transit_request", None)
+    result["divisional_charts"] = ["D1", "D9"]
+    result["required_divisional_charts"] = ["D1", "D9"]
+    parts = [
+        dict(part) for part in evidence_plan.get("question_parts") or []
+        if isinstance(part, dict)
+    ]
+    if not parts:
+        parts = [{
+            "part_id": "p1",
+            "text": "",
+            "subject": "self",
+            "timeframe": {"kind": "none"},
+            "confidence": "high",
+        }]
+    # Keep every representation of the selected route aligned. Previously the
+    # outer intent correctly selected love-versus-arranged while the inner
+    # question part remained `general_event`; generic fusion then demanded
+    # dasha/transit evidence for a static natal comparison.
+    for part in parts:
+        part["life_domain"] = "marriage"
+        part["event_profile"] = "love_vs_arranged_marriage"
+        part["intent_families"] = ["comparison"]
+        timeframe = part.get("timeframe") if isinstance(part.get("timeframe"), dict) else {}
+        part["timeframe"] = {**timeframe, "kind": "none"}
+    evidence_plan["question_parts"] = parts
+    timing_kinds = {
+        "current_dasha_stack", "dasha_timeline_lookup", "future_dasha_event_windows",
+        "historical_dasha_event_windows", "transit_event_windows",
+        "historical_transit_event_windows", "period_forecast_context",
+    }
+    clean_needs = [
+        need for need in evidence_plan.get("evidence_needs") or []
+        if isinstance(need, dict) and str(need.get("kind") or "") not in timing_kinds
+    ]
+    existing_kinds = {str(need.get("kind") or "") for need in clean_needs}
+    for kind in ("natal_topic_foundation", "divisional_chart_context", "house_analysis"):
+        if kind not in existing_kinds:
+            clean_needs.append({"kind": kind, "priority": "required"})
+    evidence_plan["evidence_needs"] = clean_needs
+    result["evidence_plan"] = evidence_plan
 
 
 def apply_education_routing_guards(result: Dict[str, Any]) -> None:
     """Normalize the LLM's semantic Education route without parsing prose."""
     category = str(result.get("category") or "").strip().lower()
     subtype = result.get("education_subtype")
-    if not is_education_category(category) and not subtype:
-        return
-    if not is_education_category(category):
-        category = "education"
-    profile = education_profile(category, subtype)
-    result["category"] = category
-    result["education_subtype"] = profile["subtype"]
-    result["focus_houses"] = list(profile["houses"])
+    evidence_plan = result.get("evidence_plan") if isinstance(result.get("evidence_plan"), dict) else {}
+    question_parts = [
+        dict(part) for part in evidence_plan.get("question_parts") or []
+        if isinstance(part, dict)
+    ]
+    education_event_profiles = {
+        "education_admission", "exam_success",
+    }
+    has_education_part = any(
+        str(part.get("life_domain") or "").strip().lower() in {"education", "exam"}
+        or str(part.get("event_profile") or "").strip().lower() in education_event_profiles
+        for part in question_parts
+    )
     allowed_traits = {
         "analytical_quantitative", "language_communication", "technical_engineering",
-        "creative_design", "biological_care", "legal_social", "commercial_management",
+        "creative_design", "biological_care", "clinical_health", "legal_social", "commercial_management",
         "research_depth", "disciplined_memory", "practical_applied",
     }
-    result["education_target_traits"] = [
+    clean_target_traits = [
         str(value).strip() for value in result.get("education_target_traits") or []
         if str(value).strip() in allowed_traits
     ][:4]
@@ -223,8 +431,139 @@ def apply_education_routing_guards(result: Dict[str, Any]) -> None:
                 clean_options.append({"label": label, "traits": traits})
         elif str(value or "").strip():
             clean_options.append(str(value).strip())
+    # The top-level domain is a summary and may be noisy (for example, a
+    # course-choice question beginning with the word "Career" was labelled as
+    # Career even though its structured parts and options were Education).
+    # Treat the router's more specific structured fields as authoritative. This
+    # avoids sending a valid multi-part request into the wrong graph without
+    # adding language- or phrase-specific matching here.
+    has_education_signal = bool(
+        is_education_category(category)
+        or subtype
+        or has_education_part
+        or clean_options
+    )
+    if not has_education_signal:
+        return
+    result["education_target_traits"] = clean_target_traits
+    if not is_education_category(category):
+        logger.info(
+            "instant_structured_domain_override from=%s to=education subtype=%s education_parts=%s options=%s",
+            category or "unset",
+            str(subtype or ""),
+            len(question_parts),
+            len(clean_options),
+        )
+        category = "education"
+    profile = education_profile(category, subtype)
+    result["category"] = category
+    result["education_subtype"] = profile["subtype"]
+    result["focus_houses"] = list(profile["houses"])
     if clean_options:
         result["education_options"] = clean_options[:6]
+
+    has_timing_part = any(
+        "event_timing" in {
+            str(value or "").strip().lower()
+            for value in part.get("intent_families") or []
+        }
+        or str(part.get("event_profile") or "").strip().lower() in education_event_profiles
+        for part in question_parts
+    )
+    if len(clean_options) >= 2 and has_timing_part:
+        event_profiles = {
+            str(part.get("event_profile") or "").strip().lower()
+            for part in question_parts
+        }
+        timing_subtype = "exam_timing" if "exam_success" in event_profiles else "admission_timing"
+        result["education_compound_parts"] = {
+            "comparison_subtype": "course_comparison",
+            "timing_subtype": timing_subtype,
+            "required_parts": ["course_comparison", timing_subtype],
+        }
+        result["education_subtype"] = timing_subtype
+        result["answer_mode"] = "event_prediction"
+        result["mode"] = "LIFESPAN_EVENT_TIMING"
+        result["needs_transits"] = True
+        profile = education_profile(category, timing_subtype)
+        result["focus_houses"] = list(profile["houses"])
+        comparison_parts = [
+            part for part in question_parts
+            if "comparison" in {
+                str(value or "").strip().lower()
+                for value in part.get("intent_families") or []
+            }
+        ]
+        timing_parts = [
+            part for part in question_parts
+            if "event_timing" in {
+                str(value or "").strip().lower()
+                for value in part.get("intent_families") or []
+            }
+            or str(part.get("event_profile") or "").strip().lower() in education_event_profiles
+        ]
+        if not comparison_parts:
+            logger.info(
+                "instant_compound_part_restored domain=education part=comparison options=%s",
+                len(clean_options),
+            )
+        comparison_source = comparison_parts[0] if comparison_parts else {}
+        timing_source = timing_parts[0] if timing_parts else {}
+        # Once the router has supplied two named education options and an
+        # education timing event, this is one compatible Education calculation.
+        # Discard stale summary parts such as life_domain=career/general_event;
+        # otherwise the downstream compound detector invokes a second generic
+        # classifier, which can downgrade the route and erase timing evidence.
+        question_parts = [
+            {
+                "part_id": "education-choice",
+                "text": str(comparison_source.get("text") or ""),
+                "life_domain": "education",
+                "intent_families": ["comparison"],
+                "event_profile": None,
+                "subject": "self",
+                "timeframe": {"kind": "none"},
+                "confidence": "high",
+            },
+            {
+                "part_id": "education-timing",
+                "text": str(timing_source.get("text") or ""),
+                "life_domain": "education",
+                "intent_families": ["event_timing"],
+                "event_profile": (
+                    "exam_success" if timing_subtype == "exam_timing" else "education_admission"
+                ),
+                "subject": "self",
+                "timeframe": (
+                    timing_source.get("timeframe")
+                    if isinstance(timing_source.get("timeframe"), dict)
+                    else {"kind": "open_future"}
+                ),
+                "confidence": "high",
+            },
+        ]
+        evidence_plan["question_parts"] = question_parts
+        answer_plan = (
+            dict(evidence_plan.get("answer_plan"))
+            if isinstance(evidence_plan.get("answer_plan"), dict)
+            else {}
+        )
+        answer_plan["must_answer_parts"] = ["education-choice", "education-timing"]
+        answer_plan["answer_order"] = ["education-choice", "education-timing"]
+        evidence_plan["answer_plan"] = answer_plan
+        timing_kinds = {
+            "current_dasha_stack", "future_dasha_event_windows",
+            "transit_event_windows", "kp_cusp_analysis",
+        }
+        needs = [
+            dict(need) for need in evidence_plan.get("evidence_needs") or []
+            if isinstance(need, dict)
+        ]
+        existing = {str(need.get("kind") or "") for need in needs}
+        for kind in sorted(timing_kinds - existing):
+            needs.append({"kind": kind, "priority": "required"})
+        evidence_plan["evidence_needs"] = needs
+        result["evidence_plan"] = evidence_plan
     charts = ["D1", "D24", "D9"]
     if profile["subtype"] in {"education_vs_work", "education_vs_work_timing", "research", "research_timing"}:
         charts.append("D10")
@@ -241,7 +580,71 @@ def apply_children_routing_guards(result: Dict[str, Any]) -> None:
     profile = children_profile(category, subtype)
     result["category"] = "progeny"
     result["children_subtype"] = profile["subtype"]
-    result["focus_houses"] = list(profile["houses"])
+    extracted = result.get("extracted_context") if isinstance(result.get("extracted_context"), dict) else {}
+    dialogue = result.get("dialogue_state") if isinstance(result.get("dialogue_state"), dict) else {}
+    known = dialogue.get("known_facts") if isinstance(dialogue.get("known_facts"), dict) else {}
+    raw_order = result.get("child_order") or extracted.get("child_order") or known.get("child_order")
+    try:
+        child_order = int(raw_order) if raw_order not in (None, "") else None
+    except (TypeError, ValueError):
+        child_order = None
+    if child_order is not None and child_order < 1:
+        child_order = None
+    order_required = profile["subtype"] in {
+        "conception_timing", "childbirth_timing", "first_child", "subsequent_child",
+        "assisted_conception_timing",
+    }
+    if order_required and child_order is None:
+        result["status"] = "CLARIFY"
+        result["route_action"] = "clarify"
+        result["needs_transits"] = False
+        result["focus_houses"] = []
+        extracted["awaiting_child_order"] = True
+        result["extracted_context"] = extracted
+        result.setdefault("dialogue_state", {})
+        if isinstance(result["dialogue_state"], dict):
+            result["dialogue_state"]["ready_to_calculate"] = False
+            unresolved = list(result["dialogue_state"].get("unresolved_facts") or [])
+            if "child_order" not in unresolved:
+                unresolved.append("child_order")
+            result["dialogue_state"]["unresolved_facts"] = unresolved
+        if not str(result.get("clarification_question") or "").strip():
+            result["_needs_child_order_clarify_retry"] = True
+        return
+    if child_order is not None:
+        result["child_order"] = child_order
+        extracted["child_order"] = child_order
+        extracted.pop("awaiting_child_order", None)
+        result["extracted_context"] = extracted
+        if profile["subtype"] in {"first_child", "subsequent_child"}:
+            result["children_subtype"] = "first_child" if child_order == 1 else "subsequent_child"
+            profile = children_profile("progeny", result["children_subtype"])
+        primary_house = child_order_house(child_order)
+        supporting = [2, 11] + ([5] if child_order > 1 else [])
+        result["focus_houses"] = [primary_house] + [h for h in supporting if h != primary_house]
+    else:
+        result["focus_houses"] = list(profile["houses"])
+    if profile["subtype"] == "medical_safety_handoff":
+        # Non-urgent clinical questions are hybrid answers: retain the medical
+        # boundary, but still calculate the native's general D1/D7 pregnancy
+        # or parenthood climate.  Urgent/emergency triage is intercepted by
+        # the pipeline before these calculations run.
+        result["route_action"] = "answer"
+        result["answer_mode"] = "topic_reading"
+        result["mode"] = "ANALYZE_TOPIC_POTENTIAL"
+        result["needs_transits"] = False
+        result["divisional_charts"] = ["D1", "D7"]
+        result["required_divisional_charts"] = ["D1", "D7"]
+        triage = result.get("medical_triage")
+        if not isinstance(triage, dict):
+            triage = {}
+        triage["urgency"] = (
+            str(triage.get("urgency") or "").strip().lower()
+            if str(triage.get("urgency") or "").strip().lower() in {"urgent", "emergency"}
+            else "clinical"
+        )
+        result["medical_triage"] = triage
+        return
     if profile["subtype"] in BOUNDARY_CHILDREN_SUBTYPES:
         result["divisional_charts"] = []
         result["required_divisional_charts"] = []
@@ -440,6 +843,39 @@ def apply_foreign_routing_guards(result: Dict[str, Any]) -> None:
         result["required_divisional_charts"] = list(profile["charts"])
 
 
+def apply_nakshatra_routing_guards(result: Dict[str, Any]) -> None:
+    """Normalize explicit Nakshatra requests without stealing generic topics."""
+    category = str(result.get("category") or "").strip().lower().replace("-", "_")
+    raw_subtype = result.get("nakshatra_subtype")
+    if not is_nakshatra_category(category) and not raw_subtype:
+        result.pop("nakshatra_subtype", None)
+        result.pop("nakshatra_target_planet", None)
+        result.pop("nakshatra_topic", None)
+        return
+    subtype = normalize_nakshatra_subtype(raw_subtype)
+    profile = nakshatra_profile(subtype)
+    result["category"] = "nakshatra"
+    result["nakshatra_subtype"] = subtype
+    target = str(result.get("nakshatra_target_planet") or "").strip().title()
+    if target not in {"Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"}:
+        target = ""
+    result["nakshatra_target_planet"] = target or None
+    topic = str(result.get("nakshatra_topic") or "general").strip().lower()
+    result["nakshatra_topic"] = topic if topic in NAKSHATRA_TOPICS else "general"
+    result["answer_mode"] = profile["answer_mode"]
+    result["divisional_charts"] = list(profile["charts"])
+    result["required_divisional_charts"] = list(profile["charts"])
+    timing = subtype == "nakshatra_timing"
+    result["needs_transits"] = timing
+    if not timing:
+        result.pop("period_window", None)
+        result.pop("transit_request", None)
+        result["required_evidence"] = [
+            value for value in result.get("required_evidence") or []
+            if not any(token in str(value).lower() for token in ("dasha", "transit", "timing_window"))
+        ]
+
+
 _CHART_FOCUS_SYNONYMS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("D1", ("d1",)),
     ("LAGNA", ("lagna", "ascendant", "rising sign", "asc")),
@@ -557,7 +993,7 @@ def extract_chart_focus_from_question(user_question: str) -> Dict[str, Any] | No
 
     primary = _normalize_chart_focus_code(matched_code)
     label = "Lagna" if matched_code == "LAGNA" else primary
-    return {
+    normalized_focus = {
         "kind": "chart_specific",
         "primary": primary,
         "label": label,
@@ -605,7 +1041,15 @@ def _normalize_chart_focus_payload(focus: Dict[str, Any] | None) -> Dict[str, An
                 normalized_requested.append(token)
     else:
         normalized_requested = [primary]
-    return {
+    requested_houses: list[int] = []
+    for value in focus.get("requested_houses") or []:
+        try:
+            house = int(value)
+        except (TypeError, ValueError):
+            continue
+        if 1 <= house <= 12 and house not in requested_houses:
+            requested_houses.append(house)
+    normalized_focus = {
         "kind": "chart_specific",
         "primary": primary,
         "label": label,
@@ -613,6 +1057,9 @@ def _normalize_chart_focus_payload(focus: Dict[str, Any] | None) -> Dict[str, An
         "phrase": str(focus.get("phrase") or "").strip(),
         "requested": normalized_requested,
     }
+    if requested_houses:
+        normalized_focus["requested_houses"] = requested_houses
+    return normalized_focus
 
 
 def merge_divisional_charts_with_category_defaults(
@@ -739,9 +1186,12 @@ def apply_chart_focus_guards(result: Dict[str, Any], user_question: str) -> None
         result["extracted_context"]["chart_focus"] = {
             "primary": focus.get("primary"),
             "label": focus.get("label"),
+            "requested_houses": list(focus.get("requested_houses") or []),
         }
         if primary:
             result["extracted_context"].setdefault("requested_chart", primary)
+        if focus.get("requested_houses"):
+            result["extracted_context"]["requested_houses"] = list(focus["requested_houses"])
     if not primary or primary == "D1":
         return
     raw = result.get("divisional_charts")
@@ -1057,6 +1507,84 @@ def apply_daily_micro_intent_guards(result: Dict[str, Any]) -> None:
         activity_label=activity_label,
         category=str(result.get("category") or "general"),
     )
+
+
+_SEMANTIC_CADENCE_DAYS = {
+    "hours_to_days": 10,
+    "days_to_weeks": 45,
+    "weeks_to_months": 120,
+    "months_to_year": 365,
+}
+_SEMANTIC_PROCESS_SCALE_DAYS = {
+    "rapid_operational": 10,
+    "routine_operational": 45,
+    "extended_institutional": 180,
+}
+
+
+def apply_semantic_resolution_cadence(result: Dict[str, Any]) -> None:
+    """Bound active-process timing from router semantics, never question words.
+
+    A submitted, scheduled or already-running process asks for its next
+    resolution cadence. Treating it like an unstarted lifetime event releases
+    the three-year scanner and produces operationally useless windows.
+    """
+    temporal = result.get("temporal_intent") if isinstance(result.get("temporal_intent"), dict) else {}
+    state = str(temporal.get("event_state") or "unknown").strip().lower()
+    cadence = str(temporal.get("expected_cadence") or "open").strip().lower()
+    process_scale = str(temporal.get("process_scale") or "").strip().lower()
+    explicit_timeframe = bool(temporal.get("explicit_timeframe"))
+    answer_mode = str(result.get("answer_mode") or "").strip().lower()
+    if (
+        explicit_timeframe
+        or state not in {"scheduled", "submitted", "pending_external", "in_progress", "awaiting_result"}
+        or (cadence not in _SEMANTIC_CADENCE_DAYS and process_scale not in _SEMANTIC_PROCESS_SCALE_DAYS)
+        or answer_mode not in {
+            "event_prediction", "timing_window", "problem_diagnosis", "topic_reading",
+        }
+    ):
+        return
+    days = _SEMANTIC_PROCESS_SCALE_DAYS.get(
+        process_scale,
+        _SEMANTIC_CADENCE_DAYS.get(cadence, 45),
+    )
+    if (
+        process_scale != "extended_institutional"
+        and state in {"scheduled", "submitted", "pending_external", "awaiting_result"}
+    ):
+        # These states represent one outstanding operational step. A router's
+        # overly broad cadence must not reopen the multi-month/lifetime scan.
+        # Truly long institutional processes have to opt in explicitly through
+        # process_scale=extended_institutional.
+        days = min(days, 45)
+    evidence_plan = result.get("evidence_plan") if isinstance(result.get("evidence_plan"), dict) else {}
+    parts = [dict(part) for part in evidence_plan.get("question_parts") or [] if isinstance(part, dict)]
+    changed = False
+    for part in parts:
+        timeframe = part.get("timeframe") if isinstance(part.get("timeframe"), dict) else {}
+        kind = str(timeframe.get("kind") or "none").strip().lower()
+        # The router may already have emitted an implicit bounded_future using
+        # its broad event-timing default. Because explicit_timeframe is false,
+        # that range is not user-owned and must not outrank the process-scale
+        # contract. Preserve only retrospective scopes here; an active process
+        # is otherwise rewritten to its operational horizon.
+        if kind not in {"past", "open_past", "retrospective"}:
+            part["timeframe"] = {
+                "kind": "bounded_future",
+                "duration_days": days,
+                "granularity": "week" if days <= 45 else "month_window",
+                "source": "semantic_operational_cadence",
+            }
+            changed = True
+    if changed:
+        evidence_plan["question_parts"] = parts
+        result["evidence_plan"] = evidence_plan
+        extracted = result.setdefault("extracted_context", {})
+        if isinstance(extracted, dict):
+            extracted["implied_timing_horizon"] = {
+                "duration_days": days,
+                "source": "semantic_operational_cadence",
+            }
 
 
 _WEAK_INTENT_CATEGORIES = frozenset({"general", "timing", ""})
@@ -1530,6 +2058,54 @@ class IntentRouter:
 
     async def _generate_instant_content(self, prompt: str, model_name: str, timeout_s: float):
         provider = get_instant_chat_llm_provider()
+        if provider == CHAT_LLM_OPENAI:
+            try:
+                from openai import AsyncOpenAI
+            except ImportError as exc:
+                raise RuntimeError(
+                    "The 'openai' package is required for OpenAI Instant intent classification"
+                ) from exc
+
+            api_key = os.getenv("OPENAI_API_KEY") or ""
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY environment variable not set")
+            # This router owns the retry budget. Disable SDK retries so a
+            # cancelled attempt cannot keep retrying underneath asyncio.
+            client = AsyncOpenAI(
+                api_key=api_key,
+                timeout=max(3.0, timeout_s),
+                max_retries=0,
+            )
+            model_clean = str(model_name or "gpt-5.6-luna").strip()
+            request_args: Dict[str, Any] = {
+                "model": model_clean,
+                "input": prompt,
+                "max_output_tokens": 4096,
+            }
+            reasoning_effort = resolve_openai_reasoning_effort(model_clean, "none")
+            if reasoning_effort:
+                request_args["reasoning"] = {"effort": reasoning_effort}
+            response = await asyncio.wait_for(
+                client.responses.create(**request_args),
+                timeout=max(3.0, timeout_s),
+            )
+            text = str(getattr(response, "output_text", "") or "")
+            usage = getattr(response, "usage", None)
+            input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+            output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+            input_details = getattr(usage, "input_tokens_details", None)
+            cached_tokens = int(getattr(input_details, "cached_tokens", 0) or 0)
+            total_tokens = int(getattr(usage, "total_tokens", 0) or (input_tokens + output_tokens))
+            return SimpleNamespace(
+                text=text,
+                usage_metadata=SimpleNamespace(
+                    prompt_token_count=input_tokens,
+                    candidates_token_count=output_tokens,
+                    cached_content_token_count=cached_tokens,
+                    total_token_count=total_tokens,
+                ),
+            )
+
         if provider == CHAT_LLM_DEEPSEEK:
             try:
                 from openai import AsyncOpenAI
@@ -1737,10 +2313,12 @@ class IntentRouter:
                 ]
             )
         apply_career_routing_guards(result)
+        apply_marriage_routing_guards(result)
         apply_education_routing_guards(result)
         apply_children_routing_guards(result)
         apply_foreign_routing_guards(result)
         apply_home_routing_guards(result)
+        apply_nakshatra_routing_guards(result)
         if 'divisional_charts' not in result or not isinstance(result.get('divisional_charts'), list):
             result['divisional_charts'] = self._get_default_divisional_charts(result.get('category', 'general'))
         merge_divisional_charts_with_category_defaults(result, user_question=user_question)
@@ -1771,6 +2349,7 @@ class IntentRouter:
             now=resolved_now.replace(tzinfo=None) if getattr(resolved_now, "tzinfo", None) else resolved_now,
         )
         apply_daily_micro_intent_guards(result)
+        apply_semantic_resolution_cadence(result)
         if normalized_query_context:
             result["query_context"] = normalized_query_context
         from utils.query_context import clamp_remedy_modes_on_intent
@@ -1930,11 +2509,14 @@ class IntentRouter:
         # traits and required divisional charts actually reach the live graph.
         # These guards inspect only the model's JSON, never the user's prose.
         apply_career_routing_guards(result)
+        apply_marriage_routing_guards(result)
         apply_education_routing_guards(result)
         apply_children_routing_guards(result)
         apply_foreign_routing_guards(result)
         apply_home_routing_guards(result)
+        apply_nakshatra_routing_guards(result)
         apply_daily_micro_intent_guards(result)
+        apply_semantic_resolution_cadence(result)
 
         if normalized_query_context:
             result["query_context"] = normalized_query_context
@@ -2002,6 +2584,7 @@ class IntentRouter:
             apply_children_routing_guards(result)
             apply_foreign_routing_guards(result)
             apply_home_routing_guards(result)
+            apply_nakshatra_routing_guards(result)
             if not isinstance(result.get("divisional_charts"), list):
                 result["divisional_charts"] = self._get_default_divisional_charts(result.get("category", "general"))
             merge_divisional_charts_with_category_defaults(result, user_question=user_question)
@@ -2076,13 +2659,14 @@ LATEST USER MESSAGE (answer this turn): "{latest_user_reply}"
 
 Task:
 1. Semantically understand the user's question in any language/script.
-   MEDICAL SAFETY OVERRIDE: If the latest message describes a potentially urgent symptom happening now (for example chest pain/pressure, serious breathing difficulty, stroke signs, fainting, severe bleeding, or another possible emergency), set `medical_triage.urgency` to `emergency` or `urgent`. Write `medical_triage.user_message` in the user's current language/script. It must say astrology cannot assess the active symptom, direct the user to immediate medical care/emergency services, and must not ask a question that delays care. Do not route ordinary questions about future susceptibility or general health risk to triage.
+   If LATEST USER MESSAGE is only a greeting, thanks, acknowledgement, deferral, or says there is no question, set route_action=ack, status=READY, and write one short natural `user_message` in that same language/script. Do not request astrology evidence.
+   MEDICAL SAFETY OVERRIDE: Use `medical_triage.urgency=clinical` for any request asking astrology to diagnose a condition, predict or pre-judge a pending medical test/report, determine whether a pregnancy/baby is medically healthy, assess genetic abnormality, miscarriage or treatment/procedure success, or decide whether a current symptom is medically harmless. `clinical` is a hybrid-answer safety flag, not a refusal or handoff: Live should still calculate and explain only a general astrological health, pregnancy, or parenthood climate, while explicitly separating that symbolism from every clinical claim. Use `urgent` or `emergency` instead when the latest message describes a potentially urgent active symptom such as chest pain/pressure, serious breathing difficulty, stroke signs, fainting, severe bleeding or another possible emergency; those routes bypass astrology. For `clinical`, write `medical_triage.user_message` as a concise same-language boundary and appropriate clinical next step, not the whole answer. Plainly state what cannot be known before examination/results and distinguish screening from diagnosis when relevant. Never imply that a supportive chart predicts a normal report, healthy baby, normal growth, absence of genetic conditions, harmless symptoms, or treatment success; never imply that a pressured chart predicts abnormality, loss, disease, poor growth, or complications. Never mention an internal flow, routing, missing astrology evidence, Standard/Premium mode, or offer a paid/deeper astrology reading. Do not use `clinical` for ordinary non-diagnostic questions about general health tendencies, prevention or a future health outlook.
    First classify `turn_relation`:
    - `clarification_answer` only when LATEST USER MESSAGE semantically answers the open clarification (including a short one-word answer).
    - `follow_up` when it asks about, challenges, or continues the immediately previous answer.
    - `new_request` when it is a self-contained request with a different subject, goal, life area, or requested action. A new request abandons the unresolved clarification; do not merge its old topic, subject, question parts, known_facts, or unresolved_facts into this turn.
-2. Decide READY vs CLARIFY. Clarify whenever a missing fact would materially change which chart factors, relationship role, event definition, or timing calculation should be used. Resolve ambiguous people and pronouns through conversation; never guess who "he", "she", "they", "that person", or a similar reference means. Clarify when the core topic/event is genuinely unclear, the user asks multiple unrelated life areas, a reference cannot be resolved from recent history/state, OR the mode is RECOMMEND_LOCATION and india-vs-abroad scope is unknown. Do not clarify for one clear domain with multiple facets, follow-up challenges, or natural messy phrasing.
-   If the message contains two or more independently answerable questions, set CLARIFY, answer_mode=compound_plan, route_action=clarify, and ask the user in their own language/script to choose just one question first. Do not create calculator work for either part yet.
+2. Decide READY vs CLARIFY. Clarify whenever a missing fact would materially change which chart factors, relationship role, event definition, or timing calculation should be used. Resolve ambiguous people and pronouns through conversation; never guess who "he", "she", "they", "that person", or a similar reference means. Clarify when the core topic/event is genuinely unclear, the user asks multiple unrelated life areas, a reference cannot be resolved from recent history/state, OR the mode is RECOMMEND_LOCATION and india-vs-abroad scope is unknown. Do not clarify for one clear domain with multiple facets, follow-up challenges, natural messy phrasing, or one identical question/predicate applied to two or more clearly named people.
+   If the message contains two or more independently answerable questions from different life domains or incompatible calculation families, set CLARIFY, answer_mode=compound_plan, route_action=clarify, and ask the user in their own language/script to choose just one question first. Promise/outlook plus timing for the same event is one compatible composite request: keep it READY, emit each facet as a question_part, and use the event-timing route because it already checks natal promise before timing. Likewise, one shared behavior/event question applied to several explicitly identified relatives is compatible: keep READY, place every person in target_subject_keys, emit one question_part per person, and never ask the user to repeat the same question one person at a time.
    If the user asks for compatibility between two charts, set answer_mode=dedicated_partnership_flow and route_action=handoff. Instant Chat does not calculate compatibility.
    After a pick-one clarification, classify only LATEST USER MESSAGE. Do not keep compound_plan just because the abandoned original list is still in history.
 3. Maintain `dialogue_state` as a complete corrected snapshot, not a delta. If `turn_relation=clarification_answer`, semantically apply LATEST USER MESSAGE to known_facts, remove the fact it resolves from unresolved_facts, and do not repeat the same question. If `turn_relation=new_request`, create a fresh dialogue_state from LATEST USER MESSAGE only. Ask the next necessary question only if a different material fact remains unresolved. Ask exactly one natural question at a time in the user's current language/script. Continue clarifying until you have enough information to choose the correct astrological calculation; only then set READY and ready_to_calculate=true.
@@ -2107,21 +2691,22 @@ Answer modes:
 - potential_capacity: suitability, promise, aptitude, capacity.
 - comparison_choice: choosing between options.
 - location_recommendation: where to move / which city or direction for a life goal.
-- factual_chart_lookup: the user wants the named chart itself interpreted from its calculated data (any language/script). Predict that chart's life area from the calculated packet; do not dump placements as the product, and do not map a named varga to family/career/soul topic_reading just because that chart is associated with that life area. Supported requested_chart codes: D1, D2, D3, D4, D7, D9, D10, D12, D16, D20, D24, D27, D30, D40, D45, D60, Karkamsa, Swamsa.
+- factual_chart_lookup: the user wants a named chart or one or more specified houses within that chart interpreted from calculated data (any language/script). For a house request, set chart_focus.requested_houses to the exact integer house numbers and use the named chart, or D1 when no other chart is named. Predict from the requested house's sign and lord, the lord's actual placement and condition, occupants, and exact aspects; do not replace this with a lagna-lord or whole-chart essay. For a whole-chart request, predict that chart's life area from the calculated packet; do not dump placements as the product, and do not map a named varga to family/career/soul topic_reading just because that chart is associated with that life area. Supported requested_chart codes: D1, D2, D3, D4, D7, D9, D10, D12, D16, D20, D24, D27, D30, D40, D45, D60, Karkamsa, Swamsa.
 - dedicated_muhurat_flow: choosing an auspicious time/date for a specified activity; collect the event, location and usable date range before READY. The location must be either the saved birth location (`muhurat_use_birth_location=true`) or the user's own place text in `muhurat_location_query`; never invent coordinates.
 - dedicated_partnership_flow: compatibility/synastry between two charts; hand off to Partnership mode.
-- compound_plan: two or more independently answerable questions; clarify and ask for one question only.
+- compound_plan: questions from different life domains or incompatible calculation families; clarify and ask for one question only. Do not use it for promise/outlook plus timing of the same event.
 - problem_diagnosis: why something is blocked, delayed, unstable, difficult.
 - remedy_action: when query_context marks a Remedies CTA follow-up OR `explicit_remedy_request=true` because the latest message directly and unambiguously asks for astrological remedies for a clear problem/life area. Do not choose it for vague advice requests.
 - topic_reading: focused reading when no other answer mode fits.
 
 Categories:
-career, job, promotion, employment, authority, job_change, project, business, love, relationship, marriage, partner, separation, wealth, money, finance, income, debt, investment, inheritance, health, disease, mental_wellbeing, surgery, accident, recovery, property, home, child, pregnancy, childbirth, adoption, education, learning, exams, travel, visa, foreign, immigration, location, legal, competition, reputation, government, friends, creativity, sports, research, karma, retirement, gain, wish, general, self, life_purpose, son, daughter, mother, father, spouse, siblings, children, family, soul, spirituality, purpose, dharma, vehicles, muhurat, timing.
+career, job, promotion, employment, authority, job_change, project, business, love, relationship, marriage, partner, separation, wealth, money, finance, income, debt, investment, inheritance, health, disease, mental_wellbeing, surgery, accident, recovery, property, home, child, pregnancy, childbirth, adoption, education, learning, exams, travel, visa, foreign, immigration, location, legal, competition, reputation, government, friends, creativity, sports, research, karma, retirement, gain, wish, general, self, life_purpose, son, daughter, mother, father, spouse, siblings, children, family, soul, spirituality, purpose, dharma, vehicles, nakshatra, birth_star, janma_nakshatra, muhurat, timing.
 For "when will I..." choose the life area category, not generic timing, when identifiable.
 
 Target subjects:
-self, spouse, wife, husband, partner, child, first_child, second_child, third_child, mother, father, sibling, brother, sister, younger_brother, younger_sister, younger_sibling, elder_brother, elder_sister, elder_sibling, maternal_uncle, uncle.
+self, spouse, wife, husband, partner, child, first_child, second_child, third_child, mother, father, sibling, brother, sister, younger_brother, younger_sister, younger_sibling, elder_brother, elder_sister, elder_sibling, maternal_uncle, uncle, mother_in_law, father_in_law, maternal_grandmother, maternal_grandfather, paternal_grandmother, paternal_grandfather.
 Use self only when the question is about the native directly. If the user asks about "my wife", "my husband", "spouse", "partner", child, parent, or sibling, use that person as target_subject_key.
+If one identical behavior, event, or timing question is asked for several clearly named people, it remains one compatible request. Return every person in target_subject_keys in user order, use the first as target_subject_key, emit one question_part per person, and return READY rather than asking for one person at a time.
 
 Date/time rules:
 - The AUTHORITATIVE USER-LOCAL CALENDAR above is the sole authority for relative-day phrases in the CURRENT QUESTION.
@@ -2132,30 +2717,36 @@ Date/time rules:
 - needs_transits true for daily, timing, and period outlook questions.
 - For every PREDICT_DAILY request, describe the actual activity semantically in `daily_activity_label` and select every relevant `daily_event_facets` value from: {", ".join(DAILY_EVENT_FACET_IDS)}. These facets describe meaning across languages and dialects; do not reduce a named activity to a generic day or static aptitude reading.
 - Temporal scope and subject are independent. When a named activity is tied to one exact day, `mode` remains PREDICT_DAILY even if the activity also names a profession, business, health matter, exam, relationship event, or another life domain. Domain fields describe the activity; they must never downgrade the mode to static aptitude, potential, or topic analysis.
+- Infer `temporal_intent` semantically in every language. `event_state` is scheduled, submitted, pending_external, in_progress or awaiting_result when the event/process has already begun and the user is waiting for its next step; use not_started for a future event that has not begun, completed for a finished event, and unknown otherwise.
+- Infer the ordinary real-world `expected_cadence` of the requested next step: hours_to_days, days_to_weeks, weeks_to_months, months_to_year, or open. This is about the process being asked about, not astrological strength.
+- Classify `process_scale` independently from cadence: rapid_operational for a queued response/result normally resolved in days; routine_operational for one remaining review, verification, approval, delivery, or onboarding step normally resolved in days or weeks; extended_institutional only when the underlying process is structurally multi-stage and long (for example legal proceedings, immigration, construction, adoption, or prolonged treatment); life_event for a broad future event that has not started; unknown otherwise. These are semantic calibration examples in every language, never application-side keyword rules.
+- A delayed single-step process that is already submitted, pending externally, scheduled, or awaiting a result remains rapid_operational or routine_operational. Never label it extended_institutional merely because it has been delayed or because a later astrological period looks stronger.
+- For an already-started process with no user-stated timeframe, use a bounded_future timeframe at that cadence instead of open_future. Do not let an administrative, response, result, delivery, approval, recovery, or other operational next-step question expand into a multi-year window merely because no date was written. This rule is semantic and cross-domain; examples are calibration only, never application keyword rules.
+- Set `explicit_timeframe=true` only when the latest user message itself supplies a date, range, named period, or duration. An earlier scheduled date is factual process context, not automatically the requested forecast horizon.
 
 Divisional charts:
 Always keep small. D1/D9 default. Add D10 career/job/business, D7 relationship/children/pregnancy, D30 health/disease, D24 education, D4 property/home, D12 parents/family, Karkamsa/Swamsa soul/purpose.
 CHART-FACT vs TOPIC (semantic, any language):
-- If the asked object is a named varga / Jaimini chart itself (D2–D60, Navamsha, Dashamsha, Dwadasamsa, Hora, Karkamsa/Karakamsha, Swamsa, native-script names, mixed script), set answer_mode=factual_chart_lookup, category=general, chart_focus.explicit=true, extracted_context.requested_chart to the canonical code, and question_parts.intent_families=["factual_chart_lookup"].
+- If the asked object is a named varga / Jaimini chart itself, or specified houses within a chart (D2–D60, Lagna/D1, Navamsha, Dashamsha, Dwadasamsa, Hora, Karkamsa/Karakamsha, Swamsa, native-script names, mixed script), set answer_mode=factual_chart_lookup, category=general, chart_focus.explicit=true, extracted_context.requested_chart to the canonical code, and question_parts.intent_families=["factual_chart_lookup"]. For a specified-house request also populate chart_focus.requested_houses and extracted_context.requested_houses with integers 1–12. Do not infer a life-outcome route merely from the traditional themes of that house.
 - If they ask how a life area or period is going and a varga is only supporting evidence, leave chart_focus null, put the varga in divisional_charts only, and use topic_reading or timing_window.
 
 Evidence planner:
 - Build an `evidence_plan` that describes what data agents must collect; do not write astrology rule combinations as text.
 - Use enum values only.
-- Detect compound questions semantically, but do not split or calculate them in Instant Chat. Return CLARIFY with answer_mode=compound_plan and one LLM-authored request to ask one question at a time.
+- Detect compound questions semantically. Return CLARIFY/compound_plan only for different life domains or incompatible calculation families. For same-event promise/outlook plus timing—including marriage potential plus reconnection timing—emit multiple question_parts, keep READY, and calculate them together through event_prediction.
 - A comparison is multi-part: emit one `question_part` per option and give each option its own event_profile (for example promotion and job_change). Add a `decision_option_context` evidence need covering those parts. Never collapse both options into `general_event`.
 - Add one `evidence_needs` item per data need, not per sentence.
 - For "When will I get married?", use event_timing + future_dasha_event_windows + transit_event_windows + natal_topic_foundation with event_profile marriage.
 - For retrospective event discovery such as "When was I married?", use event_timing with timeframe {{"kind":"open_past"}}; request historical_dasha_event_windows, historical_transit_event_windows, and natal_topic_foundation. This asks for probable past periods, not a future forecast or a known factual date.
 - When the assistant has asked which probable past period matches and the user supplies the actual event date, treat the reply as user confirmation, not a new prediction. Preserve the ISO date in `dialogue_state.known_facts.confirmed_event_date`, set `dialogue_state.known_facts.event_date_source="user_confirmed"`, and retain the active event/category. Never describe that confirmed date as a date recovered from astrology.
-- For "When will my Mercury dasha start and how will my career be?", return CLARIFY/compound_plan and ask which one they want answered first. Do not emit evidence needs yet.
+- For "When will my Mercury dasha start and how will my career be?", return CLARIFY/compound_plan because a factual dasha lookup and a career reading are incompatible calculation families. Do not emit evidence needs yet.
 - Always include safety.blocked_content_checks for death_prediction and fetal_sex_determination.
 - For every bounded rolling horizon, timeframe MUST include numeric `duration_months` (for example next six months -> {{"kind":"bounded_future","duration_months":6}}). Use `duration_years` only in addition, never instead.
 - Past event discovery must use timeframe.kind `open_past` (or `past` for a bounded known past range), never `open_future` or `bounded_future`.
 
 Calibration:
 - "How is my relationship with my wife?" -> READY, ANALYZE_TOPIC_POTENTIAL, category relationship or marriage, answer_mode topic_reading, target_subject_key wife, needs_transits false.
-- Named-chart reads in any language (examples of meaning, not keywords): "Explain my D12 chart"; "मेरी D12 / द्वादशांश कुंडली समझाओ"; "मेरा कारकांश चार्ट बताओ"; "Swamsa chart padho" -> READY, factual_chart_lookup, category general, chart_focus.explicit true, requested_chart D12/Karkamsa/Swamsa as appropriate, needs_transits false. Do NOT map these to family/career/soul topic readings.
+- Named-chart and single-house reads in any language (examples of meaning, not keywords): "Explain my D12 chart"; "मेरी D12 / द्वादशांश कुंडली समझाओ"; "मेरा कारकांश चार्ट बताओ"; "Swamsa chart padho"; "Analyze House 8 in my D1/लग्न chart" -> READY, factual_chart_lookup, requested_object named_chart, category general, chart_focus.explicit true, requested_chart D12/Karkamsa/Swamsa/D1 as appropriate, needs_transits false. For the final example, set requested_houses=[8]. Do NOT map these to family/career/soul/health topic readings merely from the chart or house's traditional subject.
 - Period/topic reads stay period/topic even if a varga is mentioned as support: "How is my D10 this year?" / "इस साल मेरा दशमांश कैसा है?" -> timing_window or topic_reading, not a named-chart D10-only prediction.
 - Natal-promise questions stay natal-promise questions even when the user names the chart that should support them: "Is marriage possible in my birth chart/kundali?" or "Does my D9 promise marriage?" -> potential_capacity, category marriage, D9 in divisional_charts as evidence, and chart_focus null. The requested outcome is marriage promise, not a description of D9 itself.
 - Always identify what the user is actually asking you to judge in requested_object. Use life_outcome when the requested object is marriage, career, children, health, wealth or another lived outcome—even if the user says "in my chart/kundali/D9". Use named_chart only when the chart itself is the requested object (for example, "explain my D9"). factual_chart_lookup is only valid together with requested_object=named_chart.
@@ -2163,17 +2754,21 @@ Calibration:
 - Set `response_language` to the language actually used by the latest user message. The app language, chart data, prior assistant language, and internal English instructions must not override the latest user message. For English input return `english`; for Hindi input return `hindi`; for Romanized Hindi return `hinglish`; use a concise lowercase language name for other languages.
 - "How will my career be in the second half of 2028?" -> READY, PREDICT_PERIOD_OUTLOOK, category career, answer_mode timing_window, target_subject_key self, needs_transits true, timeframe second half of 2028.
 - For every career/work question, set career_subtype semantically from the user's meaning in any language. Use general only when no narrower subtype applies. Examples: finding work=employment, receiving a specific appointment/offer=offer, reporting to a selected role or joining date=joining, raise/pay=salary, changing role=job_change, quitting=resignation, losing job=job_security, clients/enterprise=business, starting a new enterprise=business_launch, whether an existing enterprise will succeed=business_success, major initiative=project, management role=leadership, public-sector selection=government, overseas work=foreign_career, returning after a break=return_to_work, conflict at work=workplace_conflict, no progress=career_stagnation, hard work not being seen/rewarded or lack of visibility/appraisal=recognition, suitable profession=career_fit, job versus business=job_vs_business. Workplace relationships must use the person-role: manager/boss/supervisor=manager_relationship, colleague/coworker/peer=colleague_relationship, subordinate/direct report/team member=subordinate_relationship, client/customer=client_relationship, business partner=business_partner_relationship, mentor/professional guide=mentor_relationship. Classify these meanings semantically in every supported language; do not implement question-text keyword matching in application code.
+- Strengths + suitable work + the work with the best earning potential is ONE coherent Career Fit request. Return READY with category=career, career_subtype=career_fit, answer_mode=potential_capacity, and one career_fit question_part. Treat income or "most money" as Career Fit's viability criterion (H2/H11), not a separate Wealth domain and not compound_plan. When that request says "whole chart", use the bounded Career Fit evidence bundle; do not change the category to general.
 - For a question about suitability for a specific named profession, industry, practice, product, or business, preserve that exact object in `career_target`. Set `career_target_structure` to business, employment, freelance, hybrid, or unspecified from the user's meaning. Map the work itself to 1-4 `career_target_traits` using only: knowledge_advisory, analytical_research, communication_content, technical_systems, creative_aesthetic, care_healing, commercial_trade, operations_execution, leadership_authority, client_service, spiritual_esoteric, physical_competitive. These traits describe the work, not the user's chart. For example, a counselling practice may need knowledge_advisory, client_service and care_healing; a software business may need technical_systems, analytical_research, commercial_trade and client_service. Do this semantically for any field and language; never drop the named target into generic career/business.
-- For every marriage/relationship question, set marriage_subtype semantically in every language: general, love_vs_arranged, remarriage, engagement_vs_wedding, spouse_meeting, spouse_details, or affair. Love-versus-arranged uses comparison_choice. Remarriage uses potential_capacity for promise and event_prediction for timing; clarify the prior marriage/legal status when unknown and store it in extracted_context.prior_marriage_context. Engagement and wedding remain separate milestones. Where/how a spouse may be met uses topic_reading. Spouse profession/location/appearance uses relationship_person and marriage_subtype=spouse_details; also set extracted_context.spouse_detail_scope to profession, location, appearance, or combined. Questions such as "How will they look?" inherit the spouse reference from the immediately preceding exchange and use scope=appearance. Affair concerns use problem_diagnosis and require relationship context; never assert cheating. Marriage Muhurat uses dedicated_muhurat_flow with muhurat_event_type=marriage. Actual compatibility uses dedicated_partnership_flow and requires two resolved charts.
+- For every marriage/relationship question, set marriage_subtype semantically in every language: general, love_vs_arranged, remarriage, engagement_vs_wedding, spouse_meeting, spouse_details, affair, current_relationship_state, or specific_partner_decision. Love-versus-arranged uses comparison_choice. Remarriage uses potential_capacity for promise and event_prediction for timing; clarify the prior marriage/legal status when unknown and store it in extracted_context.prior_marriage_context. Engagement and wedding remain separate milestones. Where/how a spouse may be met uses topic_reading. Spouse profession/location/appearance uses relationship_person and marriage_subtype=spouse_details; also set extracted_context.spouse_detail_scope to profession, location, appearance, or combined. Questions asking whether an ex/partner has moved on, still has feelings, is thinking about the native, is emotionally detached, or what they currently intend use current_relationship_state, PREDICT_PERIOD_OUTLOOK, timing_window, needs_transits=true and a current timeframe in every language/script. A question asking whether or when a specific independent person will accept/reject a proposal, agree, choose the native, commit, marry, contact, respond, return, or take another voluntary action uses specific_partner_decision and sets third_party_decision_request=true. Also classify the requested action as third_party_action=proposal_decision, return_reconciliation, contact_response, commitment_marriage, or other_voluntary_action. It may calculate only the native's relationship-opportunity or clarification periods; it must plainly describe the actual requested action and say that person's choice and decision date cannot be known from the native chart. Never substitute proposal wording for a return, contact, reconciliation, commitment, or marriage question. Never use Yogi, Gandanta or generic natal modifiers as evidence of that person's decision. Questions such as "How will they look?" inherit the spouse reference from the immediately preceding exchange and use scope=appearance. General affair-pattern concerns use problem_diagnosis and require relationship context; a specific person's future choice takes precedence over affair even when one or both people are married. Never assert cheating. Marriage Muhurat uses dedicated_muhurat_flow with muhurat_event_type=marriage. Actual compatibility uses dedicated_partnership_flow and requires two resolved charts.
+- A question asking whether the user's marriage will be love-led, arranged, family-mediated, or a hybrid is always the static pathway comparison: category=marriage, marriage_subtype=love_vs_arranged, answer_mode=comparison_choice, and question_parts.event_profile=love_vs_arranged_marriage. This remains true in future tense and in Hindi/Hinglish or any other language. Do not turn “meri love marriage hogi kya?” into generic marriage possibility or marriage timing, and do not request dashas, transits, or dates unless the user separately asks when.
 - For wealth/finance questions, set wealth_subtype semantically in every language: general, source, savings_instability, multiple_income, debt_repayment, loan_support, loan_decision, investing_vs_trading, investment_risk, loss_vulnerability, or windfall. Keep income, debt, investment and inheritance as their specific categories. Generic questions about loans, borrowing capacity or loan tendencies (for example "What do you think about loans from my chart?") are static debt questions with wealth_subtype=general and topic_reading/potential_capacity. Questions asking when loans will be repaid, cleared, closed or when the user may become debt-free use category=debt, wealth_subtype=debt_repayment and a timing mode. Use loan_support only when the user asks about receiving loan approval/support during a stated period. Use loan_decision when the user asks whether they should take, accept, increase or use a loan for a stated purpose; route it as one concrete event/decision with event_prediction when a current or bounded period is named. Never use either subtype for repaying an existing loan. Use problem_diagnosis for instability, persistent debt or fluctuating investments; potential_capacity for source, multiple income, investment suitability or windfall assessment; comparison_choice for investing versus trading; and a timing mode only when the user asks when, names a bounded calendar period, or requests dated phases. Descriptive phrases such as long-term wealth potential, lifetime potential, overall prospects, future capacity, or sustainable wealth are static potential_capacity questions—not timing requests—and their timeframe must not be marked open_future merely because those phrases look temporal.
-- For education, exams and research questions, set category to education, exams, or research and set education_subtype semantically in every language: overall, education_timing, learning_style, subject_fit, course_comparison, higher_education, higher_education_timing, exam_capacity, exam_timing, admission_capacity, admission_timing, scholarship, research, research_timing, foreign_study, foreign_study_timing, education_obstacles, education_resume, education_vs_work, or education_remedies. Use potential_capacity for capability/fit, comparison_choice for named course choices, problem_diagnosis for obstacles, decision_support for an undated education-versus-work choice, remedy_action only for explicit remedies, and timing only when the user asks when or names a period. A time-bound study-versus-work question must remain education_vs_work with a timing answer_mode; never reduce it to higher_education. Foreign-versus-domestic study must remain foreign_study with comparison_choice. PhD/doctoral aptitude and completion belong to research, while a Masters/postgraduate degree belongs to higher_education. A why-question about retention, concentration, exam underperformance, research completion or changing course belongs to education_obstacles. Preserve a named subject/course/exam/research area in education_target, map its demands to education_target_traits, and preserve every explicitly named choice in education_options. Foreign study is not settlement; scholarship potential is not a guaranteed award; exam capacity is not exam timing or a guaranteed result.
+- For education, exams and research questions, set category to education, exams, or research and set education_subtype semantically in every language: overall, education_timing, learning_style, subject_fit, course_comparison, higher_education, higher_education_timing, exam_capacity, exam_timing, admission_capacity, admission_timing, scholarship, research, research_timing, foreign_study, foreign_study_timing, education_obstacles, education_resume, education_vs_work, or education_remedies. Use potential_capacity for capability/fit, comparison_choice for named course choices, problem_diagnosis for obstacles, decision_support for an undated education-versus-work choice, remedy_action only for explicit remedies, and timing only when the user asks when or names a period. A time-bound study-versus-work question must remain education_vs_work with a timing answer_mode; never reduce it to higher_education. Foreign-versus-domestic study must remain foreign_study with comparison_choice. PhD/doctoral aptitude and completion belong to research, while a Masters/postgraduate degree belongs to higher_education. A why-question about retention, concentration, exam underperformance, research completion or changing course belongs to education_obstacles. Preserve a named subject/course/exam/research area in education_target, map its demands to education_target_traits, and preserve every explicitly named choice in education_options. Use clinical_health for medicine, dentistry, nursing, pharmacy and allied clinical study; biological_care is for caregiving or life-science orientation and must not make the Moon a standalone medical indicator. Foreign study is not settlement; scholarship potential is not a guaranteed award; exam capacity is not exam timing or a guaranteed result.
+- If one question names two or more courses and separately asks the year or month of college admission, keep both question_parts: use comparison for the choices and event_timing with event_profile=education_admission for admission. Preserve every education_option and use admission_timing/event_prediction as the top-level route so the answer can carry both calculated ledgers.
 - "Is this a better year for higher education or professional experience?" -> category education, education_subtype education_vs_work, answer_mode timing_window, needs_transits true, education_options Higher education and Professional experience. The words "higher education" must not collapse this comparison into higher_education.
 - "Is foreign education stronger for me than studying in India?" -> category education, education_subtype foreign_study, answer_mode comparison_choice, education_options Foreign education and Education in India.
 - "Does my chart support completing a PhD?" -> category research, education_subtype research, answer_mode potential_capacity, education_target PhD.
 - An explicit education/exam/research remedy request -> category education, education_subtype education_remedies, answer_mode remedy_action, even when the named problem is concentration or exam anxiety.
-- For every children, conception, pregnancy, childbirth, adoption or parenthood question, set category progeny and set children_subtype semantically: children_overview, parenthood_capacity, conception_capacity, conception_timing, childbirth_timing, first_child_capacity, first_child, subsequent_child_capacity, subsequent_child, family_size_tendency, children_delay_diagnosis, assisted_conception, assisted_conception_timing, adoption_pathway, adoption_timing, step_parenthood, parenthood_decision, parenthood_vs_career, parenthood_vs_career_timing, parent_child_relationship, parent_child_reconciliation_timing, retrospective_child_timing, children_remedy, two_chart_children_handoff, child_chart_required_handoff, medical_safety_handoff, muhurat_handoff, legal_custody_handoff, or fetal_sex_refusal. Keep conception and childbirth as separate events. Static promise/capacity excludes timing; a when/month/year question uses the matching timing subtype. First-child and later-child promise use their capacity subtypes; their timing questions use first_child or subsequent_child. Joint-parent questions require two_chart_children_handoff; detailed claims about the child require child_chart_required_handoff; pregnancy symptoms, fertility diagnosis, miscarriage or pregnancy-health prediction require medical_safety_handoff; shortlisted electional dates require muhurat_handoff; custody outcomes require legal_custody_handoff; son/daughter or fetal-sex questions require fetal_sex_refusal. Never route a medical, fetal-sex, child-chart, custody or Muhurat boundary into ordinary progeny analysis.
+- For every children, conception, pregnancy, childbirth, adoption or parenthood question, set category progeny and set children_subtype semantically: children_overview, parenthood_capacity, conception_capacity, conception_timing, childbirth_timing, first_child_capacity, first_child, subsequent_child_capacity, subsequent_child, family_size_tendency, children_delay_diagnosis, assisted_conception, assisted_conception_timing, adoption_pathway, adoption_timing, step_parenthood, parenthood_decision, parenthood_vs_career, parenthood_vs_career_timing, parent_child_relationship, parent_child_reconciliation_timing, retrospective_child_timing, children_remedy, two_chart_children_handoff, child_chart_required_handoff, medical_safety_handoff, muhurat_handoff, legal_custody_handoff, or fetal_sex_refusal. Keep conception and childbirth as separate events. Static promise/capacity excludes timing; a when/month/year question uses the matching timing subtype. First-child and later-child promise use their capacity subtypes; their timing questions use first_child or subsequent_child. For any conception, baby, childbirth or assisted-conception timing request, `child_order` is calculation-critical. Set it to the positive integer explicitly supplied or already established in dialogue. If unknown, return CLARIFY before calculation and ask one concise same-language question offering first, second, third, or later child. After the reply preserve the number: H5 controls the first, H7 the second, H9 the third, continuing the odd-house progression for later children. Joint-parent questions require two_chart_children_handoff; detailed claims about the child require child_chart_required_handoff; pregnancy symptoms, fertility diagnosis, miscarriage or pregnancy-health prediction use medical_safety_handoff as a hybrid non-diagnostic astrology route; shortlisted electional dates require muhurat_handoff; custody outcomes require legal_custody_handoff; son/daughter or fetal-sex questions require fetal_sex_refusal. Never route fetal-sex, child-chart, custody or Muhurat boundaries into ordinary progeny analysis.
 - For every home, property or vehicle question, set home_subtype semantically in every language: home_overview, living_arrangement, property_potential, property_purchase, property_purchase_timing, property_sale_decision, property_sale_timing, property_finance, property_comparison, property_type_fit, joint_property, rental_income, possession_documentation_timing, retrospective_property_timing, property_portfolio_comparison, property_obstacles, construction_renovation, construction_timing, vehicle_potential, vehicle_selection, vehicle_timing, property_remedy, property_dispute_handoff, muhurat_handoff, foreign_handoff, vastu_handoff, or property_business_handoff. Domestic relocation now belongs to the Foreign Life domain, not Home. Vehicle ownership/capacity is vehicle_potential; a colour/colour-family recommendation is vehicle_selection with comparison_choice and no timing evidence; purchase timing is vehicle_timing only when the user asks when or names a period. Never carry vehicle_timing, needs_transits or a prior timing window into a new vehicle-selection request. A property dispute, court case, title/boundary/tenant/builder conflict, settlement or win/loss question is property_dispute_handoff. Electional property or vehicle dates are muhurat_handoff. Inheritance belongs to the Wealth graph. Static property potential, home comfort and vehicle suitability never request timing. Only a question asking when, now, this month/year, or naming a period selects the matching timing subtype and requests dasha, KP and transit evidence.
 - For every travel, relocation, visa, immigration, foreign-residence or settlement question, set foreign_subtype semantically in every language: foreign_overview, travel_tendency, short_travel, short_travel_timing, long_travel, long_travel_timing, travel_purpose, travel_obstacles, retrospective_travel, domestic_relocation, domestic_relocation_timing, stay_vs_relocate, temporary_vs_permanent, foreign_travel, foreign_travel_timing, foreign_residence, foreign_residence_timing, permanent_settlement, settlement_timing, visa_support, visa_timing, migration_pathway, return_home, return_home_timing, foreign_life_adjustment, foreign_obstacles, foreign_remedy, location_comparison, location_recommendation_handoff, legal_immigration_handoff, muhurat_handoff, travel_safety_handoff, or other_person_handoff. Keep travel, residence and permanent settlement distinct. Static support/capacity never requests timing; only an explicit when/period question uses a timing subtype. Country/city comparison with named options uses location_comparison; an open-ended best-country/city request uses location_recommendation_handoff. Legal eligibility, approval guarantees and application advice use legal_immigration_handoff; accident/safety guarantees use travel_safety_handoff; exact electional departure dates use muhurat_handoff; claims about another person's chart use other_person_handoff. Foreign career, foreign study and foreign spouse remain in their Career, Education and Marriage domains; use migration_pathway only when the question asks whether that pathway produces travel, residence or settlement.
+- For an explicit Nakshatra, birth-star, Janma Nakshatra, planetary Nakshatra or pada question, use category=nakshatra and set nakshatra_subtype to exactly one of: birth_star_overview, ascendant_nakshatra, planet_nakshatra, full_nakshatra_profile, pada_expression, nakshatra_dispositor_chain, topic_nakshatra_analysis, nakshatra_timing, special_nakshatra_conditions, nakshatra_remedy, naming_syllable. Set nakshatra_target_planet only when a planet is named, and nakshatra_topic only when the user explicitly asks for a career, relationship, wealth, health, spirituality, personality or emotions reading through the Nakshatra lens. Generic career/marriage/health questions remain owned by their life domain. Only an explicit when/current transit request uses nakshatra_timing; only an explicit remedy request uses nakshatra_remedy. Compatibility between two people belongs to the dedicated partnership flow and exact auspicious dates belong to Muhurta.
 - Questions about living independently, living with family, domestic privacy, moving out, or the home arrangement that best supports the user are Home questions, never Career questions. Use category=property and home_subtype=living_arrangement; purchase/rental remains property_comparison.
 - "Should I take a loan to expand my business this year?" (and the same meaning in any language) -> READY, category debt, wealth_subtype loan_decision, answer_mode event_prediction, needs_transits true, timeframe this year. This asks whether new debt is advisable for a productive use; it is neither a static debt tendency nor merely loan-approval timing.
 - "Did I have a love or arranged marriage?" and the same meaning in any language -> READY, category marriage, marriage_subtype love_vs_arranged, answer_mode comparison_choice, route_action answer. This asks which natal pathway better matches an already-past marriage; it is not retrospective marriage-date discovery and must not request historical dasha or transit windows.
@@ -2193,12 +2788,12 @@ Calibration:
 
 Return exactly this JSON shape:
 {{
-  "medical_triage": {{"urgency":"none or urgent or emergency","reason":"brief semantic reason","user_message":"localized urgent-care message, empty when none"}},
+  "medical_triage": {{"urgency":"none or clinical or urgent or emergency","reason":"brief semantic reason","user_message":"for clinical: concise same-language limitation and clinical next step; for urgent/emergency: complete same-language safety response; empty only when urgency is none"}},
   "turn_relation": "new_request" or "clarification_answer" or "follow_up",
   "explicit_remedy_request": true only for an unambiguous direct request for astrological remedies, otherwise false,
   "status": "CLARIFY" or "READY",
   "clarification_question": "same language/script as user, only when CLARIFY",
-  "route_action": "answer" or "clarify" or "handoff",
+  "route_action": "answer" or "clarify" or "handoff" or "ack",
   "user_message": "LLM-authored same-language clarification or handoff message, otherwise empty",
   "dialogue_state": {{
     "request_summary": "concise resolved meaning so far",
@@ -2211,24 +2806,32 @@ Return exactly this JSON shape:
   }},
   "chart_insights": [],
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
-  "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
+  "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"],"requested_houses":[1-12 integer values only when specific houses are asked]}} or null,
   "requested_object": "named_chart" or "life_outcome" or "period" or "person" or "mechanism" or "other",
   "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "decision_support" or "location_recommendation" or "factual_chart_lookup" or "dedicated_muhurat_flow" or "dedicated_partnership_flow" or "compound_plan" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "temporal_intent": {{"event_state":"not_started or scheduled or submitted or pending_external or in_progress or awaiting_result or completed or unknown","expected_cadence":"hours_to_days or days_to_weeks or weeks_to_months or months_to_year or open","process_scale":"rapid_operational or routine_operational or extended_institutional or life_event or unknown","explicit_timeframe":true_or_false,"reason":"brief semantic reason"}},
   "response_language": "lowercase language of the latest user message, for example english, hindi, hinglish, tamil, bengali, telugu, marathi or gujarati",
   "career_subtype": "general" or "employment" or "offer" or "joining" or "promotion" or "job_change" or "resignation" or "job_security" or "business" or "business_launch" or "business_success" or "salary" or "project" or "leadership" or "government" or "foreign_career" or "return_to_work" or "workplace_conflict" or "career_stagnation" or "recognition" or "career_fit" or "job_vs_business" or "manager_relationship" or "colleague_relationship" or "subordinate_relationship" or "client_relationship" or "business_partner_relationship" or "mentor_relationship" or null,
   "career_target": "concise user-named profession, industry, practice, product, or business; null when none",
   "career_target_structure": "business" or "employment" or "freelance" or "hybrid" or "unspecified",
   "career_target_traits": ["0-4 allowed semantic work-trait ids"],
-  "marriage_subtype": "general" or "love_vs_arranged" or "remarriage" or "engagement_vs_wedding" or "spouse_meeting" or "spouse_details" or "affair" or null,
+  "marriage_subtype": "general" or "love_vs_arranged" or "remarriage" or "engagement_vs_wedding" or "spouse_meeting" or "spouse_details" or "affair" or "current_relationship_state" or "specific_partner_decision" or null,
+  "third_party_decision_request": true or false,
+  "third_party_action": "proposal_decision" or "return_reconciliation" or "contact_response" or "commitment_marriage" or "other_voluntary_action" or null,
   "wealth_subtype": "general" or "source" or "savings_instability" or "multiple_income" or "debt_repayment" or "loan_support" or "loan_decision" or "investing_vs_trading" or "investment_risk" or "loss_vulnerability" or "windfall" or null,
   "education_subtype": "overall" or "education_timing" or "learning_style" or "subject_fit" or "course_comparison" or "higher_education" or "higher_education_timing" or "exam_capacity" or "exam_timing" or "admission_capacity" or "admission_timing" or "scholarship" or "research" or "research_timing" or "foreign_study" or "foreign_study_timing" or "education_obstacles" or "education_resume" or "education_vs_work" or "education_remedies" or null,
   "children_subtype": "children_overview" or "parenthood_capacity" or "conception_capacity" or "conception_timing" or "childbirth_timing" or "first_child_capacity" or "first_child" or "subsequent_child_capacity" or "subsequent_child" or "family_size_tendency" or "children_delay_diagnosis" or "assisted_conception" or "assisted_conception_timing" or "adoption_pathway" or "adoption_timing" or "step_parenthood" or "parenthood_decision" or "parenthood_vs_career" or "parenthood_vs_career_timing" or "parent_child_relationship" or "parent_child_reconciliation_timing" or "retrospective_child_timing" or "children_remedy" or "two_chart_children_handoff" or "child_chart_required_handoff" or "medical_safety_handoff" or "muhurat_handoff" or "legal_custody_handoff" or "fetal_sex_refusal" or null,
+  "child_order": positive_integer_when_known_or_null,
   "home_subtype": "home_overview" or "living_arrangement" or "property_potential" or "property_purchase" or "property_purchase_timing" or "property_sale_decision" or "property_sale_timing" or "property_finance" or "property_comparison" or "property_type_fit" or "joint_property" or "rental_income" or "possession_documentation_timing" or "retrospective_property_timing" or "property_portfolio_comparison" or "property_obstacles" or "construction_renovation" or "construction_timing" or "relocation_home" or "relocation_timing" or "vehicle_potential" or "vehicle_selection" or "vehicle_timing" or "property_remedy" or "property_dispute_handoff" or "muhurat_handoff" or "foreign_handoff" or "inheritance_handoff" or "vastu_handoff" or "property_business_handoff" or null,
   "foreign_subtype": "foreign_overview" or "travel_tendency" or "short_travel" or "short_travel_timing" or "long_travel" or "long_travel_timing" or "travel_purpose" or "travel_obstacles" or "retrospective_travel" or "domestic_relocation" or "domestic_relocation_timing" or "stay_vs_relocate" or "temporary_vs_permanent" or "foreign_travel" or "foreign_travel_timing" or "foreign_residence" or "foreign_residence_timing" or "permanent_settlement" or "settlement_timing" or "visa_support" or "visa_timing" or "migration_pathway" or "return_home" or "return_home_timing" or "foreign_life_adjustment" or "foreign_obstacles" or "foreign_remedy" or "location_comparison" or "location_recommendation_handoff" or "legal_immigration_handoff" or "muhurat_handoff" or "travel_safety_handoff" or "other_person_handoff" or null,
+  "nakshatra_subtype": "birth_star_overview" or "ascendant_nakshatra" or "planet_nakshatra" or "full_nakshatra_profile" or "pada_expression" or "nakshatra_dispositor_chain" or "topic_nakshatra_analysis" or "nakshatra_timing" or "special_nakshatra_conditions" or "nakshatra_remedy" or "naming_syllable" or null,
+  "nakshatra_target_planet": "Sun/Moon/Mars/Mercury/Jupiter/Venus/Saturn/Rahu/Ketu or null",
+  "nakshatra_topic": "general/personality/emotions/career/relationship/wealth/health/spirituality or null",
   "education_target": "concise user-named subject, course, exam, degree or research area; null when none",
-  "education_target_traits": ["0-4 of analytical_quantitative, language_communication, technical_engineering, creative_design, biological_care, legal_social, commercial_management, research_depth, disciplined_memory, practical_applied"],
+  "education_target_traits": ["0-4 of analytical_quantitative, language_communication, technical_engineering, creative_design, biological_care, clinical_health, legal_social, commercial_management, research_depth, disciplined_memory, practical_applied"],
   "education_options": [{{"label":"every explicitly named course/subject/degree choice", "traits":["0-4 allowed education_target_traits describing this option's actual demands"]}}],
-  "target_subject_key": "one allowed target subject",
+  "target_subject_key": "first allowed target subject",
+  "target_subject_keys": ["all explicitly named compatible target subjects; one item for a single target"],
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
   "daily_activity_label": "concise language-neutral description of the exact-day activity, or null",
@@ -2238,6 +2841,7 @@ Return exactly this JSON shape:
     "specific_date_basis":"not_date_bound",
     "requested_chart":"D1/D2/.../D60/Karkamsa/Swamsa or null",
     "requested_fact":"LLM-normalized fact requested or null",
+    "requested_houses":["integer house numbers 1-12 explicitly requested; empty otherwise"],
     "spouse_detail_scope":"profession or location or appearance or combined or null",
     "prior_marriage_context":"LLM-normalized prior marriage/legal status or null",
     "location_scope":"india or abroad or both or null",
@@ -2359,7 +2963,7 @@ You are the lightweight intent router for an astrology chat. Keep this fast and 
 
 Your job:
 - classify the user's current question
-- detect active potentially urgent medical symptoms before any astrology. For active chest pain/pressure, serious breathing difficulty, stroke signs, fainting, severe bleeding, or another possible emergency, set medical_triage urgency to urgent/emergency and write a concise same-language message directing immediate medical care; astrology must not assess the symptom. General health-risk questions are not emergencies.
+- Apply medical safety before astrology only for `urgent` or `emergency`. Set medical_triage urgency to `clinical` when the user asks astrology to diagnose, predict a pending test/report, determine pregnancy or fetal medical health/genetic status, predict miscarriage or treatment/procedure success, or decide whether a symptom is harmless. `clinical` requests continue as hybrid answers: give only a general calculated astrological climate after a clear medical limitation. A supportive chart must never imply a normal report, healthy baby, normal growth, absence of genetic conditions, harmless symptom or successful treatment; a pressured chart must never imply abnormality, loss, disease, poor growth or complications. Set urgency to `urgent`/`emergency` for potentially urgent active symptoms such as chest pain, serious breathing difficulty, stroke signs, fainting or severe bleeding. For `clinical`, write user_message as a concise limitation and clinical next step in the user's language/script; for urgent/emergency, write the complete safety answer. Never say “medical safety flow”, “dedicated flow”, “handoff”, “Standard”, “Premium”, or “deeper reading”. Ordinary non-diagnostic health tendencies, prevention and future outlook questions are not medical triage.
 - decide if clarification is needed
 - identify if it is a daily / exact-date / timing / personality / topic-potential / remedy style question
 - classify the universal answer mode needed by the response generator
@@ -2406,16 +3010,20 @@ Rules:
 - Use `RECOMMEND_LOCATION` ONLY when the user wants where to relocate/live/settle, or which city/place/country/direction is favorable. Not for "when will I move". Not for marriage timing, love/compatibility, or "whom will he marry". Birth "Place:" fields are NOT a relocate ask.
 - For `RECOMMEND_LOCATION`: if the user has NOT clearly said India-only / abroad-overseas / both, return CLARIFY. Your clarification_question MUST ask that geography preference in the SAME language/script as the current question (LLM-authored; never English-by-default). Set extracted_context.location_scope to "india"|"abroad"|"both" when known, else null.
 - Use `RECOMMEND_REMEDY_FOR_PROBLEM` when query_context marks a Remedies CTA follow-up OR the latest message is an unambiguous direct request for astrological remedies/upayas/corrective actions for one clear problem or life area. Set `explicit_remedy_request=true` for the latter. Infer this semantically in every language/script. A vague "what should I do?" is not enough by itself.
-- For every marriage/relationship question, set marriage_subtype semantically in every language: general, love_vs_arranged, remarriage, engagement_vs_wedding, spouse_meeting, spouse_details, or affair. Love-versus-arranged uses comparison_choice. Remarriage uses potential_capacity for promise and event_prediction for timing; clarify the prior marriage/legal status when unknown and store it in extracted_context.prior_marriage_context. Keep engagement and wedding as separate milestones. Spouse-meeting questions use topic_reading; profession/location/appearance questions use relationship_person and marriage_subtype=spouse_details; also set extracted_context.spouse_detail_scope to profession, location, appearance, or combined. A follow-up such as "How will they look?" retains the spouse reference and uses scope=appearance. Affair concerns use problem_diagnosis and require relationship context; never assert cheating. Marriage Muhurat uses dedicated_muhurat_flow with muhurat_event_type=marriage. Compatibility uses dedicated_partnership_flow and requires two resolved charts.
+- For every career/work question, set career_subtype semantically. Suitable work, natural vocational strengths, or the work direction likely to produce the best earnings use career_fit. Strengths + suitable work + best earning potential is ONE coherent Career Fit request: category=career, career_subtype=career_fit, answer_mode=potential_capacity, one career_fit question_part, READY. Income is the H2/H11 viability criterion inside Career Fit, not a separate Wealth ask and not compound_plan. "Whole chart" does not change a clearly vocational request to general.
+- For every marriage/relationship question, set marriage_subtype semantically in every language: general, love_vs_arranged, remarriage, engagement_vs_wedding, spouse_meeting, spouse_details, affair, current_relationship_state, or specific_partner_decision. Love-versus-arranged uses comparison_choice. Remarriage uses potential_capacity for promise and event_prediction for timing; clarify the prior marriage/legal status when unknown and store it in extracted_context.prior_marriage_context. Keep engagement and wedding as separate milestones. Spouse-meeting questions use topic_reading; profession/location/appearance questions use relationship_person and marriage_subtype=spouse_details; also set extracted_context.spouse_detail_scope to profession, location, appearance, or combined. Questions asking whether an ex/partner has moved on, still has feelings, is thinking about the native, is emotionally detached, or what they currently intend use current_relationship_state, PREDICT_PERIOD_OUTLOOK, timing_window, needs_transits=true and a current timeframe in every language/script. A question asking whether or when a specific independent person will accept/reject a proposal, agree, choose the native, commit, marry, contact, respond, return, or take another voluntary action uses specific_partner_decision and third_party_decision_request=true. Classify the requested action as third_party_action=proposal_decision, return_reconciliation, contact_response, commitment_marriage, or other_voluntary_action. Calculate only the native's relationship opportunity/clarification periods and explicitly describe that actual action while saying the other person's choice or decision date is unknowable from this chart. Never substitute proposal wording for a return, contact, reconciliation, commitment, or marriage question. Never use Yogi, Gandanta or generic natal modifiers as decision evidence. A specific person's voluntary choice takes precedence over affair even if one or both people are married; general affair-pattern concerns remain problem_diagnosis. A follow-up such as "How will they look?" retains the spouse reference and uses scope=appearance. Never assert cheating. Marriage Muhurat uses dedicated_muhurat_flow with muhurat_event_type=marriage. Compatibility uses dedicated_partnership_flow and requires two resolved charts.
+- A question asking whether marriage will be love-led, arranged, family-mediated, or hybrid is always category=marriage, marriage_subtype=love_vs_arranged, answer_mode=comparison_choice, with question_parts.event_profile=love_vs_arranged_marriage. Future tense does not make it a timing request. Apply this semantic rule in Hindi/Hinglish and every supported language; do not supply dasha/transit windows unless timing is separately requested.
 - For wealth/finance questions, set wealth_subtype semantically in every language: general, source, savings_instability, multiple_income, debt_repayment, loan_support, loan_decision, investing_vs_trading, investment_risk, loss_vulnerability, or windfall. Preserve income, debt, investment and inheritance as specific categories. Generic questions about loans, borrowing capacity or loan tendencies (for example "What do you think about loans from my chart?") are static debt questions with wealth_subtype=general and topic_reading/potential_capacity. Questions asking when loans will be repaid, cleared, closed or when the user may become debt-free use category=debt, wealth_subtype=debt_repayment and a timing mode. Use loan_support only for receiving loan approval/support during a stated period. Use loan_decision when the user asks whether they should take, accept, increase or use a loan for a stated purpose; use event_prediction for a current or bounded decision. Never use either subtype for repaying an existing loan. Use problem_diagnosis for instability, persistent debt or fluctuating investments; potential_capacity for source, multiple income, investment suitability or windfall assessment; comparison_choice for investing versus trading; and timing only when the user asks when, names a bounded calendar period, or requests dated phases. Descriptive phrases such as long-term wealth potential, lifetime potential, overall prospects, future capacity, or sustainable wealth remain static potential_capacity questions and must not receive an open_future timeframe solely because of that wording.
-- For education, exams and research questions, set category to education, exams, or research and set education_subtype semantically in every language: overall, education_timing, learning_style, subject_fit, course_comparison, higher_education, higher_education_timing, exam_capacity, exam_timing, admission_capacity, admission_timing, scholarship, research, research_timing, foreign_study, foreign_study_timing, education_obstacles, education_resume, education_vs_work, or education_remedies. Use potential_capacity for capability/fit, comparison_choice for named course choices, problem_diagnosis for obstacles, decision_support for an undated education-versus-work choice, remedy_action only for explicit remedies, and timing only when the user asks when or names a period. A time-bound study-versus-work question must remain education_vs_work with a timing answer_mode; foreign-versus-domestic study must remain foreign_study with comparison_choice. Route PhD/doctoral questions to research, Masters/postgraduate questions to higher_education, and causal questions about retention, concentration, exam underperformance, research completion or changing direction to education_obstacles. Preserve a named subject/course/exam/research area in education_target, its demands in education_target_traits, and all explicit choices in education_options. Do not conflate foreign study with settlement, scholarship potential with an award, or exam capacity with timing/results.
+- For education, exams and research questions, set category to education, exams, or research and set education_subtype semantically in every language: overall, education_timing, learning_style, subject_fit, course_comparison, higher_education, higher_education_timing, exam_capacity, exam_timing, admission_capacity, admission_timing, scholarship, research, research_timing, foreign_study, foreign_study_timing, education_obstacles, education_resume, education_vs_work, or education_remedies. Use potential_capacity for capability/fit, comparison_choice for named course choices, problem_diagnosis for obstacles, decision_support for an undated education-versus-work choice, remedy_action only for explicit remedies, and timing only when the user asks when or names a period. A time-bound study-versus-work question must remain education_vs_work with a timing answer_mode; foreign-versus-domestic study must remain foreign_study with comparison_choice. Route PhD/doctoral questions to research, Masters/postgraduate questions to higher_education, and causal questions about retention, concentration, exam underperformance, research completion or changing direction to education_obstacles. Preserve a named subject/course/exam/research area in education_target, its demands in education_target_traits, and all explicit choices in education_options. Use clinical_health for medicine, dentistry, nursing, pharmacy and allied clinical study; biological_care is for caregiving or life-science orientation and must not make the Moon a standalone medical indicator. Do not conflate foreign study with settlement, scholarship potential with an award, or exam capacity with timing/results.
+- If one question names two or more courses and separately asks the year or month of college admission, keep both question_parts: use comparison for the choices and event_timing with event_profile=education_admission for admission. Preserve every education_option and use admission_timing/event_prediction as the top-level route so the answer can carry both calculated ledgers.
 - "Is this a better year for higher education or professional experience?" -> category education, education_subtype education_vs_work, answer_mode timing_window, needs_transits true, education_options Higher education and Professional experience. Never collapse it into higher_education.
 - "Is foreign education stronger for me than studying in India?" -> category education, education_subtype foreign_study, answer_mode comparison_choice, education_options Foreign education and Education in India.
 - "Does my chart support completing a PhD?" -> category research, education_subtype research, answer_mode potential_capacity, education_target PhD.
 - Explicit education/exam/research remedies always use education_subtype education_remedies and answer_mode remedy_action.
-- For children, conception, pregnancy, childbirth, adoption and parenthood, use category progeny and choose the exact children_subtype. Keep static promise separate from timing; keep conception separate from childbirth; keep first-child analysis separate from subsequent-child analysis. Use two_chart_children_handoff for joint-couple claims, child_chart_required_handoff for the child's detailed fate, medical_safety_handoff for fertility/pregnancy diagnosis, symptoms or loss prediction, muhurat_handoff for electional dates, legal_custody_handoff for custody outcomes, and fetal_sex_refusal for son/daughter or fetal-sex prediction. Assisted conception and adoption are distinct pathways, not fallback labels for weak biological promise.
+- For children, conception, pregnancy, childbirth, adoption and parenthood, use category progeny and choose the exact children_subtype. Keep static promise separate from timing; keep conception separate from childbirth; keep first-child analysis separate from subsequent-child analysis. Any conception, baby, childbirth or assisted-conception timing question requires a known positive integer `child_order`. If the latest question and dialogue do not establish it, return CLARIFY and ask one concise same-language question offering first, second, third, or later child. After the reply preserve the number: H5 controls the first, H7 the second, H9 the third, continuing the odd-house progression. Use two_chart_children_handoff for joint-couple claims, child_chart_required_handoff for the child's detailed fate, medical_safety_handoff as a hybrid non-diagnostic astrology route for fertility/pregnancy diagnosis, symptoms or loss prediction, muhurat_handoff for electional dates, legal_custody_handoff for custody outcomes, and fetal_sex_refusal for son/daughter or fetal-sex prediction. Assisted conception and adoption are distinct pathways, not fallback labels for weak biological promise.
 - For home, property and vehicle questions, set the exact home_subtype. Domestic relocation now belongs to the Foreign Life domain and must use foreign_subtype domestic_relocation or domestic_relocation_timing. Vehicle colour selection is vehicle_selection/comparison_choice with no timing; only a when/period vehicle-purchase question is vehicle_timing. Property disputes use property_dispute_handoff; electional dates use muhurat_handoff; inheritance belongs to Wealth. Undated ownership questions are static property capacity; explicit when/period questions use timing.
 - For travel, domestic relocation, visa, immigration, foreign residence and settlement, choose the exact foreign_subtype from the foreign route list in the JSON schema. Distinguish short travel, long travel, domestic relocation, foreign travel, foreign residence and permanent settlement. Use timing variants only for explicit when/period questions. Named location options use location_comparison; open-ended best-place requests, legal immigration advice/approval, exact Muhurat dates, travel-safety guarantees and another person's fate use their dedicated handoff subtype. Career abroad, study abroad and spouse abroad remain owned by Career, Education and Marriage unless the actual question is whether that pathway leads to residence or settlement.
+- Explicit Nakshatra/birth-star/pada questions use category=nakshatra and one exact nakshatra_subtype. Named planets populate nakshatra_target_planet. A career, relationship, wealth, health, spirituality, personality or emotions question uses topic_nakshatra_analysis only when the user explicitly asks through a Nakshatra lens; generic life-area questions stay in their owning domain. Use nakshatra_timing only for explicit timing/current-transit asks and nakshatra_remedy only for explicit remedies. Two-chart compatibility is dedicated_partnership_flow; exact auspicious dates are dedicated_muhurat_flow.
 - Living independently versus with family, domestic privacy, moving out and home-arrangement questions are category=property and home_subtype=living_arrangement, never Career questions.
 - "Should I take a loan to expand my business this year?" -> category debt, wealth_subtype loan_decision, answer_mode event_prediction, timeframe this year, needs_transits true.
 - "Did I have a love or arranged marriage?" and the same meaning in any language -> READY, category marriage, marriage_subtype love_vs_arranged, answer_mode comparison_choice, route_action answer. It is a static natal-pathway comparison about a past marriage, not retrospective date discovery; do not request historical dasha or transit evidence.
@@ -2469,6 +3077,11 @@ Rules:
 - Set `needs_transits=true` for daily, timing, and period outlook questions. Otherwise false unless clearly timing-sensitive.
 - For every PREDICT_DAILY request, preserve the named activity in `daily_activity_label` and select all relevant `daily_event_facets` from: {", ".join(DAILY_EVENT_FACET_IDS)}. Do this semantically in the user's language or dialect; never infer the activity with keyword matching and never replace it with static profession suitability.
 - Temporal scope and subject are independent. When a named activity is tied to one exact day, `mode` remains PREDICT_DAILY even if the activity also names a profession, business, health matter, exam, relationship event, or another life domain. Domain fields describe the activity; they must never downgrade the mode to static aptitude, potential, or topic analysis.
+- Infer `temporal_intent` semantically in every language. `event_state` is scheduled, submitted, pending_external, in_progress or awaiting_result when the process has already begun and the user is waiting for its next step; otherwise use not_started, completed or unknown as appropriate.
+- Infer its ordinary real-world `expected_cadence`: hours_to_days, days_to_weeks, weeks_to_months, months_to_year, or open. For an already-started process with no requested timeframe, use bounded_future at that cadence instead of open_future. This applies across domains and must not depend on application-side language keywords.
+- Classify `process_scale` separately: rapid_operational for a queued response/result normally resolved in days; routine_operational for one remaining review, verification, approval, delivery, or onboarding step normally resolved in days or weeks; extended_institutional only when the underlying process is inherently multi-stage and long (such as legal proceedings, immigration, construction, adoption, or prolonged treatment); life_event for a broad future event that has not started; unknown otherwise. Treat these as semantic calibration across languages, not keyword rules.
+- An already-submitted, scheduled, externally pending, or awaiting-result single step does not become extended_institutional because of delay or because astrology offers a stronger later period.
+- Set `explicit_timeframe=true` only when the latest question supplies the requested date, range, named period or duration. A date saying when a process began or was scheduled is context, not automatically the forecast horizon.
 - `context_type` is usually `birth`; use `annual` only for whole-year forecast style questions.
 - Keep `divisional_charts` small but sensible. D1 and D9 are enough for most instant routing. Add D10 for career/work, D7 for relationships/children, D30 for health/disease, D24 for education, D4 for property/home.
 - When you do return `CLARIFY`, ask only one short narrowing question and give 2-4 quick options when helpful.
@@ -2482,10 +3095,10 @@ UNIVERSAL ANSWER MODE:
 - `potential_capacity`: suitability, promise, capacity, aptitude
 - `comparison_choice`: choice between two or more options
 - `location_recommendation`: where to relocate/live/settle for a stated goal
-- `factual_chart_lookup`: the asked object is a named chart or calculated fact, in any language. Set chart_focus + requested_chart. Interpret that chart from calculated data (D12 predicts parents/elders from D12, D10 predicts career from D10) rather than routing to family/career/soul topic_reading. A period question that mentions a varga stays timing_window.
+- `factual_chart_lookup`: the asked object is a named chart, specified house within a chart, or calculated fact, in any language. Set chart_focus + requested_chart. For a house request, put exact integers 1–12 in chart_focus.requested_houses and extracted_context.requested_houses, defaulting the chart to D1 only when no other chart is named. Interpret that house from its calculated sign/lord, the lord's placement and condition, occupants, and exact aspects; do not substitute a lagna-lord or whole-chart reading. Interpret whole-chart requests from calculated data (D12 predicts parents/elders from D12, D10 predicts career from D10) rather than routing to family/career/soul topic_reading. A period question that mentions a varga stays timing_window.
 - `dedicated_muhurat_flow`: choose an auspicious date/time for a specified activity; required event, location, and date range must be known. Preserve a user-stated place in `muhurat_location_query` or explicitly select the saved birth location; never invent latitude/longitude.
 - `dedicated_partnership_flow`: compatibility between two charts; return a handoff because Instant Chat does not calculate compatibility
-- `compound_plan`: two or more independently answerable questions; ask the user to choose one question first
+- `compound_plan`: questions from different life domains or incompatible calculation families; do not use it for promise/outlook plus timing of the same event
 - `problem_diagnosis`: why something is blocked, unstable, delayed, difficult, or leaking
 - `remedy_action`: when query_context marks a Remedies CTA follow-up OR `explicit_remedy_request=true` for a direct, unambiguous astrological-remedy request. Do not use it for vague general advice.
 - `topic_reading`: focused reading when no other answer mode fits
@@ -2493,7 +3106,7 @@ UNIVERSAL ANSWER MODE:
 EVIDENCE PLAN:
 - Return `evidence_plan` as the data-collection plan for backend agents.
 - Use enum values only.
-- For multiple independently answerable questions, return CLARIFY with answer_mode=compound_plan and route_action=clarify. Ask one natural same-language question telling the user to choose one question first. Do not emit calculator evidence needs yet.
+- For multiple questions from different life domains or incompatible calculation families, return CLARIFY with answer_mode=compound_plan and route_action=clarify. Same-event promise/outlook plus timing is compatible: keep READY, emit all question_parts, and request natal foundation plus timing evidence so the answer covers every supported facet. One shared question applied to multiple named people is also compatible: keep READY and emit one same-family question_part per target.
 - A comparison is multi-part: emit one `question_part` per option and give each option its own event_profile (for example promotion and job_change). Add a `decision_option_context` evidence need covering those parts. Never collapse both options into `general_event`.
 - Planner chooses evidence needs; agents own detailed astrology rule combinations.
 - For any specific named profession, industry, practice, product, or business, preserve it in `career_target`; set `career_target_structure`; and map the work to 1-4 allowed `career_target_traits`. Never collapse a named target into generic career/business. Allowed traits: knowledge_advisory, analytical_research, communication_content, technical_systems, creative_aesthetic, care_healing, commercial_trade, operations_execution, leadership_authority, client_service, spiritual_esoteric, physical_competitive.
@@ -2514,12 +3127,12 @@ CATEGORY for "when will I…" life-event questions (CRITICAL):
 
 Return ONLY this JSON shape:
 {{
-  "medical_triage": {{"urgency":"none or urgent or emergency","reason":"brief semantic reason","user_message":"same-language urgent-care message, empty when none"}},
+  "medical_triage": {{"urgency":"none or clinical or urgent or emergency","reason":"brief semantic reason","user_message":"for clinical: concise same-language limitation and clinical next step; for urgent/emergency: complete same-language safety response; empty only when urgency is none"}},
   "turn_relation": "new_request" or "clarification_answer" or "follow_up",
   "explicit_remedy_request": true only for an unambiguous direct request for astrological remedies, otherwise false,
   "status": "CLARIFY" or "READY",
   "clarification_question": "short question only when status=CLARIFY",
-  "route_action": "answer" or "clarify" or "handoff",
+  "route_action": "answer" or "clarify" or "handoff" or "ack",
   "user_message": "same-language clarification or handoff message, otherwise empty",
   "dialogue_state": {{
     "request_summary": "concise resolved meaning so far",
@@ -2532,23 +3145,31 @@ Return ONLY this JSON shape:
   }},
   "chart_insights": [],
   "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
-  "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"]}} or null,
+  "chart_focus": {{"kind":"chart_specific","primary":"D9","label":"Navamsha","explicit":true,"phrase":"navamsha","requested":["D9"],"requested_houses":[1-12 integer values only when specific houses are asked]}} or null,
   "answer_mode": "explanation_mechanism" or "trait_nature" or "relationship_person" or "timing_window" or "event_prediction" or "potential_capacity" or "comparison_choice" or "decision_support" or "location_recommendation" or "factual_chart_lookup" or "dedicated_muhurat_flow" or "dedicated_partnership_flow" or "compound_plan" or "problem_diagnosis" or "remedy_action" or "topic_reading",
+  "temporal_intent": {{"event_state":"not_started or scheduled or submitted or pending_external or in_progress or awaiting_result or completed or unknown","expected_cadence":"hours_to_days or days_to_weeks or weeks_to_months or months_to_year or open","process_scale":"rapid_operational or routine_operational or extended_institutional or life_event or unknown","explicit_timeframe":true_or_false,"reason":"brief semantic reason"}},
   "response_language": "lowercase language of the latest user message, for example english, hindi, hinglish, tamil, bengali, telugu, marathi or gujarati",
   "career_subtype": "general" or "employment" or "offer" or "joining" or "promotion" or "job_change" or "resignation" or "job_security" or "business" or "business_launch" or "business_success" or "salary" or "project" or "leadership" or "government" or "foreign_career" or "return_to_work" or "workplace_conflict" or "career_stagnation" or "recognition" or "career_fit" or "job_vs_business" or "manager_relationship" or "colleague_relationship" or "subordinate_relationship" or "client_relationship" or "business_partner_relationship" or "mentor_relationship" or null,
   "career_target": "concise user-named profession, industry, practice, product, or business; null when none",
   "career_target_structure": "business" or "employment" or "freelance" or "hybrid" or "unspecified",
   "career_target_traits": ["0-4 of knowledge_advisory, analytical_research, communication_content, technical_systems, creative_aesthetic, care_healing, commercial_trade, operations_execution, leadership_authority, client_service, spiritual_esoteric, physical_competitive"],
-  "marriage_subtype": "general" or "love_vs_arranged" or "remarriage" or "engagement_vs_wedding" or "spouse_meeting" or "spouse_details" or "affair" or null,
+  "marriage_subtype": "general" or "love_vs_arranged" or "remarriage" or "engagement_vs_wedding" or "spouse_meeting" or "spouse_details" or "affair" or "current_relationship_state" or "specific_partner_decision" or null,
+  "third_party_decision_request": true or false,
+  "third_party_action": "proposal_decision" or "return_reconciliation" or "contact_response" or "commitment_marriage" or "other_voluntary_action" or null,
   "wealth_subtype": "general" or "source" or "savings_instability" or "multiple_income" or "debt_repayment" or "loan_support" or "loan_decision" or "investing_vs_trading" or "investment_risk" or "loss_vulnerability" or "windfall" or null,
   "education_subtype": "overall" or "education_timing" or "learning_style" or "subject_fit" or "course_comparison" or "higher_education" or "higher_education_timing" or "exam_capacity" or "exam_timing" or "admission_capacity" or "admission_timing" or "scholarship" or "research" or "research_timing" or "foreign_study" or "foreign_study_timing" or "education_obstacles" or "education_resume" or "education_vs_work" or "education_remedies" or null,
   "children_subtype": "children_overview" or "parenthood_capacity" or "conception_capacity" or "conception_timing" or "childbirth_timing" or "first_child_capacity" or "first_child" or "subsequent_child_capacity" or "subsequent_child" or "family_size_tendency" or "children_delay_diagnosis" or "assisted_conception" or "assisted_conception_timing" or "adoption_pathway" or "adoption_timing" or "step_parenthood" or "parenthood_decision" or "parenthood_vs_career" or "parenthood_vs_career_timing" or "parent_child_relationship" or "parent_child_reconciliation_timing" or "retrospective_child_timing" or "children_remedy" or "two_chart_children_handoff" or "child_chart_required_handoff" or "medical_safety_handoff" or "muhurat_handoff" or "legal_custody_handoff" or "fetal_sex_refusal" or null,
+  "child_order": positive_integer_when_known_or_null,
   "home_subtype": "home_overview" or "living_arrangement" or "property_potential" or "property_purchase" or "property_purchase_timing" or "property_sale_decision" or "property_sale_timing" or "property_finance" or "property_comparison" or "property_type_fit" or "joint_property" or "rental_income" or "possession_documentation_timing" or "retrospective_property_timing" or "property_portfolio_comparison" or "property_obstacles" or "construction_renovation" or "construction_timing" or "relocation_home" or "relocation_timing" or "vehicle_potential" or "vehicle_selection" or "vehicle_timing" or "property_remedy" or "property_dispute_handoff" or "muhurat_handoff" or "foreign_handoff" or "inheritance_handoff" or "vastu_handoff" or "property_business_handoff" or null,
   "foreign_subtype": "foreign_overview" or "travel_tendency" or "short_travel" or "short_travel_timing" or "long_travel" or "long_travel_timing" or "travel_purpose" or "travel_obstacles" or "retrospective_travel" or "domestic_relocation" or "domestic_relocation_timing" or "stay_vs_relocate" or "temporary_vs_permanent" or "foreign_travel" or "foreign_travel_timing" or "foreign_residence" or "foreign_residence_timing" or "permanent_settlement" or "settlement_timing" or "visa_support" or "visa_timing" or "migration_pathway" or "return_home" or "return_home_timing" or "foreign_life_adjustment" or "foreign_obstacles" or "foreign_remedy" or "location_comparison" or "location_recommendation_handoff" or "legal_immigration_handoff" or "muhurat_handoff" or "travel_safety_handoff" or "other_person_handoff" or null,
+  "nakshatra_subtype": "birth_star_overview" or "ascendant_nakshatra" or "planet_nakshatra" or "full_nakshatra_profile" or "pada_expression" or "nakshatra_dispositor_chain" or "topic_nakshatra_analysis" or "nakshatra_timing" or "special_nakshatra_conditions" or "nakshatra_remedy" or "naming_syllable" or null,
+  "nakshatra_target_planet": "Sun/Moon/Mars/Mercury/Jupiter/Venus/Saturn/Rahu/Ketu or null",
+  "nakshatra_topic": "general/personality/emotions/career/relationship/wealth/health/spirituality or null",
   "education_target": "concise user-named subject, course, exam, degree or research area; null when none",
-  "education_target_traits": ["0-4 of analytical_quantitative, language_communication, technical_engineering, creative_design, biological_care, legal_social, commercial_management, research_depth, disciplined_memory, practical_applied"],
+  "education_target_traits": ["0-4 of analytical_quantitative, language_communication, technical_engineering, creative_design, biological_care, clinical_health, legal_social, commercial_management, research_depth, disciplined_memory, practical_applied"],
   "education_options": [{{"label":"every explicitly named course/subject/degree choice", "traits":["0-4 allowed education_target_traits describing this option's actual demands"]}}],
-  "target_subject_key": "self" or "spouse" or "wife" or "husband" or "partner" or "child" or "first_child" or "second_child" or "third_child" or "mother" or "father" or "sibling" or "brother" or "sister" or "younger_brother" or "younger_sister" or "younger_sibling" or "elder_brother" or "elder_sister" or "elder_sibling" or "maternal_uncle" or "uncle",
+  "target_subject_key": "self" or "spouse" or "wife" or "husband" or "partner" or "child" or "first_child" or "second_child" or "third_child" or "mother" or "father" or "sibling" or "brother" or "sister" or "younger_brother" or "younger_sister" or "younger_sibling" or "elder_brother" or "elder_sister" or "elder_sibling" or "maternal_uncle" or "uncle" or "mother_in_law" or "father_in_law" or "maternal_grandmother" or "maternal_grandfather" or "paternal_grandmother" or "paternal_grandfather",
+  "target_subject_keys": ["all explicitly named compatible targets; one item for a single target"],
   "needs_year_clarification": false,
   "daily_intent_confirmed": true or false,
   "daily_activity_label": "concise language-neutral description of the exact-day activity, or null",
@@ -2559,6 +3180,7 @@ Return ONLY this JSON shape:
     "specific_date_basis":"explicit_user_day or relative_user_day or not_date_bound",
     "requested_chart":"D1/D2/.../D60/Karkamsa/Swamsa or null",
     "requested_fact":"LLM-normalized fact requested or null",
+    "requested_houses":["integer house numbers 1-12 explicitly requested; empty otherwise"],
     "spouse_detail_scope":"profession or location or appearance or combined or null",
     "prior_marriage_context":"LLM-normalized prior marriage/legal status or null",
     "location_scope":"india or abroad or both or null",
@@ -2621,10 +3243,25 @@ Return ONLY this JSON shape:
             response = None
             gemini_start = time.time()
             last_error: Exception | None = None
-            first_request_timeout = _env_float("INSTANT_INTENT_ROUTER_TIMEOUT_S", 8.0)
-            retry_request_timeout = _env_float("INSTANT_INTENT_ROUTER_RETRY_TIMEOUT_S", 10.0)
-            first_wall_timeout = max(first_request_timeout + 2.0, _env_float("INSTANT_INTENT_ROUTER_WALL_TIMEOUT_S", 10.0))
-            retry_wall_timeout = max(retry_request_timeout + 2.0, _env_float("INSTANT_INTENT_ROUTER_RETRY_WALL_TIMEOUT_S", 12.0))
+            openai_router = provider == CHAT_LLM_OPENAI
+            first_request_timeout = _env_float(
+                "INSTANT_INTENT_ROUTER_TIMEOUT_S", 15.0 if openai_router else 8.0
+            )
+            retry_request_timeout = _env_float(
+                "INSTANT_INTENT_ROUTER_RETRY_TIMEOUT_S", 20.0 if openai_router else 10.0
+            )
+            first_wall_timeout = max(
+                first_request_timeout + 2.0,
+                _env_float(
+                    "INSTANT_INTENT_ROUTER_WALL_TIMEOUT_S", 17.0 if openai_router else 10.0
+                ),
+            )
+            retry_wall_timeout = max(
+                retry_request_timeout + 2.0,
+                _env_float(
+                    "INSTANT_INTENT_ROUTER_RETRY_WALL_TIMEOUT_S", 22.0 if openai_router else 12.0
+                ),
+            )
             for attempt in range(2):
                 try:
                     per_request_timeout = first_request_timeout if attempt == 0 else retry_request_timeout
@@ -2811,8 +3448,9 @@ Invalid previous JSON:
         except Exception as e:
             total_time = time.time() - intent_start
             logger.exception(
-                "instant_intent_classification_failed total_s=%.3f error=%s",
+                "instant_intent_classification_failed total_s=%.3f error_type=%s error=%r",
                 total_time,
+                type(e).__name__,
                 e,
             )
             if (
@@ -3164,7 +3802,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
 
         CHART-FOCUS DETECTION:
         Decide semantically, in the user's language, whether they want a specific chart/lens read rather than a life-topic reading.
-        - If the asked object is a named varga/Jaimini chart itself (any language or script), set `chart_focus` with explicit=true and canonical primary (D1–D60, Karkamsa, Swamsa).
+        - If the asked object is a named varga/Jaimini chart itself or a specified house within one (any language or script), set `chart_focus` with explicit=true and canonical primary (D1–D60, Karkamsa, Swamsa). For a house request include exact integer `requested_houses`; use D1 when no other chart is named.
         - Examples of meaning that SHOULD set `chart_focus`: analyzing D10, reading navamsha/द्वादशांश/कारकांश/Swamsa, "career in d10 tell".
         - Examples that should NOT set `chart_focus`: career/marriage/life from "my chart", a period outlook that only mentions a varga as support.
         - Mentioning "chart" alone is NOT enough. Only set `chart_focus` when a specific lens/chart is actually the requested object.
@@ -3181,7 +3819,8 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
                 "label": "Lagna or D10 or Navamsha",
                 "explicit": true,
                 "phrase": "the phrase or implied lens you detected",
-                "requested": ["D10"]
+                "requested": ["D10"],
+                "requested_houses": ["integer house numbers 1-12, only when explicitly asked"]
             }} or null,
             "daily_intent_confirmed": true or false,
             "extracted_context": {{ "timeframe": "2025", "aspect": "promotion", "specific_date": "YYYY-MM-DD only when daily_intent_confirmed=true", "specific_date_basis": "explicit_user_day or relative_user_day or not_date_bound", "location_scope": "india or abroad or both or null", "awaiting_location_scope": true or false }},
@@ -3199,7 +3838,7 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
             }}
         }}
 
-        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, learning, travel, visa, foreign, gain, wish, general, son, daughter, mother, father, spouse, siblings, children, family, soul, spirituality, purpose, dharma, vehicles, timing
+        Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, learning, travel, visa, foreign, gain, wish, general, son, daughter, mother, father, spouse, siblings, children, family, soul, spirituality, purpose, dharma, vehicles, nakshatra, birth_star, timing
         """
         
         model = self._get_model()

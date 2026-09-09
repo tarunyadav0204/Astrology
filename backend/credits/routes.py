@@ -26,7 +26,7 @@ from .instant_billing import (
     start_session as start_instant_billing_session,
 )
 from utils.admin_settings import get_chart_guide_video_url, get_nakshatra_guide_videos
-from utils.llm_pricing import deepseek_rate_usd_per_million, mixed_stage_cost_usd
+from utils.llm_pricing import deepseek_rate_usd_per_million, mixed_stage_cost_usd, openai_rate_usd_per_million
 
 router = APIRouter()
 credit_service = CreditService()
@@ -4271,6 +4271,9 @@ def _question_cost_rate_for_model(
     deepseek_rate = deepseek_rate_usd_per_million(m, priced_at=priced_at)
     if deepseek_rate is not None:
         return deepseek_rate
+    openai_rate = openai_rate_usd_per_million(m)
+    if openai_rate is not None:
+        return openai_rate
     rates = {
         "models/gemini-3.1-flash-lite": {"in_le": 0.25, "in_gt": 0.25, "cached_in_le": 0.025, "cached_in_gt": 0.025, "out_le": 1.50, "out_gt": 1.50},
         "models/gemini-3.1-pro-preview": {"in_le": 2.00, "in_gt": 4.00, "cached_in_le": 0.20, "cached_in_gt": 0.40, "out_le": 12.00, "out_gt": 18.00},

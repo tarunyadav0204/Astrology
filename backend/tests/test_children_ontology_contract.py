@@ -19,8 +19,9 @@ from chat.instant_chat_pipeline import (  # noqa: E402
     _is_retrospective_event_request,
     _rank_historical_event_periods,
     _requested_charts_from_intent,
+    _strip_internal_scoring,
 )
-from instant_chat_v2.children import BOUNDARY_CHILDREN_SUBTYPES, CHILDREN_PROFILES, TIMING_CHILDREN_SUBTYPES, children_profile  # noqa: E402
+from instant_chat_v2.children import BOUNDARY_CHILDREN_SUBTYPES, CHILDREN_PROFILES, TIMING_CHILDREN_SUBTYPES, child_order_house, children_profile  # noqa: E402
 from instant_chat_v2.children_calculation import _house_condition, build_children_foundation  # noqa: E402
 from instant_chat_v2.children_graph_policy import ChildrenGraphPolicyStore  # noqa: E402
 from instant_chat_v2.children_graph_runtime import children_graph_runtime_key, compare_children_graph_policy  # noqa: E402
@@ -73,9 +74,9 @@ QUESTION_MATRIX = [
     ("Do our charts jointly support having children?", "two_chart_children_handoff", "dedicated_partnership_flow", "two_chart_children_handoff"),
     ("What career will my child choose?", "child_chart_required_handoff", "handoff", "child_chart_required_handoff"),
     ("Will my child be healthy?", "child_chart_required_handoff", "handoff", "child_chart_required_handoff"),
-    ("Will my pregnancy be healthy?", "medical_safety_handoff", "handoff", "medical_safety_handoff"),
-    ("Will I miscarry again?", "medical_safety_handoff", "handoff", "medical_safety_handoff"),
-    ("Is this pregnancy symptom dangerous?", "medical_safety_handoff", "handoff", "medical_safety_handoff"),
+    ("Will my pregnancy be healthy?", "medical_safety_handoff", "topic_reading", "medical_safety_handoff"),
+    ("Will I miscarry again?", "medical_safety_handoff", "topic_reading", "medical_safety_handoff"),
+    ("Is this pregnancy symptom dangerous?", "medical_safety_handoff", "topic_reading", "medical_safety_handoff"),
     ("Which embryo-transfer date has the cleanest Panchang?", "muhurat_handoff", "dedicated_muhurat_flow", "muhurat_handoff"),
     ("Will I get custody of my child?", "legal_custody_handoff", "handoff", "legal_custody_handoff"),
     ("Will I have a son or daughter?", "fetal_sex_refusal", "safety_refusal", "fetal_sex_refusal"),
@@ -88,7 +89,7 @@ def _required_houses(key: str) -> list[int]:
 
 def _context(key: str, *, timing: bool = False) -> dict:
     policy = ChildrenGraphPolicyStore().require(key)
-    boundary = key in BOUNDARY_CHILDREN_SUBTYPES
+    boundary = key in BOUNDARY_CHILDREN_SUBTYPES and key != "medical_safety_handoff"
     availability = {
         "d1": not boundary, "d7": not boundary,
         "d10": "children:D10" in policy.required_factors,
@@ -167,6 +168,52 @@ def test_first_and_subsequent_child_routes_are_materially_distinct() -> None:
     assert first != later
 
 
+def test_ambiguous_baby_timing_requires_child_order_before_calculation() -> None:
+    intent = {
+        "status": "READY",
+        "route_action": "answer",
+        "category": "pregnancy",
+        "children_subtype": "childbirth_timing",
+        "answer_mode": "event_prediction",
+        "clarification_question": "Kya yeh aapka pehla, doosra, teesra ya uske baad ka baby hoga?",
+    }
+    apply_children_routing_guards(intent)
+    assert intent["status"] == "CLARIFY"
+    assert intent["route_action"] == "clarify"
+    assert intent["focus_houses"] == []
+    assert intent["extracted_context"]["awaiting_child_order"] is True
+
+
+def test_numbered_child_timing_selects_exact_odd_house_progression() -> None:
+    assert [child_order_house(order) for order in (1, 2, 3, 4, 5)] == [5, 7, 9, 11, 1]
+    for order, expected_house, expected_subtype in (
+        (1, 5, "first_child"),
+        (2, 7, "subsequent_child"),
+        (3, 9, "subsequent_child"),
+    ):
+        intent = {
+            "status": "READY", "category": "progeny",
+            "children_subtype": "subsequent_child", "answer_mode": "event_prediction",
+            "child_order": order,
+        }
+        apply_children_routing_guards(intent)
+        assert intent["status"] == "READY"
+        assert intent["children_subtype"] == expected_subtype
+        assert intent["focus_houses"][0] == expected_house
+
+
+def test_live_composer_boundary_removes_internal_scoring_fields() -> None:
+    value = {
+        "score": 65,
+        "relevance_score": 65,
+        "score_delta": 12,
+        "route": {"verdict": "supported", "margin": 0.4, "planet": "Venus"},
+    }
+    assert _strip_internal_scoring(value) == {
+        "route": {"verdict": "supported", "planet": "Venus"},
+    }
+
+
 def test_conception_childbirth_assisted_and_adoption_use_different_chains() -> None:
     store = ChildrenGraphPolicyStore()
     conception = set(store.require("conception_timing").required_factors)
@@ -190,8 +237,11 @@ def test_routing_guard_requests_only_real_route_charts() -> None:
     assert decision["divisional_charts"] == ["D1", "D7", "D10"]
     boundary = {"category": "pregnancy", "children_subtype": "medical_safety_handoff"}
     apply_children_routing_guards(boundary)
-    assert boundary["route_action"] == "handoff"
-    assert boundary["divisional_charts"] == []
+    assert boundary["route_action"] == "answer"
+    assert boundary["answer_mode"] == "topic_reading"
+    assert boundary["needs_transits"] is False
+    assert boundary["divisional_charts"] == ["D1", "D7"]
+    assert boundary["medical_triage"]["urgency"] == "clinical"
 
 
 def test_instant_finalizer_preserves_children_subtype_and_chart_contract() -> None:
@@ -320,9 +370,10 @@ def test_reference_chart_children_remedy_pipeline_uses_real_remedy_engine() -> N
 
 
 def test_complete_foundation_matches_every_graph_route() -> None:
-    modes = {key: "event_prediction" if key in TIMED_KEYS else "handoff" if key in BOUNDARY_CHILDREN_SUBTYPES else "remedy_action" if key == "children_remedy" else "problem_diagnosis" if key in {"children_delay_diagnosis", "parent_child_relationship"} else "decision_support" if key in {"assisted_conception", "parenthood_decision", "parenthood_vs_career"} else "potential_capacity" for key in EXPECTED_KEYS}
+    modes = {key: "event_prediction" if key in TIMED_KEYS else "handoff" if key in BOUNDARY_CHILDREN_SUBTYPES and key != "medical_safety_handoff" else "remedy_action" if key == "children_remedy" else "problem_diagnosis" if key in {"children_delay_diagnosis", "parent_child_relationship"} else "decision_support" if key in {"assisted_conception", "parenthood_decision", "parenthood_vs_career"} else "potential_capacity" for key in EXPECTED_KEYS}
     modes["children_overview"] = "topic_reading"
     modes["fetal_sex_refusal"] = "safety_refusal"
+    modes["medical_safety_handoff"] = "topic_reading"
     for key, mode in modes.items():
         comparison = compare_children_graph_policy(
             category="progeny", query_plan={"category": "progeny", "children_subtype": key, "answer_mode": mode},
@@ -333,7 +384,7 @@ def test_complete_foundation_matches_every_graph_route() -> None:
 
 
 def test_live_graph_is_authoritative_for_calculation_and_boundary_routes() -> None:
-    for key, mode in (("conception_capacity", "potential_capacity"), ("conception_timing", "event_prediction"), ("medical_safety_handoff", "handoff")):
+    for key, mode in (("conception_capacity", "potential_capacity"), ("conception_timing", "event_prediction"), ("medical_safety_handoff", "topic_reading")):
         packet = {"query_plan": {"category": "progeny", "children_subtype": key, "answer_mode": mode}, "verdict": {}, "answer_spec": {}, "verification": {}}
         resolved = apply_live_graph_policy(packet, intent=packet["query_plan"], context=_context(key, timing=key in TIMED_KEYS))
         policy = resolved["answer_spec"]["knowledge_graph_policy"]
@@ -345,7 +396,6 @@ def test_live_graph_is_authoritative_for_calculation_and_boundary_routes() -> No
 def test_boundary_answers_fail_closed_even_if_writer_hallucinates() -> None:
     expected_phrases = {
         "fetal_sex_refusal": "can’t predict or imply",
-        "medical_safety_handoff": "cannot determine whether a pregnancy is healthy",
         "two_chart_children_handoff": "needs both resolved birth charts",
         "child_chart_required_handoff": "need the child’s own chart",
         "muhurat_handoff": "dedicated Muhurat",
@@ -357,6 +407,13 @@ def test_boundary_answers_fail_closed_even_if_writer_hallucinates() -> None:
         answer = enforce_live_graph_answer("A fabricated astrological certainty.", resolved)
         assert phrase in answer
         assert "fabricated" not in answer
+
+
+def test_medical_route_is_hybrid_not_hardcoded_handoff() -> None:
+    packet = {"query_plan": {"category": "progeny", "children_subtype": "medical_safety_handoff", "answer_mode": "topic_reading"}, "verdict": {}, "answer_spec": {}, "verification": {}}
+    resolved = apply_live_graph_policy(packet, intent=packet["query_plan"], context=_context("medical_safety_handoff"))
+    assert resolved["answer_spec"]["knowledge_graph_policy"]["claim_permission"] == "children_medical_hybrid"
+    assert enforce_live_graph_answer("Bounded astrology plus medical limitation.", resolved) == "Bounded astrology plus medical limitation."
 
 
 def test_reference_chart_produces_individualized_evidence_for_all_calculated_routes() -> None:

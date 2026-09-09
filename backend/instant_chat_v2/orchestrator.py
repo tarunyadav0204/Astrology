@@ -21,6 +21,7 @@ def build_instant_v2_packet(*, question: str, intent: Dict[str, Any] | None,
     # existing Instant pipeline. Prefer its resolved fields while preserving
     # the router's structured query context and requested evidence.
     planner_intent = dict(intent or {})
+    router_category = str(planner_intent.get("category") or "").strip().lower()
     resolved_intent = instant_context.get("intent_summary")
     if isinstance(resolved_intent, dict):
         for key in (
@@ -34,6 +35,14 @@ def build_instant_v2_packet(*, question: str, intent: Dict[str, Any] | None,
         ):
             value = resolved_intent.get(key)
             if value not in (None, "", [], {}):
+                if key == "category" and router_category in {
+                    "relationship", "love", "separation", "reconciliation",
+                }:
+                    # The calculator layer may canonicalize these to
+                    # ``marriage`` to reuse house machinery. Preserve the
+                    # router's semantic branch for the graph: relationship
+                    # timing and reconnection are not marriage timing.
+                    continue
                 planner_intent[key] = value
     query_plan = build_query_plan(
         question=question, intent=planner_intent, answer_mode=answer_mode,

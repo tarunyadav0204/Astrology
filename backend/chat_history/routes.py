@@ -373,10 +373,8 @@ def _should_skip_subject_gate_for_location_clarify(
     question: str,
     conn=None,
 ) -> bool:
-    """
-    Avoid partnership/subject gates hijacking short India/abroad/both replies
-    that answer a RECOMMEND_LOCATION clarification.
-    """
+    """Use persisted semantic state, never words in the latest reply."""
+    _ = question
     try:
         state = _load_chat_history_and_state(session_id, conn=conn)
     except Exception:
@@ -386,42 +384,6 @@ def _should_skip_subject_gate_for_location_clarify(
     if extracted.get("awaiting_location_scope"):
         return True
 
-    clarification_count = int(state.get("clarification_count") or 0)
-    if clarification_count <= 0:
-        return False
-
-    try:
-        from ai.intent_router import _infer_location_scope_from_text
-
-        if _infer_location_scope_from_text(question):
-            return True
-    except Exception:
-        pass
-
-    # Last assistant turn was an intent-router clarification about place geography.
-    rows = state.get("history_rows") or []
-    for sender, content, message_type in reversed(rows):
-        if sender != "assistant":
-            continue
-        if str(message_type or "").strip().lower() != "clarification":
-            break
-        text = str(content or "").lower()
-        geo_cues = (
-            "india",
-            "abroad",
-            "overseas",
-            "both",
-            "भारत",
-            "विदेश",
-            "cities",
-            "shehar",
-            "शहर",
-            "location",
-            "place suggestions",
-        )
-        if any(cue in text for cue in geo_cues):
-            return True
-        break
     return False
 
 
@@ -3845,7 +3807,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 isinstance(extracted_context, dict)
                 and extracted_context.get("awaiting_location_scope")
             )
-            text_scope_raw = _infer_location_scope_from_text(question)
+            text_scope_raw = (
+                None if is_instant_chat
+                else _infer_location_scope_from_text(question)
+            )
 
             # Check if this is a clarification response and combine with original question
             combined_question = question
@@ -4029,6 +3994,35 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         intent["extracted_context"].pop("awaiting_location_scope", None)
                         intent["status"] = "READY"
                         intent["clarification_question"] = None
+
+            # A numbered-child timing route cannot be calculated from generic
+            # H5 evidence. If the first semantic pass omitted the same-language
+            # clarification text, ask the router to author that one missing
+            # question; application code still performs no language matching.
+            needs_child_order_retry = bool(
+                is_instant_chat
+                and isinstance(intent, dict)
+                and intent.get("_needs_child_order_clarify_retry")
+                and not force_ready
+            )
+            if needs_child_order_retry:
+                intent = await intent_router.classify_instant_intent(
+                    combined_question,
+                    history,
+                    clarification_count=clarification_count,
+                    max_clarifications=max_clarifications,
+                    language=language,
+                    force_ready=False,
+                    force_clarify=True,
+                    query_context=query_context,
+                    dialogue_state=(
+                        extracted_context.get("instant_dialogue")
+                        if isinstance(extracted_context, dict)
+                        and isinstance(extracted_context.get("instant_dialogue"), dict)
+                        else None
+                    ),
+                    latest_user_reply=question,
+                )
 
             # Ensure location asks always clarify India/abroad/both (never silently default to India,
             # except force_ready / WhatsApp plain-text channels).

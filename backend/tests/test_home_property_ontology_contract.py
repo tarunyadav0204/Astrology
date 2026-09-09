@@ -885,9 +885,9 @@ def test_every_home_timing_route_uses_its_own_event_language() -> None:
 
 
 def test_open_ended_vehicle_when_question_leads_with_next_window_not_requested_period() -> None:
-    assert _looks_like_open_ended_life_event_when(
+    assert not _looks_like_open_ended_life_event_when(
         "When will I buy a vehicle?", {"mode": "LIFESPAN_EVENT_TIMING"},
-    ) is True
+    )
     result = _home_timing_decision(
         "vehicle_timing",
         requested_period_supportive=True,

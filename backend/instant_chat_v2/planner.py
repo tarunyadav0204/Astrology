@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from calendar import monthrange
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List
 
 
@@ -44,6 +44,37 @@ def _is_retrospective_semantic_value(value: Any) -> bool:
     )
 
 
+def _operational_horizon_days(temporal: Any) -> int | None:
+    """Resolve only typed router semantics; never inspect question wording."""
+    value = temporal if isinstance(temporal, dict) else {}
+    if bool(value.get("explicit_timeframe")):
+        return None
+    state = str(value.get("event_state") or "unknown").strip().lower()
+    if state not in {"scheduled", "submitted", "pending_external", "in_progress", "awaiting_result"}:
+        return None
+    scale = str(value.get("process_scale") or "").strip().lower()
+    cadence = str(value.get("expected_cadence") or "open").strip().lower()
+    scale_days = {
+        "rapid_operational": 10,
+        "routine_operational": 45,
+        "extended_institutional": 180,
+    }
+    cadence_days = {
+        "hours_to_days": 10,
+        "days_to_weeks": 45,
+        "weeks_to_months": 120,
+        "months_to_year": 365,
+    }
+    days = scale_days.get(scale, cadence_days.get(cadence))
+    if days is None:
+        return None
+    if scale != "extended_institutional" and state in {
+        "scheduled", "submitted", "pending_external", "awaiting_result",
+    }:
+        days = min(days, 45)
+    return days
+
+
 def build_query_plan(
     *, question: str, intent: Dict[str, Any] | None, answer_mode: str,
     target_subject: Dict[str, Any] | None, language: str, as_of: Any = None,
@@ -62,9 +93,18 @@ def build_query_plan(
         (
             part.get("timeframe")
             for part in question_parts
-            if isinstance(part, dict) and part.get("timeframe") not in (None, "", {})
+            if isinstance(part, dict)
+            and isinstance(part.get("timeframe"), dict)
+            and str((part.get("timeframe") or {}).get("kind") or "none").lower() != "none"
         ),
-        None,
+        next(
+            (
+                part.get("timeframe")
+                for part in question_parts
+                if isinstance(part, dict) and part.get("timeframe") not in (None, "", {})
+            ),
+            None,
+        ),
     )
     dialogue = (
         extracted.get("instant_dialogue")
@@ -107,6 +147,26 @@ def build_query_plan(
     semantic_value = (semantic_timeframe or {}).get("value")
     semantic_duration = (semantic_timeframe or {}).get("duration")
     duration_months = (semantic_timeframe or {}).get("duration_months")
+    duration_days = (semantic_timeframe or {}).get("duration_days")
+    if duration_days is None and (semantic_timeframe or {}).get("duration_weeks") is not None:
+        try:
+            duration_days = int((semantic_timeframe or {}).get("duration_weeks")) * 7
+        except (TypeError, ValueError):
+            duration_days = None
+    operational_days = _operational_horizon_days(intent.get("temporal_intent"))
+    if operational_days is not None:
+        # Defense in depth: even if an upstream model emitted an implicit
+        # multi-month bounded_future, typed active-process semantics own the
+        # horizon unless the user explicitly supplied one.
+        duration_days = operational_days
+        duration_months = None
+        semantic_timeframe = {
+            "kind": "bounded_future",
+            "duration_days": operational_days,
+            "granularity": "week" if operational_days <= 45 else "month_window",
+            "source": "semantic_operational_cadence",
+        }
+        semantic_kind = "bounded_future"
     if duration_months is None:
         try:
             amount = int((semantic_timeframe or {}).get("amount"))
@@ -165,6 +225,17 @@ def build_query_plan(
             "event_prediction", "event_timing", "lifetime_event_timing", "timing_window",
         }
     )
+    open_future_window = bool(
+        semantic_kind == "open_future"
+        and str(answer_mode or "").strip().lower() in {
+            "event_prediction", "event_timing", "lifetime_event_timing", "timing_window",
+        }
+    ) or bool(
+        str(answer_mode or "").strip().lower() == "event_prediction"
+        and not retrospective
+        and resolved_period_kind != "day"
+        and semantic_kind in {"", "none"}
+    )
     exact_day = bool(
         resolved_period_kind == "day"
         or str(intent.get("mode") or "").strip().upper() == "PREDICT_DAILY"
@@ -190,18 +261,23 @@ def build_query_plan(
     rolling_duration_kinds = {"bounded_future", "rolling_window"}
     if retrospective:
         horizon_end = as_of_day
-    elif next_event_window:
+    elif next_event_window or open_future_window:
         # The one-day current period is only the scan anchor for an open-ended
         # "when will I" request. Treating it as a hard answer horizon forbids
         # every future window that the event scanner correctly calculated.
         horizon_end = None
+    elif duration_days is not None and semantic_kind in rolling_duration_kinds:
+        try:
+            horizon_end = (datetime.fromisoformat(str(as_of_day)) + timedelta(days=max(1, int(duration_days)))).date().isoformat()
+        except (TypeError, ValueError):
+            horizon_end = None
     elif duration_months is not None and semantic_kind in rolling_duration_kinds:
         horizon_end = _add_months(as_of_day, duration_months)
     else:
         horizon_end = resolved_horizon_end or _add_months(as_of_day, duration_months)
     if retrospective:
         relation = "past"
-    elif next_event_window:
+    elif next_event_window or open_future_window:
         relation = "current_to_future"
     elif retrospective_signal and _is_retrospective_semantic_value(relation):
         # Preserve grammatical/semantic past tense for static readings without
@@ -241,6 +317,7 @@ def build_query_plan(
             else query_context.get("career_target_traits") or []
         ),
         "marriage_subtype": intent.get("marriage_subtype") or query_context.get("marriage_subtype"),
+        "third_party_action": intent.get("third_party_action") or query_context.get("third_party_action"),
         "wealth_subtype": intent.get("wealth_subtype") or query_context.get("wealth_subtype"),
         "education_subtype": intent.get("education_subtype") or query_context.get("education_subtype"),
         "education_target": intent.get("education_target") or query_context.get("education_target"),
@@ -254,9 +331,24 @@ def build_query_plan(
             if isinstance(intent.get("education_options"), list)
             else query_context.get("education_options") or []
         ),
+        "education_compound_parts": (
+            intent.get("education_compound_parts")
+            if isinstance(intent.get("education_compound_parts"), dict)
+            else {}
+        ),
         "children_subtype": intent.get("children_subtype") or query_context.get("children_subtype"),
+        "child_order": intent.get("child_order") or query_context.get("child_order"),
+        "medical_safety": (
+            dict(intent.get("medical_triage") or {})
+            if isinstance(intent.get("medical_triage"), dict)
+            and str((intent.get("medical_triage") or {}).get("urgency") or "").strip().lower() == "clinical"
+            else None
+        ),
         "home_subtype": intent.get("home_subtype") or query_context.get("home_subtype"),
         "foreign_subtype": intent.get("foreign_subtype") or query_context.get("foreign_subtype"),
+        "nakshatra_subtype": intent.get("nakshatra_subtype") or query_context.get("nakshatra_subtype"),
+        "nakshatra_target_planet": intent.get("nakshatra_target_planet") or query_context.get("nakshatra_target_planet"),
+        "nakshatra_topic": intent.get("nakshatra_topic") or query_context.get("nakshatra_topic"),
         "prior_marriage_context": extracted.get("prior_marriage_context"),
         "answer_mode": str(answer_mode or "topic_reading"),
         "route_action": route_action,
@@ -273,6 +365,7 @@ def build_query_plan(
             "as_of": as_of_day,
             "horizon_end": horizon_end,
             "granularity": "day" if exact_day else semantic_kind,
+            "operational_cadence": intent.get("temporal_intent") or None,
             "is_exact_day": exact_day,
             "target_date": target_day,
             "retrospective": retrospective,
@@ -290,6 +383,15 @@ def build_query_plan(
         "special_flow": {
             "requested_chart": extracted.get("requested_chart"),
             "requested_fact": extracted.get("requested_fact"),
+            "requested_houses": [
+                int(value)
+                for value in (
+                    extracted.get("requested_houses")
+                    or ((intent.get("chart_focus") or {}).get("requested_houses") if isinstance(intent.get("chart_focus"), dict) else [])
+                    or []
+                )
+                if str(value).isdigit() and 1 <= int(value) <= 12
+            ],
             "spouse_detail_scope": extracted.get("spouse_detail_scope"),
             "location_scope": extracted.get("location_scope"),
             "location_goal": extracted.get("location_goal") or category,
@@ -302,6 +404,17 @@ def build_query_plan(
         },
         "requested_evidence": requested,
         "requested_precision": query_context.get("requested_precision") or "best_supported",
+        "question_parts": [
+            {
+                "part_id": part.get("part_id"),
+                "life_domain": part.get("life_domain"),
+                "event_profile": part.get("event_profile"),
+                "intent_families": list(part.get("intent_families") or []),
+                "timeframe": dict(part.get("timeframe") or {}),
+            }
+            for part in question_parts[:6]
+            if isinstance(part, dict)
+        ],
         "comparison_options": [
             {
                 "part_id": part.get("part_id"),

@@ -211,87 +211,12 @@ def should_offer_remedy_cta(
         return True
     if mode == "problem_diagnosis":
         return True
-    q = str(question or "").lower()
-    problem_markers = (
-        "problem", "issue", "anxiety", "stress", "why am i", "why do i",
-        "blocked", "stuck", "struggling", "remedy", "upay", "what should i do",
-        "what can i do", "how to fix",
-    )
-    if any(m in q for m in problem_markers):
-        return True
+    _ = question
     if mode in {"topic_reading", "timing_window", "potential_capacity"} and cat in {
         "health", "career", "job", "marriage", "love", "relationship", "wealth", "money", "finance",
     }:
         return True
     return False
-
-
-def _question_script_family(question: str, language: str = "") -> str:
-    lang = str(language or "").strip().lower()
-    if lang in {"hindi", "hi", "hinglish", "devanagari"}:
-        return "hindi"
-    if re.search(r"[\u0900-\u097F]", str(question or "")):
-        return "hindi"
-    return "english"
-
-
-def _fallback_remedy_fomo_copy(category: str, question: str, language: str = "") -> Dict[str, str]:
-    """Last-resort FOMO card copy when the model omitted NEXT_ACTION_META."""
-    family = _question_script_family(question, language)
-    cat = str(category or "").strip().lower()
-    if family == "hindi":
-        by_cat = {
-            "health": (
-                "स्वास्थ्य दबाव अभी सक्रिय है",
-                "इस दशा में चार्ट की कमज़ोरी तेज़ हो सकती है — सही समय पर उपाय से संतुलन बेहतर रहता है।",
-                "मेरे उपाय देखें",
-            ),
-            "career": (
-                "करियर का यह मोड़ अभी खुला है",
-                "सक्रिय दशा में सही उपाय रास्ता साफ़ कर सकते हैं — देरी से असर कम होता है।",
-                "करियर उपाय देखें",
-            ),
-            "marriage": (
-                "रिश्तों का दबाव अभी चरम पर है",
-                "इस चक्र में उपाय से रुकावटें हल्की हो सकती हैं — अभी देखना फायदेमंद है।",
-                "रिश्ता उपाय देखें",
-            ),
-        }
-        title, reason, button = by_cat.get(
-            cat,
-            (
-                "यह दबाव अभी सक्रिय है",
-                "चार्ट में दिखी कमज़ोरी इस दशा में बढ़ सकती है — समय पर उपाय ज़्यादा असरदार रहते हैं।",
-                "उपाय देखें",
-            ),
-        )
-        return {"title": title, "reason": reason, "follow_up": button}
-    by_cat_en = {
-        "health": (
-            "Your health pressure is peaking now",
-            "This dasha window can intensify the chart stress you just saw — timely remedies land better.",
-            "Show my health remedies",
-        ),
-        "career": (
-            "Your career window is open now",
-            "Aligned remedies in this active period can clear blocks faster — worth opening before it passes.",
-            "Show my career remedies",
-        ),
-        "marriage": (
-            "Relationship pressure is active now",
-            "This cycle responds well to targeted remedies — see what fits before the phase shifts.",
-            "Show relationship remedies",
-        ),
-    }
-    title, reason, button = by_cat_en.get(
-        cat,
-        (
-            "This chart pressure is active now",
-            "The vulnerability in your reading is strongest in the current dasha — remedies work best when matched to this phase.",
-            "Show my remedies",
-        ),
-    )
-    return {"title": title, "reason": reason, "follow_up": button}
 
 
 def _complete_remedy_fomo_copy(
@@ -301,20 +226,18 @@ def _complete_remedy_fomo_copy(
     question: str,
     language: str = "",
 ) -> Dict[str, Any]:
-    """Fill missing remedy-card fields; keep any LLM-provided FOMO copy."""
-    fb = _fallback_remedy_fomo_copy(category, question, language)
+    """Keep complete model-authored remedy-card copy in any language."""
+    _ = (category, question, language)
     follow = [
         str(q).strip()
         for q in (next_action.get("follow_up_questions") or [])
         if str(q).strip()
     ]
-    if not follow:
-        follow = [fb["follow_up"]]
     return {
         **next_action,
         "type": "remedy",
-        "title": str(next_action.get("title") or "").strip() or fb["title"],
-        "reason": str(next_action.get("reason") or "").strip() or fb["reason"],
+        "title": str(next_action.get("title") or "").strip(),
+        "reason": str(next_action.get("reason") or "").strip(),
         "confidence": str(next_action.get("confidence") or "medium").strip().lower() or "medium",
         "follow_up_questions": follow[:3],
         "source": str(next_action.get("source") or "merge").strip() or "merge",
@@ -356,15 +279,10 @@ def ensure_remedy_cta_next_action(
         remedy_followup_active=remedy_followup_active,
     ):
         return next_action if action_type else None
-    fb = _fallback_remedy_fomo_copy(category, question, language)
-    return {
-        "type": "remedy",
-        "title": fb["title"],
-        "reason": fb["reason"],
-        "confidence": "medium",
-        "follow_up_questions": [fb["follow_up"]],
-        "source": "fallback",
-    }
+    # Do not manufacture an English/Hindi-only card when the multilingual
+    # composer omitted it. Suppressing the optional CTA is safer than showing
+    # the wrong language or inventing urgency.
+    return None
 
 
 def is_remedy_followup_request(intent_or_context: Optional[Dict[str, Any]]) -> bool:
@@ -422,20 +340,13 @@ def is_remedy_followup_request(intent_or_context: Optional[Dict[str, Any]]) -> b
     return False
 
 
-_REMEDY_CHAIN_MARKERS = (
-    "remedy-only",
-    "generate a remedy-only",
-    "give practical remedies only",
-    "do not give a general chart reading",
-)
+_REMEDY_CHAIN_MARKERS: tuple[str, ...] = ()
 
 
 def is_remedy_chain_question(text: Optional[str]) -> bool:
-    """Detect remedy CTA follow-up text merged into a clarification chain."""
-    lowered = str(text or "").strip().lower()
-    if not lowered:
-        return False
-    return any(marker in lowered for marker in _REMEDY_CHAIN_MARKERS)
+    """Legacy compatibility shim; remedy state must arrive as structured context."""
+    _ = text
+    return False
 
 
 def resolve_remedy_followup_active(
@@ -446,7 +357,8 @@ def resolve_remedy_followup_active(
     """True only for explicit Remedies CTA / chain text — never from answer_mode alone."""
     if is_remedy_followup_request(intent_or_context):
         return True
-    return is_remedy_chain_question(combined_question)
+    _ = combined_question
+    return False
 
 
 def clamp_remedy_modes_on_intent(result: Optional[Dict[str, Any]], question: str = "") -> None:
@@ -456,15 +368,7 @@ def clamp_remedy_modes_on_intent(result: Optional[Dict[str, Any]], question: str
     """
     if not isinstance(result, dict):
         return
-    q = str(question or "").strip().lower()
-    # Narrow deterministic protection for an explicit remedy noun. The
-    # multilingual router remains authoritative for indirect requests, but a
-    # direct ask such as "Which calculated remedy is most relevant?" must not
-    # be downgraded merely because the model omitted its boolean flag.
-    direct_remedy_noun = bool(re.search(r"\b(remed(?:y|ies)|upay(?:a|am)?s?)\b", q))
-    negated = bool(re.search(r"\b(no|not|without|don't|do not)\b[^.?!]{0,24}\bremed(?:y|ies)\b", q))
-    if direct_remedy_noun and not negated:
-        result["explicit_remedy_request"] = True
+    _ = question
     if is_remedy_followup_request(result):
         result["answer_mode"] = "remedy_action"
         mode = str(result.get("mode") or "").strip().upper()
@@ -473,14 +377,7 @@ def clamp_remedy_modes_on_intent(result: Optional[Dict[str, Any]], question: str
         return
 
     if str(result.get("answer_mode") or "").strip() == "remedy_action":
-        q = str(question or "").lower()
-        problem_markers = (
-            "why", "problem", "issue", "stuck", "delay", "blocked", "struggle",
-            "anxiety", "stress", "difficult", "trouble", "leak", "loss",
-        )
-        result["answer_mode"] = (
-            "problem_diagnosis" if any(m in q for m in problem_markers) else "topic_reading"
-        )
+        result["answer_mode"] = "topic_reading"
 
     if str(result.get("mode") or "").strip().upper() == "RECOMMEND_REMEDY_FOR_PROBLEM":
         result["mode"] = "ANALYZE_ROOT_CAUSE"

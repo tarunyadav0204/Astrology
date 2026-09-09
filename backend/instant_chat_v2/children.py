@@ -62,7 +62,10 @@ CHILDREN_PROFILES: dict[str, dict[str, Any]] = {
     "children_remedy": {"houses": [2, 5, 11, 8], "planets": ["Jupiter", "Moon", "Saturn", "Rahu", "Ketu"]},
     "two_chart_children_handoff": {"houses": [], "planets": []},
     "child_chart_required_handoff": {"houses": [], "planets": []},
-    "medical_safety_handoff": {"houses": [], "planets": []},
+    # A clinical question receives a bounded non-diagnostic pregnancy climate
+    # reading. These factors never authorize a test, diagnosis, fetal-health,
+    # growth, loss, or treatment-outcome claim.
+    "medical_safety_handoff": {"houses": [5, 2, 11, 8, 6, 12], "planets": ["Jupiter", "Moon", "Venus", "Mars", "Saturn", "Rahu", "Ketu"]},
     "muhurat_handoff": {"houses": [], "planets": []},
     "legal_custody_handoff": {"houses": [], "planets": []},
     "fetal_sex_refusal": {"houses": [], "planets": []},
@@ -75,7 +78,7 @@ TIMING_CHILDREN_SUBTYPES = frozenset({
 })
 
 BOUNDARY_CHILDREN_SUBTYPES = frozenset({
-    "two_chart_children_handoff", "child_chart_required_handoff", "medical_safety_handoff",
+    "two_chart_children_handoff", "child_chart_required_handoff",
     "muhurat_handoff", "legal_custody_handoff", "fetal_sex_refusal",
 })
 
@@ -107,3 +110,14 @@ def is_children_timing(subtype: Any, answer_mode: Any = None) -> bool:
             "month_timing", "timing_window", "daily_forecast",
         }
     )
+
+
+def child_order_house(value: Any) -> int | None:
+    """Return the odd-house progression from H5 for a numbered child."""
+    try:
+        order = int(value)
+    except (TypeError, ValueError):
+        return None
+    if order < 1:
+        return None
+    return ((5 - 1 + (order - 1) * 2) % 12) + 1

@@ -41,7 +41,181 @@ def _ensure_google_stub():
 _ensure_google_stub()
 
 import ai.intent_router as intent_router_module
-from ai.intent_router import IntentRouter
+from ai.intent_router import IntentRouter, apply_semantic_resolution_cadence
+
+
+def test_semantic_operational_cadence_bounds_any_active_process_without_text_parsing():
+    for category, state, cadence, expected_days in (
+        ("career", "pending_external", "days_to_weeks", 45),
+        ("education", "awaiting_result", "weeks_to_months", 45),
+        ("property", "in_progress", "months_to_year", 365),
+        ("relationship", "submitted", "hours_to_days", 10),
+    ):
+        result = {
+            "category": category,
+            "answer_mode": "event_prediction",
+            "temporal_intent": {
+                "event_state": state,
+                "expected_cadence": cadence,
+                "explicit_timeframe": False,
+            },
+            "evidence_plan": {
+                "question_parts": [{"part_id": "p1", "timeframe": {"kind": "open_future"}}]
+            },
+            "extracted_context": {},
+        }
+        apply_semantic_resolution_cadence(result)
+        timeframe = result["evidence_plan"]["question_parts"][0]["timeframe"]
+        assert timeframe["kind"] == "bounded_future"
+        assert timeframe["duration_days"] == expected_days
+
+
+def test_pending_single_step_is_capped_even_when_router_cadence_is_too_broad():
+    result = {
+        "answer_mode": "event_prediction",
+        "temporal_intent": {
+            "event_state": "pending_external",
+            "expected_cadence": "weeks_to_months",
+            "explicit_timeframe": False,
+        },
+        "evidence_plan": {
+            "question_parts": [{"part_id": "p1", "timeframe": {"kind": "open_future"}}]
+        },
+    }
+    apply_semantic_resolution_cadence(result)
+    timeframe = result["evidence_plan"]["question_parts"][0]["timeframe"]
+    assert timeframe["duration_days"] == 45
+
+
+def test_explicit_extended_institutional_process_can_use_longer_horizon():
+    result = {
+        "answer_mode": "event_prediction",
+        "temporal_intent": {
+            "event_state": "pending_external",
+            "expected_cadence": "months_to_year",
+            "process_scale": "extended_institutional",
+            "explicit_timeframe": False,
+        },
+        "evidence_plan": {
+            "question_parts": [{"part_id": "p1", "timeframe": {"kind": "open_future"}}]
+        },
+    }
+    apply_semantic_resolution_cadence(result)
+    timeframe = result["evidence_plan"]["question_parts"][0]["timeframe"]
+    assert timeframe["duration_days"] == 180
+
+
+def test_routine_operational_scale_overrides_an_overly_broad_cadence():
+    result = {
+        "answer_mode": "event_prediction",
+        "temporal_intent": {
+            "event_state": "pending_external",
+            "expected_cadence": "months_to_year",
+            "process_scale": "routine_operational",
+            "explicit_timeframe": False,
+        },
+        "evidence_plan": {
+            "question_parts": [{"part_id": "p1", "timeframe": {"kind": "open_future"}}]
+        },
+    }
+    apply_semantic_resolution_cadence(result)
+    timeframe = result["evidence_plan"]["question_parts"][0]["timeframe"]
+    assert timeframe["duration_days"] == 45
+
+
+def test_implicit_router_bounded_window_is_replaced_by_operational_scope():
+    result = {
+        "answer_mode": "event_prediction",
+        "temporal_intent": {
+            "event_state": "pending_external",
+            "expected_cadence": "weeks_to_months",
+            "process_scale": "routine_operational",
+            "explicit_timeframe": False,
+        },
+        "evidence_plan": {
+            "question_parts": [{
+                "part_id": "p1",
+                "timeframe": {"kind": "bounded_future", "duration_months": 6},
+            }]
+        },
+    }
+    apply_semantic_resolution_cadence(result)
+    timeframe = result["evidence_plan"]["question_parts"][0]["timeframe"]
+    assert timeframe == {
+        "kind": "bounded_future",
+        "duration_days": 45,
+        "granularity": "week",
+        "source": "semantic_operational_cadence",
+    }
+
+
+def test_semantic_operational_cadence_never_overrides_user_stated_horizon():
+    result = {
+        "answer_mode": "event_prediction",
+        "temporal_intent": {
+            "event_state": "pending_external",
+            "expected_cadence": "days_to_weeks",
+            "explicit_timeframe": True,
+        },
+        "evidence_plan": {
+            "question_parts": [{"part_id": "p1", "timeframe": {"kind": "bounded_future", "duration_months": 6}}]
+        },
+    }
+    apply_semantic_resolution_cadence(result)
+    assert result["evidence_plan"]["question_parts"][0]["timeframe"]["duration_months"] == 6
+
+
+def test_love_marriage_pathway_guard_removes_generic_timing_contract():
+    result = {
+        "category": "marriage",
+        "marriage_subtype": "love_vs_arranged",
+        "mode": "LIFESPAN_EVENT_TIMING",
+        "answer_mode": "event_prediction",
+        "needs_transits": True,
+        "period_window": {"kind": "current", "start": "2026-09-07", "end": "2026-09-07"},
+        "evidence_plan": {
+            "question_parts": [{
+                "life_domain": "marriage",
+                "event_profile": "marriage",
+                "intent_families": ["event_timing"],
+            }],
+            "evidence_needs": [
+                {"kind": "future_dasha_event_windows"},
+                {"kind": "transit_event_windows"},
+            ],
+        },
+    }
+
+    intent_router_module.apply_marriage_routing_guards(result)
+
+    assert result["answer_mode"] == "comparison_choice"
+    assert result["mode"] == "ANALYZE_TOPIC_POTENTIAL"
+    assert result["needs_transits"] is False
+    assert "period_window" not in result
+    part = result["evidence_plan"]["question_parts"][0]
+    assert part["life_domain"] == "marriage"
+    assert part["event_profile"] == "love_vs_arranged_marriage"
+    assert part["intent_families"] == ["comparison"]
+    assert part["timeframe"]["kind"] == "none"
+    assert {row["kind"] for row in result["evidence_plan"]["evidence_needs"]} == {
+        "natal_topic_foundation", "divisional_chart_context", "house_analysis",
+    }
+
+
+def test_love_marriage_event_profile_recovers_missing_top_level_subtype():
+    result = {
+        "category": "marriage",
+        "answer_mode": "event_prediction",
+        "evidence_plan": {
+            "question_parts": [{"event_profile": "love_vs_arranged_marriage"}],
+            "evidence_needs": [],
+        },
+    }
+
+    intent_router_module.apply_marriage_routing_guards(result)
+
+    assert result["marriage_subtype"] == "love_vs_arranged"
+    assert result["answer_mode"] == "comparison_choice"
 
 
 class _FakeResponse:

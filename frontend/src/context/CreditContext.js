@@ -36,6 +36,7 @@ export const CreditProvider = ({ children }) => {
     const [speechChatCost, setSpeechChatCost] = useState(1);
     const [instantChatEnabled, setInstantChatEnabled] = useState(true);
     const [speechChatEnabled, setSpeechChatEnabled] = useState(true);
+    const [speechTtsProvider, setSpeechTtsProvider] = useState(null);
 
     const fetchBalance = useCallback(async () => {
         try {
@@ -175,9 +176,13 @@ export const CreditProvider = ({ children }) => {
             if (features && typeof features === 'object') {
                 setInstantChatEnabled(features.instant_chat_enabled !== false);
                 setSpeechChatEnabled(features.speech_chat_enabled !== false);
+                setSpeechTtsProvider(features.speech_tts_provider === 'google' ? 'google' : 'local');
+            } else {
+                setSpeechTtsProvider('local');
             }
         } catch (error) {
             console.error('Error fetching pricing:', error);
+            setSpeechTtsProvider('local');
         }
     }, []);
 
@@ -269,6 +274,7 @@ export const CreditProvider = ({ children }) => {
             speechChatCost,
             instantChatEnabled,
             speechChatEnabled,
+            speechTtsProvider,
             loading,
             fetchBalance,
             fetchCosts,

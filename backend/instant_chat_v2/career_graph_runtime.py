@@ -301,10 +301,23 @@ def compare_career_graph_policy(
         }
 
     observed_mode = str(observed_answer_mode or "")
-    compatible_modes = _MODE_COMPATIBILITY.get(policy.answer_mode, set())
+    # Overall Career's compiled route explicitly allows timing when the user
+    # names a period (for example, "this year"). Keep the general career
+    # foundation, but require delivery evidence instead of applying the
+    # static route's dasha/transit exclusions.
+    general_period_outlook = bool(
+        runtime_key == "general"
+        and observed_mode in {"timing_window", "event_prediction"}
+    )
+    compatible_modes = set(_MODE_COMPATIBILITY.get(policy.answer_mode, set()))
+    if general_period_outlook:
+        compatible_modes.update({"timing_window", "event_prediction"})
     actual = observed_career_factors(context)
     required = set(policy.required_factors)
     excluded = set(policy.default_exclusions)
+    if general_period_outlook:
+        required.update({"career:DashaActivation", "career:TransitActivation"})
+        excluded.difference_update({"career:DashaActivation", "career:TransitActivation"})
     missing = sorted(required - actual)
     unexpected_excluded = sorted(excluded & actual)
     mode_match = observed_mode in compatible_modes
@@ -330,6 +343,7 @@ def compare_career_graph_policy(
         "question_label": policy.question_label,
         "graph_tree": policy.graph_tree,
         "expected_answer_mode": policy.answer_mode,
+        "period_outlook_override": general_period_outlook,
         "observed_answer_mode": observed_mode,
         "mode_match": mode_match,
         "required_factors": sorted(required),

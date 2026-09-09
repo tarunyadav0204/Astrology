@@ -10,6 +10,8 @@ class SpeechRecognition: RCTEventEmitter {
   private var speechRecognizer: SFSpeechRecognizer?
   private var pendingResolve: RCTPromiseResolveBlock?
   private var pendingReject: RCTPromiseRejectBlock?
+  private var latestTranscript = ""
+  private var activeSessionID: UUID?
   private var hasListeners = false
 
   override static func requiresMainQueueSetup() -> Bool {
@@ -17,7 +19,7 @@ class SpeechRecognition: RCTEventEmitter {
   }
 
   override func supportedEvents() -> [String]! {
-    ["SpeechRecognitionPartial"]
+    ["SpeechRecognitionPartial", "SpeechRecognitionDebug"]
   }
 
   override func startObserving() {
@@ -39,7 +41,8 @@ class SpeechRecognition: RCTEventEmitter {
     _ resolve: RCTPromiseResolveBlock,
     rejecter reject: RCTPromiseRejectBlock
   ) {
-    resolve(SFSpeechRecognizer.authorizationStatus() != .restricted)
+    let status = SFSpeechRecognizer.authorizationStatus()
+    resolve(status == .authorized || status == .notDetermined)
   }
 
   @objc(startListening:resolver:rejecter:)
@@ -69,9 +72,16 @@ class SpeechRecognition: RCTEventEmitter {
   @objc
   func stopListening() {
     DispatchQueue.main.async {
+      let sessionID = self.activeSessionID
       if self.audioEngine.isRunning {
         self.audioEngine.stop()
         self.recognitionRequest?.endAudio()
+      }
+      // iOS does not guarantee another recognition callback after endAudio().
+      // Always settle the React Native promise so the UI cannot spin forever.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        guard sessionID != nil, self.activeSessionID == sessionID else { return }
+        self.settleWithLatestTranscript(reason: "manual_stop_timeout")
       }
     }
   }
@@ -109,6 +119,9 @@ class SpeechRecognition: RCTEventEmitter {
 
       pendingResolve = resolve
       pendingReject = reject
+      latestTranscript = ""
+      let sessionID = UUID()
+      activeSessionID = sessionID
       speechRecognizer = recognizer
       recognitionRequest = request
 
@@ -124,13 +137,13 @@ class SpeechRecognition: RCTEventEmitter {
 
       recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
         guard let self else { return }
+        guard self.activeSessionID == sessionID else { return }
 
         if let transcription = result?.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines),
            !transcription.isEmpty {
+          self.latestTranscript = transcription
           if result?.isFinal == true {
-            self.pendingResolve?(transcription)
-            self.clearPendingCallbacks()
-            self.cleanupAudioSession()
+            self.settleWithLatestTranscript(reason: "final_result")
             return
           }
 
@@ -140,9 +153,26 @@ class SpeechRecognition: RCTEventEmitter {
         }
 
         if let error {
-          self.pendingReject?("speech_error", error.localizedDescription, error)
-          self.clearPendingCallbacks()
-          self.cleanupAudioSession()
+          if !self.latestTranscript.isEmpty {
+            self.settleWithLatestTranscript(reason: "error_with_partial")
+          } else {
+            self.pendingReject?("speech_error", error.localizedDescription, error)
+            self.clearPendingCallbacks()
+            self.cleanupAudioSession()
+          }
+        }
+      }
+
+      // A recognizer/provider stall must never leave JavaScript waiting forever.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 18.0) { [weak self] in
+        guard let self, self.activeSessionID == sessionID else { return }
+        if self.audioEngine.isRunning {
+          self.audioEngine.stop()
+          self.recognitionRequest?.endAudio()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+          guard let self, self.activeSessionID == sessionID else { return }
+          self.settleWithLatestTranscript(reason: "maximum_listening_timeout")
         }
       }
     } catch {
@@ -176,6 +206,7 @@ class SpeechRecognition: RCTEventEmitter {
   }
 
   private func cleanupAudioSession() {
+    activeSessionID = nil
     recognitionTask?.cancel()
     recognitionTask = nil
 
@@ -193,6 +224,29 @@ class SpeechRecognition: RCTEventEmitter {
   private func clearPendingCallbacks() {
     pendingResolve = nil
     pendingReject = nil
+  }
+
+  private func emitDebug(_ event: String, details: String = "") {
+    guard hasListeners else { return }
+    sendEvent(withName: "SpeechRecognitionDebug", body: [
+      "event": event,
+      "details": details,
+      "latestTranscript": latestTranscript,
+    ])
+  }
+
+  private func settleWithLatestTranscript(reason: String) {
+    guard pendingResolve != nil || pendingReject != nil else { return }
+    let transcript = latestTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+    emitDebug("resolveWithLatestTranscript", details: reason)
+    if transcript.isEmpty {
+      pendingReject?("no_speech", "No speech detected", nil)
+    } else {
+      pendingResolve?(transcript)
+    }
+    latestTranscript = ""
+    clearPendingCallbacks()
+    cleanupAudioSession()
   }
 
   private func normalizedLocaleIdentifier(_ locale: String?) -> String {

@@ -55,9 +55,67 @@ from .foreign_graph_runtime import (
     build_foreign_graph_route, compare_foreign_graph_policy,
     is_foreign_category, resolve_foreign_graph_inputs,
 )
+from .nakshatra_graph_runtime import (
+    build_nakshatra_graph_route, compare_nakshatra_graph_policy,
+    resolve_nakshatra_graph_inputs,
+)
+from .nakshatra import is_nakshatra_category
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def required_divisional_codes_for_live_route(
+    *,
+    intent: Mapping[str, Any] | None,
+    answer_mode: str,
+) -> list[str]:
+    """Return the compiled route's required vargas before evidence is built.
+
+    Live previously selected the graph only *after* context construction. That
+    allowed the router's optional ``divisional_charts`` list to omit a varga
+    which the selected ontology route declares mandatory, producing a false
+    missing-evidence refusal after all other calculations had succeeded. This
+    lightweight preflight uses structured route fields only; it never parses
+    question text and never marks a chart available before it is calculated.
+    """
+    routed = dict(intent or {})
+    query_plan = {
+        key: routed.get(key)
+        for key in (
+            "category", "career_subtype", "marriage_subtype", "wealth_subtype",
+            "education_subtype", "children_subtype", "home_subtype", "foreign_subtype",
+            "nakshatra_subtype",
+            "comparison_options", "route_action",
+        )
+        if routed.get(key) not in (None, "", [], {})
+    }
+    query_plan["answer_mode"] = str(answer_mode or routed.get("answer_mode") or "topic_reading")
+    policy = resolve_live_graph_policy(intent=routed, context={}, query_plan=query_plan)
+    if not isinstance(policy, Mapping) or not policy.get("runtime_key"):
+        return []
+    codes: list[str] = []
+    for factor in policy.get("required_factors") or []:
+        match = re.fullmatch(
+            r"[^:]+:(D\d{1,2}|Kara?kamsha|Swamsa)",
+            str(factor or ""),
+            re.IGNORECASE,
+        )
+        if match:
+            raw_code = match.group(1).upper()
+            code = (
+                "KARAKAMSHA"
+                if raw_code in {"KARAKAMSHA", "KARKAMSHA"}
+                else "SWAMSA"
+                if raw_code == "SWAMSA"
+                else raw_code
+            )
+            if code not in codes:
+                codes.append(code)
+    return sorted(
+        codes,
+        key=lambda code: (0, int(code[1:])) if re.fullmatch(r"D\d{1,2}", code) else (1, code),
+    )
 
 
 def _deeper_mode_fallback(language: str) -> str:
@@ -119,7 +177,40 @@ def _output_sections(graph_tree: Any) -> list[dict[str, str]]:
 
 
 def _live_contract(domain: str, comparison: Mapping[str, Any], review: Mapping[str, Any]) -> dict[str, Any]:
-    incomplete = not bool(comparison.get("match"))
+    missing_required = list(comparison.get("missing_required_factors") or [])
+    unexpected_exclusions = list(comparison.get("unexpected_default_exclusions") or [])
+    mode_match = bool(comparison.get("mode_match"))
+    # A comparator mismatch has two very different meanings. Missing required
+    # factors are a genuine evidence gap. Unexpected exclusions mean the
+    # shared calculation workspace contains an incidental branch (usually
+    # current dasha/transit) which this route explicitly says not to use. The
+    # composer boundary removes the latter structurally, so it must never send
+    # a customer to a paid/deeper mode.
+    # D1 and D10 are the primary Career Fit evidence. Amatyakaraka and
+    # Karakamsha are confirmation layers: if a legacy/saved chart cannot
+    # calculate one of them, Live must qualify the Jaimini portion rather than
+    # discard the complete Parashari career reading and advertise a paid mode.
+    partial_career_confirmation = bool(
+        domain == "career"
+        and str(comparison.get("runtime_key") or "") == "career_fit"
+        and missing_required
+        and set(missing_required).issubset({"career:Amatyakaraka", "career:Karakamsha"})
+    )
+    missing_evidence = bool(missing_required) and not partial_career_confirmation
+    contract_contamination = bool(unexpected_exclusions)
+    route_contract_error = not mode_match
+    if partial_career_confirmation:
+        evidence_status = "partial_confirmation"
+    elif missing_evidence:
+        evidence_status = "missing_required_evidence"
+    elif route_contract_error:
+        evidence_status = "route_contract_error"
+    elif contract_contamination:
+        # It is complete from the customer's perspective; the separate audit
+        # flag records that the composer boundary had exclusions to remove.
+        evidence_status = "complete"
+    else:
+        evidence_status = "complete"
     return {
         "live": True,
         "enforcement": "authoritative_pre_generation",
@@ -129,14 +220,19 @@ def _live_contract(domain: str, comparison: Mapping[str, Any], review: Mapping[s
         "ontology_resource": comparison.get("ontology_resource"),
         "question_type": comparison.get("question_label"),
         "expected_answer_mode": comparison.get("expected_answer_mode"),
-        "mode_match": bool(comparison.get("mode_match")),
-        "evidence_status": "complete" if not incomplete else "incomplete_or_conflicting",
-        "fallback_to_deeper_mode": incomplete,
+        "period_outlook_override": bool(comparison.get("period_outlook_override")),
+        "mode_match": mode_match,
+        "evidence_status": evidence_status,
+        "fallback_to_deeper_mode": missing_evidence,
+        "fallback_reason": "missing_required_evidence" if missing_evidence else None,
+        "partial_confirmation": partial_career_confirmation,
+        "route_contract_error": route_contract_error,
+        "excluded_evidence_sanitized": contract_contamination,
         "required_factors": list(comparison.get("required_factors") or []),
         "observed_factors": list(comparison.get("observed_factors") or []),
-        "missing_required_factors": list(comparison.get("missing_required_factors") or []),
+        "missing_required_factors": missing_required,
         "default_exclusions": list(comparison.get("default_exclusions") or []),
-        "unexpected_default_exclusions": list(comparison.get("unexpected_default_exclusions") or []),
+        "unexpected_default_exclusions": unexpected_exclusions,
         "required_capabilities": list(comparison.get("required_capabilities") or []),
         "decision_rules": list(comparison.get("decision_rules") or []),
         "guardrails": list(comparison.get("guardrails") or []),
@@ -151,7 +247,11 @@ def _live_contract(domain: str, comparison: Mapping[str, Any], review: Mapping[s
                 "The route cannot support a reliable Live answer. In the same language and script as the user, "
                 "briefly say that this needs a deeper Standard or Premium reading. Do not name another domain, "
                 "invent a comparison, expose missing-factor names, or ask an unrelated follow-up."
-                if incomplete else ""
+                if missing_evidence else
+                "Use the complete D1 and D10 career evidence to answer strengths, suitable work, work setting and "
+                "earning viability. State briefly that the unavailable Jaimini layer could not confirm or refine "
+                "the result; do not replace the supported answer with a deeper-mode refusal."
+                if partial_career_confirmation else ""
             )
         ),
         "route": dict(review),
@@ -224,6 +324,10 @@ def resolve_live_graph_policy(
         domain, resolver, comparator, reviewer = (
             "home_property", resolve_home_graph_inputs, compare_home_graph_policy, build_home_graph_route,
         )
+    elif is_nakshatra_category(category):
+        domain, resolver, comparator, reviewer = (
+            "nakshatra", resolve_nakshatra_graph_inputs, compare_nakshatra_graph_policy, build_nakshatra_graph_route,
+        )
     else:
         return None
 
@@ -284,6 +388,110 @@ def apply_live_graph_policy(
     compact_policy = {
         key: value for key, value in policy.items() if key != "route"
     }
+    if (
+        policy.get("domain") == "career"
+        and policy.get("runtime_key") == "general"
+        and policy.get("period_outlook_override")
+    ):
+        compact_policy["claim_permission"] = "bounded_career_period_outlook"
+        compact_policy["instruction"] = (
+            "Answer the requested overall career period from the calculated natal career foundation plus the "
+            "supplied dasha and transit delivery evidence. Cover the whole requested period, keep D1 and D10 "
+            "identities separate, and do not replace the answer with a static career profile or a deeper-mode fallback."
+        )
+        compact_policy["period_outlook_rules"] = {
+            "scope": "bounded overall-career outlook",
+            "required_evidence": [
+                "D1 career foundation",
+                "D10 professional expression",
+                "Amatyakaraka and Karakamsha vocation context",
+                "dasha activation",
+                "transit delivery",
+            ],
+            "forbidden_moves": [
+                "Do not omit the requested period.",
+                "Do not apply the static-route exclusion to requested dasha or transit evidence.",
+                "Do not send a complete bounded career outlook to Standard or Premium mode.",
+            ],
+        }
+    if policy.get("domain") == "marriage" and str(policy.get("runtime_key") or "") in {
+        "marriage_timing", "relationship_timing", "separation_reconciliation_timing",
+        "engagement_wedding_timing",
+    }:
+        compact_policy["specific_partner_scope"] = {
+            "single_chart_can_answer": [
+                "the native chart's marriage or relationship promise",
+                "the native chart's relationship activation and reconnection periods",
+                "pressure, delay, family-resistance, or continuity themes shown in the native chart",
+            ],
+            "single_chart_cannot_prove": [
+                "that one named independent person will choose marriage",
+                "the named person's feelings, intentions, family decision, or future actions",
+                "two-chart compatibility or mutually aligned timing",
+            ],
+            "answer_rule": (
+                "Answer every supported native-chart part first. If the user asks about one named partner, add one "
+                "plain limitation sentence for the identity-specific part; do not refuse or suppress the supported "
+                "relationship direction and timing merely because the partner's chart is unavailable."
+            ),
+        }
+    if (
+        policy.get("domain") == "marriage"
+        and str(query_plan.get("marriage_subtype") or "")
+        in {"current_relationship_state", "specific_partner_decision"}
+    ):
+        specific_decision = (
+            str(query_plan.get("marriage_subtype") or "") == "specific_partner_decision"
+        )
+        compact_policy["claim_permission"] = "native_current_relationship_climate_only"
+        rule_key = (
+            "specific_partner_decision_rules" if specific_decision
+            else "current_relationship_state_rules"
+        )
+        compact_policy[rule_key] = {
+            "scope": "current relationship climate in the native chart",
+            "requested_action": (
+                str(query_plan.get("third_party_action") or "other_voluntary_action")
+                if specific_decision else None
+            ),
+            "required_answer_order": [
+                (
+                    "state that the specific voluntary action actually asked about, and its decision date, cannot be predicted from the native chart"
+                    if specific_decision else
+                    "state that the other person's private state cannot be confirmed from the native chart"
+                ),
+                "give only the native's relationship opportunity or clarification climate from supplied dasha and transit evidence",
+                "separate a relationship-active period from the independent person's consent or choice",
+                "give one grounded observation the user can verify through direct, respectful communication",
+            ],
+            "forbidden_claims": [
+                "the ex or partner has definitely moved on",
+                "the ex or partner still loves, misses, remembers or thinks about the native",
+                "the ex or partner made a difficult emotional decision",
+                "the other person will accept or reject the proposal",
+                "the other person will return, reconnect, contact, respond, commit or marry",
+                "the couple will definitely be happy together",
+                "a date or window when the other person will decide or consent",
+                "the ex or partner's motives, memories, intentions or emotional rebirth",
+                "generic Yogi, Gandanta or other natal modifiers as proof of the other person's state",
+            ],
+        }
+        compact_policy["instruction"] = (
+            (
+                "This asks for an independent person's future voluntary decision. Open by naming the actual action "
+                "the user asked about (proposal, return/reconciliation, contact/response, commitment/marriage, or "
+                "another voluntary choice) and saying the native chart cannot predict whether or when that person "
+                "will take it. Never mention a proposal unless the user actually asked about a proposal. If calculated timing is "
+                "available, label it only as the native's relationship-opportunity or clarification period—not the "
+                "other person's acceptance window. Respect consent and existing commitments. "
+                if specific_decision else
+                "This is a present-state timing question, not a static natal profile. Use the supplied current dasha "
+                "and transit evidence to describe only the native chart's present relationship climate. Open by saying "
+                "that the ex or partner's private emotional state cannot be confirmed from this chart. "
+            )
+            + "Never convert relationship pressure, closure or reconnection activation into a factual claim about "
+            "that person's mind or choice. Never use Yogi, Gandanta, Dagdha or unrelated natal modifiers as the reason."
+        )
     missing = [str(value) for value in policy.get("missing_required_factors") or []]
     timing_missing = [
         value for value in missing
@@ -325,6 +533,10 @@ def apply_live_graph_policy(
     love_arranged_route = bool(
         policy.get("domain") == "marriage"
         and policy.get("runtime_key") == "love_arranged_marriage"
+    )
+    married_life_route = bool(
+        policy.get("domain") == "marriage"
+        and policy.get("runtime_key") == "married_life"
     )
     spouse_meeting_route = bool(
         policy.get("domain") == "marriage"
@@ -392,6 +604,7 @@ def apply_live_graph_policy(
                 if runtime_key in {"higher_education", "higher_education_timing"}
                 else {}
             ),
+            "timing_windows": list(foundation.get("timing_windows") or [])[:6],
             "route_specific_syntheses": {
                 key: foundation.get(key) or {}
                 for key in (
@@ -448,13 +661,14 @@ def apply_live_graph_policy(
         boundary_permissions = {
             "two_chart_children_handoff": "children_two_chart_handoff",
             "child_chart_required_handoff": "children_child_chart_handoff",
-            "medical_safety_handoff": "children_medical_handoff",
             "muhurat_handoff": "children_muhurat_handoff",
             "legal_custody_handoff": "children_legal_handoff",
             "fetal_sex_refusal": "children_fetal_sex_refusal",
         }
         if runtime_key in boundary_permissions:
             compact_policy["claim_permission"] = boundary_permissions[runtime_key]
+        elif runtime_key == "medical_safety_handoff":
+            compact_policy["claim_permission"] = "children_medical_hybrid"
         static_route = runtime_key not in {
             "conception_timing", "childbirth_timing", "first_child", "subsequent_child",
             "assisted_conception_timing", "adoption_timing", "parenthood_vs_career_timing",
@@ -485,6 +699,8 @@ def apply_live_graph_policy(
                 "Never use a parent's chart as the child's own personality, health, education, career, marriage or fate chart.",
                 "Never present a remedy as fertility treatment or a guarantee.",
                 "Never mention timing on a static route or dates absent from timing_windows.",
+                "Never expose scores, weights, margins or ranking numbers; translate them into the adjudicated verdict.",
+                "Every planet named as a timing reason must have an explicit supplied connection to the selected child-order house and realization chain. Venus is not a generic childbirth carrier and cannot be justified only as happiness, comfort, love or new life.",
                 "For nodes, never use fifth or ninth aspects; retain occupation, conjunction and seventh aspect only.",
             ],
         }
@@ -495,6 +711,12 @@ def apply_live_graph_policy(
             "D7 independently confirms or qualifies it. Use the exact route synthesis; first and later children, "
             "conception and childbirth, assisted conception and adoption are not interchangeable routes."
         )
+        if runtime_key == "medical_safety_handoff":
+            compact_policy["instruction"] += (
+                " This is a non-diagnostic hybrid route: calculate and explain the general D1/D7 pregnancy or "
+                "parenthood climate after a direct clinical limitation. Never convert support or pressure into a "
+                "test, diagnosis, fetal-health, growth, loss, symptom-safety, condition-effect, or treatment claim."
+            )
     if bool(policy.get("live")) and policy.get("domain") == "home_property":
         runtime_key = str(policy.get("runtime_key") or "home_life")
         normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
@@ -865,6 +1087,47 @@ def apply_live_graph_policy(
             verdict["direction"]=timing.get("verdict") or (foundation.get("route_synthesis") or {}).get("verdict")
             verdict["ranked_windows"]=windows
             result["verdict"]=verdict
+    if bool(policy.get("live")) and policy.get("domain") == "nakshatra":
+        normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
+        foundation = normalized.get("nakshatra_foundation") if isinstance(normalized.get("nakshatra_foundation"), Mapping) else {}
+        runtime_key = str(policy.get("runtime_key") or "birth_star_overview")
+        nakshatra_rules = {
+            "runtime_key": runtime_key,
+            "primary_evidence": "evidence.nakshatra_foundation",
+            "carriers": list(foundation.get("carriers") or []),
+            "timing_carriers": list(foundation.get("timing_carriers") or []),
+            "current_transit_nakshatras": list(foundation.get("current_transit_nakshatras") or []),
+            "claim_boundaries": list(foundation.get("claim_boundaries") or []),
+            "required_flow": [
+                "answer the exact Nakshatra question directly",
+                "name the selected carrier, its exact nakshatra and pada",
+                "explain the nakshatra quality through the supplied deity/quality and the pada's Navamsha sign",
+                "qualify the expression through the supplied nakshatra-lord placement and condition",
+                "synthesize the factors in connected prose rather than listing chart rows",
+            ],
+            "simple_mode": (
+                "Use plain language and at most two astrology anchors. Explain what the pattern feels like in life; "
+                "do not dump degrees, internal factors, scores or a placement inventory."
+            ),
+            "technical_mode": (
+                "Give connected technical reasoning: carrier -> exact nakshatra/pada -> pada Navamsha -> "
+                "nakshatra lord and its actual house/sign condition -> synthesis. Do not output scores or a raw list."
+            ),
+            "forbidden_moves": [
+                "Do not replace the selected carrier with Moon, Mercury, Mars, Rahu, Yogi or Gandanta merely because a generic rule mentions it.",
+                "Do not let one nakshatra establish a profession, marriage, money, health outcome or event date.",
+                "Do not prescribe a remedy unless runtime_key is nakshatra_remedy.",
+                "Do not describe all Gandamoola births as dosha-bearing or remedy-requiring.",
+                "Do not infer another person's private feelings, consent or decision.",
+            ],
+        }
+        compact_policy["nakshatra_answer_rules"] = nakshatra_rules
+        answer_spec["nakshatra_answer_rules"] = nakshatra_rules
+        compact_policy["instruction"] = (
+            "Use nakshatra_foundation as the sole source for placements and carrier selection. Interpret the exact "
+            "nakshatra, pada, pada Navamsha and nakshatra-lord condition together. A nakshatra modifies a topic; it "
+            "does not independently prove a life event."
+        )
     if bool(policy.get("live")) and wealth_route:
         runtime_key = str(policy.get("runtime_key") or "")
         normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
@@ -1225,6 +1488,53 @@ def apply_live_graph_policy(
                 "natal promise, current activation, or planet folklore for the missing layer."
             )
             answer_spec["limitation_instruction"] = compact_policy["instruction"]
+    if bool(policy.get("live")) and married_life_route:
+        normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
+        foundation = (
+            normalized.get("married_life_foundation")
+            if isinstance(normalized.get("married_life_foundation"), Mapping)
+            else {}
+        )
+        married_life_rules = {
+            "scope": "static married-life quality and continuity; no timing",
+            "evidence_complete": bool(foundation.get("evidence_complete")),
+            "primary_evidence": "evidence.married_life_foundation",
+            "required_answer_order": list(foundation.get("interpretation_order") or []),
+            "required_layers": [
+                "D1 Houses 7, 2, 11, 8 and 12 with seventh-lord condition",
+                "D9 Houses 1, 7, 2, 8, 11 and 12",
+                "Venus and Jupiter in D1 and D9",
+                "Darakaraka, Upapada, second from Upapada and Darapada A7",
+            ],
+            "forbidden_moves": [
+                "Do not decide married-life quality from House 2, Yogi lord, Gandanta or another single modifier.",
+                "Do not use communication advice as a substitute for analyzing the marriage bond and D9.",
+                "Do not mix D1 and D9 identities or mix Parashari reasoning with Jaimini reasoning.",
+                "Do not mention dasha, transit, dates, divorce certainty or the spouse's hidden motives.",
+                "Do not expose scores or weights.",
+            ],
+        }
+        compact_policy["married_life_rules"] = married_life_rules
+        answer_spec["married_life_rules"] = married_life_rules
+        answer_spec["max_words"] = max(int(answer_spec.get("max_words") or 0), 480)
+        answer_spec["composer_word_target"] = "Usually 260-420 words; preserve every D1, D9 and Jaimini layer without listing raw scores."
+        compact_policy["instruction"] = (
+            "Use the married_life_foundation as the sole answer-bearing source. Begin with D1 House 7 and its lord; "
+            "then judge continuity through Houses 2/11 and intimacy/strain through Houses 8/12. Require D9 confirmation "
+            "and separately qualify the result with Venus/Jupiter and Jaimini Darakaraka-Upapada evidence."
+        )
+        verdict = dict(result.get("verdict") or {})
+        verdict.pop("ranked_windows", None)
+        verdict["direction"] = "synthesize_from_married_life_foundation"
+        verdict["scope"] = "static married-life quality from D1, D9 and Jaimini evidence"
+        result["verdict"] = verdict
+        if not foundation.get("evidence_complete"):
+            compact_policy["claim_permission"] = "no_complete_married_life_verdict"
+            compact_policy["instruction"] = (
+                "The required D1-D9-Jaimini married-life foundation is incomplete. State the missing calculation layer "
+                "and do not replace it with generic House 2, Mercury, Yogi or Gandanta advice."
+            )
+            answer_spec["limitation_instruction"] = compact_policy["instruction"]
     if bool(policy.get("live")) and love_arranged_route:
         relation = str((query_plan.get("time_scope") or {}).get("relation") or "").strip().lower()
         pathway_rules = {
@@ -1282,6 +1592,13 @@ def apply_live_graph_policy(
         answer_spec["marriage_pathway_rules"] = pathway_rules
         verdict = dict(result.get("verdict") or {})
         verdict.pop("ranked_windows", None)
+        # The shared comparison fusion ranks dated option windows. This route
+        # instead compares natal pathways, so its generic option verdict and
+        # timing gaps must not compete with the D1/D9 pathway ledger.
+        verdict["direction"] = "synthesize_from_marriage_pathway_comparison"
+        verdict.pop("rationale", None)
+        verdict.pop("modifiers", None)
+        verdict.pop("missing_required_capabilities", None)
         verdict["scope"] = "static love-led versus family-mediated marriage-pathway comparison"
         result["verdict"] = verdict
     if bool(policy.get("live")) and spouse_meeting_route:
@@ -1699,6 +2016,52 @@ def enforce_live_graph_answer(
         return "A birth chart cannot guarantee that a trip will be safe or replace official travel, weather, health or security guidance. Use current advisories and practical precautions; I can discuss only non-safety travel themes."
     if foreign_boundary == "foreign_other_person_handoff":
         return "Your chart cannot reliably determine another adult's travel, residence or settlement outcome. That question needs their own birth chart and consent; this reading can only discuss how their move may affect your experience."
+    nakshatra_rules = (
+        policy.get("nakshatra_answer_rules")
+        if isinstance(policy.get("nakshatra_answer_rules"), Mapping) else {}
+    )
+    if policy.get("domain") == "nakshatra" and nakshatra_rules:
+        carriers = [
+            row for row in (
+                list(nakshatra_rules.get("carriers") or [])
+                + list(nakshatra_rules.get("timing_carriers") or [])
+                + list(nakshatra_rules.get("current_transit_nakshatras") or [])
+            ) if isinstance(row, Mapping)
+        ]
+        allowed_planets = {
+            str(value).lower()
+            for row in carriers
+            for value in (row.get("carrier"), row.get("planet"), row.get("nakshatra_lord"))
+            if value and str(value) != "Ascendant"
+        }
+        allowed_stars = {str(row.get("nakshatra") or "").lower() for row in carriers if row.get("nakshatra")}
+        all_stars = (
+            "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya",
+            "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati",
+            "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana",
+            "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati",
+        )
+        planet_pattern = re.compile(r"\b(Sun|Moon|Mars|Mercury|Jupiter|Venus|Saturn|Rahu|Ketu)\b", re.IGNORECASE)
+        star_pattern = re.compile(r"\b(" + "|".join(re.escape(value) for value in all_stars) + r")\b", re.IGNORECASE)
+        timing_pattern = re.compile(r"\b(dasha|mahadasha|antardasha|pratyantardasha|transit|active period|\d{4})\b", re.IGNORECASE)
+        runtime_key = str(policy.get("runtime_key") or "")
+        retained = []
+        for sentence in re.split(r"(?<=[.!?])\s+", clean_answer):
+            named_planets = {match.group(1).lower() for match in planet_pattern.finditer(sentence)}
+            named_stars = {match.group(1).lower() for match in star_pattern.finditer(sentence)}
+            if named_planets - allowed_planets:
+                continue
+            if named_stars - allowed_stars:
+                continue
+            if runtime_key != "nakshatra_timing" and timing_pattern.search(sentence):
+                continue
+            if runtime_key != "nakshatra_remedy" and re.search(r"\b(remedy|mantra|chant|donate|puja)\b", sentence, re.IGNORECASE):
+                continue
+            if runtime_key != "special_nakshatra_conditions" and re.search(r"\b(gandamoola|ganda\s*mool|gandanta|dosha)\b", sentence, re.IGNORECASE):
+                continue
+            retained.append(sentence.strip())
+        if retained:
+            clean_answer = "\n\n".join(retained)
     foreign_rules = (
         policy.get("foreign_answer_rules")
         if isinstance(policy.get("foreign_answer_rules"), Mapping)
@@ -1886,6 +2249,171 @@ def enforce_live_graph_answer(
                     )
     if policy.get("fallback_to_deeper_mode"):
         return _deeper_mode_fallback(language)
+    if policy.get("domain") == "education":
+        education_rules = (
+            policy.get("education_answer_rules")
+            if isinstance(policy.get("education_answer_rules"), Mapping)
+            else {}
+        )
+        route_synthesis = (
+            education_rules.get("route_synthesis")
+            if isinstance(education_rules.get("route_synthesis"), Mapping)
+            else {}
+        )
+        compound = (
+            route_synthesis.get("compound_part_synthesis")
+            if isinstance(route_synthesis.get("compound_part_synthesis"), Mapping)
+            else {}
+        )
+        comparison = (
+            compound.get("course_comparison")
+            if isinstance(compound.get("course_comparison"), Mapping)
+            else {}
+        )
+        option_rows = [
+            row for row in comparison.get("options") or []
+            if isinstance(row, Mapping) and row.get("option")
+        ]
+        timing_windows = [
+            row for row in education_rules.get("timing_windows") or []
+            if isinstance(row, Mapping) and (row.get("start") or row.get("end"))
+        ]
+        if len(option_rows) >= 2:
+            visible = spec.get("visible_astrology") if isinstance(spec.get("visible_astrology"), Mapping) else {}
+            # Older callers did not carry a presentation contract and used
+            # the technical renderer. An explicit False is the Simple-mode
+            # signal and must never be treated like a missing value.
+            technical_mode = (
+                bool(visible.get("technical_detail_allowed"))
+                if "technical_detail_allowed" in visible
+                else True
+            )
+            lower_answer = clean_answer.lower()
+            names_all_options = all(
+                str(row.get("option") or "").lower() in lower_answer
+                for row in option_rows
+            )
+            has_concrete_chart_reason = bool(
+                re.search(r"\bD1\b", clean_answer, re.IGNORECASE)
+                and re.search(r"\bD24\b", clean_answer, re.IGNORECASE)
+                and re.search(r"\b(?:H|house\s*)\d{1,2}\b", clean_answer, re.IGNORECASE)
+            )
+            timing_verdict = str(route_synthesis.get("timing_verdict") or "")
+            expected_year = str((timing_windows[0] if timing_windows else {}).get("start") or "")[:4]
+            names_timing = bool(
+                timing_verdict != "supportive_windows_found"
+                or (expected_year and expected_year in clean_answer)
+            )
+            exposes_internal_scoring = bool(
+                re.search(r"\b(?:score|scores|margin)\b", clean_answer, re.IGNORECASE)
+            )
+            if technical_mode or exposes_internal_scoring or not (
+                names_all_options and has_concrete_chart_reason and names_timing
+            ):
+                ranked = [row for row in comparison.get("ranked_options") or [] if isinstance(row, Mapping)]
+                direction = str(comparison.get("direction") or "")
+                if direction == "clear_lead" and ranked:
+                    opening = (
+                        f"The chart comparison favors {ranked[0].get('option')} over "
+                        f"{ranked[1].get('option')} because its relevant D1–D24 combination repeats more clearly."
+                        if technical_mode
+                        else
+                        f"The chart leans toward {ranked[0].get('option')} over "
+                        f"{ranked[1].get('option')}, although practical eligibility and genuine interest still matter."
+                    )
+                else:
+                    opening = (
+                        f"The chart supports both {option_rows[0].get('option')} and "
+                        f"{option_rows[1].get('option')} through different combinations, but it does not establish "
+                        "a decisive astrological winner between them."
+                    )
+                reasons = []
+                for row in option_rows[:2]:
+                    reasoning = row.get("technical_reasoning") if isinstance(row.get("technical_reasoning"), Mapping) else {}
+                    fact_rows = [
+                        value for value in reasoning.get("decisive_facts") or []
+                        if isinstance(value, Mapping) and value.get("fact")
+                    ]
+                    facts = [str(value.get("fact") or "").replace("_", " ") for value in fact_rows[:3]]
+                    if not facts:
+                        seen_facts: set[str] = set()
+                        for trait in row.get("trait_results") or []:
+                            if not isinstance(trait, Mapping):
+                                continue
+                            for carrier in trait.get("carriers") or []:
+                                if not isinstance(carrier, Mapping):
+                                    continue
+                                for fact in carrier.get("support") or []:
+                                    clean_fact = str(fact or "").replace("_", " ")
+                                    if clean_fact and clean_fact not in seen_facts:
+                                        facts.append(clean_fact)
+                                        seen_facts.add(clean_fact)
+                                    if len(facts) >= 3:
+                                        break
+                                if len(facts) >= 3:
+                                    break
+                            if len(facts) >= 3:
+                                break
+                    labels = [str(value) for value in row.get("demand_labels") or [] if str(value)]
+                    if not labels:
+                        labels = [
+                            str(value).replace("_", " ")
+                            for value in row.get("demand_traits") or [] if str(value)
+                        ]
+                    demands = ", ".join(labels)
+                    combination_rule = str(reasoning.get("combination_rule") or "").strip()
+                    planets = list(dict.fromkeys(
+                        str(value.get("planet") or "").strip()
+                        for value in fact_rows
+                        if str(value.get("planet") or "").strip()
+                    ))
+                    if facts and technical_mode:
+                        reasons.append(
+                            f"For {row.get('option')}, I tested {demands or 'its actual study demands'}, not a "
+                            f"single planet. {'; '.join(facts)}. {combination_rule}"
+                        )
+                    elif planets:
+                        if len(planets) == 1:
+                            planet_text = planets[0]
+                        else:
+                            planet_text = f"{', '.join(planets[:-1])} and {planets[-1]}"
+                        reason = (
+                            f"For {row.get('option')}, {planet_text} work together around "
+                            f"{demands or 'the course’s main learning demands'}. This is a combined pattern, "
+                            "not a conclusion drawn from one planet."
+                        )
+                        if reasoning.get("moon_standalone_forbidden"):
+                            reason += (
+                                " The Moon can add a caring or receptive quality, but it is not being used by "
+                                "itself as proof of a medical path."
+                            )
+                        reasons.append(reason)
+                    else:
+                        reasons.append(
+                            f"For {row.get('option')}, the option-specific evidence is incomplete, so a preference "
+                            "should not be invented."
+                        )
+                if timing_verdict == "supportive_windows_found" and timing_windows:
+                    window = timing_windows[0]
+                    timing_sentence = (
+                        f"Separately, the next calculated admission-support window runs from "
+                        f"{str(window.get('start') or '')[:10]} to {str(window.get('end') or '')[:10]}. "
+                        "It is a supportive application/admission period, not a guaranteed seat."
+                    )
+                elif timing_verdict:
+                    timing_sentence = (
+                        f"Separately, the admission timing result is {timing_verdict.replace('_', ' ')}; "
+                        "no date should be invented beyond that calculated result."
+                    )
+                else:
+                    timing_sentence = "The admission-timing part has no calculated verdict, so no year should be invented."
+                clean_answer = " ".join([
+                    opening,
+                    *reasons,
+                    timing_sentence,
+                    "Use entrance eligibility and your actual subject performance to break an astrologically close "
+                    "result. Which entrance cycle are you preparing for?",
+                ])
     if policy.get("claim_permission") == "no_specific_meeting_story":
         if str(language or "").lower().startswith("hi"):
             return (

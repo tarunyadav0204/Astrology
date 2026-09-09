@@ -14,12 +14,17 @@ from fastapi import APIRouter, BackgroundTasks, WebSocket, WebSocketDisconnect
 from auth import ALGORITHM, SECRET_KEY, User
 from chat_history.routes import ask_question_async, check_message_status
 from db import execute, get_conn
+from utils.admin_settings import (
+    is_instant_response_validation_enabled,
+    is_speech_unvalidated_streaming_enabled,
+)
+from utils.response_transport import strip_internal_evidence_markers
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/speech", tags=["speech_ws"])
 
-POLL_INTERVAL_SECONDS = 0.9
+POLL_INTERVAL_SECONDS = 0.35
 MAX_TURN_SECONDS = 150
 PING_INTERVAL_SECONDS = 25
 
@@ -33,7 +38,7 @@ def _json_preview(value: Any, limit: int = 240) -> str:
     return raw[:limit]
 
 
-def _split_answer_chunks(text: str, max_chars: int = 520) -> List[str]:
+def _split_answer_chunks(text: str, max_chars: int = 260) -> List[str]:
     raw = " ".join(str(text or "").split()).strip()
     if not raw:
         return []
@@ -56,6 +61,22 @@ def _split_answer_chunks(text: str, max_chars: int = 520) -> List[str]:
     if current:
         chunks.append(current)
     return chunks or [raw]
+
+
+def _visible_stream_checkpoint(text: str) -> str:
+    """Remove composer-only tails from a provisional client checkpoint."""
+    visible = str(text or "")
+    for sentinel in ("NEXT_ACTION_META:", "PREDICTION_ANCHOR_META:"):
+        visible = visible.split(sentinel, 1)[0]
+    return strip_internal_evidence_markers(visible, provisional=True).rstrip()
+
+
+def _provisional_speech_chunks_playable() -> bool:
+    """Raw chunks are playable when validation is globally off or speech opts in."""
+    return bool(
+        not is_instant_response_validation_enabled()
+        or is_speech_unvalidated_streaming_enabled()
+    )
 
 
 def _token_from_websocket(websocket: WebSocket) -> Optional[str]:
@@ -127,9 +148,17 @@ async def _invoke_chat_v2(request: Dict[str, Any], user: User) -> Dict[str, Any]
     return response
 
 
-async def _poll_answer(message_id: int, user: User, cancel_event: asyncio.Event, websocket: WebSocket, turn_id: str) -> Dict[str, Any]:
+async def _poll_answer(
+    message_id: int,
+    user: User,
+    cancel_event: asyncio.Event,
+    websocket: WebSocket,
+    turn_id: str,
+    stream_state: Dict[str, Any],
+) -> Dict[str, Any]:
     started = time.monotonic()
     last_status = None
+    provisional_playable = _provisional_speech_chunks_playable()
     while True:
         if cancel_event.is_set():
             raise asyncio.CancelledError()
@@ -151,6 +180,35 @@ async def _poll_answer(message_id: int, user: User, cancel_event: asyncio.Event,
             return status_payload
         if status == "failed":
             raise RuntimeError(status_payload.get("error_message") or "Answer failed. Please try again.")
+        partial = _visible_stream_checkpoint(status_payload.get("partial_content") or "")
+        previous = str(stream_state.get("content") or "")
+        if partial and partial != previous:
+            if partial.startswith(previous):
+                delta = partial[len(previous):]
+                if delta:
+                    await _send(
+                        websocket,
+                        "answer_chunk",
+                        turn_id=turn_id,
+                        message_id=message_id,
+                        index=int(stream_state.get("index") or 0),
+                        text=delta,
+                        content=partial,
+                        validated=False,
+                        playable=provisional_playable,
+                    )
+                    stream_state["index"] = int(stream_state.get("index") or 0) + 1
+            else:
+                await _send(
+                    websocket,
+                    "answer_replace",
+                    turn_id=turn_id,
+                    message_id=message_id,
+                    content=partial,
+                    validated=False,
+                    playable=provisional_playable,
+                )
+            stream_state["content"] = partial
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
 
@@ -213,24 +271,48 @@ async def _handle_ask(
         final_payload = ask_response
     else:
         await _send(websocket, "turn_queued", turn_id=turn_id, message_id=message_id)
-        final_payload = await _poll_answer(int(message_id), user, cancel_event, websocket, turn_id)
+        stream_state: Dict[str, Any] = {"content": "", "index": 0}
+        final_payload = await _poll_answer(
+            int(message_id), user, cancel_event, websocket, turn_id, stream_state
+        )
 
     content = str(final_payload.get("content") or final_payload.get("response") or "").strip()
     if not content:
         raise RuntimeError("The answer came back empty. Please try again.")
 
-    chunks = _split_answer_chunks(content)
+    stream_state = locals().get("stream_state", {"content": "", "index": 0})
+    streamed_content = str(stream_state.get("content") or "")
+    if streamed_content and not content.startswith(streamed_content):
+        # Validation/post-processing changed the provider draft. Replace the
+        # provisional display with the authoritative answer before playback.
+        await _send(
+            websocket,
+            "answer_replace",
+            turn_id=turn_id,
+            message_id=message_id,
+            content=content,
+            validated=True,
+        )
+        streamed_content = content
+
+    remaining = content[len(streamed_content):] if content.startswith(streamed_content) else content
+    chunks = _split_answer_chunks(remaining)
+    delivered_content = streamed_content
     for index, chunk in enumerate(chunks):
         if cancel_event.is_set():
             raise asyncio.CancelledError()
+        separator = "" if not delivered_content or delivered_content.endswith((" ", "\n")) else " "
+        delivered_content = f"{delivered_content}{separator}{chunk}".strip()
         await _send(
             websocket,
             "answer_chunk",
             turn_id=turn_id,
             message_id=message_id,
-            index=index,
+            index=int(stream_state.get("index") or 0) + index,
             total=len(chunks),
             text=chunk,
+            content=delivered_content,
+            validated=True,
         )
         await asyncio.sleep(0)
 

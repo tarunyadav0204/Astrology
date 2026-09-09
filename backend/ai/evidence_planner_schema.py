@@ -26,6 +26,7 @@ INTENT_FAMILIES = {
 
 LIFE_DOMAINS = {
     "marriage",
+    "love_vs_arranged_marriage",
     "relationship",
     "career",
     "wealth",
@@ -48,6 +49,10 @@ LIFE_DOMAINS = {
 
 EVENT_PROFILES = {
     "marriage",
+    "love_vs_arranged_marriage",
+    "career_fit",
+    "relationship_current_state",
+    "specific_partner_decision",
     "promotion",
     "job_change",
     "first_job",
@@ -57,6 +62,7 @@ EVENT_PROFILES = {
     "meeting_partner",
     "health_recovery",
     "exam_success",
+    "education_admission",
     "weight_loss",
     "appearance_glow_up",
     "property_purchase",
@@ -164,6 +170,13 @@ def _normalize_timeframe(value: Any) -> Dict[str, Any]:
             unit = match.group(2)
             months = amount / 30.4375 if unit.startswith("day") else amount * 7 / 30.4375 if unit.startswith("week") else amount * 12 if unit.startswith("year") else amount
             out["duration_months"] = max(1, int(round(months)))
+    for key in ("duration_days", "duration_weeks", "duration_months"):
+        if out.get(key) in (None, ""):
+            continue
+        try:
+            out[key] = max(1, int(out[key]))
+        except (TypeError, ValueError):
+            out.pop(key, None)
     if "granularity" in out:
         out["granularity"] = _enum_ci(out.get("granularity"), GRANULARITIES, "multi_year_window")
     return out

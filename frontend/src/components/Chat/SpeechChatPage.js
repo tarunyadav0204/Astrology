@@ -5,9 +5,19 @@ import { useCredits } from '../../context/CreditContext';
 import { buildQueryContext } from '../../utils/queryContext';
 import textToSpeech from '../../utils/textToSpeech';
 import { speakThinkingHandoff } from '../../utils/speechThinkingHandoff';
+import {
+    buildConversationalClosing,
+    inferSpeechLanguage,
+    speechLocaleForLanguage,
+    takeSpeakableChunks,
+} from '../../utils/speechStreaming';
 import './SpeechChatPage.css';
 
 const POLL_INTERVAL_MS = 1400;
+const RECOGNITION_MAX_MS = 20000;
+const RECOGNITION_SILENCE_MS = 1400;
+const RECOGNITION_END_GRACE_MS = 1600;
+const BACKEND_RECORDING_MAX_MS = 20000;
 
 function readStoredWebUserName() {
     try {
@@ -19,9 +29,14 @@ function readStoredWebUserName() {
     }
 }
 
-function buildTaraGreeting(displayName, chartFirstName) {
+function buildTaraGreeting(displayName, chartFirstName, language = 'english') {
     const chart = String(chartFirstName || 'this').trim();
     const user = String(displayName || '').trim();
+    if (String(language).toLowerCase().startsWith('hi')) {
+        return user
+            ? `नमस्ते ${user}, मैं तारा हूँ। ${chart} की कुंडली मेरे सामने है। आप क्या जानना चाहते हैं?`
+            : `नमस्ते, मैं तारा हूँ। ${chart} की कुंडली मेरे सामने है। आप क्या जानना चाहते हैं?`;
+    }
     if (user) {
         return `Hello ${user}, I'm Tara, your voice guide on AstroRoshni. Thanks for sharing ${chart}'s chart. How can I help you? Do you have a question for me?`;
     }
@@ -33,7 +48,21 @@ const getSpeechRecognitionClass = () => {
     return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 };
 
-const getSpeechRecognitionLang = () => 'en-US';
+const getSpeechRecognitionLang = () => {
+    const stored = String(localStorage.getItem('language') || '').toLowerCase();
+    if (stored.startsWith('hi') || stored === 'hindi') return 'hi-IN';
+    return navigator.language || 'en-US';
+};
+
+const getChatLanguage = () => (
+    getSpeechRecognitionLang().toLowerCase().startsWith('hi') ? 'hindi' : 'english'
+);
+
+const supportsBackendRecording = () => Boolean(
+    typeof window !== 'undefined'
+    && window.MediaRecorder
+    && window.navigator?.mediaDevices?.getUserMedia
+);
 
 const toChatBirthDetails = (birthData) => ({
     name: birthData?.name,
@@ -57,6 +86,7 @@ const SpeechChatPage = () => {
         speechChatCost,
         instantChatEnabled,
         speechChatEnabled,
+        speechTtsProvider,
     } = useCredits();
 
     const [sessionId, setSessionId] = useState(null);
@@ -66,15 +96,41 @@ const SpeechChatPage = () => {
     const [errorText, setErrorText] = useState('');
     const [handsFree, setHandsFree] = useState(true);
     const [followUps, setFollowUps] = useState([]);
-    const [isSpeechSupported, setIsSpeechSupported] = useState(() => Boolean(getSpeechRecognitionClass()));
+    const [isSpeechSupported, setIsSpeechSupported] = useState(() => (
+        Boolean(getSpeechRecognitionClass()) || supportsBackendRecording()
+    ));
+    const [speechLanguage, setSpeechLanguage] = useState(() => getChatLanguage());
     const [displayUserName] = useState(() => readStoredWebUserName());
 
     const recognitionRef = useRef(null);
+    const recognitionSilenceTimerRef = useRef(null);
+    const recognitionMaxTimerRef = useRef(null);
+    const recognitionEndTimerRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const mediaStreamRef = useRef(null);
+    const mediaChunksRef = useRef([]);
+    const mediaRecordingStartedAtRef = useRef(0);
+    const mediaRecordingTimerRef = useRef(null);
+    const speechSocketRef = useRef(null);
+    const speechSocketConnectRef = useRef(null);
+    const speechSocketTurnsRef = useRef(new Map());
     const finalTranscriptRef = useRef('');
     const liveTranscriptRef = useRef('');
     const shouldAutoSendSpeechRef = useRef(false);
+    const speechLeadInEpochRef = useRef(0);
     const mountedRef = useRef(true);
     const thinkingTurnIdRef = useRef(null);
+    const cancelledTurnIdsRef = useRef(new Set());
+    const streamSpeechRef = useRef({
+        epoch: 0,
+        turnId: null,
+        queue: [],
+        buffer: '',
+        playing: false,
+        started: false,
+        completed: false,
+        language: 'english',
+    });
     const autoRestartTimerRef = useRef(null);
     const scrollRef = useRef(null);
     const greetedRef = useRef(false);
@@ -83,20 +139,28 @@ const SpeechChatPage = () => {
 
     handsFreeRef.current = handsFree;
 
+    useEffect(() => {
+        if (!speechTtsProvider) return;
+        textToSpeech.setProvider(speechTtsProvider);
+        return () => textToSpeech.setProvider('local');
+    }, [speechTtsProvider]);
+
     const taraStatusLabels = useMemo(() => ({
         idle: handsFree
             ? 'Tap the mic and AstroRoshni will keep listening after each answer'
             : 'Tap the mic and ask your question',
         listening: 'Listening… tap again when done',
         thinking: 'Reading the chart…',
+        transcribing: 'Understanding your question…',
         speaking: 'Speaking the answer… tap to stop',
     }), [handsFree]);
 
     useEffect(() => {
         mountedRef.current = true;
-        setIsSpeechSupported(Boolean(getSpeechRecognitionClass()));
+        setIsSpeechSupported(Boolean(getSpeechRecognitionClass()) || supportsBackendRecording());
         return () => {
             mountedRef.current = false;
+            speechLeadInEpochRef.current += 1;
             if (recognitionRef.current) {
                 recognitionRef.current.onstart = null;
                 recognitionRef.current.onresult = null;
@@ -105,6 +169,20 @@ const SpeechChatPage = () => {
                 recognitionRef.current.abort();
                 recognitionRef.current = null;
             }
+            [recognitionSilenceTimerRef, recognitionMaxTimerRef, recognitionEndTimerRef].forEach((timerRef) => {
+                if (timerRef.current) clearTimeout(timerRef.current);
+                timerRef.current = null;
+            });
+            if (mediaRecordingTimerRef.current) clearTimeout(mediaRecordingTimerRef.current);
+            if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
+            mediaRecorderRef.current = null;
+            mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+            mediaStreamRef.current = null;
+            speechSocketTurnsRef.current.forEach((pending) => pending.reject?.(new Error('Speech socket closed')));
+            speechSocketTurnsRef.current.clear();
+            speechSocketRef.current?.close();
+            speechSocketRef.current = null;
+            speechSocketConnectRef.current = null;
             if (autoRestartTimerRef.current) {
                 clearTimeout(autoRestartTimerRef.current);
                 autoRestartTimerRef.current = null;
@@ -113,15 +191,17 @@ const SpeechChatPage = () => {
         };
     }, []);
 
+    const latestAnswer = turns.length ? turns[turns.length - 1]?.answer : '';
+
     useEffect(() => {
-        if (!currentTranscript) return undefined;
+        if (!currentTranscript && !latestAnswer) return undefined;
         const el = scrollRef.current;
         if (!el) return undefined;
         const timer = setTimeout(() => {
             el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
         }, 60);
         return () => clearTimeout(timer);
-    }, [currentTranscript]);
+    }, [currentTranscript, latestAnswer]);
 
     const chartLabel = useMemo(() => {
         if (!birthData?.name) return 'your selected chart';
@@ -165,7 +245,108 @@ const SpeechChatPage = () => {
         throw new Error('Speech session response was incomplete.');
     };
 
+    const scheduleHandsFreeRestart = () => {
+        if (!handsFreeRef.current || !mountedRef.current) return;
+        if (autoRestartTimerRef.current) clearTimeout(autoRestartTimerRef.current);
+        autoRestartTimerRef.current = setTimeout(() => {
+            if (mountedRef.current && handsFreeRef.current) startListeningRef.current();
+        }, 450);
+    };
+
+    const resetStreamSpeech = ({ stopAudio = true } = {}) => {
+        const previous = streamSpeechRef.current;
+        streamSpeechRef.current = {
+            epoch: Number(previous?.epoch || 0) + 1,
+            turnId: null,
+            queue: [],
+            buffer: '',
+            playing: false,
+            started: false,
+            completed: false,
+            language: 'english',
+        };
+        if (stopAudio) textToSpeech.stop();
+    };
+
+    const finishStreamSpeech = (turnId, epoch) => {
+        const state = streamSpeechRef.current;
+        if (state.turnId !== turnId || state.epoch !== epoch || !state.completed) return;
+        state.playing = false;
+        setStatus('idle');
+        scheduleHandsFreeRestart();
+    };
+
+    const pumpStreamSpeech = (turnId) => {
+        const state = streamSpeechRef.current;
+        if (state.turnId !== turnId || state.playing) return;
+        const next = state.queue.shift();
+        if (!next) {
+            if (state.completed) finishStreamSpeech(turnId, state.epoch);
+            else setStatus('thinking');
+            return;
+        }
+        const epoch = state.epoch;
+        state.playing = true;
+        state.started = true;
+        setStatus('speaking');
+        textToSpeech.speak(next, {
+            rate: 0.93,
+            pitch: 1,
+            lang: speechLocaleForLanguage(state.language),
+            onEnd: () => {
+                const current = streamSpeechRef.current;
+                if (current.turnId !== turnId || current.epoch !== epoch) return;
+                current.playing = false;
+                pumpStreamSpeech(turnId);
+            },
+            onError: () => {
+                const current = streamSpeechRef.current;
+                if (current.turnId !== turnId || current.epoch !== epoch) return;
+                current.playing = false;
+                current.queue = [];
+                if (current.completed) finishStreamSpeech(turnId, epoch);
+                else setStatus('thinking');
+            },
+        });
+    };
+
+    const beginStreamSpeech = (turnId, language) => {
+        resetStreamSpeech();
+        streamSpeechRef.current.turnId = turnId;
+        streamSpeechRef.current.language = language;
+    };
+
+    const enqueuePlayableText = (turnId, text, { flush = false } = {}) => {
+        const state = streamSpeechRef.current;
+        if (state.turnId !== turnId) return;
+        const extracted = takeSpeakableChunks(`${state.buffer}${String(text || '')}`, { flush });
+        state.buffer = extracted.remainder;
+        state.queue.push(...extracted.chunks);
+        if (state.queue.length) pumpStreamSpeech(turnId);
+    };
+
+    const replaceStreamSpeech = (turnId, content, event) => {
+        const state = streamSpeechRef.current;
+        if (state.turnId !== turnId || !(event?.validated || event?.playable)) return;
+        const language = state.language;
+        const nextEpoch = state.epoch + 1;
+        textToSpeech.stop();
+        streamSpeechRef.current = {
+            epoch: nextEpoch,
+            turnId,
+            queue: [],
+            buffer: '',
+            playing: false,
+            started: false,
+            completed: false,
+            language,
+        };
+        enqueuePlayableText(turnId, content, { flush: Boolean(event?.validated) });
+    };
+
     const interruptAssistantSpeech = () => {
+        speechLeadInEpochRef.current += 1;
+        resetStreamSpeech();
         textToSpeech.stop();
         if (autoRestartTimerRef.current) {
             clearTimeout(autoRestartTimerRef.current);
@@ -174,7 +355,126 @@ const SpeechChatPage = () => {
         setStatus('idle');
     };
 
-    const speakAnswer = (answerText) => {
+    const ensureSpeechSocket = async () => {
+        if (speechSocketRef.current?.readyState === WebSocket.OPEN) return speechSocketRef.current;
+        if (speechSocketConnectRef.current) return speechSocketConnectRef.current;
+
+        speechSocketConnectRef.current = new Promise((resolve, reject) => {
+            const token = localStorage.getItem('token') || '';
+            const wsOrigin = window.location.origin.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
+            const socket = new WebSocket(`${wsOrigin}/api/speech/ws?token=${encodeURIComponent(token)}`);
+            let ready = false;
+            const timeout = setTimeout(() => {
+                if (ready) return;
+                speechSocketConnectRef.current = null;
+                socket.close();
+                reject(new Error('Speech connection timed out.'));
+            }, 8000);
+
+            socket.onmessage = (message) => {
+                let event;
+                try {
+                    event = JSON.parse(message.data || '{}');
+                } catch {
+                    return;
+                }
+                if (event.type === 'ready') {
+                    ready = true;
+                    clearTimeout(timeout);
+                    speechSocketRef.current = socket;
+                    speechSocketConnectRef.current = null;
+                    resolve(socket);
+                    return;
+                }
+                if (event.type === 'ping') {
+                    socket.send(JSON.stringify({ type: 'pong' }));
+                    return;
+                }
+                const pending = speechSocketTurnsRef.current.get(event.turn_id);
+                if (!pending) return;
+                if (event.type === 'turn_started' || event.type === 'turn_queued') {
+                    pending.accepted = true;
+                    return;
+                }
+                if (event.type === 'answer_chunk') {
+                    const delta = String(event.text || '');
+                    pending.content = String(event.content || `${pending.content || ''}${delta}`);
+                    pending.onChunk?.(delta, { ...event, content: pending.content });
+                    return;
+                }
+                if (event.type === 'answer_replace') {
+                    pending.content = String(event.content || '');
+                    pending.onReplace?.(pending.content, event);
+                    return;
+                }
+                if (event.type === 'turn_completed') {
+                    speechSocketTurnsRef.current.delete(event.turn_id);
+                    pending.resolve(event);
+                    return;
+                }
+                if (event.type === 'turn_error') {
+                    speechSocketTurnsRef.current.delete(event.turn_id);
+                    const error = new Error(event.message || 'Speech turn failed.');
+                    error.turnAccepted = true;
+                    pending.reject(error);
+                    return;
+                }
+                if (event.type === 'cancelled' || event.type === 'turn_cancelled') {
+                    speechSocketTurnsRef.current.delete(event.turn_id);
+                    const error = new Error('Speech turn cancelled.');
+                    error.turnAccepted = true;
+                    error.cancelled = true;
+                    pending.reject(error);
+                }
+            };
+            socket.onerror = () => {
+                if (!ready) {
+                    clearTimeout(timeout);
+                    speechSocketConnectRef.current = null;
+                    reject(new Error('Speech connection failed.'));
+                }
+            };
+            socket.onclose = () => {
+                clearTimeout(timeout);
+                speechSocketRef.current = null;
+                speechSocketConnectRef.current = null;
+                speechSocketTurnsRef.current.forEach((pending) => {
+                    const error = new Error('Speech connection closed.');
+                    error.turnAccepted = Boolean(pending.accepted);
+                    pending.reject?.(error);
+                });
+                speechSocketTurnsRef.current.clear();
+            };
+        });
+        return speechSocketConnectRef.current;
+    };
+
+    const askOverSpeechSocket = async (requestBody, turnId, handlers = {}) => {
+        const socket = await ensureSpeechSocket();
+        if (cancelledTurnIdsRef.current.has(turnId)) {
+            const error = new Error('Speech turn cancelled.');
+            error.cancelled = true;
+            throw error;
+        }
+        return new Promise((resolve, reject) => {
+            speechSocketTurnsRef.current.set(turnId, {
+                resolve,
+                reject,
+                onChunk: handlers.onChunk,
+                onReplace: handlers.onReplace,
+                content: '',
+                accepted: false,
+            });
+            try {
+                socket.send(JSON.stringify({ ...requestBody, type: 'ask', turn_id: turnId }));
+            } catch (error) {
+                speechSocketTurnsRef.current.delete(turnId);
+                reject(error);
+            }
+        });
+    };
+
+    const speakAnswer = (answerText, language = speechLanguage) => {
         const trimmed = String(answerText || '').trim();
         if (!trimmed) {
             setStatus('idle');
@@ -187,16 +487,11 @@ const SpeechChatPage = () => {
         textToSpeech.speak(trimmed, {
             rate: 0.93,
             pitch: 1,
+            lang: speechLocaleForLanguage(language),
             onEnd: () => {
                 if (!mountedRef.current) return;
                 setStatus('idle');
-                if (handsFree) {
-                    autoRestartTimerRef.current = setTimeout(() => {
-                        if (mountedRef.current) {
-                            startListening();
-                        }
-                    }, 450);
-                }
+                scheduleHandsFreeRestart();
             },
             onError: () => {
                 if (!mountedRef.current) return;
@@ -205,7 +500,116 @@ const SpeechChatPage = () => {
         });
     };
 
+    const submitRecognizedQuestion = async (transcript) => {
+        const question = String(transcript || '').trim();
+        if (!question || !mountedRef.current) return;
+        const turnLanguage = inferSpeechLanguage(question, speechLanguage);
+        const leadInEpoch = speechLeadInEpochRef.current + 1;
+        speechLeadInEpochRef.current = leadInEpoch;
+        setStatus('thinking');
+        await speakThinkingHandoff(turnLanguage);
+        if (mountedRef.current && speechLeadInEpochRef.current === leadInEpoch) {
+            sendQuestion(question, turnLanguage);
+        }
+    };
+
+    const stopBackendRecording = () => {
+        if (mediaRecordingTimerRef.current) {
+            clearTimeout(mediaRecordingTimerRef.current);
+            mediaRecordingTimerRef.current = null;
+        }
+        const recorder = mediaRecorderRef.current;
+        if (recorder?.state === 'recording') {
+            setStatus('transcribing');
+            recorder.stop();
+        }
+    };
+
+    const startBackendRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (!mountedRef.current) {
+                stream.getTracks().forEach((track) => track.stop());
+                return;
+            }
+            const preferredMime = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/mp4',
+            ].find((mime) => window.MediaRecorder.isTypeSupported?.(mime));
+            const recorder = preferredMime
+                ? new window.MediaRecorder(stream, { mimeType: preferredMime })
+                : new window.MediaRecorder(stream);
+            mediaStreamRef.current = stream;
+            mediaRecorderRef.current = recorder;
+            mediaChunksRef.current = [];
+            mediaRecordingStartedAtRef.current = Date.now();
+
+            recorder.ondataavailable = (event) => {
+                if (event.data?.size) mediaChunksRef.current.push(event.data);
+            };
+            recorder.onerror = () => {
+                if (!mountedRef.current) return;
+                setErrorText('Microphone recording failed. Please try again.');
+                setStatus('idle');
+            };
+            recorder.onstop = async () => {
+                const chunks = mediaChunksRef.current;
+                const durationMs = Math.max(0, Date.now() - mediaRecordingStartedAtRef.current);
+                const mimeType = recorder.mimeType || preferredMime || 'audio/webm';
+                mediaChunksRef.current = [];
+                mediaRecorderRef.current = null;
+                mediaRecordingStartedAtRef.current = 0;
+                mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+                mediaStreamRef.current = null;
+                if (!chunks.length || !mountedRef.current) {
+                    if (mountedRef.current) {
+                        setErrorText('No speech was recorded. Please try again.');
+                        setStatus('idle');
+                    }
+                    return;
+                }
+                try {
+                    const extension = mimeType.includes('mp4') ? 'm4a' : 'webm';
+                    const form = new FormData();
+                    form.append('audio', new Blob(chunks, { type: mimeType }), `speech-question.${extension}`);
+                    form.append('language', speechLanguage);
+                    form.append('duration_ms', String(durationMs));
+                    const response = await fetch('/api/speech/transcribe', {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+                        body: form,
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(data.detail || 'Could not understand the recording.');
+                    const transcript = String(data.transcript || '').trim();
+                    if (!transcript) throw new Error('No speech was detected. Please try again.');
+                    setCurrentTranscript(transcript);
+                    await submitRecognizedQuestion(transcript);
+                } catch (error) {
+                    if (!mountedRef.current) return;
+                    setErrorText(error?.message || 'Speech transcription failed. Please try again.');
+                    setStatus('idle');
+                }
+            };
+
+            recorder.start(250);
+            setStatus('listening');
+            mediaRecordingTimerRef.current = setTimeout(stopBackendRecording, BACKEND_RECORDING_MAX_MS);
+        } catch (error) {
+            if (!mountedRef.current) return;
+            const permissionDenied = error?.name === 'NotAllowedError' || error?.name === 'SecurityError';
+            setErrorText(
+                permissionDenied
+                    ? 'Microphone permission was blocked for this site.'
+                    : 'Could not start microphone recording. Please try again.'
+            );
+            setStatus('idle');
+        }
+    };
+
     const startListening = () => {
+        speechLeadInEpochRef.current += 1;
         if (!birthData) {
             setErrorText('Select a birth chart before starting speech chat.');
             return;
@@ -224,7 +628,7 @@ const SpeechChatPage = () => {
         }
 
         const SpeechRecognitionClass = getSpeechRecognitionClass();
-        if (!SpeechRecognitionClass) {
+        if (!SpeechRecognitionClass && !supportsBackendRecording()) {
             setErrorText('Speech recognition is not supported in this browser.');
             return;
         }
@@ -240,15 +644,47 @@ const SpeechChatPage = () => {
         liveTranscriptRef.current = '';
         shouldAutoSendSpeechRef.current = true;
 
+        if (!SpeechRecognitionClass) {
+            startBackendRecording();
+            return;
+        }
+
         const recognition = new SpeechRecognitionClass();
-        recognition.lang = getSpeechRecognitionLang();
+        recognition.lang = speechLocaleForLanguage(speechLanguage);
         recognition.interimResults = true;
         recognition.continuous = false;
         recognition.maxAlternatives = 1;
 
+        let recognitionSettled = false;
+        const clearRecognitionTimers = () => {
+            [recognitionSilenceTimerRef, recognitionMaxTimerRef, recognitionEndTimerRef].forEach((timerRef) => {
+                if (timerRef.current) clearTimeout(timerRef.current);
+                timerRef.current = null;
+            });
+        };
+        const finishRecognition = () => {
+            if (recognitionSettled || !mountedRef.current) return;
+            recognitionSettled = true;
+            clearRecognitionTimers();
+            recognitionRef.current = null;
+            const transcript = String(finalTranscriptRef.current || liveTranscriptRef.current || '').trim();
+            const shouldSend = shouldAutoSendSpeechRef.current;
+            shouldAutoSendSpeechRef.current = false;
+            if (shouldSend && transcript) {
+                void submitRecognizedQuestion(transcript);
+            } else {
+                setStatus('idle');
+                if (!transcript) setErrorText('No speech was detected. Please try again.');
+            }
+        };
+
         recognition.onstart = () => {
             if (!mountedRef.current) return;
             setStatus('listening');
+            recognitionMaxTimerRef.current = setTimeout(() => {
+                try { recognition.stop(); } catch { finishRecognition(); }
+                recognitionEndTimerRef.current = setTimeout(finishRecognition, RECOGNITION_END_GRACE_MS);
+            }, RECOGNITION_MAX_MS);
         };
 
         recognition.onresult = (event) => {
@@ -266,13 +702,23 @@ const SpeechChatPage = () => {
             finalTranscriptRef.current = finalText.trim() || combined;
             liveTranscriptRef.current = combined;
             setCurrentTranscript(combined);
+            if (recognitionSilenceTimerRef.current) clearTimeout(recognitionSilenceTimerRef.current);
+            recognitionSilenceTimerRef.current = setTimeout(() => {
+                try { recognition.stop(); } catch { finishRecognition(); }
+                recognitionEndTimerRef.current = setTimeout(finishRecognition, RECOGNITION_END_GRACE_MS);
+            }, RECOGNITION_SILENCE_MS);
         };
 
         recognition.onerror = (event) => {
             recognitionRef.current = null;
-            shouldAutoSendSpeechRef.current = false;
             if (!mountedRef.current) return;
-            if (event?.error === 'aborted') return;
+            if (event?.error === 'aborted' && (finalTranscriptRef.current || liveTranscriptRef.current)) {
+                finishRecognition();
+                return;
+            }
+            clearRecognitionTimers();
+            recognitionSettled = true;
+            shouldAutoSendSpeechRef.current = false;
             if (event?.error === 'no-speech') {
                 setErrorText('No speech was detected. Please try again.');
             } else if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
@@ -284,33 +730,76 @@ const SpeechChatPage = () => {
         };
 
         recognition.onend = () => {
-            recognitionRef.current = null;
-            if (!mountedRef.current) return;
-            const transcript = String(finalTranscriptRef.current || liveTranscriptRef.current || '').trim();
-            const shouldSend = shouldAutoSendSpeechRef.current;
-            shouldAutoSendSpeechRef.current = false;
-            if (shouldSend && transcript) {
-                void (async () => {
-                    await speakThinkingHandoff();
-                    if (!mountedRef.current) return;
-                    sendQuestion(transcript);
-                })();
-            } else {
-                setStatus('idle');
-            }
+            finishRecognition();
         };
 
         recognitionRef.current = recognition;
-        recognition.start();
+        try {
+            recognition.start();
+        } catch (error) {
+            recognitionRef.current = null;
+            clearRecognitionTimers();
+            setErrorText('Could not start speech recognition. Please try again.');
+            setStatus('idle');
+        }
     };
 
     const stopListening = () => {
+        if (mediaRecorderRef.current?.state === 'recording') {
+            stopBackendRecording();
+            return;
+        }
         shouldAutoSendSpeechRef.current = true;
-        recognitionRef.current?.stop();
+        const recognition = recognitionRef.current;
+        recognition?.stop();
+        if (recognitionEndTimerRef.current) clearTimeout(recognitionEndTimerRef.current);
+        recognitionEndTimerRef.current = setTimeout(() => {
+            recognition?.onend?.();
+        }, RECOGNITION_END_GRACE_MS);
         setStatus('thinking');
     };
 
-    const sendQuestion = async (questionText) => {
+    const completeTurn = (turnId, result, language) => {
+        if (cancelledTurnIdsRef.current.has(turnId) || !mountedRef.current) return;
+        const answer = String(result?.content || '').trim() || 'I have the answer, but it came back empty.';
+        const nextFollowUps = Array.isArray(result?.follow_up_questions)
+            ? result.follow_up_questions.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
+            : [];
+        const closingQuestion = buildConversationalClosing(answer, nextFollowUps, language);
+        const conversationalAnswer = closingQuestion
+            ? `${answer}\n\n${closingQuestion}`
+            : answer;
+        setTurns((prev) => prev.map((turn) => (
+            turn.id === turnId
+                ? { ...turn, answer: conversationalAnswer, pending: false, assistantMessageId: result?.message_id }
+                : turn
+        )));
+        setFollowUps(nextFollowUps);
+        setCurrentTranscript('');
+        fetchBalance();
+        if (thinkingTurnIdRef.current === turnId) thinkingTurnIdRef.current = null;
+
+        const streamState = streamSpeechRef.current;
+        const hasStreamedSpeech = streamState.turnId === turnId && Boolean(
+            streamState.started || streamState.queue.length || streamState.buffer.trim()
+        );
+        if (hasStreamedSpeech) {
+            streamState.completed = true;
+            enqueuePlayableText(
+                turnId,
+                closingQuestion ? `\n\n${closingQuestion}` : '',
+                { flush: true }
+            );
+            if (!streamState.playing && !streamState.queue.length) {
+                finishStreamSpeech(turnId, streamState.epoch);
+            }
+            return;
+        }
+        resetStreamSpeech();
+        speakAnswer(conversationalAnswer, language);
+    };
+
+    const sendQuestion = async (questionText, requestedLanguage = speechLanguage) => {
         const question = String(questionText || '').trim();
         if (!question) {
             setStatus('idle');
@@ -328,9 +817,18 @@ const SpeechChatPage = () => {
         }
 
         const token = localStorage.getItem('token');
-        const activeSessionId = await ensureSession();
+        let activeSessionId;
+        try {
+            activeSessionId = await ensureSession();
+        } catch (error) {
+            setErrorText(error?.message || 'Could not start a speech session right now.');
+            setStatus('idle');
+            return;
+        }
         const turnId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const turnLanguage = inferSpeechLanguage(question, requestedLanguage);
         thinkingTurnIdRef.current = turnId;
+        beginStreamSpeech(turnId, turnLanguage);
 
         setTurns((prev) => [
             ...prev,
@@ -342,15 +840,15 @@ const SpeechChatPage = () => {
             },
         ]);
         setFollowUps([]);
-        setCurrentTranscript(question);
+        setCurrentTranscript('');
         setStatus('thinking');
 
         const requestBody = {
             session_id: activeSessionId,
             question,
             query_context: buildQueryContext(),
-            language: 'english',
-            response_style: 'concise',
+            language: turnLanguage,
+            response_style: 'simple',
             premium_analysis: false,
             chat_tier: 'instant',
             speech_chat: true,
@@ -360,6 +858,28 @@ const SpeechChatPage = () => {
         };
 
         try {
+            try {
+                const streamedResult = await askOverSpeechSocket(requestBody, turnId, {
+                    onChunk: (delta, event) => {
+                        setTurns((prev) => prev.map((turn) => (
+                            turn.id === turnId ? { ...turn, answer: event?.content || '', pending: true } : turn
+                        )));
+                        if (event?.validated || event?.playable) enqueuePlayableText(turnId, delta);
+                    },
+                    onReplace: (content, event) => {
+                        setTurns((prev) => prev.map((turn) => (
+                            turn.id === turnId ? { ...turn, answer: content, pending: true } : turn
+                        )));
+                        replaceStreamSpeech(turnId, content, event);
+                    },
+                });
+                completeTurn(turnId, streamedResult, turnLanguage);
+                return;
+            } catch (socketError) {
+                // Only fall back before a WebSocket turn has been accepted.
+                if (socketError?.cancelled) return;
+                if (socketError?.turnAccepted) throw socketError;
+            }
             const response = await fetch('/api/chat-v2/ask', {
                 method: 'POST',
                 headers: {
@@ -380,8 +900,11 @@ const SpeechChatPage = () => {
                 throw new Error('Speech reply did not start correctly.');
             }
 
-            pollForReply(assistantMessageId, turnId);
+            pollForReply(assistantMessageId, turnId, turnLanguage);
         } catch (error) {
+            if (error?.cancelled || cancelledTurnIdsRef.current.has(turnId)) return;
+            resetStreamSpeech();
+            if (thinkingTurnIdRef.current === turnId) thinkingTurnIdRef.current = null;
             setTurns((prev) =>
                 prev.map((turn) =>
                     turn.id === turnId
@@ -394,12 +917,13 @@ const SpeechChatPage = () => {
         }
     };
 
-    const pollForReply = async (assistantMessageId, turnId) => {
+    const pollForReply = async (assistantMessageId, turnId, turnLanguage) => {
         const token = localStorage.getItem('token');
         let pollCount = 0;
         const maxPolls = 120;
 
         const poll = async () => {
+            if (cancelledTurnIdsRef.current.has(turnId) || !mountedRef.current) return;
             const res = await fetch(`/api/chat-v2/status/${assistantMessageId}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -409,23 +933,16 @@ const SpeechChatPage = () => {
             const statusData = await res.json();
 
             if (statusData.status === 'completed') {
-                const answer = String(statusData.content || '').trim() || 'I have the answer, but it came back empty.';
-                const nextFollowUps = Array.isArray(statusData.follow_up_questions)
-                    ? statusData.follow_up_questions.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
-                    : [];
-
-                setTurns((prev) =>
-                    prev.map((turn) =>
-                        turn.id === turnId
-                            ? { ...turn, answer, pending: false, assistantMessageId }
-                            : turn
-                    )
-                );
-                setFollowUps(nextFollowUps);
-                setCurrentTranscript('');
-                fetchBalance();
-                speakAnswer(answer);
+                completeTurn(turnId, { ...statusData, message_id: assistantMessageId }, turnLanguage);
                 return;
+            }
+
+            if (statusData.status === 'processing' && statusData.partial_content) {
+                setTurns((prev) => prev.map((turn) => (
+                    turn.id === turnId
+                        ? { ...turn, answer: String(statusData.partial_content), pending: true }
+                        : turn
+                )));
             }
 
             if (statusData.status === 'failed') {
@@ -440,6 +957,9 @@ const SpeechChatPage = () => {
         };
 
         const handlePollError = (error) => {
+            if (cancelledTurnIdsRef.current.has(turnId) || !mountedRef.current) return;
+            resetStreamSpeech();
+            if (thinkingTurnIdRef.current === turnId) thinkingTurnIdRef.current = null;
             setTurns((prev) =>
                 prev.map((turn) =>
                     turn.id === turnId
@@ -454,9 +974,37 @@ const SpeechChatPage = () => {
         poll().catch(handlePollError);
     };
 
+    const cancelActiveTurn = () => {
+        const turnId = thinkingTurnIdRef.current;
+        if (!turnId) return false;
+        cancelledTurnIdsRef.current.add(turnId);
+        thinkingTurnIdRef.current = null;
+        const pending = speechSocketTurnsRef.current.get(turnId);
+        if (pending) {
+            speechSocketTurnsRef.current.delete(turnId);
+            const error = new Error('Speech turn cancelled.');
+            error.turnAccepted = true;
+            error.cancelled = true;
+            pending.reject?.(error);
+        }
+        const socket = speechSocketRef.current;
+        if (socket?.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'cancel', turn_id: turnId }));
+        }
+        resetStreamSpeech();
+        setTurns((prev) => prev.map((turn) => (
+            turn.id === turnId
+                ? { ...turn, answer: turn.answer || 'Answer stopped.', pending: false, stopped: true }
+                : turn
+        )));
+        setCurrentTranscript('');
+        setStatus('idle');
+        return true;
+    };
+
     const handleMicPress = () => {
         if (status === 'speaking') {
-            interruptAssistantSpeech();
+            if (!cancelActiveTurn()) interruptAssistantSpeech();
             startListening();
             return;
         }
@@ -465,6 +1013,8 @@ const SpeechChatPage = () => {
             return;
         }
         if (status === 'thinking') {
+            if (!cancelActiveTurn()) interruptAssistantSpeech();
+            startListening();
             return;
         }
         startListening();
@@ -472,21 +1022,29 @@ const SpeechChatPage = () => {
 
     const handleFollowUp = (question) => {
         interruptAssistantSpeech();
-        setStatus('thinking');
-        void (async () => {
-            await speakThinkingHandoff();
-            if (!mountedRef.current) return;
-            sendQuestion(question);
-        })();
+        void submitRecognizedQuestion(question);
+    };
+
+    const handleSpeechLanguageChange = (language) => {
+        const nextLanguage = language === 'hindi' ? 'hindi' : 'english';
+        if (nextLanguage === speechLanguage) return;
+        if (status === 'speaking' && turns.length === 0 && !thinkingTurnIdRef.current) {
+            interruptAssistantSpeech();
+            greetedRef.current = false;
+        }
+        localStorage.setItem('language', nextLanguage);
+        setSpeechLanguage(nextLanguage);
+        setErrorText('');
     };
 
     startListeningRef.current = startListening;
 
     useEffect(() => {
-        if (greetedRef.current || !birthData?.name || status !== 'idle') return;
+        if (greetedRef.current || !birthData?.name || status !== 'idle' || !speechTtsProvider) return;
         if (!speechChatEnabled || !instantChatEnabled) return;
 
-        const greeting = buildTaraGreeting(displayUserName, birthData.name);
+        const greetingLanguage = speechLanguage;
+        const greeting = buildTaraGreeting(displayUserName, birthData.name, greetingLanguage);
         if (!greeting) return;
 
         greetedRef.current = true;
@@ -496,6 +1054,7 @@ const SpeechChatPage = () => {
         textToSpeech.speak(greeting, {
             rate: 0.95,
             pitch: 1,
+            lang: speechLocaleForLanguage(greetingLanguage),
             onEnd: () => {
                 if (!mountedRef.current) return;
                 if (handsFreeRef.current) {
@@ -510,9 +1069,13 @@ const SpeechChatPage = () => {
                 if (mountedRef.current) setStatus('idle');
             },
         });
-    }, [birthData?.name, displayUserName, status, speechChatEnabled, instantChatEnabled]);
+    }, [birthData?.name, displayUserName, status, speechChatEnabled, instantChatEnabled, speechLanguage, speechTtsProvider]);
 
-    const micBusy = status === 'thinking';
+    const micWaiting = status === 'thinking' || status === 'transcribing';
+    const micDisabled = status === 'transcribing' || !isSpeechSupported || credits < speechChatCost;
+    const languageSelectionDisabled = status !== 'idle' && !(
+        status === 'speaking' && turns.length === 0 && !thinkingTurnIdRef.current
+    );
 
     const sessionActive = Boolean(birthData && speechChatEnabled && instantChatEnabled);
 
@@ -531,6 +1094,26 @@ const SpeechChatPage = () => {
                             <span className="speech-chat-tara-badge" aria-hidden>✦</span>
                         </div>
                         <p className="speech-chat-header__subtitle">{headerSubtitle}</p>
+                    </div>
+                    <div className="speech-chat-language" role="group" aria-label="Voice chat language">
+                        <button
+                            type="button"
+                            className={speechLanguage === 'english' ? 'is-selected' : ''}
+                            aria-pressed={speechLanguage === 'english'}
+                            disabled={languageSelectionDisabled}
+                            onClick={() => handleSpeechLanguageChange('english')}
+                        >
+                            English
+                        </button>
+                        <button
+                            type="button"
+                            className={speechLanguage === 'hindi' ? 'is-selected' : ''}
+                            aria-pressed={speechLanguage === 'hindi'}
+                            disabled={languageSelectionDisabled}
+                            onClick={() => handleSpeechLanguageChange('hindi')}
+                        >
+                            हिंदी
+                        </button>
                     </div>
                     <div className="speech-chat-live-badge" role="status">
                         <span className="speech-chat-live-dot" aria-hidden />
@@ -579,9 +1162,14 @@ const SpeechChatPage = () => {
                                                 <span>You asked</span>
                                                 <p>{turn.question}</p>
                                             </div>
-                                            <div className="speech-turn__answer">
-                                                <span>Tara answered</span>
-                                                <p>{turn.pending ? 'Tara is reading the chart…' : turn.answer}</p>
+                                            <div
+                                                className="speech-turn__answer"
+                                                role="status"
+                                                aria-live="polite"
+                                                aria-atomic="false"
+                                            >
+                                                <span>{turn.pending ? 'Tara is answering' : turn.stopped ? 'Answer stopped' : 'Tara answered'}</span>
+                                                <p>{turn.pending ? (turn.answer || 'Tara is reading the chart…') : turn.answer}</p>
                                             </div>
                                         </article>
                                     ))}
@@ -640,7 +1228,9 @@ const SpeechChatPage = () => {
                                     </span>
                                 </button>
 
-                                <p className="speech-chat-status">{taraStatusLabels[status] || taraStatusLabels.idle}</p>
+                                <p className="speech-chat-status" role="status" aria-live="polite">
+                                    {taraStatusLabels[status] || taraStatusLabels.idle}
+                                </p>
                                 <p className="speech-chat-meta">
                                     Credits: {credits} · Speech chat (Tara): {speechChatCost} credit{speechChatCost !== 1 ? 's' : ''} per turn
                                 </p>
@@ -650,16 +1240,20 @@ const SpeechChatPage = () => {
                                         type="button"
                                         className={`speech-chat-mic speech-chat-mic--${status}`}
                                         onClick={handleMicPress}
-                                        disabled={micBusy || !isSpeechSupported || credits < speechChatCost}
+                                        disabled={micDisabled}
                                         aria-label={
                                             status === 'speaking'
                                                 ? 'Stop speaking'
+                                                : status === 'thinking'
+                                                    ? 'Stop answer'
                                                 : status === 'listening'
                                                     ? 'Stop listening'
+                                                    : status === 'transcribing'
+                                                        ? 'Transcribing speech'
                                                     : 'Start microphone'
                                         }
                                     >
-                                        {micBusy ? (
+                                        {micWaiting ? (
                                             <span className="speech-chat-mic-spinner" aria-hidden />
                                         ) : (
                                             <>

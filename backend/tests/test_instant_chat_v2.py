@@ -2,7 +2,10 @@ from datetime import datetime
 
 import pytest
 
+import chat.instant_chat_pipeline as instant_pipeline
+from ai.intent_router import apply_chart_focus_guards
 from instant_chat_v2.orchestrator import build_instant_v2_packet, finalize_instant_v2_packet
+from instant_chat_v2.graph_live import apply_live_graph_policy
 from instant_chat_v2.planner import build_query_plan
 from instant_chat_v2.answer_spec import build_answer_spec
 from instant_chat_v2.evidence import build_evidence_ledger
@@ -15,6 +18,7 @@ from chat.instant_chat_pipeline import (
     _build_instant_prompt,
     _constitutional_health_required_rows,
     _fit_composer_brief,
+    _semantic_event_horizon_days,
     _build_event_timing_verdict,
     _instant_real_chart_facts,
     _is_retrospective_event_request,
@@ -25,6 +29,7 @@ from chat.instant_chat_pipeline import (
     _requested_charts_from_intent,
     _should_force_event_current_window,
     _strip_constitutional_health_validation_markers,
+    _structured_parts_need_compound_clarification,
     _repair_common_utf8_mojibake,
     _resolve_constitutional_health_rules,
     _resolve_period_window,
@@ -32,6 +37,129 @@ from chat.instant_chat_pipeline import (
     _target_focus_calculation_frame,
     _validate_constitutional_health_answer,
 )
+
+
+def test_operational_duration_days_controls_planner_and_event_scanner_horizon():
+    intent = {
+        "category": "career",
+        "answer_mode": "event_prediction",
+        "temporal_intent": {
+            "event_state": "pending_external",
+            "expected_cadence": "days_to_weeks",
+            "explicit_timeframe": False,
+        },
+        "evidence_plan": {
+            "question_parts": [{
+                "part_id": "p1",
+                "timeframe": {"kind": "bounded_future", "duration_days": 45},
+            }]
+        },
+    }
+    plan = build_query_plan(
+        question="opaque multilingual operational request",
+        intent=intent,
+        answer_mode="event_prediction",
+        target_subject={"key": "self"},
+        language="english",
+        as_of=datetime(2026, 9, 8),
+    )
+    assert plan["time_scope"]["horizon_end"] == "2026-10-23"
+    assert plan["time_scope"]["operational_cadence"]["event_state"] == "pending_external"
+    assert _semantic_event_horizon_days(intent) == 45
+
+
+def test_typed_operational_state_caps_conflicting_six_month_router_window():
+    intent = {
+        "category": "career",
+        "answer_mode": "event_prediction",
+        "temporal_intent": {
+            "event_state": "pending_external",
+            "expected_cadence": "weeks_to_months",
+            "process_scale": "routine_operational",
+            "explicit_timeframe": False,
+        },
+        "evidence_plan": {
+            "question_parts": [{
+                "part_id": "p1",
+                "timeframe": {"kind": "bounded_future", "duration_months": 6},
+            }]
+        },
+    }
+    plan = build_query_plan(
+        question="opaque operational request",
+        intent=intent,
+        answer_mode="event_prediction",
+        target_subject={"key": "self"},
+        language="english",
+        as_of=datetime(2026, 9, 8),
+    )
+    assert plan["time_scope"]["horizon_end"] == "2026-10-23"
+    assert plan["time_scope"]["semantic"]["duration_days"] == 45
+    assert _semantic_event_horizon_days(intent) == 45
+
+
+def test_unstarted_open_event_keeps_long_event_scanner_horizon():
+    intent = {
+        "temporal_intent": {
+            "event_state": "not_started",
+            "expected_cadence": "open",
+            "explicit_timeframe": False,
+        },
+        "evidence_plan": {"question_parts": [{"timeframe": {"kind": "open_future"}}]},
+    }
+    assert _semantic_event_horizon_days(intent) == instant_pipeline._INSTANT_EVENT_HORIZON_DAYS
+
+
+def test_same_event_promise_and_timing_parts_are_not_forced_into_pick_one_flow():
+    same_event = [
+        {
+            "life_domain": "marriage",
+            "event_profile": "marriage",
+            "intent_families": ["topic_outlook"],
+        },
+        {
+            "life_domain": "relationship",
+            "event_profile": "relationship_reconciliation",
+            "intent_families": ["event_timing"],
+        },
+    ]
+    unrelated = [
+        {"life_domain": "marriage", "intent_families": ["event_timing"]},
+        {"life_domain": "career", "intent_families": ["topic_outlook"]},
+    ]
+    incompatible = [
+        {"life_domain": "career", "intent_families": ["factual_chart_lookup"]},
+        {"life_domain": "career", "intent_families": ["topic_outlook"]},
+    ]
+    education_comparison_and_timing = [
+        {"life_domain": "education", "intent_families": ["comparison"]},
+        {
+            "life_domain": "education",
+            "event_profile": "education_admission",
+            "intent_families": ["event_timing"],
+        },
+    ]
+
+    assert _structured_parts_need_compound_clarification(same_event) is False
+    assert _structured_parts_need_compound_clarification(education_comparison_and_timing) is False
+    assert _structured_parts_need_compound_clarification(unrelated) is True
+    assert _structured_parts_need_compound_clarification(incompatible) is True
+
+    plan = build_query_plan(
+        question="Will I marry my girlfriend, and when will we speak again?",
+        intent={
+            "category": "marriage",
+            "evidence_plan": {"question_parts": same_event},
+        },
+        answer_mode="event_prediction",
+        target_subject={"key": "self"},
+        language="hinglish",
+        as_of="2026-09-07",
+    )
+    assert len(plan["question_parts"]) == 2
+    assert {row["event_profile"] for row in plan["question_parts"]} == {
+        "marriage", "relationship_reconciliation",
+    }
 
 
 def test_all_instant_answer_prompt_paths_share_relational_voice_contract():
@@ -104,18 +232,18 @@ def test_instant_response_language_prefers_latest_message_router_over_app_locale
         "What are my health vulnerabilities?",
         {"response_language": "hindi"},
         "hindi",
-    ) == "english"
-
-
-def test_instant_response_language_uses_script_for_older_intent_payloads():
-    assert _instant_response_language(
-        "मेरी स्वास्थ्य कमजोरियाँ क्या हैं?", {}, "english"
     ) == "hindi"
 
 
-def test_instant_health_language_gate_rejects_hindi_for_english_question():
+def test_instant_response_language_uses_app_fallback_for_older_intent_payloads():
+    assert _instant_response_language(
+        "मेरी स्वास्थ्य कमजोरियाँ क्या हैं?", {}, "english"
+    ) == "english"
+
+
+def test_instant_health_language_gate_does_not_parse_visible_language():
     hindi = "आपकी कुंडली के अनुसार मुख्य स्वास्थ्य संवेदनशीलता नाक और हृदय से जुड़ी है।"
-    assert "expected English" in _instant_answer_language_error(hindi, "english")
+    assert _instant_answer_language_error(hindi, "english") is None
     assert _instant_answer_language_error("Your chart highlights the nose and upper back.", "english") is None
 
 
@@ -244,6 +372,9 @@ def test_slim_event_prediction_preserves_d1_promise_for_readable_evidence():
         },
         normalized_evidence={
             "natal_promise": {"status": "supported", "topic_support": "supportive"},
+            "transit_activation_timeline": {
+                "peak_windows": [{"start": "2027-02-01", "end": "2027-02-10"}],
+            },
         },
         period_window={"start": "2026-08-20", "end": "2027-08-20"},
         category="career",
@@ -259,6 +390,7 @@ def test_slim_event_prediction_preserves_d1_promise_for_readable_evidence():
     )
 
     assert context["normalized_evidence"]["natal_promise"]["status"] == "supported"
+    assert context["normalized_evidence"]["transit_activation_timeline"]["peak_windows"]
     assert context["_user_evidence"]["natal_topic_factors"] == natal_topic_factors
     assert derivation["natal_promise"]["d1_house_factors"][0]["house"] == 10
 
@@ -630,6 +762,60 @@ def _context():
             "claim_gates": {"allow_timing": True},
         },
     }
+
+
+def test_open_future_relationship_timing_keeps_semantic_route_and_unbounded_horizon():
+    context = _context()
+    context["intent_summary"] = {
+        "category": "marriage",
+        "mode": "LIFESPAN_EVENT_TIMING",
+        "answer_mode": "event_prediction",
+        "period_window": {
+            "kind": "current",
+            "start": "2026-09-07",
+            "end": "2026-09-07",
+            "span_days": 1,
+            "request_semantics": "requested_period",
+        },
+        "time_relation": "future",
+        "target_subject": {"key": "self", "label": "self"},
+    }
+    context["current_dashas"]["as_of"] = "2026-09-07"
+    intent = {
+        "category": "relationship",
+        "mode": "LIFESPAN_EVENT_TIMING",
+        "answer_mode": "event_prediction",
+        "period_window": context["intent_summary"]["period_window"],
+        "time_relation": "future",
+        "evidence_plan": {
+            "question_parts": [{"timeframe": {"kind": "open_future"}}],
+        },
+        "query_context": {
+            "event_profile": "relationship",
+            "required_evidence": [
+                "future_dasha_event_windows",
+                "transit_event_windows",
+            ],
+        },
+    }
+
+    packet = build_instant_v2_packet(
+        question="When will we start talking like before?",
+        intent=intent,
+        answer_mode="event_prediction",
+        target_subject={"key": "self", "label": "self"},
+        language="hinglish",
+        instant_context=context,
+    )
+
+    assert packet["query_plan"]["category"] == "relationship"
+    assert packet["query_plan"]["time_scope"]["semantic"]["kind"] == "open_future"
+    assert packet["query_plan"]["time_scope"]["relation"] == "current_to_future"
+    assert packet["query_plan"]["time_scope"]["horizon_end"] is None
+    packet = apply_live_graph_policy(packet, intent=intent, context=context)
+    graph = packet["answer_spec"]["knowledge_graph_policy"]
+    assert graph["runtime_key"] == "relationship_timing"
+    assert "marriage:KpSeventh" not in graph["required_factors"]
 
 
 def test_marriage_possibility_uses_natal_promise_without_current_timing():
@@ -1828,10 +2014,8 @@ def test_constitutional_health_answer_rejects_invented_region_causes():
 
     errors = _validate_constitutional_health_answer(wrong, rows)
 
-    assert any("hair" in error and "Ardra" in error for error in errors)
-    assert any("shoulders" in error and "Gemini" in error for error in errors)
-    assert any("head" in error and "House 6" in error for error in errors)
-    assert any("anorectal" in error and "House 8" in error for error in errors)
+    assert len(errors) == 4
+    assert all("missing immutable evidence marker" in error for error in errors)
 
 
 def test_constitutional_health_answer_accepts_exact_calculated_causes_per_region():
@@ -1850,7 +2034,8 @@ def test_constitutional_health_answer_accepts_exact_calculated_causes_per_region
         "The anorectal and pelvic region is highlighted because the 6th lord Mars is placed in House 8."
     )
 
-    assert _validate_constitutional_health_answer(correct, rows) == []
+    marked = correct + " " + " ".join(row["validation_marker"] for row in rows)
+    assert _validate_constitutional_health_answer(marked, rows) == []
 
 
 def test_constitutional_health_answer_accepts_localized_prose_with_exact_row_markers():
@@ -1898,7 +2083,7 @@ def test_constitutional_health_localized_answer_without_markers_still_fails_clos
         rows,
         strict_sentence_binding=False,
     )
-    assert any("missing region: nose" in error for error in errors)
+    assert any("missing immutable evidence marker" in error for error in errors)
 
 
 def test_constitutional_health_gate_resolves_rules_from_v2_answer_spec():
@@ -2066,6 +2251,192 @@ def test_unsupported_chart_fact_is_unavailable_instead_of_guessed():
     )
     assert facts["calculation_complete"] is False
     assert facts["missing_requested_charts"] == ["D13"]
+
+
+def test_single_house_chart_fact_uses_only_requested_house_and_complete_chain(monkeypatch):
+    monkeypatch.setattr(
+        instant_pipeline,
+        "_compact_natal_topic_factors",
+        lambda *_args, **_kwargs: {
+            "source": "validated_d1_natal_promise",
+            "houses": [{
+                "house": 8,
+                "lord": "Saturn",
+                "occupants": ["Mercury", "Ketu"],
+                "aspecting_planets": ["Saturn"],
+                "tone": "mixed",
+                "factors": [
+                    {"source": "house_lord_condition", "planet": "Saturn", "polarity": "challenging", "facts": {"placement_house": 2}},
+                    {"source": "occupant_functional_lordship", "planet": "Mercury", "polarity": "mixed", "facts": {"relation": "occupant", "ruled_houses": [3, 12]}},
+                    {"source": "yogi_lord", "planet": "Mercury", "polarity": "supportive", "facts": {"roles": ["occupant"], "target_house": 8}},
+                    {"source": "avayogi_lord", "planet": "Saturn", "polarity": "challenging", "facts": {"roles": ["house_lord", "aspector"], "target_house": 8, "avayogi_effect": {"polarity": "challenging"}}},
+                ],
+            }],
+        },
+    )
+    chart = {
+        "ascendant": 90.0,
+        "planets": {
+            "Saturn": {"longitude": 130.0, "sign": 4, "house": 2, "retrograde": True},
+            "Mercury": {"longitude": 310.0, "sign": 10, "house": 8},
+            "Ketu": {"longitude": 312.0, "sign": 10, "house": 8},
+            "Moon": {"longitude": 190.0, "sign": 6, "house": 4},
+        },
+    }
+    facts = _instant_real_chart_facts(
+        chart_data=chart,
+        requested_charts=["D1"],
+        requested_fact="requested house analysis",
+        requested_houses=[8],
+        karaka_evidence={
+            "calculation_method": "seven-karaka scheme",
+            "chara_karakas": {
+                "Atmakaraka": {"planet": "Saturn", "house": 2, "sign": 4, "title": "self indicator"},
+                "Amatyakaraka": {"planet": "Mercury", "house": 8, "sign": 10, "title": "work indicator"},
+            },
+        },
+        d1_snapshot={},
+    )
+    d1 = facts["charts"]["D1"]
+    assert [row["house"] for row in d1["houses"] if row["focus"]] == [8]
+    eighth = next(row for row in d1["houses"] if row["house"] == 8)
+    assert eighth["sign_name"] == "Aquarius"
+    assert eighth["lord"] == "Saturn"
+    assert eighth["lord_condition"]["placement_house"] == 2
+    assert set(eighth["occupants"]) == {"Mercury", "Ketu"}
+    assert "Saturn" in {row["planet"] for row in eighth["aspected_by"]}
+    assert "lagna and lagna-lord result" not in facts["prediction_format"]
+    deep = facts["single_house_analysis"]["houses"][0]
+    assert deep["validated_assessment"]["tone"] == "mixed"
+    assert {row["planet"] for row in deep["planet_impact_matrix"]} == {"Saturn", "Mercury"}
+    assert {row["source"] for row in deep["special_conditions"]} == {"yogi_lord", "avayogi_lord"}
+    assert deep["jaimini"]["house_arudha"]["name"] == "A8"
+    assert {row["karaka"] for row in deep["jaimini"]["chara_karaka_connections"]} == {
+        "Atmakaraka", "Amatyakaraka",
+    }
+    bindings = deep["fact_bindings"]
+    assert any(row["kind"] == "occupant" and row["planet"] == "Ketu" for row in bindings)
+    assert any(row["kind"] == "house_arudha" for row in bindings)
+    contract = facts["single_house_analysis"]["fact_contract"]
+    assert instant_pipeline._validate_single_house_fact_markers("no markers", contract)
+    marked = " ".join(contract["required_markers"])
+    assert instant_pipeline._validate_single_house_fact_markers(marked, contract) == []
+    assert "[[SH_D1_H8_" not in instant_pipeline._strip_single_house_fact_markers(marked)
+    malformed = "लाभ मिलता है [[SH_D1_H आगे बढ़ने में समय लगता है 1_H11_OCC_GULIKA]]"
+    assert "[[SH_" not in instant_pipeline.strip_internal_evidence_markers(malformed)
+    assert "OCC_GULIKA]]" not in instant_pipeline.strip_internal_evidence_markers(malformed)
+    derivation = build_user_derivation(
+        query_plan={"category": "general", "answer_mode": "factual_chart_lookup"},
+        verdict={"direction": "calculated_chart", "confidence": "medium"},
+        instant_context={"normalized_evidence": {"chart_facts": facts}},
+    )
+    audit_lines = derivation["chart_reading"]["fact_groups"][0]["lines"]
+    assert any("Mercury, Ketu" in line for line in audit_lines)
+    assert any("Jaimini A8" in line for line in audit_lines)
+    assert not any("ascendant is" in line for line in audit_lines)
+
+
+def test_chart_focus_guard_preserves_structured_requested_houses_without_text_parsing():
+    intent = {
+        "chart_focus": {
+            "kind": "chart_specific",
+            "primary": "D1",
+            "explicit": True,
+            "requested": ["D1"],
+            "requested_houses": [8, "8", 13, "bad"],
+        }
+    }
+    apply_chart_focus_guards(intent, "arbitrary language")
+    assert intent["chart_focus"]["requested_houses"] == [8]
+    assert intent["extracted_context"]["requested_houses"] == [8]
+
+
+def test_single_house_composer_contract_forbids_unrelated_lagna_lord_drift():
+    prompt = _build_instant_composer_prompt_v3(
+        "Analyze the requested house",
+        {
+            "context_profile": "instant_composer_v3",
+            "query_plan": {"category": "general", "answer_mode": "factual_chart_lookup"},
+            "intent": {"category": "general", "answer_mode": "factual_chart_lookup"},
+            "verdict": {},
+            "answer_contract": {},
+            "answer_blueprint": {},
+            "evidence": {
+                "chart_facts": {
+                    "requested_houses": [8],
+                    "charts": {"D1": {"houses": [{"house": 8, "lord": "Saturn"}]}},
+                }
+            },
+        },
+        "english",
+    )
+    assert "SINGLE-HOUSE CHART CONTRACT" in prompt
+    assert "The lagna lord, Moon, Atmakaraka" in prompt
+    assert "Never manufacture a “significant link”" in prompt
+    assert "Analyze EVERY occupant separately" in prompt
+    assert "Analyze EVERY supplied Parashari aspector separately" in prompt
+    assert "Yogi lord, Avayogi lord/effect" in prompt
+    assert "Keep Jaimini reasoning separate from Parashari reasoning" in prompt
+    assert "house's Arudha" in prompt
+
+
+def test_single_house_answer_spec_replaces_whole_chart_lagna_template():
+    spec = build_answer_spec(
+        {
+            "category": "general",
+            "answer_mode": "factual_chart_lookup",
+            "special_flow": {"requested_houses": [8]},
+        },
+        {"direction": "calculated_chart", "missing_required_capabilities": []},
+        {"records": []},
+    )
+    assert spec["max_words"] == 600
+    assert spec["chart_fact_rules"]["requested_houses"] == [8]
+    assert "separate Jaimini" in " ".join(spec["answer_order"])
+    assert "lagna and lagna-lord result" not in spec["answer_order"]
+
+
+def test_single_house_composer_brief_removes_unrelated_whole_chart_surface():
+    context = _build_instant_composer_context(
+        {
+            "intent_summary": {"answer_mode": "factual_chart_lookup"},
+            "normalized_evidence": {
+                "chart_facts": {
+                    "requested_charts": ["D1"],
+                    "requested_houses": [8],
+                    "single_house_analysis": {"schema_version": "single-house-analysis/v1"},
+                    "charts": {
+                        "D1": {
+                            "domain": {"code": "D1"},
+                            "lagna": {"lord": "Moon"},
+                            "atmakaraka": "Moon",
+                            "support_signals": ["unrelated generic support"],
+                            "planets": {
+                                "Moon": {"house": 4, "sign": 6},
+                                "Saturn": {"house": 2, "sign": 4},
+                            },
+                            "houses": [
+                                {"house": 1, "sign_name": "Cancer", "lord": "Moon"},
+                                {"house": 8, "sign_name": "Aquarius", "lord": "Saturn", "focus": True},
+                            ],
+                        },
+                    },
+                },
+            },
+        },
+        {
+            "query_plan": {"category": "general", "answer_mode": "factual_chart_lookup"},
+            "verdict": {},
+            "answer_spec": {},
+            "user_derivation": {},
+        },
+    )
+    d1 = context["evidence"]["chart_facts"]["charts"]["D1"]
+    assert [row["house"] for row in d1["houses"]] == [8]
+    assert "lagna" not in d1
+    assert "atmakaraka" not in d1
+    assert "planets" not in d1
+    assert "support_signals" not in d1
 
 
 def test_requested_charts_come_from_llm_fields_not_question_text():

@@ -115,8 +115,9 @@ CHAT_LLM_GEMMA = "gemma"
 # Self-hosted Gemma (or compatible) HTTP POST /generate-analysis — override via admin or GEMMA_CHAT_GENERATE_URL.
 DEFAULT_GEMMA_CHAT_GENERATE_URL = "http://8.231.104.209:8000/generate-analysis"
 
-# OpenAI model IDs for Chat Completions API (no `models/` prefix).
+# OpenAI model IDs (no `models/` prefix). GPT-5 models use Responses API.
 OPENAI_CHAT_MODEL_OPTIONS = [
+    ("gpt-5.6-luna", "OpenAI GPT-5.6 Luna (fast, low cost)"),
     ("gpt-5.4-pro", "OpenAI GPT-5.4 Pro (large context / premium)"),
     ("gpt-4o-mini", "OpenAI GPT-4o mini (fast, low cost)"),
     ("gpt-4o", "OpenAI GPT-4o (balanced)"),
@@ -126,6 +127,7 @@ OPENAI_CHAT_MODEL_OPTIONS = [
 
 DEFAULT_OPENAI_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_OPENAI_PREMIUM_MODEL = "gpt-4o"
+DEFAULT_OPENAI_INSTANT_MODEL = "gpt-5.6-luna"
 
 # DeepSeek API model IDs (OpenAI-compatible). Confirm current ids with GET
 # https://api.deepseek.com/v1/models when upgrading.  Keep only API-accepted
@@ -526,7 +528,7 @@ def get_gemini_instant_model() -> str:
 def get_instant_chat_llm_provider() -> str:
     """LLM vendor dedicated to Instant Chat; independent from standard chat."""
     value = (get_setting("instant_chat_llm_provider") or "").strip().lower()
-    return value if value in {CHAT_LLM_GEMINI, CHAT_LLM_DEEPSEEK} else CHAT_LLM_GEMINI
+    return value if value in {CHAT_LLM_GEMINI, CHAT_LLM_OPENAI, CHAT_LLM_DEEPSEEK} else CHAT_LLM_GEMINI
 
 
 def get_deepseek_instant_model() -> str:
@@ -537,10 +539,21 @@ def get_deepseek_instant_model() -> str:
     return DEFAULT_DEEPSEEK_CHAT_MODEL
 
 
+def get_openai_instant_model() -> str:
+    """OpenAI model ID dedicated to Instant Chat."""
+    value = get_setting("openai_instant_chat_model")
+    if value and value.strip():
+        return value.strip()
+    return DEFAULT_OPENAI_INSTANT_MODEL
+
+
 def get_instant_chat_model() -> str:
     """Resolved model for the currently selected Instant Chat vendor."""
-    if get_instant_chat_llm_provider() == CHAT_LLM_DEEPSEEK:
+    provider = get_instant_chat_llm_provider()
+    if provider == CHAT_LLM_DEEPSEEK:
         return get_deepseek_instant_model()
+    if provider == CHAT_LLM_OPENAI:
+        return get_openai_instant_model()
     return get_gemini_instant_model()
 
 
@@ -738,6 +751,14 @@ def is_debug_logging_enabled() -> bool:
 def is_instant_chat_enabled() -> bool:
     """Global feature flag for the instant chat prototype."""
     return _parse_bool_setting(get_setting("instant_chat_enabled"), default=False)
+
+
+def is_instant_response_validation_enabled() -> bool:
+    """Whether Live/Instant answers run post-generation fact validation and correction."""
+    return _parse_bool_setting(
+        get_setting("instant_response_validation_enabled"),
+        default=True,
+    )
 
 
 DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS = 110
@@ -1105,6 +1126,14 @@ def instant_chat_enabled_for_user(user_id: Optional[int]) -> bool:
 def is_speech_chat_enabled() -> bool:
     """Global feature flag for mobile speech input (mic) + /api/speech/transcribe."""
     return _parse_bool_setting(get_setting("speech_chat_enabled"), default=False)
+
+
+def is_speech_unvalidated_streaming_enabled() -> bool:
+    """Allow provisional Instant model chunks to be displayed/spoken in speech chat."""
+    return _parse_bool_setting(
+        get_setting("speech_allow_unvalidated_streaming"),
+        default=False,
+    )
 
 
 def get_speech_chat_user_allowlist() -> Set[int]:

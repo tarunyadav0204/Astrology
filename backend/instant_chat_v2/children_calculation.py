@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Mapping
 
-from .children import BOUNDARY_CHILDREN_SUBTYPES, TIMING_CHILDREN_SUBTYPES, children_profile, normalize_children_subtype
+from .children import BOUNDARY_CHILDREN_SUBTYPES, TIMING_CHILDREN_SUBTYPES, child_order_house, children_profile, normalize_children_subtype
 
 
 _DIGNITY = {"exalted": 3.0, "mooltrikona": 2.5, "own_sign": 2.0, "friendly_sign": 0.5, "debilitated": -3.0, "enemy_sign": -0.5}
@@ -317,7 +317,7 @@ def _timing_windows(normalized: Mapping[str, Any], success_houses: set[int], per
 def build_children_foundation(
     *, chart_data: Mapping[str, Any], normalized_evidence: Mapping[str, Any], category: Any,
     answer_mode: Any, children_subtype: Any, period_window: Mapping[str, Any] | None = None,
-    kp_evidence: Mapping[str, Any] | None = None,
+    kp_evidence: Mapping[str, Any] | None = None, child_order: Any = None,
 ) -> dict[str, Any]:
     subtype = normalize_children_subtype(children_subtype)
     mode = str(answer_mode or "").strip().lower()
@@ -336,7 +336,13 @@ def build_children_foundation(
     elif subtype == "parenthood_vs_career" and mode in {"event_prediction", "timing_window", "event_timing"}:
         subtype = "parenthood_vs_career_timing"
     profile = children_profile(category, subtype)
-    if subtype in BOUNDARY_CHILDREN_SUBTYPES:
+    try:
+        resolved_child_order = int(child_order) if child_order not in (None, "") else None
+    except (TypeError, ValueError):
+        resolved_child_order = None
+    if resolved_child_order is not None and resolved_child_order < 1:
+        resolved_child_order = None
+    if subtype in BOUNDARY_CHILDREN_SUBTYPES and subtype != "medical_safety_handoff":
         return {
             "children_subtype": subtype, "focus_houses": [], "houses_available": [],
             "route_synthesis": {"verdict": "specialist_boundary", "boundary": subtype},
@@ -344,7 +350,15 @@ def build_children_foundation(
         }
     facts = normalized_evidence.get("chart_facts") if isinstance(normalized_evidence.get("chart_facts"), Mapping) else {}
     d1, d7, d10 = _chart(facts, "D1"), _chart(facts, "D7"), _chart(facts, "D10")
-    houses = list(profile["houses"])
+    order_house = child_order_house(resolved_child_order)
+    houses = (
+        [order_house] + [house for house in [2, 11, 5] if house != order_house]
+        if order_house and subtype in {
+            "conception_timing", "childbirth_timing", "first_child", "subsequent_child",
+            "assisted_conception_timing",
+        }
+        else list(profile["houses"])
+    )
     jupiter = _jupiter_condition(d1, d7)
     lord_chains = _nakshatra_chains(chart_data, d1, houses)
     d1_d7 = [("D1", d1), ("D7", d7)]
@@ -360,6 +374,12 @@ def build_children_foundation(
     second = _branch("second child", d1_d7, [7], [5, 9, 11], "The second-child route uses the explicit H7 progression from H5, with H9/later-child and D7 confirmation; it never copies the H5 result.")
     later = _branch("later children", d1_d7, [9], [5, 7, 11], "Later-child potential uses H9 as fifth-from-fifth with the preceding order chain and D7 confirmation.")
     order_frames = {"first": first, "second": second, "later": later}
+    selected_order_frame = (
+        first if resolved_child_order == 1
+        else second if resolved_child_order == 2
+        else later if resolved_child_order and resolved_child_order >= 3
+        else {}
+    )
     supported_orders = sum(1 for row in order_frames.values() if row.get("verdict") in {"supported", "qualified"})
     family_size = {
         "verdict": "not_established" if any(not row.get("evidence_complete") for row in order_frames.values()) else "multiple_parenthood_potential" if supported_orders >= 2 else "more_concentrated_parenthood_pattern",
@@ -417,14 +437,22 @@ def build_children_foundation(
         "parent_child_reconciliation_timing": [5, 11], "retrospective_child_timing": [5, 11],
     }
     route_success = success_by_route.get(subtype, {2, 5, 11})
-    kp = _kp_adjudication(kp_evidence or {}, primary_cusps.get(subtype, [5, 11]), route_success) if subtype in TIMING_CHILDREN_SUBTYPES else {}
+    route_primary_cusps = primary_cusps.get(subtype, [5, 11])
+    if order_house and subtype in {
+        "conception_timing", "childbirth_timing", "first_child", "subsequent_child",
+        "assisted_conception_timing",
+    }:
+        route_success = {2, 11, order_house} | ({5} if order_house != 5 else set())
+        route_primary_cusps = [order_house, 11]
+    kp = _kp_adjudication(kp_evidence or {}, route_primary_cusps, route_success) if subtype in TIMING_CHILDREN_SUBTYPES else {}
     windows = _timing_windows(normalized_evidence, route_success, period_window, subtype == "retrospective_child_timing") if subtype in TIMING_CHILDREN_SUBTYPES else []
 
     route_map = {
         "children_overview": promise, "parenthood_capacity": relationship,
         "conception_capacity": pathways["biological"], "conception_timing": pathways["biological"],
         "childbirth_timing": childbirth, "first_child_capacity": first, "first_child": first,
-        "subsequent_child_capacity": second, "subsequent_child": second,
+        "subsequent_child_capacity": selected_order_frame or second,
+        "subsequent_child": selected_order_frame or second,
         "family_size_tendency": family_size, "children_delay_diagnosis": delay,
         "assisted_conception": pathways["assisted"], "assisted_conception_timing": pathways["assisted"],
         "adoption_pathway": pathways["adoption"], "adoption_timing": pathways["adoption"],
@@ -432,6 +460,10 @@ def build_children_foundation(
         "parenthood_vs_career": parenthood_vs_career, "parenthood_vs_career_timing": parenthood_vs_career,
         "parent_child_relationship": relationship, "parent_child_reconciliation_timing": reconciliation,
         "retrospective_child_timing": promise,
+        # Medical facts remain outside astrology.  This route deliberately
+        # exposes only the broad pregnancy/parenthood promise and pressures so
+        # the writer can provide useful astrology after stating that boundary.
+        "medical_safety_handoff": promise,
     }
     remedy_blueprint = normalized_evidence.get("remedy_blueprint") if isinstance(normalized_evidence.get("remedy_blueprint"), Mapping) else {}
     remedy = {
@@ -445,6 +477,10 @@ def build_children_foundation(
     if subtype == "children_remedy":
         route_map[subtype] = remedy
     route = dict(route_map.get(subtype) or promise)
+    if selected_order_frame and subtype in {"conception_timing", "childbirth_timing", "first_child", "subsequent_child"}:
+        route["selected_child_order_frame"] = selected_order_frame
+        route["selected_child_order"] = resolved_child_order
+        route["selected_child_house"] = order_house
     available_chains = [row for row in lord_chains if row.get("lord_nakshatra") and row.get("nakshatra_lord")]
     chain_score = round(
         sum(float(row.get("chain_score") or 0) for row in available_chains) / len(available_chains), 3
@@ -468,7 +504,8 @@ def build_children_foundation(
             "timing_rule": "Promise precedes KP, dasha and transit. Conception, childbirth, adoption and reconciliation use different success chains.",
         })
     return {
-        "children_subtype": subtype, "focus_houses": houses,
+        "children_subtype": subtype, "child_order": resolved_child_order,
+        "selected_child_house": order_house, "focus_houses": houses,
         "houses_available": houses if d1 else [],
         "charts": {key: value for key, value in {"D1": d1, "D7": d7, "D10": d10 if subtype in {"parenthood_vs_career", "parenthood_vs_career_timing"} else {}}.items() if value},
         "lord_nakshatra_chains": lord_chains, "jupiter_karaka_synthesis": jupiter,

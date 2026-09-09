@@ -2,6 +2,19 @@ from .base_calculator import BaseCalculator
 
 class NakshatraCalculator(BaseCalculator):
     """Calculate Nakshatra positions, lords, and padas"""
+
+    # Classical Gandamoola stars.  This is deliberately separate from the
+    # much narrower gandanta *junction* padas below: membership in one of the
+    # six stars is a classification, not an automatic defect or remedy order.
+    GANDAMOOLA_NUMBERS = frozenset({1, 9, 10, 18, 19, 27})
+    GANDANTA_JUNCTION_PADAS = frozenset({
+        (1, 1),   # Ashwini: immediately after Pisces/Aries junction
+        (9, 4),   # Ashlesha: immediately before Cancer/Leo junction
+        (10, 1),  # Magha: immediately after Cancer/Leo junction
+        (18, 4),  # Jyeshtha: immediately before Scorpio/Sagittarius junction
+        (19, 1),  # Mula: immediately after Scorpio/Sagittarius junction
+        (27, 4),  # Revati: immediately before Pisces/Aries junction
+    })
     
     def __init__(self, birth_data=None, chart_data=None):
         super().__init__(chart_data)
@@ -118,15 +131,42 @@ class NakshatraCalculator(BaseCalculator):
         moon_nak = positions.get('Moon', {}).get('nakshatra_number', 0)
         sun_nak = positions.get('Sun', {}).get('nakshatra_number', 0)
         
-        # Ganda Mool Nakshatras
-        ganda_mool = [1, 2, 9, 18, 19, 27]  # Ashwini, Bharani, Ashlesha, Jyeshtha, Mula, Revati
-        
-        if moon_nak in ganda_mool:
+        # Gandamoola is a six-star classification.  It must not be confused
+        # with gandanta itself, which is strongest only around the water/fire
+        # junction padas and needs degree/context qualification.
+        moon_pada = positions.get('Moon', {}).get('pada', 0)
+        if moon_nak in self.GANDAMOOLA_NUMBERS:
+            moon_longitude = float(positions.get('Moon', {}).get('longitude', 0) or 0) % 360
+            boundary_distance = min(
+                min(abs(moon_longitude - boundary), 360 - abs(moon_longitude - boundary))
+                for boundary in (0.0, 120.0, 240.0)
+            )
+            junction_pada = (moon_nak, moon_pada) in self.GANDANTA_JUNCTION_PADAS
+            # Classical gandanta is the final/first 48 arcminutes (0.8°) at
+            # each water/fire sign boundary. The whole pada is context, not
+            # the exact degree zone.
+            junction_zone = junction_pada and boundary_distance <= 0.8
             yogas.append({
                 'name': 'Ganda Mool',
-                'description': 'Moon in Ganda Mool nakshatra - requires special remedies',
+                'classification': 'gandamoola_nakshatra',
+                'junction_zone': junction_zone,
+                'junction_pada': junction_pada,
+                'boundary_distance_degrees': round(boundary_distance, 4),
+                'exact_gandanta_orb_degrees': 0.8,
+                'remedy_required': False,
+                'remedy_assessment': 'Requires full-chart and tradition-specific review; not inferred from membership alone.',
+                'description': (
+                    'Moon is in a Gandamoola nakshatra and in its water/fire junction pada; '
+                    'the exact degree and full chart must qualify the effect.'
+                    if junction_zone else
+                    'Moon is in a Gandamoola nakshatra and its junction pada, but outside the exact 48-arcminute gandanta band; membership is not a remedy verdict.'
+                    if junction_pada else
+                    'Moon is in a Gandamoola nakshatra but outside its water/fire junction pada; '
+                    'membership alone is not a dosha or remedy verdict.'
+                ),
                 'planet': 'Moon',
-                'nakshatra': positions['Moon']['nakshatra_name']
+                'nakshatra': positions['Moon']['nakshatra_name'],
+                'pada': moon_pada,
             })
         
         # Abhijit Nakshatra (special 28th nakshatra)

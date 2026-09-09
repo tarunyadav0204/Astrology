@@ -1,6 +1,30 @@
 from datetime import datetime, timezone
 
-from utils.llm_pricing import deepseek_rate_usd_per_million, mixed_stage_cost_usd
+from utils.llm_pricing import (
+    deepseek_rate_usd_per_million,
+    mixed_stage_cost_usd,
+    openai_rate_usd_per_million,
+)
+
+
+def test_openai_luna_official_token_rates():
+    rate = openai_rate_usd_per_million("gpt-5.6-luna")
+
+    assert rate == {
+        "input": 0.20,
+        "cached_input": 0.02,
+        "output": 1.20,
+        "tier": "openai_standard",
+        "resolved_model": "gpt-5.6-luna",
+    }
+
+
+def test_admin_chat_cost_resolvers_use_luna_cached_rate():
+    from chat_history.admin_routes import _resolve_model_rate
+    from credits.routes import _question_cost_rate_for_model
+
+    assert _resolve_model_rate("gpt-5.6-luna")["cached_input"] == 0.02
+    assert _question_cost_rate_for_model("gpt-5.6-luna", 1000)["output"] == 1.20
 
 
 def test_deepseek_v4_flash_off_peak_and_legacy_alias_match():

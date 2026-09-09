@@ -4,7 +4,6 @@ import {
   Animated,
   Alert,
   Dimensions,
-  Image,
   Linking,
   PermissionsAndroid,
   Platform,
@@ -19,7 +18,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { chatAPI, creditAPI, pricingAPI, speechAPI } from '../../services/api';
@@ -29,6 +28,7 @@ import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { useTheme } from '../../context/ThemeContext';
 import { speechRecognition } from '../../native/speechRecognition';
 import { useAuthGate } from '../../auth/AuthGateContext';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 
 const POLL_INTERVAL_MS = 1400;
 const MAX_POLLS = 90;
@@ -38,7 +38,8 @@ const ALLOW_NATIVE_RUNTIME_BACKEND_FALLBACK = false;
 const PREFER_NATIVE_SPEECH_RECOGNITION = Platform.OS === 'ios';
 const REQUIRE_NATIVE_SPEECH_FOR_WEBSOCKET = Platform.OS === 'ios';
 const USE_SPEECH_WEBSOCKET = true;
-const HANDS_FREE_AUTO_STOP_MS = 5 * 60 * 1000;
+const HANDS_FREE_AUTO_STOP_MS = 45 * 1000;
+const BACKEND_RECORDING_UNDETECTED_SPEECH_MAX_MS = 18 * 1000;
 const BACKEND_RECORDING_MIN_MS = 2600;
 const BACKEND_RECORDING_SILENCE_STOP_MS = 4200;
 const BACKEND_RECORDING_LONG_SILENCE_STOP_MS = 7000;
@@ -172,98 +173,26 @@ const estimateSpeechDurationMs = (text) => {
 const buildSpeechAfterAnswerPrompt = (turnLanguage, followUpQuestion, translate) => {
   const lang = normalizeLanguageCode(turnLanguage || 'english');
   const question = String(followUpQuestion || '').trim();
+  if (question) return question;
   if (lang === 'hindi') {
-    return question
-      ? `आप यह भी पूछ सकते हैं: ${question}`
-      : 'आप चाहें तो एक और सवाल पूछ सकते हैं।';
+    return 'अब आप किस बात को थोड़ा और समझना चाहेंगे?';
   }
-  return question
-    ? translate('speechChat.afterAnswerPromptWithFollowUp', {
-        question,
-        defaultValue: `You can also ask: ${question}`,
-      })
-    : translate('speechChat.afterAnswerPrompt', "If you'd like, ask me another question.");
-};
-
-const TARA_BASE = require('../../assets/tara/base_head_body.png');
-const TARA_EYES_OPEN = require('../../assets/tara/eyes_open.png');
-const TARA_EYES_CLOSED = require('../../assets/tara/eyes_closed.png');
-const TARA_MOUTH_CLOSED = require('../../assets/tara/mouth_closed.png');
-const TARA_VISEME_SOURCES = {
-  rest: TARA_MOUTH_CLOSED,
-};
-
-function TaraSpeakingAvatar({ status, compact = false, tiny = false }) {
-  const [blinkClosed, setBlinkClosed] = useState(false);
-  const bobAnim = useRef(new Animated.Value(0)).current;
-  const blinkTimerRef = useRef(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const scheduleBlink = () => {
-      const delay = 2200 + Math.random() * 2600;
-      blinkTimerRef.current = setTimeout(() => {
-        if (cancelled) return;
-        setBlinkClosed(true);
-        setTimeout(() => {
-          if (cancelled) return;
-          setBlinkClosed(false);
-          scheduleBlink();
-        }, 120);
-      }, delay);
-    };
-
-    scheduleBlink();
-
-    return () => {
-      cancelled = true;
-      if (blinkTimerRef.current) clearTimeout(blinkTimerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    bobAnim.stopAnimation();
-    bobAnim.setValue(0);
-  }, [bobAnim, status]);
-
-  const translateY = bobAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, status === 'speaking' ? -3 : -1.5],
-  });
-  const mouthSource = TARA_VISEME_SOURCES.rest;
-
-  return (
-    <Animated.View style={[
-      styles.avatarWrap,
-      compact && styles.avatarWrapCompact,
-      tiny && styles.avatarWrapTiny,
-      { transform: [{ translateY }] },
-    ]}>
-      <View style={[
-        styles.avatarImageStage,
-        compact && styles.avatarImageStageCompact,
-        tiny && styles.avatarImageStageTiny,
-      ]}>
-        <Image source={TARA_BASE} style={[styles.avatarImageLayer, styles.avatarBaseLayer]} resizeMode="contain" />
-        <Image
-          source={blinkClosed ? TARA_EYES_CLOSED : TARA_EYES_OPEN}
-          style={[styles.avatarImageLayer, styles.avatarFeatureLayer]}
-          resizeMode="contain"
-        />
-        <Image source={mouthSource} style={[styles.avatarImageLayer, styles.avatarFeatureLayer]} resizeMode="contain" />
-      </View>
-    </Animated.View>
+  return translate(
+    'speechChat.afterAnswerPrompt',
+    'What would you like to understand a little better next?'
   );
-}
+};
 
 export default function SpeechChatScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { requireAuthForPaid } = useAuthGate();
   const [userName, setUserName] = useState('');
   const [birthData, setBirthData] = useState(route.params?.birthData || null);
-  const [sessionId, setSessionId] = useState(null);
+  // Reuse the text-chat thread when Speech was opened as a consultation mode.
+  // Speech remains an Instant interaction, while both modalities share history.
+  const [sessionId, setSessionId] = useState(route.params?.sessionId || null);
   const [language, setLanguage] = useState(route.params?.language || 'english');
   const [answerStyle, setAnswerStyle] = useState(
     route.params?.responseStyle === 'technical' ? 'technical' : 'simple'
@@ -271,6 +200,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const [status, setStatus] = useState('idle');
   const [turns, setTurns] = useState([]);
   const [currentTranscript, setCurrentTranscript] = useState('');
+  const [streamingAnswer, setStreamingAnswer] = useState('');
   const [followUps, setFollowUps] = useState([]);
   const [errorText, setErrorText] = useState('');
   const [handsFreeEnabled, setHandsFreeEnabled] = useState(true);
@@ -299,6 +229,8 @@ export default function SpeechChatScreen({ navigation, route }) {
   const greetedRef = useRef(false);
   const thinkingLeadInIndexRef = useRef(0);
   const recordingRef = useRef(null);
+  const recordingStartPromiseRef = useRef(null);
+  const recordingTeardownPromiseRef = useRef(Promise.resolve());
   const listeningModeRef = useRef(null);
   const recordingMeterTimerRef = useRef(null);
   const recordingAutoStopTimerRef = useRef(null);
@@ -321,6 +253,12 @@ export default function SpeechChatScreen({ navigation, route }) {
   const speechSocketRef = useRef(null);
   const speechSocketConnectPromiseRef = useRef(null);
   const speechSocketPendingTurnsRef = useRef(new Map());
+  const streamSpeechQueueRef = useRef([]);
+  const streamSpeechPlayingTurnRef = useRef(0);
+  const streamSpeechStartedRef = useRef(false);
+  const streamSpeechFailedRef = useRef(false);
+  const streamSpeechTurnRef = useRef(0);
+  const streamSpeechWaitersRef = useRef([]);
   const greetingPrefetchKeyRef = useRef('');
   const speakingWatchdogRef = useRef(null);
   const billingSessionRef = useRef(null);
@@ -418,7 +356,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       sessionId: billingSessionRef.current?.session_id,
     });
     stopSpeechUiImmediately();
-    releaseSpeechRecognizer();
+    await releaseSpeechRecognizer();
     setStatus('idle');
     setErrorText(t('speechChat.creditFinished', 'Speech chat ended because your available talk credits finished.'));
     await endSpeechBillingSession('credit_finished');
@@ -1248,13 +1186,18 @@ export default function SpeechChatScreen({ navigation, route }) {
     recordingRef.current = null;
     listeningModeRef.current = null;
     if (recording) {
-      recording.stopAndUnloadAsync?.().catch?.(() => {});
+      const teardown = recordingTeardownPromiseRef.current
+        .catch(() => {})
+        .then(() => recording.stopAndUnloadAsync?.())
+        .catch(() => {});
+      recordingTeardownPromiseRef.current = teardown;
     }
     try {
       speechRecognition.cancelListening();
     } catch {
       // Ignore cleanup failures; recognizer may already be inactive.
     }
+    return recordingTeardownPromiseRef.current;
   };
 
   const speakWithAvatar = async (
@@ -1320,7 +1263,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   /** Brief natural line when recognition is done so the jump to “thinking” is not silent. */
   const speakThinkingHandoff = async () => {
     if (!mountedRef.current) return;
-    releaseSpeechRecognizer();
+    await releaseSpeechRecognizer();
     const i = thinkingLeadInIndexRef.current % THINKING_HANDOFF_KEYS.length;
     thinkingLeadInIndexRef.current += 1;
     const phrase = t(THINKING_HANDOFF_KEYS[i], THINKING_HANDOFF_DEFAULTS[i]);
@@ -1335,6 +1278,16 @@ export default function SpeechChatScreen({ navigation, route }) {
     const permission = await Audio.requestPermissionsAsync();
     if (permission?.status !== 'granted') {
       throw new Error(t('speechChat.micPermissionBody', 'Please allow microphone access so AstroRoshni can hear your question.'));
+    }
+
+    // Expo permits only one prepared Recording instance. Wait for any prior
+    // stop/unload to finish and share an in-flight create across rapid taps or
+    // hands-free restarts.
+    await recordingTeardownPromiseRef.current.catch(() => {});
+    if (recordingRef.current || listeningModeRef.current === 'backend') return;
+    if (recordingStartPromiseRef.current) {
+      await recordingStartPromiseRef.current;
+      return;
     }
 
     await Audio.setAudioModeAsync({
@@ -1354,7 +1307,16 @@ export default function SpeechChatScreen({ navigation, route }) {
     recordingSpeechFirstDetectedAtRef.current = 0;
     recordingSpeechSampleCountRef.current = 0;
     recordingLastSpeechAtRef.current = 0;
-    const { recording } = await Audio.Recording.createAsync(SPEECH_RECORDING_OPTIONS);
+    const createPromise = Audio.Recording.createAsync(SPEECH_RECORDING_OPTIONS);
+    recordingStartPromiseRef.current = createPromise;
+    let recording;
+    try {
+      ({ recording } = await createPromise);
+    } finally {
+      if (recordingStartPromiseRef.current === createPromise) {
+        recordingStartPromiseRef.current = null;
+      }
+    }
     const stopBackendFromTimer = (reason) => {
       if (!recordingRef.current || recordingAutoStoppingRef.current) return;
       recordingAutoStoppingRef.current = true;
@@ -1469,6 +1431,17 @@ export default function SpeechChatScreen({ navigation, route }) {
               );
             }
           }
+          if (
+            handsFreeEnabledRef.current
+            && elapsedMs >= BACKEND_RECORDING_UNDETECTED_SPEECH_MAX_MS
+            && !recordingSpeechDetectedRef.current
+          ) {
+            // Metering may be absent or too quiet to cross the configured
+            // threshold on some Android devices. Submit the captured audio
+            // anyway; server transcription is a better terminal decision than
+            // leaving the microphone spinning indefinitely.
+            stopBackendFromTimer('speech_detection_timeout');
+          }
         })
         .catch(() => {});
     }, 180);
@@ -1485,6 +1458,11 @@ export default function SpeechChatScreen({ navigation, route }) {
     recordingRef.current = null;
     listeningModeRef.current = null;
     if (!recording) return;
+
+    let finishRecordingTeardown;
+    recordingTeardownPromiseRef.current = new Promise((resolve) => {
+      finishRecordingTeardown = resolve;
+    });
 
     setStatus('transcribing');
     if (recordingMeterTimerRef.current) {
@@ -1529,7 +1507,11 @@ export default function SpeechChatScreen({ navigation, route }) {
         message: statusError?.message,
       });
     }
-    await recording.stopAndUnloadAsync();
+    try {
+      await recording.stopAndUnloadAsync();
+    } finally {
+      finishRecordingTeardown?.();
+    }
     const uri = recording.getURI();
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
@@ -1591,6 +1573,60 @@ export default function SpeechChatScreen({ navigation, route }) {
     });
   };
 
+  const settleStreamSpeechWaiters = (ok) => {
+    const waiters = streamSpeechWaitersRef.current.splice(0);
+    waiters.forEach((resolve) => resolve(ok));
+  };
+
+  const pumpStreamSpeechQueue = async (turnSerial, turnLanguage) => {
+    if (streamSpeechPlayingTurnRef.current === turnSerial || streamSpeechTurnRef.current !== turnSerial) return;
+    streamSpeechPlayingTurnRef.current = turnSerial;
+    while (streamSpeechQueueRef.current.length && streamSpeechTurnRef.current === turnSerial) {
+      const chunk = streamSpeechQueueRef.current.shift();
+      setStatus('speaking');
+      const ok = await playAvatarLine(trimForSpeechPlayback(chunk), {
+        language: turnLanguage || language,
+      });
+      if (!ok) {
+        streamSpeechFailedRef.current = true;
+        streamSpeechQueueRef.current = [];
+        break;
+      }
+    }
+    if (streamSpeechPlayingTurnRef.current === turnSerial) {
+      streamSpeechPlayingTurnRef.current = 0;
+    }
+    if (streamSpeechTurnRef.current !== turnSerial) return;
+    if (streamSpeechTurnRef.current === turnSerial && streamSpeechQueueRef.current.length) {
+      pumpStreamSpeechQueue(turnSerial, turnLanguage);
+      return;
+    }
+    settleStreamSpeechWaiters(!streamSpeechFailedRef.current);
+  };
+
+  const enqueueStreamSpeech = (text, turnSerial, turnLanguage) => {
+    const chunk = String(text || '').trim();
+    if (!chunk || streamSpeechTurnRef.current !== turnSerial) return;
+    streamSpeechStartedRef.current = true;
+    streamSpeechQueueRef.current.push(chunk);
+    pumpStreamSpeechQueue(turnSerial, turnLanguage);
+  };
+
+  const waitForStreamSpeech = () => {
+    if (!streamSpeechPlayingTurnRef.current && streamSpeechQueueRef.current.length === 0) {
+      return Promise.resolve(!streamSpeechFailedRef.current);
+    }
+    return new Promise((resolve) => streamSpeechWaitersRef.current.push(resolve));
+  };
+
+  const resetStreamSpeech = (turnSerial) => {
+    settleStreamSpeechWaiters(false);
+    streamSpeechQueueRef.current = [];
+    streamSpeechStartedRef.current = false;
+    streamSpeechFailedRef.current = false;
+    streamSpeechTurnRef.current = turnSerial;
+  };
+
   const closeSpeechSocket = () => {
     speechSocketPendingTurnsRef.current.forEach((pending) => {
       pending.reject?.(new Error('Speech socket closed'));
@@ -1643,9 +1679,20 @@ export default function SpeechChatScreen({ navigation, route }) {
             const pending = turnId ? speechSocketPendingTurnsRef.current.get(turnId) : null;
             if (!pending) return;
 
+            if (event?.type === 'turn_started' || event?.type === 'turn_queued') {
+              pending.accepted = true;
+              return;
+            }
+
             if (event?.type === 'answer_chunk') {
-              pending.chunks.push(String(event.text || ''));
-              pending.onChunk?.(String(event.text || ''), event);
+              const delta = String(event.text || '');
+              pending.content = String(event.content || `${pending.content || ''}${delta}`);
+              pending.onChunk?.(delta, { ...event, content: pending.content });
+              return;
+            }
+            if (event?.type === 'answer_replace') {
+              pending.content = String(event.content || '');
+              pending.onReplace?.(pending.content, event);
               return;
             }
             if (event?.type === 'turn_completed') {
@@ -1653,7 +1700,7 @@ export default function SpeechChatScreen({ navigation, route }) {
               pending.resolve({
                 status: 'completed',
                 message_id: event.message_id,
-                content: String(event.content || pending.chunks.join(' ')).trim(),
+                content: String(event.content || pending.content || '').trim(),
                 follow_up_questions: Array.isArray(event.follow_up_questions) ? event.follow_up_questions : [],
                 next_action: event.next_action || null,
               });
@@ -1661,7 +1708,9 @@ export default function SpeechChatScreen({ navigation, route }) {
             }
             if (event?.type === 'turn_error') {
               speechSocketPendingTurnsRef.current.delete(turnId);
-              pending.reject(new Error(event.message || event.error || 'Speech turn failed'));
+              const error = new Error(event.message || event.error || 'Speech turn failed');
+              error.turnAccepted = true;
+              pending.reject(error);
             }
           },
           onError: () => {
@@ -1673,7 +1722,9 @@ export default function SpeechChatScreen({ navigation, route }) {
               reason: event?.reason,
             });
             speechSocketPendingTurnsRef.current.forEach((pending) => {
-              pending.reject?.(new Error('Speech socket disconnected'));
+              const error = new Error('Speech socket disconnected');
+              error.turnAccepted = Boolean(pending.accepted);
+              pending.reject?.(error);
             });
             speechSocketPendingTurnsRef.current.clear();
             speechSocketRef.current = null;
@@ -1693,7 +1744,7 @@ export default function SpeechChatScreen({ navigation, route }) {
     return speechSocketConnectPromiseRef.current;
   };
 
-  const askSpeechSocket = async (question, turnLanguage = language) => {
+  const askSpeechSocket = async (question, turnLanguage = language, streamHandlers = {}) => {
     if (!USE_SPEECH_WEBSOCKET) {
       throw new Error('Speech websocket disabled');
     }
@@ -1707,8 +1758,10 @@ export default function SpeechChatScreen({ navigation, route }) {
       speechSocketPendingTurnsRef.current.set(turnId, {
         resolve,
         reject,
-        chunks: [],
-        onChunk: () => {},
+        content: '',
+        accepted: false,
+        onChunk: streamHandlers.onChunk,
+        onReplace: streamHandlers.onReplace,
       });
       const sent = socketClient.send({
         type: 'ask',
@@ -1730,15 +1783,16 @@ export default function SpeechChatScreen({ navigation, route }) {
     });
   };
 
-  const askInstant = async (question, turnLanguage = language) => {
+  const askInstant = async (question, turnLanguage = language, streamHandlers = {}) => {
     if (USE_SPEECH_WEBSOCKET) {
       try {
-        return await askSpeechSocket(question, turnLanguage);
+        return await askSpeechSocket(question, turnLanguage, streamHandlers);
       } catch (socketError) {
         logSpeechDebug('speechSocket.fallbackToHttp', {
           message: socketError?.message,
         });
         closeSpeechSocket();
+        if (socketError?.turnAccepted) throw socketError;
       }
     }
     let activeSessionId = await ensureSession();
@@ -1781,10 +1835,11 @@ export default function SpeechChatScreen({ navigation, route }) {
       return askData;
     }
     if (!askData.message_id) throw new Error(t('speechChat.askError', 'Could not send your question.'));
-    return await pollForAnswer(question, askData.message_id);
+    return await pollForAnswer(question, askData.message_id, streamHandlers);
   };
 
-  const pollForAnswer = async (question, messageId) => {
+  const pollForAnswer = async (question, messageId, streamHandlers = {}) => {
+    let previousPartial = '';
     for (let attempt = 0; attempt < MAX_POLLS; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       if (!mountedRef.current) return;
@@ -1796,6 +1851,18 @@ export default function SpeechChatScreen({ navigation, route }) {
       if (data.status === 'failed') {
         throw new Error(data.error_message || t('speechChat.answerError', 'Answer failed. Please try again.'));
       }
+      const partial = String(data.partial_content || '');
+      if (partial && partial !== previousPartial) {
+        if (partial.startsWith(previousPartial)) {
+          streamHandlers.onChunk?.(partial.slice(previousPartial.length), {
+            content: partial,
+            validated: false,
+          });
+        } else {
+          streamHandlers.onReplace?.(partial, { validated: false });
+        }
+        previousPartial = partial;
+      }
     }
     throw new Error(t('speechChat.timeout', 'The answer is taking too long. Please try again.'));
   };
@@ -1806,7 +1873,6 @@ export default function SpeechChatScreen({ navigation, route }) {
     turnSerial = activeTurnSerialRef.current,
     turnLanguage = activeTurnLanguageRef.current || language
   ) => {
-    releaseSpeechRecognizer();
     const answer = String(data.content || '').trim();
     if (!answer) {
       throw new Error(t('speechChat.emptyAnswerError', 'Tara finished processing, but no answer text came back. Please try again.'));
@@ -1818,11 +1884,18 @@ export default function SpeechChatScreen({ navigation, route }) {
     const spokenAnswer = trimForSpeechPlayback(`${answer} ${closingLine}`);
     setFollowUps(nextFollowUps);
     setTurns((prev) => [...prev, { question, answer, followUps: nextFollowUps }]);
+    setStreamingAnswer('');
     setCurrentTranscript('');
     setStatus('speaking');
     handsFreeRestartRef.current = !!handsFreeEnabledRef.current;
     if (!mountedRef.current || activeTurnSerialRef.current !== turnSerial) return;
-    const ok = await playAvatarLine(spokenAnswer, { language: turnLanguage || language });
+    let ok;
+    if (streamSpeechStartedRef.current && !streamSpeechFailedRef.current) {
+      enqueueStreamSpeech(closingLine, turnSerial, turnLanguage);
+      ok = await waitForStreamSpeech();
+    } else {
+      ok = await playAvatarLine(spokenAnswer, { language: turnLanguage || language });
+    }
     if (!mountedRef.current || activeTurnSerialRef.current !== turnSerial) return;
     if (!ok) {
       if (!mountedRef.current) return;
@@ -1845,6 +1918,7 @@ export default function SpeechChatScreen({ navigation, route }) {
 
     const turnSerial = activeTurnSerialRef.current + 1;
     activeTurnSerialRef.current = turnSerial;
+    resetStreamSpeech(turnSerial);
     const turnLanguage = inferSpeechTurnLanguage(spokenQuestion, language);
     activeTurnLanguageRef.current = turnLanguage;
     if (turnLanguage !== normalizeLanguageCode(language)) {
@@ -1856,7 +1930,27 @@ export default function SpeechChatScreen({ navigation, route }) {
       turnLanguage,
     });
     const isCurrentTurn = () => mountedRef.current && activeTurnSerialRef.current === turnSerial;
-    const answerPromise = askInstant(spokenQuestion, turnLanguage);
+    setStreamingAnswer('');
+    // Recognition has finished before generation starts. Release its audio
+    // session now so validated answer chunks can begin playing immediately
+    // without a later recognizer cleanup interrupting TTS.
+    await releaseSpeechRecognizer();
+    const answerPromise = askInstant(spokenQuestion, turnLanguage, {
+      onChunk: (delta, event) => {
+        if (!isCurrentTurn()) return;
+        setStreamingAnswer(String(event?.content || '').trimStart());
+        if (event?.validated || event?.playable) {
+          enqueueStreamSpeech(delta, turnSerial, turnLanguage);
+        }
+      },
+      onReplace: (content, event) => {
+        if (!isCurrentTurn()) return;
+        setStreamingAnswer(String(content || '').trimStart());
+        if (event?.validated || event?.playable) {
+          enqueueStreamSpeech(content, turnSerial, turnLanguage);
+        }
+      },
+    });
 
     try {
       const finalData = await answerPromise;
@@ -1864,6 +1958,9 @@ export default function SpeechChatScreen({ navigation, route }) {
       await handleCompletedAnswer(spokenQuestion, finalData, turnSerial, turnLanguage);
     } catch (error) {
       if (!isCurrentTurn()) return;
+      setStreamingAnswer('');
+      resetStreamSpeech(turnSerial);
+      await getTextToSpeech().stop();
       throw error;
     }
   };
@@ -1885,6 +1982,7 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const stopSpeechUiImmediately = () => {
     activeTurnSerialRef.current += 1;
+    resetStreamSpeech(activeTurnSerialRef.current);
     handsFreeRestartRef.current = false;
     startListeningInFlightRef.current = false;
     if (speakingWatchdogRef.current) {
@@ -1907,7 +2005,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const handleBackPress = async () => {
     logSpeechDebug('backPress', { status, listeningMode: listeningModeRef.current }).catch(() => {});
     stopSpeechUiImmediately();
-    releaseSpeechRecognizer();
+    await releaseSpeechRecognizer();
     endSpeechBillingSession('back').catch(() => {});
     navigation.goBack();
   };
@@ -1919,7 +2017,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       hasRecording: Boolean(recordingRef.current),
     }).catch(() => {});
     stopSpeechUiImmediately();
-    releaseSpeechRecognizer();
+    await releaseSpeechRecognizer();
     if (!billingSessionRef.current?.session_id) {
       const billingOk = await startSpeechBillingSession();
       if (!billingOk) return;
@@ -1937,7 +2035,7 @@ export default function SpeechChatScreen({ navigation, route }) {
     setHandsFreeEnabled(false);
     handsFreeEnabledRef.current = false;
     startListeningInFlightRef.current = false;
-    releaseSpeechRecognizer();
+    await releaseSpeechRecognizer();
     stopSpeechUiImmediately();
     setCurrentTranscript('');
     setErrorText('');
@@ -1991,56 +2089,66 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const busy = ['transcribing', 'thinking'].includes(status) || speechPreparing || nativeRecognizerStarting;
   const screenPalette = {
-    background: '#fbf4ed',
-    backgroundAlt: '#f6ede5',
-    surface: 'rgba(255,255,255,0.74)',
-    surfaceStrong: '#fffaf5',
-    border: 'rgba(148,163,184,0.18)',
-    text: '#1f2937',
-    textSecondary: '#6b7280',
-    primary: '#c2410c',
-    accent: '#2563eb',
+    background: colors.background,
+    backgroundAlt: colors.backgroundSecondary || colors.background,
+    surface: colors.surface,
+    surfaceStrong: colors.surfaceRaised || colors.surface,
+    surfaceMuted: colors.surfaceMuted || colors.backgroundSecondary || colors.surface,
+    border: colors.cardBorder || colors.strokeMuted || colors.border,
+    text: colors.text,
+    textSecondary: colors.textSecondary,
+    primary: colors.primary,
+    primaryStrong: colors.primaryStrong || colors.primary,
+    onPrimary: colors.onPrimary || colors.textInverse || colors.text,
+    accent: colors.secondary || colors.primary,
+    selectionSurface: colors.selectionSurface || colors.surfaceMuted,
+    selectionControl: colors.selectionControl || colors.selectionSurface || colors.surfaceMuted,
+    selectionBorder: colors.selectionBorder || colors.primary,
+    selectionText: colors.selectionText || colors.text,
+    selectionTextMuted: colors.selectionTextMuted || colors.textSecondary,
+    glow: colors.cosmicGlow || colors.selectionSurface || colors.surfaceMuted,
+    line: colors.strokeMuted || colors.cardBorder || colors.border,
   };
   const stageProfile = {
     idle: {
       eyebrow: t('speechChat.stageEyebrowIdle', 'Voice Chamber'),
       headline: t('speechChat.stageHeadlineIdle', 'Ask Tara anything'),
-      chamberColors: ['rgba(255,255,255,0.98)', 'rgba(252,245,238,0.96)', 'rgba(247,237,227,0.94)'],
-      haloOuter: 'rgba(251,191,36,0.12)',
-      haloInner: 'rgba(245,158,11,0.10)',
-      line: 'rgba(148,163,184,0.18)',
-      star: 'rgba(245,158,11,0.82)',
-      dot: 'rgba(249,115,22,0.50)',
+      chamberColors: [screenPalette.surfaceStrong, screenPalette.surface, screenPalette.backgroundAlt],
+      haloOuter: screenPalette.glow,
+      haloInner: screenPalette.selectionSurface,
+      line: screenPalette.line,
+      star: colors.accent || screenPalette.primary,
+      dot: screenPalette.accent,
     },
     listening: {
       eyebrow: t('speechChat.stageEyebrowListening', 'Listening'),
       headline: t('speechChat.stageHeadlineListening', 'Speak now'),
-      chamberColors: ['rgba(255,255,255,0.98)', 'rgba(239,246,255,0.96)', 'rgba(224,242,254,0.94)'],
-      haloOuter: 'rgba(56,189,248,0.16)',
-      haloInner: 'rgba(37,99,235,0.10)',
-      line: 'rgba(37,99,235,0.22)',
-      star: 'rgba(37,99,235,0.78)',
-      dot: 'rgba(56,189,248,0.52)',
+      chamberColors: [screenPalette.surfaceStrong, screenPalette.selectionSurface, screenPalette.backgroundAlt],
+      haloOuter: screenPalette.selectionSurface,
+      haloInner: screenPalette.selectionControl,
+      line: screenPalette.selectionBorder,
+      star: screenPalette.accent,
+      dot: screenPalette.primary,
     },
     thinking: {
       eyebrow: t('speechChat.stageEyebrowThinking', 'Reading The Chart'),
       headline: t('speechChat.stageHeadlineThinking', 'Patterns are settling'),
-      chamberColors: ['rgba(255,255,255,0.98)', 'rgba(248,245,255,0.96)', 'rgba(238,232,255,0.94)'],
-      haloOuter: 'rgba(168,85,247,0.14)',
-      haloInner: 'rgba(124,58,237,0.10)',
-      line: 'rgba(124,58,237,0.18)',
-      star: 'rgba(168,85,247,0.74)',
-      dot: 'rgba(196,181,253,0.55)',
+      chamberColors: [screenPalette.surfaceStrong, screenPalette.surfaceMuted, screenPalette.backgroundAlt],
+      haloOuter: screenPalette.glow,
+      haloInner: screenPalette.selectionSurface,
+      line: screenPalette.line,
+      star: colors.accent || screenPalette.primary,
+      dot: screenPalette.accent,
     },
     speaking: {
       eyebrow: t('speechChat.stageEyebrowSpeaking', 'Speaking'),
       headline: t('speechChat.stageHeadlineSpeaking', 'Tara is answering'),
-      chamberColors: ['rgba(255,255,255,0.98)', 'rgba(255,246,237,0.96)', 'rgba(255,237,213,0.94)'],
-      haloOuter: 'rgba(251,146,60,0.16)',
-      haloInner: 'rgba(249,115,22,0.12)',
-      line: 'rgba(249,115,22,0.18)',
-      star: 'rgba(249,115,22,0.82)',
-      dot: 'rgba(251,191,36,0.56)',
+      chamberColors: [screenPalette.surfaceStrong, screenPalette.selectionSurface, screenPalette.backgroundAlt],
+      haloOuter: screenPalette.glow,
+      haloInner: screenPalette.selectionControl,
+      line: screenPalette.selectionBorder,
+      star: screenPalette.primary,
+      dot: colors.accent || screenPalette.accent,
     },
   }[
     status === 'listening'
@@ -2103,7 +2211,11 @@ export default function SpeechChatScreen({ navigation, route }) {
   const micIconSize = tinyVoiceLayout ? 24 : compactVoiceLayout ? 26 : 30;
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: screenPalette.background }]}>
+    <SafeAreaView
+      edges={['top']}
+      style={[styles.safeArea, { backgroundColor: colors.headerSurface }]}
+    >
+      <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
       <LinearGradient
         colors={[screenPalette.background, screenPalette.backgroundAlt]}
         style={styles.container}
@@ -2120,25 +2232,33 @@ export default function SpeechChatScreen({ navigation, route }) {
               {birthData?.name
                 ? t('speechChat.screenSubtitleWithChart', {
                     name: birthData.name,
-                    defaultValue: `Voice guide on AstroRoshni · Live answers for ${birthData.name}`,
+                    defaultValue: `Speech consultation for ${birthData.name}`,
                   })
-                : t('speechChat.screenSubtitleDefault', 'Voice guide on AstroRoshni · Live spoken answers')}
+                : t('speechChat.screenSubtitleDefault', 'Talk naturally with Tara')}
             </Text>
           </View>
-          <View style={[styles.liveBadge, { backgroundColor: 'rgba(37,99,235,0.08)', borderColor: 'rgba(37,99,235,0.12)' }]}>
-            <View style={styles.liveDot} />
-            <Text style={[styles.liveBadgeText, { color: screenPalette.accent }]}>Live</Text>
+          <View style={[
+            styles.liveBadge,
+            {
+              backgroundColor: screenPalette.selectionSurface,
+              borderColor: screenPalette.selectionBorder,
+            },
+          ]}>
+            <View style={[styles.liveDot, { backgroundColor: screenPalette.primary }]} />
+            <Text style={[styles.liveBadgeText, { color: screenPalette.selectionText }]}>
+              {t('chat.modeIntro.speech.name', 'Speech')}
+            </Text>
           </View>
         </View>
 
         <View style={[styles.callMeter, { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong }]}>
           <View style={styles.callMeterItem}>
-            <Ionicons name="time-outline" size={15} color={screenPalette.accent} />
+            <Ionicons name="time-outline" size={15} color={screenPalette.primary} />
             <Text style={[styles.callMeterText, { color: screenPalette.text }]}>
               {formatCallTime(callElapsedSeconds)}
             </Text>
           </View>
-          <View style={styles.callMeterDivider} />
+          <View style={[styles.callMeterDivider, { backgroundColor: screenPalette.line }]} />
           <Text style={[styles.callMeterSubtext, { color: screenPalette.textSecondary }]}>
             {speechPerMinuteCost != null
               ? `${speechPerMinuteCost} credits/min`
@@ -2168,14 +2288,20 @@ export default function SpeechChatScreen({ navigation, route }) {
                     setAnswerStyle(styleKey);
                     chatAPI.updateAnswerStylePreference(styleKey).catch(() => {});
                   }}
-                  style={[styles.answerStyleOption, selected && { backgroundColor: screenPalette.accent }]}
+                  style={[
+                    styles.answerStyleOption,
+                    selected && {
+                      backgroundColor: screenPalette.selectionSurface,
+                      borderColor: screenPalette.selectionBorder,
+                    },
+                  ]}
                   accessibilityRole="radio"
                   accessibilityState={{ selected, checked: selected }}
                   accessibilityLabel={label}
                 >
                   <Text style={[
                     styles.answerStyleOptionText,
-                    { color: selected ? '#ffffff' : screenPalette.textSecondary },
+                    { color: selected ? screenPalette.selectionText : screenPalette.textSecondary },
                   ]}>
                     {label}
                   </Text>
@@ -2187,41 +2313,9 @@ export default function SpeechChatScreen({ navigation, route }) {
 
         <View style={styles.mainColumn}>
         <ScrollView ref={scrollRef} style={styles.conversation} contentContainerStyle={styles.conversationContent}>
-          {turns.length === 0 && !currentTranscript ? (
-            <View style={[
-              styles.emptyVoiceState,
-              {
-                borderColor: screenPalette.border,
-                backgroundColor: screenPalette.surface,
-              },
-            ]}>
-              <View style={[styles.emptyVoiceIcon, { backgroundColor: stageProfile.haloOuter }]}>
-                <Ionicons
-                  name={
-                    status === 'listening'
-                      ? 'mic'
-                      : status === 'thinking' || status === 'transcribing'
-                        ? 'sparkles'
-                        : status === 'speaking'
-                          ? 'volume-high'
-                          : 'chatbubble-ellipses'
-                  }
-                  size={28}
-                  color={status === 'listening' ? screenPalette.accent : screenPalette.primary}
-                />
-              </View>
-              <Text style={[styles.emptyVoiceTitle, { color: screenPalette.text }]}>
-                {stageProfile.headline}
-              </Text>
-              <Text style={[styles.emptyVoiceBody, { color: screenPalette.textSecondary }]}>
-                {statusText}
-              </Text>
-            </View>
-          ) : null}
-
           {turns.map((turn, index) => (
             <View key={`${turn.question}_${index}`} style={styles.turnBlock}>
-              <View style={[styles.userBubble, { backgroundColor: 'rgba(249,115,22,0.10)' }]}>
+              <View style={[styles.userBubble, { backgroundColor: screenPalette.selectionSurface }]}>
                 <Text style={[styles.bubbleLabel, { color: screenPalette.textSecondary }]}>You asked</Text>
                 <Text style={[styles.bubbleText, { color: screenPalette.text }]}>{turn.question}</Text>
               </View>
@@ -2234,13 +2328,20 @@ export default function SpeechChatScreen({ navigation, route }) {
             </View>
           ))}
 
+          {streamingAnswer ? (
+            <Animated.View style={[styles.answerBubble, { backgroundColor: screenPalette.surfaceStrong, borderColor: screenPalette.border }]}>
+              <Text style={[styles.bubbleText, { color: screenPalette.text }]}>{streamingAnswer}</Text>
+            </Animated.View>
+          ) : null}
+
           {currentTranscript ? (
             <Animated.View
               style={[
                 styles.liveCard,
                 {
-                  borderColor: 'rgba(37,99,235,0.12)',
-                  backgroundColor: 'rgba(255,255,255,0.92)',
+                  borderColor: screenPalette.selectionBorder,
+                  backgroundColor: screenPalette.surfaceStrong,
+                  shadowColor: screenPalette.primary,
                   shadowOpacity: status === 'idle' ? 0.08 : transcriptGlow,
                   transform: [{ scale: transcriptScale }],
                 },
@@ -2257,7 +2358,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         {followUps.length > 0 && status === 'idle' ? (
           <View style={styles.followUpRow}>
             {followUps.map((item) => (
-              <TouchableOpacity key={item} onPress={() => askFollowUp(item)} style={[styles.followUpChip, { borderColor: screenPalette.border, backgroundColor: 'rgba(255,255,255,0.8)' }]}>
+              <TouchableOpacity key={item} onPress={() => askFollowUp(item)} style={[styles.followUpChip, { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong }]}>
                 <Text style={[styles.followUpText, { color: screenPalette.text }]} numberOfLines={2}>{item}</Text>
               </TouchableOpacity>
             ))}
@@ -2268,12 +2369,15 @@ export default function SpeechChatScreen({ navigation, route }) {
         </View>
 
         <LinearGradient
-          colors={['rgba(255,251,247,0.98)', 'rgba(248,241,233,0.98)', 'rgba(244,235,226,0.96)']}
+          colors={[screenPalette.surfaceStrong, screenPalette.surface, screenPalette.backgroundAlt]}
           style={[
             styles.controlsShell,
             compactVoiceLayout && styles.controlsShellCompact,
             tinyVoiceLayout && styles.controlsShellTiny,
-            { borderColor: screenPalette.border },
+            {
+              borderColor: screenPalette.border,
+              paddingBottom: Math.max(4, insets.bottom || 0),
+            },
           ]}
         >
         <View style={[styles.controls, compactVoiceLayout && styles.controlsCompact]}>
@@ -2287,8 +2391,8 @@ export default function SpeechChatScreen({ navigation, route }) {
             ]}
           >
             <View pointerEvents="none" style={styles.chamberBackdrop}>
-              <View style={[styles.moonArcOuter, { borderColor: stageProfile.line, backgroundColor: stageProfile.haloOuter }]} />
-              <View style={[styles.moonArcInner, { borderColor: stageProfile.line, backgroundColor: stageProfile.haloInner }]} />
+              <View style={[styles.moonArcOuter, { borderColor: stageProfile.line }]} />
+              <View style={[styles.moonArcInner, { borderColor: stageProfile.line }]} />
               <View style={[styles.geometryCircleLarge, { borderColor: stageProfile.line }]} />
               <View style={[styles.geometryCircleSmall, { borderColor: stageProfile.line }]} />
               <View style={[styles.constellationLine, styles.constellationLineLeft, { backgroundColor: stageProfile.line }]} />
@@ -2361,11 +2465,47 @@ export default function SpeechChatScreen({ navigation, route }) {
                 />
               </Animated.View>
 
-              <TaraSpeakingAvatar
-                status={status}
-                compact={compactVoiceLayout}
-                tiny={tinyVoiceLayout}
-              />
+              <Animated.View
+                style={[
+                  styles.voiceStateOrb,
+                  compactVoiceLayout && styles.voiceStateOrbCompact,
+                  tinyVoiceLayout && styles.voiceStateOrbTiny,
+                  {
+                    backgroundColor: screenPalette.selectionSurface,
+                    borderColor: screenPalette.selectionBorder,
+                    shadowColor: screenPalette.primary,
+                    transform: [{ scale: status === 'idle' ? 1 : thinkingScale }],
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={
+                    status === 'listening'
+                      ? 'mic'
+                      : status === 'thinking' || status === 'transcribing'
+                        ? 'sparkles'
+                        : status === 'speaking'
+                          ? 'volume-high'
+                          : 'chatbubble-ellipses'
+                  }
+                  size={tinyVoiceLayout ? 32 : compactVoiceLayout ? 38 : 44}
+                  color={screenPalette.selectionText}
+                />
+                <View style={styles.voiceWave}>
+                  {[0.52, 0.82, 1, 0.82, 0.52].map((scale, index) => (
+                    <Animated.View
+                      key={`${scale}_${index}`}
+                      style={[
+                        styles.voiceWaveBar,
+                        {
+                          backgroundColor: screenPalette.primary,
+                          transform: [{ scaleY: status === 'idle' ? scale : thinkingScale }],
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              </Animated.View>
             </View>
 
             <Text style={[
@@ -2388,20 +2528,27 @@ export default function SpeechChatScreen({ navigation, route }) {
                     styles.handsFreeToggleInline,
                     compactVoiceLayout && styles.handsFreeToggleInlineCompact,
                     {
-                      backgroundColor: handsFreeEnabled ? 'rgba(249,115,22,0.10)' : 'rgba(255,255,255,0.58)',
-                      borderColor: screenPalette.border,
-                  },
-                ]}
+                      backgroundColor: handsFreeEnabled
+                        ? screenPalette.selectionSurface
+                        : screenPalette.surfaceMuted,
+                      borderColor: handsFreeEnabled
+                        ? screenPalette.selectionBorder
+                        : screenPalette.border,
+                    },
+                  ]}
               >
                 <Ionicons
                   name={handsFreeEnabled ? 'radio-outline' : 'radio-button-off-outline'}
                   size={16}
-                  color={handsFreeEnabled ? screenPalette.primary : screenPalette.textSecondary}
+                  color={handsFreeEnabled ? screenPalette.selectionText : screenPalette.textSecondary}
                 />
-                <Text style={[styles.handsFreeInlineText, { color: screenPalette.text }]}>
+                <Text style={[
+                  styles.handsFreeInlineText,
+                  { color: handsFreeEnabled ? screenPalette.selectionText : screenPalette.text },
+                ]}>
                   {t('speechChat.handsFreeLabel', 'Hands-free follow-up')}
                 </Text>
-                <Text style={[styles.handsFreeInlineState, { color: handsFreeEnabled ? screenPalette.primary : screenPalette.textSecondary }]}>
+                <Text style={[styles.handsFreeInlineState, { color: handsFreeEnabled ? screenPalette.selectionText : screenPalette.textSecondary }]}>
                   {handsFreeEnabled ? t('speechChat.handsFreeOn', 'On') : t('speechChat.handsFreeOff', 'Off')}
                 </Text>
               </TouchableOpacity>
@@ -2421,14 +2568,17 @@ export default function SpeechChatScreen({ navigation, route }) {
                   compactVoiceLayout && styles.chamberMicOuterCompact,
                   tinyVoiceLayout && styles.chamberMicOuterTiny,
                   busy && styles.micButtonDisabled,
+                  { shadowColor: screenPalette.primary },
                 ]}
               >
                 <LinearGradient
-                  colors={status === 'listening' ? ['#0ea5e9', '#2563eb'] : ['#fb923c', '#f97316']}
+                  colors={status === 'listening'
+                    ? [screenPalette.accent, screenPalette.primary]
+                    : [screenPalette.primaryStrong, screenPalette.primary]}
                   style={styles.chamberMicButton}
                 >
                   {busy ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color={screenPalette.onPrimary} />
                   ) : (
                     <Ionicons
                       name={
@@ -2441,7 +2591,7 @@ export default function SpeechChatScreen({ navigation, route }) {
                               : 'mic'
                       }
                       size={micIconSize}
-                      color="#fff"
+                      color={screenPalette.onPrimary}
                     />
                   )}
                 </LinearGradient>
@@ -2497,7 +2647,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#38bdf8',
   },
   liveBadgeText: {
     fontSize: 12,
@@ -2537,7 +2686,6 @@ const styles = StyleSheet.create({
   callMeterDivider: {
     width: 1,
     height: 18,
-    backgroundColor: 'rgba(148,163,184,0.26)',
   },
   callMeterSubtext: {
     flex: 1,
@@ -2569,6 +2717,8 @@ const styles = StyleSheet.create({
     minWidth: 78,
     minHeight: 44,
     paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'transparent',
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2584,37 +2734,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 10,
     flexGrow: 1,
-  },
-  emptyVoiceState: {
-    flex: 1,
-    minHeight: 180,
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyVoiceIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  emptyVoiceTitle: {
-    fontSize: 22,
-    lineHeight: 27,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  emptyVoiceBody: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 8,
-    textAlign: 'center',
-    maxWidth: 300,
   },
   emptyCard: {
     alignItems: 'center',
@@ -2654,7 +2773,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 18,
     padding: 14,
-    shadowColor: '#38bdf8',
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 4,
@@ -2679,7 +2797,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 9,
     paddingHorizontal: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   followUpText: {
     fontSize: 13,
@@ -2730,7 +2847,6 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     overflow: 'hidden',
     alignItems: 'center',
-    shadowColor: '#f59e0b',
     shadowOpacity: 0.08,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 10 },
@@ -2861,19 +2977,19 @@ const styles = StyleSheet.create({
   voiceStage: {
     width: '100%',
     maxWidth: 260,
-    height: 188,
+    height: 150,
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     marginBottom: 2,
     overflow: 'visible',
   },
   voiceStageCompact: {
-    height: 150,
+    height: 124,
     maxWidth: 220,
     marginBottom: 0,
   },
   voiceStageTiny: {
-    height: 124,
+    height: 104,
     maxWidth: 188,
     marginBottom: 0,
   },
@@ -2886,9 +3002,41 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignSelf: 'center',
   },
-  avatarStageBlank: {
-    position: 'absolute',
-    inset: 0,
+  voiceStateOrb: {
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
+  voiceStateOrbCompact: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+  },
+  voiceStateOrbTiny: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    gap: 5,
+  },
+  voiceWave: {
+    height: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  voiceWaveBar: {
+    width: 4,
+    height: 18,
+    borderRadius: 999,
   },
   cosmicLayer: {
     position: 'absolute',
@@ -2907,14 +3055,12 @@ const styles = StyleSheet.create({
     width: 2,
     height: 18,
     borderRadius: 999,
-    backgroundColor: 'rgba(245,158,11,0.85)',
   },
   sparkleHorizontal: {
     position: 'absolute',
     width: 18,
     height: 2,
     borderRadius: 999,
-    backgroundColor: 'rgba(251,191,36,0.82)',
   },
   sparkleStarTopLeft: {
     top: 54,
@@ -2941,7 +3087,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(249,115,22,0.48)',
   },
   sparkleDotOne: {
     top: 102,
@@ -2958,156 +3103,12 @@ const styles = StyleSheet.create({
     left: 54,
     width: 5,
     height: 5,
-    backgroundColor: 'rgba(251,191,36,0.42)',
   },
   sparkleDotFour: {
     top: 262,
     right: 56,
     width: 4,
     height: 4,
-    backgroundColor: 'rgba(245,158,11,0.4)',
-  },
-  avatarWrap: {
-    width: 166,
-    height: 188,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginBottom: 0,
-  },
-  avatarWrapCompact: {
-    width: 132,
-    height: 150,
-  },
-  avatarWrapTiny: {
-    width: 110,
-    height: 124,
-  },
-  avatarImageStage: {
-    width: 166,
-    height: 188,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'visible',
-  },
-  avatarImageStageCompact: {
-    width: 132,
-    height: 150,
-  },
-  avatarImageStageTiny: {
-    width: 110,
-    height: 124,
-  },
-  avatarImageLayer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-  },
-  avatarBaseLayer: {
-    width: '124%',
-    height: '124%',
-    bottom: -6,
-  },
-  avatarFeatureLayer: {
-    width: '124%',
-    height: '124%',
-    bottom: -6,
-  },
-  avatarHairBack: {
-    position: 'absolute',
-    width: 88,
-    height: 78,
-    borderTopLeftRadius: 44,
-    borderTopRightRadius: 44,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    top: 8,
-  },
-  avatarShoulders: {
-    position: 'absolute',
-    width: 110,
-    height: 42,
-    borderTopLeftRadius: 34,
-    borderTopRightRadius: 34,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
-    bottom: 0,
-  },
-  avatarNeck: {
-    position: 'absolute',
-    width: 20,
-    height: 18,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    bottom: 26,
-  },
-  avatarHead: {
-    width: 76,
-    height: 86,
-    borderRadius: 32,
-    alignItems: 'center',
-    paddingTop: 16,
-    overflow: 'hidden',
-    marginBottom: 14,
-  },
-  avatarHairTop: {
-    position: 'absolute',
-    width: 78,
-    height: 34,
-    top: 0,
-    borderBottomLeftRadius: 18,
-    borderBottomRightRadius: 18,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-  },
-  avatarBindi: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginBottom: 6,
-  },
-  avatarBrowsRow: {
-    width: 36,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 3,
-  },
-  avatarBrow: {
-    width: 12,
-    height: 2,
-    borderRadius: 2,
-  },
-  avatarEyesRow: {
-    width: 40,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 7,
-  },
-  avatarEye: {
-    width: 12,
-    height: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarEyeClosed: {
-    height: 2,
-    marginTop: 3,
-  },
-  avatarPupil: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-  },
-  avatarNose: {
-    width: 4,
-    height: 12,
-    borderRadius: 3,
-    marginBottom: 8,
-  },
-  avatarMouth: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   handsFreeToggle: {
     width: '100%',
@@ -3199,7 +3200,6 @@ const styles = StyleSheet.create({
     width: 66,
     height: 66,
     borderRadius: 999,
-    shadowColor: '#ea580c',
     shadowOpacity: 0.22,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },

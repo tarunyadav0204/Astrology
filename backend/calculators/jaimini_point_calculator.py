@@ -83,6 +83,23 @@ class JaiminiPointCalculator:
             }
         }
 
+    def calculate_house_arudha(self, house_num: int) -> Dict[str, Any]:
+        """Calculate the Arudha Pada (A1-A12) for one D1 house."""
+        house = int(house_num)
+        if house < 1 or house > 12:
+            raise ValueError("house_num must be between 1 and 12")
+        sign = self._calculate_arudha_pada(house_num=house)
+        return {
+            "house": house,
+            "name": f"A{house}",
+            "sign_id": sign,
+            "sign_name": self._get_sign_name(sign),
+            "calculation_rule": (
+                "Count from the house sign to its lord and repeat the distance, "
+                "using the standard same-sign and seventh-sign exceptions."
+            ),
+        }
+
     # -------------------------------------------------------------------------
     # CORE LOGIC: Arudha Calculation
     # -------------------------------------------------------------------------

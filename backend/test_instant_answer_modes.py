@@ -31,8 +31,11 @@ _stub_module(
     "utils.admin_settings",
     CHAT_LLM_DEEPSEEK="deepseek",
     CHAT_LLM_GEMINI="gemini",
+    CHAT_LLM_OPENAI="openai",
     get_instant_chat_llm_provider=lambda: "gemini",
     get_instant_chat_model=lambda: "stub-model",
+    is_instant_response_validation_enabled=lambda: True,
+    is_speech_unvalidated_streaming_enabled=lambda: False,
 )
 # Keep real remedy-CTA helpers; only stub time resolution for period-window tests.
 import utils.query_context as _qc_mod
@@ -67,6 +70,7 @@ from chat.instant_chat_pipeline import (
     _is_conversational_non_question,
     _instant_lifetime_event_year_clarification_response,
     _merge_adjacent_low_score_event_periods,
+    _multi_target_house_ledger,
     _normalize_event_category,
     _normalize_question_text,
     _normalize_instant_evidence,
@@ -680,6 +684,8 @@ def test_event_prediction_prompt_contains_claim_discipline():
     assert "astrological indicators suggest" in prompt
     assert "not active in a timing window unless" in prompt
     assert "do not say \"career house\"" in prompt.lower()
+    assert "naturally continues the conversation" in prompt
+    assert "most relevant question to ask aloud immediately" in prompt
 
 
 def test_instant_chat_prompt_closes_as_a_conversation_not_an_upsell():
@@ -806,7 +812,7 @@ def test_compact_divisional_support_keeps_requested_and_available_charts():
 def test_infer_answer_mode_for_explanation():
     mode = _infer_answer_mode(
         "You said Rahu activates my 10th house. How exactly?",
-        {"mode": "ANALYZE_TOPIC_POTENTIAL", "category": "career"},
+        {"mode": "ANALYZE_TOPIC_POTENTIAL", "category": "career", "answer_mode": "explanation_mechanism"},
         [{"question": "career", "response": "Rahu activates 10th"}],
     )
     assert mode == "explanation_mechanism"
@@ -929,7 +935,7 @@ def test_build_answer_mode_contract_for_factual_chart_lookup():
 def test_infer_answer_mode_for_trait_question():
     mode = _infer_answer_mode(
         "Tell me about my behaviour",
-        {"mode": "ANALYZE_PERSONALITY", "category": "general"},
+        {"mode": "ANALYZE_PERSONALITY", "category": "general", "answer_mode": "trait_nature"},
         [],
     )
     assert mode == "trait_nature"
@@ -953,7 +959,7 @@ def test_build_answer_mode_contract_for_trait_nature_uses_personality_axes():
 def test_infer_answer_mode_for_period_window():
     mode = _infer_answer_mode(
         "How will October 2026 be for me?",
-        {"mode": "PREDICT_PERIOD_OUTLOOK", "category": "general", "needs_transits": True},
+        {"mode": "PREDICT_PERIOD_OUTLOOK", "category": "general", "needs_transits": True, "answer_mode": "timing_window"},
         [],
     )
     assert mode == "timing_window"
@@ -963,7 +969,7 @@ def test_infer_answer_mode_for_tomorrow_outlook_questions():
     for question in ("What will be happen tomorrow?", "How will be my day tomorrow?"):
         mode = _infer_answer_mode(
             question,
-            {"mode": "PREDICT_DAILY", "category": "general", "needs_transits": True},
+            {"mode": "PREDICT_DAILY", "category": "general", "needs_transits": True, "answer_mode": "timing_window"},
             [],
         )
         assert mode == "timing_window"
@@ -993,6 +999,12 @@ def test_resolve_period_window_for_tomorrow_day_and_next_year():
     next_year = _resolve_period_window(
         {
             "mode": "PREDICT_PERIOD_OUTLOOK",
+            "period_window": {
+                "kind": "window",
+                "start": "2027-01-01",
+                "end": "2027-12-31",
+                "label": "2027",
+            },
             "extracted_context": {"timeframe": "next year"},
         },
         now,
@@ -1060,13 +1072,84 @@ def test_build_answer_mode_contract_for_relationship_person():
     assert "native's ascendant" in " ".join(contract["avoid_drift"])
 
 
-def test_fallback_target_subject_handles_second_child_and_younger_brother():
+def test_fallback_target_subject_does_not_guess_from_english_words():
     second_child = _fallback_target_subject("What is my second child's nature?")
     younger_brother = _fallback_target_subject("Tell me about my younger brother")
-    assert second_child["key"] == "second_child"
-    assert second_child["base_house"] == 7
-    assert younger_brother["key"] == "younger_brother"
-    assert younger_brother["base_house"] == 3
+    assert second_child["key"] == "self"
+    assert second_child["base_house"] == 1
+    assert younger_brother["key"] == "self"
+    assert younger_brother["base_house"] == 1
+
+
+def test_same_question_for_multiple_named_relatives_stays_answerable():
+    selection = _mode_selection_from_intent({
+        "status": "READY",
+        "route_action": "answer",
+        "mode": "LIFESPAN_EVENT_TIMING",
+        "answer_mode": "event_prediction",
+        "category": "family",
+        "target_subject_key": "husband",
+        "target_subject_keys": ["husband", "child"],
+        "evidence_plan": {
+            "question_parts": [
+                {"life_domain": "family", "subject": "husband", "intent_families": ["event_timing"]},
+                {"life_domain": "family", "subject": "child", "intent_families": ["event_timing"]},
+            ],
+            "evidence_needs": [],
+        },
+    })
+    assert selection["route_action"] == "answer"
+    assert [row["key"] for row in selection["target_subjects"]] == ["husband", "child"]
+    assert selection["target_subject"]["key"] == "husband"
+
+
+def test_multi_target_composer_removes_native_natal_fallbacks():
+    multi_rows = [
+        {"target_subject": {"key": "husband"}, "target_house_ledger": [{"house_from_target": 2, "corresponding_native_house": 8}]},
+        {"target_subject": {"key": "child"}, "target_house_ledger": [{"house_from_target": 2, "corresponding_native_house": 6}]},
+    ]
+    context = _build_instant_composer_context(
+        {
+            "birth_summary": {"name": "ABC"},
+            "intent_summary": {"category": "family", "answer_mode": "event_prediction"},
+            "normalized_evidence": {
+                "natal_promise": {"wrong_native_branch": True},
+                "special_natal_factors": [{"effect": "native H2 Mars"}],
+                "multi_target_contexts": multi_rows,
+                "multi_target_contract": {
+                    "subjects": [{"key": "husband"}, {"key": "child"}],
+                    "answer_each_subject_separately": True,
+                },
+            },
+        },
+        {
+            "query_plan": {"category": "family", "answer_mode": "event_prediction"},
+            "verdict": {"direction": "generic native verdict", "confidence": "medium"},
+            "answer_spec": {},
+            "user_derivation": {},
+        },
+    )
+    assert set(context["evidence"]) == {"multi_target_contexts", "multi_target_contract"}
+    assert context["verdict"]["direction"] == "separate_target_relative_readings_with_choice_boundary"
+
+
+def test_compact_router_contract_does_not_split_shared_multi_subject_question():
+    router = object.__new__(IntentRouter)
+    prompt = router._build_compact_instant_router_prompt(
+        user_question="same behavior for husband and child",
+        latest_user_reply="same behavior for husband and child",
+        history_text="",
+        app_language="hinglish",
+        current_date="2026-09-08",
+        current_year=2026,
+        current_month="September",
+        clarification_limit_text="",
+        force_ready_instruction="",
+        force_clarify_instruction="",
+        dialogue_state_text="{}",
+    )
+    assert "never ask the user to repeat the same question one person at a time" in prompt
+    assert '"target_subject_keys"' in prompt
 
 
 def test_build_person_profile_axes_uses_target_house_not_native_lagna():
@@ -1123,6 +1206,28 @@ def test_build_target_chart_context_rotates_houses_for_target():
     assert ctx["target_transits"]["Jupiter"]["house"] == 10
     assert ctx["target_transits"]["Jupiter"]["house_from_native"] == 12
     assert ctx["target_transits"]["Jupiter"]["house_from_target"] == 10
+
+
+def test_husband_second_house_uses_native_eighth_not_native_second():
+    ctx = _build_target_chart_context(
+        {"ascendant": {"sign": "Cancer"}},
+        {
+            "key_planets": {
+                "Mars": {"sign": "Leo", "house": 2},
+                "Mercury": {"sign": "Aquarius", "house": 8},
+                "Ketu": {"sign": "Aquarius", "house": 8},
+            }
+        },
+        {},
+        {"key": "husband", "label": "husband", "base_house": 7},
+    )
+    ledger = _multi_target_house_ledger(ctx, [2, 8])
+    husband_h2 = next(row for row in ledger if row["house_from_target"] == 2)
+    husband_h8 = next(row for row in ledger if row["house_from_target"] == 8)
+    assert husband_h2["corresponding_native_house"] == 8
+    assert husband_h2["occupants"] == ["Mercury", "Ketu"]
+    assert husband_h8["corresponding_native_house"] == 2
+    assert husband_h8["occupants"] == ["Mars"]
 
 
 def test_target_context_as_birth_summary_uses_target_ascendant():
@@ -1230,9 +1335,8 @@ def test_build_answer_mode_contract_for_event_prediction_is_investigative():
     )
     assert contract["answer_mode"] == "event_prediction"
     assert "question-led yes bias" in contract["avoid_drift"]
-    assert "timing_policy" in contract["primary_evidence"]
-    assert "forward_event_dasha_scan" in contract["primary_evidence"]
-    assert "horizon_dasha_segments" in contract["primary_evidence"]
+    assert "transit_activation_timeline" in contract["primary_evidence"]
+    assert "career_manifestations" in contract["primary_evidence"]
     assert "next 3 years" in contract["answer_skeleton"]
     assert "Support vs obstruction vs uncertainty" in contract["answer_skeleton"]
 
@@ -1315,6 +1419,8 @@ def test_normalized_event_prediction_exposes_current_dasha_chain():
         natal_snapshot={},
         relationship_target=None,
         target_chart_context=None,
+        question="",
+        chart_data={},
     )
     assert (norm.get("current_timing") or {}).get("current_dasha_chain") == "Saturn > Mercury > Jupiter"
     assert "horizon_dasha_segments" in norm
@@ -1523,12 +1629,12 @@ def test_normalize_question_text_treats_same_retry_as_same_question():
 
 
 def test_infer_answer_mode_married_this_year_prefers_event_prediction():
-    intent = {"mode": "LIFESPAN_EVENT_TIMING", "category": "marriage"}
+    intent = {"mode": "LIFESPAN_EVENT_TIMING", "category": "marriage", "answer_mode": "event_prediction"}
     assert _infer_answer_mode("When will I get married this year?", intent, []) == "event_prediction"
 
 
 def test_infer_answer_mode_marriage_possibility_in_chart_is_natal_promise():
-    intent = {"mode": "LIFESPAN_EVENT_TIMING", "category": "marriage"}
+    intent = {"mode": "ANALYZE_TOPIC_POTENTIAL", "category": "marriage", "answer_mode": "potential_capacity"}
     assert _infer_answer_mode(
         "Is there any possibility of marriage in my birth chart or kundali?",
         intent,
@@ -1542,7 +1648,7 @@ def test_infer_answer_mode_remedy_with_cta_or_semantic_router_flag():
     plain = {"mode": "RECOMMEND_REMEDY_FOR_PROBLEM", "answer_mode": "remedy_action", "category": "health"}
     assert not _explicit_remedy_followup_requested(plain)
     assert _infer_answer_mode("What remedies for my anxiety?", plain, []) != "remedy_action"
-    assert _clamp_remedy_answer_mode("remedy_action", plain, "what should I do for anxiety") == "problem_diagnosis"
+    assert _clamp_remedy_answer_mode("remedy_action", plain, "what should I do for anxiety") == "topic_reading"
 
     semantic = {
         "mode": "RECOMMEND_REMEDY_FOR_PROBLEM",
@@ -1564,15 +1670,15 @@ def test_infer_answer_mode_remedy_with_cta_or_semantic_router_flag():
 
 
 def test_open_ended_life_event_when_detects_job_and_ex():
-    assert _looks_like_open_ended_life_event_when("When will I get a job?", {"mode": "ANALYZE_TOPIC_POTENTIAL"})
-    assert _looks_like_open_ended_life_event_when("When will my ex come back?", {"mode": "LIFESPAN_EVENT_TIMING"})
+    assert not _looks_like_open_ended_life_event_when("When will I get a job?", {"mode": "ANALYZE_TOPIC_POTENTIAL"})
+    assert not _looks_like_open_ended_life_event_when("When will my ex come back?", {"mode": "LIFESPAN_EVENT_TIMING"})
     assert not _looks_like_open_ended_life_event_when("How will this month be for me?", {"mode": "PREDICT_PERIOD_OUTLOOK"})
 
 
 def test_conversational_non_question_detects_deferrals():
-    assert _is_conversational_non_question("Nothing for now.")
-    assert _is_conversational_non_question("no thanks")
-    assert _is_conversational_non_question("I'm good for now")
+    assert not _is_conversational_non_question("Nothing for now.")
+    assert not _is_conversational_non_question("no thanks")
+    assert not _is_conversational_non_question("I'm good for now")
     assert not _is_conversational_non_question("What about my career next month?")
     assert not _is_conversational_non_question("Is there nothing good in my chart?")
 

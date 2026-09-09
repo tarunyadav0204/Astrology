@@ -7,6 +7,7 @@ class _FakeAnalyzer:
     def __init__(self):
         self.generate_calls = 0
         self.prompts = []
+        self.generate_kwargs = []
 
     def get_named_gemini_model(self, model_name, premium_analysis=False):
         return {"model": model_name}
@@ -14,6 +15,7 @@ class _FakeAnalyzer:
     async def generate_text_from_prompt(self, prompt, **kwargs):
         self.generate_calls += 1
         self.prompts.append(prompt)
+        self.generate_kwargs.append(kwargs)
         return {
             "success": True,
             "response": (
@@ -81,3 +83,56 @@ def test_instant_answer_uses_exactly_one_generation_call(monkeypatch):
     assert debug["contract_enforcement"]["reason"] == "single_call_contract_in_primary_prompt"
     assert debug["composer_metrics"]["generation_calls"] == 1
     assert debug["composer_metrics"]["within_prompt_budget"] is True
+
+
+def test_disabled_response_validation_streams_without_running_fact_validator(monkeypatch):
+    analyzer = _FakeAnalyzer()
+    packet = {
+        "query_plan": {"category": "career", "answer_mode": "topic_reading"},
+        "verdict": {"direction": "mixed", "confidence": 0.6},
+        "answer_spec": {
+            "max_words": 120,
+            "visible_astrology": {"required": True, "allowed_planets": ["Moon"]},
+        },
+        "evidence_ledger": {"records": []},
+        "verification": {"passed": True},
+    }
+    compact_context = {
+        "birth_summary": {"name": "Test"},
+        "intent_summary": {"category": "career", "answer_mode": "topic_reading"},
+        "normalized_evidence": {},
+        "recent_history": [],
+    }
+    callback = lambda _delta, _content: None
+
+    monkeypatch.setattr(pipeline, "_build_instant_context", lambda **kwargs: compact_context)
+    monkeypatch.setattr(pipeline, "build_instant_v2_packet", lambda **kwargs: packet)
+    monkeypatch.setattr(pipeline, "get_instant_chat_llm_provider", lambda: "gemini")
+    monkeypatch.setattr(pipeline, "get_instant_chat_model", lambda: "models/gemini-flash-lite-test")
+    monkeypatch.setattr(pipeline, "is_instant_response_validation_enabled", lambda: False)
+    monkeypatch.setattr(
+        pipeline,
+        "validate_translated_astrology_answer",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("validator ran")),
+    )
+    monkeypatch.setattr(pipeline, "finalize_instant_v2_packet", lambda current, answer: current)
+
+    result = asyncio.run(
+        pipeline.generate_instant_chat_response(
+            analyzer,
+            question="How is my career?",
+            birth_data={"name": "Test"},
+            intent={"category": "career", "answer_mode": "topic_reading"},
+            history=[],
+            language="english",
+            stream_callback=callback,
+        )
+    )
+
+    assert result["success"] is True
+    assert analyzer.generate_calls == 1
+    assert analyzer.generate_kwargs[0]["stream_callback"] is callback
+    assert "FINAL OUTPUT OVERRIDE — RESPONSE VALIDATION IS DISABLED" in analyzer.prompts[0]
+    assert "Never emit text enclosed in double square brackets" in analyzer.prompts[0]
+    enforcement = result["instant_evidence_debug"]["contract_enforcement"]
+    assert enforcement["response_validation_enabled"] is False

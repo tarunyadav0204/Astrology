@@ -448,6 +448,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [geminiInstantChatModel, setGeminiInstantChatModel] = useState('');
   const [instantChatLlmProvider, setInstantChatLlmProvider] = useState('gemini');
   const [deepseekInstantChatModel, setDeepseekInstantChatModel] = useState('');
+  const [openaiInstantChatModel, setOpenaiInstantChatModel] = useState('gpt-5.6-luna');
   const [parallelBranchGeminiModels, setParallelBranchGeminiModels] = useState(DEFAULT_PARALLEL_BRANCH_MODELS);
   const [parallelBranchPlannerEnabled, setParallelBranchPlannerEnabled] = useState(false);
   const [parallelBranchPlannerModel, setParallelBranchPlannerModel] = useState('');
@@ -498,6 +499,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [deathQueryUnlockSaving, setDeathQueryUnlockSaving] = useState(false);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
   const [instantChatUserAllowlist, setInstantChatUserAllowlist] = useState('');
+  const [instantResponseValidationEnabled, setInstantResponseValidationEnabled] = useState(true);
+  const [speechAllowUnvalidatedStreaming, setSpeechAllowUnvalidatedStreaming] = useState(false);
+  const [instantValidationFlagsSaving, setInstantValidationFlagsSaving] = useState(false);
   const [speechChatEnabled, setSpeechChatEnabled] = useState(false);
   const [speechChatUserAllowlist, setSpeechChatUserAllowlist] = useState('');
   const [speechTtsProvider, setSpeechTtsProvider] = useState('local');
@@ -929,6 +933,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setGeminiInstantChatModel(data.gemini_instant_chat_model || '');
       setInstantChatLlmProvider(data.instant_chat_llm_provider || 'gemini');
       setDeepseekInstantChatModel(data.deepseek_instant_chat_model || 'deepseek-chat');
+      setOpenaiInstantChatModel(data.openai_instant_chat_model || 'gpt-5.6-luna');
       setParallelBranchGeminiModels({
         ...DEFAULT_PARALLEL_BRANCH_MODELS,
         ...(data.parallel_branch_gemini_models || {}),
@@ -987,6 +992,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setDeathQueryUnlockKeyword(deathUnlockKeyword?.value || '');
       setInstantChatEnabled(Boolean(data.instant_chat_enabled));
       setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
+      setInstantResponseValidationEnabled(data.instant_response_validation_enabled !== false);
+      setSpeechAllowUnvalidatedStreaming(Boolean(data.speech_allow_unvalidated_streaming));
       setSpeechChatEnabled(Boolean(data.speech_chat_enabled));
       setSpeechChatUserAllowlist(data.speech_chat_user_allowlist || '');
       setSpeechTtsProvider(data.speech_tts_provider === 'google' ? 'google' : 'local');
@@ -1323,7 +1330,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setGeminiModelsSaving(true);
     try {
       const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
-      const [enabledRes, allowlistRes, providerRes, geminiModelRes, deepseekModelRes] = await Promise.all([
+      const [enabledRes, allowlistRes, providerRes, geminiModelRes, deepseekModelRes, openaiModelRes] = await Promise.all([
         fetch('/api/admin/settings/instant_chat_enabled', {
           method: 'PUT',
           headers,
@@ -1348,7 +1355,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           body: JSON.stringify({
             key: 'instant_chat_llm_provider',
             value: instantChatLlmProvider,
-            description: 'Dedicated LLM provider for Instant Chat (gemini or deepseek)',
+            description: 'Dedicated LLM provider for Instant Chat (gemini, openai, or deepseek)',
           }),
         }),
         fetch('/api/admin/settings/gemini_instant_chat_model', {
@@ -1369,16 +1376,26 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             description: 'DeepSeek model for Instant Chat',
           }),
         }),
+        fetch('/api/admin/settings/openai_instant_chat_model', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'openai_instant_chat_model',
+            value: openaiInstantChatModel,
+            description: 'OpenAI GPT model for Instant Chat',
+          }),
+        }),
       ]);
-      if (!enabledRes.ok || !allowlistRes.ok || !providerRes.ok || !geminiModelRes.ok || !deepseekModelRes.ok) {
+      if (!enabledRes.ok || !allowlistRes.ok || !providerRes.ok || !geminiModelRes.ok || !deepseekModelRes.ok || !openaiModelRes.ok) {
         const enabledErr = await enabledRes.json().catch(() => ({}));
         const allowlistErr = await allowlistRes.json().catch(() => ({}));
         const providerErr = await providerRes.json().catch(() => ({}));
         const geminiModelErr = await geminiModelRes.json().catch(() => ({}));
         const deepseekModelErr = await deepseekModelRes.json().catch(() => ({}));
+        const openaiModelErr = await openaiModelRes.json().catch(() => ({}));
         alert(
           'Failed to save instant chat settings: ' +
-            (enabledErr.detail || allowlistErr.detail || providerErr.detail || geminiModelErr.detail || deepseekModelErr.detail || 'check console')
+            (enabledErr.detail || allowlistErr.detail || providerErr.detail || geminiModelErr.detail || deepseekModelErr.detail || openaiModelErr.detail || 'check console')
         );
         return;
       }
@@ -1515,6 +1532,49 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save homepage FOMO setting.');
     } finally {
       setHomepageFomoSaving(false);
+    }
+  };
+
+  const handleSaveInstantValidationFlags = async () => {
+    setInstantValidationFlagsSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const [validationRes, speechStreamingRes] = await Promise.all([
+        fetch('/api/admin/settings/instant_response_validation_enabled', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'instant_response_validation_enabled',
+            value: instantResponseValidationEnabled ? 'true' : 'false',
+            description: 'Run post-generation fact validation and correction for Live/Instant chat answers',
+          }),
+        }),
+        fetch('/api/admin/settings/speech_allow_unvalidated_streaming', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'speech_allow_unvalidated_streaming',
+            value: speechAllowUnvalidatedStreaming ? 'true' : 'false',
+            description: 'Allow provisional, not-yet-validated Instant answer chunks to be displayed and spoken in speech chat',
+          }),
+        }),
+      ]);
+      if (!validationRes.ok || !speechStreamingRes.ok) {
+        const validationErr = await validationRes.json().catch(() => ({}));
+        const speechErr = await speechStreamingRes.json().catch(() => ({}));
+        alert(
+          'Failed to save Instant validation flags: '
+          + (validationErr.detail || speechErr.detail || 'check console')
+        );
+        return;
+      }
+      alert('Instant validation flags saved. New Live and speech turns use them immediately.');
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving Instant validation flags:', error);
+      alert('Failed to save Instant validation flags.');
+    } finally {
+      setInstantValidationFlagsSaving(false);
     }
   };
 
@@ -6440,6 +6500,59 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             {settingsSubTab === 'featureFlags' && (
               <div className="settings-subtab-group">
                 <div className="settings-section">
+                  <h3>Live answer validation</h3>
+                  <p className="settings-hint">
+                    Runtime controls for post-generation fact checking in Live/Instant chat. These switches do not
+                    disable medical safety, chart calculations, authentication, billing, or API request validation.
+                  </p>
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <strong>Validate Instant responses</strong>
+                      <p>
+                        When enabled, Live checks generated chart facts and may run one corrective generation before
+                        delivery. Turning it off reduces latency, but an incorrect model-authored chart statement can
+                        reach the user without correction.
+                      </p>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={instantResponseValidationEnabled}
+                        onChange={(event) => setInstantResponseValidationEnabled(event.target.checked)}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <strong>Allow provisional speech streaming</strong>
+                      <p>
+                        Display and speak speech-chat chunks as the model produces them, before final validation.
+                        If final validation changes the answer, the visible draft is replaced. When response validation
+                        is off, speech is necessarily provisional regardless of this switch.
+                      </p>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={speechAllowUnvalidatedStreaming}
+                        onChange={(event) => setSpeechAllowUnvalidatedStreaming(event.target.checked)}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="form-buttons" style={{ marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      className="create-btn"
+                      onClick={handleSaveInstantValidationFlags}
+                      disabled={instantValidationFlagsSaving}
+                    >
+                      {instantValidationFlagsSaving ? 'Saving…' : 'Save Live validation flags'}
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-section">
                   <h3>Homepage experience</h3>
                   <p className="settings-hint">
                     Switches the public homepage between the modern cinematic experience and the preserved legacy homepage.
@@ -7528,18 +7641,25 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   style={{ minWidth: '280px' }}
                 >
                   <option value="gemini">Gemini</option>
+                  <option value="openai">OpenAI (GPT)</option>
                   <option value="deepseek">DeepSeek</option>
                 </select>
               </div>
               <div className="setting-item">
                 <div className="setting-info">
-                  <strong>{instantChatLlmProvider === 'deepseek' ? 'DeepSeek' : 'Gemini'} model — instant chat</strong>
+                  <strong>{instantChatLlmProvider === 'deepseek' ? 'DeepSeek' : instantChatLlmProvider === 'openai' ? 'OpenAI GPT' : 'Gemini'} model — instant chat</strong>
                   <p>The selected model is used for both Instant routing and its final conversational answer.</p>
                 </div>
                 {instantChatLlmProvider === 'deepseek' ? (
                   <select value={deepseekInstantChatModel} onChange={(e) => setDeepseekInstantChatModel(e.target.value)} style={{ minWidth: '280px' }}>
                     {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
                       <option key={`dsi-${opt.value}`} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : instantChatLlmProvider === 'openai' ? (
+                  <select value={openaiInstantChatModel} onChange={(e) => setOpenaiInstantChatModel(e.target.value)} style={{ minWidth: '280px' }}>
+                    {(openaiModelOptions.length ? openaiModelOptions : [{ value: 'gpt-5.6-luna', label: 'OpenAI GPT-5.6 Luna' }]).map((opt) => (
+                      <option key={`oai-${opt.value}`} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 ) : (

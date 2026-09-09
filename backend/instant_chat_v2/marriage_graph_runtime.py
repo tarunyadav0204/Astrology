@@ -13,7 +13,8 @@ MARRIAGE_CATEGORIES = frozenset({"marriage", "spouse", "partner", "relationship"
 TIMING_MODES = frozenset({"event_timing", "lifetime_event_timing", "month_timing", "timing_window", "event_prediction", "daily_forecast"})
 MARRIAGE_SUBTYPES = frozenset({
     "general", "love_vs_arranged", "remarriage", "engagement_vs_wedding",
-    "spouse_meeting", "spouse_details", "affair",
+    "spouse_meeting", "spouse_details", "affair", "current_relationship_state",
+    "specific_partner_decision",
 })
 
 _MODE_COMPATIBILITY = {
@@ -96,24 +97,12 @@ def is_marriage_graph_request(category: Any, query_plan: Mapping[str, Any] | Non
 
 
 def spouse_detail_scope(query_plan: Mapping[str, Any] | None) -> str | None:
-    """Resolve the semantic spouse-detail facet, with a narrow outage fallback."""
+    """Resolve the spouse-detail facet from structured semantic routing."""
     plan = query_plan if isinstance(query_plan, Mapping) else {}
     special = plan.get("special_flow") if isinstance(plan.get("special_flow"), Mapping) else {}
     explicit = str(special.get("spouse_detail_scope") or "").strip().lower()
     if explicit in {"profession", "location", "appearance", "combined"}:
         return explicit
-    requested = str(special.get("requested_fact") or "").strip().lower()
-    question = str(plan.get("question") or "").strip().lower()
-    text = f"{requested} {question}"
-    if any(marker in text for marker in (
-        "appearance", "physical", "look like", "looks like", "how will they look",
-        "height", "build", "complexion", "face", "facial", "body type",
-    )):
-        return "appearance"
-    if any(marker in text for marker in ("profession", "career", "occupation", "job", "work")):
-        return "profession"
-    if any(marker in text for marker in ("location", "where from", "settle", "country", "city", "place")):
-        return "location"
     return None
 
 
@@ -152,6 +141,8 @@ def marriage_graph_runtime_key(category: Any, query_plan: Mapping[str, Any] | No
         "spouse_meeting": "spouse_meeting",
         "spouse_details": "spouse_details",
         "affair": "affair_assessment",
+        "current_relationship_state": "relationship_timing",
+        "specific_partner_decision": "relationship_timing",
     }
     if subtype in subtype_routes:
         return subtype_routes[subtype]
@@ -203,8 +194,37 @@ def _present(value: Any) -> bool:
 def observed_marriage_factors(context: Mapping[str, Any], *, runtime_key: str) -> set[str]:
     factors: set[str] = set()
     normalized = context.get("normalized_evidence") if isinstance(context.get("normalized_evidence"), Mapping) else {}
-    if normalized:
+    married_life_foundation = (
+        normalized.get("married_life_foundation")
+        if isinstance(normalized.get("married_life_foundation"), Mapping)
+        else {}
+    )
+    if normalized and runtime_key != "married_life":
         factors.update({"marriage:D1", "marriage:D9", "marriage:H7", "marriage:SeventhLord", "marriage:VenusJupiter"})
+    elif married_life_foundation:
+        if married_life_foundation.get("d1_houses"):
+            factors.add("marriage:D1")
+        if married_life_foundation.get("d9_houses"):
+            factors.add("marriage:D9")
+        d1_houses = {
+            int(row.get("house"))
+            for row in married_life_foundation.get("d1_houses") or []
+            if isinstance(row, Mapping) and str(row.get("house") or "").isdigit()
+        }
+        factors.update(f"marriage:H{house}" for house in d1_houses)
+        seventh = next(
+            (row for row in married_life_foundation.get("d1_houses") or []
+             if isinstance(row, Mapping) and int(row.get("house") or 0) == 7),
+            {},
+        )
+        if seventh.get("lord") and seventh.get("lord_condition"):
+            factors.add("marriage:SeventhLord")
+        significators = married_life_foundation.get("natural_significators")
+        if isinstance(significators, Mapping) and significators.get("Venus") and significators.get("Jupiter"):
+            factors.add("marriage:VenusJupiter")
+        jaimini = married_life_foundation.get("jaimini")
+        if isinstance(jaimini, Mapping) and jaimini.get("darakaraka") and jaimini.get("upapada_lagna"):
+            factors.add("marriage:DarakarakaUpapada")
     route_houses = {
         "marriage_timing": (2, 7, 11), "marriage_history": (2, 7, 11), "married_life": (2, 7, 8, 11, 12),
         "married_life_timing": (2, 7, 8, 11, 12), "relationship_outlook": (5, 7, 11),
@@ -216,7 +236,7 @@ def observed_marriage_factors(context: Mapping[str, Any], *, runtime_key: str) -
         "spouse_location": (3, 4, 7, 9, 12),
         "affair_assessment": (5, 6, 7, 8, 12),
     }
-    if normalized:
+    if normalized and runtime_key != "married_life":
         if runtime_key == "spouse_meeting":
             meeting = normalized.get("spouse_meeting_context") if isinstance(normalized.get("spouse_meeting_context"), Mapping) else {}
             factors.update(
@@ -283,14 +303,24 @@ def observed_marriage_factors(context: Mapping[str, Any], *, runtime_key: str) -
         factors.add("marriage:KpSeventh")
     if "darakaraka" in serialized or "upapada" in serialized:
         factors.add("marriage:DarakarakaUpapada")
+    time_sensitive_route = runtime_key in {
+        "marriage_timing", "marriage_history", "married_life_timing",
+        "relationship_timing", "separation_reconciliation_timing",
+        "engagement_wedding_timing", "remarriage",
+    }
+    current_dashas = context.get("current_dashas") if isinstance(context.get("current_dashas"), Mapping) else {}
     if runtime_key != "marriage_remedies" and (
         _present(normalized.get("forward_event_dasha_scan"))
         or _present(normalized.get("historical_event_dasha_scan"))
         or _present(normalized.get("current_timing"))
+        or (time_sensitive_route and _present(current_dashas.get("levels")))
     ):
         factors.add("marriage:DashaActivation")
     transit = normalized.get("transit_activation_timeline")
-    if runtime_key != "marriage_remedies" and _present(transit):
+    current_transits = context.get("current_transits") if isinstance(context.get("current_transits"), Mapping) else {}
+    if runtime_key != "marriage_remedies" and (
+        _present(transit) or (time_sensitive_route and _present(current_transits.get("planets")))
+    ):
         factors.add("marriage:TransitConfirmation")
     historical = normalized.get("historical_event_dasha_scan") if isinstance(normalized.get("historical_event_dasha_scan"), Mapping) else {}
     if any((row.get("transit_trigger_windows") or row.get("peak_activation_windows")) for row in historical.get("periods") or [] if isinstance(row, Mapping)):
