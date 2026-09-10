@@ -43,6 +43,8 @@ GOOGLE_PLAY_PRODUCTS_CACHE_MAX = 8
 GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_MAX = 32
 PLAY_PAYMENT_SERVICE_TIMEOUT_SECONDS = float(os.getenv("PLAY_PAYMENT_SERVICE_TIMEOUT_SECONDS", "8.0"))
 SPEECH_BILLING_MIN_START_MINUTES = 5
+SPEECH_BILLING_HEARTBEAT_INTERVAL_SECONDS = 10
+SPEECH_BILLING_RECONNECT_GRACE_SECONDS = 45
 
 # Env var name preferred; GOOGLE_SERVICE_ACCOUNT_KEY accepted as fallback.
 # Keep trying fallback values if the preferred env points at a missing file.
@@ -106,11 +108,17 @@ def _ensure_speech_billing_table(conn) -> None:
             starting_balance INTEGER NOT NULL,
             charged_credits INTEGER NOT NULL DEFAULT 0,
             elapsed_seconds INTEGER NOT NULL DEFAULT 0,
+            last_heartbeat_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             ended_reason TEXT,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
         """,
+        (),
+    )
+    execute(
+        conn,
+        "ALTER TABLE speech_billing_sessions ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
         (),
     )
 
@@ -122,6 +130,50 @@ def _speech_minutes_from_seconds(seconds: int) -> int:
 def _iso_utc_now() -> str:
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat()
+
+
+def _settle_stale_speech_session_locked(conn, row, *, reason: str = "connection_lost") -> int:
+    """Close an abandoned speech meter at its last confirmed heartbeat."""
+    session_id = str(row[0])
+    userid = int(row[1])
+    per_minute_cost = max(1, int(row[2] or 1))
+    elapsed_seconds = max(1, int(row[3] or 1))
+    minutes = _speech_minutes_from_seconds(elapsed_seconds)
+    balance = int(credit_service.get_user_credits(userid, conn=conn) or 0)
+    charge = min(minutes * per_minute_cost, balance)
+    new_balance = balance - charge
+    if charge:
+        execute(
+            conn,
+            "UPDATE user_credits SET credits = ?, updated_at = CURRENT_TIMESTAMP WHERE userid = ?",
+            (new_balance, userid),
+        )
+        execute(
+            conn,
+            """
+            INSERT INTO credit_transactions
+            (userid, transaction_type, amount, balance_after, source, reference_id, description)
+            VALUES (?, 'spent', ?, ?, 'feature_usage', 'speech_chat_minutes', ?)
+            """,
+            (
+                userid,
+                -charge,
+                new_balance,
+                f"Talk To Tara call: {minutes} minute(s), {elapsed_seconds}s ({reason})",
+            ),
+        )
+    execute(
+        conn,
+        """
+        UPDATE speech_billing_sessions
+        SET status = 'ended', ended_at = CURRENT_TIMESTAMP,
+            elapsed_seconds = ?, charged_credits = ?, ended_reason = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE session_id = ? AND userid = ? AND status = 'active'
+        """,
+        (elapsed_seconds, charge, reason, session_id, userid),
+    )
+    return new_balance
 
 
 def _get_play_credentials():
@@ -2462,24 +2514,76 @@ async def start_speech_billing_session(current_user: User = Depends(get_current_
     discount_percent = int(credit_service.get_subscription_discount_percent(current_user.userid) or 0)
     required_start_credits = per_minute_cost * SPEECH_BILLING_MIN_START_MINUTES
     balance = int(credit_service.get_user_credits(current_user.userid) or 0)
-    if balance < required_start_credits:
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "message": (
-                    f"Talk To Tara requires at least {required_start_credits} credits "
-                    f"for {SPEECH_BILLING_MIN_START_MINUTES} minutes."
-                ),
-                "required_credits": required_start_credits,
-                "balance": balance,
-                "per_minute_cost": per_minute_cost,
-                "minimum_minutes": SPEECH_BILLING_MIN_START_MINUTES,
-            },
-        )
-
     billing_session_id = f"speech_{uuid.uuid4().hex}"
     with get_conn() as conn:
         _ensure_speech_billing_table(conn)
+        cur = execute(
+            conn,
+            """
+            SELECT session_id, userid, per_minute_cost,
+                   GREATEST(1, EXTRACT(EPOCH FROM (last_heartbeat_at - started_at)))::INTEGER AS confirmed_elapsed,
+                   GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_heartbeat_at)))::INTEGER AS heartbeat_gap,
+                   starting_balance, original_per_minute_cost, discount_percent,
+                   required_start_credits, started_at
+            FROM speech_billing_sessions
+            WHERE userid = ? AND status = 'active'
+            ORDER BY started_at DESC LIMIT 1 FOR UPDATE
+            """,
+            (current_user.userid,),
+        )
+        active = cur.fetchone()
+        if active:
+            heartbeat_gap = max(0, int(active[4] or 0))
+            if heartbeat_gap <= SPEECH_BILLING_RECONNECT_GRACE_SECONDS:
+                active_balance = int(credit_service.get_user_credits(current_user.userid, conn=conn) or 0)
+                active_rate = max(1, int(active[2] or per_minute_cost))
+                max_seconds = int((active_balance // active_rate) * 60)
+                conn.commit()
+                return {
+                    "session_id": str(active[0]),
+                    "started_at": str(active[9]),
+                    "balance": active_balance,
+                    "per_minute_cost": active_rate,
+                    "original_per_minute_cost": int(active[6] or active_rate),
+                    "subscription_discount_percent": int(active[7] or 0),
+                    "required_start_credits": int(active[8] or required_start_credits),
+                    "minimum_minutes": SPEECH_BILLING_MIN_START_MINUTES,
+                    "max_seconds": max_seconds,
+                    "elapsed_seconds": max(0, int(active[3] or 0)),
+                    "heartbeat_interval_seconds": SPEECH_BILLING_HEARTBEAT_INTERVAL_SECONDS,
+                    "reconnect_grace_seconds": SPEECH_BILLING_RECONNECT_GRACE_SECONDS,
+                    "resumed": True,
+                }
+            balance = _settle_stale_speech_session_locked(conn, active)
+            if balance < required_start_credits:
+                conn.commit()
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "message": (
+                            f"Talk To Tara requires at least {required_start_credits} credits "
+                            f"for {SPEECH_BILLING_MIN_START_MINUTES} minutes."
+                        ),
+                        "required_credits": required_start_credits,
+                        "balance": balance,
+                        "per_minute_cost": per_minute_cost,
+                        "minimum_minutes": SPEECH_BILLING_MIN_START_MINUTES,
+                    },
+                )
+        if balance < required_start_credits:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "message": (
+                        f"Talk To Tara requires at least {required_start_credits} credits "
+                        f"for {SPEECH_BILLING_MIN_START_MINUTES} minutes."
+                    ),
+                    "required_credits": required_start_credits,
+                    "balance": balance,
+                    "per_minute_cost": per_minute_cost,
+                    "minimum_minutes": SPEECH_BILLING_MIN_START_MINUTES,
+                },
+            )
         execute(
             conn,
             """
@@ -2515,6 +2619,59 @@ async def start_speech_billing_session(current_user: User = Depends(get_current_
         "max_seconds": max_seconds,
         "warning_after_seconds": warning_after_seconds,
         "warning_interval_seconds": 10,
+        "heartbeat_interval_seconds": SPEECH_BILLING_HEARTBEAT_INTERVAL_SECONDS,
+        "reconnect_grace_seconds": SPEECH_BILLING_RECONNECT_GRACE_SECONDS,
+        "elapsed_seconds": 0,
+        "resumed": False,
+    }
+
+
+@router.post("/speech-session/{session_id}/heartbeat")
+async def heartbeat_speech_billing_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    with get_conn() as conn:
+        _ensure_speech_billing_table(conn)
+        cur = execute(
+            conn,
+            """
+            SELECT status, per_minute_cost,
+                   GREATEST(1, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)))::INTEGER AS elapsed_seconds
+            FROM speech_billing_sessions
+            WHERE session_id = ? AND userid = ?
+            FOR UPDATE
+            """,
+            (session_id, current_user.userid),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Speech billing session not found")
+        status = str(row[0] or "ended")
+        elapsed_seconds = max(0, int(row[2] or 0))
+        balance = int(credit_service.get_user_credits(current_user.userid, conn=conn) or 0)
+        per_minute_cost = max(1, int(row[1] or 1))
+        max_seconds = int((balance // per_minute_cost) * 60)
+        if status == "active":
+            execute(
+                conn,
+                """
+                UPDATE speech_billing_sessions
+                SET last_heartbeat_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE session_id = ? AND userid = ? AND status = 'active'
+                """,
+                (session_id, current_user.userid),
+            )
+        conn.commit()
+    return {
+        "session_id": session_id,
+        "status": status,
+        "elapsed_seconds": elapsed_seconds,
+        "remaining_seconds": max(0, max_seconds - elapsed_seconds),
+        "per_minute_cost": per_minute_cost,
+        "balance": balance,
+        "heartbeat_interval_seconds": SPEECH_BILLING_HEARTBEAT_INTERVAL_SECONDS,
+        "reconnect_grace_seconds": SPEECH_BILLING_RECONNECT_GRACE_SECONDS,
     }
 
 

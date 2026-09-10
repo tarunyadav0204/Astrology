@@ -502,7 +502,7 @@ export const speechAPI = {
       isOpen: () => socket.readyState === WebSocket.OPEN,
     };
   },
-  transcribeAudio: (audioFile, language = 'english', metadata = {}) => {
+  transcribeAudio: async (audioFile, language = 'english', metadata = {}) => {
     const form = new FormData();
     form.append('language', language || 'english');
     if (metadata?.durationMs != null) {
@@ -514,13 +514,29 @@ export const speechAPI = {
     if (metadata?.meteringAvg != null) {
       form.append('metering_avg', String(Number(metadata.meteringAvg)));
     }
-    form.append('audio', audioFile);
-    return api.post(getEndpoint('/speech/transcribe'), form, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      timeout: API_TIMEOUT,
-    });
+    if (Platform.OS === 'web' && audioFile?.uri) {
+      // Expo AV returns a blob: URL on web. A React Native `{ uri, name, type }`
+      // object is not a valid browser multipart part, so materialize it first.
+      const audioResponse = await fetch(audioFile.uri);
+      if (!audioResponse.ok) {
+        throw new Error('Could not read the recorded audio.');
+      }
+      const recordedBlob = await audioResponse.blob();
+      const mimeType = recordedBlob.type || audioFile.type || 'audio/mp4';
+      const filename = audioFile.name || `speech-question-${Date.now()}.m4a`;
+      const uploadFile = typeof File !== 'undefined'
+        ? new File([recordedBlob], filename, { type: mimeType })
+        : recordedBlob;
+      form.append('audio', uploadFile, filename);
+    } else {
+      form.append('audio', audioFile);
+    }
+
+    const requestConfig = { timeout: API_TIMEOUT };
+    if (Platform.OS !== 'web') {
+      requestConfig.headers = { 'Content-Type': 'multipart/form-data' };
+    }
+    return api.post(getEndpoint('/speech/transcribe'), form, requestConfig);
   },
   getGuideLines: ({
     scene,
@@ -1028,6 +1044,8 @@ export const creditAPI = {
   startSpeechSession: () => api.post(getEndpoint('/credits/speech-session/start'), {}, GLOBAL_ERROR_CONFIG),
   endSpeechSession: (sessionId, reason = 'ended') =>
     api.post(getEndpoint(`/credits/speech-session/${encodeURIComponent(sessionId)}/end`), { reason }, GLOBAL_ERROR_CONFIG),
+  heartbeatSpeechSession: (sessionId) =>
+    api.post(getEndpoint(`/credits/speech-session/${encodeURIComponent(sessionId)}/heartbeat`), {}, GLOBAL_ERROR_CONFIG),
   getSpeechSessionStatus: (sessionId) =>
     api.get(getEndpoint(`/credits/speech-session/${encodeURIComponent(sessionId)}/status`), GLOBAL_ERROR_CONFIG),
   redeemPromoCode: (code) => 

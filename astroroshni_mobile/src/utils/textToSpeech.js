@@ -16,6 +16,11 @@ let seekPromise = null;
 let pendingSeekMillis = null;
 let speechProvider = 'local';
 const serverTtsInflight = new Map();
+const SERVER_TTS_CACHE_PREFIX = 'tts_';
+const SERVER_TTS_CACHE_MAX_FILES = 120;
+const SERVER_TTS_CACHE_MAX_BYTES = 150 * 1024 * 1024;
+const SERVER_TTS_CACHE_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
+let lastServerTtsCachePruneAt = 0;
 
 const SPEECH_PROVIDER_LOCAL = 'local';
 const SPEECH_PROVIDER_GOOGLE = 'google';
@@ -333,6 +338,40 @@ const getServerTtsCacheKey = (text, { language = 'english', voiceName, cacheKey,
 
 const getServerTtsCacheUri = (key) => `${FileSystem.cacheDirectory}tts_${hashText(key)}.mp3`;
 
+const pruneServerTtsCache = async () => {
+  if (isWebPlatform() || !FileSystem.cacheDirectory) return;
+  const now = Date.now();
+  if (now - lastServerTtsCachePruneAt < SERVER_TTS_CACHE_PRUNE_INTERVAL_MS) return;
+  lastServerTtsCachePruneAt = now;
+  const names = (await FileSystem.readDirectoryAsync(FileSystem.cacheDirectory))
+    .filter((name) => name.startsWith(SERVER_TTS_CACHE_PREFIX) && name.endsWith('.mp3'));
+  const entries = (await Promise.all(names.map(async (name) => {
+    const uri = `${FileSystem.cacheDirectory}${name}`;
+    try {
+      const info = await FileSystem.getInfoAsync(uri);
+      return {
+        uri,
+        size: Math.max(0, Number(info?.size || 0)),
+        modifiedAt: Math.max(0, Number(info?.modificationTime || 0)),
+      };
+    } catch {
+      return null;
+    }
+  }))).filter(Boolean).sort((a, b) => a.modifiedAt - b.modifiedAt);
+  let totalBytes = entries.reduce((sum, entry) => sum + entry.size, 0);
+  let remainingFiles = entries.length;
+  for (const entry of entries) {
+    if (remainingFiles <= SERVER_TTS_CACHE_MAX_FILES && totalBytes <= SERVER_TTS_CACHE_MAX_BYTES) break;
+    try {
+      await FileSystem.deleteAsync(entry.uri, { idempotent: true });
+      totalBytes = Math.max(0, totalBytes - entry.size);
+      remainingFiles -= 1;
+    } catch {
+      // A cache cleanup failure must never interrupt speech playback.
+    }
+  }
+};
+
 const splitForStreamingTts = (text, maxChars = 260) => {
   const raw = String(text || '').replace(/\s+/g, ' ').trim();
   if (!raw) return [];
@@ -410,6 +449,7 @@ const synthesizeServerTtsToCache = async (
     await FileSystem.writeAsStringAsync(uri, base64Audio, {
       encoding: FileSystem.EncodingType.Base64,
     });
+    pruneServerTtsCache().catch(() => {});
     console.log('[TTS] Google TTS cached', {
       key,
       uri,

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Animated,
   AppState,
@@ -10,6 +11,7 @@ import {
   Platform,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   Vibration,
   View,
@@ -35,6 +37,12 @@ const POLL_INTERVAL_MS = 1400;
 const MAX_POLLS = 90;
 const USE_BACKEND_SPEECH_TRANSCRIPTION = true;
 const ALLOW_NATIVE_RUNTIME_BACKEND_FALLBACK = true;
+const IS_IOS_WEB = Platform.OS === 'web'
+  && typeof navigator !== 'undefined'
+  && (
+    /iPad|iPhone|iPod/i.test(String(navigator.userAgent || ''))
+    || (/Macintosh/i.test(String(navigator.userAgent || '')) && Number(navigator.maxTouchPoints || 0) > 1)
+  );
 // Use the platform recognizer for the real-time experience on installed apps.
 // The recorded-audio backend remains a compatibility fallback when a device
 // has no recognizer service or the native recognizer fails to initialize.
@@ -54,13 +62,32 @@ const NATIVE_READY_TIMEOUT_MS = 4500;
 const POST_TTS_LISTEN_DELAY_MS = Platform.OS === 'android' ? 1200 : 900;
 const POST_TTS_ECHO_GUARD_MS = Platform.OS === 'android' ? 250 : 200;
 const HANDS_FREE_NO_SPEECH_RETRY_DELAY_MS = Platform.OS === 'android' ? 1100 : 800;
+const HANDS_FREE_MAX_NO_SPEECH_RETRIES = 4;
+const TRANSCRIPT_SEND_GRACE_MS = 1800;
 const SPEECH_BILLING_MIN_START_MINUTES = 5;
 const SPEECH_CREDIT_WARNING_SECONDS = 60;
 const SPEECH_CREDIT_WARNING_INTERVAL_SECONDS = 10;
 const CREDIT_WARNING_BEEP_BASE64 = 'UklGRqQCAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YYACAACAudjOoWQ0JkJ6tNfRpmk3Jj50sNXTq286Jjpvq9PVsHQ+JjdpptHXtHpCJjRkoc7YuX9GJzFem8vZvYVLKC5ZlsjZwYtPKixUkMXaxZBULCpPi8HZyJZZLihLhb3Zy5teMSdGgLnYzqFkNCZCerTX0aZpNyY+dLDV06tvOiY6b6vT1bB0PiY3aabR17R6QiY0ZKHO2LmARicxXpvL2b2FSyguWZbI2cGLTyosVJDF2sWQVCwqT4vB2ciWWS4oS4W92cubXjEnRoC52M6hZDQmQnq019GmaTcmPnSw1dOrbzomOm+r09WwdD4mN2mm0de0ekImNGShzti5f0YnMV6by9m9hUsoLlmWyNnBi08qLFSQxdrFkFQsKk+LwdnIllkuKEuFvdnLm14xJ0Z/udjOoWQ0JkJ6tNfRpmk3Jj50sNXTq286Jjpvq9PVsHQ+JjdpptHXtHpCJjRkoc7YuX9GJzFem8vZvYVLKC5ZlsjZwYtPKixUkMXaxZBULCpPi8HZyJZZLihLhb3Zy5teMSdGgLnYzqFkNCZCerTX0aZpNyY+dLDV06tvOiY6b6vT1bB0PiY3aabR17R6QiY0ZKHO2Ll/RicxXpvL2b2FSyguWZbI2cGLTyosVJDF2sWQVCwqT4vB2ciWWS4oS4W92cubXjEnRoC52M6hZDQmQnq019GmaTcmPnSw1dOrbzomOm+r09WwdD4mN2mm0de0ekImNGShzti5f0YnMV6by9m9hUsoLlmWyNnBi08qLFSQxdrFkFQsKk+LwdnIllkuKEuFvdnLm14xJ0Z/udjOoWQ0JkJ6tNfRpmk3Jj50sNXTq286Jjpvq9PVsHQ+JjdpptHX';
+const getSupportedWebRecordingMimeType = () => {
+  if (Platform.OS !== 'web' || typeof MediaRecorder === 'undefined') return '';
+  const candidates = IS_IOS_WEB
+    ? ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']
+    : ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=mp4a.40.2', 'audio/mp4'];
+  if (typeof MediaRecorder.isTypeSupported !== 'function') return IS_IOS_WEB ? 'audio/mp4' : '';
+  return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || '';
+};
+const WEB_SPEECH_RECORDING_MIME_TYPE = getSupportedWebRecordingMimeType();
 const SPEECH_RECORDING_OPTIONS = {
   ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
   isMeteringEnabled: true,
+  ...(Platform.OS === 'web'
+    ? {
+      web: {
+        ...(WEB_SPEECH_RECORDING_MIME_TYPE ? { mimeType: WEB_SPEECH_RECORDING_MIME_TYPE } : {}),
+        bitsPerSecond: 128000,
+      },
+    }
+    : {}),
 };
 
 const normalizeLanguageCode = (language) => {
@@ -210,6 +237,8 @@ export default function SpeechChatScreen({ navigation, route }) {
   const [speechTtsProvider, setSpeechTtsProvider] = useState(SPEECH_CHAT_TTS_PROVIDER);
   const [speechTtsReady, setSpeechTtsReady] = useState(true);
   const [speechContextReady, setSpeechContextReady] = useState(false);
+  const [requiresFirstMicTap, setRequiresFirstMicTap] = useState(IS_IOS_WEB);
+  const [pendingTranscript, setPendingTranscript] = useState('');
   const [avatarSpeech, setAvatarSpeech] = useState({
     active: false,
     text: '',
@@ -233,6 +262,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const recordingMeterTimerRef = useRef(null);
   const recordingAutoStopTimerRef = useRef(null);
   const nativePartialStableTimerRef = useRef(null);
+  const transcriptSendTimerRef = useRef(null);
   const nativeMaxListenTimerRef = useRef(null);
   const nativeReadyTimerRef = useRef(null);
   const latestNativeTranscriptRef = useRef('');
@@ -258,7 +288,10 @@ export default function SpeechChatScreen({ navigation, route }) {
   const greetingPrefetchKeyRef = useRef('');
   const speakingWatchdogRef = useRef(null);
   const billingSessionRef = useRef(null);
+  const iosWebMicPrimedRef = useRef(!IS_IOS_WEB);
   const billingTimerRef = useRef(null);
+  const billingHeartbeatInFlightRef = useRef(false);
+  const lastBillingHeartbeatSecondRef = useRef(0);
   const billingStartMsRef = useRef(0);
   const lastCreditWarningBeepRef = useRef(0);
   const billingEndingRef = useRef(false);
@@ -375,7 +408,9 @@ export default function SpeechChatScreen({ navigation, route }) {
       const res = await creditAPI.startSpeechSession();
       const data = res?.data || {};
       billingSessionRef.current = data;
-      billingStartMsRef.current = Date.now();
+      const resumedElapsedSeconds = Math.max(0, Number(data.elapsed_seconds || 0));
+      billingStartMsRef.current = Date.now() - resumedElapsedSeconds * 1000;
+      lastBillingHeartbeatSecondRef.current = resumedElapsedSeconds;
       lastCreditWarningBeepRef.current = 0;
       setBillingSession(data);
       setCallElapsedSeconds(0);
@@ -390,6 +425,28 @@ export default function SpeechChatScreen({ navigation, route }) {
         const remaining = maxSeconds > 0 ? Math.max(0, maxSeconds - elapsed) : null;
         setCallElapsedSeconds(elapsed);
         setCallRemainingSeconds(remaining);
+        const heartbeatEvery = Math.max(5, Number(currentSession.heartbeat_interval_seconds || 10));
+        if (
+          elapsed > 0
+          && elapsed - lastBillingHeartbeatSecondRef.current >= heartbeatEvery
+          && !billingHeartbeatInFlightRef.current
+        ) {
+          lastBillingHeartbeatSecondRef.current = elapsed;
+          billingHeartbeatInFlightRef.current = true;
+          creditAPI.heartbeatSpeechSession(currentSession.session_id)
+            .then((heartbeat) => {
+              const heartbeatData = heartbeat?.data || {};
+              if (heartbeatData.status && heartbeatData.status !== 'active') {
+                stopSpeechForCreditFinish();
+              }
+            })
+            .catch((error) => {
+              logSpeechDebug('billing.heartbeatFailed', { message: error?.message });
+            })
+            .finally(() => {
+              billingHeartbeatInFlightRef.current = false;
+            });
+        }
         if (
           remaining != null
           && remaining > 0
@@ -562,6 +619,10 @@ export default function SpeechChatScreen({ navigation, route }) {
       if (billingTimerRef.current) {
         clearInterval(billingTimerRef.current);
         billingTimerRef.current = null;
+      }
+      if (transcriptSendTimerRef.current) {
+        clearTimeout(transcriptSendTimerRef.current);
+        transcriptSendTimerRef.current = null;
       }
       if (billingSessionRef.current?.session_id) {
         creditAPI.endSpeechSession(billingSessionRef.current.session_id, 'screen_unmount').catch(() => {});
@@ -832,6 +893,36 @@ export default function SpeechChatScreen({ navigation, route }) {
     return false;
   };
 
+  const primeIosWebMicrophone = async () => {
+    if (!IS_IOS_WEB || iosWebMicPrimedRef.current) return true;
+    if (!navigator?.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      throw new Error(t(
+        'speechChat.safariMicUnavailable',
+        'Microphone recording is not available here. Open AstroRoshni in Safari over HTTPS and try again.'
+      ));
+    }
+    let permissionStream = null;
+    try {
+      // Keep getUserMedia directly inside the tap call chain. Safari can reject
+      // the first capture request when it starts later from greeting onDone.
+      permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      iosWebMicPrimedRef.current = true;
+      setRequiresFirstMicTap(false);
+      return true;
+    } catch (error) {
+      const permissionBlocked = ['NotAllowedError', 'PermissionDeniedError', 'SecurityError']
+        .includes(String(error?.name || ''));
+      throw new Error(permissionBlocked
+        ? t(
+          'speechChat.safariMicBlocked',
+          'Microphone access is blocked. In iPhone Settings, open Safari, check Microphone access, then reopen Talk To Tara.'
+        )
+        : t('speechChat.micStartError', 'Could not start the microphone. Please try again.'));
+    } finally {
+      permissionStream?.getTracks?.().forEach((track) => track.stop());
+    }
+  };
+
   const clearNativeListeningTimers = () => {
     if (nativePartialStableTimerRef.current) {
       clearTimeout(nativePartialStableTimerRef.current);
@@ -941,7 +1032,9 @@ export default function SpeechChatScreen({ navigation, route }) {
       }
 
       let useBackendTranscription = USE_BACKEND_SPEECH_TRANSCRIPTION;
-      if (PREFER_NATIVE_SPEECH_RECOGNITION) {
+      // Safari's browser speech service is not dependable in an installed
+      // Home Screen web app. Record audio and use our server transcription.
+      if (PREFER_NATIVE_SPEECH_RECOGNITION && !IS_IOS_WEB) {
         if (nativeSpeechUnavailableForSessionRef.current) {
           useBackendTranscription = true;
           await logSpeechDebug('startListening.nativeSkippedForSession', {
@@ -1075,8 +1168,7 @@ export default function SpeechChatScreen({ navigation, route }) {
             throw new Error(t('speechChat.noTranscript', 'I could not understand that. Please try again.'));
           }
           setCurrentTranscript(finalTranscript);
-          setStatus('thinking');
-          await runQuestionTurn(finalTranscript);
+          queueRecognizedQuestion(finalTranscript);
         })
         .catch(async (error) => {
           clearNativeListeningTimers();
@@ -1120,6 +1212,13 @@ export default function SpeechChatScreen({ navigation, route }) {
           if (shouldKeepListening) {
             nativeNoSpeechRetryCountRef.current += 1;
             setCurrentTranscript('');
+            if (nativeNoSpeechRetryCountRef.current >= HANDS_FREE_MAX_NO_SPEECH_RETRIES) {
+              pauseSpeechChat('inactivity_timeout').then(() => {
+                setErrorText(t('speechChat.inactivityPaused', 'Talk To Tara paused after prolonged silence. Tap the mic when you are ready.'));
+                endSpeechBillingSession('inactivity_timeout');
+              });
+              return;
+            }
             setTimeout(() => {
               if (mountedRef.current && handsFreeEnabledRef.current) {
                 startListening({ source: 'nativeRetryAfterNoSpeech', stopCurrentSpeech: false }).catch((retryError) => {
@@ -1199,6 +1298,11 @@ export default function SpeechChatScreen({ navigation, route }) {
   const maybeStartAfterGreeting = async () => {
     if (!mountedRef.current || !handsFreeEnabledRef.current) return;
     setErrorText('');
+    if (IS_IOS_WEB && !iosWebMicPrimedRef.current) {
+      setRequiresFirstMicTap(true);
+      setStatus('idle');
+      return;
+    }
     try {
       // The welcome itself is free. Start metered time only when the live
       // microphone conversation is about to begin.
@@ -1418,6 +1522,13 @@ export default function SpeechChatScreen({ navigation, route }) {
           backendNoSpeechRetryCountRef.current += 1;
           setErrorText('');
           setCurrentTranscript('');
+          if (backendNoSpeechRetryCountRef.current >= HANDS_FREE_MAX_NO_SPEECH_RETRIES) {
+            pauseSpeechChat('inactivity_timeout').then(() => {
+              setErrorText(t('speechChat.inactivityPaused', 'Talk To Tara paused after prolonged silence. Tap the mic when you are ready.'));
+              endSpeechBillingSession('inactivity_timeout');
+            });
+            return;
+          }
           setTimeout(() => {
             if (mountedRef.current && handsFreeEnabledRef.current && !recordingRef.current) {
               startListening({ source: 'backendRetryAfterNoSpeech', stopCurrentSpeech: false }).catch((retryError) => {
@@ -1612,20 +1723,25 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
 
     const transcriptionLanguage = normalizeLanguageCode(activeTurnLanguageRef.current || language);
+    const recordingMimeType = Platform.OS === 'web'
+      ? (WEB_SPEECH_RECORDING_MIME_TYPE || 'audio/mp4')
+      : 'audio/mp4';
+    const recordingExtension = recordingMimeType.includes('webm') ? 'webm' : 'm4a';
     await logSpeechDebug('backendTranscribe.request', {
       uri,
       language: transcriptionLanguage,
       durationMs,
       meteringMax,
       meteringAvg,
+      recordingMimeType,
     });
     let response;
     try {
       response = await speechAPI.transcribeAudio(
         {
           uri,
-          name: `speech-question-${Date.now()}.m4a`,
-          type: Platform.OS === 'android' ? 'audio/mp4' : 'audio/mp4',
+          name: `speech-question-${Date.now()}.${recordingExtension}`,
+          type: recordingMimeType,
         },
         transcriptionLanguage,
         { durationMs, meteringMax, meteringAvg }
@@ -1637,6 +1753,10 @@ export default function SpeechChatScreen({ navigation, route }) {
         detail: error?.response?.data?.detail,
       });
       throw error;
+    } finally {
+      if (Platform.OS === 'web' && String(uri).startsWith('blob:')) {
+        URL.revokeObjectURL(uri);
+      }
     }
     const finalTranscript = String(response?.data?.transcript || '').trim();
     await logSpeechDebug('backendTranscribe.result', { transcript: finalTranscript });
@@ -1645,8 +1765,7 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
     backendNoSpeechRetryCountRef.current = 0;
     setCurrentTranscript(finalTranscript);
-    setStatus('thinking');
-    await runQuestionTurn(finalTranscript);
+    queueRecognizedQuestion(finalTranscript);
   };
 
   const playAvatarLine = async (text, options = {}) => {
@@ -1716,6 +1835,7 @@ export default function SpeechChatScreen({ navigation, route }) {
 
             if (event?.type === 'turn_started' || event?.type === 'turn_queued') {
               pending.accepted = true;
+              if (event?.message_id) pending.messageId = event.message_id;
               return;
             }
 
@@ -1745,6 +1865,8 @@ export default function SpeechChatScreen({ navigation, route }) {
               speechSocketPendingTurnsRef.current.delete(turnId);
               const error = new Error(event.message || event.error || 'Speech turn failed');
               error.turnAccepted = true;
+              error.messageId = pending.messageId;
+              error.clientRequestId = pending.clientRequestId;
               pending.reject(error);
             }
           },
@@ -1759,6 +1881,9 @@ export default function SpeechChatScreen({ navigation, route }) {
             speechSocketPendingTurnsRef.current.forEach((pending) => {
               const error = new Error('Speech socket disconnected');
               error.turnAccepted = Boolean(pending.accepted);
+              error.messageId = pending.messageId;
+              error.clientRequestId = pending.clientRequestId;
+              error.retryableConnectionFailure = true;
               pending.reject?.(error);
             });
             speechSocketPendingTurnsRef.current.clear();
@@ -1779,7 +1904,12 @@ export default function SpeechChatScreen({ navigation, route }) {
     return speechSocketConnectPromiseRef.current;
   };
 
-  const askSpeechSocket = async (question, turnLanguage = language, streamHandlers = {}) => {
+  const askSpeechSocket = async (
+    question,
+    turnLanguage = language,
+    streamHandlers = {},
+    suppliedClientRequestId = null
+  ) => {
     if (!USE_SPEECH_WEBSOCKET) {
       throw new Error('Speech websocket disabled');
     }
@@ -1787,7 +1917,8 @@ export default function SpeechChatScreen({ navigation, route }) {
     if (!activeSessionId) throw new Error(t('speechChat.sessionError', 'Could not start Talk To Tara.'));
     const socketClient = await ensureSpeechSocket();
     const turnId = `turn_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const clientRequestId = `speech_ws_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const clientRequestId = suppliedClientRequestId
+      || `speech_ws_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
     return new Promise((resolve, reject) => {
       speechSocketPendingTurnsRef.current.set(turnId, {
@@ -1795,6 +1926,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         reject,
         content: '',
         accepted: false,
+        clientRequestId,
         onChunk: streamHandlers.onChunk,
         onReplace: streamHandlers.onReplace,
       });
@@ -1819,15 +1951,21 @@ export default function SpeechChatScreen({ navigation, route }) {
   };
 
   const askInstant = async (question, turnLanguage = language, streamHandlers = {}) => {
+    const clientRequestId = `speech_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     if (USE_SPEECH_WEBSOCKET) {
       try {
-        return await askSpeechSocket(question, turnLanguage, streamHandlers);
+        return await askSpeechSocket(question, turnLanguage, streamHandlers, clientRequestId);
       } catch (socketError) {
         logSpeechDebug('speechSocket.fallbackToHttp', {
           message: socketError?.message,
         });
         closeSpeechSocket();
-        if (socketError?.turnAccepted) throw socketError;
+        if (socketError?.turnAccepted && socketError?.messageId) {
+          return await pollForAnswer(question, socketError.messageId, streamHandlers);
+        }
+        if (socketError?.turnAccepted && !socketError?.retryableConnectionFailure) throw socketError;
+        // Continue over HTTP with the same idempotency key if the socket
+        // disconnected before returning a message id.
       }
     }
     let activeSessionId = await ensureSession();
@@ -1844,7 +1982,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       speech_billing: false,
       native_name: birthData?.name,
       birth_details: toChatBirthDetails(birthData),
-      client_request_id: `speech_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      client_request_id: clientRequestId,
     });
     let askResponse;
     try {
@@ -1959,6 +2097,10 @@ export default function SpeechChatScreen({ navigation, route }) {
   const runQuestionTurn = async (question) => {
     const spokenQuestion = String(question || '').trim();
     if (!spokenQuestion) return;
+    if (!billingSessionRef.current?.session_id) {
+      const billingStarted = await startSpeechBillingSession();
+      if (!billingStarted) return;
+    }
 
     const turnSerial = activeTurnSerialRef.current + 1;
     activeTurnSerialRef.current = turnSerial;
@@ -2003,6 +2145,62 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
   };
 
+  const clearTranscriptSendTimer = () => {
+    if (!transcriptSendTimerRef.current) return;
+    clearTimeout(transcriptSendTimerRef.current);
+    transcriptSendTimerRef.current = null;
+  };
+
+  const submitPendingTranscript = async (overrideText = null) => {
+    const question = String(overrideText ?? pendingTranscript).trim();
+    clearTranscriptSendTimer();
+    setPendingTranscript('');
+    if (!question || !mountedRef.current) {
+      setCurrentTranscript('');
+      setStatus('idle');
+      return;
+    }
+    nativeNoSpeechRetryCountRef.current = 0;
+    backendNoSpeechRetryCountRef.current = 0;
+    setCurrentTranscript(question);
+    setErrorText('');
+    setStatus('thinking');
+    Vibration.vibrate(35);
+    AccessibilityInfo.announceForAccessibility?.(
+      t('speechChat.questionSentA11y', 'Question sent. Tara is reading the chart.')
+    );
+    try {
+      await runQuestionTurn(question);
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setErrorText(error?.message || t('speechChat.answerError', 'Answer failed. Please try again.'));
+      setStatus('idle');
+    }
+  };
+
+  const queueRecognizedQuestion = (transcript) => {
+    const question = String(transcript || '').trim();
+    if (!question || !mountedRef.current) return;
+    clearTranscriptSendTimer();
+    setPendingTranscript(question);
+    setCurrentTranscript(question);
+    setStatus('reviewing');
+    transcriptSendTimerRef.current = setTimeout(() => {
+      transcriptSendTimerRef.current = null;
+      submitPendingTranscript(question);
+    }, TRANSCRIPT_SEND_GRACE_MS);
+  };
+
+  const cancelPendingTranscript = () => {
+    clearTranscriptSendTimer();
+    setPendingTranscript('');
+    setCurrentTranscript('');
+    setStatus('idle');
+    AccessibilityInfo.announceForAccessibility?.(
+      t('speechChat.questionCancelledA11y', 'Question cancelled.')
+    );
+  };
+
   const askFollowUp = async (question) => {
     if (status !== 'idle') return;
     if (Platform.OS === 'web') getTextToSpeech().unlockWebAudio?.();
@@ -2023,6 +2221,8 @@ export default function SpeechChatScreen({ navigation, route }) {
     activeTurnSerialRef.current += 1;
     handsFreeRestartRef.current = false;
     startListeningInFlightRef.current = false;
+    clearTranscriptSendTimer();
+    setPendingTranscript('');
     if (speakingWatchdogRef.current) {
       clearTimeout(speakingWatchdogRef.current);
       speakingWatchdogRef.current = null;
@@ -2091,14 +2291,28 @@ export default function SpeechChatScreen({ navigation, route }) {
         inFlight: startListeningInFlightRef.current,
         hasRecording: Boolean(recordingRef.current),
       }).catch(() => {});
+      if (IS_IOS_WEB && status !== 'listening' && !iosWebMicPrimedRef.current) {
+        setErrorText('');
+        setStatus('listening');
+        const permissionGranted = await primeIosWebMicrophone();
+        if (!permissionGranted) {
+          setStatus('idle');
+          return;
+        }
+      }
       if (status === 'listening') {
         if (handsFreeEnabledRef.current) {
           await pauseSpeechChat('main_button_while_hands_free_listening');
         } else {
           await stopListening();
         }
+      } else if (status === 'reviewing') {
+        cancelPendingTranscript();
+        await forceStartListening();
       } else if (status === 'speaking') {
-        await pauseSpeechChat('main_button_while_speaking');
+        // Barge-in: stop Tara and listen immediately without silently turning
+        // off the user's hands-free preference.
+        await forceStartListening();
       } else {
         await forceStartListening();
       }
@@ -2155,7 +2369,9 @@ export default function SpeechChatScreen({ navigation, route }) {
     && nativeRecognizerPhase === 'starting'
     && !currentTranscript;
   const statusText = {
-    idle: handsFreeEnabled
+    idle: requiresFirstMicTap
+      ? t('speechChat.statusTapForSafariMic', 'Tap the mic once to allow microphone access')
+      : handsFreeEnabled
       ? t('speechChat.statusIdleHandsFree', 'Tap the mic and AstroRoshni will keep listening after each answer')
       : t('speechChat.statusIdle', 'Tap the mic and ask your question'),
     listening: nativeRecognizerStarting
@@ -2164,6 +2380,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         ? t('speechChat.statusListeningHandsFree', 'Speak now. Tap pause if you want to stop listening.')
         : t('speechChat.statusListening', 'Listening... tap again when done'),
     transcribing: t('speechChat.statusTranscribing', 'Finishing your question...'),
+    reviewing: t('speechChat.statusReviewing', 'Check your question — sending shortly'),
     thinking: t('speechChat.statusThinking', 'Reading the chart...'),
     speaking: speechPreparing
       ? t('speechChat.statusPreparingSpeech', 'Preparing Tara’s voice...')
@@ -2293,6 +2510,17 @@ export default function SpeechChatScreen({ navigation, route }) {
   const compactVoiceLayout = SCREEN_HEIGHT < 840;
   const tinyVoiceLayout = SCREEN_HEIGHT < 740;
   const micIconSize = tinyVoiceLayout ? 24 : compactVoiceLayout ? 26 : 30;
+
+  useEffect(() => {
+    if (!statusText) return;
+    AccessibilityInfo.announceForAccessibility?.(statusText);
+  }, [status]);
+
+  useEffect(() => {
+    if (!errorText) return;
+    Vibration.vibrate([0, 70, 45, 70]);
+    AccessibilityInfo.announceForAccessibility?.(errorText);
+  }, [errorText]);
 
   return (
     <SafeAreaView
@@ -2456,7 +2684,46 @@ export default function SpeechChatScreen({ navigation, route }) {
             </View>
           ))}
 
-          {currentTranscript || status === 'listening' ? (
+          {status === 'reviewing' ? (
+            <View style={[styles.reviewCard, { borderColor: screenPalette.selectionBorder, backgroundColor: screenPalette.surfaceStrong }]}> 
+              <Text style={[styles.bubbleLabel, { color: screenPalette.textSecondary }]}> 
+                {t('speechChat.reviewTitle', 'Check your question')}
+              </Text>
+              <TextInput
+                value={pendingTranscript}
+                onFocus={clearTranscriptSendTimer}
+                onChangeText={(value) => {
+                  clearTranscriptSendTimer();
+                  setPendingTranscript(value);
+                  setCurrentTranscript(value);
+                }}
+                multiline
+                style={[styles.reviewInput, { color: screenPalette.text, borderColor: screenPalette.border }]}
+                placeholder={t('speechChat.reviewPlaceholder', 'Edit the transcript if needed')}
+                placeholderTextColor={screenPalette.textSecondary}
+                accessibilityLabel={t('speechChat.reviewPlaceholder', 'Edit the transcript if needed')}
+              />
+              <View style={styles.reviewActions}>
+                <TouchableOpacity
+                  onPress={cancelPendingTranscript}
+                  style={[styles.reviewSecondaryButton, { borderColor: screenPalette.border }]}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.reviewSecondaryText, { color: screenPalette.textSecondary }]}> 
+                    {t('speechChat.cancelQuestion', 'Cancel')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => submitPendingTranscript()}
+                  disabled={!pendingTranscript.trim()}
+                  style={[styles.reviewPrimaryButton, { backgroundColor: screenPalette.primary }, !pendingTranscript.trim() && styles.optionDisabled]}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.reviewPrimaryText}>{t('speechChat.sendNow', 'Send now')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : currentTranscript || status === 'listening' ? (
             <Animated.View
               style={[
                 styles.liveCard,
@@ -2953,6 +3220,52 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 4,
+  },
+  reviewCard: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    gap: 10,
+  },
+  reviewInput: {
+    minHeight: 56,
+    maxHeight: 120,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    lineHeight: 21,
+    textAlignVertical: 'top',
+  },
+  reviewActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 9,
+  },
+  reviewSecondaryButton: {
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewSecondaryText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  reviewPrimaryButton: {
+    minHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewPrimaryText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
   bubbleLabel: {
     fontSize: 11,

@@ -17,6 +17,8 @@ const RECOGNITION_MAX_MS = 20000;
 const RECOGNITION_SILENCE_MS = 1400;
 const RECOGNITION_END_GRACE_MS = 1600;
 const BACKEND_RECORDING_MAX_MS = 20000;
+const SPEECH_BILLING_MIN_START_MINUTES = 5;
+const HANDS_FREE_MAX_NO_SPEECH_RETRIES = 4;
 
 function readStoredWebUserName() {
     try {
@@ -63,6 +65,12 @@ const supportsBackendRecording = () => Boolean(
     && window.navigator?.mediaDevices?.getUserMedia
 );
 
+const formatSpeechDuration = (seconds) => {
+    const total = Math.max(0, Number(seconds || 0));
+    const minutes = Math.floor(total / 60);
+    return `${minutes}:${String(total % 60).padStart(2, '0')}`;
+};
+
 const toChatBirthDetails = (birthData) => ({
     name: birthData?.name,
     date: typeof birthData?.date === 'string' ? birthData.date.split('T')[0] : birthData?.date,
@@ -81,8 +89,7 @@ const SpeechChatPage = () => {
     const {
         credits,
         fetchBalance,
-        instantChatCost,
-        speechChatCost,
+        speechChatPerMinuteCost,
         instantChatEnabled,
         speechChatEnabled,
         speechTtsProvider,
@@ -100,6 +107,8 @@ const SpeechChatPage = () => {
     ));
     const [speechLanguage, setSpeechLanguage] = useState(() => getChatLanguage());
     const [displayUserName] = useState(() => readStoredWebUserName());
+    const [billingSession, setBillingSession] = useState(null);
+    const [callElapsedSeconds, setCallElapsedSeconds] = useState(0);
 
     const recognitionRef = useRef(null);
     const recognitionSilenceTimerRef = useRef(null);
@@ -138,6 +147,14 @@ const SpeechChatPage = () => {
     const startListeningRef = useRef(() => {});
     const handsFreeRef = useRef(handsFree);
     const speechLanguageRef = useRef(speechLanguage);
+    const billingSessionRef = useRef(null);
+    const billingStartPromiseRef = useRef(null);
+    const billingTimerRef = useRef(null);
+    const billingStartMsRef = useRef(0);
+    const lastBillingHeartbeatSecondRef = useRef(0);
+    const billingHeartbeatInFlightRef = useRef(false);
+    const endSpeechBillingSessionRef = useRef(() => Promise.resolve());
+    const consecutiveNoSpeechRef = useRef(0);
 
     handsFreeRef.current = handsFree;
     speechLanguageRef.current = speechLanguage;
@@ -191,6 +208,8 @@ const SpeechChatPage = () => {
                 autoRestartTimerRef.current = null;
             }
             textToSpeech.stop();
+            if (billingTimerRef.current) clearInterval(billingTimerRef.current);
+            endSpeechBillingSessionRef.current('screen_unmount', { keepalive: true });
         };
     }, []);
 
@@ -248,8 +267,104 @@ const SpeechChatPage = () => {
         throw new Error('Speech session response was incomplete.');
     };
 
-    const scheduleHandsFreeRestart = () => {
+    const endSpeechBillingSession = async (reason = 'ended', { keepalive = false } = {}) => {
+        const current = billingSessionRef.current;
+        if (!current?.session_id) return;
+        billingSessionRef.current = null;
+        setBillingSession(null);
+        if (billingTimerRef.current) {
+            clearInterval(billingTimerRef.current);
+            billingTimerRef.current = null;
+        }
+        try {
+            const token = localStorage.getItem('token') || '';
+            await fetch(`/api/credits/speech-session/${encodeURIComponent(current.session_id)}/end`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ reason }),
+                keepalive,
+            });
+            if (!keepalive) fetchBalance();
+        } catch {
+            // The server heartbeat lease reconciles an interrupted close.
+        }
+    };
+    endSpeechBillingSessionRef.current = endSpeechBillingSession;
+
+    const ensureSpeechBillingSession = async () => {
+        if (billingSessionRef.current?.session_id) return true;
+        if (billingStartPromiseRef.current) return billingStartPromiseRef.current;
+        billingStartPromiseRef.current = (async () => {
+            try {
+                const token = localStorage.getItem('token') || '';
+                const response = await fetch('/api/credits/speech-session/start', {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const detail = data?.detail || {};
+                    throw new Error(detail.message || 'Could not start Talk To Tara billing.');
+                }
+                const elapsed = Math.max(0, Number(data.elapsed_seconds || 0));
+                billingSessionRef.current = data;
+                billingStartMsRef.current = Date.now() - elapsed * 1000;
+                lastBillingHeartbeatSecondRef.current = elapsed;
+                setBillingSession(data);
+                setCallElapsedSeconds(elapsed);
+                if (billingTimerRef.current) clearInterval(billingTimerRef.current);
+                billingTimerRef.current = setInterval(() => {
+                    const active = billingSessionRef.current;
+                    if (!active?.session_id) return;
+                    const currentElapsed = Math.max(0, Math.floor((Date.now() - billingStartMsRef.current) / 1000));
+                    setCallElapsedSeconds(currentElapsed);
+                    const heartbeatEvery = Math.max(5, Number(active.heartbeat_interval_seconds || 10));
+                    if (
+                        currentElapsed - lastBillingHeartbeatSecondRef.current >= heartbeatEvery
+                        && !billingHeartbeatInFlightRef.current
+                    ) {
+                        lastBillingHeartbeatSecondRef.current = currentElapsed;
+                        billingHeartbeatInFlightRef.current = true;
+                        fetch(`/api/credits/speech-session/${encodeURIComponent(active.session_id)}/heartbeat`, {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${token}` },
+                        }).then(async (heartbeatResponse) => {
+                            const heartbeat = await heartbeatResponse.json().catch(() => ({}));
+                            if (!heartbeatResponse.ok || heartbeat.status !== 'active' || heartbeat.remaining_seconds === 0) {
+                                await endSpeechBillingSession('credits_finished');
+                                setErrorText('Talk To Tara paused because your available talk credits finished.');
+                                setStatus('idle');
+                            }
+                        }).catch(() => {}).finally(() => {
+                            billingHeartbeatInFlightRef.current = false;
+                        });
+                    }
+                }, 1000);
+                return true;
+            } catch (error) {
+                setErrorText(error?.message || 'Could not start Talk To Tara billing.');
+                return false;
+            } finally {
+                billingStartPromiseRef.current = null;
+            }
+        })();
+        return billingStartPromiseRef.current;
+    };
+
+    const scheduleHandsFreeRestart = ({ noSpeech = false } = {}) => {
         if (!handsFreeRef.current || !mountedRef.current) return;
+        consecutiveNoSpeechRef.current = noSpeech ? consecutiveNoSpeechRef.current + 1 : 0;
+        if (noSpeech && consecutiveNoSpeechRef.current >= HANDS_FREE_MAX_NO_SPEECH_RETRIES) {
+            setHandsFree(false);
+            handsFreeRef.current = false;
+            setStatus('idle');
+            setErrorText('Talk To Tara paused after prolonged silence. Tap the mic when you are ready.');
+            void endSpeechBillingSessionRef.current('inactivity_timeout');
+            return;
+        }
         if (autoRestartTimerRef.current) clearTimeout(autoRestartTimerRef.current);
         autoRestartTimerRef.current = setTimeout(() => {
             if (mountedRef.current && handsFreeRef.current) startListeningRef.current();
@@ -397,6 +512,7 @@ const SpeechChatPage = () => {
                 if (!pending) return;
                 if (event.type === 'turn_started' || event.type === 'turn_queued') {
                     pending.accepted = true;
+                    if (event.message_id) pending.messageId = event.message_id;
                     return;
                 }
                 if (event.type === 'answer_chunk') {
@@ -419,6 +535,8 @@ const SpeechChatPage = () => {
                     speechSocketTurnsRef.current.delete(event.turn_id);
                     const error = new Error(event.message || 'Speech turn failed.');
                     error.turnAccepted = true;
+                    error.messageId = pending.messageId;
+                    error.clientRequestId = pending.clientRequestId;
                     pending.reject(error);
                     return;
                 }
@@ -444,6 +562,9 @@ const SpeechChatPage = () => {
                 speechSocketTurnsRef.current.forEach((pending) => {
                     const error = new Error('Speech connection closed.');
                     error.turnAccepted = Boolean(pending.accepted);
+                    error.messageId = pending.messageId;
+                    error.clientRequestId = pending.clientRequestId;
+                    error.retryableConnectionFailure = true;
                     pending.reject?.(error);
                 });
                 speechSocketTurnsRef.current.clear();
@@ -467,6 +588,7 @@ const SpeechChatPage = () => {
                 onReplace: handlers.onReplace,
                 content: '',
                 accepted: false,
+                clientRequestId: requestBody.client_request_id,
             });
             try {
                 socket.send(JSON.stringify({ ...requestBody, type: 'ask', turn_id: turnId }));
@@ -507,6 +629,7 @@ const SpeechChatPage = () => {
     const submitRecognizedQuestion = async (transcript) => {
         const question = String(transcript || '').trim();
         if (!question || !mountedRef.current) return;
+        consecutiveNoSpeechRef.current = 0;
         const turnLanguage = speechLanguageRef.current;
         const leadInEpoch = speechLeadInEpochRef.current + 1;
         speechLeadInEpochRef.current = leadInEpoch;
@@ -572,7 +695,7 @@ const SpeechChatPage = () => {
                     if (mountedRef.current) {
                         setErrorText('No speech was recorded. Please try again.');
                         setStatus('idle');
-                        scheduleHandsFreeRestart();
+                        scheduleHandsFreeRestart({ noSpeech: true });
                     }
                     return;
                 }
@@ -598,7 +721,7 @@ const SpeechChatPage = () => {
                     setErrorText(error?.message || 'Speech transcription failed. Please try again.');
                     setStatus('idle');
                     if (/no speech|understand|empty/i.test(String(error?.message || ''))) {
-                        scheduleHandsFreeRestart();
+                        scheduleHandsFreeRestart({ noSpeech: true });
                     }
                 }
             };
@@ -632,14 +755,22 @@ const SpeechChatPage = () => {
             setErrorText('Live chat is turned off right now. Use typed chat instead.');
             return;
         }
-        if (credits < speechChatCost) {
-            setErrorText(`You need at least ${speechChatCost} credit${speechChatCost !== 1 ? 's' : ''} for Talk To Tara.`);
+        const requiredStartCredits = speechChatPerMinuteCost * SPEECH_BILLING_MIN_START_MINUTES;
+        if (!billingSessionRef.current?.session_id && credits < requiredStartCredits) {
+            setErrorText(`You need at least ${requiredStartCredits} credits to start a Talk To Tara session.`);
             return;
         }
 
         const SpeechRecognitionClass = getSpeechRecognitionClass();
         if (!SpeechRecognitionClass && !supportsBackendRecording()) {
             setErrorText('Speech recognition is not supported in this browser.');
+            return;
+        }
+        if (!billingSessionRef.current?.session_id) {
+            if (billingStartPromiseRef.current) return;
+            void ensureSpeechBillingSession().then((started) => {
+                if (started && mountedRef.current) startListeningRef.current();
+            });
             return;
         }
 
@@ -685,7 +816,7 @@ const SpeechChatPage = () => {
             } else {
                 setStatus('idle');
                 if (!transcript) setErrorText('No speech was detected. Please try again.');
-                if (!transcript) scheduleHandsFreeRestart();
+                if (!transcript) scheduleHandsFreeRestart({ noSpeech: true });
             }
         };
 
@@ -732,7 +863,7 @@ const SpeechChatPage = () => {
             shouldAutoSendSpeechRef.current = false;
             if (event?.error === 'no-speech') {
                 setErrorText('No speech was detected. Please try again.');
-                scheduleHandsFreeRestart();
+                scheduleHandsFreeRestart({ noSpeech: true });
             } else if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
                 setErrorText('Microphone permission was blocked for this site.');
             } else {
@@ -822,10 +953,18 @@ const SpeechChatPage = () => {
             setStatus('idle');
             return;
         }
-        if (credits < speechChatCost) {
-            setErrorText(`You need at least ${speechChatCost} credit${speechChatCost !== 1 ? 's' : ''} for Talk To Tara.`);
+        const requiredStartCredits = speechChatPerMinuteCost * SPEECH_BILLING_MIN_START_MINUTES;
+        if (!billingSessionRef.current?.session_id && credits < requiredStartCredits) {
+            setErrorText(`You need at least ${requiredStartCredits} credits to start a Talk To Tara session.`);
             setStatus('idle');
             return;
+        }
+        if (!billingSessionRef.current?.session_id) {
+            const billingStarted = await ensureSpeechBillingSession();
+            if (!billingStarted) {
+                setStatus('idle');
+                return;
+            }
         }
 
         const token = localStorage.getItem('token');
@@ -890,7 +1029,14 @@ const SpeechChatPage = () => {
             } catch (socketError) {
                 // Only fall back before a WebSocket turn has been accepted.
                 if (socketError?.cancelled) return;
-                if (socketError?.turnAccepted) throw socketError;
+                if (socketError?.turnAccepted && socketError?.messageId) {
+                    pollForReply(socketError.messageId, turnId, turnLanguage);
+                    return;
+                }
+                if (socketError?.turnAccepted && !socketError?.retryableConnectionFailure) throw socketError;
+                // Re-submit the identical idempotency key over HTTP when the
+                // socket closed before it delivered a message id. The backend
+                // returns the existing turn if it was already created.
             }
             const response = await fetch('/api/chat-v2/ask', {
                 method: 'POST',
@@ -1127,7 +1273,10 @@ const SpeechChatPage = () => {
     }, [birthData?.name, displayUserName, status, speechChatEnabled, instantChatEnabled, speechLanguage, speechTtsProvider]);
 
     const micWaiting = status === 'thinking' || status === 'transcribing';
-    const micDisabled = status === 'transcribing' || !isSpeechSupported || credits < speechChatCost;
+    const requiredStartCredits = speechChatPerMinuteCost * SPEECH_BILLING_MIN_START_MINUTES;
+    const micDisabled = status === 'transcribing'
+        || !isSpeechSupported
+        || (!billingSession && credits < requiredStartCredits);
     const languageSelectionDisabled = status === 'thinking' || status === 'transcribing';
 
     const sessionActive = Boolean(birthData && speechChatEnabled && instantChatEnabled);
@@ -1285,7 +1434,8 @@ const SpeechChatPage = () => {
                                     {taraStatusLabels[status] || taraStatusLabels.idle}
                                 </p>
                                 <p className="speech-chat-meta">
-                                    Credits: {credits} · Talk To Tara: {speechChatCost} credit{speechChatCost !== 1 ? 's' : ''} per turn
+                                    {billingSession ? `${formatSpeechDuration(callElapsedSeconds)} · ` : ''}
+                                    Credits: {credits} · Talk To Tara: {speechChatPerMinuteCost} credit{speechChatPerMinuteCost !== 1 ? 's' : ''}/min
                                 </p>
 
                                 <div className="speech-chat-mic-outer">
