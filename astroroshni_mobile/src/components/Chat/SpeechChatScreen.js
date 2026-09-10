@@ -34,8 +34,11 @@ const POLL_INTERVAL_MS = 1400;
 const MAX_POLLS = 90;
 const SPEECH_TTS_MAX_CHARS = 820;
 const USE_BACKEND_SPEECH_TRANSCRIPTION = true;
-const ALLOW_NATIVE_RUNTIME_BACKEND_FALLBACK = false;
-const PREFER_NATIVE_SPEECH_RECOGNITION = Platform.OS === 'ios' || Platform.OS === 'web';
+const ALLOW_NATIVE_RUNTIME_BACKEND_FALLBACK = true;
+// Use the platform recognizer for the real-time experience on installed apps.
+// The recorded-audio backend remains a compatibility fallback when a device
+// has no recognizer service or the native recognizer fails to initialize.
+const PREFER_NATIVE_SPEECH_RECOGNITION = ['android', 'ios', 'web'].includes(Platform.OS);
 const REQUIRE_NATIVE_SPEECH_FOR_WEBSOCKET = Platform.OS === 'ios';
 const USE_SPEECH_WEBSOCKET = true;
 const HANDS_FREE_AUTO_STOP_MS = 45 * 1000;
@@ -50,7 +53,7 @@ const NATIVE_MAX_LISTENING_MS = 14000;
 const NATIVE_READY_TIMEOUT_MS = 4500;
 const POST_TTS_LISTEN_DELAY_MS = Platform.OS === 'android' ? 1200 : 900;
 const POST_TTS_ECHO_GUARD_MS = Platform.OS === 'android' ? 250 : 200;
-const MAX_NATIVE_NO_SPEECH_RETRIES = 0;
+const HANDS_FREE_NO_SPEECH_RETRY_DELAY_MS = Platform.OS === 'android' ? 1100 : 800;
 const SPEECH_BILLING_MIN_START_MINUTES = 5;
 const SPEECH_CREDIT_WARNING_SECONDS = 60;
 const SPEECH_CREDIT_WARNING_INTERVAL_SECONDS = 10;
@@ -192,12 +195,15 @@ export default function SpeechChatScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
   const { colors } = useTheme();
   const { requireAuthForPaid } = useAuthGate();
+  const initialSpeechLanguage = normalizeLanguageCode(
+    i18n.resolvedLanguage || i18n.language || route.params?.language || 'english'
+  );
   const [userName, setUserName] = useState('');
   const [birthData, setBirthData] = useState(route.params?.birthData || null);
   // Reuse the text-chat thread when Speech was opened as a consultation mode.
   // Speech remains an Instant interaction, while both modalities share history.
   const [sessionId, setSessionId] = useState(route.params?.sessionId || null);
-  const [language, setLanguage] = useState(route.params?.language || 'english');
+  const [language, setLanguage] = useState(initialSpeechLanguage);
   const [answerStyle, setAnswerStyle] = useState(
     route.params?.responseStyle === 'technical' ? 'technical' : 'simple'
   );
@@ -232,6 +238,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const scrollRef = useRef(null);
   const handsFreeRestartRef = useRef(false);
   const greetedRef = useRef(false);
+  const greetingPlaybackEpochRef = useRef(0);
   const thinkingLeadInIndexRef = useRef(0);
   const recordingRef = useRef(null);
   const recordingStartPromiseRef = useRef(null);
@@ -244,6 +251,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const nativeReadyTimerRef = useRef(null);
   const latestNativeTranscriptRef = useRef('');
   const nativeNoSpeechRetryCountRef = useRef(0);
+  const backendNoSpeechRetryCountRef = useRef(0);
   const nativeSpeechUnavailableForSessionRef = useRef(false);
   const recordingAutoStoppingRef = useRef(false);
   const recordingStartedAtRef = useRef(0);
@@ -254,8 +262,8 @@ export default function SpeechChatScreen({ navigation, route }) {
   const recordingMeterSamplesRef = useRef([]);
   const startListeningInFlightRef = useRef(false);
   const activeTurnSerialRef = useRef(0);
-  const activeTurnLanguageRef = useRef(normalizeLanguageCode(route.params?.language || 'english'));
-  const speechLanguageLockedRef = useRef(Boolean(route.params?.language));
+  const activeTurnLanguageRef = useRef(initialSpeechLanguage);
+  const speechLanguageLockedRef = useRef(true);
   const speechSocketRef = useRef(null);
   const speechSocketConnectPromiseRef = useRef(null);
   const speechSocketPendingTurnsRef = useRef(new Map());
@@ -482,10 +490,16 @@ export default function SpeechChatScreen({ navigation, route }) {
         ]);
         if (mountedRef.current) {
           if (!birthData && storedBirthData) setBirthData(storedBirthData);
-          if (!route.params?.language && (storedSpeechLanguage || storedLanguage)) {
-            const nextLanguage = normalizeLanguageCode(storedSpeechLanguage || storedLanguage);
+          const selectedAppLanguage = storedLanguage
+            || i18n.resolvedLanguage
+            || i18n.language
+            || route.params?.language
+            || storedSpeechLanguage;
+          if (selectedAppLanguage) {
+            const nextLanguage = normalizeLanguageCode(selectedAppLanguage);
             setLanguage(nextLanguage);
             activeTurnLanguageRef.current = nextLanguage;
+            speechLanguageLockedRef.current = true;
           }
           setUserName(String(storedUser?.name || storedUser?.full_name || '').trim());
         }
@@ -730,6 +744,8 @@ export default function SpeechChatScreen({ navigation, route }) {
 
     const greet = async () => {
       greetedRef.current = true;
+      const greetingEpoch = greetingPlaybackEpochRef.current + 1;
+      greetingPlaybackEpochRef.current = greetingEpoch;
       const greeting = buildGreetingText();
       if (!greeting || !mountedRef.current) return;
       const cacheKey = getGreetingCacheKey();
@@ -740,14 +756,23 @@ export default function SpeechChatScreen({ navigation, route }) {
         cacheKey,
         prepareSpoken: false,
         onDone: () => {
-          if (!mountedRef.current) return;
+          if (!mountedRef.current || greetingPlaybackEpochRef.current !== greetingEpoch) return;
           if (handsFreeEnabledRef.current) {
             maybeStartAfterGreeting();
             return;
           }
           setStatus('idle');
         },
-        onError: () => mountedRef.current && setStatus('idle'),
+        onError: () => {
+          if (!mountedRef.current || greetingPlaybackEpochRef.current !== greetingEpoch) return;
+          // A greeting playback failure must not strand a hands-free session.
+          // The user can still begin speaking even when the welcome audio failed.
+          if (handsFreeEnabledRef.current) {
+            maybeStartAfterGreeting();
+            return;
+          }
+          setStatus('idle');
+        },
       });
     };
 
@@ -860,6 +885,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       && (
         code === 'speech_error_1'
         || code === 'speech_error_2'
+        || code === 'speech_error_3'
         || code === 'speech_error_4'
         || code === 'speech_error_5'
         || code === 'speech_error_7'
@@ -897,6 +923,9 @@ export default function SpeechChatScreen({ navigation, route }) {
       if (source !== 'nativeRetryAfterNoSpeech') {
         nativeNoSpeechRetryCountRef.current = 0;
       }
+      if (source !== 'backendRetryAfterNoSpeech') {
+        backendNoSpeechRetryCountRef.current = 0;
+      }
       handsFreeRestartRef.current = false;
       setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0, audioStarted: false });
       if (stopCurrentSpeech) {
@@ -904,7 +933,12 @@ export default function SpeechChatScreen({ navigation, route }) {
       }
 
       const permissionGranted = await ensureMicrophonePermission();
-      if (!permissionGranted) return;
+      if (!permissionGranted) {
+        setNativeRecognizerReady(false);
+        setNativeRecognizerPhase('idle');
+        setStatus('idle');
+        return;
+      }
 
       let useBackendTranscription = USE_BACKEND_SPEECH_TRANSCRIPTION;
       if (PREFER_NATIVE_SPEECH_RECOGNITION) {
@@ -944,9 +978,11 @@ export default function SpeechChatScreen({ navigation, route }) {
       }
 
       if (useBackendTranscription) {
+        setNativeRecognizerReady(false);
+        setNativeRecognizerPhase('idle');
         await logSpeechDebug('startListening.backendTranscription', {
           platform: route?.params?.platform || 'native',
-          language,
+          language: activeTurnLanguageRef.current || language,
         });
         await startBackendRecording();
         return;
@@ -974,7 +1010,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       await logSpeechDebug('startListening.request', {
         platform: route?.params?.platform || 'native',
         language,
-        normalizedLanguage: normalizeLanguageCode(language),
+        normalizedLanguage: normalizeLanguageCode(activeTurnLanguageRef.current || language),
       });
 
       setStatus('listening');
@@ -1024,7 +1060,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         }
       }, NATIVE_MAX_LISTENING_MS);
 
-      speechRecognition.startListening(normalizeLanguageCode(language))
+      speechRecognition.startListening(normalizeLanguageCode(activeTurnLanguageRef.current || language))
         .then(async (transcript) => {
           clearNativeListeningTimers();
           listeningModeRef.current = null;
@@ -1057,6 +1093,7 @@ export default function SpeechChatScreen({ navigation, route }) {
             return;
           }
           if (shouldFallbackToBackendSpeech(error)) {
+            nativeSpeechUnavailableForSessionRef.current = true;
             await logSpeechDebug('startListening.nativeRuntimeFallbackToBackend', {
               source,
               code: error?.code,
@@ -1079,7 +1116,7 @@ export default function SpeechChatScreen({ navigation, route }) {
               || error?.code === 'speech_error_8'
               || error?.code === 'no_speech'
               || /no speech|timeout/i.test(String(error?.message || '')));
-          if (shouldKeepListening && nativeNoSpeechRetryCountRef.current < MAX_NATIVE_NO_SPEECH_RETRIES) {
+          if (shouldKeepListening) {
             nativeNoSpeechRetryCountRef.current += 1;
             setCurrentTranscript('');
             setTimeout(() => {
@@ -1090,7 +1127,7 @@ export default function SpeechChatScreen({ navigation, route }) {
                   setStatus('idle');
                 });
               }
-            }, 320);
+            }, HANDS_FREE_NO_SPEECH_RETRY_DELAY_MS);
             return;
           }
           nativeNoSpeechRetryCountRef.current = 0;
@@ -1364,7 +1401,12 @@ export default function SpeechChatScreen({ navigation, route }) {
           status: error?.response?.status,
           detail: error?.response?.data?.detail,
         });
-        if (handsFreeEnabledRef.current) {
+        const isNoSpeechFailure = /no speech|understand|empty|too short/i.test(String(detail));
+        if (
+          handsFreeEnabledRef.current
+          && isNoSpeechFailure
+        ) {
+          backendNoSpeechRetryCountRef.current += 1;
           setErrorText('');
           setCurrentTranscript('');
           setTimeout(() => {
@@ -1378,9 +1420,10 @@ export default function SpeechChatScreen({ navigation, route }) {
                 setStatus('idle');
               });
             }
-          }, /no speech|understand|audio/i.test(String(detail)) ? 1100 : 1400);
+          }, HANDS_FREE_NO_SPEECH_RETRY_DELAY_MS);
           return;
         }
+        backendNoSpeechRetryCountRef.current = 0;
         setErrorText(detail || t('speechChat.noTranscript', 'I could not understand that. Please try again.'));
         setStatus('idle');
       });
@@ -1559,7 +1602,14 @@ export default function SpeechChatScreen({ navigation, route }) {
       throw new Error(t('speechChat.recordingTooShort', 'I only caught a tiny bit of audio. Please hold the mic a moment longer and try again.'));
     }
 
-    await logSpeechDebug('backendTranscribe.request', { uri, language, durationMs, meteringMax, meteringAvg });
+    const transcriptionLanguage = normalizeLanguageCode(activeTurnLanguageRef.current || language);
+    await logSpeechDebug('backendTranscribe.request', {
+      uri,
+      language: transcriptionLanguage,
+      durationMs,
+      meteringMax,
+      meteringAvg,
+    });
     let response;
     try {
       response = await speechAPI.transcribeAudio(
@@ -1568,7 +1618,7 @@ export default function SpeechChatScreen({ navigation, route }) {
           name: `speech-question-${Date.now()}.m4a`,
           type: Platform.OS === 'android' ? 'audio/mp4' : 'audio/mp4',
         },
-        language || 'english',
+        transcriptionLanguage,
         { durationMs, meteringMax, meteringAvg }
       );
     } catch (error) {
@@ -1584,6 +1634,7 @@ export default function SpeechChatScreen({ navigation, route }) {
     if (!finalTranscript) {
       throw new Error(t('speechChat.noTranscript', 'I could not understand that. Please try again.'));
     }
+    backendNoSpeechRetryCountRef.current = 0;
     setCurrentTranscript(finalTranscript);
     setStatus('thinking');
     await runQuestionTurn(finalTranscript);
@@ -1932,8 +1983,12 @@ export default function SpeechChatScreen({ navigation, route }) {
     if (!mountedRef.current || activeTurnSerialRef.current !== turnSerial) return;
     if (!ok) {
       if (!mountedRef.current) return;
-      handsFreeRestartRef.current = false;
       setErrorText(t('speechChat.playbackError', 'I prepared the answer, but audio playback failed. Please read the answer on screen or try again.'));
+      if (handsFreeRestartRef.current && handsFreeEnabledRef.current) {
+        await maybeRestartHandsFree();
+        return;
+      }
+      handsFreeRestartRef.current = false;
       setStatus('idle');
       return;
     }
@@ -1952,9 +2007,10 @@ export default function SpeechChatScreen({ navigation, route }) {
     const turnSerial = activeTurnSerialRef.current + 1;
     activeTurnSerialRef.current = turnSerial;
     resetStreamSpeech(turnSerial);
+    const selectedLanguage = normalizeLanguageCode(activeTurnLanguageRef.current || language);
     const turnLanguage = speechLanguageLockedRef.current
-      ? normalizeLanguageCode(language)
-      : inferSpeechTurnLanguage(spokenQuestion, language);
+      ? selectedLanguage
+      : inferSpeechTurnLanguage(spokenQuestion, selectedLanguage);
     activeTurnLanguageRef.current = turnLanguage;
     if (turnLanguage !== normalizeLanguageCode(language)) {
       setLanguage(turnLanguage);
@@ -2106,18 +2162,39 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
   };
 
-  const handleSpeechLanguageChange = (nextLanguage) => {
+  const handleSpeechLanguageChange = async (nextLanguage) => {
     const normalized = normalizeLanguageCode(nextLanguage);
-    if (statusRef.current !== 'idle' || normalized === normalizeLanguageCode(language)) return;
+    if (
+      ['transcribing', 'thinking'].includes(statusRef.current)
+      || normalized === normalizeLanguageCode(activeTurnLanguageRef.current || language)
+    ) return;
+    const previousStatus = statusRef.current;
+    const switchingInitialGreeting = previousStatus === 'speaking' && turns.length === 0;
+    const switchingActiveMicrophone = previousStatus === 'listening';
     speechLanguageLockedRef.current = true;
     activeTurnLanguageRef.current = normalized;
     greetingPrefetchKeyRef.current = '';
-    // Before the first question, replay the welcome in the newly selected language.
-    greetedRef.current = turns.length > 0;
-    setFollowUps([]);
+    greetedRef.current = switchingInitialGreeting ? false : turns.length > 0;
+    if (switchingInitialGreeting || switchingActiveMicrophone) setFollowUps([]);
     setErrorText('');
     setLanguage(normalized);
     storage.setSpeechLanguage(normalized).catch(() => {});
+    if (switchingInitialGreeting) {
+      greetingPlaybackEpochRef.current += 1;
+      stopSpeechUiImmediately();
+      setStatus('idle');
+      return;
+    }
+    if (switchingActiveMicrophone) {
+      startListeningInFlightRef.current = false;
+      await releaseSpeechRecognizer();
+      setCurrentTranscript('');
+      setStatus('idle');
+      await wait(100);
+      if (mountedRef.current) {
+        await startListening({ source: 'languageChange', stopCurrentSpeech: false });
+      }
+    }
   };
 
   const speechPreparing = status === 'speaking' && avatarSpeech.active && !avatarSpeech.audioStarted;
@@ -2141,7 +2218,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   }[status] || '';
 
   const busy = ['transcribing', 'thinking'].includes(status) || speechPreparing || nativeRecognizerStarting;
-  const languageSwitchDisabled = status !== 'idle';
+  const languageSwitchDisabled = ['transcribing', 'thinking'].includes(status);
   const screenPalette = {
     background: colors.background,
     backgroundAlt: colors.backgroundSecondary || colors.background,

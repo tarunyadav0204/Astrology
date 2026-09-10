@@ -7,7 +7,6 @@ import textToSpeech from '../../utils/textToSpeech';
 import { speakThinkingHandoff } from '../../utils/speechThinkingHandoff';
 import {
     buildConversationalClosing,
-    inferSpeechLanguage,
     speechLocaleForLanguage,
     takeSpeakableChunks,
 } from '../../utils/speechStreaming';
@@ -111,6 +110,7 @@ const SpeechChatPage = () => {
     const mediaChunksRef = useRef([]);
     const mediaRecordingStartedAtRef = useRef(0);
     const mediaRecordingTimerRef = useRef(null);
+    const discardedMediaRecordersRef = useRef(new WeakSet());
     const speechSocketRef = useRef(null);
     const speechSocketConnectRef = useRef(null);
     const speechSocketTurnsRef = useRef(new Map());
@@ -134,10 +134,13 @@ const SpeechChatPage = () => {
     const autoRestartTimerRef = useRef(null);
     const scrollRef = useRef(null);
     const greetedRef = useRef(false);
+    const greetingEpochRef = useRef(0);
     const startListeningRef = useRef(() => {});
     const handsFreeRef = useRef(handsFree);
+    const speechLanguageRef = useRef(speechLanguage);
 
     handsFreeRef.current = handsFree;
+    speechLanguageRef.current = speechLanguage;
 
     useEffect(() => {
         if (!speechTtsProvider) return;
@@ -496,6 +499,7 @@ const SpeechChatPage = () => {
             onError: () => {
                 if (!mountedRef.current) return;
                 setStatus('idle');
+                scheduleHandsFreeRestart();
             },
         });
     };
@@ -503,7 +507,7 @@ const SpeechChatPage = () => {
     const submitRecognizedQuestion = async (transcript) => {
         const question = String(transcript || '').trim();
         if (!question || !mountedRef.current) return;
-        const turnLanguage = inferSpeechLanguage(question, speechLanguage);
+        const turnLanguage = speechLanguageRef.current;
         const leadInEpoch = speechLeadInEpochRef.current + 1;
         speechLeadInEpochRef.current = leadInEpoch;
         setStatus('thinking');
@@ -544,7 +548,6 @@ const SpeechChatPage = () => {
             mediaRecorderRef.current = recorder;
             mediaChunksRef.current = [];
             mediaRecordingStartedAtRef.current = Date.now();
-
             recorder.ondataavailable = (event) => {
                 if (event.data?.size) mediaChunksRef.current.push(event.data);
             };
@@ -555,6 +558,8 @@ const SpeechChatPage = () => {
             };
             recorder.onstop = async () => {
                 const chunks = mediaChunksRef.current;
+                const discardRecording = discardedMediaRecordersRef.current.has(recorder);
+                discardedMediaRecordersRef.current.delete(recorder);
                 const durationMs = Math.max(0, Date.now() - mediaRecordingStartedAtRef.current);
                 const mimeType = recorder.mimeType || preferredMime || 'audio/webm';
                 mediaChunksRef.current = [];
@@ -562,10 +567,12 @@ const SpeechChatPage = () => {
                 mediaRecordingStartedAtRef.current = 0;
                 mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
                 mediaStreamRef.current = null;
+                if (discardRecording) return;
                 if (!chunks.length || !mountedRef.current) {
                     if (mountedRef.current) {
                         setErrorText('No speech was recorded. Please try again.');
                         setStatus('idle');
+                        scheduleHandsFreeRestart();
                     }
                     return;
                 }
@@ -573,7 +580,7 @@ const SpeechChatPage = () => {
                     const extension = mimeType.includes('mp4') ? 'm4a' : 'webm';
                     const form = new FormData();
                     form.append('audio', new Blob(chunks, { type: mimeType }), `speech-question.${extension}`);
-                    form.append('language', speechLanguage);
+                    form.append('language', speechLanguageRef.current);
                     form.append('duration_ms', String(durationMs));
                     const response = await fetch('/api/speech/transcribe', {
                         method: 'POST',
@@ -590,6 +597,9 @@ const SpeechChatPage = () => {
                     if (!mountedRef.current) return;
                     setErrorText(error?.message || 'Speech transcription failed. Please try again.');
                     setStatus('idle');
+                    if (/no speech|understand|empty/i.test(String(error?.message || ''))) {
+                        scheduleHandsFreeRestart();
+                    }
                 }
             };
 
@@ -650,7 +660,7 @@ const SpeechChatPage = () => {
         }
 
         const recognition = new SpeechRecognitionClass();
-        recognition.lang = speechLocaleForLanguage(speechLanguage);
+        recognition.lang = speechLocaleForLanguage(speechLanguageRef.current);
         recognition.interimResults = true;
         recognition.continuous = false;
         recognition.maxAlternatives = 1;
@@ -675,6 +685,7 @@ const SpeechChatPage = () => {
             } else {
                 setStatus('idle');
                 if (!transcript) setErrorText('No speech was detected. Please try again.');
+                if (!transcript) scheduleHandsFreeRestart();
             }
         };
 
@@ -721,6 +732,7 @@ const SpeechChatPage = () => {
             shouldAutoSendSpeechRef.current = false;
             if (event?.error === 'no-speech') {
                 setErrorText('No speech was detected. Please try again.');
+                scheduleHandsFreeRestart();
             } else if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
                 setErrorText('Microphone permission was blocked for this site.');
             } else {
@@ -826,7 +838,7 @@ const SpeechChatPage = () => {
             return;
         }
         const turnId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const turnLanguage = inferSpeechLanguage(question, requestedLanguage);
+        const turnLanguage = requestedLanguage === 'hindi' ? 'hindi' : 'english';
         thinkingTurnIdRef.current = turnId;
         beginStreamSpeech(turnId, turnLanguage);
 
@@ -1027,14 +1039,53 @@ const SpeechChatPage = () => {
 
     const handleSpeechLanguageChange = (language) => {
         const nextLanguage = language === 'hindi' ? 'hindi' : 'english';
-        if (nextLanguage === speechLanguage) return;
-        if (status === 'speaking' && turns.length === 0 && !thinkingTurnIdRef.current) {
+        if (
+            nextLanguage === speechLanguageRef.current
+            || status === 'thinking'
+            || status === 'transcribing'
+        ) return;
+        const switchingInitialGreeting = status === 'speaking' && turns.length === 0 && !thinkingTurnIdRef.current;
+        const switchingActiveMicrophone = status === 'listening';
+        speechLanguageRef.current = nextLanguage;
+        if (switchingInitialGreeting) {
+            greetingEpochRef.current += 1;
             interruptAssistantSpeech();
             greetedRef.current = false;
         }
-        localStorage.setItem('language', nextLanguage);
         setSpeechLanguage(nextLanguage);
         setErrorText('');
+        if (switchingActiveMicrophone) {
+            shouldAutoSendSpeechRef.current = false;
+            finalTranscriptRef.current = '';
+            liveTranscriptRef.current = '';
+            setCurrentTranscript('');
+            [recognitionSilenceTimerRef, recognitionMaxTimerRef, recognitionEndTimerRef].forEach((timerRef) => {
+                if (timerRef.current) clearTimeout(timerRef.current);
+                timerRef.current = null;
+            });
+            const recognition = recognitionRef.current;
+            recognitionRef.current = null;
+            if (recognition) {
+                recognition.onresult = null;
+                recognition.onerror = null;
+                recognition.onend = null;
+                try { recognition.abort(); } catch { /* already stopped */ }
+            }
+            if (mediaRecordingTimerRef.current) {
+                clearTimeout(mediaRecordingTimerRef.current);
+                mediaRecordingTimerRef.current = null;
+            }
+            const recorder = mediaRecorderRef.current;
+            if (recorder?.state === 'recording') {
+                discardedMediaRecordersRef.current.add(recorder);
+                try { recorder.stop(); } catch { /* already stopped */ }
+            }
+            mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+            setStatus('idle');
+            setTimeout(() => {
+                if (mountedRef.current) startListeningRef.current();
+            }, 120);
+        }
     };
 
     startListeningRef.current = startListening;
@@ -1048,6 +1099,8 @@ const SpeechChatPage = () => {
         if (!greeting) return;
 
         greetedRef.current = true;
+        const greetingEpoch = greetingEpochRef.current + 1;
+        greetingEpochRef.current = greetingEpoch;
         setErrorText('');
         setStatus('speaking');
 
@@ -1056,7 +1109,7 @@ const SpeechChatPage = () => {
             pitch: 1,
             lang: speechLocaleForLanguage(greetingLanguage),
             onEnd: () => {
-                if (!mountedRef.current) return;
+                if (!mountedRef.current || greetingEpochRef.current !== greetingEpoch) return;
                 if (handsFreeRef.current) {
                     autoRestartTimerRef.current = setTimeout(() => {
                         if (mountedRef.current) startListeningRef.current();
@@ -1066,16 +1119,16 @@ const SpeechChatPage = () => {
                 setStatus('idle');
             },
             onError: () => {
-                if (mountedRef.current) setStatus('idle');
+                if (!mountedRef.current || greetingEpochRef.current !== greetingEpoch) return;
+                setStatus('idle');
+                scheduleHandsFreeRestart();
             },
         });
     }, [birthData?.name, displayUserName, status, speechChatEnabled, instantChatEnabled, speechLanguage, speechTtsProvider]);
 
     const micWaiting = status === 'thinking' || status === 'transcribing';
     const micDisabled = status === 'transcribing' || !isSpeechSupported || credits < speechChatCost;
-    const languageSelectionDisabled = status !== 'idle' && !(
-        status === 'speaking' && turns.length === 0 && !thinkingTurnIdRef.current
-    );
+    const languageSelectionDisabled = status === 'thinking' || status === 'transcribing';
 
     const sessionActive = Boolean(birthData && speechChatEnabled && instantChatEnabled);
 
