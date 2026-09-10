@@ -548,7 +548,7 @@ export const textToSpeech = {
         if (!isWebPlatform()) {
           await Audio.setAudioModeAsync({
             playsInSilentModeIOS: true,
-            staysActiveInBackground: false,
+            staysActiveInBackground: true,
             allowsRecordingIOS: false,
             playThroughEarpieceAndroid: false,
             shouldDuckAndroid: false,
@@ -556,27 +556,27 @@ export const textToSpeech = {
             interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
           });
         }
-        let nextAudioPromise = synthesizeServerTtsToCache(streamedChunks[0], {
-          language,
-          voiceName,
-          cacheKey: cacheKey ? `${cacheKey}:seg0` : undefined,
-          prepareSpoken,
-        });
+        // Start synthesizing every segment together. The first segment keeps
+        // startup latency low while later audio becomes ready during playback.
+        const chunkAudioPromises = streamedChunks.map((chunk, index) => (
+          synthesizeServerTtsToCache(chunk, {
+            language,
+            voiceName,
+            cacheKey: cacheKey ? `${cacheKey}:seg${index}` : undefined,
+            prepareSpoken,
+          }).then(
+            (audio) => ({ audio, error: null }),
+            (error) => ({ audio: null, error })
+          )
+        ));
         for (let i = 0; i < streamedChunks.length; i += 1) {
           console.log('[TTS] segmented chunk awaiting audio', {
             index: i + 1,
             chunks: streamedChunks.length,
             length: streamedChunks[i]?.length || 0,
           });
-          const cachedAudio = await nextAudioPromise;
-          if (i + 1 < streamedChunks.length) {
-            nextAudioPromise = synthesizeServerTtsToCache(streamedChunks[i + 1], {
-              language,
-              voiceName,
-              cacheKey: cacheKey ? `${cacheKey}:seg${i + 1}` : undefined,
-              prepareSpoken,
-            });
-          }
+          const { audio: cachedAudio, error: synthesisError } = await chunkAudioPromises[i];
+          if (synthesisError) throw synthesisError;
           if (!cachedAudio?.uri) throw new Error('Google TTS: missing cached segment audio');
           console.log('[TTS] segmented chunk playback start', {
             index: i + 1,
@@ -668,7 +668,7 @@ export const textToSpeech = {
       if (!isWebPlatform()) {
         await Audio.setAudioModeAsync({
           playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
+          staysActiveInBackground: true,
           allowsRecordingIOS: false,
           playThroughEarpieceAndroid: false,
           shouldDuckAndroid: false,
@@ -770,18 +770,6 @@ export const textToSpeech = {
                 completePlayback();
                 return;
               }
-              if (
-                startedCallbackSent
-                && position > 250
-                && status.isPlaying === false
-                && status.isBuffering !== true
-              ) {
-                console.warn('[TTS] playback stopped without finish event', {
-                  durationMillis: duration,
-                  positionMillis: position,
-                });
-                completePlayback();
-              }
             })
             .catch(() => {
               // Ignore transient polling failures; status updates may still arrive normally.
@@ -811,19 +799,6 @@ export const textToSpeech = {
           if (status?.didJustFinish) {
             completePlayback();
             return;
-          }
-          if (
-            startedCallbackSent
-            && status?.isLoaded
-            && Number(status.positionMillis || 0) > 250
-            && status.isPlaying === false
-            && status.isBuffering !== true
-          ) {
-            console.warn('[TTS] playback status stopped without finish event', {
-              durationMillis: status.durationMillis ?? 0,
-              positionMillis: status.positionMillis ?? 0,
-            });
-            completePlayback();
           }
         });
 

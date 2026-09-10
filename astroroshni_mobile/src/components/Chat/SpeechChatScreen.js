@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   Alert,
   Dimensions,
   Linking,
@@ -32,7 +33,6 @@ import FocusedStatusBar from '../Common/FocusedStatusBar';
 
 const POLL_INTERVAL_MS = 1400;
 const MAX_POLLS = 90;
-const SPEECH_TTS_MAX_CHARS = 820;
 const USE_BACKEND_SPEECH_TRANSCRIPTION = true;
 const ALLOW_NATIVE_RUNTIME_BACKEND_FALLBACK = true;
 // Use the platform recognizer for the real-time experience on installed apps.
@@ -154,20 +154,6 @@ const hashGreetingText = (value) => {
   return (hash >>> 0).toString(16);
 };
 
-const trimForSpeechPlayback = (text, limit = SPEECH_TTS_MAX_CHARS) => {
-  const raw = String(text || '').replace(/\s+/g, ' ').trim();
-  if (raw.length <= limit) return raw;
-  const slice = raw.slice(0, limit);
-  const boundary = Math.max(
-    slice.lastIndexOf('.'),
-    slice.lastIndexOf('?'),
-    slice.lastIndexOf('!'),
-    slice.lastIndexOf('।')
-  );
-  if (boundary >= 500) return slice.slice(0, boundary + 1).trim();
-  return `${slice.slice(0, Math.max(0, limit - 1)).trim()}…`;
-};
-
 const estimateSpeechDurationMs = (text) => {
   const spoken = String(text || '').replace(/\s+/g, ' ').trim();
   if (!spoken) return 2500;
@@ -261,18 +247,14 @@ export default function SpeechChatScreen({ navigation, route }) {
   const recordingLastSpeechAtRef = useRef(0);
   const recordingMeterSamplesRef = useRef([]);
   const startListeningInFlightRef = useRef(false);
+  const appStateRef = useRef(AppState.currentState);
+  const resumeHandsFreeOnActiveRef = useRef(false);
   const activeTurnSerialRef = useRef(0);
   const activeTurnLanguageRef = useRef(initialSpeechLanguage);
   const speechLanguageLockedRef = useRef(true);
   const speechSocketRef = useRef(null);
   const speechSocketConnectPromiseRef = useRef(null);
   const speechSocketPendingTurnsRef = useRef(new Map());
-  const streamSpeechQueueRef = useRef([]);
-  const streamSpeechPlayingTurnRef = useRef(0);
-  const streamSpeechStartedRef = useRef(false);
-  const streamSpeechFailedRef = useRef(false);
-  const streamSpeechTurnRef = useRef(0);
-  const streamSpeechWaitersRef = useRef([]);
   const greetingPrefetchKeyRef = useRef('');
   const speakingWatchdogRef = useRef(null);
   const billingSessionRef = useRef(null);
@@ -642,10 +624,29 @@ export default function SpeechChatScreen({ navigation, route }) {
   }, [handsFreeEnabled]);
 
   useEffect(() => {
-    if (!currentTranscript) return undefined;
+    if (!currentTranscript && !streamingAnswer && !turns.length) return undefined;
     const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
     return () => clearTimeout(timer);
-  }, [currentTranscript]);
+  }, [currentTranscript, streamingAnswer, turns]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      appStateRef.current = nextState;
+      if (
+        nextState === 'active'
+        && resumeHandsFreeOnActiveRef.current
+        && handsFreeEnabledRef.current
+      ) {
+        resumeHandsFreeOnActiveRef.current = false;
+        setTimeout(() => {
+          if (mountedRef.current && handsFreeEnabledRef.current) {
+            maybeRestartHandsFree();
+          }
+        }, POST_TTS_LISTEN_DELAY_MS);
+      }
+    });
+    return () => subscription?.remove?.();
+  }, []);
 
   useEffect(() => {
     pulseAnim.stopAnimation();
@@ -888,9 +889,8 @@ export default function SpeechChatScreen({ navigation, route }) {
         || code === 'speech_error_3'
         || code === 'speech_error_4'
         || code === 'speech_error_5'
-        || code === 'speech_error_7'
         || code === 'speech_error_11'
-        || /network|server|client|service|understand/i.test(message)
+        || /network|server|client|service/i.test(message)
       );
   };
 
@@ -1114,6 +1114,7 @@ export default function SpeechChatScreen({ navigation, route }) {
             handsFreeEnabledRef.current
             && (error?.code === 'speech_error_6'
               || error?.code === 'speech_error_8'
+              || error?.code === 'speech_error_7'
               || error?.code === 'no_speech'
               || /no speech|timeout/i.test(String(error?.message || '')));
           if (shouldKeepListening) {
@@ -1169,6 +1170,14 @@ export default function SpeechChatScreen({ navigation, route }) {
   const maybeRestartHandsFree = async () => {
     if (!mountedRef.current || !handsFreeEnabledRef.current) return;
     handsFreeRestartRef.current = false;
+    if (appStateRef.current !== 'active') {
+      // Keep playback alive while locked, but defer the next microphone cycle
+      // until the app is visible again.
+      resumeHandsFreeOnActiveRef.current = true;
+      setStatus('idle');
+      return;
+    }
+    resumeHandsFreeOnActiveRef.current = false;
     setErrorText('');
     try {
       await wait(POST_TTS_LISTEN_DELAY_MS);
@@ -1653,60 +1662,6 @@ export default function SpeechChatScreen({ navigation, route }) {
     });
   };
 
-  const settleStreamSpeechWaiters = (ok) => {
-    const waiters = streamSpeechWaitersRef.current.splice(0);
-    waiters.forEach((resolve) => resolve(ok));
-  };
-
-  const pumpStreamSpeechQueue = async (turnSerial, turnLanguage) => {
-    if (streamSpeechPlayingTurnRef.current === turnSerial || streamSpeechTurnRef.current !== turnSerial) return;
-    streamSpeechPlayingTurnRef.current = turnSerial;
-    while (streamSpeechQueueRef.current.length && streamSpeechTurnRef.current === turnSerial) {
-      const chunk = streamSpeechQueueRef.current.shift();
-      setStatus('speaking');
-      const ok = await playAvatarLine(trimForSpeechPlayback(chunk), {
-        language: turnLanguage || language,
-      });
-      if (!ok) {
-        streamSpeechFailedRef.current = true;
-        streamSpeechQueueRef.current = [];
-        break;
-      }
-    }
-    if (streamSpeechPlayingTurnRef.current === turnSerial) {
-      streamSpeechPlayingTurnRef.current = 0;
-    }
-    if (streamSpeechTurnRef.current !== turnSerial) return;
-    if (streamSpeechTurnRef.current === turnSerial && streamSpeechQueueRef.current.length) {
-      pumpStreamSpeechQueue(turnSerial, turnLanguage);
-      return;
-    }
-    settleStreamSpeechWaiters(!streamSpeechFailedRef.current);
-  };
-
-  const enqueueStreamSpeech = (text, turnSerial, turnLanguage) => {
-    const chunk = String(text || '').trim();
-    if (!chunk || streamSpeechTurnRef.current !== turnSerial) return;
-    streamSpeechStartedRef.current = true;
-    streamSpeechQueueRef.current.push(chunk);
-    pumpStreamSpeechQueue(turnSerial, turnLanguage);
-  };
-
-  const waitForStreamSpeech = () => {
-    if (!streamSpeechPlayingTurnRef.current && streamSpeechQueueRef.current.length === 0) {
-      return Promise.resolve(!streamSpeechFailedRef.current);
-    }
-    return new Promise((resolve) => streamSpeechWaitersRef.current.push(resolve));
-  };
-
-  const resetStreamSpeech = (turnSerial) => {
-    settleStreamSpeechWaiters(false);
-    streamSpeechQueueRef.current = [];
-    streamSpeechStartedRef.current = false;
-    streamSpeechFailedRef.current = false;
-    streamSpeechTurnRef.current = turnSerial;
-  };
-
   const closeSpeechSocket = () => {
     speechSocketPendingTurnsRef.current.forEach((pending) => {
       pending.reject?.(new Error('Speech socket closed'));
@@ -1965,21 +1920,22 @@ export default function SpeechChatScreen({ navigation, route }) {
       nextFollowUps[0],
       getSpeechTranslator(turnLanguage)
     );
-    const spokenAnswer = trimForSpeechPlayback(`${answer} ${closingLine}`);
+    const conversationalAnswer = `${answer}\n\n${closingLine}`.trim();
+    const spokenAnswer = conversationalAnswer;
     setFollowUps(nextFollowUps);
-    setTurns((prev) => [...prev, { question, answer, followUps: nextFollowUps }]);
+    setTurns((prev) => [...prev, { question, answer: conversationalAnswer, followUps: nextFollowUps }]);
     setStreamingAnswer('');
     setCurrentTranscript('');
     setStatus('speaking');
     handsFreeRestartRef.current = !!handsFreeEnabledRef.current;
     if (!mountedRef.current || activeTurnSerialRef.current !== turnSerial) return;
-    let ok;
-    if (streamSpeechStartedRef.current && !streamSpeechFailedRef.current) {
-      enqueueStreamSpeech(closingLine, turnSerial, turnLanguage);
-      ok = await waitForStreamSpeech();
-    } else {
-      ok = await playAvatarLine(spokenAnswer, { language: turnLanguage || language });
-    }
+    // Use one native audio item for the complete visible answer. The backend
+    // concatenates any Google TTS chunks before returning the MP3, so playback
+    // remains continuous and can survive a screen lock without waiting for JS.
+    const ok = await playAvatarLine(spokenAnswer, {
+      language: turnLanguage || language,
+      segmented: false,
+    });
     if (!mountedRef.current || activeTurnSerialRef.current !== turnSerial) return;
     if (!ok) {
       if (!mountedRef.current) return;
@@ -2006,7 +1962,6 @@ export default function SpeechChatScreen({ navigation, route }) {
 
     const turnSerial = activeTurnSerialRef.current + 1;
     activeTurnSerialRef.current = turnSerial;
-    resetStreamSpeech(turnSerial);
     const selectedLanguage = normalizeLanguageCode(activeTurnLanguageRef.current || language);
     const turnLanguage = speechLanguageLockedRef.current
       ? selectedLanguage
@@ -2023,23 +1978,16 @@ export default function SpeechChatScreen({ navigation, route }) {
     const isCurrentTurn = () => mountedRef.current && activeTurnSerialRef.current === turnSerial;
     setStreamingAnswer('');
     // Recognition has finished before generation starts. Release its audio
-    // session now so validated answer chunks can begin playing immediately
-    // without a later recognizer cleanup interrupting TTS.
+    // session now so it cannot interrupt the completed-answer TTS playback.
     await releaseSpeechRecognizer();
     const answerPromise = askInstant(spokenQuestion, turnLanguage, {
       onChunk: (delta, event) => {
         if (!isCurrentTurn()) return;
-        setStreamingAnswer(String(event?.content || '').trimStart());
-        if (event?.validated || event?.playable) {
-          enqueueStreamSpeech(delta, turnSerial, turnLanguage);
-        }
+        setStreamingAnswer(String(event?.content || delta || '').trimStart());
       },
-      onReplace: (content, event) => {
+      onReplace: (content) => {
         if (!isCurrentTurn()) return;
         setStreamingAnswer(String(content || '').trimStart());
-        if (event?.validated || event?.playable) {
-          enqueueStreamSpeech(content, turnSerial, turnLanguage);
-        }
       },
     });
 
@@ -2050,7 +1998,6 @@ export default function SpeechChatScreen({ navigation, route }) {
     } catch (error) {
       if (!isCurrentTurn()) return;
       setStreamingAnswer('');
-      resetStreamSpeech(turnSerial);
       await getTextToSpeech().stop();
       throw error;
     }
@@ -2074,7 +2021,6 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const stopSpeechUiImmediately = () => {
     activeTurnSerialRef.current += 1;
-    resetStreamSpeech(activeTurnSerialRef.current);
     handsFreeRestartRef.current = false;
     startListeningInFlightRef.current = false;
     if (speakingWatchdogRef.current) {
@@ -2181,8 +2127,15 @@ export default function SpeechChatScreen({ navigation, route }) {
     storage.setSpeechLanguage(normalized).catch(() => {});
     if (switchingInitialGreeting) {
       greetingPlaybackEpochRef.current += 1;
-      stopSpeechUiImmediately();
-      setStatus('idle');
+      activeTurnSerialRef.current += 1;
+      handsFreeRestartRef.current = false;
+      startListeningInFlightRef.current = false;
+      setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0, audioStarted: false });
+      // Wait until the English sound is fully stopped and unloaded. Starting
+      // the Hindi greeting during that teardown lets the old player interrupt
+      // the new one after its first word.
+      await getTextToSpeech().stop();
+      if (mountedRef.current) setStatus('idle');
       return;
     }
     if (switchingActiveMicrophone) {
@@ -2503,13 +2456,7 @@ export default function SpeechChatScreen({ navigation, route }) {
             </View>
           ))}
 
-          {streamingAnswer ? (
-            <Animated.View style={[styles.answerBubble, { backgroundColor: screenPalette.surfaceStrong, borderColor: screenPalette.border }]}>
-              <Text style={[styles.bubbleText, { color: screenPalette.text }]}>{streamingAnswer}</Text>
-            </Animated.View>
-          ) : null}
-
-          {currentTranscript ? (
+          {currentTranscript || status === 'listening' ? (
             <Animated.View
               style={[
                 styles.liveCard,
@@ -2525,7 +2472,18 @@ export default function SpeechChatScreen({ navigation, route }) {
               <Text style={[styles.bubbleLabel, { color: screenPalette.textSecondary }]}>
                 {status === 'listening' ? t('speechChat.heardSoFar', 'Heard so far') : t('speechChat.currentQuestion', 'Current question')}
               </Text>
-              <Text style={[styles.bubbleText, { color: screenPalette.text }]}>{currentTranscript}</Text>
+              <Text style={[styles.bubbleText, { color: screenPalette.text }]}>
+                {currentTranscript || t(
+                  'speechChat.listeningLivePlaceholder',
+                  normalizeLanguageCode(language) === 'hindi' ? 'सुन रही हूँ…' : 'Listening…'
+                )}
+              </Text>
+            </Animated.View>
+          ) : null}
+
+          {streamingAnswer ? (
+            <Animated.View style={[styles.answerBubble, { backgroundColor: screenPalette.surfaceStrong, borderColor: screenPalette.border }]}>
+              <Text style={[styles.bubbleText, { color: screenPalette.text }]}>{streamingAnswer}</Text>
             </Animated.View>
           ) : null}
         </ScrollView>

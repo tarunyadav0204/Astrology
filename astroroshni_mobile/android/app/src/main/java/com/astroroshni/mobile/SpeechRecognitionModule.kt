@@ -18,10 +18,13 @@ import java.util.Locale
 class SpeechRecognitionModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext), RecognitionListener {
   companion object {
-    private const val MINIMUM_LISTENING_MILLIS = 6500L
-    private const val COMPLETE_SILENCE_MILLIS = 3200L
-    private const val POSSIBLY_COMPLETE_SILENCE_MILLIS = 2200L
-    private const val PARTIAL_STABLE_MILLIS = 1300L
+    // Long minimum/silence hints cause some Google recognizer builds to hold
+    // partial text for 5-6 seconds. Keep the session open through live partial
+    // updates, but allow the first words to reach React Native immediately.
+    private const val MINIMUM_LISTENING_MILLIS = 900L
+    private const val COMPLETE_SILENCE_MILLIS = 1800L
+    private const val POSSIBLY_COMPLETE_SILENCE_MILLIS = 1100L
+    private const val PARTIAL_STABLE_MILLIS = 1100L
     private const val MAX_LISTENING_MILLIS = 14000L
   }
 
