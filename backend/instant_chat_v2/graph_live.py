@@ -582,11 +582,11 @@ def apply_live_graph_policy(
         str(value) for value in (result.get("verdict") or {}).get("missing_required_capabilities") or []
     }
     if policy.get("domain") == "health" and "parashari.health_body_area" in verdict_missing:
-        compact_policy["claim_permission"] = "no_health_area_specificity"
+        compact_policy["body_area_permission"] = "none"
         compact_policy["instruction"] = (
-            "The required health body-area calculation is unavailable. Do not name a body zone, organ, system, "
-            "symptom pattern, recovery theme, dasha, transit, date, or relative risk window. Give a concise "
-            "evidence limitation and general preventive guidance only."
+            "Body-area evidence is unavailable, so do not name a body zone, organ, system, symptom pattern, or "
+            "condition. Continue answering the requested general health outlook from the supported natal health "
+            "foundation and, for a time-bound question, its supplied dasha and transit phases."
         )
         answer_spec["limitation_instruction"] = compact_policy["instruction"]
     if bool(policy.get("live")) and policy.get("domain") == "education":

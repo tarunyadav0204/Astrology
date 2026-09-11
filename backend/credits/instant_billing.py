@@ -18,6 +18,7 @@ from db import execute, get_conn
 
 
 HEARTBEAT_INTERVAL_SECONDS = max(5, int(os.getenv("INSTANT_BILLING_HEARTBEAT_SECONDS", "10") or 10))
+MAX_CONFIRMED_INTERVAL_SECONDS = HEARTBEAT_INTERVAL_SECONDS * 2
 RECONNECT_GRACE_SECONDS = max(
     HEARTBEAT_INTERVAL_SECONDS * 2,
     int(os.getenv("INSTANT_BILLING_RECONNECT_GRACE_SECONDS", "75") or 75),
@@ -91,11 +92,20 @@ def _balance_for_update(conn, userid: int) -> int:
     return int(row[0] or 0) if row else 0
 
 
-def _settlement_billable_seconds(*, prior: int, total: int, disconnected: bool) -> int:
-    """Return server-confirmed billable time without monetizing reconnect grace."""
+def _confirmed_interval_seconds(seconds_since_last_confirmation: int) -> int:
+    """Return a timely confirmed interval; reject suspended wall-clock gaps."""
+    gap = max(0, int(seconds_since_last_confirmation or 0))
+    if gap > MAX_CONFIRMED_INTERVAL_SECONDS:
+        return 0
+    return gap
+
+
+def _settlement_billable_seconds(*, prior: int, confirmation_gap: int, disconnected: bool) -> int:
+    """Accumulate confirmed active time without monetizing reconnect gaps."""
     prior_seconds = max(0, int(prior or 0))
-    total_seconds = max(prior_seconds, int(total or 0))
-    return prior_seconds if disconnected else total_seconds
+    if disconnected:
+        return prior_seconds
+    return prior_seconds + _confirmed_interval_seconds(confirmation_gap)
 
 
 def _charge(
@@ -165,8 +175,7 @@ def _row_locked(conn, session_id: str, userid: int):
                COALESCE(original_first_minute_cost, original_per_minute_cost),
                starting_balance, charged_credits, billed_minutes, billable_seconds,
                started_at, ended_at, ended_reason,
-               GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_heartbeat_at)))::INTEGER AS heartbeat_gap,
-               GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)))::INTEGER AS total_elapsed
+               GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_heartbeat_at)))::INTEGER AS heartbeat_gap
         FROM instant_billing_sessions
         WHERE session_id = ? AND userid = ?
         FOR UPDATE
@@ -224,14 +233,12 @@ def _settle_locked(conn, row, *, explicit_end_reason: Optional[str] = None) -> D
     gap = max(0, int(row[17] or 0))
     disconnected = gap > RECONNECT_GRACE_SECONDS
     prior_billable_seconds = max(0, int(row[13] or 0))
-    total_elapsed_seconds = max(prior_billable_seconds, int(row[18] or 0))
-    # While heartbeats are healthy, elapsed time comes directly from the server
-    # start timestamp so sub-second truncation cannot accumulate. If the client
-    # disappears, freeze billing at the last confirmed heartbeat. The grace
-    # period is only a recovery lease; it must never become paid time.
+    # Add only a timely interval since the previous server confirmation. A
+    # browser/app that wakes after suspension cannot convert the offline gap
+    # into paid time. Reconnect grace remains a recovery lease, not usage.
     billable_seconds = _settlement_billable_seconds(
         prior=prior_billable_seconds,
-        total=total_elapsed_seconds,
+        confirmation_gap=gap,
         disconnected=disconnected,
     )
     rate = max(1, int(row[5] or 1))

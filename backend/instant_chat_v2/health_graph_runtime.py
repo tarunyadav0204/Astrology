@@ -92,12 +92,18 @@ def observed_health_factors(
             if 1 <= house <= 12:
                 factors.add(f"health:H{house}")
     rows = list(health.get("major_vulnerabilities") or []) if isinstance(health, Mapping) else []
-    if rows:
-        factors.update({"health:BodyZoneEvidence", "health:SixthLordChain"})
+    # A completed calculation with no retained finding is still observed
+    # evidence. Treating an empty result as a missing calculator made the
+    # graph report “currently unavailable” when it had actually found no
+    # strong body-zone confluence.
+    if isinstance(health, Mapping) and "major_vulnerabilities" in health:
+        factors.add("health:BodyZoneEvidence")
+    if rows or (isinstance(health, Mapping) and "sixth_house_chain" in health):
+        factors.add("health:SixthLordChain")
     profile = health.get("medical_profile") if isinstance(health.get("medical_profile"), Mapping) else {}
-    if _present(profile.get("protective_factors")):
+    if isinstance(health, Mapping) and "medical_profile" in health:
         factors.add("health:ProtectiveFactors")
-    if _present(health.get("planet_conditions")) or rows:
+    if (isinstance(health, Mapping) and "planet_conditions" in health) or rows:
         factors.add("health:DignityStrength")
     serialized = json.dumps(health, default=str)
     for division in (3, 6, 8, 30):

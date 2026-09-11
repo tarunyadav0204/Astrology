@@ -131,6 +131,8 @@ backend/gcp_key.json
 !package.json
 !package-lock.json
 !knowledge_graph/nakshatra_poc/nakshatra-runtime-preview.json
+!knowledge_graph/health_poc/competency-questions.json
+!knowledge_graph/health_poc/health-runtime-preview.json
 !astroroshni_mobile/src/locales/*.json
 !backend/whatsapp/flows/registration_flow.json
 !backend/longevity/classical_rule_registry.json

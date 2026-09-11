@@ -26,6 +26,7 @@ from chat.instant_chat_pipeline import (  # noqa: E402
     _normalize_instant_evidence,
     _build_instant_composer_context,
     _build_instant_composer_prompt_v3,
+    _build_period_topic_forecast,
     _normalize_event_category,
 )
 
@@ -1121,8 +1122,11 @@ def test_comparison_graph_reads_both_option_house_sets_from_fused_verdict() -> N
     assert result["verdict"]["ranked_windows"][0]["option"] == "job_change"
 
 
-def test_missing_health_body_area_is_hard_gated_after_generation() -> None:
-    packet = _packet("health", "event_prediction")
+def test_missing_health_body_area_preserves_general_timing_answer() -> None:
+    packet = _packet(
+        "health", "event_prediction",
+        time_scope={"requested": "this year", "as_of": "2026-09-11", "horizon_end": "2026-12-31"},
+    )
     packet["verdict"] = {
         "direction": "insufficient_evidence",
         "missing_required_capabilities": ["parashari.health_body_area"],
@@ -1130,13 +1134,101 @@ def test_missing_health_body_area_is_hard_gated_after_generation() -> None:
     result = apply_live_graph_policy(
         packet,
         intent={"category": "health"},
-        context={"intent_summary": {"category": "health", "answer_mode": "event_prediction"}},
+        context={
+            "intent_summary": {"category": "health", "answer_mode": "event_prediction"},
+            "normalized_evidence": {
+                "health_body_area": {
+                    "house_map": [{"house": value} for value in (1, 6, 8, 12)],
+                    "major_vulnerabilities": [],
+                    "medical_profile": {"protective_factors": ["calculated protective support"]},
+                    "planet_conditions": [{"planet": "Saturn"}],
+                },
+            },
+            "current_dashas": {"levels": {"MD": "Saturn"}},
+            "current_transits": {"planets": {"Saturn": {"house": 9}}},
+        },
     )
-    assert result["answer_spec"]["knowledge_graph_policy"]["claim_permission"] == "no_health_area_specificity"
+    policy = result["answer_spec"]["knowledge_graph_policy"]
+    assert policy["body_area_permission"] == "none"
+    assert policy.get("claim_permission") != "no_health_area_specificity"
     safe = enforce_live_graph_answer(
         "Your 8th house shows a recovery concern from September 2026.", result, language="english"
     )
-    assert "8th house" not in safe
-    assert "September 2026" not in safe
-    assert "Standard or Premium mode" in safe
-    assert not safe.endswith("?")
+    assert safe == "Your 8th house shows a recovery concern from September 2026."
+
+
+def test_health_remedy_is_evidence_bound_and_medically_bounded() -> None:
+    blueprint = RemedyEngine({"planets": {"Saturn": {"house": 2, "sign_name": "Leo"}}}).build_remedy_blueprint(
+        question="What are the remedies?",
+        category="health",
+        instant_parashari={"focus_houses": [1, 6, 8, 12]},
+        normalized_evidence={},
+        current_dashas_context={
+            "md": {"planet": "Saturn", "lordships": [7, 8]},
+            "pd": {"planet": "Saturn", "lordships": [7, 8]},
+        },
+    )
+    top = blueprint["top_recommendation"]
+    assert "major period" in top["astrological_reason"]
+    assert "focus house(s) 8" in top["astrological_reason"]
+    assert "medical treatment" in blueprint["caution"]
+    assert "test result" in blueprint["caution"]
+
+    packet = _packet("health", "remedy_action")
+    context = {
+        "intent_summary": {"category": "health", "answer_mode": "remedy_action"},
+        "normalized_evidence": {"remedy_blueprint": blueprint},
+    }
+    result = apply_live_graph_policy(packet, intent={"category": "health"}, context=context)
+    composer = _build_instant_composer_context(context, result)
+    prompt = _build_instant_composer_prompt_v3("What are the remedies?", composer, "english")
+    assert "optional spiritual or reflective support" in prompt
+    assert "metabolic/vascular pressure" in prompt
+    assert "do not extend it with an invented bodily mechanism" in prompt
+
+
+def test_health_forecast_without_body_zone_keeps_timing_and_drops_global_special_factors() -> None:
+    health_rules = {
+        "is_time_bound_question": True,
+        "allowed_zone_evidence": [],
+        "condition_susceptibilities": [],
+    }
+    forecast = _build_period_topic_forecast(
+        {
+            "window_dasha_segments": {
+                "segments": [{
+                    "start": "2026-09-11",
+                    "end": "2026-12-31",
+                    "mahadasha": "Saturn",
+                    "antardasha": "Rahu",
+                    "pratyantardasha": "Saturn",
+                    "activated_focus_houses": [1, 8],
+                    "natal_promise_status": "supported_by_active_dasha_carriers",
+                    "peak_activation_windows": [{"start": "2026-10-01", "end": "2026-10-15"}],
+                }],
+            },
+        },
+        "health",
+        {"as_of": "2026-09-11", "horizon_end": "2026-12-31", "requested": "this year"},
+        health_rules=health_rules,
+    )
+    assert forecast["chronological_phases"]
+    assert "complete general health-phase forecast" in forecast["health_narration_contract"]
+
+    packet = _packet(
+        "health", "event_prediction",
+        time_scope={"requested": "this year", "as_of": "2026-09-11", "horizon_end": "2026-12-31"},
+    )
+    packet["answer_spec"]["health_rules"] = health_rules
+    context = {
+        "intent_summary": {"category": "health", "answer_mode": "event_prediction"},
+        "birth_summary": {},
+        "normalized_evidence": {},
+    }
+    packet["user_derivation"] = {
+        "natal_promise": {
+            "d1_house_factors": [{"house": 8, "special_caution_notes": ["Mars is in Gandanta"]}],
+        },
+    }
+    composer = _build_instant_composer_context(context, packet)
+    assert "special_natal_factors" not in composer.get("evidence", {})

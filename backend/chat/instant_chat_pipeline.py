@@ -15187,11 +15187,20 @@ def _build_period_topic_forecast(
         ),
     }
     if is_health and health_rules:
+        has_specific_health_finding = bool(
+            health_rules.get("allowed_zone_evidence")
+            or health_rules.get("condition_susceptibilities")
+        )
+        specificity_rule = (
+            "State which supplied body regions or condition patterns could be more susceptible in each."
+            if has_specific_health_finding
+            else "No specific body region or condition was supplied; give the complete general health-phase forecast without inventing one or calling the whole reading unavailable."
+        )
         result["health_narration_contract"] = (
-            "Answer the paid question directly: identify the dated strongest and elevated watch periods, "
-            "state which supplied body regions or condition patterns could be more susceptible in each, "
-            "and explain the dasha trigger plus dated transit reinforcement. Cover quieter phases briefly. "
-            "Do not replace this with routine, consistency, vitality-management, or general wellness advice."
+            "Answer the paid question directly: identify the dated strongest and elevated watch periods and "
+            f"explain the dasha trigger plus dated transit reinforcement. {specificity_rule} "
+            "Cover quieter phases briefly. Do not replace this with routine, consistency, vitality-management, "
+            "or general wellness advice."
         )
     return result
 
@@ -17232,6 +17241,13 @@ def _build_instant_composer_context(
             instant_context.get("daily_prediction_spine") or normalized.get("daily_prediction_spine")
         ) if exact_day else None,
     }
+    if health_rules:
+        # Health has its own bounded calculator packet. Generic special-factor
+        # summaries are parallel evidence and previously caused the writer to
+        # transfer a planet's Gandanta condition onto the ascendant. Keep any
+        # relevant special condition only where the health calculator binds it
+        # to the exact carrier.
+        evidence.pop("special_natal_factors", None)
     if career_target and isinstance(career_foundation, dict):
         evidence["career_target_assessment"] = build_career_target_assessment(
             career_foundation.get("vocation_synthesis") or {},
@@ -19361,6 +19377,8 @@ EVIDENCE-SPECIFIC OUTPUT RULES:
 - Ordinary career advice such as work consistently, improve communication, seek training, avoid shortcuts, or plan carefully is not a remedy unless it is a concrete `house_expression` or `behavioral` action from the supplied blueprint and its chart connection is stated.
 - Gemstones must remain optional and suitability-dependent. Preserve `evidence.caution`; avoid fear, guarantees, expensive prescriptions, and excessive ritual.
 - Do not mention current dasha, sub-period, transit or activation. Do not give event dates or claim that a remedy guarantees an outcome.
+- For a health-related remedy, describe every practice as an optional spiritual or reflective support, never as medical treatment. Never claim that a mantra, donation, gemstone, ritual, diet, color, or seva prevents, cures, controls, transforms, or relieves a disease, symptom, organ, test result, metabolic/vascular pressure, pregnancy outcome, or other physical condition. Do not infer a medical effect from a planet's house or sign. Tell the user to continue appropriate clinical care.
+- The `astrological_reason` attached to each ranked remedy is the complete permitted reason. Preserve it faithfully; do not extend it with an invented bodily mechanism or outcome.
 """
     elif is_period_topic_forecast:
         period_forecast_rules = """
@@ -19397,12 +19415,13 @@ EVIDENCE-SPECIFIC OUTPUT RULES:
         constitutional_health_rules = """
 - This is a time-bound health forecast. Obey `health_rules.period_forecast_rule` as a hard contract.
 - Stay strictly inside `health_rules.requested_horizon`; "this year" must never extend into the following year.
-- Begin by naming the strongest dated health watch period and the possible calculated health problem/body region in plain language. Then compare every materially distinct supplied phase chronologically.
+- Begin with the overall outlook and strongest supported dated health watch period, then compare every materially distinct supplied phase chronologically. Name a possible body region only when it appears in `health_rules.allowed_zone_names`. If that list is empty, give the complete general forecast without body-area specificity; do not say the entire health forecast is unavailable.
 - Keep three layers separate: standing natal vulnerability, dated dasha activation, and dated transit confirmation. A natal vulnerability alone is not an active health forecast. Dasha support without transit confirmation is background vigilance, not likely manifestation.
-- Treat `period_topic_forecast.chronological_phases[*].health_forecast` as authoritative. For each `strongest_watch_period` or `elevated_watch_period`, state its exact dates, its allowed possible body regions or condition patterns, the activated health houses, and whether a dated transit confirms it. Briefly identify quieter phases as lower concern.
+- Treat `period_topic_forecast.chronological_phases[*].health_forecast` as authoritative. For each `strongest_watch_period` or `elevated_watch_period`, state its exact dates, the activated health theme/houses and whether a dated transit confirms it. Include possible body regions or condition patterns only when explicitly allowed by `health_rules`. Briefly identify quieter phases as lower concern.
 - A paying user is asking when health trouble is more plausible and what form it could take. Do not evade that question with "generally stable", "maintain a routine", "manage vitality", "be consistent", or other generic wellness language unless the calculated phase record truly contains no elevated period; even then, explicitly say which calculations were checked and that no convergence was found.
 - Name only body regions and condition susceptibilities allowed by `health_rules`. Never invent sleep, digestion, diet, posture, fitness, a symptom, or another body system.
 - Gandanta is only a natal modifier and must never be the principal reason that a dated health phase is active.
+- A special condition belongs only to the exact supplied carrier. Never turn a planet's Gandanta into "the Lagna/ascendant is in Gandanta," and never attach it to a different planet, sign, or house.
 - Never recommend or reject a medical treatment and never advise avoiding experimental or conventional treatment. Use restrained preventive language and qualified medical care where appropriate.
 - State protective factors when supplied. Never predict illness, diagnosis, recovery, hospitalization, surgery, or an acute event as certain.
 """

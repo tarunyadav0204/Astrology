@@ -11,7 +11,7 @@
 | `surgery_constitution` | Does my chart show surgical susceptibility? | `surgery` | `ModeSafetyAssessment` | 10 | 5 | PASS |
 | `accident_constitution` | Does my chart show accident susceptibility? | `accident` | `ModeSafetyAssessment` | 10 | 5 | PASS |
 | `recovery_constitution` | What recovery support does my chart show? | `recovery` | `ModeRecoverySupport` | 11 | 5 | PASS |
-| `health_timing` | How will my health be this year? | `health_timing` | `ModePeriodForecast` | 12 | 7 | PASS |
+| `health_timing` | How will my health be this year? | `health_timing` | `ModePeriodForecast` | 11 | 6 | PASS |
 | `mental_timing` | How will my mental wellbeing be this year? | `mental_wellbeing_timing` | `ModePeriodForecast` | 13 | 7 | PASS |
 | `surgery_timing` | Is this a sensitive period for surgery? | `surgery_timing` | `ModePeriodForecast` | 11 | 7 | PASS |
 | `accident_timing` | Are there periods requiring extra accident caution this year? | `accident_timing` | `ModePeriodForecast` | 11 | 7 | PASS |

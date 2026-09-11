@@ -22,6 +22,7 @@ RUNTIME_MIGRATIONS = (
     "add_pandit_verified_jobs.sql",
     "add_instant_billing_sessions.sql",
     "add_instant_billing_split_rates.sql",
+    "set_talk_to_tara_rate_five.sql",
     "add_chat_message_tier.sql",
     "add_chat_message_response_style.sql",
 )

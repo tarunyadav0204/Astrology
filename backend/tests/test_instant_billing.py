@@ -1,5 +1,6 @@
 from credits.instant_billing import (
     LOW_BALANCE_MINUTES,
+    _confirmed_interval_seconds,
     _payload,
     _settlement_billable_seconds,
 )
@@ -44,14 +45,25 @@ def test_low_balance_only_below_five_minutes_worth():
 def test_disconnected_session_does_not_bill_reconnect_grace():
     assert _settlement_billable_seconds(
         prior=58,
-        total=140,
+        confirmation_gap=140,
         disconnected=True,
     ) == 58
 
 
-def test_connected_session_uses_server_elapsed_time():
+def test_connected_session_accumulates_timely_confirmed_interval():
     assert _settlement_billable_seconds(
         prior=58,
-        total=68,
+        confirmation_gap=10,
         disconnected=False,
     ) == 68
+
+
+def test_delayed_connected_heartbeat_does_not_bill_suspended_gap():
+    assert _confirmed_interval_seconds(10) == 10
+    assert _confirmed_interval_seconds(20) == 20
+    assert _confirmed_interval_seconds(21) == 0
+    assert _settlement_billable_seconds(
+        prior=58,
+        confirmation_gap=446,
+        disconnected=False,
+    ) == 58

@@ -115,7 +115,7 @@ _DOMAINS: Dict[str, Dict[str, Any]] = {
             "kp.active_houses",
             "transit.health_triggers",
         ],
-        "required_for_timing": ["parashari.health_body_area"],
+        "required_for_timing": ["parashari.health_foundation"],
     },
     "mental_wellbeing": {
         "focus_houses": [1, 4, 5, 6, 8, 12],
@@ -132,7 +132,7 @@ _DOMAINS: Dict[str, Dict[str, Any]] = {
             "kp.active_houses",
             "transit.mental_wellbeing_triggers",
         ],
-        "required_for_timing": ["parashari.health_body_area"],
+        "required_for_timing": ["parashari.mental_wellbeing_foundation"],
     },
     "surgery": {
         "focus_houses": [1, 6, 8, 12],
@@ -153,7 +153,7 @@ _DOMAINS: Dict[str, Dict[str, Any]] = {
             "transit.surgery_triggers",
             "transit.double_transit",
         ],
-        "required_for_timing": ["parashari.dasha_windows", "parashari.health_body_area"],
+        "required_for_timing": ["parashari.dasha_windows"],
     },
     "accident": {
         "focus_houses": [1, 3, 6, 8, 12],
@@ -173,7 +173,7 @@ _DOMAINS: Dict[str, Dict[str, Any]] = {
             "transit.accident_triggers",
             "transit.double_transit",
         ],
-        "required_for_timing": ["parashari.dasha_windows", "parashari.health_body_area"],
+        "required_for_timing": ["parashari.dasha_windows"],
     },
     "recovery": {
         "focus_houses": [1, 5, 6, 8, 11, 12],
@@ -193,7 +193,7 @@ _DOMAINS: Dict[str, Dict[str, Any]] = {
             "transit.recovery_triggers",
             "parashari.karaka_support",
         ],
-        "required_for_timing": ["parashari.dasha_windows", "parashari.health_body_area"],
+        "required_for_timing": ["parashari.dasha_windows"],
     },
     "progeny": {
         "focus_houses": [2, 5, 11],
@@ -509,5 +509,11 @@ def get_methodology(category: str, answer_mode: str) -> Dict[str, Any]:
         result.setdefault("required_for_timing", []).append("comparison.option_specific_evidence")
     if key in {"health", "mental_wellbeing", "surgery", "accident", "recovery"}:
         result.setdefault("operations", []).append("parashari.health_body_area")
-        result.setdefault("required_for_timing", []).append("parashari.health_body_area")
+        # Body-area evidence is an optional specificity layer.  A general
+        # health-period reading can still be supported by the natal health
+        # foundation, dasha activation and transit confirmation.  Requiring
+        # this calculation here caused valid questions such as "health this
+        # year" to collapse into a generic unavailable-calculation response.
+        # The answer contract separately forbids naming an organ/body region
+        # when this optional evidence is absent.
     return result

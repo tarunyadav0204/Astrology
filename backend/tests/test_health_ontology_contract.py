@@ -17,6 +17,7 @@ from instant_chat_v2.health_graph_runtime import (  # noqa: E402
     health_graph_runtime_key,
     resolve_health_graph_inputs,
 )
+from instant_chat_v2.methodology import get_methodology  # noqa: E402
 
 
 def test_health_ontology_compiles_and_validates() -> None:
@@ -59,6 +60,42 @@ def test_static_health_excludes_timing_and_timed_health_requires_activation_chai
     assert {"health:DashaActivation", "health:TransitConfirmation"}.issubset(timed.required_factors)
     assert "health:NoActivationWithoutChain" in timed.guardrails
     assert "health:StrictRequestedHorizon" in timed.guardrails
+    assert "health:BodyZoneEvidence" not in timed.required_factors
+    assert "health:CapBodyZones" not in timed.required_capabilities
+
+
+def test_general_health_timing_does_not_require_optional_body_area_calculation() -> None:
+    methodology = get_methodology("health", "event_prediction")
+    assert "parashari.health_body_area" in methodology["operations"]
+    assert methodology["required_for_timing"] == ["parashari.dasha_windows"]
+
+
+def test_completed_empty_health_findings_are_not_reported_as_missing_calculations() -> None:
+    context = {
+        "intent_summary": {"category": "health"},
+        "normalized_evidence": {
+            "health_body_area": {
+                "house_map": [{"house": value} for value in (1, 6, 8, 12)],
+                "major_vulnerabilities": [],
+                "sixth_house_chain": {},
+                "medical_profile": {"protective_factors": []},
+                "planet_conditions": [],
+            },
+        },
+        "current_dashas": {"levels": {"MD": "Saturn"}},
+        "current_transits": {"planets": {"Saturn": {"house": 9}}},
+    }
+    result = compare_health_graph_policy(
+        category="health",
+        query_plan={"answer_mode": "event_prediction", "time_scope": {"requested": "this year"}},
+        observed_answer_mode="event_prediction",
+        context=context,
+    )
+    assert result is not None
+    assert "health:BodyZoneEvidence" in result["observed_factors"]
+    assert "health:ProtectiveFactors" in result["observed_factors"]
+    assert result["missing_required_factors"] == []
+    assert result["match"] is True
 
 
 def test_health_category_specific_safety_guardrails_are_compiled() -> None:

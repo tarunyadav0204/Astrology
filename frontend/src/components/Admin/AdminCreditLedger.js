@@ -53,6 +53,20 @@ function formatInrAmountCell(row) {
   return isLedgerCreditType(row?.type) ? `+${formatted}` : `-${formatted}`;
 }
 
+function speechRateLabel(row) {
+  if (row?.reference_id !== 'speech_chat_minutes') return '';
+  const metadataRate = Number(row?.metadata?.per_minute_cost);
+  if (Number.isFinite(metadataRate) && metadataRate > 0) {
+    return `${metadataRate} credits/started min`;
+  }
+  const minutesMatch = String(row?.description || '').match(/(\d+)\s+(?:started\s+)?minute\(s\)/i);
+  const minutes = Number(minutesMatch?.[1]);
+  const credits = Math.abs(Number(row?.amount) || 0);
+  if (!Number.isFinite(minutes) || minutes <= 0 || credits <= 0) return '';
+  const inferred = credits / minutes;
+  return Number.isInteger(inferred) ? `${inferred} credits/started min` : '';
+}
+
 function computeActionMenuPosition(triggerRect) {
   const pad = 8;
   const w = Math.min(ACTION_MENU_WIDTH, window.innerWidth - 2 * pad);
@@ -582,7 +596,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                       <th>Type</th>
                       <th>Feature</th>
                       <th>Credits</th>
-                      <th>Amount</th>
+                      <th title="Cash-value equivalent of the credits used; the captured feature rate is shown in the Feature column.">Credit value</th>
                       <th>Balance</th>
                     </tr>
                   </thead>
@@ -655,6 +669,9 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                         </td>
                         <td className="feature-cell">
                           {tx.description || getFeatureName(tx.source, tx.reference_id)}
+                          {speechRateLabel(tx) && !String(tx.description || '').includes('credits/min') ? (
+                            <small className="ledger-feature-rate"> · applied rate: {speechRateLabel(tx)}</small>
+                          ) : null}
                         </td>
                         <td className={`amount-cell ${tx.type}`}>{formatCreditsCell(tx)}</td>
                         <td className={`amount-cell inr-amount-cell ${tx.type}`}>{formatInrAmountCell(tx)}</td>

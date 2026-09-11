@@ -532,6 +532,11 @@ const SpeechChatPage = () => {
                                 await endSpeechBillingSession('credits_finished');
                                 setErrorText(copy('creditsFinished'));
                                 setStatus('idle');
+                            } else if (Number.isFinite(Number(heartbeat.elapsed_seconds))) {
+                                const confirmedElapsed = Math.max(0, Number(heartbeat.elapsed_seconds));
+                                billingStartMsRef.current = Date.now() - confirmedElapsed * 1000;
+                                lastBillingHeartbeatSecondRef.current = confirmedElapsed;
+                                setCallElapsedSeconds(confirmedElapsed);
                             }
                         }).catch(() => {}).finally(() => {
                             billingHeartbeatInFlightRef.current = false;

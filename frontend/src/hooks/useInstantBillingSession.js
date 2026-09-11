@@ -96,6 +96,22 @@ export default function useInstantBillingSession({ refreshBalance }) {
         }
     }, [acceptState, refreshBalance, serverState?.session_id]);
 
+    const endWithKeepalive = useCallback((reason = 'screen_unloaded') => {
+        const sessionId = localStorage.getItem(STORAGE_KEY);
+        if (!sessionId) return;
+        const token = localStorage.getItem('token') || '';
+        localStorage.removeItem(STORAGE_KEY);
+        fetch(`/api/credits/instant-session/${encodeURIComponent(sessionId)}/end`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ reason }),
+            keepalive: true,
+        }).catch(() => {});
+    }, []);
+
     useEffect(() => {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) heartbeat(stored);
@@ -107,14 +123,27 @@ export default function useInstantBillingSession({ refreshBalance }) {
         const intervalSeconds = Math.max(5, Number(serverState.heartbeat_interval_seconds || 10));
         const timer = setInterval(() => heartbeat(), intervalSeconds * 1000);
         const onVisibility = () => {
-            if (document.visibilityState === 'visible') heartbeat();
+            if (document.visibilityState === 'visible') {
+                heartbeat();
+            } else {
+                end('page_hidden').catch(() => {});
+            }
         };
         document.addEventListener('visibilitychange', onVisibility);
         return () => {
             clearInterval(timer);
             document.removeEventListener('visibilitychange', onVisibility);
         };
-    }, [heartbeat, serverState?.heartbeat_interval_seconds, serverState?.status]);
+    }, [end, heartbeat, serverState?.heartbeat_interval_seconds, serverState?.status]);
+
+    useEffect(() => {
+        const onPageHide = () => endWithKeepalive('page_unloaded');
+        window.addEventListener('pagehide', onPageHide);
+        return () => {
+            window.removeEventListener('pagehide', onPageHide);
+            endWithKeepalive('screen_unmount');
+        };
+    }, [endWithKeepalive]);
 
     useEffect(() => {
         if (!serverState) return undefined;

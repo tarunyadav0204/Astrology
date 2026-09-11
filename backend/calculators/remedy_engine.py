@@ -142,6 +142,10 @@ class RemedyEngine:
             active_planets = list(dict.fromkeys([*natal_planets, *active_planets]))[:4]
         chart_planets = (self.chart_data.get("planets") or {}) if isinstance(self.chart_data, dict) else {}
         candidate_planet_rows = [self._planet_summary(planet, chart_planets.get(planet) or {}) for planet in active_planets]
+        planet_reasons = {
+            planet: self._planet_selection_reason(planet, focus_houses, current_dashas_context)
+            for planet in active_planets
+        }
         special_points = self._special_point_summary()
 
         remedy_sections = {
@@ -184,6 +188,7 @@ class RemedyEngine:
             planets=active_planets,
             remedy_sections=remedy_sections,
             recurring_marital_conflict=recurring_marital_conflict,
+            planet_reasons=planet_reasons,
         )
 
         return {
@@ -199,7 +204,7 @@ class RemedyEngine:
             "recurring_marital_conflict": recurring_marital_conflict,
             "constructive_house_expression": self._house_expression_guidance(active_planets, focus_houses, current_dashas_context),
             "remedy_sections": remedy_sections,
-            "caution": self._caution_line(active_planets, special_points),
+            "caution": self._caution_line(active_planets, special_points, category=category),
             "follow_up_prompts": self._follow_up_prompts(category),
         }
 
@@ -246,6 +251,7 @@ class RemedyEngine:
         planets: List[str],
         remedy_sections: Dict[str, Any],
         recurring_marital_conflict: bool,
+        planet_reasons: Dict[str, str],
     ) -> List[Dict[str, Any]]:
         primary = str((planets or [""])[0] or "").strip()
         rows: List[Dict[str, Any]] = []
@@ -274,7 +280,7 @@ class RemedyEngine:
                     "planet": primary,
                     "action": str(mantra.get("text")),
                     "frequency": "108 repetitions daily for 40 days, or on the planet's weekday if daily practice is impractical.",
-                    "astrological_reason": f"This is the calculated sound remedy for the first-priority driver, {primary}.",
+                    "astrological_reason": planet_reasons.get(primary) or f"{primary} is the first calculated chart driver for this remedy request.",
                 })
         charity_rows = remedy_sections.get("charity") if isinstance(remedy_sections.get("charity"), list) else []
         if primary:
@@ -286,7 +292,7 @@ class RemedyEngine:
                     "planet": primary,
                     "action": str(charity.get("text")),
                     "frequency": "Once weekly for 6 weeks.",
-                    "astrological_reason": f"This is the calculated seva/charity expression for {primary}.",
+                    "astrological_reason": planet_reasons.get(primary) or f"{primary} is the first calculated chart driver for this remedy request.",
                 })
         if not rows:
             behavioral = remedy_sections.get("behavioral") if isinstance(remedy_sections.get("behavioral"), list) else []
@@ -300,6 +306,46 @@ class RemedyEngine:
                     "astrological_reason": f"Calculated behavioral expression for {category}." + (f" Primary driver: {primary}." if primary else ""),
                 })
         return rows[:3]
+
+    def _planet_selection_reason(
+        self,
+        planet: str,
+        focus_houses: List[int],
+        current_dashas_context: Dict[str, Any],
+    ) -> str:
+        """Return only the calculated facts that made a remedy planet relevant."""
+        level_names = {
+            "md": "major period",
+            "ad": "sub-period",
+            "pd": "sub-sub-period",
+            "sk": "Sookshma period",
+            "pr": "Prana period",
+        }
+        active_levels: List[str] = []
+        linked_houses: List[int] = []
+        focus_set = {int(h) for h in focus_houses if str(h).isdigit()}
+        for level in ("md", "ad", "pd", "sk", "pr"):
+            row = (current_dashas_context or {}).get(level) or {}
+            if str(row.get("planet") or "").strip() != planet:
+                continue
+            active_levels.append(level_names[level])
+            for house in row.get("lordships") or []:
+                if isinstance(house, int) and house in focus_set and house not in linked_houses:
+                    linked_houses.append(house)
+
+        natal_row = (self.chart_data.get("planets") or {}).get(planet) or {}
+        natal_house = natal_row.get("house")
+        if isinstance(natal_house, int) and natal_house in focus_set and natal_house not in linked_houses:
+            linked_houses.append(natal_house)
+
+        facts: List[str] = []
+        if active_levels:
+            facts.append(f"{planet} is active as the {' and '.join(active_levels)} lord")
+        if linked_houses:
+            facts.append(f"it is directly connected to the question's focus house(s) {', '.join(str(h) for h in linked_houses)}")
+        if not facts:
+            return f"{planet} is the first calculated chart driver for this remedy request."
+        return "; ".join(facts) + "."
 
     def _candidate_planets(self, current_dashas_context: Dict[str, Any], focus_houses: List[int]) -> List[str]:
         planets: List[str] = []
@@ -576,7 +622,12 @@ class RemedyEngine:
             return f"Remedy focus is tied to {category} and the active chart pressure."
         return f"Use the remedy mode to address the chart issue raised in: {question}"
 
-    def _caution_line(self, planets: List[str], special_points: Dict[str, Any]) -> str:
+    def _caution_line(self, planets: List[str], special_points: Dict[str, Any], *, category: str = "") -> str:
+        if str(category or "").strip().lower() == "health":
+            return (
+                "These are optional spiritual practices, not medical treatment and not a way to predict or change "
+                "a diagnosis, symptom, test result, or physical outcome; continue appropriate clinical care."
+            )
         if special_points.get("mrityu_bhaga"):
             return "Treat gemstone suggestions as optional and suitability-dependent; keep the emphasis on mantra, behavior, charity, and steady routine."
         if planets:

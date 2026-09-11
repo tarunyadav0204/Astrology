@@ -479,6 +479,17 @@ export default function SpeechChatScreen({ navigation, route }) {
               const heartbeatData = heartbeat?.data || {};
               if (heartbeatData.status && heartbeatData.status !== 'active') {
                 stopSpeechForCreditFinish();
+              } else if (Number.isFinite(Number(heartbeatData.elapsed_seconds))) {
+                const confirmedElapsed = Math.max(0, Number(heartbeatData.elapsed_seconds));
+                billingStartMsRef.current = Date.now() - confirmedElapsed * 1000;
+                lastBillingHeartbeatSecondRef.current = confirmedElapsed;
+                setCallElapsedSeconds(confirmedElapsed);
+                const confirmedMaxSeconds = Number(currentSession.max_seconds || 0);
+                setCallRemainingSeconds(
+                  confirmedMaxSeconds > 0
+                    ? Math.max(0, confirmedMaxSeconds - confirmedElapsed)
+                    : null
+                );
               }
             })
             .catch((error) => {

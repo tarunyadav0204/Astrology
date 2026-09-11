@@ -1,0 +1,4044 @@
+{
+  "generated_from": "astroroshni-health-poc.ttl",
+  "ontology_version": "0.1.0",
+  "purpose": "Compiled Health policy bundle for shadow-mode runtime evaluation",
+  "topics": {
+    "accident": {
+      "answer_contract": "health:ContractConstitutional",
+      "answer_mode": "health:ModeSafetyAssessment",
+      "calculator_bindings": {
+        "health:CapCategoryFilter": "instant_chat_v2.answer_spec: category-specific health rules",
+        "health:CapMedicalDivisionals": "DivisionalChartCalculator: D3, D6, D8 and D30",
+        "health:CapMedicalTriage": "instant_chat_pipeline._instant_medical_triage_decision",
+        "health:CapNatalFoundation": "instant_chat_pipeline: D1 health foundation and house lordships",
+        "health:CapPlanetCondition": "PlanetaryDignitiesCalculator and ShadbalaCalculator"
+      },
+      "competency_id": "accident_constitution",
+      "decision_rules": [
+        "health:RuleNatalFirst",
+        "health:RuleProtectionModifies"
+      ],
+      "decision_stages": [
+        "health:ConstitutionStage",
+        "health:AccidentPatternStage",
+        "health:ProtectionStage"
+      ],
+      "default_exclusions": [
+        "health:DashaActivation",
+        "health:TransitConfirmation"
+      ],
+      "evidence_policy": "health:EvidenceAccident",
+      "graph_tree": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "domain:Health",
+                            "label": "Overall health"
+                          },
+                          {
+                            "id": "domain:MentalWellbeing",
+                            "label": "Mental and emotional wellbeing"
+                          },
+                          {
+                            "id": "domain:Surgery",
+                            "label": "Surgery and procedures"
+                          },
+                          {
+                            "id": "domain:Accident",
+                            "label": "Accident and injury susceptibility"
+                          },
+                          {
+                            "id": "domain:Recovery",
+                            "label": "Recovery and rehabilitation"
+                          }
+                        ],
+                        "id": "ar:hasDomainTopic",
+                        "label": "Domain topics"
+                      }
+                    ],
+                    "id": "domain:HealthWellbeing",
+                    "label": "Health and wellbeing"
+                  }
+                ],
+                "id": "ar:inDomain",
+                "label": "Life domain"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:D1",
+                            "label": "D1 constitutional foundation"
+                          },
+                          {
+                            "id": "health:H1",
+                            "label": "Vitality, constitution and physical resilience"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ConstitutionStage",
+                    "label": "Constitution and vitality"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H3",
+                            "label": "Movement, courage and injury context"
+                          },
+                          {
+                            "id": "health:H6",
+                            "label": "Disease, imbalance, treatment and daily management"
+                          },
+                          {
+                            "id": "health:H8",
+                            "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                          },
+                          {
+                            "id": "health:D3",
+                            "label": "D3 injury and physical resilience confirmation"
+                          },
+                          {
+                            "id": "health:D30",
+                            "label": "D30 adversity and vulnerability refinement"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:AccidentPatternStage",
+                    "label": "Injury and accident susceptibility"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DignityStrength",
+                            "label": "Dignity, functional nature and Shadbala modifiers"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ProtectionStage",
+                    "label": "Protection and resilience modifiers"
+                  }
+                ],
+                "id": "ar:evaluatesStage",
+                "label": "Decision stages"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:D1",
+                    "label": "D1 constitutional foundation"
+                  },
+                  {
+                    "id": "health:D3",
+                    "label": "D3 injury and physical resilience confirmation"
+                  },
+                  {
+                    "id": "health:D30",
+                    "label": "D30 adversity and vulnerability refinement"
+                  },
+                  {
+                    "id": "health:H1",
+                    "label": "Vitality, constitution and physical resilience"
+                  },
+                  {
+                    "id": "health:H3",
+                    "label": "Movement, courage and injury context"
+                  },
+                  {
+                    "id": "health:H6",
+                    "label": "Disease, imbalance, treatment and daily management"
+                  },
+                  {
+                    "id": "health:H8",
+                    "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                  },
+                  {
+                    "id": "health:MedicalGrahas",
+                    "label": "Medical grahas with exact calculated relationships"
+                  },
+                  {
+                    "id": "health:DignityStrength",
+                    "label": "Dignity, functional nature and Shadbala modifiers"
+                  },
+                  {
+                    "id": "health:ProtectiveFactors",
+                    "label": "Calculated protective and recovery factors"
+                  }
+                ],
+                "id": "ar:requiresFactor",
+                "label": "Required astrology factors"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:CapNatalFoundation",
+                    "label": "Calculate natal health foundation"
+                  },
+                  {
+                    "id": "health:CapMedicalDivisionals",
+                    "label": "Calculate medical divisional confirmations"
+                  },
+                  {
+                    "id": "health:CapPlanetCondition",
+                    "label": "Calculate severity and protection modifiers"
+                  },
+                  {
+                    "id": "health:CapCategoryFilter",
+                    "label": "Apply health question category policy"
+                  },
+                  {
+                    "id": "health:CapMedicalTriage",
+                    "label": "Apply medical emergency triage"
+                  }
+                ],
+                "id": "ar:requiresCapability",
+                "label": "Required calculator capabilities"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:ModeSafetyAssessment",
+                    "label": "Restrained susceptibility assessment"
+                  }
+                ],
+                "id": "ar:allowedAnswerMode",
+                "label": "Answer mode"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:SectionDirectAnswer",
+                            "label": "Direct answer with medical framing"
+                          },
+                          {
+                            "id": "health:SectionNatalEvidence",
+                            "label": "Natal vulnerability evidence"
+                          },
+                          {
+                            "id": "health:SectionProtection",
+                            "label": "Protective and recovery factors"
+                          },
+                          {
+                            "id": "health:SectionGuidance",
+                            "label": "Responsible practical guidance"
+                          }
+                        ],
+                        "id": "ar:hasOutputSection",
+                        "label": "Output sections"
+                      }
+                    ],
+                    "id": "health:ContractConstitutional",
+                    "label": "Constitutional health answer"
+                  }
+                ],
+                "id": "ar:usesAnswerContract",
+                "label": "Answer contract"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EvidenceAccident",
+                    "label": "Evidence Accident"
+                  }
+                ],
+                "id": "ar:hasEvidencePolicy",
+                "label": "Evidence policy"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:RuleNatalFirst",
+                    "label": "Rule Natal First"
+                  },
+                  {
+                    "id": "health:RuleProtectionModifies",
+                    "label": "Rule Protection Modifies"
+                  }
+                ],
+                "id": "ar:evaluatesRule",
+                "label": "Decision rules"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EmergencyTriageFirst",
+                    "label": "Emergency Triage First"
+                  },
+                  {
+                    "id": "health:NoDiagnosis",
+                    "label": "No Diagnosis"
+                  },
+                  {
+                    "id": "health:NoAccidentPrediction",
+                    "label": "No Accident Prediction"
+                  },
+                  {
+                    "id": "health:NoTimingFromNatal",
+                    "label": "No Timing From Natal"
+                  },
+                  {
+                    "id": "health:NoTreatmentAdvice",
+                    "label": "No Treatment Advice"
+                  }
+                ],
+                "id": "ar:hasGuardrail",
+                "label": "Guardrails"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:DashaActivation",
+                    "label": "Explicit dasha activation of a natal health theme"
+                  },
+                  {
+                    "id": "health:TransitConfirmation",
+                    "label": "Dated transit confirmation of the same health theme"
+                  }
+                ],
+                "id": "ar:defaultExcludesFactor",
+                "label": "Excluded by default"
+              }
+            ],
+            "id": "health:AccidentSusceptibility",
+            "label": "Accident and injury susceptibility"
+          }
+        ],
+        "id": "ar:QuestionType",
+        "label": "Question type"
+      },
+      "guardrails": [
+        "health:EmergencyTriageFirst",
+        "health:NoDiagnosis",
+        "health:NoAccidentPrediction",
+        "health:NoTimingFromNatal",
+        "health:NoTreatmentAdvice"
+      ],
+      "ontology_resource": "health:AccidentSusceptibility",
+      "override_condition": null,
+      "question_example": "Does my chart show accident susceptibility?",
+      "question_label": "Accident and injury susceptibility",
+      "required_capabilities": [
+        "health:CapNatalFoundation",
+        "health:CapMedicalDivisionals",
+        "health:CapPlanetCondition",
+        "health:CapCategoryFilter",
+        "health:CapMedicalTriage"
+      ],
+      "required_factors": [
+        "health:D1",
+        "health:D3",
+        "health:D30",
+        "health:H1",
+        "health:H3",
+        "health:H6",
+        "health:H8",
+        "health:MedicalGrahas",
+        "health:DignityStrength",
+        "health:ProtectiveFactors"
+      ]
+    },
+    "accident_timing": {
+      "answer_contract": "health:ContractTimed",
+      "answer_mode": "health:ModePeriodForecast",
+      "calculator_bindings": {
+        "health:CapCategoryFilter": "instant_chat_v2.answer_spec: category-specific health rules",
+        "health:CapDashaActivation": "instant event horizon: health-theme dasha activation",
+        "health:CapMedicalDivisionals": "DivisionalChartCalculator: D3, D6, D8 and D30",
+        "health:CapMedicalTriage": "instant_chat_pipeline._instant_medical_triage_decision",
+        "health:CapNatalFoundation": "instant_chat_pipeline: D1 health foundation and house lordships",
+        "health:CapPlanetCondition": "PlanetaryDignitiesCalculator and ShadbalaCalculator",
+        "health:CapTransitConfirmation": "instant transit activation timeline with Instant aspect policy"
+      },
+      "competency_id": "accident_timing",
+      "decision_rules": [
+        "health:RuleNatalFirst",
+        "health:RuleTimedActivation",
+        "health:RuleProtectionModifies"
+      ],
+      "decision_stages": [
+        "health:ConstitutionStage",
+        "health:AccidentPatternStage",
+        "health:ProtectionStage",
+        "health:ActivationStage",
+        "health:TransitStage"
+      ],
+      "default_exclusions": [],
+      "evidence_policy": "health:EvidenceAccident",
+      "graph_tree": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "domain:Health",
+                            "label": "Overall health"
+                          },
+                          {
+                            "id": "domain:MentalWellbeing",
+                            "label": "Mental and emotional wellbeing"
+                          },
+                          {
+                            "id": "domain:Surgery",
+                            "label": "Surgery and procedures"
+                          },
+                          {
+                            "id": "domain:Accident",
+                            "label": "Accident and injury susceptibility"
+                          },
+                          {
+                            "id": "domain:Recovery",
+                            "label": "Recovery and rehabilitation"
+                          }
+                        ],
+                        "id": "ar:hasDomainTopic",
+                        "label": "Domain topics"
+                      }
+                    ],
+                    "id": "domain:HealthWellbeing",
+                    "label": "Health and wellbeing"
+                  }
+                ],
+                "id": "ar:inDomain",
+                "label": "Life domain"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:D1",
+                            "label": "D1 constitutional foundation"
+                          },
+                          {
+                            "id": "health:H1",
+                            "label": "Vitality, constitution and physical resilience"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ConstitutionStage",
+                    "label": "Constitution and vitality"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H3",
+                            "label": "Movement, courage and injury context"
+                          },
+                          {
+                            "id": "health:H6",
+                            "label": "Disease, imbalance, treatment and daily management"
+                          },
+                          {
+                            "id": "health:H8",
+                            "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                          },
+                          {
+                            "id": "health:D3",
+                            "label": "D3 injury and physical resilience confirmation"
+                          },
+                          {
+                            "id": "health:D30",
+                            "label": "D30 adversity and vulnerability refinement"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:AccidentPatternStage",
+                    "label": "Injury and accident susceptibility"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DignityStrength",
+                            "label": "Dignity, functional nature and Shadbala modifiers"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ProtectionStage",
+                    "label": "Protection and resilience modifiers"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DashaActivation",
+                            "label": "Explicit dasha activation of a natal health theme"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ActivationStage",
+                    "label": "Dasha activation of the natal theme"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:TransitConfirmation",
+                            "label": "Dated transit confirmation of the same health theme"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:TransitStage",
+                    "label": "Dated transit confirmation"
+                  }
+                ],
+                "id": "ar:evaluatesStage",
+                "label": "Decision stages"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:D1",
+                    "label": "D1 constitutional foundation"
+                  },
+                  {
+                    "id": "health:D3",
+                    "label": "D3 injury and physical resilience confirmation"
+                  },
+                  {
+                    "id": "health:D30",
+                    "label": "D30 adversity and vulnerability refinement"
+                  },
+                  {
+                    "id": "health:H1",
+                    "label": "Vitality, constitution and physical resilience"
+                  },
+                  {
+                    "id": "health:H3",
+                    "label": "Movement, courage and injury context"
+                  },
+                  {
+                    "id": "health:H6",
+                    "label": "Disease, imbalance, treatment and daily management"
+                  },
+                  {
+                    "id": "health:H8",
+                    "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                  },
+                  {
+                    "id": "health:MedicalGrahas",
+                    "label": "Medical grahas with exact calculated relationships"
+                  },
+                  {
+                    "id": "health:ProtectiveFactors",
+                    "label": "Calculated protective and recovery factors"
+                  },
+                  {
+                    "id": "health:DashaActivation",
+                    "label": "Explicit dasha activation of a natal health theme"
+                  },
+                  {
+                    "id": "health:TransitConfirmation",
+                    "label": "Dated transit confirmation of the same health theme"
+                  }
+                ],
+                "id": "ar:requiresFactor",
+                "label": "Required astrology factors"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:CapNatalFoundation",
+                    "label": "Calculate natal health foundation"
+                  },
+                  {
+                    "id": "health:CapMedicalDivisionals",
+                    "label": "Calculate medical divisional confirmations"
+                  },
+                  {
+                    "id": "health:CapPlanetCondition",
+                    "label": "Calculate severity and protection modifiers"
+                  },
+                  {
+                    "id": "health:CapCategoryFilter",
+                    "label": "Apply health question category policy"
+                  },
+                  {
+                    "id": "health:CapDashaActivation",
+                    "label": "Calculate health dasha activation"
+                  },
+                  {
+                    "id": "health:CapTransitConfirmation",
+                    "label": "Calculate dated transit confirmation"
+                  },
+                  {
+                    "id": "health:CapMedicalTriage",
+                    "label": "Apply medical emergency triage"
+                  }
+                ],
+                "id": "ar:requiresCapability",
+                "label": "Required calculator capabilities"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:ModePeriodForecast",
+                    "label": "Time-bound health forecast"
+                  }
+                ],
+                "id": "ar:allowedAnswerMode",
+                "label": "Answer mode"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:SectionDirectAnswer",
+                            "label": "Direct answer with medical framing"
+                          },
+                          {
+                            "id": "health:SectionNatalEvidence",
+                            "label": "Natal vulnerability evidence"
+                          },
+                          {
+                            "id": "health:SectionActivation",
+                            "label": "Dated activation chain"
+                          },
+                          {
+                            "id": "health:SectionProtection",
+                            "label": "Protective and recovery factors"
+                          },
+                          {
+                            "id": "health:SectionGuidance",
+                            "label": "Responsible practical guidance"
+                          }
+                        ],
+                        "id": "ar:hasOutputSection",
+                        "label": "Output sections"
+                      }
+                    ],
+                    "id": "health:ContractTimed",
+                    "label": "Time-bound health answer"
+                  }
+                ],
+                "id": "ar:usesAnswerContract",
+                "label": "Answer contract"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EvidenceAccident",
+                    "label": "Evidence Accident"
+                  }
+                ],
+                "id": "ar:hasEvidencePolicy",
+                "label": "Evidence policy"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:RuleNatalFirst",
+                    "label": "Rule Natal First"
+                  },
+                  {
+                    "id": "health:RuleTimedActivation",
+                    "label": "Rule Timed Activation"
+                  },
+                  {
+                    "id": "health:RuleProtectionModifies",
+                    "label": "Rule Protection Modifies"
+                  }
+                ],
+                "id": "ar:evaluatesRule",
+                "label": "Decision rules"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EmergencyTriageFirst",
+                    "label": "Emergency Triage First"
+                  },
+                  {
+                    "id": "health:NoDiagnosis",
+                    "label": "No Diagnosis"
+                  },
+                  {
+                    "id": "health:NoAccidentPrediction",
+                    "label": "No Accident Prediction"
+                  },
+                  {
+                    "id": "health:NoActivationWithoutChain",
+                    "label": "No Activation Without Chain"
+                  },
+                  {
+                    "id": "health:StrictRequestedHorizon",
+                    "label": "Strict Requested Horizon"
+                  },
+                  {
+                    "id": "health:NoTreatmentAdvice",
+                    "label": "No Treatment Advice"
+                  }
+                ],
+                "id": "ar:hasGuardrail",
+                "label": "Guardrails"
+              }
+            ],
+            "id": "health:AccidentTiming",
+            "label": "Accident and injury caution period"
+          }
+        ],
+        "id": "ar:QuestionType",
+        "label": "Question type"
+      },
+      "guardrails": [
+        "health:EmergencyTriageFirst",
+        "health:NoDiagnosis",
+        "health:NoAccidentPrediction",
+        "health:NoActivationWithoutChain",
+        "health:StrictRequestedHorizon",
+        "health:NoTreatmentAdvice"
+      ],
+      "ontology_resource": "health:AccidentTiming",
+      "override_condition": null,
+      "question_example": "Are there periods requiring extra accident caution this year?",
+      "question_label": "Accident and injury caution period",
+      "required_capabilities": [
+        "health:CapNatalFoundation",
+        "health:CapMedicalDivisionals",
+        "health:CapPlanetCondition",
+        "health:CapCategoryFilter",
+        "health:CapDashaActivation",
+        "health:CapTransitConfirmation",
+        "health:CapMedicalTriage"
+      ],
+      "required_factors": [
+        "health:D1",
+        "health:D3",
+        "health:D30",
+        "health:H1",
+        "health:H3",
+        "health:H6",
+        "health:H8",
+        "health:MedicalGrahas",
+        "health:ProtectiveFactors",
+        "health:DashaActivation",
+        "health:TransitConfirmation"
+      ]
+    },
+    "health": {
+      "answer_contract": "health:ContractConstitutional",
+      "answer_mode": "health:ModeConstitutional",
+      "calculator_bindings": {
+        "health:CapBodyZones": "reports.context.health_body_zones.build_priority_body_zones",
+        "health:CapMedicalDivisionals": "DivisionalChartCalculator: D3, D6, D8 and D30",
+        "health:CapMedicalTriage": "instant_chat_pipeline._instant_medical_triage_decision",
+        "health:CapNatalFoundation": "instant_chat_pipeline: D1 health foundation and house lordships",
+        "health:CapPlanetCondition": "PlanetaryDignitiesCalculator and ShadbalaCalculator",
+        "health:CapSixthLordChain": "health_body_zones: sixth house, lord, placement and nakshatra"
+      },
+      "competency_id": "health_constitution",
+      "decision_rules": [
+        "health:RuleNatalFirst",
+        "health:RuleProtectionModifies"
+      ],
+      "decision_stages": [
+        "health:ConstitutionStage",
+        "health:DiseasePatternStage",
+        "health:BodyZoneStage",
+        "health:ChronicityStage",
+        "health:ProtectionStage"
+      ],
+      "default_exclusions": [
+        "health:DashaActivation",
+        "health:TransitConfirmation"
+      ],
+      "evidence_policy": "health:EvidenceConstitutional",
+      "graph_tree": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "domain:Health",
+                            "label": "Overall health"
+                          },
+                          {
+                            "id": "domain:MentalWellbeing",
+                            "label": "Mental and emotional wellbeing"
+                          },
+                          {
+                            "id": "domain:Surgery",
+                            "label": "Surgery and procedures"
+                          },
+                          {
+                            "id": "domain:Accident",
+                            "label": "Accident and injury susceptibility"
+                          },
+                          {
+                            "id": "domain:Recovery",
+                            "label": "Recovery and rehabilitation"
+                          }
+                        ],
+                        "id": "ar:hasDomainTopic",
+                        "label": "Domain topics"
+                      }
+                    ],
+                    "id": "domain:HealthWellbeing",
+                    "label": "Health and wellbeing"
+                  }
+                ],
+                "id": "ar:inDomain",
+                "label": "Life domain"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:D1",
+                            "label": "D1 constitutional foundation"
+                          },
+                          {
+                            "id": "health:H1",
+                            "label": "Vitality, constitution and physical resilience"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ConstitutionStage",
+                    "label": "Constitution and vitality"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H6",
+                            "label": "Disease, imbalance, treatment and daily management"
+                          },
+                          {
+                            "id": "health:SixthLordChain",
+                            "label": "Sixth-house sign, lord, placement and nakshatra chain"
+                          },
+                          {
+                            "id": "health:D6",
+                            "label": "D6 disease-pattern confirmation"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:DiseasePatternStage",
+                    "label": "Disease and imbalance pattern"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:BodyZoneEvidence",
+                            "label": "Calculated body-zone susceptibility evidence"
+                          },
+                          {
+                            "id": "health:D30",
+                            "label": "D30 adversity and vulnerability refinement"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:BodyZoneStage",
+                    "label": "Calculated body-system focus"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H8",
+                            "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                          },
+                          {
+                            "id": "health:H12",
+                            "label": "Rest, hospitalization, drain and convalescence"
+                          },
+                          {
+                            "id": "health:D8",
+                            "label": "D8 chronicity, crisis and procedural confirmation"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ChronicityStage",
+                    "label": "Chronicity and hidden pressure"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DignityStrength",
+                            "label": "Dignity, functional nature and Shadbala modifiers"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ProtectionStage",
+                    "label": "Protection and resilience modifiers"
+                  }
+                ],
+                "id": "ar:evaluatesStage",
+                "label": "Decision stages"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:D1",
+                    "label": "D1 constitutional foundation"
+                  },
+                  {
+                    "id": "health:D6",
+                    "label": "D6 disease-pattern confirmation"
+                  },
+                  {
+                    "id": "health:D8",
+                    "label": "D8 chronicity, crisis and procedural confirmation"
+                  },
+                  {
+                    "id": "health:D30",
+                    "label": "D30 adversity and vulnerability refinement"
+                  },
+                  {
+                    "id": "health:H1",
+                    "label": "Vitality, constitution and physical resilience"
+                  },
+                  {
+                    "id": "health:H6",
+                    "label": "Disease, imbalance, treatment and daily management"
+                  },
+                  {
+                    "id": "health:H8",
+                    "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                  },
+                  {
+                    "id": "health:H12",
+                    "label": "Rest, hospitalization, drain and convalescence"
+                  },
+                  {
+                    "id": "health:MedicalGrahas",
+                    "label": "Medical grahas with exact calculated relationships"
+                  },
+                  {
+                    "id": "health:SixthLordChain",
+                    "label": "Sixth-house sign, lord, placement and nakshatra chain"
+                  },
+                  {
+                    "id": "health:DignityStrength",
+                    "label": "Dignity, functional nature and Shadbala modifiers"
+                  },
+                  {
+                    "id": "health:BodyZoneEvidence",
+                    "label": "Calculated body-zone susceptibility evidence"
+                  },
+                  {
+                    "id": "health:ProtectiveFactors",
+                    "label": "Calculated protective and recovery factors"
+                  }
+                ],
+                "id": "ar:requiresFactor",
+                "label": "Required astrology factors"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:CapNatalFoundation",
+                    "label": "Calculate natal health foundation"
+                  },
+                  {
+                    "id": "health:CapMedicalDivisionals",
+                    "label": "Calculate medical divisional confirmations"
+                  },
+                  {
+                    "id": "health:CapSixthLordChain",
+                    "label": "Calculate sixth-lord anatomy chain"
+                  },
+                  {
+                    "id": "health:CapBodyZones",
+                    "label": "Calculate ranked susceptibility zones"
+                  },
+                  {
+                    "id": "health:CapPlanetCondition",
+                    "label": "Calculate severity and protection modifiers"
+                  },
+                  {
+                    "id": "health:CapMedicalTriage",
+                    "label": "Apply medical emergency triage"
+                  }
+                ],
+                "id": "ar:requiresCapability",
+                "label": "Required calculator capabilities"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:ModeConstitutional",
+                    "label": "Constitutional susceptibility reading"
+                  }
+                ],
+                "id": "ar:allowedAnswerMode",
+                "label": "Answer mode"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:SectionDirectAnswer",
+                            "label": "Direct answer with medical framing"
+                          },
+                          {
+                            "id": "health:SectionNatalEvidence",
+                            "label": "Natal vulnerability evidence"
+                          },
+                          {
+                            "id": "health:SectionProtection",
+                            "label": "Protective and recovery factors"
+                          },
+                          {
+                            "id": "health:SectionGuidance",
+                            "label": "Responsible practical guidance"
+                          }
+                        ],
+                        "id": "ar:hasOutputSection",
+                        "label": "Output sections"
+                      }
+                    ],
+                    "id": "health:ContractConstitutional",
+                    "label": "Constitutional health answer"
+                  }
+                ],
+                "id": "ar:usesAnswerContract",
+                "label": "Answer contract"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EvidenceConstitutional",
+                    "label": "Evidence Constitutional"
+                  }
+                ],
+                "id": "ar:hasEvidencePolicy",
+                "label": "Evidence policy"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:RuleNatalFirst",
+                    "label": "Rule Natal First"
+                  },
+                  {
+                    "id": "health:RuleProtectionModifies",
+                    "label": "Rule Protection Modifies"
+                  }
+                ],
+                "id": "ar:evaluatesRule",
+                "label": "Decision rules"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EmergencyTriageFirst",
+                    "label": "Emergency Triage First"
+                  },
+                  {
+                    "id": "health:NoDiagnosis",
+                    "label": "No Diagnosis"
+                  },
+                  {
+                    "id": "health:NoBodyPartWithoutEvidence",
+                    "label": "No Body Part Without Evidence"
+                  },
+                  {
+                    "id": "health:NoTimingFromNatal",
+                    "label": "No Timing From Natal"
+                  },
+                  {
+                    "id": "health:NoTreatmentAdvice",
+                    "label": "No Treatment Advice"
+                  }
+                ],
+                "id": "ar:hasGuardrail",
+                "label": "Guardrails"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:DashaActivation",
+                    "label": "Explicit dasha activation of a natal health theme"
+                  },
+                  {
+                    "id": "health:TransitConfirmation",
+                    "label": "Dated transit confirmation of the same health theme"
+                  }
+                ],
+                "id": "ar:defaultExcludesFactor",
+                "label": "Excluded by default"
+              }
+            ],
+            "id": "health:OverallHealth",
+            "label": "Overall health constitution"
+          }
+        ],
+        "id": "ar:QuestionType",
+        "label": "Question type"
+      },
+      "guardrails": [
+        "health:EmergencyTriageFirst",
+        "health:NoDiagnosis",
+        "health:NoBodyPartWithoutEvidence",
+        "health:NoTimingFromNatal",
+        "health:NoTreatmentAdvice"
+      ],
+      "ontology_resource": "health:OverallHealth",
+      "override_condition": null,
+      "question_example": "What health vulnerabilities does my chart show?",
+      "question_label": "Overall health constitution",
+      "required_capabilities": [
+        "health:CapNatalFoundation",
+        "health:CapMedicalDivisionals",
+        "health:CapSixthLordChain",
+        "health:CapBodyZones",
+        "health:CapPlanetCondition",
+        "health:CapMedicalTriage"
+      ],
+      "required_factors": [
+        "health:D1",
+        "health:D6",
+        "health:D8",
+        "health:D30",
+        "health:H1",
+        "health:H6",
+        "health:H8",
+        "health:H12",
+        "health:MedicalGrahas",
+        "health:SixthLordChain",
+        "health:DignityStrength",
+        "health:BodyZoneEvidence",
+        "health:ProtectiveFactors"
+      ]
+    },
+    "health_timing": {
+      "answer_contract": "health:ContractTimed",
+      "answer_mode": "health:ModePeriodForecast",
+      "calculator_bindings": {
+        "health:CapDashaActivation": "instant event horizon: health-theme dasha activation",
+        "health:CapMedicalDivisionals": "DivisionalChartCalculator: D3, D6, D8 and D30",
+        "health:CapMedicalTriage": "instant_chat_pipeline._instant_medical_triage_decision",
+        "health:CapNatalFoundation": "instant_chat_pipeline: D1 health foundation and house lordships",
+        "health:CapPlanetCondition": "PlanetaryDignitiesCalculator and ShadbalaCalculator",
+        "health:CapTransitConfirmation": "instant transit activation timeline with Instant aspect policy"
+      },
+      "competency_id": "health_timing",
+      "decision_rules": [
+        "health:RuleNatalFirst",
+        "health:RuleTimedActivation",
+        "health:RuleProtectionModifies"
+      ],
+      "decision_stages": [
+        "health:ConstitutionStage",
+        "health:DiseasePatternStage",
+        "health:ProtectionStage",
+        "health:ActivationStage",
+        "health:TransitStage"
+      ],
+      "default_exclusions": [],
+      "evidence_policy": "health:EvidenceTimed",
+      "graph_tree": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "domain:Health",
+                            "label": "Overall health"
+                          },
+                          {
+                            "id": "domain:MentalWellbeing",
+                            "label": "Mental and emotional wellbeing"
+                          },
+                          {
+                            "id": "domain:Surgery",
+                            "label": "Surgery and procedures"
+                          },
+                          {
+                            "id": "domain:Accident",
+                            "label": "Accident and injury susceptibility"
+                          },
+                          {
+                            "id": "domain:Recovery",
+                            "label": "Recovery and rehabilitation"
+                          }
+                        ],
+                        "id": "ar:hasDomainTopic",
+                        "label": "Domain topics"
+                      }
+                    ],
+                    "id": "domain:HealthWellbeing",
+                    "label": "Health and wellbeing"
+                  }
+                ],
+                "id": "ar:inDomain",
+                "label": "Life domain"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:D1",
+                            "label": "D1 constitutional foundation"
+                          },
+                          {
+                            "id": "health:H1",
+                            "label": "Vitality, constitution and physical resilience"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ConstitutionStage",
+                    "label": "Constitution and vitality"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H6",
+                            "label": "Disease, imbalance, treatment and daily management"
+                          },
+                          {
+                            "id": "health:SixthLordChain",
+                            "label": "Sixth-house sign, lord, placement and nakshatra chain"
+                          },
+                          {
+                            "id": "health:D6",
+                            "label": "D6 disease-pattern confirmation"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:DiseasePatternStage",
+                    "label": "Disease and imbalance pattern"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DignityStrength",
+                            "label": "Dignity, functional nature and Shadbala modifiers"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ProtectionStage",
+                    "label": "Protection and resilience modifiers"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DashaActivation",
+                            "label": "Explicit dasha activation of a natal health theme"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ActivationStage",
+                    "label": "Dasha activation of the natal theme"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:TransitConfirmation",
+                            "label": "Dated transit confirmation of the same health theme"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:TransitStage",
+                    "label": "Dated transit confirmation"
+                  }
+                ],
+                "id": "ar:evaluatesStage",
+                "label": "Decision stages"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:D1",
+                    "label": "D1 constitutional foundation"
+                  },
+                  {
+                    "id": "health:D6",
+                    "label": "D6 disease-pattern confirmation"
+                  },
+                  {
+                    "id": "health:D8",
+                    "label": "D8 chronicity, crisis and procedural confirmation"
+                  },
+                  {
+                    "id": "health:D30",
+                    "label": "D30 adversity and vulnerability refinement"
+                  },
+                  {
+                    "id": "health:H1",
+                    "label": "Vitality, constitution and physical resilience"
+                  },
+                  {
+                    "id": "health:H6",
+                    "label": "Disease, imbalance, treatment and daily management"
+                  },
+                  {
+                    "id": "health:H8",
+                    "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                  },
+                  {
+                    "id": "health:H12",
+                    "label": "Rest, hospitalization, drain and convalescence"
+                  },
+                  {
+                    "id": "health:ProtectiveFactors",
+                    "label": "Calculated protective and recovery factors"
+                  },
+                  {
+                    "id": "health:DashaActivation",
+                    "label": "Explicit dasha activation of a natal health theme"
+                  },
+                  {
+                    "id": "health:TransitConfirmation",
+                    "label": "Dated transit confirmation of the same health theme"
+                  }
+                ],
+                "id": "ar:requiresFactor",
+                "label": "Required astrology factors"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:CapNatalFoundation",
+                    "label": "Calculate natal health foundation"
+                  },
+                  {
+                    "id": "health:CapMedicalDivisionals",
+                    "label": "Calculate medical divisional confirmations"
+                  },
+                  {
+                    "id": "health:CapPlanetCondition",
+                    "label": "Calculate severity and protection modifiers"
+                  },
+                  {
+                    "id": "health:CapDashaActivation",
+                    "label": "Calculate health dasha activation"
+                  },
+                  {
+                    "id": "health:CapTransitConfirmation",
+                    "label": "Calculate dated transit confirmation"
+                  },
+                  {
+                    "id": "health:CapMedicalTriage",
+                    "label": "Apply medical emergency triage"
+                  }
+                ],
+                "id": "ar:requiresCapability",
+                "label": "Required calculator capabilities"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:ModePeriodForecast",
+                    "label": "Time-bound health forecast"
+                  }
+                ],
+                "id": "ar:allowedAnswerMode",
+                "label": "Answer mode"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:SectionDirectAnswer",
+                            "label": "Direct answer with medical framing"
+                          },
+                          {
+                            "id": "health:SectionNatalEvidence",
+                            "label": "Natal vulnerability evidence"
+                          },
+                          {
+                            "id": "health:SectionActivation",
+                            "label": "Dated activation chain"
+                          },
+                          {
+                            "id": "health:SectionProtection",
+                            "label": "Protective and recovery factors"
+                          },
+                          {
+                            "id": "health:SectionGuidance",
+                            "label": "Responsible practical guidance"
+                          }
+                        ],
+                        "id": "ar:hasOutputSection",
+                        "label": "Output sections"
+                      }
+                    ],
+                    "id": "health:ContractTimed",
+                    "label": "Time-bound health answer"
+                  }
+                ],
+                "id": "ar:usesAnswerContract",
+                "label": "Answer contract"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EvidenceTimed",
+                    "label": "Evidence Timed"
+                  }
+                ],
+                "id": "ar:hasEvidencePolicy",
+                "label": "Evidence policy"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:RuleNatalFirst",
+                    "label": "Rule Natal First"
+                  },
+                  {
+                    "id": "health:RuleTimedActivation",
+                    "label": "Rule Timed Activation"
+                  },
+                  {
+                    "id": "health:RuleProtectionModifies",
+                    "label": "Rule Protection Modifies"
+                  }
+                ],
+                "id": "ar:evaluatesRule",
+                "label": "Decision rules"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EmergencyTriageFirst",
+                    "label": "Emergency Triage First"
+                  },
+                  {
+                    "id": "health:NoDiagnosis",
+                    "label": "No Diagnosis"
+                  },
+                  {
+                    "id": "health:NoBodyPartWithoutEvidence",
+                    "label": "No Body Part Without Evidence"
+                  },
+                  {
+                    "id": "health:NoActivationWithoutChain",
+                    "label": "No Activation Without Chain"
+                  },
+                  {
+                    "id": "health:StrictRequestedHorizon",
+                    "label": "Strict Requested Horizon"
+                  },
+                  {
+                    "id": "health:NoTreatmentAdvice",
+                    "label": "No Treatment Advice"
+                  }
+                ],
+                "id": "ar:hasGuardrail",
+                "label": "Guardrails"
+              }
+            ],
+            "id": "health:OverallHealthTiming",
+            "label": "Health outlook for a requested period"
+          }
+        ],
+        "id": "ar:QuestionType",
+        "label": "Question type"
+      },
+      "guardrails": [
+        "health:EmergencyTriageFirst",
+        "health:NoDiagnosis",
+        "health:NoBodyPartWithoutEvidence",
+        "health:NoActivationWithoutChain",
+        "health:StrictRequestedHorizon",
+        "health:NoTreatmentAdvice"
+      ],
+      "ontology_resource": "health:OverallHealthTiming",
+      "override_condition": null,
+      "question_example": "How will my health be this year?",
+      "question_label": "Health outlook for a requested period",
+      "required_capabilities": [
+        "health:CapNatalFoundation",
+        "health:CapMedicalDivisionals",
+        "health:CapPlanetCondition",
+        "health:CapDashaActivation",
+        "health:CapTransitConfirmation",
+        "health:CapMedicalTriage"
+      ],
+      "required_factors": [
+        "health:D1",
+        "health:D6",
+        "health:D8",
+        "health:D30",
+        "health:H1",
+        "health:H6",
+        "health:H8",
+        "health:H12",
+        "health:ProtectiveFactors",
+        "health:DashaActivation",
+        "health:TransitConfirmation"
+      ]
+    },
+    "mental_wellbeing": {
+      "answer_contract": "health:ContractConstitutional",
+      "answer_mode": "health:ModeMentalWellbeing",
+      "calculator_bindings": {
+        "health:CapCategoryFilter": "instant_chat_v2.answer_spec: category-specific health rules",
+        "health:CapMedicalDivisionals": "DivisionalChartCalculator: D3, D6, D8 and D30",
+        "health:CapMedicalTriage": "instant_chat_pipeline._instant_medical_triage_decision",
+        "health:CapNatalFoundation": "instant_chat_pipeline: D1 health foundation and house lordships",
+        "health:CapPlanetCondition": "PlanetaryDignitiesCalculator and ShadbalaCalculator"
+      },
+      "competency_id": "mental_constitution",
+      "decision_rules": [
+        "health:RuleNatalFirst",
+        "health:RuleProtectionModifies"
+      ],
+      "decision_stages": [
+        "health:ConstitutionStage",
+        "health:MentalFoundationStage",
+        "health:MentalPressureStage",
+        "health:ProtectionStage"
+      ],
+      "default_exclusions": [
+        "health:DashaActivation",
+        "health:TransitConfirmation"
+      ],
+      "evidence_policy": "health:EvidenceMental",
+      "graph_tree": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "domain:Health",
+                            "label": "Overall health"
+                          },
+                          {
+                            "id": "domain:MentalWellbeing",
+                            "label": "Mental and emotional wellbeing"
+                          },
+                          {
+                            "id": "domain:Surgery",
+                            "label": "Surgery and procedures"
+                          },
+                          {
+                            "id": "domain:Accident",
+                            "label": "Accident and injury susceptibility"
+                          },
+                          {
+                            "id": "domain:Recovery",
+                            "label": "Recovery and rehabilitation"
+                          }
+                        ],
+                        "id": "ar:hasDomainTopic",
+                        "label": "Domain topics"
+                      }
+                    ],
+                    "id": "domain:HealthWellbeing",
+                    "label": "Health and wellbeing"
+                  }
+                ],
+                "id": "ar:inDomain",
+                "label": "Life domain"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:D1",
+                            "label": "D1 constitutional foundation"
+                          },
+                          {
+                            "id": "health:H1",
+                            "label": "Vitality, constitution and physical resilience"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ConstitutionStage",
+                    "label": "Constitution and vitality"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H4",
+                            "label": "Emotional base and mental comfort"
+                          },
+                          {
+                            "id": "health:MoonMind",
+                            "label": "Moon and mental-emotional regulation"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:MentalFoundationStage",
+                    "label": "Mental and emotional regulation"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H6",
+                            "label": "Disease, imbalance, treatment and daily management"
+                          },
+                          {
+                            "id": "health:H8",
+                            "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                          },
+                          {
+                            "id": "health:H12",
+                            "label": "Rest, hospitalization, drain and convalescence"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:MentalPressureStage",
+                    "label": "Stress, recurrence and rest pressure"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DignityStrength",
+                            "label": "Dignity, functional nature and Shadbala modifiers"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ProtectionStage",
+                    "label": "Protection and resilience modifiers"
+                  }
+                ],
+                "id": "ar:evaluatesStage",
+                "label": "Decision stages"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:D1",
+                    "label": "D1 constitutional foundation"
+                  },
+                  {
+                    "id": "health:D6",
+                    "label": "D6 disease-pattern confirmation"
+                  },
+                  {
+                    "id": "health:D8",
+                    "label": "D8 chronicity, crisis and procedural confirmation"
+                  },
+                  {
+                    "id": "health:D30",
+                    "label": "D30 adversity and vulnerability refinement"
+                  },
+                  {
+                    "id": "health:H1",
+                    "label": "Vitality, constitution and physical resilience"
+                  },
+                  {
+                    "id": "health:H4",
+                    "label": "Emotional base and mental comfort"
+                  },
+                  {
+                    "id": "health:H6",
+                    "label": "Disease, imbalance, treatment and daily management"
+                  },
+                  {
+                    "id": "health:H8",
+                    "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                  },
+                  {
+                    "id": "health:H12",
+                    "label": "Rest, hospitalization, drain and convalescence"
+                  },
+                  {
+                    "id": "health:MoonMind",
+                    "label": "Moon and mental-emotional regulation"
+                  },
+                  {
+                    "id": "health:DignityStrength",
+                    "label": "Dignity, functional nature and Shadbala modifiers"
+                  },
+                  {
+                    "id": "health:ProtectiveFactors",
+                    "label": "Calculated protective and recovery factors"
+                  }
+                ],
+                "id": "ar:requiresFactor",
+                "label": "Required astrology factors"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:CapNatalFoundation",
+                    "label": "Calculate natal health foundation"
+                  },
+                  {
+                    "id": "health:CapMedicalDivisionals",
+                    "label": "Calculate medical divisional confirmations"
+                  },
+                  {
+                    "id": "health:CapPlanetCondition",
+                    "label": "Calculate severity and protection modifiers"
+                  },
+                  {
+                    "id": "health:CapCategoryFilter",
+                    "label": "Apply health question category policy"
+                  },
+                  {
+                    "id": "health:CapMedicalTriage",
+                    "label": "Apply medical emergency triage"
+                  }
+                ],
+                "id": "ar:requiresCapability",
+                "label": "Required calculator capabilities"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:ModeMentalWellbeing",
+                    "label": "Mental-wellbeing susceptibility reading"
+                  }
+                ],
+                "id": "ar:allowedAnswerMode",
+                "label": "Answer mode"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:SectionDirectAnswer",
+                            "label": "Direct answer with medical framing"
+                          },
+                          {
+                            "id": "health:SectionNatalEvidence",
+                            "label": "Natal vulnerability evidence"
+                          },
+                          {
+                            "id": "health:SectionProtection",
+                            "label": "Protective and recovery factors"
+                          },
+                          {
+                            "id": "health:SectionGuidance",
+                            "label": "Responsible practical guidance"
+                          }
+                        ],
+                        "id": "ar:hasOutputSection",
+                        "label": "Output sections"
+                      }
+                    ],
+                    "id": "health:ContractConstitutional",
+                    "label": "Constitutional health answer"
+                  }
+                ],
+                "id": "ar:usesAnswerContract",
+                "label": "Answer contract"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EvidenceMental",
+                    "label": "Evidence Mental"
+                  }
+                ],
+                "id": "ar:hasEvidencePolicy",
+                "label": "Evidence policy"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:RuleNatalFirst",
+                    "label": "Rule Natal First"
+                  },
+                  {
+                    "id": "health:RuleProtectionModifies",
+                    "label": "Rule Protection Modifies"
+                  }
+                ],
+                "id": "ar:evaluatesRule",
+                "label": "Decision rules"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EmergencyTriageFirst",
+                    "label": "Emergency Triage First"
+                  },
+                  {
+                    "id": "health:NoDiagnosis",
+                    "label": "No Diagnosis"
+                  },
+                  {
+                    "id": "health:ExactRelationshipOnly",
+                    "label": "Exact Relationship Only"
+                  },
+                  {
+                    "id": "health:NoTimingFromNatal",
+                    "label": "No Timing From Natal"
+                  },
+                  {
+                    "id": "health:NoTreatmentAdvice",
+                    "label": "No Treatment Advice"
+                  }
+                ],
+                "id": "ar:hasGuardrail",
+                "label": "Guardrails"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:DashaActivation",
+                    "label": "Explicit dasha activation of a natal health theme"
+                  },
+                  {
+                    "id": "health:TransitConfirmation",
+                    "label": "Dated transit confirmation of the same health theme"
+                  }
+                ],
+                "id": "ar:defaultExcludesFactor",
+                "label": "Excluded by default"
+              }
+            ],
+            "id": "health:MentalWellbeing",
+            "label": "Mental and emotional wellbeing"
+          }
+        ],
+        "id": "ar:QuestionType",
+        "label": "Question type"
+      },
+      "guardrails": [
+        "health:EmergencyTriageFirst",
+        "health:NoDiagnosis",
+        "health:ExactRelationshipOnly",
+        "health:NoTimingFromNatal",
+        "health:NoTreatmentAdvice"
+      ],
+      "ontology_resource": "health:MentalWellbeing",
+      "override_condition": null,
+      "question_example": "What mental-wellbeing vulnerabilities does my chart show?",
+      "question_label": "Mental and emotional wellbeing",
+      "required_capabilities": [
+        "health:CapNatalFoundation",
+        "health:CapMedicalDivisionals",
+        "health:CapPlanetCondition",
+        "health:CapCategoryFilter",
+        "health:CapMedicalTriage"
+      ],
+      "required_factors": [
+        "health:D1",
+        "health:D6",
+        "health:D8",
+        "health:D30",
+        "health:H1",
+        "health:H4",
+        "health:H6",
+        "health:H8",
+        "health:H12",
+        "health:MoonMind",
+        "health:DignityStrength",
+        "health:ProtectiveFactors"
+      ]
+    },
+    "mental_wellbeing_timing": {
+      "answer_contract": "health:ContractTimed",
+      "answer_mode": "health:ModePeriodForecast",
+      "calculator_bindings": {
+        "health:CapCategoryFilter": "instant_chat_v2.answer_spec: category-specific health rules",
+        "health:CapDashaActivation": "instant event horizon: health-theme dasha activation",
+        "health:CapMedicalDivisionals": "DivisionalChartCalculator: D3, D6, D8 and D30",
+        "health:CapMedicalTriage": "instant_chat_pipeline._instant_medical_triage_decision",
+        "health:CapNatalFoundation": "instant_chat_pipeline: D1 health foundation and house lordships",
+        "health:CapPlanetCondition": "PlanetaryDignitiesCalculator and ShadbalaCalculator",
+        "health:CapTransitConfirmation": "instant transit activation timeline with Instant aspect policy"
+      },
+      "competency_id": "mental_timing",
+      "decision_rules": [
+        "health:RuleNatalFirst",
+        "health:RuleTimedActivation",
+        "health:RuleProtectionModifies"
+      ],
+      "decision_stages": [
+        "health:ConstitutionStage",
+        "health:MentalFoundationStage",
+        "health:MentalPressureStage",
+        "health:ProtectionStage",
+        "health:ActivationStage",
+        "health:TransitStage"
+      ],
+      "default_exclusions": [],
+      "evidence_policy": "health:EvidenceTimed",
+      "graph_tree": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "domain:Health",
+                            "label": "Overall health"
+                          },
+                          {
+                            "id": "domain:MentalWellbeing",
+                            "label": "Mental and emotional wellbeing"
+                          },
+                          {
+                            "id": "domain:Surgery",
+                            "label": "Surgery and procedures"
+                          },
+                          {
+                            "id": "domain:Accident",
+                            "label": "Accident and injury susceptibility"
+                          },
+                          {
+                            "id": "domain:Recovery",
+                            "label": "Recovery and rehabilitation"
+                          }
+                        ],
+                        "id": "ar:hasDomainTopic",
+                        "label": "Domain topics"
+                      }
+                    ],
+                    "id": "domain:HealthWellbeing",
+                    "label": "Health and wellbeing"
+                  }
+                ],
+                "id": "ar:inDomain",
+                "label": "Life domain"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:D1",
+                            "label": "D1 constitutional foundation"
+                          },
+                          {
+                            "id": "health:H1",
+                            "label": "Vitality, constitution and physical resilience"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ConstitutionStage",
+                    "label": "Constitution and vitality"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H4",
+                            "label": "Emotional base and mental comfort"
+                          },
+                          {
+                            "id": "health:MoonMind",
+                            "label": "Moon and mental-emotional regulation"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:MentalFoundationStage",
+                    "label": "Mental and emotional regulation"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H6",
+                            "label": "Disease, imbalance, treatment and daily management"
+                          },
+                          {
+                            "id": "health:H8",
+                            "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                          },
+                          {
+                            "id": "health:H12",
+                            "label": "Rest, hospitalization, drain and convalescence"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:MentalPressureStage",
+                    "label": "Stress, recurrence and rest pressure"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DignityStrength",
+                            "label": "Dignity, functional nature and Shadbala modifiers"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ProtectionStage",
+                    "label": "Protection and resilience modifiers"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DashaActivation",
+                            "label": "Explicit dasha activation of a natal health theme"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ActivationStage",
+                    "label": "Dasha activation of the natal theme"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:TransitConfirmation",
+                            "label": "Dated transit confirmation of the same health theme"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:TransitStage",
+                    "label": "Dated transit confirmation"
+                  }
+                ],
+                "id": "ar:evaluatesStage",
+                "label": "Decision stages"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:D1",
+                    "label": "D1 constitutional foundation"
+                  },
+                  {
+                    "id": "health:D6",
+                    "label": "D6 disease-pattern confirmation"
+                  },
+                  {
+                    "id": "health:D8",
+                    "label": "D8 chronicity, crisis and procedural confirmation"
+                  },
+                  {
+                    "id": "health:D30",
+                    "label": "D30 adversity and vulnerability refinement"
+                  },
+                  {
+                    "id": "health:H1",
+                    "label": "Vitality, constitution and physical resilience"
+                  },
+                  {
+                    "id": "health:H4",
+                    "label": "Emotional base and mental comfort"
+                  },
+                  {
+                    "id": "health:H6",
+                    "label": "Disease, imbalance, treatment and daily management"
+                  },
+                  {
+                    "id": "health:H8",
+                    "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                  },
+                  {
+                    "id": "health:H12",
+                    "label": "Rest, hospitalization, drain and convalescence"
+                  },
+                  {
+                    "id": "health:MoonMind",
+                    "label": "Moon and mental-emotional regulation"
+                  },
+                  {
+                    "id": "health:ProtectiveFactors",
+                    "label": "Calculated protective and recovery factors"
+                  },
+                  {
+                    "id": "health:DashaActivation",
+                    "label": "Explicit dasha activation of a natal health theme"
+                  },
+                  {
+                    "id": "health:TransitConfirmation",
+                    "label": "Dated transit confirmation of the same health theme"
+                  }
+                ],
+                "id": "ar:requiresFactor",
+                "label": "Required astrology factors"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:CapNatalFoundation",
+                    "label": "Calculate natal health foundation"
+                  },
+                  {
+                    "id": "health:CapMedicalDivisionals",
+                    "label": "Calculate medical divisional confirmations"
+                  },
+                  {
+                    "id": "health:CapPlanetCondition",
+                    "label": "Calculate severity and protection modifiers"
+                  },
+                  {
+                    "id": "health:CapCategoryFilter",
+                    "label": "Apply health question category policy"
+                  },
+                  {
+                    "id": "health:CapDashaActivation",
+                    "label": "Calculate health dasha activation"
+                  },
+                  {
+                    "id": "health:CapTransitConfirmation",
+                    "label": "Calculate dated transit confirmation"
+                  },
+                  {
+                    "id": "health:CapMedicalTriage",
+                    "label": "Apply medical emergency triage"
+                  }
+                ],
+                "id": "ar:requiresCapability",
+                "label": "Required calculator capabilities"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:ModePeriodForecast",
+                    "label": "Time-bound health forecast"
+                  }
+                ],
+                "id": "ar:allowedAnswerMode",
+                "label": "Answer mode"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:SectionDirectAnswer",
+                            "label": "Direct answer with medical framing"
+                          },
+                          {
+                            "id": "health:SectionNatalEvidence",
+                            "label": "Natal vulnerability evidence"
+                          },
+                          {
+                            "id": "health:SectionActivation",
+                            "label": "Dated activation chain"
+                          },
+                          {
+                            "id": "health:SectionProtection",
+                            "label": "Protective and recovery factors"
+                          },
+                          {
+                            "id": "health:SectionGuidance",
+                            "label": "Responsible practical guidance"
+                          }
+                        ],
+                        "id": "ar:hasOutputSection",
+                        "label": "Output sections"
+                      }
+                    ],
+                    "id": "health:ContractTimed",
+                    "label": "Time-bound health answer"
+                  }
+                ],
+                "id": "ar:usesAnswerContract",
+                "label": "Answer contract"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EvidenceTimed",
+                    "label": "Evidence Timed"
+                  }
+                ],
+                "id": "ar:hasEvidencePolicy",
+                "label": "Evidence policy"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:RuleNatalFirst",
+                    "label": "Rule Natal First"
+                  },
+                  {
+                    "id": "health:RuleTimedActivation",
+                    "label": "Rule Timed Activation"
+                  },
+                  {
+                    "id": "health:RuleProtectionModifies",
+                    "label": "Rule Protection Modifies"
+                  }
+                ],
+                "id": "ar:evaluatesRule",
+                "label": "Decision rules"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EmergencyTriageFirst",
+                    "label": "Emergency Triage First"
+                  },
+                  {
+                    "id": "health:NoDiagnosis",
+                    "label": "No Diagnosis"
+                  },
+                  {
+                    "id": "health:ExactRelationshipOnly",
+                    "label": "Exact Relationship Only"
+                  },
+                  {
+                    "id": "health:NoActivationWithoutChain",
+                    "label": "No Activation Without Chain"
+                  },
+                  {
+                    "id": "health:StrictRequestedHorizon",
+                    "label": "Strict Requested Horizon"
+                  },
+                  {
+                    "id": "health:NoTreatmentAdvice",
+                    "label": "No Treatment Advice"
+                  }
+                ],
+                "id": "ar:hasGuardrail",
+                "label": "Guardrails"
+              }
+            ],
+            "id": "health:MentalWellbeingTiming",
+            "label": "Mental-wellbeing outlook for a requested period"
+          }
+        ],
+        "id": "ar:QuestionType",
+        "label": "Question type"
+      },
+      "guardrails": [
+        "health:EmergencyTriageFirst",
+        "health:NoDiagnosis",
+        "health:ExactRelationshipOnly",
+        "health:NoActivationWithoutChain",
+        "health:StrictRequestedHorizon",
+        "health:NoTreatmentAdvice"
+      ],
+      "ontology_resource": "health:MentalWellbeingTiming",
+      "override_condition": null,
+      "question_example": "How will my mental wellbeing be this year?",
+      "question_label": "Mental-wellbeing outlook for a requested period",
+      "required_capabilities": [
+        "health:CapNatalFoundation",
+        "health:CapMedicalDivisionals",
+        "health:CapPlanetCondition",
+        "health:CapCategoryFilter",
+        "health:CapDashaActivation",
+        "health:CapTransitConfirmation",
+        "health:CapMedicalTriage"
+      ],
+      "required_factors": [
+        "health:D1",
+        "health:D6",
+        "health:D8",
+        "health:D30",
+        "health:H1",
+        "health:H4",
+        "health:H6",
+        "health:H8",
+        "health:H12",
+        "health:MoonMind",
+        "health:ProtectiveFactors",
+        "health:DashaActivation",
+        "health:TransitConfirmation"
+      ]
+    },
+    "recovery": {
+      "answer_contract": "health:ContractConstitutional",
+      "answer_mode": "health:ModeRecoverySupport",
+      "calculator_bindings": {
+        "health:CapCategoryFilter": "instant_chat_v2.answer_spec: category-specific health rules",
+        "health:CapMedicalDivisionals": "DivisionalChartCalculator: D3, D6, D8 and D30",
+        "health:CapMedicalTriage": "instant_chat_pipeline._instant_medical_triage_decision",
+        "health:CapNatalFoundation": "instant_chat_pipeline: D1 health foundation and house lordships",
+        "health:CapPlanetCondition": "PlanetaryDignitiesCalculator and ShadbalaCalculator"
+      },
+      "competency_id": "recovery_constitution",
+      "decision_rules": [
+        "health:RuleNatalFirst",
+        "health:RuleProtectionModifies"
+      ],
+      "decision_stages": [
+        "health:ConstitutionStage",
+        "health:RecoveryPatternStage",
+        "health:ProtectionStage"
+      ],
+      "default_exclusions": [
+        "health:DashaActivation",
+        "health:TransitConfirmation"
+      ],
+      "evidence_policy": "health:EvidenceRecovery",
+      "graph_tree": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "domain:Health",
+                            "label": "Overall health"
+                          },
+                          {
+                            "id": "domain:MentalWellbeing",
+                            "label": "Mental and emotional wellbeing"
+                          },
+                          {
+                            "id": "domain:Surgery",
+                            "label": "Surgery and procedures"
+                          },
+                          {
+                            "id": "domain:Accident",
+                            "label": "Accident and injury susceptibility"
+                          },
+                          {
+                            "id": "domain:Recovery",
+                            "label": "Recovery and rehabilitation"
+                          }
+                        ],
+                        "id": "ar:hasDomainTopic",
+                        "label": "Domain topics"
+                      }
+                    ],
+                    "id": "domain:HealthWellbeing",
+                    "label": "Health and wellbeing"
+                  }
+                ],
+                "id": "ar:inDomain",
+                "label": "Life domain"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:D1",
+                            "label": "D1 constitutional foundation"
+                          },
+                          {
+                            "id": "health:H1",
+                            "label": "Vitality, constitution and physical resilience"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ConstitutionStage",
+                    "label": "Constitution and vitality"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H5",
+                            "label": "Digestion, regulation and recovery intelligence"
+                          },
+                          {
+                            "id": "health:H6",
+                            "label": "Disease, imbalance, treatment and daily management"
+                          },
+                          {
+                            "id": "health:H11",
+                            "label": "Improvement, support and recovery fulfilment"
+                          },
+                          {
+                            "id": "health:H12",
+                            "label": "Rest, hospitalization, drain and convalescence"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:RecoveryPatternStage",
+                    "label": "Recovery support and convalescence"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DignityStrength",
+                            "label": "Dignity, functional nature and Shadbala modifiers"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ProtectionStage",
+                    "label": "Protection and resilience modifiers"
+                  }
+                ],
+                "id": "ar:evaluatesStage",
+                "label": "Decision stages"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:D1",
+                    "label": "D1 constitutional foundation"
+                  },
+                  {
+                    "id": "health:D6",
+                    "label": "D6 disease-pattern confirmation"
+                  },
+                  {
+                    "id": "health:D8",
+                    "label": "D8 chronicity, crisis and procedural confirmation"
+                  },
+                  {
+                    "id": "health:D30",
+                    "label": "D30 adversity and vulnerability refinement"
+                  },
+                  {
+                    "id": "health:H1",
+                    "label": "Vitality, constitution and physical resilience"
+                  },
+                  {
+                    "id": "health:H5",
+                    "label": "Digestion, regulation and recovery intelligence"
+                  },
+                  {
+                    "id": "health:H6",
+                    "label": "Disease, imbalance, treatment and daily management"
+                  },
+                  {
+                    "id": "health:H11",
+                    "label": "Improvement, support and recovery fulfilment"
+                  },
+                  {
+                    "id": "health:H12",
+                    "label": "Rest, hospitalization, drain and convalescence"
+                  },
+                  {
+                    "id": "health:DignityStrength",
+                    "label": "Dignity, functional nature and Shadbala modifiers"
+                  },
+                  {
+                    "id": "health:ProtectiveFactors",
+                    "label": "Calculated protective and recovery factors"
+                  }
+                ],
+                "id": "ar:requiresFactor",
+                "label": "Required astrology factors"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:CapNatalFoundation",
+                    "label": "Calculate natal health foundation"
+                  },
+                  {
+                    "id": "health:CapMedicalDivisionals",
+                    "label": "Calculate medical divisional confirmations"
+                  },
+                  {
+                    "id": "health:CapPlanetCondition",
+                    "label": "Calculate severity and protection modifiers"
+                  },
+                  {
+                    "id": "health:CapCategoryFilter",
+                    "label": "Apply health question category policy"
+                  },
+                  {
+                    "id": "health:CapMedicalTriage",
+                    "label": "Apply medical emergency triage"
+                  }
+                ],
+                "id": "ar:requiresCapability",
+                "label": "Required calculator capabilities"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:ModeRecoverySupport",
+                    "label": "Recovery-support assessment"
+                  }
+                ],
+                "id": "ar:allowedAnswerMode",
+                "label": "Answer mode"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:SectionDirectAnswer",
+                            "label": "Direct answer with medical framing"
+                          },
+                          {
+                            "id": "health:SectionNatalEvidence",
+                            "label": "Natal vulnerability evidence"
+                          },
+                          {
+                            "id": "health:SectionProtection",
+                            "label": "Protective and recovery factors"
+                          },
+                          {
+                            "id": "health:SectionGuidance",
+                            "label": "Responsible practical guidance"
+                          }
+                        ],
+                        "id": "ar:hasOutputSection",
+                        "label": "Output sections"
+                      }
+                    ],
+                    "id": "health:ContractConstitutional",
+                    "label": "Constitutional health answer"
+                  }
+                ],
+                "id": "ar:usesAnswerContract",
+                "label": "Answer contract"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EvidenceRecovery",
+                    "label": "Evidence Recovery"
+                  }
+                ],
+                "id": "ar:hasEvidencePolicy",
+                "label": "Evidence policy"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:RuleNatalFirst",
+                    "label": "Rule Natal First"
+                  },
+                  {
+                    "id": "health:RuleProtectionModifies",
+                    "label": "Rule Protection Modifies"
+                  }
+                ],
+                "id": "ar:evaluatesRule",
+                "label": "Decision rules"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EmergencyTriageFirst",
+                    "label": "Emergency Triage First"
+                  },
+                  {
+                    "id": "health:NoDiagnosis",
+                    "label": "No Diagnosis"
+                  },
+                  {
+                    "id": "health:NoRecoveryPromise",
+                    "label": "No Recovery Promise"
+                  },
+                  {
+                    "id": "health:NoTimingFromNatal",
+                    "label": "No Timing From Natal"
+                  },
+                  {
+                    "id": "health:NoTreatmentAdvice",
+                    "label": "No Treatment Advice"
+                  }
+                ],
+                "id": "ar:hasGuardrail",
+                "label": "Guardrails"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:DashaActivation",
+                    "label": "Explicit dasha activation of a natal health theme"
+                  },
+                  {
+                    "id": "health:TransitConfirmation",
+                    "label": "Dated transit confirmation of the same health theme"
+                  }
+                ],
+                "id": "ar:defaultExcludesFactor",
+                "label": "Excluded by default"
+              }
+            ],
+            "id": "health:RecoverySupport",
+            "label": "Recovery and resilience support"
+          }
+        ],
+        "id": "ar:QuestionType",
+        "label": "Question type"
+      },
+      "guardrails": [
+        "health:EmergencyTriageFirst",
+        "health:NoDiagnosis",
+        "health:NoRecoveryPromise",
+        "health:NoTimingFromNatal",
+        "health:NoTreatmentAdvice"
+      ],
+      "ontology_resource": "health:RecoverySupport",
+      "override_condition": null,
+      "question_example": "What recovery support does my chart show?",
+      "question_label": "Recovery and resilience support",
+      "required_capabilities": [
+        "health:CapNatalFoundation",
+        "health:CapMedicalDivisionals",
+        "health:CapPlanetCondition",
+        "health:CapCategoryFilter",
+        "health:CapMedicalTriage"
+      ],
+      "required_factors": [
+        "health:D1",
+        "health:D6",
+        "health:D8",
+        "health:D30",
+        "health:H1",
+        "health:H5",
+        "health:H6",
+        "health:H11",
+        "health:H12",
+        "health:DignityStrength",
+        "health:ProtectiveFactors"
+      ]
+    },
+    "recovery_timing": {
+      "answer_contract": "health:ContractTimed",
+      "answer_mode": "health:ModePeriodForecast",
+      "calculator_bindings": {
+        "health:CapCategoryFilter": "instant_chat_v2.answer_spec: category-specific health rules",
+        "health:CapDashaActivation": "instant event horizon: health-theme dasha activation",
+        "health:CapMedicalDivisionals": "DivisionalChartCalculator: D3, D6, D8 and D30",
+        "health:CapMedicalTriage": "instant_chat_pipeline._instant_medical_triage_decision",
+        "health:CapNatalFoundation": "instant_chat_pipeline: D1 health foundation and house lordships",
+        "health:CapPlanetCondition": "PlanetaryDignitiesCalculator and ShadbalaCalculator",
+        "health:CapTransitConfirmation": "instant transit activation timeline with Instant aspect policy"
+      },
+      "competency_id": "recovery_timing",
+      "decision_rules": [
+        "health:RuleNatalFirst",
+        "health:RuleTimedActivation",
+        "health:RuleProtectionModifies"
+      ],
+      "decision_stages": [
+        "health:ConstitutionStage",
+        "health:RecoveryPatternStage",
+        "health:ProtectionStage",
+        "health:ActivationStage",
+        "health:TransitStage"
+      ],
+      "default_exclusions": [],
+      "evidence_policy": "health:EvidenceRecovery",
+      "graph_tree": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "domain:Health",
+                            "label": "Overall health"
+                          },
+                          {
+                            "id": "domain:MentalWellbeing",
+                            "label": "Mental and emotional wellbeing"
+                          },
+                          {
+                            "id": "domain:Surgery",
+                            "label": "Surgery and procedures"
+                          },
+                          {
+                            "id": "domain:Accident",
+                            "label": "Accident and injury susceptibility"
+                          },
+                          {
+                            "id": "domain:Recovery",
+                            "label": "Recovery and rehabilitation"
+                          }
+                        ],
+                        "id": "ar:hasDomainTopic",
+                        "label": "Domain topics"
+                      }
+                    ],
+                    "id": "domain:HealthWellbeing",
+                    "label": "Health and wellbeing"
+                  }
+                ],
+                "id": "ar:inDomain",
+                "label": "Life domain"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:D1",
+                            "label": "D1 constitutional foundation"
+                          },
+                          {
+                            "id": "health:H1",
+                            "label": "Vitality, constitution and physical resilience"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ConstitutionStage",
+                    "label": "Constitution and vitality"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H5",
+                            "label": "Digestion, regulation and recovery intelligence"
+                          },
+                          {
+                            "id": "health:H6",
+                            "label": "Disease, imbalance, treatment and daily management"
+                          },
+                          {
+                            "id": "health:H11",
+                            "label": "Improvement, support and recovery fulfilment"
+                          },
+                          {
+                            "id": "health:H12",
+                            "label": "Rest, hospitalization, drain and convalescence"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:RecoveryPatternStage",
+                    "label": "Recovery support and convalescence"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DignityStrength",
+                            "label": "Dignity, functional nature and Shadbala modifiers"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ProtectionStage",
+                    "label": "Protection and resilience modifiers"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DashaActivation",
+                            "label": "Explicit dasha activation of a natal health theme"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ActivationStage",
+                    "label": "Dasha activation of the natal theme"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:TransitConfirmation",
+                            "label": "Dated transit confirmation of the same health theme"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:TransitStage",
+                    "label": "Dated transit confirmation"
+                  }
+                ],
+                "id": "ar:evaluatesStage",
+                "label": "Decision stages"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:D1",
+                    "label": "D1 constitutional foundation"
+                  },
+                  {
+                    "id": "health:D6",
+                    "label": "D6 disease-pattern confirmation"
+                  },
+                  {
+                    "id": "health:D8",
+                    "label": "D8 chronicity, crisis and procedural confirmation"
+                  },
+                  {
+                    "id": "health:D30",
+                    "label": "D30 adversity and vulnerability refinement"
+                  },
+                  {
+                    "id": "health:H1",
+                    "label": "Vitality, constitution and physical resilience"
+                  },
+                  {
+                    "id": "health:H5",
+                    "label": "Digestion, regulation and recovery intelligence"
+                  },
+                  {
+                    "id": "health:H6",
+                    "label": "Disease, imbalance, treatment and daily management"
+                  },
+                  {
+                    "id": "health:H11",
+                    "label": "Improvement, support and recovery fulfilment"
+                  },
+                  {
+                    "id": "health:H12",
+                    "label": "Rest, hospitalization, drain and convalescence"
+                  },
+                  {
+                    "id": "health:ProtectiveFactors",
+                    "label": "Calculated protective and recovery factors"
+                  },
+                  {
+                    "id": "health:DashaActivation",
+                    "label": "Explicit dasha activation of a natal health theme"
+                  },
+                  {
+                    "id": "health:TransitConfirmation",
+                    "label": "Dated transit confirmation of the same health theme"
+                  }
+                ],
+                "id": "ar:requiresFactor",
+                "label": "Required astrology factors"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:CapNatalFoundation",
+                    "label": "Calculate natal health foundation"
+                  },
+                  {
+                    "id": "health:CapMedicalDivisionals",
+                    "label": "Calculate medical divisional confirmations"
+                  },
+                  {
+                    "id": "health:CapPlanetCondition",
+                    "label": "Calculate severity and protection modifiers"
+                  },
+                  {
+                    "id": "health:CapCategoryFilter",
+                    "label": "Apply health question category policy"
+                  },
+                  {
+                    "id": "health:CapDashaActivation",
+                    "label": "Calculate health dasha activation"
+                  },
+                  {
+                    "id": "health:CapTransitConfirmation",
+                    "label": "Calculate dated transit confirmation"
+                  },
+                  {
+                    "id": "health:CapMedicalTriage",
+                    "label": "Apply medical emergency triage"
+                  }
+                ],
+                "id": "ar:requiresCapability",
+                "label": "Required calculator capabilities"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:ModePeriodForecast",
+                    "label": "Time-bound health forecast"
+                  }
+                ],
+                "id": "ar:allowedAnswerMode",
+                "label": "Answer mode"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:SectionDirectAnswer",
+                            "label": "Direct answer with medical framing"
+                          },
+                          {
+                            "id": "health:SectionNatalEvidence",
+                            "label": "Natal vulnerability evidence"
+                          },
+                          {
+                            "id": "health:SectionActivation",
+                            "label": "Dated activation chain"
+                          },
+                          {
+                            "id": "health:SectionProtection",
+                            "label": "Protective and recovery factors"
+                          },
+                          {
+                            "id": "health:SectionGuidance",
+                            "label": "Responsible practical guidance"
+                          }
+                        ],
+                        "id": "ar:hasOutputSection",
+                        "label": "Output sections"
+                      }
+                    ],
+                    "id": "health:ContractTimed",
+                    "label": "Time-bound health answer"
+                  }
+                ],
+                "id": "ar:usesAnswerContract",
+                "label": "Answer contract"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EvidenceRecovery",
+                    "label": "Evidence Recovery"
+                  }
+                ],
+                "id": "ar:hasEvidencePolicy",
+                "label": "Evidence policy"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:RuleNatalFirst",
+                    "label": "Rule Natal First"
+                  },
+                  {
+                    "id": "health:RuleTimedActivation",
+                    "label": "Rule Timed Activation"
+                  },
+                  {
+                    "id": "health:RuleProtectionModifies",
+                    "label": "Rule Protection Modifies"
+                  }
+                ],
+                "id": "ar:evaluatesRule",
+                "label": "Decision rules"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EmergencyTriageFirst",
+                    "label": "Emergency Triage First"
+                  },
+                  {
+                    "id": "health:NoDiagnosis",
+                    "label": "No Diagnosis"
+                  },
+                  {
+                    "id": "health:NoRecoveryPromise",
+                    "label": "No Recovery Promise"
+                  },
+                  {
+                    "id": "health:NoActivationWithoutChain",
+                    "label": "No Activation Without Chain"
+                  },
+                  {
+                    "id": "health:StrictRequestedHorizon",
+                    "label": "Strict Requested Horizon"
+                  },
+                  {
+                    "id": "health:NoTreatmentAdvice",
+                    "label": "No Treatment Advice"
+                  }
+                ],
+                "id": "ar:hasGuardrail",
+                "label": "Guardrails"
+              }
+            ],
+            "id": "health:RecoveryTiming",
+            "label": "Recovery-support outlook for a requested period"
+          }
+        ],
+        "id": "ar:QuestionType",
+        "label": "Question type"
+      },
+      "guardrails": [
+        "health:EmergencyTriageFirst",
+        "health:NoDiagnosis",
+        "health:NoRecoveryPromise",
+        "health:NoActivationWithoutChain",
+        "health:StrictRequestedHorizon",
+        "health:NoTreatmentAdvice"
+      ],
+      "ontology_resource": "health:RecoveryTiming",
+      "override_condition": null,
+      "question_example": "When is recovery support stronger?",
+      "question_label": "Recovery-support outlook for a requested period",
+      "required_capabilities": [
+        "health:CapNatalFoundation",
+        "health:CapMedicalDivisionals",
+        "health:CapPlanetCondition",
+        "health:CapCategoryFilter",
+        "health:CapDashaActivation",
+        "health:CapTransitConfirmation",
+        "health:CapMedicalTriage"
+      ],
+      "required_factors": [
+        "health:D1",
+        "health:D6",
+        "health:D8",
+        "health:D30",
+        "health:H1",
+        "health:H5",
+        "health:H6",
+        "health:H11",
+        "health:H12",
+        "health:ProtectiveFactors",
+        "health:DashaActivation",
+        "health:TransitConfirmation"
+      ]
+    },
+    "surgery": {
+      "answer_contract": "health:ContractConstitutional",
+      "answer_mode": "health:ModeSafetyAssessment",
+      "calculator_bindings": {
+        "health:CapCategoryFilter": "instant_chat_v2.answer_spec: category-specific health rules",
+        "health:CapMedicalDivisionals": "DivisionalChartCalculator: D3, D6, D8 and D30",
+        "health:CapMedicalTriage": "instant_chat_pipeline._instant_medical_triage_decision",
+        "health:CapNatalFoundation": "instant_chat_pipeline: D1 health foundation and house lordships",
+        "health:CapPlanetCondition": "PlanetaryDignitiesCalculator and ShadbalaCalculator"
+      },
+      "competency_id": "surgery_constitution",
+      "decision_rules": [
+        "health:RuleNatalFirst",
+        "health:RuleProtectionModifies"
+      ],
+      "decision_stages": [
+        "health:ConstitutionStage",
+        "health:SurgeryPatternStage",
+        "health:ProtectionStage"
+      ],
+      "default_exclusions": [
+        "health:DashaActivation",
+        "health:TransitConfirmation"
+      ],
+      "evidence_policy": "health:EvidenceSurgery",
+      "graph_tree": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "domain:Health",
+                            "label": "Overall health"
+                          },
+                          {
+                            "id": "domain:MentalWellbeing",
+                            "label": "Mental and emotional wellbeing"
+                          },
+                          {
+                            "id": "domain:Surgery",
+                            "label": "Surgery and procedures"
+                          },
+                          {
+                            "id": "domain:Accident",
+                            "label": "Accident and injury susceptibility"
+                          },
+                          {
+                            "id": "domain:Recovery",
+                            "label": "Recovery and rehabilitation"
+                          }
+                        ],
+                        "id": "ar:hasDomainTopic",
+                        "label": "Domain topics"
+                      }
+                    ],
+                    "id": "domain:HealthWellbeing",
+                    "label": "Health and wellbeing"
+                  }
+                ],
+                "id": "ar:inDomain",
+                "label": "Life domain"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:D1",
+                            "label": "D1 constitutional foundation"
+                          },
+                          {
+                            "id": "health:H1",
+                            "label": "Vitality, constitution and physical resilience"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ConstitutionStage",
+                    "label": "Constitution and vitality"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H6",
+                            "label": "Disease, imbalance, treatment and daily management"
+                          },
+                          {
+                            "id": "health:H8",
+                            "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                          },
+                          {
+                            "id": "health:H12",
+                            "label": "Rest, hospitalization, drain and convalescence"
+                          },
+                          {
+                            "id": "health:D8",
+                            "label": "D8 chronicity, crisis and procedural confirmation"
+                          },
+                          {
+                            "id": "health:D30",
+                            "label": "D30 adversity and vulnerability refinement"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:SurgeryPatternStage",
+                    "label": "Procedural and surgical susceptibility"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DignityStrength",
+                            "label": "Dignity, functional nature and Shadbala modifiers"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ProtectionStage",
+                    "label": "Protection and resilience modifiers"
+                  }
+                ],
+                "id": "ar:evaluatesStage",
+                "label": "Decision stages"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:D1",
+                    "label": "D1 constitutional foundation"
+                  },
+                  {
+                    "id": "health:D8",
+                    "label": "D8 chronicity, crisis and procedural confirmation"
+                  },
+                  {
+                    "id": "health:D30",
+                    "label": "D30 adversity and vulnerability refinement"
+                  },
+                  {
+                    "id": "health:H1",
+                    "label": "Vitality, constitution and physical resilience"
+                  },
+                  {
+                    "id": "health:H6",
+                    "label": "Disease, imbalance, treatment and daily management"
+                  },
+                  {
+                    "id": "health:H8",
+                    "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                  },
+                  {
+                    "id": "health:H12",
+                    "label": "Rest, hospitalization, drain and convalescence"
+                  },
+                  {
+                    "id": "health:MedicalGrahas",
+                    "label": "Medical grahas with exact calculated relationships"
+                  },
+                  {
+                    "id": "health:DignityStrength",
+                    "label": "Dignity, functional nature and Shadbala modifiers"
+                  },
+                  {
+                    "id": "health:ProtectiveFactors",
+                    "label": "Calculated protective and recovery factors"
+                  }
+                ],
+                "id": "ar:requiresFactor",
+                "label": "Required astrology factors"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:CapNatalFoundation",
+                    "label": "Calculate natal health foundation"
+                  },
+                  {
+                    "id": "health:CapMedicalDivisionals",
+                    "label": "Calculate medical divisional confirmations"
+                  },
+                  {
+                    "id": "health:CapPlanetCondition",
+                    "label": "Calculate severity and protection modifiers"
+                  },
+                  {
+                    "id": "health:CapCategoryFilter",
+                    "label": "Apply health question category policy"
+                  },
+                  {
+                    "id": "health:CapMedicalTriage",
+                    "label": "Apply medical emergency triage"
+                  }
+                ],
+                "id": "ar:requiresCapability",
+                "label": "Required calculator capabilities"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:ModeSafetyAssessment",
+                    "label": "Restrained susceptibility assessment"
+                  }
+                ],
+                "id": "ar:allowedAnswerMode",
+                "label": "Answer mode"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:SectionDirectAnswer",
+                            "label": "Direct answer with medical framing"
+                          },
+                          {
+                            "id": "health:SectionNatalEvidence",
+                            "label": "Natal vulnerability evidence"
+                          },
+                          {
+                            "id": "health:SectionProtection",
+                            "label": "Protective and recovery factors"
+                          },
+                          {
+                            "id": "health:SectionGuidance",
+                            "label": "Responsible practical guidance"
+                          }
+                        ],
+                        "id": "ar:hasOutputSection",
+                        "label": "Output sections"
+                      }
+                    ],
+                    "id": "health:ContractConstitutional",
+                    "label": "Constitutional health answer"
+                  }
+                ],
+                "id": "ar:usesAnswerContract",
+                "label": "Answer contract"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EvidenceSurgery",
+                    "label": "Evidence Surgery"
+                  }
+                ],
+                "id": "ar:hasEvidencePolicy",
+                "label": "Evidence policy"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:RuleNatalFirst",
+                    "label": "Rule Natal First"
+                  },
+                  {
+                    "id": "health:RuleProtectionModifies",
+                    "label": "Rule Protection Modifies"
+                  }
+                ],
+                "id": "ar:evaluatesRule",
+                "label": "Decision rules"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EmergencyTriageFirst",
+                    "label": "Emergency Triage First"
+                  },
+                  {
+                    "id": "health:NoDiagnosis",
+                    "label": "No Diagnosis"
+                  },
+                  {
+                    "id": "health:NoSurgeryCertainty",
+                    "label": "No Surgery Certainty"
+                  },
+                  {
+                    "id": "health:NoTimingFromNatal",
+                    "label": "No Timing From Natal"
+                  },
+                  {
+                    "id": "health:NoTreatmentAdvice",
+                    "label": "No Treatment Advice"
+                  }
+                ],
+                "id": "ar:hasGuardrail",
+                "label": "Guardrails"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:DashaActivation",
+                    "label": "Explicit dasha activation of a natal health theme"
+                  },
+                  {
+                    "id": "health:TransitConfirmation",
+                    "label": "Dated transit confirmation of the same health theme"
+                  }
+                ],
+                "id": "ar:defaultExcludesFactor",
+                "label": "Excluded by default"
+              }
+            ],
+            "id": "health:SurgerySusceptibility",
+            "label": "Surgery or procedure susceptibility"
+          }
+        ],
+        "id": "ar:QuestionType",
+        "label": "Question type"
+      },
+      "guardrails": [
+        "health:EmergencyTriageFirst",
+        "health:NoDiagnosis",
+        "health:NoSurgeryCertainty",
+        "health:NoTimingFromNatal",
+        "health:NoTreatmentAdvice"
+      ],
+      "ontology_resource": "health:SurgerySusceptibility",
+      "override_condition": null,
+      "question_example": "Does my chart show surgical susceptibility?",
+      "question_label": "Surgery or procedure susceptibility",
+      "required_capabilities": [
+        "health:CapNatalFoundation",
+        "health:CapMedicalDivisionals",
+        "health:CapPlanetCondition",
+        "health:CapCategoryFilter",
+        "health:CapMedicalTriage"
+      ],
+      "required_factors": [
+        "health:D1",
+        "health:D8",
+        "health:D30",
+        "health:H1",
+        "health:H6",
+        "health:H8",
+        "health:H12",
+        "health:MedicalGrahas",
+        "health:DignityStrength",
+        "health:ProtectiveFactors"
+      ]
+    },
+    "surgery_timing": {
+      "answer_contract": "health:ContractTimed",
+      "answer_mode": "health:ModePeriodForecast",
+      "calculator_bindings": {
+        "health:CapCategoryFilter": "instant_chat_v2.answer_spec: category-specific health rules",
+        "health:CapDashaActivation": "instant event horizon: health-theme dasha activation",
+        "health:CapMedicalDivisionals": "DivisionalChartCalculator: D3, D6, D8 and D30",
+        "health:CapMedicalTriage": "instant_chat_pipeline._instant_medical_triage_decision",
+        "health:CapNatalFoundation": "instant_chat_pipeline: D1 health foundation and house lordships",
+        "health:CapPlanetCondition": "PlanetaryDignitiesCalculator and ShadbalaCalculator",
+        "health:CapTransitConfirmation": "instant transit activation timeline with Instant aspect policy"
+      },
+      "competency_id": "surgery_timing",
+      "decision_rules": [
+        "health:RuleNatalFirst",
+        "health:RuleTimedActivation",
+        "health:RuleProtectionModifies"
+      ],
+      "decision_stages": [
+        "health:ConstitutionStage",
+        "health:SurgeryPatternStage",
+        "health:ProtectionStage",
+        "health:ActivationStage",
+        "health:TransitStage"
+      ],
+      "default_exclusions": [],
+      "evidence_policy": "health:EvidenceSurgery",
+      "graph_tree": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "domain:Health",
+                            "label": "Overall health"
+                          },
+                          {
+                            "id": "domain:MentalWellbeing",
+                            "label": "Mental and emotional wellbeing"
+                          },
+                          {
+                            "id": "domain:Surgery",
+                            "label": "Surgery and procedures"
+                          },
+                          {
+                            "id": "domain:Accident",
+                            "label": "Accident and injury susceptibility"
+                          },
+                          {
+                            "id": "domain:Recovery",
+                            "label": "Recovery and rehabilitation"
+                          }
+                        ],
+                        "id": "ar:hasDomainTopic",
+                        "label": "Domain topics"
+                      }
+                    ],
+                    "id": "domain:HealthWellbeing",
+                    "label": "Health and wellbeing"
+                  }
+                ],
+                "id": "ar:inDomain",
+                "label": "Life domain"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:D1",
+                            "label": "D1 constitutional foundation"
+                          },
+                          {
+                            "id": "health:H1",
+                            "label": "Vitality, constitution and physical resilience"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ConstitutionStage",
+                    "label": "Constitution and vitality"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:H6",
+                            "label": "Disease, imbalance, treatment and daily management"
+                          },
+                          {
+                            "id": "health:H8",
+                            "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                          },
+                          {
+                            "id": "health:H12",
+                            "label": "Rest, hospitalization, drain and convalescence"
+                          },
+                          {
+                            "id": "health:D8",
+                            "label": "D8 chronicity, crisis and procedural confirmation"
+                          },
+                          {
+                            "id": "health:D30",
+                            "label": "D30 adversity and vulnerability refinement"
+                          },
+                          {
+                            "id": "health:MedicalGrahas",
+                            "label": "Medical grahas with exact calculated relationships"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:SurgeryPatternStage",
+                    "label": "Procedural and surgical susceptibility"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DignityStrength",
+                            "label": "Dignity, functional nature and Shadbala modifiers"
+                          },
+                          {
+                            "id": "health:ProtectiveFactors",
+                            "label": "Calculated protective and recovery factors"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ProtectionStage",
+                    "label": "Protection and resilience modifiers"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:DashaActivation",
+                            "label": "Explicit dasha activation of a natal health theme"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:ActivationStage",
+                    "label": "Dasha activation of the natal theme"
+                  },
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:TransitConfirmation",
+                            "label": "Dated transit confirmation of the same health theme"
+                          }
+                        ],
+                        "id": "ar:stageRequiresFactor",
+                        "label": "Required astrology factors"
+                      }
+                    ],
+                    "id": "health:TransitStage",
+                    "label": "Dated transit confirmation"
+                  }
+                ],
+                "id": "ar:evaluatesStage",
+                "label": "Decision stages"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:D1",
+                    "label": "D1 constitutional foundation"
+                  },
+                  {
+                    "id": "health:D8",
+                    "label": "D8 chronicity, crisis and procedural confirmation"
+                  },
+                  {
+                    "id": "health:D30",
+                    "label": "D30 adversity and vulnerability refinement"
+                  },
+                  {
+                    "id": "health:H1",
+                    "label": "Vitality, constitution and physical resilience"
+                  },
+                  {
+                    "id": "health:H6",
+                    "label": "Disease, imbalance, treatment and daily management"
+                  },
+                  {
+                    "id": "health:H8",
+                    "label": "Chronicity, crisis, surgery and hidden vulnerability"
+                  },
+                  {
+                    "id": "health:H12",
+                    "label": "Rest, hospitalization, drain and convalescence"
+                  },
+                  {
+                    "id": "health:MedicalGrahas",
+                    "label": "Medical grahas with exact calculated relationships"
+                  },
+                  {
+                    "id": "health:ProtectiveFactors",
+                    "label": "Calculated protective and recovery factors"
+                  },
+                  {
+                    "id": "health:DashaActivation",
+                    "label": "Explicit dasha activation of a natal health theme"
+                  },
+                  {
+                    "id": "health:TransitConfirmation",
+                    "label": "Dated transit confirmation of the same health theme"
+                  }
+                ],
+                "id": "ar:requiresFactor",
+                "label": "Required astrology factors"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:CapNatalFoundation",
+                    "label": "Calculate natal health foundation"
+                  },
+                  {
+                    "id": "health:CapMedicalDivisionals",
+                    "label": "Calculate medical divisional confirmations"
+                  },
+                  {
+                    "id": "health:CapPlanetCondition",
+                    "label": "Calculate severity and protection modifiers"
+                  },
+                  {
+                    "id": "health:CapCategoryFilter",
+                    "label": "Apply health question category policy"
+                  },
+                  {
+                    "id": "health:CapDashaActivation",
+                    "label": "Calculate health dasha activation"
+                  },
+                  {
+                    "id": "health:CapTransitConfirmation",
+                    "label": "Calculate dated transit confirmation"
+                  },
+                  {
+                    "id": "health:CapMedicalTriage",
+                    "label": "Apply medical emergency triage"
+                  }
+                ],
+                "id": "ar:requiresCapability",
+                "label": "Required calculator capabilities"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:ModePeriodForecast",
+                    "label": "Time-bound health forecast"
+                  }
+                ],
+                "id": "ar:allowedAnswerMode",
+                "label": "Answer mode"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "id": "health:SectionDirectAnswer",
+                            "label": "Direct answer with medical framing"
+                          },
+                          {
+                            "id": "health:SectionNatalEvidence",
+                            "label": "Natal vulnerability evidence"
+                          },
+                          {
+                            "id": "health:SectionActivation",
+                            "label": "Dated activation chain"
+                          },
+                          {
+                            "id": "health:SectionProtection",
+                            "label": "Protective and recovery factors"
+                          },
+                          {
+                            "id": "health:SectionGuidance",
+                            "label": "Responsible practical guidance"
+                          }
+                        ],
+                        "id": "ar:hasOutputSection",
+                        "label": "Output sections"
+                      }
+                    ],
+                    "id": "health:ContractTimed",
+                    "label": "Time-bound health answer"
+                  }
+                ],
+                "id": "ar:usesAnswerContract",
+                "label": "Answer contract"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EvidenceSurgery",
+                    "label": "Evidence Surgery"
+                  }
+                ],
+                "id": "ar:hasEvidencePolicy",
+                "label": "Evidence policy"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:RuleNatalFirst",
+                    "label": "Rule Natal First"
+                  },
+                  {
+                    "id": "health:RuleTimedActivation",
+                    "label": "Rule Timed Activation"
+                  },
+                  {
+                    "id": "health:RuleProtectionModifies",
+                    "label": "Rule Protection Modifies"
+                  }
+                ],
+                "id": "ar:evaluatesRule",
+                "label": "Decision rules"
+              },
+              {
+                "children": [
+                  {
+                    "id": "health:EmergencyTriageFirst",
+                    "label": "Emergency Triage First"
+                  },
+                  {
+                    "id": "health:NoDiagnosis",
+                    "label": "No Diagnosis"
+                  },
+                  {
+                    "id": "health:NoSurgeryCertainty",
+                    "label": "No Surgery Certainty"
+                  },
+                  {
+                    "id": "health:NoActivationWithoutChain",
+                    "label": "No Activation Without Chain"
+                  },
+                  {
+                    "id": "health:StrictRequestedHorizon",
+                    "label": "Strict Requested Horizon"
+                  },
+                  {
+                    "id": "health:NoTreatmentAdvice",
+                    "label": "No Treatment Advice"
+                  }
+                ],
+                "id": "ar:hasGuardrail",
+                "label": "Guardrails"
+              }
+            ],
+            "id": "health:SurgeryTiming",
+            "label": "Surgery or procedure timing susceptibility"
+          }
+        ],
+        "id": "ar:QuestionType",
+        "label": "Question type"
+      },
+      "guardrails": [
+        "health:EmergencyTriageFirst",
+        "health:NoDiagnosis",
+        "health:NoSurgeryCertainty",
+        "health:NoActivationWithoutChain",
+        "health:StrictRequestedHorizon",
+        "health:NoTreatmentAdvice"
+      ],
+      "ontology_resource": "health:SurgeryTiming",
+      "override_condition": null,
+      "question_example": "Is this a sensitive period for surgery?",
+      "question_label": "Surgery or procedure timing susceptibility",
+      "required_capabilities": [
+        "health:CapNatalFoundation",
+        "health:CapMedicalDivisionals",
+        "health:CapPlanetCondition",
+        "health:CapCategoryFilter",
+        "health:CapDashaActivation",
+        "health:CapTransitConfirmation",
+        "health:CapMedicalTriage"
+      ],
+      "required_factors": [
+        "health:D1",
+        "health:D8",
+        "health:D30",
+        "health:H1",
+        "health:H6",
+        "health:H8",
+        "health:H12",
+        "health:MedicalGrahas",
+        "health:ProtectiveFactors",
+        "health:DashaActivation",
+        "health:TransitConfirmation"
+      ]
+    }
+  }
+}

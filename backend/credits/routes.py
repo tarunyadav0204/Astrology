@@ -45,6 +45,7 @@ PLAY_PAYMENT_SERVICE_TIMEOUT_SECONDS = float(os.getenv("PLAY_PAYMENT_SERVICE_TIM
 SPEECH_BILLING_MIN_START_MINUTES = 2
 SPEECH_BILLING_HEARTBEAT_INTERVAL_SECONDS = 10
 SPEECH_BILLING_RECONNECT_GRACE_SECONDS = 45
+SPEECH_BILLING_MAX_CONFIRMED_INTERVAL_SECONDS = SPEECH_BILLING_HEARTBEAT_INTERVAL_SECONDS * 2
 
 # Env var name preferred; GOOGLE_SERVICE_ACCOUNT_KEY accepted as fallback.
 # Keep trying fallback values if the preferred env points at a missing file.
@@ -127,6 +128,49 @@ def _speech_minutes_from_seconds(seconds: int) -> int:
     return max(1, int(math.ceil(max(1, int(seconds or 0)) / 60.0)))
 
 
+def _speech_confirmed_interval_seconds(seconds_since_last_confirmation: int) -> int:
+    """Count only a timely interval between two client confirmations.
+
+    Browser timers and mobile apps can be suspended while a page is hidden or
+    an app is backgrounded. A late heartbeat must therefore never turn that
+    unconfirmed wall-clock gap into billable speech time.
+    """
+    gap = max(0, int(seconds_since_last_confirmation or 0))
+    if gap > SPEECH_BILLING_MAX_CONFIRMED_INTERVAL_SECONDS:
+        return 0
+    return gap
+
+
+def _speech_confirmed_elapsed_seconds(stored_seconds: int, confirmation_gap_seconds: int) -> int:
+    return max(0, int(stored_seconds or 0)) + _speech_confirmed_interval_seconds(
+        confirmation_gap_seconds
+    )
+
+
+def _speech_billing_description(minutes: int, seconds: int, per_minute_cost: int, reason: str) -> str:
+    return (
+        f"Talk To Tara call: {int(minutes)} started minute(s), {int(seconds)}s "
+        f"at {int(per_minute_cost)} credits/min ({reason})"
+    )
+
+
+def _speech_billing_metadata(
+    session_id: str,
+    minutes: int,
+    seconds: int,
+    per_minute_cost: int,
+    reason: str,
+) -> str:
+    return json.dumps({
+        "billing_type": "speech",
+        "speech_billing_session_id": str(session_id),
+        "billed_started_minutes": int(minutes),
+        "elapsed_seconds": int(seconds),
+        "per_minute_cost": int(per_minute_cost),
+        "ended_reason": str(reason),
+    })
+
+
 def _iso_utc_now() -> str:
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat()
@@ -152,14 +196,15 @@ def _settle_stale_speech_session_locked(conn, row, *, reason: str = "connection_
             conn,
             """
             INSERT INTO credit_transactions
-            (userid, transaction_type, amount, balance_after, source, reference_id, description)
-            VALUES (?, 'spent', ?, ?, 'feature_usage', 'speech_chat_minutes', ?)
+            (userid, transaction_type, amount, balance_after, source, reference_id, description, metadata)
+            VALUES (?, 'spent', ?, ?, 'feature_usage', 'speech_chat_minutes', ?, ?)
             """,
             (
                 userid,
                 -charge,
                 new_balance,
-                f"Talk To Tara call: {minutes} minute(s), {elapsed_seconds}s ({reason})",
+                _speech_billing_description(minutes, elapsed_seconds, per_minute_cost, reason),
+                _speech_billing_metadata(session_id, minutes, elapsed_seconds, per_minute_cost, reason),
             ),
         )
     execute(
@@ -2521,7 +2566,7 @@ async def start_speech_billing_session(current_user: User = Depends(get_current_
             conn,
             """
             SELECT session_id, userid, per_minute_cost,
-                   GREATEST(1, EXTRACT(EPOCH FROM (last_heartbeat_at - started_at)))::INTEGER AS confirmed_elapsed,
+                   GREATEST(0, elapsed_seconds)::INTEGER AS confirmed_elapsed,
                    GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_heartbeat_at)))::INTEGER AS heartbeat_gap,
                    starting_balance, original_per_minute_cost, discount_percent,
                    required_start_credits, started_at
@@ -2538,6 +2583,17 @@ async def start_speech_billing_session(current_user: User = Depends(get_current_
                 active_balance = int(credit_service.get_user_credits(current_user.userid, conn=conn) or 0)
                 active_rate = max(1, int(active[2] or per_minute_cost))
                 max_seconds = int((active_balance // active_rate) * 60)
+                # A reconnect confirms that the conversation is active again,
+                # but it does not confirm the offline gap since the old lease.
+                execute(
+                    conn,
+                    """
+                    UPDATE speech_billing_sessions
+                    SET last_heartbeat_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                    WHERE session_id = ? AND userid = ? AND status = 'active'
+                    """,
+                    (str(active[0]), current_user.userid),
+                )
                 conn.commit()
                 return {
                     "session_id": str(active[0]),
@@ -2637,7 +2693,8 @@ async def heartbeat_speech_billing_session(
             conn,
             """
             SELECT status, per_minute_cost,
-                   GREATEST(1, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)))::INTEGER AS elapsed_seconds
+                   GREATEST(0, elapsed_seconds)::INTEGER AS confirmed_elapsed_seconds,
+                   GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_heartbeat_at)))::INTEGER AS confirmation_gap
             FROM speech_billing_sessions
             WHERE session_id = ? AND userid = ?
             FOR UPDATE
@@ -2653,14 +2710,16 @@ async def heartbeat_speech_billing_session(
         per_minute_cost = max(1, int(row[1] or 1))
         max_seconds = int((balance // per_minute_cost) * 60)
         if status == "active":
+            elapsed_seconds = _speech_confirmed_elapsed_seconds(elapsed_seconds, row[3])
             execute(
                 conn,
                 """
                 UPDATE speech_billing_sessions
-                SET last_heartbeat_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                SET elapsed_seconds = ?, last_heartbeat_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE session_id = ? AND userid = ? AND status = 'active'
                 """,
-                (session_id, current_user.userid),
+                (elapsed_seconds, session_id, current_user.userid),
             )
         conn.commit()
     return {
@@ -2719,7 +2778,8 @@ async def end_speech_billing_session(
             conn,
             """
             SELECT session_id, userid, status, per_minute_cost,
-                   EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at))::INTEGER AS elapsed_seconds
+                   GREATEST(0, elapsed_seconds)::INTEGER AS confirmed_elapsed_seconds,
+                   GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_heartbeat_at)))::INTEGER AS confirmation_gap
             FROM speech_billing_sessions
             WHERE session_id = ? AND userid = ?
             FOR UPDATE
@@ -2752,7 +2812,7 @@ async def end_speech_billing_session(
             }
 
         per_minute_cost = max(1, int(row[3] or 1))
-        elapsed_seconds = max(1, int(row[4] or 1))
+        elapsed_seconds = max(1, _speech_confirmed_elapsed_seconds(row[4], row[5]))
         minutes = _speech_minutes_from_seconds(elapsed_seconds)
         charge = max(1, minutes * per_minute_cost)
         balance = int(credit_service.get_user_credits(current_user.userid, conn=conn) or 0)
@@ -2767,14 +2827,15 @@ async def end_speech_billing_session(
             conn,
             """
             INSERT INTO credit_transactions
-            (userid, transaction_type, amount, balance_after, source, reference_id, description)
-            VALUES (?, 'spent', ?, ?, 'feature_usage', 'speech_chat_minutes', ?)
+            (userid, transaction_type, amount, balance_after, source, reference_id, description, metadata)
+            VALUES (?, 'spent', ?, ?, 'feature_usage', 'speech_chat_minutes', ?, ?)
             """,
             (
                 current_user.userid,
                 -charge,
                 new_balance,
-                f"Talk To Tara call: {minutes} minute(s), {elapsed_seconds}s ({reason})",
+                _speech_billing_description(minutes, elapsed_seconds, per_minute_cost, reason),
+                _speech_billing_metadata(session_id, minutes, elapsed_seconds, per_minute_cost, reason),
             ),
         )
         execute(

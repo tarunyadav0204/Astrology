@@ -927,7 +927,7 @@ def build_answer_spec(query_plan: Dict[str, Any], verdict: Dict[str, Any], ledge
             if verdict.get("direction") == "insufficient_option_evidence"
             else "The option scores are too close to justify a winner. Say it is a close call, give the distinct best window and activation logic for each option, and ask which path is becoming concrete in real life."
             if verdict.get("direction") == "close_call"
-            else "No body-area evidence is available. Do not name an organ, body system, symptom, or recovery window. State only the supported general pressure and ask which area is actually troubling the user."
+            else "No body-area evidence is available. Do not name an organ, body system, symptom, or condition. Still answer the requested general health outlook and any supported timing phases; body-area specificity is optional, not a reason to refuse the whole reading."
             if "parashari.health_body_area" in (verdict.get("missing_required_capabilities") or [])
             else None
         ),

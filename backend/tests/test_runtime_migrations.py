@@ -46,3 +46,13 @@ def test_instant_billing_settings_seeds_support_legacy_credit_settings_schema():
         assert "\nON CONFLICT (setting_key)" not in sql
         assert "WHERE NOT EXISTS" in sql
         assert f"WHERE setting_key = '{setting_key}'" in sql
+
+
+def test_talk_to_tara_rate_correction_runs_only_once_and_preserves_future_admin_changes():
+    sql = (MIGRATIONS / "set_talk_to_tara_rate_five.sql").read_text(encoding="utf-8")
+    assert "runtime_data_migrations" in sql
+    assert "ON CONFLICT (migration_key) DO NOTHING" in sql
+    assert "SET setting_value = CASE WHEN setting_value = 7 THEN 5 ELSE setting_value END" in sql
+    assert "discount = CASE WHEN discount = 7 THEN NULL ELSE discount END" in sql
+    assert "AND (setting_value = 7 OR discount = 7)" in sql
+    assert "EXISTS (SELECT 1 FROM applied_now)" in sql
