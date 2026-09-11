@@ -48,7 +48,13 @@ export function buildConversationalClosing(answer, followUps = [], language = 'e
         const normalizedAnswer = comparableSpeechText(answer);
         const normalizedFollowUp = comparableSpeechText(firstFollowUp);
         if (normalizedFollowUp && normalizedAnswer.endsWith(normalizedFollowUp)) return '';
-        return firstFollowUp;
+        // Suggestions are commonly phrased in the user's first person. Reading
+        // them verbatim would make Tara sound as though she is asking about
+        // herself. The normal path uses the guide generator; this is its safe
+        // offline fallback.
+        return String(language || '').toLowerCase().startsWith('hi')
+            ? 'अगर आप चाहें, तो मैं इसी से जुड़े अगले विषय पर और बता सकती हूँ।'
+            : 'If you would like, I can continue with the next related part of this reading.';
     }
     return String(language || '').toLowerCase().startsWith('hi')
         ? 'अब आप किस बात को थोड़ा और समझना चाहेंगे?'

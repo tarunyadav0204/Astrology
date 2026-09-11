@@ -56,8 +56,10 @@ const BACKEND_RECORDING_SILENCE_STOP_MS = 4200;
 const BACKEND_RECORDING_LONG_SILENCE_STOP_MS = 7000;
 const BACKEND_RECORDING_LONG_QUESTION_AFTER_MS = 5000;
 const BACKEND_RECORDING_SPEECH_THRESHOLD_DB = -55;
-const NATIVE_PARTIAL_STABLE_SUBMIT_MS = 1300;
-const NATIVE_MAX_LISTENING_MS = 14000;
+// A brief pause often means the user is thinking, especially for a detailed
+// astrology question. Wait for a deliberate three-second pause before ending.
+const NATIVE_PARTIAL_STABLE_SUBMIT_MS = 3000;
+const NATIVE_MAX_LISTENING_MS = 30000;
 const NATIVE_READY_TIMEOUT_MS = 4500;
 const POST_TTS_LISTEN_DELAY_MS = Platform.OS === 'android' ? 1200 : 900;
 const POST_TTS_ECHO_GUARD_MS = Platform.OS === 'android' ? 250 : 200;
@@ -153,17 +155,6 @@ const logSpeechDebug = async (label, payload = {}) => {
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
-/** i18n keys for short spoken handoff after listening → thinking (rotate to avoid repetition). */
-const THINKING_HANDOFF_KEYS = [
-  'speechChat.thinkingHandoff1',
-  'speechChat.thinkingHandoff2',
-  'speechChat.thinkingHandoff3',
-];
-const THINKING_HANDOFF_DEFAULTS = [
-  'Got it. Give me a moment.',
-  'Okay, I’m looking at that now.',
-  'I have what I need. Let me read that for you.',
-];
 const SPEECH_CHAT_TTS_PROVIDER = 'google';
 const SPEECH_GREETING_CACHE_VERSION = 'v3';
 const SPEECH_LANGUAGE_OPTIONS = [
@@ -190,10 +181,22 @@ const estimateSpeechDurationMs = (text) => {
   return Math.max(2600, Math.min(42000, estimate));
 };
 
+const progressiveSpeechCaption = (text, positionMs, durationMs, minimumWords = 1) => {
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return '';
+  const ratio = durationMs > 0 ? Math.max(0, Math.min(1, positionMs / durationMs)) : 0;
+  const count = Math.min(words.length, Math.max(minimumWords, Math.ceil(words.length * ratio)));
+  return words.slice(0, count).join(' ');
+};
+
 const buildSpeechAfterAnswerPrompt = (turnLanguage, followUpQuestion, translate) => {
   const lang = normalizeLanguageCode(turnLanguage || 'english');
   const question = String(followUpQuestion || '').trim();
-  if (question) return question;
+  if (question) {
+    return lang === 'hindi'
+      ? 'अगर आप चाहें, तो मैं इसी से जुड़े अगले विषय पर और बता सकती हूँ।'
+      : 'If you would like, I can continue with the next related part of this reading.';
+  }
   if (lang === 'hindi') {
     return 'अब आप किस बात को थोड़ा और समझना चाहेंगे?';
   }
@@ -224,6 +227,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const [turns, setTurns] = useState([]);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [streamingAnswer, setStreamingAnswer] = useState('');
+  const [processingBridgeCaption, setProcessingBridgeCaption] = useState('');
   const [followUps, setFollowUps] = useState([]);
   const [errorText, setErrorText] = useState('');
   const [handsFreeEnabled, setHandsFreeEnabled] = useState(true);
@@ -254,7 +258,10 @@ export default function SpeechChatScreen({ navigation, route }) {
   const handsFreeRestartRef = useRef(false);
   const greetedRef = useRef(false);
   const greetingPlaybackEpochRef = useRef(0);
-  const thinkingLeadInIndexRef = useRef(0);
+  const processingBridgeEpochRef = useRef(0);
+  const processingBridgeSpeakingRef = useRef(false);
+  const recentProcessingBridgeLinesRef = useRef([]);
+  const pendingSpokenFollowUpRef = useRef('');
   const recordingRef = useRef(null);
   const recordingStartPromiseRef = useRef(null);
   const recordingTeardownPromiseRef = useRef(Promise.resolve());
@@ -295,7 +302,12 @@ export default function SpeechChatScreen({ navigation, route }) {
   const billingStartMsRef = useRef(0);
   const lastCreditWarningBeepRef = useRef(0);
   const billingEndingRef = useRef(false);
+  const micRequestedAtRef = useRef(0);
+  const firstPartialReportedRef = useRef(false);
+  const questionSubmittedAtRef = useRef(0);
+  const firstAnswerTextReportedRef = useRef(false);
   const pulseAnim = useRef(new Animated.Value(0)).current;
+  const micLevelAnim = useRef(new Animated.Value(0.15)).current;
   const cardPulseAnim = useRef(new Animated.Value(0)).current;
   const sparkleAnims = useRef(
     Array.from({ length: 8 }, () => new Animated.Value(0))
@@ -304,6 +316,22 @@ export default function SpeechChatScreen({ navigation, route }) {
   const getSpeechTranslator = (selectedLanguage = language) => (
     i18n.getFixedT(normalizeLanguageCode(selectedLanguage) === 'hindi' ? 'hindi' : 'english')
   );
+
+  const emitSpeechMetric = (event, options = {}) => {
+    speechAPI.logTelemetry({
+      event,
+      platform: Platform.OS,
+      session_id: billingSessionRef.current?.session_id || null,
+      turn_id: activeTurnSerialRef.current ? String(activeTurnSerialRef.current) : null,
+      value_ms: options.valueMs == null ? null : Math.max(0, Math.round(options.valueMs)),
+      success: options.success == null ? null : Boolean(options.success),
+      metadata: {
+        language: normalizeLanguageCode(activeTurnLanguageRef.current || language),
+        hands_free: Boolean(handsFreeEnabledRef.current),
+        ...(options.metadata || {}),
+      },
+    }).catch(() => {});
+  };
 
   const buildGreetingText = () => {
     const speechT = getSpeechTranslator();
@@ -494,6 +522,14 @@ export default function SpeechChatScreen({ navigation, route }) {
       const next = String(partial || '').trim();
       if (!next || !mountedRef.current) return;
       latestNativeTranscriptRef.current = next;
+      if (!firstPartialReportedRef.current && micRequestedAtRef.current) {
+        firstPartialReportedRef.current = true;
+        emitSpeechMetric('first_partial_transcript_ms', {
+          valueMs: Date.now() - micRequestedAtRef.current,
+          success: true,
+          metadata: { recognizer: 'native' },
+        });
+      }
       nativeNoSpeechRetryCountRef.current = 0;
       setNativeRecognizerReady(true);
       setNativeRecognizerPhase('ready');
@@ -505,9 +541,21 @@ export default function SpeechChatScreen({ navigation, route }) {
     const debugSubscription = speechRecognition.addDebugListener?.((event) => {
       logSpeechDebug('nativeRecognizer', event || {});
       const eventName = String(event?.event || '');
+      const rmsDb = Number(event?.rmsDb ?? event?.rms_db ?? event?.metering);
+      if (Number.isFinite(rmsDb)) {
+        micLevelAnim.setValue(Math.max(0.12, Math.min(1, (rmsDb + 60) / 60)));
+      }
       if (['onReadyForSpeech', 'onBeginningOfSpeech', 'onPartialResults'].includes(eventName)) {
         if (mountedRef.current) setNativeRecognizerReady(true);
         if (mountedRef.current) setNativeRecognizerPhase('ready');
+        if (eventName === 'onReadyForSpeech') {
+          Vibration.vibrate(20);
+          emitSpeechMetric('microphone_ready_ms', {
+            valueMs: micRequestedAtRef.current ? Date.now() - micRequestedAtRef.current : null,
+            success: true,
+            metadata: { recognizer: 'native' },
+          });
+        }
         if (nativeReadyTimerRef.current) {
           clearTimeout(nativeReadyTimerRef.current);
           nativeReadyTimerRef.current = null;
@@ -693,6 +741,10 @@ export default function SpeechChatScreen({ navigation, route }) {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       appStateRef.current = nextState;
+      if (nextState === 'active' && statusRef.current === 'speaking') {
+        getTextToSpeech().resumeCurrentSpeech?.().catch?.(() => {});
+        emitSpeechMetric('playback_resumed', { success: true, metadata: { app_state: nextState } });
+      }
       if (
         nextState === 'active'
         && resumeHandsFreeOnActiveRef.current
@@ -1005,6 +1057,8 @@ export default function SpeechChatScreen({ navigation, route }) {
 
     startListeningInFlightRef.current = true;
     try {
+      micRequestedAtRef.current = Date.now();
+      firstPartialReportedRef.current = false;
       await logSpeechDebug('startListening.begin', { source, status, stopCurrentSpeech });
       setNativeRecognizerReady(false);
       setNativeRecognizerPhase('starting');
@@ -1281,6 +1335,7 @@ export default function SpeechChatScreen({ navigation, route }) {
     try {
       await wait(POST_TTS_LISTEN_DELAY_MS);
       await startListening({ source: 'handsFreeAfterAnswer', stopCurrentSpeech: false });
+      emitSpeechMetric('hands_free_restart', { success: true, metadata: { reason: 'after_answer' } });
     } catch (error) {
       if (!mountedRef.current) return;
       setErrorText(error?.message || t('speechChat.genericError', 'Something went wrong. Please try again.'));
@@ -1438,21 +1493,6 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
   };
 
-  /** Brief natural line when recognition is done so the jump to “thinking” is not silent. */
-  const speakThinkingHandoff = async () => {
-    if (!mountedRef.current) return;
-    await releaseSpeechRecognizer();
-    const i = thinkingLeadInIndexRef.current % THINKING_HANDOFF_KEYS.length;
-    thinkingLeadInIndexRef.current += 1;
-    const speechT = getSpeechTranslator(activeTurnLanguageRef.current || language);
-    const phrase = speechT(THINKING_HANDOFF_KEYS[i], THINKING_HANDOFF_DEFAULTS[i]);
-    try {
-      await speakWithAvatar(phrase, { language });
-    } catch {
-      // ignore short transition TTS failures
-    }
-  };
-
   const startBackendRecording = async () => {
     const permission = await Audio.requestPermissionsAsync();
     if (permission?.status !== 'granted') {
@@ -1566,6 +1606,12 @@ export default function SpeechChatScreen({ navigation, route }) {
     };
     recordingRef.current = recording;
     listeningModeRef.current = 'backend';
+    Vibration.vibrate(20);
+    emitSpeechMetric('microphone_ready_ms', {
+      valueMs: micRequestedAtRef.current ? Date.now() - micRequestedAtRef.current : null,
+      success: true,
+      metadata: { recognizer: 'backend' },
+    });
     recording.setOnRecordingStatusUpdate?.((recStatus) => {
       handleBackendRecordingStatus(recStatus, 'status_update');
     });
@@ -1587,6 +1633,7 @@ export default function SpeechChatScreen({ navigation, route }) {
           const elapsedMs = now - recordingStartedAtRef.current;
           const metering = Number(recStatus?.metering);
           if (Number.isFinite(metering)) {
+            micLevelAnim.setValue(Math.max(0.12, Math.min(1, (metering + 60) / 60)));
             recordingMeterSamplesRef.current.push(metering);
             if (recordingMeterSamplesRef.current.length > 80) {
               recordingMeterSamplesRef.current = recordingMeterSamplesRef.current.slice(-80);
@@ -1781,6 +1828,83 @@ export default function SpeechChatScreen({ navigation, route }) {
     });
   };
 
+  const cancelProcessingBridge = async (reason = 'cancelled', { interruptCurrent = true } = {}) => {
+    processingBridgeEpochRef.current += 1;
+    if (!processingBridgeSpeakingRef.current) {
+      setProcessingBridgeCaption('');
+      return;
+    }
+    if (!interruptCurrent) {
+      emitSpeechMetric('processing_bridge_cancelled', {
+        success: true,
+        metadata: { cancel_reason: `${reason}_after_current_line` },
+      });
+      const gracefulDeadline = Date.now() + 20000;
+      while (mountedRef.current && processingBridgeSpeakingRef.current && Date.now() < gracefulDeadline) {
+        await wait(40);
+      }
+      if (processingBridgeSpeakingRef.current) {
+        processingBridgeSpeakingRef.current = false;
+        await getTextToSpeech().stop();
+      }
+      if (mountedRef.current) setProcessingBridgeCaption('');
+      return;
+    }
+    setProcessingBridgeCaption('');
+    processingBridgeSpeakingRef.current = false;
+    await getTextToSpeech().stop();
+    emitSpeechMetric('processing_bridge_cancelled', {
+      success: true,
+      metadata: { cancel_reason: reason },
+    });
+  };
+
+  const startProcessingBridge = async (question, turnSerial, turnLanguage, submittedAt) => {
+    const epoch = processingBridgeEpochRef.current + 1;
+    processingBridgeEpochRef.current = epoch;
+    const generatedAt = Date.now();
+    try {
+      const response = await speechAPI.getGuideLines({
+        scene: 'processing',
+        language: turnLanguage,
+        userName: userName || null,
+        chartName: birthData?.name || null,
+        question,
+        handsFree: handsFreeEnabledRef.current,
+        recentLines: recentProcessingBridgeLinesRef.current.slice(-20),
+        answerStyle,
+      });
+      if (!mountedRef.current || activeTurnSerialRef.current !== turnSerial || processingBridgeEpochRef.current !== epoch) return;
+      const data = response?.data || {};
+      const lines = Array.isArray(data.lines)
+        ? data.lines.map((line) => String(line || '').trim()).filter(Boolean).slice(0, Number(data.max_lines) || 3)
+        : [];
+      emitSpeechMetric('processing_bridge_generated_ms', {
+        valueMs: Date.now() - generatedAt,
+        success: Boolean(lines.length),
+        metadata: { line_count: lines.length },
+      });
+      if (!lines.length) return;
+      const delayMs = Math.max(0, (Number(data.initial_delay_ms) || 0) - (Date.now() - submittedAt));
+      if (delayMs) await wait(delayMs);
+      for (const line of lines) {
+        if (!mountedRef.current || activeTurnSerialRef.current !== turnSerial || processingBridgeEpochRef.current !== epoch) break;
+        processingBridgeSpeakingRef.current = true;
+        setProcessingBridgeCaption(line);
+        const spoken = await playAvatarLine(line, { language: turnLanguage, segmented: false });
+        processingBridgeSpeakingRef.current = false;
+        if (spoken) recentProcessingBridgeLinesRef.current = [...recentProcessingBridgeLinesRef.current, line].slice(-20);
+        if (!spoken || processingBridgeEpochRef.current !== epoch) break;
+        emitSpeechMetric('processing_bridge_spoken', { success: true });
+        const gapMs = Math.max(0, Number(data.line_gap_ms) || 0);
+        if (gapMs) await wait(gapMs);
+      }
+      if (processingBridgeEpochRef.current === epoch) setProcessingBridgeCaption('');
+    } catch {
+      if (processingBridgeEpochRef.current === epoch) setProcessingBridgeCaption('');
+    }
+  };
+
   const closeSpeechSocket = () => {
     speechSocketPendingTurnsRef.current.forEach((pending) => {
       pending.reject?.(new Error('Speech socket closed'));
@@ -1908,7 +2032,8 @@ export default function SpeechChatScreen({ navigation, route }) {
     question,
     turnLanguage = language,
     streamHandlers = {},
-    suppliedClientRequestId = null
+    suppliedClientRequestId = null,
+    queryContext = null
   ) => {
     if (!USE_SPEECH_WEBSOCKET) {
       throw new Error('Speech websocket disabled');
@@ -1935,7 +2060,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         turn_id: turnId,
         session_id: activeSessionId,
         question,
-        query_context: buildQueryContext(),
+        query_context: queryContext || buildQueryContext(),
         language: turnLanguage || language || 'english',
         response_style: answerStyle,
         speech_billing: false,
@@ -1952,9 +2077,20 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const askInstant = async (question, turnLanguage = language, streamHandlers = {}) => {
     const clientRequestId = `speech_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const offeredFollowUp = pendingSpokenFollowUpRef.current;
+    pendingSpokenFollowUpRef.current = '';
+    const speechQueryContext = buildQueryContext(
+      offeredFollowUp ? { speech_follow_up_offer: offeredFollowUp } : {}
+    );
     if (USE_SPEECH_WEBSOCKET) {
       try {
-        return await askSpeechSocket(question, turnLanguage, streamHandlers, clientRequestId);
+        return await askSpeechSocket(
+          question,
+          turnLanguage,
+          streamHandlers,
+          clientRequestId,
+          speechQueryContext
+        );
       } catch (socketError) {
         logSpeechDebug('speechSocket.fallbackToHttp', {
           message: socketError?.message,
@@ -1973,7 +2109,7 @@ export default function SpeechChatScreen({ navigation, route }) {
     const buildAskBody = (sid) => ({
       session_id: sid,
       question,
-      query_context: buildQueryContext(),
+      query_context: speechQueryContext,
       language: turnLanguage || language || 'english',
       response_style: answerStyle,
       premium_analysis: false,
@@ -2046,38 +2182,125 @@ export default function SpeechChatScreen({ navigation, route }) {
     turnSerial = activeTurnSerialRef.current,
     turnLanguage = activeTurnLanguageRef.current || language
   ) => {
+    const bridgeHandoffPromise = cancelProcessingBridge('answer_complete', { interruptCurrent: false });
     const answer = String(data.content || '').trim();
     if (!answer) {
       throw new Error(t('speechChat.emptyAnswerError', 'Tara finished processing, but no answer text came back. Please try again.'));
     }
+    if (!firstAnswerTextReportedRef.current) {
+      firstAnswerTextReportedRef.current = true;
+      emitSpeechMetric('first_answer_text_ms', {
+        valueMs: questionSubmittedAtRef.current ? Date.now() - questionSubmittedAtRef.current : null,
+        success: true,
+        metadata: { transport: 'completed' },
+      });
+    }
     const nextFollowUps = Array.isArray(data.follow_up_questions)
       ? data.follow_up_questions.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
       : [];
-    const closingLine = buildSpeechAfterAnswerPrompt(
+    const generatedClosingLines = nextFollowUps.length
+      ? await getGuideLines('closing', {
+        language: turnLanguage,
+        followUps: nextFollowUps,
+        answerStyle,
+      })
+      : [];
+    const closingLine = generatedClosingLines[0] || buildSpeechAfterAnswerPrompt(
       turnLanguage,
       nextFollowUps[0],
       getSpeechTranslator(turnLanguage)
     );
     const conversationalAnswer = `${answer}\n\n${closingLine}`.trim();
     const spokenAnswer = conversationalAnswer;
+    const speechTurnId = `speech_${turnSerial}`;
+    const updateSpeechTurn = (answerText, voiceState) => {
+      setTurns((prev) => prev.map((turn) => (
+        turn.id === speechTurnId ? { ...turn, answer: answerText, voiceState } : turn
+      )));
+    };
     setFollowUps(nextFollowUps);
-    setTurns((prev) => [...prev, { question, answer: conversationalAnswer, followUps: nextFollowUps }]);
+    pendingSpokenFollowUpRef.current = nextFollowUps[0] || '';
+    setTurns((prev) => [...prev, {
+      id: speechTurnId,
+      question,
+      answer: '',
+      fullAnswer: conversationalAnswer,
+      voiceState: 'waiting',
+      followUps: nextFollowUps,
+    }]);
     setStreamingAnswer('');
     setCurrentTranscript('');
-    setStatus('speaking');
-    handsFreeRestartRef.current = !!handsFreeEnabledRef.current;
+    const answerCacheKey = `speech-answer:${turnSerial}:${hashGreetingText(spokenAnswer)}`;
+    const prefetchPromise = speechTtsProvider === 'google'
+      ? getTextToSpeech().prefetchServerTts?.(spokenAnswer, {
+        language: turnLanguage || language,
+        cacheKey: answerCacheKey,
+        prepareSpoken: false,
+      })
+      : null;
+    await bridgeHandoffPromise;
     if (!mountedRef.current || activeTurnSerialRef.current !== turnSerial) return;
+    Promise.resolve(prefetchPromise).catch(() => null);
+    handsFreeRestartRef.current = !!handsFreeEnabledRef.current;
+    let answerStarted = false;
+    let fallbackRevealed = false;
+    let captionTimer = null;
+    let hasPlaybackProgress = false;
+    const revealFallbackTimer = setTimeout(() => {
+      if (!answerStarted && mountedRef.current && activeTurnSerialRef.current === turnSerial) {
+        fallbackRevealed = true;
+        updateSpeechTurn(conversationalAnswer, 'fallback');
+      }
+    }, 8000);
     // Use one native audio item for the complete visible answer. The backend
     // concatenates any Google TTS chunks before returning the MP3, so playback
     // remains continuous and can survive a screen lock without waiting for JS.
     const ok = await playAvatarLine(spokenAnswer, {
       language: turnLanguage || language,
+      cacheKey: answerCacheKey,
       segmented: false,
+      onStart: () => {
+        answerStarted = true;
+        clearTimeout(revealFallbackTimer);
+        setStatus('speaking');
+        if (!fallbackRevealed) updateSpeechTurn(progressiveSpeechCaption(conversationalAnswer, 0, 1), 'speaking');
+        const captionStartedAt = Date.now();
+        captionTimer = setInterval(() => {
+          if (hasPlaybackProgress) return;
+          if (!fallbackRevealed) updateSpeechTurn(
+            progressiveSpeechCaption(
+              conversationalAnswer,
+              Date.now() - captionStartedAt,
+              estimateSpeechDurationMs(conversationalAnswer)
+            ),
+            'speaking'
+          );
+        }, 350);
+        if (questionSubmittedAtRef.current) {
+          emitSpeechMetric('first_spoken_audio_ms', {
+            valueMs: Date.now() - questionSubmittedAtRef.current,
+            success: true,
+            metadata: { provider: speechTtsProvider || 'unknown' },
+          });
+        }
+      },
+      onProgress: (positionMs, durationMs) => {
+        if (durationMs > 0 && !fallbackRevealed) {
+          hasPlaybackProgress = true;
+          updateSpeechTurn(
+            progressiveSpeechCaption(conversationalAnswer, positionMs, durationMs),
+            'speaking'
+          );
+        }
+      },
     });
+    if (captionTimer) clearInterval(captionTimer);
+    clearTimeout(revealFallbackTimer);
     if (!mountedRef.current || activeTurnSerialRef.current !== turnSerial) return;
     if (!ok) {
+      updateSpeechTurn(conversationalAnswer, 'fallback');
       if (!mountedRef.current) return;
-      setErrorText(t('speechChat.playbackError', 'I prepared the answer, but audio playback failed. Please read the answer on screen or try again.'));
+      setErrorText(t('speechChat.playbackError', 'Tara could not continue speaking, so the complete answer is shown on screen.'));
       if (handsFreeRestartRef.current && handsFreeEnabledRef.current) {
         await maybeRestartHandsFree();
         return;
@@ -2086,6 +2309,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       setStatus('idle');
       return;
     }
+    updateSpeechTurn(conversationalAnswer, 'done');
     if (!mountedRef.current || activeTurnSerialRef.current !== turnSerial) return;
     if (handsFreeRestartRef.current && handsFreeEnabledRef.current) {
       await maybeRestartHandsFree();
@@ -2125,6 +2349,14 @@ export default function SpeechChatScreen({ navigation, route }) {
     const answerPromise = askInstant(spokenQuestion, turnLanguage, {
       onChunk: (delta, event) => {
         if (!isCurrentTurn()) return;
+        if (!firstAnswerTextReportedRef.current) {
+          firstAnswerTextReportedRef.current = true;
+          emitSpeechMetric('first_answer_text_ms', {
+            valueMs: questionSubmittedAtRef.current ? Date.now() - questionSubmittedAtRef.current : null,
+            success: true,
+            metadata: { transport: 'stream' },
+          });
+        }
         setStreamingAnswer(String(event?.content || delta || '').trimStart());
       },
       onReplace: (content) => {
@@ -2132,6 +2364,12 @@ export default function SpeechChatScreen({ navigation, route }) {
         setStreamingAnswer(String(content || '').trimStart());
       },
     });
+    void startProcessingBridge(
+      spokenQuestion,
+      turnSerial,
+      turnLanguage,
+      questionSubmittedAtRef.current || Date.now()
+    );
 
     try {
       const finalData = await answerPromise;
@@ -2139,6 +2377,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       await handleCompletedAnswer(spokenQuestion, finalData, turnSerial, turnLanguage);
     } catch (error) {
       if (!isCurrentTurn()) return;
+      await cancelProcessingBridge('answer_error');
       setStreamingAnswer('');
       await getTextToSpeech().stop();
       throw error;
@@ -2165,6 +2404,9 @@ export default function SpeechChatScreen({ navigation, route }) {
     setCurrentTranscript(question);
     setErrorText('');
     setStatus('thinking');
+    questionSubmittedAtRef.current = Date.now();
+    firstAnswerTextReportedRef.current = false;
+    emitSpeechMetric('question_submitted', { success: true });
     Vibration.vibrate(35);
     AccessibilityInfo.announceForAccessibility?.(
       t('speechChat.questionSentA11y', 'Question sent. Tara is reading the chart.')
@@ -2219,10 +2461,18 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const stopSpeechUiImmediately = () => {
     activeTurnSerialRef.current += 1;
+    processingBridgeEpochRef.current += 1;
+    processingBridgeSpeakingRef.current = false;
+    setProcessingBridgeCaption('');
     handsFreeRestartRef.current = false;
     startListeningInFlightRef.current = false;
     clearTranscriptSendTimer();
     setPendingTranscript('');
+    setTurns((prev) => prev.map((turn) => (
+      ['waiting', 'speaking'].includes(turn.voiceState) && turn.fullAnswer
+        ? { ...turn, answer: turn.fullAnswer, voiceState: 'stopped' }
+        : turn
+    )));
     if (speakingWatchdogRef.current) {
       clearTimeout(speakingWatchdogRef.current);
       speakingWatchdogRef.current = null;
@@ -2383,7 +2633,7 @@ export default function SpeechChatScreen({ navigation, route }) {
     reviewing: t('speechChat.statusReviewing', 'Check your question — sending shortly'),
     thinking: t('speechChat.statusThinking', 'Reading the chart...'),
     speaking: speechPreparing
-      ? t('speechChat.statusPreparingSpeech', 'Preparing Tara’s voice...')
+      ? t('speechChat.statusPreparingSpeech', 'Tara is about to speak...')
       : t('speechChat.statusSpeaking', 'Speaking the answer... tap pause to stop hands-free'),
   }[status] || '';
 
@@ -2561,6 +2811,14 @@ export default function SpeechChatScreen({ navigation, route }) {
               {t('speechChat.liveBadge', 'Live')}
             </Text>
           </View>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('AccountSecurity')}
+            style={[styles.privacyButton, { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('speechChat.privacyControls', 'Voice privacy and saved chat controls')}
+          >
+            <Ionicons name="shield-checkmark-outline" size={18} color={screenPalette.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.callMeter, { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong }]}>
@@ -2675,12 +2933,16 @@ export default function SpeechChatScreen({ navigation, route }) {
                 <Text style={[styles.bubbleLabel, { color: screenPalette.textSecondary }]}>You asked</Text>
                 <Text style={[styles.bubbleText, { color: screenPalette.text }]}>{turn.question}</Text>
               </View>
-              <View style={[styles.answerBubble, { backgroundColor: screenPalette.surfaceStrong, borderColor: screenPalette.border }]}>
-                <Text style={[styles.bubbleLabel, { color: screenPalette.textSecondary }]}>
-                  {t('speechChat.answerBubbleLabel', 'Tara answered')}
-                </Text>
-                <Text style={[styles.bubbleText, { color: screenPalette.text }]}>{turn.answer}</Text>
-              </View>
+              {turn.answer ? (
+                <View style={[styles.answerBubble, { backgroundColor: screenPalette.surfaceStrong, borderColor: screenPalette.border }]}>
+                  <Text style={[styles.bubbleLabel, { color: screenPalette.textSecondary }]}>
+                    {turn.voiceState === 'speaking'
+                      ? t('speechChat.speaking', 'Tara is speaking')
+                      : t('speechChat.answerBubbleLabel', 'Tara answered')}
+                  </Text>
+                  <Text style={[styles.bubbleText, { color: screenPalette.text }]}>{turn.answer}</Text>
+                </View>
+              ) : null}
             </View>
           ))}
 
@@ -2748,9 +3010,12 @@ export default function SpeechChatScreen({ navigation, route }) {
             </Animated.View>
           ) : null}
 
-          {streamingAnswer ? (
+          {processingBridgeCaption && status === 'thinking' ? (
             <Animated.View style={[styles.answerBubble, { backgroundColor: screenPalette.surfaceStrong, borderColor: screenPalette.border }]}>
-              <Text style={[styles.bubbleText, { color: screenPalette.text }]}>{streamingAnswer}</Text>
+              <Text style={[styles.bubbleLabel, { color: screenPalette.textSecondary }]}>
+                {t('speechChat.answering', 'Tara is answering')}
+              </Text>
+              <Text style={[styles.bubbleText, { color: screenPalette.text }]}>{processingBridgeCaption}</Text>
             </Animated.View>
           ) : null}
         </ScrollView>
@@ -2899,7 +3164,16 @@ export default function SpeechChatScreen({ navigation, route }) {
                         styles.voiceWaveBar,
                         {
                           backgroundColor: screenPalette.primary,
-                          transform: [{ scaleY: status === 'idle' ? scale : thinkingScale }],
+                          transform: [{
+                            scaleY: status === 'listening'
+                              ? micLevelAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [Math.max(0.18, scale * 0.35), Math.min(1, 0.58 + scale * 0.42)],
+                                })
+                              : status === 'idle'
+                                ? scale
+                                : thinkingScale,
+                          }],
                         },
                       ]}
                     />
@@ -3053,6 +3327,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
+  },
+  privacyButton: {
+    width: 34,
+    height: 34,
+    borderWidth: 1,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 19,

@@ -3,10 +3,42 @@ from __future__ import annotations
 import re
 
 
+_INTERNAL_MARKER_NAMESPACE = (
+    r"(?:SH_D1_H\d*|HOME_|HEALTH_EVIDENCE_|RELATIVE_PROFILE_|MARRIED_LIFE_)"
+)
 _INTERNAL_MARKER_START = re.compile(
-    r"\[\[(?:SH_D1_H\d*|HOME_|HEALTH_EVIDENCE_|RELATIVE_PROFILE_|MARRIED_LIFE_)",
+    rf"\[\[{_INTERNAL_MARKER_NAMESPACE}",
     flags=re.IGNORECASE,
 )
+_COMPLETE_MACHINE_MARKER = re.compile(
+    rf"\s*\[\[{_INTERNAL_MARKER_NAMESPACE}[A-Z0-9_:\-]*\]\]",
+    flags=re.IGNORECASE,
+)
+_MALFORMED_COMPLETE_MARKER = re.compile(
+    rf"\[\[(?P<body>{_INTERNAL_MARKER_NAMESPACE}[\s\S]*?)\]\]",
+    flags=re.IGNORECASE,
+)
+_MACHINE_MARKER_PREFIX = re.compile(
+    rf"\[\[{_INTERNAL_MARKER_NAMESPACE}[A-Z0-9_:\-]*",
+    flags=re.IGNORECASE,
+)
+_MACHINE_MARKER_BODY_PREFIX = re.compile(
+    rf"{_INTERNAL_MARKER_NAMESPACE}[A-Z0-9_:\-]*",
+    flags=re.IGNORECASE,
+)
+_MACHINE_MARKER_ORPHAN_SUFFIX = re.compile(
+    r"(?:\s+|^)(?:\d*_?H\d+_[A-Z0-9_:\-]+|[A-Z][A-Z0-9_:\-]{5,})\s*$",
+    flags=re.IGNORECASE,
+)
+
+
+def _preserve_prose_from_malformed_marker(match: re.Match[str]) -> str:
+    """Remove marker syntax without deleting prose accidentally placed inside it."""
+    body = str(match.group("body") or "")
+    prefix = _MACHINE_MARKER_BODY_PREFIX.match(body)
+    remainder = body[prefix.end() :] if prefix else body
+    remainder = _MACHINE_MARKER_ORPHAN_SUFFIX.sub("", remainder).strip()
+    return f" {remainder} " if remainder else " "
 
 
 def strip_internal_evidence_markers(text: str, *, provisional: bool = False) -> str:
@@ -19,34 +51,37 @@ def strip_internal_evidence_markers(text: str, *, provisional: bool = False) -> 
     """
     visible = str(text or "")
 
-    # Well-formed bindings. Match only known internal namespaces so ordinary
-    # user-authored double brackets are preserved.
-    visible = re.sub(
-        r"\s*\[\[(?:SH_D1_H\d*|HOME_|HEALTH_EVIDENCE_|RELATIVE_PROFILE_|MARRIED_LIFE_)[\s\S]*?\]\]",
-        "",
+    # Remove only syntactically valid machine tokens. Older cleanup removed
+    # everything from a recognized opening through the next ``]]``. If a
+    # provider inserted natural language inside a damaged token, that erased
+    # a genuine sentence (and could even consume a later valid token).
+    visible = _COMPLETE_MACHINE_MARKER.sub(" ", visible)
+
+    # A damaged but closed marker may contain real answer prose. Preserve that
+    # prose and discard only the recognizable machine prefix/suffix.
+    visible = _MALFORMED_COMPLETE_MARKER.sub(
+        _preserve_prose_from_malformed_marker,
         visible,
-        flags=re.IGNORECASE,
     )
 
     matches = list(_INTERNAL_MARKER_START.finditer(visible))
     if matches:
         last = matches[-1]
         suffix = visible[last.start():]
-        if provisional and "]]" not in suffix:
-            # Do not stream a half-written marker or anything after it. The
-            # next cumulative checkpoint will restore genuine prose once the
-            # binding is complete and stripped.
+        machine_prefix = _MACHINE_MARKER_PREFIX.match(visible, last.start())
+        after_prefix = visible[machine_prefix.end() :] if machine_prefix else ""
+        if provisional and "]]" not in suffix and re.fullmatch(
+            r"[A-Z0-9_:\-]*", after_prefix, flags=re.IGNORECASE
+        ):
+            # Hold a genuinely half-written machine token. If natural prose
+            # already follows the prefix, retain it instead of hiding an
+            # arbitrarily large portion of the streamed answer.
             visible = visible[: last.start()]
         else:
             # A provider can occasionally damage the opaque token by inserting
             # whitespace or natural-language text. Remove the recognizable
             # machine prefix without swallowing the surrounding answer.
-            visible = re.sub(
-                r"\[\[(?:SH_D1_H\d*|HOME_|HEALTH_EVIDENCE_|RELATIVE_PROFILE_|MARRIED_LIFE_)[A-Z0-9_:\-]*",
-                "",
-                visible,
-                flags=re.IGNORECASE,
-            )
+            visible = _MACHINE_MARKER_PREFIX.sub(" ", visible)
 
     if provisional:
         # A provider chunk can stop before enough of the namespace exists for

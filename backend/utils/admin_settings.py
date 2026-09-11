@@ -1136,6 +1136,48 @@ def is_speech_unvalidated_streaming_enabled() -> bool:
     )
 
 
+def is_speech_processing_bridge_enabled() -> bool:
+    """Speak short, question-aware lines while a Talk To Tara answer is prepared."""
+    return _parse_bool_setting(get_setting("speech_processing_bridge_enabled"), default=True)
+
+
+def get_speech_processing_bridge_max_lines() -> int:
+    return _parse_int_setting(
+        get_setting("speech_processing_bridge_max_lines"),
+        default=3,
+        minimum=1,
+        maximum=4,
+    )
+
+
+def get_speech_processing_bridge_initial_delay_ms() -> int:
+    return _parse_int_setting(
+        get_setting("speech_processing_bridge_initial_delay_ms"),
+        default=600,
+        minimum=0,
+        maximum=5000,
+    )
+
+
+def get_speech_processing_bridge_line_gap_ms() -> int:
+    return _parse_int_setting(
+        get_setting("speech_processing_bridge_line_gap_ms"),
+        default=650,
+        minimum=0,
+        maximum=5000,
+    )
+
+
+def get_speech_processing_bridge_model() -> str:
+    value = (get_setting("speech_processing_bridge_model") or "").strip()
+    return value or get_gemini_instant_model()
+
+
+def get_speech_processing_bridge_detail_level() -> str:
+    value = (get_setting("speech_processing_bridge_detail_level") or "").strip().lower()
+    return value if value in {"simple", "balanced", "technical"} else "balanced"
+
+
 def get_speech_chat_user_allowlist() -> Set[int]:
     """Optional CSV user id allowlist for speech chat. Empty set means all users when speech is enabled."""
     raw = (get_setting("speech_chat_user_allowlist") or "").strip()

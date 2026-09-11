@@ -3379,6 +3379,10 @@ async def get_analysis_pricing():
         is_instant_chat_enabled,
         is_speech_chat_enabled,
         get_speech_tts_provider,
+        is_speech_processing_bridge_enabled,
+        get_speech_processing_bridge_max_lines,
+        get_speech_processing_bridge_initial_delay_ms,
+        get_speech_processing_bridge_line_gap_ms,
         get_chat_static_suggestions,
     )
     pricing, pricing_original = _get_pricing_with_originals()
@@ -3389,6 +3393,10 @@ async def get_analysis_pricing():
             "instant_chat_enabled": is_instant_chat_enabled(),
             "speech_chat_enabled": is_speech_chat_enabled(),
             "speech_tts_provider": get_speech_tts_provider(),
+            "speech_processing_bridge_enabled": is_speech_processing_bridge_enabled(),
+            "speech_processing_bridge_max_lines": get_speech_processing_bridge_max_lines(),
+            "speech_processing_bridge_initial_delay_ms": get_speech_processing_bridge_initial_delay_ms(),
+            "speech_processing_bridge_line_gap_ms": get_speech_processing_bridge_line_gap_ms(),
             "chat_static_suggestions": get_chat_static_suggestions(),
         },
     }
@@ -3440,6 +3448,10 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
         instant_chat_enabled_for_user,
         speech_chat_enabled_for_user,
         get_speech_tts_provider,
+        is_speech_processing_bridge_enabled,
+        get_speech_processing_bridge_max_lines,
+        get_speech_processing_bridge_initial_delay_ms,
+        get_speech_processing_bridge_line_gap_ms,
         get_chat_static_suggestions,
     )
     pricing = {}
@@ -3539,6 +3551,10 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
             "instant_chat_enabled": instant_chat_enabled_for_user(current_user.userid),
             "speech_chat_enabled": speech_chat_enabled_for_user(current_user.userid),
             "speech_tts_provider": get_speech_tts_provider(),
+            "speech_processing_bridge_enabled": is_speech_processing_bridge_enabled(),
+            "speech_processing_bridge_max_lines": get_speech_processing_bridge_max_lines(),
+            "speech_processing_bridge_initial_delay_ms": get_speech_processing_bridge_initial_delay_ms(),
+            "speech_processing_bridge_line_gap_ms": get_speech_processing_bridge_line_gap_ms(),
             "chat_static_suggestions": get_chat_static_suggestions(),
         },
     }

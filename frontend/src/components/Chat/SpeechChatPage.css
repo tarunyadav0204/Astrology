@@ -292,6 +292,84 @@
     animation: none;
 }
 
+.speech-chat-review-card {
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 18px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 8px 28px rgba(56, 189, 248, 0.1);
+}
+
+.speech-chat-review-card label {
+    display: block;
+    margin-bottom: 8px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.speech-chat-review-card textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 58px;
+    resize: vertical;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #fff;
+    color: #111827;
+    font: inherit;
+    line-height: 1.45;
+}
+
+.speech-chat-review-alternatives {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 9px;
+}
+
+.speech-chat-review-alternatives button {
+    border: 1px solid rgba(59, 130, 246, 0.18);
+    border-radius: 999px;
+    padding: 6px 10px;
+    background: rgba(239, 246, 255, 0.9);
+    color: #1e3a5f;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.speech-chat-review-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+    margin-top: 10px;
+}
+
+.speech-chat-review-actions button {
+    min-height: 38px;
+    border: 0;
+    border-radius: 999px;
+    padding: 0 15px;
+    background: #2563eb;
+    color: #fff;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.speech-chat-review-actions button.is-secondary {
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: transparent;
+    color: #475569;
+}
+
+.speech-chat-review-actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 @keyframes speech-live-breathe {
     0%,
     100% {
@@ -336,6 +414,49 @@
     font-size: 13px;
     font-weight: 700;
     flex-shrink: 0;
+}
+
+.speech-chat-privacy {
+    flex-shrink: 0;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    padding: 9px 12px;
+    background: rgba(255, 255, 255, 0.68);
+    color: #475569;
+    font-size: 12px;
+}
+
+.speech-chat-privacy summary {
+    cursor: pointer;
+    font-weight: 800;
+    color: #334155;
+}
+
+.speech-chat-privacy p {
+    margin: 9px 0;
+    line-height: 1.45;
+}
+
+.speech-chat-privacy__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.speech-chat-privacy__actions button {
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 999px;
+    padding: 7px 11px;
+    background: #fff;
+    color: #334155;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.speech-chat-privacy__actions button.is-danger {
+    border-color: rgba(220, 38, 38, 0.22);
+    color: #b91c1c;
 }
 
 .speech-chat-controls-shell {
@@ -489,6 +610,11 @@
     background: #38bdf8;
     opacity: 0.95;
     animation: speech-wave-dance 0.55s ease-in-out infinite alternate;
+}
+
+.speech-chat-voice-stage--listening .speech-chat-wave-row--metered .speech-chat-wave-bar {
+    animation: none;
+    transition: transform 90ms linear;
 }
 
 .speech-chat-voice-stage--speaking .speech-chat-wave-bar {

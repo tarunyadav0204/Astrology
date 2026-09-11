@@ -228,11 +228,18 @@ def generate_content_rest_v1beta_stream_result(
         except Exception:
             detail = response.text
         raise RuntimeError(f"Gemini REST stream {response.status_code}: {detail}")
-    response.encoding = response.encoding or "utf-8"
+    # ``text/event-stream`` commonly arrives without a charset. Requests then
+    # assigns ISO-8859-1 rather than leaving ``encoding`` empty. Gemini emits
+    # UTF-8 JSON, so keeping that fallback turns Devanagari bytes into C1
+    # control characters; json.loads rejects the affected SSE event and a
+    # complete span of the answer disappears. Always decode Gemini SSE as
+    # UTF-8 instead of trusting the HTTP fallback.
+    response.encoding = "utf-8"
 
     chunks: List[str] = []
     usage_meta: Dict[str, Any] = {}
     prompt_feedback: Dict[str, Any] = {}
+    malformed_event_count = 0
     # ``requests`` defaults to 512-byte reads here. Gemini SSE events are often
     # smaller than that, so the default can hold several model chunks until the
     # buffer fills and make a genuinely streamed response appear all at once.
@@ -248,6 +255,7 @@ def generate_content_rest_v1beta_stream_result(
         try:
             data = json.loads(payload)
         except json.JSONDecodeError:
+            malformed_event_count += 1
             logger.warning("Ignoring malformed Gemini SSE event: %r", payload[:240])
             continue
         prompt_feedback = data.get("promptFeedback") or prompt_feedback
@@ -272,6 +280,13 @@ def generate_content_rest_v1beta_stream_result(
 
     if prompt_feedback.get("blockReason"):
         raise RuntimeError(f"Prompt blocked: {prompt_feedback}")
+    if malformed_event_count:
+        # Never return and persist a response with holes. The caller's normal
+        # error/retry path is safer than presenting clauses assembled around a
+        # dropped provider event.
+        raise RuntimeError(
+            f"Gemini stream contained {malformed_event_count} malformed SSE event(s)"
+        )
     text = "".join(chunks).strip()
     if not text:
         raise RuntimeError("Empty candidates/parts in Gemini REST stream response")

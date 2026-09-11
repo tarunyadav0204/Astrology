@@ -4055,6 +4055,25 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         intent["clarification_question"] = _location_scope_clarification_fallback(
                             combined_question, language=language
                         )
+
+            # The multilingual intent model—not application keyword matching—
+            # decides whether a short voice reply accepted Tara's last offered
+            # topic. Once accepted, downstream evidence and answer generation
+            # must receive the actual offered question instead of just "yes".
+            offered_speech_follow_up = str(
+                (query_context or {}).get("speech_follow_up_offer") or ""
+            ).strip()
+            if (
+                is_instant_chat
+                and offered_speech_follow_up
+                and bool(intent.get("accepted_speech_follow_up"))
+            ):
+                combined_question = offered_speech_follow_up[:600]
+                _chat_log_event(
+                    "speech_follow_up_offer_accepted",
+                    session_id=session_id,
+                    message_id=message_id,
+                )
             intent_router_ms = round((time.time() - routing_start) * 1000, 1)
             MAX_CLARIFICATIONS = max_clarifications
 

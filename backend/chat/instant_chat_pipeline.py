@@ -14658,6 +14658,10 @@ def _build_instant_context(
 
 _FOLLOW_UPS_START = "###FOLLOW_UPS_START###"
 _FOLLOW_UPS_END = "###FOLLOW_UPS_END###"
+_ORPHAN_FOLLOW_UP_MARKER_AT_END = re.compile(
+    r"\s*\\?(?:#{0,3})?(?:FOLLOW\\?_?)?\\?_?UPS\\?_(?:START|END)#{0,3}\s*\\?\s*$",
+    flags=re.IGNORECASE,
+)
 
 
 def _repair_common_utf8_mojibake(value: Any) -> str:
@@ -14715,7 +14719,11 @@ def _parse_speech_followups_from_answer(raw: str) -> tuple[str, List[str]]:
     """Strip structured follow-up JSON from model output; return (answer_text, followups)."""
     text = (raw or "").strip()
     if _FOLLOW_UPS_START not in text:
-        return text, []
+        # If a provider truncates or mutates the hidden start marker, its end
+        # marker can otherwise leak into both the transcript and TTS. Only
+        # remove a recognized control fragment at the very end so ordinary
+        # user-visible underscores and hashes remain untouched.
+        return _ORPHAN_FOLLOW_UP_MARKER_AT_END.sub("", text).strip(), []
     before, _, rest = text.partition(_FOLLOW_UPS_START)
     inner, _, _after = rest.partition(_FOLLOW_UPS_END)
     answer = (before or "").strip()

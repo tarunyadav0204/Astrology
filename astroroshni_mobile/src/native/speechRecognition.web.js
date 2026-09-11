@@ -70,7 +70,10 @@ export const speechRecognition = {
       };
       activeSession = session;
 
-      recognition.continuous = false;
+      // Keep collecting after the browser marks an individual phrase final.
+      // SpeechChatScreen owns the deliberate silence timer and stops us after a
+      // natural pause, so a thinking pause does not submit half a question.
+      recognition.continuous = true;
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
       recognition.lang = toBrowserLanguage(language);
@@ -90,13 +93,6 @@ export const speechRecognition = {
           session.latestText = text;
           partialListener?.(text);
           debugListener?.({ event: hasFinalResult ? 'onResults' : 'onPartialResults' });
-        }
-        if (hasFinalResult) {
-          try {
-            recognition.stop();
-          } catch (_) {
-            settleSession(session);
-          }
         }
       };
 

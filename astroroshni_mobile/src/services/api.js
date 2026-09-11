@@ -410,9 +410,20 @@ export const chatAPI = {
     description: 'Cosmic Timeline Analysis' 
   }, GLOBAL_ERROR_CONFIG),
   tts: (text, lang = 'en', voiceName, includeTimepoints = false, prepareSpoken = true) =>
-    api.post(getEndpoint('/tts/synthesize'), null, {
-      params: { text, lang, voice_name: voiceName, include_timepoints: includeTimepoints, prepare_spoken: prepareSpoken },
-    }),
+    api.post(
+      getEndpoint('/tts/synthesize'),
+      {
+        text,
+        lang,
+        voice_name: voiceName,
+        include_timepoints: includeTimepoints,
+        prepare_spoken: prepareSpoken,
+        audio_format: Platform.OS === 'web' && !includeTimepoints ? 'binary' : 'json',
+      },
+      {
+        ...(Platform.OS === 'web' && !includeTimepoints ? { responseType: 'blob' } : {}),
+      },
+    ),
   getTtsVoices: () =>
     api.get(getEndpoint('/tts/voices')),
   getPodcastAudio: (messageContent, language = 'en', messageId = null, sessionId = null, preview = null, nativeName = null, birthChartId = null) =>
@@ -546,6 +557,8 @@ export const speechAPI = {
     question = null,
     followUps = [],
     handsFree = true,
+    recentLines = [],
+    answerStyle = 'simple',
   }) =>
     api.post(getEndpoint('/speech/guide-lines'), {
       scene,
@@ -555,7 +568,14 @@ export const speechAPI = {
       question,
       follow_ups: followUps,
       hands_free: handsFree,
+      recent_lines: recentLines,
+      answer_style: answerStyle,
     }),
+  logTelemetry: (payload) => api.post(
+    getEndpoint('/speech/telemetry'),
+    payload,
+    { timeout: 5000, skipGlobalError: true }
+  ),
 };
 
 export const wealthAPI = {

@@ -507,6 +507,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [speechTtsProvider, setSpeechTtsProvider] = useState('local');
   const [speechTtsVoiceEn, setSpeechTtsVoiceEn] = useState('en-IN-Neural2-A');
   const [speechTtsVoiceHi, setSpeechTtsVoiceHi] = useState('hi-IN-Neural2-A');
+  const [speechProcessingBridgeEnabled, setSpeechProcessingBridgeEnabled] = useState(true);
+  const [speechProcessingBridgeMaxLines, setSpeechProcessingBridgeMaxLines] = useState('3');
+  const [speechProcessingBridgeInitialDelayMs, setSpeechProcessingBridgeInitialDelayMs] = useState('600');
+  const [speechProcessingBridgeLineGapMs, setSpeechProcessingBridgeLineGapMs] = useState('650');
+  const [speechProcessingBridgeModel, setSpeechProcessingBridgeModel] = useState('');
+  const [speechProcessingBridgeDetailLevel, setSpeechProcessingBridgeDetailLevel] = useState('balanced');
   const [speechVoiceOptions, setSpeechVoiceOptions] = useState([]);
   const [speechChatSaving, setSpeechChatSaving] = useState(false);
   const [chatLlmProvider, setChatLlmProvider] = useState('gemini');
@@ -999,6 +1005,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setSpeechTtsProvider(data.speech_tts_provider === 'google' ? 'google' : 'local');
       setSpeechTtsVoiceEn(data.speech_tts_voice_en || 'en-IN-Neural2-A');
       setSpeechTtsVoiceHi(data.speech_tts_voice_hi || 'hi-IN-Neural2-A');
+      setSpeechProcessingBridgeEnabled(data.speech_processing_bridge_enabled !== false);
+      setSpeechProcessingBridgeMaxLines(String(data.speech_processing_bridge_max_lines ?? 3));
+      setSpeechProcessingBridgeInitialDelayMs(String(data.speech_processing_bridge_initial_delay_ms ?? 600));
+      setSpeechProcessingBridgeLineGapMs(String(data.speech_processing_bridge_line_gap_ms ?? 650));
+      setSpeechProcessingBridgeModel(data.speech_processing_bridge_model || data.gemini_instant_chat_model || '');
+      setSpeechProcessingBridgeDetailLevel(data.speech_processing_bridge_detail_level || 'balanced');
       setChatLlmProvider(data.chat_llm_provider || 'gemini');
       setChatLlmProviderPremium(data.chat_llm_provider_premium || '');
       setOpenaiModelOptions(data.openai_model_options || []);
@@ -1539,7 +1551,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     setInstantValidationFlagsSaving(true);
     try {
       const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
-      const [validationRes, speechStreamingRes] = await Promise.all([
+      const [validationRes] = await Promise.all([
         fetch('/api/admin/settings/instant_response_validation_enabled', {
           method: 'PUT',
           headers,
@@ -1549,26 +1561,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             description: 'Run post-generation fact validation and correction for Live/Instant chat answers',
           }),
         }),
-        fetch('/api/admin/settings/speech_allow_unvalidated_streaming', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'speech_allow_unvalidated_streaming',
-            value: speechAllowUnvalidatedStreaming ? 'true' : 'false',
-            description: 'Allow provisional, not-yet-validated Instant answer chunks to be displayed and spoken in Talk To Tara',
-          }),
-        }),
       ]);
-      if (!validationRes.ok || !speechStreamingRes.ok) {
+      if (!validationRes.ok) {
         const validationErr = await validationRes.json().catch(() => ({}));
-        const speechErr = await speechStreamingRes.json().catch(() => ({}));
         alert(
-          'Failed to save Instant validation flags: '
-          + (validationErr.detail || speechErr.detail || 'check console')
+          'Failed to save Instant validation flag: '
+          + (validationErr.detail || 'check console')
         );
         return;
       }
-      alert('Instant validation flags saved. New Live and speech turns use them immediately.');
+      alert('Instant validation flag saved. New Live and speech turns use it immediately.');
       fetchAdminSettings();
     } catch (error) {
       console.error('Error saving Instant validation flags:', error);
@@ -1889,66 +1891,43 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   };
 
   const handleSaveSpeechChatSettings = async () => {
+    const maxLines = Number(speechProcessingBridgeMaxLines);
+    const initialDelay = Number(speechProcessingBridgeInitialDelayMs);
+    const lineGap = Number(speechProcessingBridgeLineGapMs);
+    if (!Number.isFinite(maxLines) || maxLines < 1 || maxLines > 4
+      || !Number.isFinite(initialDelay) || initialDelay < 0 || initialDelay > 5000
+      || !Number.isFinite(lineGap) || lineGap < 0 || lineGap > 5000) {
+      alert('Bridge lines must be 1–4, and timing values must be between 0 and 5000 ms.');
+      return;
+    }
     setSpeechChatSaving(true);
     try {
       const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
-      const [enabledRes, allowlistRes, providerRes, voiceEnRes, voiceHiRes] = await Promise.all([
-        fetch('/api/admin/settings/speech_chat_enabled', {
+      const settings = [
+        ['speech_chat_enabled', speechChatEnabled ? 'true' : 'false', 'Master feature flag for Talk To Tara.'],
+        ['speech_chat_user_allowlist', speechChatUserAllowlist, 'Optional CSV user allowlist for Talk To Tara. Empty means all users.'],
+        ['speech_tts_provider', speechTtsProvider, 'Talk To Tara TTS provider.'],
+        ['speech_tts_voice_en', speechTtsVoiceEn, 'Default English Google TTS voice for Talk To Tara.'],
+        ['speech_tts_voice_hi', speechTtsVoiceHi, 'Default Hindi Google TTS voice for Talk To Tara.'],
+        ['speech_allow_unvalidated_streaming', speechAllowUnvalidatedStreaming ? 'true' : 'false', 'Allow playable provisional speech chunks before final validation.'],
+        ['speech_processing_bridge_enabled', speechProcessingBridgeEnabled ? 'true' : 'false', 'Generate question-aware speech while the main answer is prepared.'],
+        ['speech_processing_bridge_max_lines', String(Math.round(maxLines)), 'Maximum dynamic processing bridge lines per turn.'],
+        ['speech_processing_bridge_initial_delay_ms', String(Math.round(initialDelay)), 'Delay before the first processing bridge line.'],
+        ['speech_processing_bridge_line_gap_ms', String(Math.round(lineGap)), 'Silent gap between processing bridge lines.'],
+        ['speech_processing_bridge_model', speechProcessingBridgeModel, 'Gemini model used for dynamic processing bridge lines.'],
+        ['speech_processing_bridge_detail_level', speechProcessingBridgeDetailLevel, 'Detail level for dynamic processing bridge narration.'],
+      ];
+      const responses = await Promise.all(settings.map(([key, value, description]) => (
+        fetch(`/api/admin/settings/${key}`, {
           method: 'PUT',
           headers,
-          body: JSON.stringify({
-            key: 'speech_chat_enabled',
-            value: speechChatEnabled ? 'true' : 'false',
-            description: 'Feature flag for mobile speech input (mic) and /api/speech/transcribe',
-          }),
-        }),
-        fetch('/api/admin/settings/speech_chat_user_allowlist', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'speech_chat_user_allowlist',
-            value: speechChatUserAllowlist,
-            description: 'Optional CSV user allowlist for Talk To Tara. Empty = all users when enabled.',
-          }),
-        }),
-        fetch('/api/admin/settings/speech_tts_provider', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'speech_tts_provider',
-            value: speechTtsProvider,
-            description: 'Talk To Tara TTS provider: local device TTS or backend Google TTS.',
-          }),
-        }),
-        fetch('/api/admin/settings/speech_tts_voice_en', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'speech_tts_voice_en',
-            value: speechTtsVoiceEn,
-            description: 'Default Google TTS voice for English Talk To Tara conversations.',
-          }),
-        }),
-        fetch('/api/admin/settings/speech_tts_voice_hi', {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            key: 'speech_tts_voice_hi',
-            value: speechTtsVoiceHi,
-            description: 'Default Google TTS voice for Hindi Talk To Tara conversations.',
-          }),
-        }),
-      ]);
-      if (!enabledRes.ok || !allowlistRes.ok || !providerRes.ok || !voiceEnRes.ok || !voiceHiRes.ok) {
-        const enabledErr = await enabledRes.json().catch(() => ({}));
-        const allowlistErr = await allowlistRes.json().catch(() => ({}));
-        const providerErr = await providerRes.json().catch(() => ({}));
-        const voiceEnErr = await voiceEnRes.json().catch(() => ({}));
-        const voiceHiErr = await voiceHiRes.json().catch(() => ({}));
-        alert(
-          'Failed to save Talk To Tara settings: ' +
-            (enabledErr.detail || allowlistErr.detail || providerErr.detail || voiceEnErr.detail || voiceHiErr.detail || 'check console')
-        );
+          body: JSON.stringify({ key, value, description }),
+        })
+      )));
+      const failed = responses.find((response) => !response.ok);
+      if (failed) {
+        const error = await failed.json().catch(() => ({}));
+        alert('Failed to save Talk To Tara settings: ' + (error.detail || 'check console'));
         return;
       }
       alert('Talk To Tara settings saved. Clients pick this up on the next pricing/features fetch.');
@@ -6466,6 +6445,12 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 Chat
               </button>
               <button
+                className={`subtab ${settingsSubTab === 'speech' ? 'active' : ''}`}
+                onClick={() => setSettingsSubTab('speech')}
+              >
+                Speech
+              </button>
+              <button
                 className={`subtab ${settingsSubTab === 'featureFlags' ? 'active' : ''}`}
                 onClick={() => setSettingsSubTab('featureFlags')}
               >
@@ -6497,6 +6482,66 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </button>
             </div>
 
+            {settingsSubTab === 'speech' && (
+              <div className="settings-subtab-group">
+                <div className="settings-section">
+                  <h3>Talk To Tara access and delivery</h3>
+                  <p className="settings-hint">All speech-specific controls are kept here. Changes apply to new speech turns after clients refresh their feature settings.</p>
+                  <div className="setting-item">
+                    <div className="setting-info"><strong>Enable Talk To Tara</strong><p>Master switch for speech conversations on supported web and mobile builds.</p></div>
+                    <label className="toggle-switch"><input type="checkbox" checked={speechChatEnabled} onChange={(e) => setSpeechChatEnabled(e.target.checked)} /><span className="toggle-slider"></span></label>
+                  </div>
+                  <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div className="setting-info"><strong>Eligible user IDs</strong><p>Comma or space separated. Leave blank for all users.</p></div>
+                    <textarea value={speechChatUserAllowlist} onChange={(e) => setSpeechChatUserAllowlist(e.target.value)} rows={3} placeholder="e.g. 12, 45, 78" style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px' }} />
+                  </div>
+                  <div className="setting-item">
+                    <div className="setting-info"><strong>Allow provisional speech streaming</strong><p>Speak playable chunks before final answer validation. A corrected result can replace the visible draft.</p></div>
+                    <label className="toggle-switch"><input type="checkbox" checked={speechAllowUnvalidatedStreaming} onChange={(e) => setSpeechAllowUnvalidatedStreaming(e.target.checked)} /><span className="toggle-slider"></span></label>
+                  </div>
+                  <div className="setting-item">
+                    <div className="setting-info"><strong>Speech output provider</strong><p>Google TTS enables the configured Tara voices and timed playback; local uses the device voice.</p></div>
+                    <select value={speechTtsProvider} onChange={(e) => setSpeechTtsProvider(e.target.value)} style={{ minWidth: '220px' }}><option value="local">Local device TTS</option><option value="google">Google TTS</option></select>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <h3>Voices</h3>
+                  <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div className="setting-info"><strong>English preview line</strong><p>Preview the selected English voice.</p></div>
+                    <textarea value={speechPreviewTextEn} onChange={(e) => setSpeechPreviewTextEn(e.target.value)} rows={2} style={{ width: '100%', maxWidth: '420px', minHeight: '64px', padding: '8px' }} />
+                  </div>
+                  <AdminVoicePicker label="English Google voice" help="Default English voice for Talk To Tara." value={speechTtsVoiceEn} onChange={setSpeechTtsVoiceEn} options={withSelectedVoiceOption(englishSpeechVoiceOptions, speechTtsVoiceEn)} formatLabel={speechVoiceLabel} playBusy={ttsPreviewBusyKey === 'speech-en'} onPlay={() => playAdminVoicePreview({ key: 'speech-en', voiceName: speechTtsVoiceEn, text: speechPreviewTextEn, lang: 'en', mode: 'speech', role: 'female' })} />
+                  <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div className="setting-info"><strong>Hindi preview line</strong><p>Preview the selected Hindi voice.</p></div>
+                    <textarea value={speechPreviewTextHi} onChange={(e) => setSpeechPreviewTextHi(e.target.value)} rows={2} style={{ width: '100%', maxWidth: '420px', minHeight: '64px', padding: '8px' }} />
+                  </div>
+                  <AdminVoicePicker label="Hindi Google voice" help="Default Hindi voice for Talk To Tara." value={speechTtsVoiceHi} onChange={setSpeechTtsVoiceHi} options={withSelectedVoiceOption(hindiSpeechVoiceOptions, speechTtsVoiceHi)} formatLabel={speechVoiceLabel} playBusy={ttsPreviewBusyKey === 'speech-hi'} onPlay={() => playAdminVoicePreview({ key: 'speech-hi', voiceName: speechTtsVoiceHi, text: speechPreviewTextHi, lang: 'hi', mode: 'speech', role: 'female' })} />
+                </div>
+
+                <div className="settings-section">
+                  <h3>Dynamic processing bridge</h3>
+                  <p className="settings-hint">Question-aware lines play while the real answer is generated in parallel. They are temporary, never saved to chat history, and stop as soon as answer audio is ready.</p>
+                  <div className="setting-item">
+                    <div className="setting-info"><strong>Enable dynamic bridge</strong><p>If generation fails, Tara stays silent instead of repeating a static fallback.</p></div>
+                    <label className="toggle-switch"><input type="checkbox" checked={speechProcessingBridgeEnabled} onChange={(e) => setSpeechProcessingBridgeEnabled(e.target.checked)} /><span className="toggle-slider"></span></label>
+                  </div>
+                  <div className="setting-item"><div className="setting-info"><strong>Maximum lines</strong><p>One to four brief lines per question.</p></div><input type="number" min="1" max="4" value={speechProcessingBridgeMaxLines} onChange={(e) => setSpeechProcessingBridgeMaxLines(e.target.value)} style={{ width: '120px' }} /></div>
+                  <div className="setting-item"><div className="setting-info"><strong>Initial delay (ms)</strong><p>Minimum time after submission before the first bridge line starts.</p></div><input type="number" min="0" max="5000" step="50" value={speechProcessingBridgeInitialDelayMs} onChange={(e) => setSpeechProcessingBridgeInitialDelayMs(e.target.value)} style={{ width: '140px' }} /></div>
+                  <div className="setting-item"><div className="setting-info"><strong>Gap between lines (ms)</strong><p>Silence after one bridge line before the next begins.</p></div><input type="number" min="0" max="5000" step="50" value={speechProcessingBridgeLineGapMs} onChange={(e) => setSpeechProcessingBridgeLineGapMs(e.target.value)} style={{ width: '140px' }} /></div>
+                  <div className="setting-item">
+                    <div className="setting-info"><strong>Bridge model</strong><p>A fast Gemini model is recommended because this generation runs beside the main answer.</p></div>
+                    <select value={speechProcessingBridgeModel} onChange={(e) => setSpeechProcessingBridgeModel(e.target.value)} style={{ minWidth: '280px' }}>{geminiModelOptions.map((opt) => <option key={`speech-bridge-${opt.value}`} value={opt.value}>{opt.label}</option>)}</select>
+                  </div>
+                  <div className="setting-item">
+                    <div className="setting-info"><strong>Narration detail</strong><p>Controls how specifically Tara describes the analysis she is preparing, without revealing a verdict.</p></div>
+                    <select value={speechProcessingBridgeDetailLevel} onChange={(e) => setSpeechProcessingBridgeDetailLevel(e.target.value)} style={{ minWidth: '180px' }}><option value="simple">Simple</option><option value="balanced">Balanced</option><option value="technical">Technical</option></select>
+                  </div>
+                  <div className="form-buttons" style={{ marginTop: '12px' }}><button type="button" className="create-btn" onClick={handleSaveSpeechChatSettings} disabled={speechChatSaving}>{speechChatSaving ? 'Saving…' : 'Save speech settings'}</button></div>
+                </div>
+              </div>
+            )}
+
             {settingsSubTab === 'featureFlags' && (
               <div className="settings-subtab-group">
                 <div className="settings-section">
@@ -6519,24 +6564,6 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                         type="checkbox"
                         checked={instantResponseValidationEnabled}
                         onChange={(event) => setInstantResponseValidationEnabled(event.target.checked)}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <strong>Allow provisional speech streaming</strong>
-                      <p>
-                        Display and speak speech-chat chunks as the model produces them, before final validation.
-                        If final validation changes the answer, the visible draft is replaced. When response validation
-                        is off, speech is necessarily provisional regardless of this switch.
-                      </p>
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={speechAllowUnvalidatedStreaming}
-                        onChange={(event) => setSpeechAllowUnvalidatedStreaming(event.target.checked)}
                       />
                       <span className="toggle-slider"></span>
                     </label>
@@ -7682,7 +7709,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
             </div>
 
-            <div className="settings-section">
+            <div className="settings-section" hidden>
               <h3>Talk To Tara</h3>
               <p className="settings-hint">
                 Controls the microphone entry point on the mobile chat screen and access to{' '}

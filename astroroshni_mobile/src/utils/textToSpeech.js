@@ -435,6 +435,13 @@ const synthesizeServerTtsToCache = async (
     });
 
     const response = await chatAPI.tts(spoken, lang, voiceName, false, prepareSpoken);
+    if (isWebPlatform() && response?.data instanceof Blob) {
+      return {
+        uri: URL.createObjectURL(response.data),
+        key,
+        cached: false,
+      };
+    }
     const base64Audio = response?.data?.audio;
     if (!base64Audio || typeof base64Audio !== 'string') {
       throw new Error('Google TTS: missing audio from server');
@@ -782,17 +789,35 @@ export const textToSpeech = {
         };
 
         const schedulePlaybackWatchdog = (status) => {
-          if (playbackFinishTimerId || !status?.isLoaded) return;
+          // A phone call, alarm, route change, or OS audio-focus interruption
+          // can pause playback. Never treat wall-clock time during that pause
+          // as a completed answer or open the microphone over the interruption.
+          if (!status?.isLoaded || status.isPlaying === false) {
+            if (playbackFinishTimerId) {
+              clearTimeout(playbackFinishTimerId);
+              playbackFinishTimerId = null;
+            }
+            return;
+          }
+          if (playbackFinishTimerId) return;
           const duration = Number(status.durationMillis || 0);
           const position = Number(status.positionMillis || 0);
           if (!duration || duration <= 0) return;
           const remaining = Math.max(700, duration - position + 1200);
-          playbackFinishTimerId = setTimeout(() => {
-            console.warn('[TTS] playback finish watchdog fired', {
-              durationMillis: duration,
-              positionMillis: position,
-            });
-            completePlayback();
+          playbackFinishTimerId = setTimeout(async () => {
+            playbackFinishTimerId = null;
+            try {
+              const latest = await sound.getStatusAsync();
+              const latestDuration = Number(latest?.durationMillis || 0);
+              const latestPosition = Number(latest?.positionMillis || 0);
+              if (latest?.didJustFinish || (latestDuration > 0 && latestPosition >= latestDuration - 120)) {
+                completePlayback();
+                return;
+              }
+              schedulePlaybackWatchdog(latest);
+            } catch {
+              // A transient status failure must not be mistaken for completion.
+            }
           }, remaining);
         };
 
@@ -912,6 +937,22 @@ export const textToSpeech = {
       return !!currentSound || await Speech.isSpeakingAsync();
     } catch {
       return !!currentSound;
+    }
+  },
+
+  async resumeCurrentSpeech() {
+    if (!currentSound) return false;
+    try {
+      const status = await currentSound.getStatusAsync?.();
+      if (!status?.isLoaded || status.didJustFinish) return false;
+      const duration = Number(status.durationMillis || 0);
+      const position = Number(status.positionMillis || 0);
+      if (duration > 0 && position >= duration - 120) return false;
+      if (!status.isPlaying) await currentSound.playAsync?.();
+      return true;
+    } catch (error) {
+      console.warn('[TTS] could not resume interrupted speech', error?.message || error);
+      return false;
     }
   },
 

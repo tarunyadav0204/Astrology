@@ -30,10 +30,10 @@ describe('speech streaming helpers', () => {
         });
     });
 
-    test('uses the model follow-up as the conversational ending without duplicating it', () => {
+    test('never makes Tara read a user-phrased follow-up as her own question', () => {
         const question = 'Is work pressure or growth your bigger concern right now?';
         expect(buildConversationalClosing('Your career is entering a steadier phase.', [question], 'english'))
-            .toBe(question);
+            .toBe('If you would like, I can continue with the next related part of this reading.');
         expect(buildConversationalClosing(`Your career is steadier. ${question}`, [question], 'english'))
             .toBe('');
     });

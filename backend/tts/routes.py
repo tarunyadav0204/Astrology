@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import JSONResponse, Response
 import base64
 import os
@@ -764,36 +764,112 @@ def _parse_podcast_script(script: str) -> list[tuple[str, str]]:
   return [(r if r in ("female", "male") else "female", t) for r, t in segments]
 
 
-async def _chunk_and_synthesize(client, voice, audio_config, text: str) -> bytes:
-  """Chunk text for Google TTS limit and synthesize in parallel; return concatenated MP3 bytes."""
-  encoded = text.encode("utf-8")
-  max_bytes = 2000
-  chunks = []
-  start = 0
-  while start < len(encoded):
-    end = min(start + max_bytes, len(encoded))
-    while end < len(encoded) and (encoded[end] & 0xC0) == 0x80:
-      end -= 1
-    if end <= start:
-      end = min(start + max_bytes, len(encoded))
-    chunks.append(encoded[start:end].decode("utf-8", errors="ignore"))
-    start = end
+def _plain_tts_chunks(
+  text: str,
+  *,
+  max_chunk_bytes: int = 1800,
+  max_sentence_bytes: int = 700,
+) -> list[str]:
+  """Create UTF-8-safe TTS chunks with a bounded sentence inside each chunk.
 
-  async def synthesize_chunk(idx: int, chunk_text: str) -> bytes:
-    chunk_text = _apply_pronunciation_plain(chunk_text)
+  Google Chirp applies a sentence-length limit independently of its request-size
+  limit. Model output with missing punctuation can therefore be a valid request
+  but still be rejected as one oversized sentence. Artificial boundaries prefer
+  punctuation and whitespace and use the language's natural sentence terminator.
+  """
+  remaining = re.sub(r"\s+", " ", str(text or "")).strip()
+  if not remaining:
+    return []
+
+  sentence_parts: list[str] = []
+  while remaining:
+    if len(remaining.encode("utf-8")) <= max_sentence_bytes:
+      part = remaining
+      remaining = ""
+    else:
+      byte_count = 0
+      char_limit = 0
+      safe_sentence_bytes = max(32, max_sentence_bytes - 4)
+      for char_limit, char in enumerate(remaining, start=1):
+        byte_count += len(char.encode("utf-8"))
+        if byte_count > safe_sentence_bytes:
+          char_limit -= 1
+          break
+      prefix = remaining[:max(1, char_limit)]
+      minimum_boundary = max(1, len(prefix) // 3)
+      strong = [match.end() for match in re.finditer(r"[.!?।;:]\s+", prefix)]
+      soft = [match.end() for match in re.finditer(r"[,،]\s+", prefix)]
+      spaces = [match.start() for match in re.finditer(r"\s+", prefix)]
+      boundary = next((value for value in reversed(strong) if value >= minimum_boundary), None)
+      boundary = boundary or next((value for value in reversed(soft) if value >= minimum_boundary), None)
+      boundary = boundary or (spaces[-1] if spaces else len(prefix))
+      part = remaining[:max(1, boundary)].strip()
+      remaining = remaining[max(1, boundary):].strip()
+
+    if remaining and not re.search(r"[.!?।]\s*$", part):
+      part = re.sub(r"[,،;:]\s*$", "", part).rstrip()
+      part += "।" if re.search(r"[\u0900-\u097f]", part) else "."
+    if part:
+      sentence_parts.append(part)
+
+  chunks: list[str] = []
+  current = ""
+  for part in sentence_parts:
+    candidate = f"{current} {part}".strip()
+    if current and len(candidate.encode("utf-8")) > max_chunk_bytes:
+      chunks.append(current)
+      current = part
+    else:
+      current = candidate
+  if current:
+    chunks.append(current)
+  return chunks
+
+
+def _is_sentence_too_long_error(exc: Exception) -> bool:
+  message = str(exc or "").lower()
+  return "sentence" in message and "too long" in message
+
+
+async def _chunk_and_synthesize(client, voice, audio_config, text: str) -> bytes:
+  """Chunk text for Google TTS limits and synthesize in parallel."""
+  spoken_text = _apply_pronunciation_plain(text)
+  chunks = _plain_tts_chunks(spoken_text)
+
+  async def synthesize_chunk(idx: int, chunk_text: str, retry_depth: int = 0) -> bytes:
     synthesis_input = texttospeech.SynthesisInput(text=chunk_text)
     logger.info("TTS: synthesizing chunk %s/%s (%s bytes)", idx + 1, len(chunks), len(chunk_text.encode("utf-8")))
     loop = asyncio.get_running_loop()
-    response = await loop.run_in_executor(
-      None,
-      partial(
-        client.synthesize_speech,
-        input=synthesis_input,
-        voice=voice,
-        audio_config=audio_config,
-      ),
-    )
-    return response.audio_content
+    try:
+      response = await loop.run_in_executor(
+        None,
+        partial(
+          client.synthesize_speech,
+          input=synthesis_input,
+          voice=voice,
+          audio_config=audio_config,
+        ),
+      )
+      return response.audio_content
+    except Exception as exc:
+      if retry_depth >= 2 or not _is_sentence_too_long_error(exc):
+        raise
+      smaller = _plain_tts_chunks(
+        chunk_text,
+        max_chunk_bytes=max(320, 900 // (retry_depth + 1)),
+        max_sentence_bytes=max(180, 350 // (retry_depth + 1)),
+      )
+      if len(smaller) <= 1:
+        raise
+      logger.warning(
+        "TTS: provider rejected an oversized sentence in chunk %s; retrying as %s smaller chunks",
+        idx + 1,
+        len(smaller),
+      )
+      pieces = []
+      for smaller_chunk in smaller:
+        pieces.append(await synthesize_chunk(idx, smaller_chunk, retry_depth + 1))
+      return b"".join(pieces)
 
   audio_segments = await asyncio.gather(
     *[synthesize_chunk(i, chunk) for i, chunk in enumerate(chunks)]
@@ -1211,19 +1287,42 @@ async def voice_preview(
   return JSONResponse({"audio": base64.b64encode(audio_bytes).decode("ascii"), "voice_name": voice_name})
 
 
+class SpeechSynthesisRequest(BaseModel):
+  text: str
+  lang: str = "en"
+  voice_name: Optional[str] = None
+  include_timepoints: bool = False
+  prepare_spoken: bool = False
+  audio_format: str = "json"
+
+
 @router.post("/synthesize")
 async def synthesize(
-  text: str,
-  lang: str = "en",
-  voice_name: Optional[str] = None,
+  text: Optional[str] = Query(default=None),
+  lang: str = Query(default="en"),
+  voice_name: Optional[str] = Query(default=None),
   include_timepoints: bool = Query(default=False),
-  prepare_spoken: bool = False,
+  prepare_spoken: bool = Query(default=False),
+  audio_format: str = Query(default="json", pattern="^(json|binary)$"),
+  request: Optional[SpeechSynthesisRequest] = Body(default=None),
 ):
   """
   Google Cloud Text-to-Speech with Indian voices.
   - lang='en' -> en-IN Neural voice
   - lang='hi' -> hi-IN Neural voice
   """
+  # Keep query parameters backward compatible for older app builds, while new
+  # clients send text in the request body. Long Devanagari text expands heavily
+  # when percent-encoded and can otherwise exceed browser/proxy URL limits.
+  if request is not None:
+    text = request.text
+    lang = request.lang
+    voice_name = request.voice_name
+    include_timepoints = request.include_timepoints
+    prepare_spoken = request.prepare_spoken
+    audio_format = request.audio_format
+  if audio_format not in {"json", "binary"}:
+    raise HTTPException(status_code=422, detail="audio_format must be json or binary")
   if not text or not text.strip():
     raise HTTPException(status_code=400, detail="Text is required")
 
@@ -1321,6 +1420,17 @@ async def synthesize(
   except Exception as e:
     logger.exception("TTS: synthesize_speech failed")
     raise HTTPException(status_code=500, detail=f"TTS synthesis failed: {e}")
+
+  if audio_format == "binary" and not include_timepoints:
+    return Response(
+      content=audio_bytes,
+      media_type="audio/mpeg",
+      headers={
+        "X-TTS-Provider": "google",
+        "X-TTS-Voice": resolved_voice_name,
+        "Cache-Control": "private, max-age=300",
+      },
+    )
 
   audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
   response = {
