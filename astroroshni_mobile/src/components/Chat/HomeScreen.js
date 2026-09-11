@@ -2287,6 +2287,7 @@ const loadHomeData = async (nativeData = null) => {
           onCreateChart={() => navigation.navigate('BirthForm', { returnTo: 'Home' })}
           onAsk={() => onOptionSelect({ action: 'question' })}
           onTalkToTara={onTalkToTara}
+          speechPerMinuteCost={pricing.speech_chat_per_minute ?? 5}
           onOpenCharts={() => requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data }))}
           onOpenDasha={() => requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data, tab: 'dasha' }))}
           onOpenNakshatra={() => requireBirthChart((data) => navigation.navigate('NakshatraCalendar', { birthData: data }))}

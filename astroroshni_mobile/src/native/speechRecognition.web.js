@@ -25,6 +25,34 @@ let activeSession = null;
 let partialListener = null;
 let debugListener = null;
 
+const mergeTranscriptFragments = (fragments = []) => {
+  let merged = [];
+  fragments.forEach((fragment) => {
+    const next = String(fragment || '').trim().split(/\s+/).filter(Boolean);
+    if (!next.length) return;
+    if (!merged.length) {
+      merged = next;
+      return;
+    }
+    const currentLower = merged.map((word) => word.toLocaleLowerCase());
+    const nextLower = next.map((word) => word.toLocaleLowerCase());
+    const shared = Math.min(currentLower.length, nextLower.length);
+    if (currentLower.slice(0, shared).every((word, index) => word === nextLower[index])) {
+      if (next.length > merged.length) merged = next;
+      return;
+    }
+    let overlap = shared;
+    while (overlap > 0) {
+      const suffix = currentLower.slice(currentLower.length - overlap);
+      const prefix = nextLower.slice(0, overlap);
+      if (suffix.every((word, index) => word === prefix[index])) break;
+      overlap -= 1;
+    }
+    merged = [...merged, ...next.slice(overlap)];
+  });
+  return merged.join(' ').trim();
+};
+
 const settleSession = (session, error) => {
   if (!session || session.settled) return;
   session.settled = true;
@@ -82,13 +110,13 @@ export const speechRecognition = {
       recognition.onaudiostart = () => debugListener?.({ event: 'onReadyForSpeech' });
       recognition.onspeechstart = () => debugListener?.({ event: 'onBeginningOfSpeech' });
       recognition.onresult = (event) => {
-        let transcript = '';
+        const fragments = [];
         let hasFinalResult = false;
         for (let i = 0; i < event.results.length; i += 1) {
-          transcript += `${event.results[i][0]?.transcript || ''} `;
+          fragments.push(event.results[i][0]?.transcript || '');
           if (event.results[i].isFinal) hasFinalResult = true;
         }
-        const text = transcript.trim();
+        const text = mergeTranscriptFragments(fragments);
         if (text) {
           session.latestText = text;
           partialListener?.(text);

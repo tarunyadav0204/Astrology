@@ -92,6 +92,108 @@ const SPEECH_RECORDING_OPTIONS = {
     : {}),
 };
 
+const createIOSWebRecording = async (stream) => {
+  const recorderOptions = WEB_SPEECH_RECORDING_MIME_TYPE
+    ? { mimeType: WEB_SPEECH_RECORDING_MIME_TYPE, audioBitsPerSecond: 128000 }
+    : undefined;
+  let mediaRecorder;
+  try {
+    mediaRecorder = recorderOptions
+      ? new MediaRecorder(stream, recorderOptions)
+      : new MediaRecorder(stream);
+  } catch (_) {
+    // Some Safari releases report a MIME type as supported but reject it in
+    // the constructor. Its default recorder format is still usable.
+    mediaRecorder = new MediaRecorder(stream);
+  }
+
+  const startedAt = Date.now();
+  let objectUrl = '';
+  const chunks = [];
+  let audioContext = null;
+  let analyser = null;
+  let meterSamples = null;
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      audioContext = new AudioContextClass();
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      audioContext.createMediaStreamSource(stream).connect(analyser);
+      meterSamples = new Uint8Array(analyser.fftSize);
+      await audioContext.resume?.();
+    }
+  } catch (_) {
+    analyser = null;
+    meterSamples = null;
+  }
+  mediaRecorder.addEventListener('dataavailable', (event) => {
+    if (event.data?.size) chunks.push(event.data);
+  });
+
+  try {
+    // Let Safari emit one complete MP4/M4A blob at stop. Timesliced MP4 chunks
+    // are not consistently concatenatable across iOS releases.
+    mediaRecorder.start();
+  } catch (startError) {
+    stream.getTracks().forEach((track) => track.stop());
+    throw startError;
+  }
+
+  return {
+    getStatusAsync: async () => {
+      let metering;
+      if (analyser && meterSamples) {
+        analyser.getByteTimeDomainData(meterSamples);
+        const meanSquare = meterSamples.reduce((sum, value) => {
+          const normalized = (value - 128) / 128;
+          return sum + normalized * normalized;
+        }, 0) / meterSamples.length;
+        const rms = Math.sqrt(meanSquare);
+        metering = rms > 0 ? Math.max(-160, 20 * Math.log10(rms)) : -160;
+      }
+      return {
+        canRecord: mediaRecorder.state !== 'inactive',
+        isRecording: mediaRecorder.state === 'recording',
+        durationMillis: Math.max(0, Date.now() - startedAt),
+        metering,
+      };
+    },
+    setOnRecordingStatusUpdate: () => {},
+    setProgressUpdateInterval: () => {},
+    stopAndUnloadAsync: async () => {
+      try {
+        if (mediaRecorder.state !== 'inactive') {
+          await new Promise((resolve, reject) => {
+            const handleStop = () => {
+              mediaRecorder.removeEventListener('error', handleError);
+              resolve();
+            };
+            const handleError = (event) => {
+              mediaRecorder.removeEventListener('stop', handleStop);
+              reject(event?.error || new Error('Safari microphone recording failed.'));
+            };
+            mediaRecorder.addEventListener('stop', handleStop, { once: true });
+            mediaRecorder.addEventListener('error', handleError, { once: true });
+            mediaRecorder.stop();
+          });
+        }
+      } finally {
+        stream.getTracks().forEach((track) => track.stop());
+        try {
+          await audioContext?.close?.();
+        } catch (_) {
+          // The recorder has already released the microphone stream.
+        }
+      }
+      const type = mediaRecorder.mimeType || WEB_SPEECH_RECORDING_MIME_TYPE || 'audio/mp4';
+      const blob = new Blob(chunks, { type });
+      objectUrl = URL.createObjectURL(blob);
+    },
+    getURI: () => objectUrl,
+  };
+};
+
 const normalizeLanguageCode = (language) => {
   const raw = String(language || 'english').toLowerCase();
   return raw.startsWith('hi') ? 'hindi' : 'english';
@@ -299,6 +401,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const speakingWatchdogRef = useRef(null);
   const billingSessionRef = useRef(null);
   const iosWebMicPrimedRef = useRef(!IS_IOS_WEB);
+  const iosWebPrimedStreamRef = useRef(null);
   const billingTimerRef = useRef(null);
   const billingHeartbeatInFlightRef = useRef(false);
   const lastBillingHeartbeatSecondRef = useRef(0);
@@ -675,6 +778,8 @@ export default function SpeechChatScreen({ navigation, route }) {
       } catch {
         // ignore teardown errors
       }
+      iosWebPrimedStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+      iosWebPrimedStreamRef.current = null;
       clearNativeListeningTimers();
       handsFreeRestartRef.current = false;
       startListeningInFlightRef.current = false;
@@ -982,18 +1087,20 @@ export default function SpeechChatScreen({ navigation, route }) {
   };
 
   const primeIosWebMicrophone = async () => {
-    if (!IS_IOS_WEB || iosWebMicPrimedRef.current) return true;
+    if (!IS_IOS_WEB) return true;
+    if (iosWebPrimedStreamRef.current?.active) return true;
+    if (iosWebMicPrimedRef.current) return true;
     if (!navigator?.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       throw new Error(t(
         'speechChat.safariMicUnavailable',
         'Microphone recording is not available here. Open AstroRoshni in Safari over HTTPS and try again.'
       ));
     }
-    let permissionStream = null;
     try {
       // Keep getUserMedia directly inside the tap call chain. Safari can reject
       // the first capture request when it starts later from greeting onDone.
-      permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      iosWebPrimedStreamRef.current = permissionStream;
       iosWebMicPrimedRef.current = true;
       setRequiresFirstMicTap(false);
       return true;
@@ -1006,8 +1113,6 @@ export default function SpeechChatScreen({ navigation, route }) {
           'Microphone access is blocked. In iPhone Settings, open Safari, check Microphone access, then reopen Talk To Tara.'
         )
         : t('speechChat.micStartError', 'Could not start the microphone. Please try again.'));
-    } finally {
-      permissionStream?.getTracks?.().forEach((track) => track.stop());
     }
   };
 
@@ -1534,9 +1639,11 @@ export default function SpeechChatScreen({ navigation, route }) {
   };
 
   const startBackendRecording = async () => {
-    const permission = await Audio.requestPermissionsAsync();
-    if (permission?.status !== 'granted') {
-      throw new Error(t('speechChat.micPermissionBody', 'Please allow microphone access so AstroRoshni can hear your question.'));
+    if (!IS_IOS_WEB) {
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission?.status !== 'granted') {
+        throw new Error(t('speechChat.micPermissionBody', 'Please allow microphone access so AstroRoshni can hear your question.'));
+      }
     }
 
     // Expo permits only one prepared Recording instance. Wait for any prior
@@ -1566,7 +1673,16 @@ export default function SpeechChatScreen({ navigation, route }) {
     recordingSpeechFirstDetectedAtRef.current = 0;
     recordingSpeechSampleCountRef.current = 0;
     recordingLastSpeechAtRef.current = 0;
-    const createPromise = Audio.Recording.createAsync(SPEECH_RECORDING_OPTIONS);
+    const createPromise = IS_IOS_WEB
+      ? (async () => {
+        const primedStream = iosWebPrimedStreamRef.current;
+        iosWebPrimedStreamRef.current = null;
+        const stream = primedStream?.active
+          ? primedStream
+          : await navigator.mediaDevices.getUserMedia({ audio: true });
+        return { recording: await createIOSWebRecording(stream) };
+      })()
+      : Audio.Recording.createAsync(SPEECH_RECORDING_OPTIONS);
     recordingStartPromiseRef.current = createPromise;
     let recording;
     try {
@@ -2617,7 +2733,9 @@ export default function SpeechChatScreen({ navigation, route }) {
         }
       }
       if (status === 'listening') {
-        if (handsFreeEnabledRef.current) {
+        if (IS_IOS_WEB && listeningModeRef.current === 'backend') {
+          await stopListening();
+        } else if (handsFreeEnabledRef.current) {
           await pauseSpeechChat('main_button_while_hands_free_listening');
         } else {
           await stopListening();

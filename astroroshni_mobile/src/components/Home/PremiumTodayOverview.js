@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Line } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
@@ -41,6 +42,22 @@ function OrbitMotif({ colors }) {
         <OrbitMark angle={202} radius={45} color={colors.secondary} size={5} />
         <OrbitMark angle={276} radius={58} color={colors.accentSoft} size={4} />
       </Svg>
+    </View>
+  );
+}
+
+function VoiceMark({ colors }) {
+  return (
+    <View style={[styles.voiceMark, { backgroundColor: colors.accentSoft }]} accessibilityElementsHidden>
+      <Ionicons name="mic" size={24} color={colors.onAccent} />
+      <View style={styles.voiceMarkWave}>
+        {[7, 13, 19, 13, 7].map((height, index) => (
+          <View
+            key={`${height}-${index}`}
+            style={[styles.voiceMarkBar, { height, backgroundColor: colors.onAccent }]}
+          />
+        ))}
+      </View>
     </View>
   );
 }
@@ -97,6 +114,7 @@ export default function PremiumTodayOverview({
   onCreateChart,
   onAsk,
   onTalkToTara,
+  speechPerMinuteCost = 5,
   onOpenCharts,
   onOpenDasha,
   onOpenNakshatra,
@@ -183,28 +201,58 @@ export default function PremiumTodayOverview({
           accessibilityRole="button"
           accessibilityLabel={t('chat.modeIntro.speech.name', 'Talk To Tara')}
           accessibilityHint={t('chat.speechChatCtaSubtext', 'Start a live voice conversation')}
-          style={[
-            styles.talkToTaraCard,
-            { backgroundColor: colors.surface, borderColor: colors.cardBorder },
-          ]}
+          style={styles.talkToTaraCard}
         >
-          <View style={[styles.talkToTaraIcon, { backgroundColor: colors.accentSoft }]}>
-            <Ionicons name="mic" size={22} color={colors.onAccent} />
-          </View>
-          <View style={styles.talkToTaraCopy}>
-            <Text style={[styles.talkToTaraEyebrow, typography.eyebrow, { color: colors.primary }]}>
-              {t('speechChat.liveBadge', 'Live')} · {t('speechChat.homeVoiceLabel', 'Voice conversation')}
-            </Text>
-            <Text style={[styles.talkToTaraTitle, { color: colors.text }]}>
-              {t('chat.modeIntro.speech.name', 'Talk To Tara')}
-            </Text>
-            <Text style={[styles.talkToTaraBody, { color: colors.textSecondary }]} numberOfLines={2}>
+          <LinearGradient
+            colors={[colors.cosmicRaised || colors.cosmicSurface, colors.cosmicSurface]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.talkToTaraGradient, { borderColor: colors.cosmicLine }]}
+          >
+            <View style={[styles.talkToTaraGlow, { backgroundColor: colors.cosmicGlow }]} accessibilityElementsHidden />
+            <View style={[styles.talkToTaraOrbit, { borderColor: colors.cosmicLine }]} accessibilityElementsHidden />
+
+            <View style={styles.talkToTaraHeader}>
+              <VoiceMark colors={colors} />
+              <View style={styles.talkToTaraCopy}>
+                <View style={styles.talkToTaraBadgeRow}>
+                  <Text style={[styles.talkToTaraEyebrow, typography.eyebrow, { color: colors.accent }]}>
+                    {t('chat.modeIntro.speech.signature', 'Signature voice')}
+                  </Text>
+                  <View style={[styles.talkToTaraNewBadge, { backgroundColor: colors.accentSoft }]}>
+                    <Text style={[styles.talkToTaraNewBadgeText, { color: colors.onAccent }]}>
+                      {t('chat.modeIntro.speech.newBadge', 'New')}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[styles.talkToTaraTitle, { color: colors.textInverse }]}>
+                  {t('chat.modeIntro.speech.name', 'Talk To Tara')}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.talkToTaraBody, { color: colors.textInverseMuted }]} numberOfLines={2}>
               {t('chat.modeIntro.speech.benefit', 'Talk naturally with Tara and hear every reply.')}
             </Text>
-          </View>
-          <View style={[styles.talkToTaraArrow, { borderColor: colors.cardBorder }]}>
-            <Ionicons name="arrow-forward" size={17} color={colors.primary} />
-          </View>
+
+            <View style={styles.talkToTaraFooter}>
+              <View style={styles.talkToTaraRate}>
+                <Ionicons name="time-outline" size={15} color={colors.textInverseMuted} />
+                <Text style={[styles.talkToTaraRateText, { color: colors.textInverseMuted }]}>
+                  {t('chat.modeIntro.speech.perStartedMinute', {
+                    cost: speechPerMinuteCost,
+                    defaultValue: '{{cost}} credits / started min',
+                  })}
+                </Text>
+              </View>
+              <View style={[styles.talkToTaraCta, { backgroundColor: colors.accentSoft }]}>
+                <Text style={[styles.talkToTaraCtaText, { color: colors.onAccent }]}>
+                  {t('chat.modeIntro.speech.startTalking', 'Start talking')}
+                </Text>
+                <Ionicons name="arrow-forward" size={15} color={colors.onAccent} />
+              </View>
+            </View>
+          </LinearGradient>
         </TouchableOpacity>
       ) : null}
 
@@ -512,13 +560,26 @@ const styles = StyleSheet.create({
   primaryActionText: { fontSize: 14, fontWeight: '900' },
   secondaryAction: { height: 48, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   secondaryActionText: { fontSize: 13, fontWeight: '800' },
-  talkToTaraCard: { minHeight: 104, borderWidth: 1, borderRadius: 22, padding: 14, flexDirection: 'row', alignItems: 'center' },
-  talkToTaraIcon: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', marginRight: 13 },
-  talkToTaraCopy: { flex: 1, minWidth: 0, paddingRight: 10 },
-  talkToTaraEyebrow: { fontSize: 9, marginBottom: 4 },
-  talkToTaraTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 21, lineHeight: 25, marginBottom: 3 },
-  talkToTaraBody: { fontSize: 11, lineHeight: 16, fontWeight: '500' },
-  talkToTaraArrow: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  talkToTaraCard: { borderRadius: 24 },
+  talkToTaraGradient: { minHeight: 168, borderWidth: 1, borderRadius: 24, padding: 18, overflow: 'hidden' },
+  talkToTaraGlow: { position: 'absolute', width: 176, height: 176, borderRadius: 88, right: -54, top: -84 },
+  talkToTaraOrbit: { position: 'absolute', width: 142, height: 142, borderRadius: 71, borderWidth: 1, right: -30, top: -68 },
+  talkToTaraHeader: { flexDirection: 'row', alignItems: 'center', zIndex: 1 },
+  voiceMark: { width: 58, height: 58, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  voiceMarkWave: { position: 'absolute', right: 6, bottom: 7, height: 20, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  voiceMarkBar: { width: 2, borderRadius: 1 },
+  talkToTaraCopy: { flex: 1, minWidth: 0 },
+  talkToTaraBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
+  talkToTaraEyebrow: { fontSize: 9 },
+  talkToTaraNewBadge: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 },
+  talkToTaraNewBadgeText: { fontSize: 8, lineHeight: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
+  talkToTaraTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 25, lineHeight: 29 },
+  talkToTaraBody: { marginTop: 13, maxWidth: '84%', fontSize: 12, lineHeight: 17, fontWeight: '500', zIndex: 1 },
+  talkToTaraFooter: { marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, zIndex: 1 },
+  talkToTaraRate: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  talkToTaraRateText: { flexShrink: 1, fontSize: 9, lineHeight: 12, fontWeight: '700' },
+  talkToTaraCta: { minHeight: 36, maxWidth: '48%', borderRadius: 999, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  talkToTaraCtaText: { flexShrink: 1, fontSize: 10, fontWeight: '900' },
   bigThree: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 18, paddingVertical: 14 },
   bigThreeItem: { flex: 1, alignItems: 'center', paddingHorizontal: 5 },
   bigThreeDivider: { width: 1, height: 29 },
