@@ -34,7 +34,7 @@ export const CreditProvider = ({ children }) => {
     const [instantChatFirstMinuteCost, setInstantChatFirstMinuteCost] = useState(1);
     const [instantChatPerMinuteCost, setInstantChatPerMinuteCost] = useState(1);
     const [speechChatCost, setSpeechChatCost] = useState(1);
-    const [speechChatPerMinuteCost, setSpeechChatPerMinuteCost] = useState(1);
+    const [speechChatPerMinuteCost, setSpeechChatPerMinuteCost] = useState(5);
     const [instantChatEnabled, setInstantChatEnabled] = useState(true);
     const [speechChatEnabled, setSpeechChatEnabled] = useState(true);
     const [speechTtsProvider, setSpeechTtsProvider] = useState(null);
@@ -174,9 +174,9 @@ export const CreditProvider = ({ children }) => {
                 setSpeechChatCost(chatNum);
             }
             if (pricing.speech_chat_per_minute != null) {
-                setSpeechChatPerMinuteCost(Number(pricing.speech_chat_per_minute) || 1);
-            } else if (pricing.speech_chat != null) {
-                setSpeechChatPerMinuteCost(Number(pricing.speech_chat) || 1);
+                setSpeechChatPerMinuteCost(Number(pricing.speech_chat_per_minute) || 5);
+            } else {
+                setSpeechChatPerMinuteCost(5);
             }
 
             if (features && typeof features === 'object') {

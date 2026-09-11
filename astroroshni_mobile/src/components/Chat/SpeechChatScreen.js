@@ -66,7 +66,7 @@ const POST_TTS_ECHO_GUARD_MS = Platform.OS === 'android' ? 250 : 200;
 const HANDS_FREE_NO_SPEECH_RETRY_DELAY_MS = Platform.OS === 'android' ? 1100 : 800;
 const HANDS_FREE_MAX_NO_SPEECH_RETRIES = 4;
 const TRANSCRIPT_SEND_GRACE_MS = 1800;
-const SPEECH_BILLING_MIN_START_MINUTES = 5;
+const SPEECH_BILLING_MIN_START_MINUTES = 2;
 const SPEECH_CREDIT_WARNING_SECONDS = 60;
 const SPEECH_CREDIT_WARNING_INTERVAL_SECONDS = 10;
 const CREDIT_WARNING_BEEP_BASE64 = 'UklGRqQCAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YYACAACAudjOoWQ0JkJ6tNfRpmk3Jj50sNXTq286Jjpvq9PVsHQ+JjdpptHXtHpCJjRkoc7YuX9GJzFem8vZvYVLKC5ZlsjZwYtPKixUkMXaxZBULCpPi8HZyJZZLihLhb3Zy5teMSdGgLnYzqFkNCZCerTX0aZpNyY+dLDV06tvOiY6b6vT1bB0PiY3aabR17R6QiY0ZKHO2LmARicxXpvL2b2FSyguWZbI2cGLTyosVJDF2sWQVCwqT4vB2ciWWS4oS4W92cubXjEnRoC52M6hZDQmQnq019GmaTcmPnSw1dOrbzomOm+r09WwdD4mN2mm0de0ekImNGShzti5f0YnMV6by9m9hUsoLlmWyNnBi08qLFSQxdrFkFQsKk+LwdnIllkuKEuFvdnLm14xJ0Z/udjOoWQ0JkJ6tNfRpmk3Jj50sNXTq286Jjpvq9PVsHQ+JjdpptHXtHpCJjRkoc7YuX9GJzFem8vZvYVLKC5ZlsjZwYtPKixUkMXaxZBULCpPi8HZyJZZLihLhb3Zy5teMSdGgLnYzqFkNCZCerTX0aZpNyY+dLDV06tvOiY6b6vT1bB0PiY3aabR17R6QiY0ZKHO2Ll/RicxXpvL2b2FSyguWZbI2cGLTyosVJDF2sWQVCwqT4vB2ciWWS4oS4W92cubXjEnRoC52M6hZDQmQnq019GmaTcmPnSw1dOrbzomOm+r09WwdD4mN2mm0de0ekImNGShzti5f0YnMV6by9m9hUsoLlmWyNnBi08qLFSQxdrFkFQsKk+LwdnIllkuKEuFvdnLm14xJ0Z/udjOoWQ0JkJ6tNfRpmk3Jj50sNXTq286Jjpvq9PVsHQ+JjdpptHX';
@@ -236,6 +236,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const [speechChatCost, setSpeechChatCost] = useState(null);
   const [speechPerMinuteCost, setSpeechPerMinuteCost] = useState(null);
   const [billingSession, setBillingSession] = useState(null);
+  const [billingReceipt, setBillingReceipt] = useState('');
   const [callElapsedSeconds, setCallElapsedSeconds] = useState(0);
   const [callRemainingSeconds, setCallRemainingSeconds] = useState(null);
   const [speechTtsProvider, setSpeechTtsProvider] = useState(SPEECH_CHAT_TTS_PROVIDER);
@@ -286,6 +287,8 @@ export default function SpeechChatScreen({ navigation, route }) {
   const startListeningInFlightRef = useRef(false);
   const appStateRef = useRef(AppState.currentState);
   const resumeHandsFreeOnActiveRef = useRef(false);
+  const endBillingAfterCurrentTurnRef = useRef(false);
+  const pauseSpeechChatRef = useRef(() => Promise.resolve());
   const activeTurnSerialRef = useRef(0);
   const activeTurnLanguageRef = useRef(initialSpeechLanguage);
   const speechLanguageLockedRef = useRef(true);
@@ -396,8 +399,16 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
     try {
       const res = await creditAPI.endSpeechSession(current.session_id, reason);
-      logSpeechDebug('billing.end', res?.data || {});
-      return res?.data || null;
+      const result = res?.data || null;
+      logSpeechDebug('billing.end', result || {});
+      if (result && mountedRef.current) {
+        setBillingReceipt(t('speechChat.sessionReceipt', {
+          time: formatCallTime(result.elapsed_seconds || callElapsedSeconds),
+          credits: result.charged_credits ?? 0,
+          defaultValue: '{{time}} · {{credits}} credits used',
+        }));
+      }
+      return result;
     } catch (error) {
       logSpeechDebug('billing.endFailed', {
         reason,
@@ -435,13 +446,15 @@ export default function SpeechChatScreen({ navigation, route }) {
     try {
       const res = await creditAPI.startSpeechSession();
       const data = res?.data || {};
+      endBillingAfterCurrentTurnRef.current = false;
       billingSessionRef.current = data;
       const resumedElapsedSeconds = Math.max(0, Number(data.elapsed_seconds || 0));
       billingStartMsRef.current = Date.now() - resumedElapsedSeconds * 1000;
       lastBillingHeartbeatSecondRef.current = resumedElapsedSeconds;
       lastCreditWarningBeepRef.current = 0;
       setBillingSession(data);
-      setCallElapsedSeconds(0);
+      setBillingReceipt('');
+      setCallElapsedSeconds(resumedElapsedSeconds);
       setCallRemainingSeconds(Number(data.max_seconds || 0) || null);
       logSpeechDebug('billing.start', data);
       if (billingTimerRef.current) clearInterval(billingTimerRef.current);
@@ -494,7 +507,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       const detail = error?.response?.data?.detail;
       const required = detail?.required_credits;
       const balance = detail?.balance;
-      const perMinute = detail?.per_minute_cost || speechPerMinuteCost || 1;
+      const perMinute = detail?.per_minute_cost || speechPerMinuteCost || 5;
       const message = detail?.message
         || `Talk To Tara needs at least ${SPEECH_BILLING_MIN_START_MINUTES * perMinute} credits to start.`;
       Alert.alert(
@@ -626,7 +639,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         getTextToSpeech().setSpeechProvider(nextSpeechProvider);
         if (!cancelledPricing && mountedRef.current) {
           setSpeechChatCost(val);
-          setSpeechPerMinuteCost(pm != null && !Number.isNaN(pm) && pm > 0 ? pm : 1);
+          setSpeechPerMinuteCost(pm != null && !Number.isNaN(pm) && pm > 0 ? pm : 5);
           setSpeechTtsProvider(nextSpeechProvider);
           setSpeechTtsReady(true);
         }
@@ -634,6 +647,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         getTextToSpeech().setSpeechProvider(SPEECH_CHAT_TTS_PROVIDER);
         if (!cancelledPricing && mountedRef.current) {
           setSpeechChatCost(1);
+          setSpeechPerMinuteCost(5);
           setSpeechTtsProvider(SPEECH_CHAT_TTS_PROVIDER);
           setSpeechTtsReady(true);
         }
@@ -680,6 +694,15 @@ export default function SpeechChatScreen({ navigation, route }) {
       getTextToSpeech().stop();
     };
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      if (billingSessionRef.current?.session_id) {
+        pauseSpeechChatRef.current('screen_blur').catch(() => {});
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   useEffect(() => {
     getTextToSpeech().setSpeechProvider(speechTtsProvider);
@@ -741,21 +764,21 @@ export default function SpeechChatScreen({ navigation, route }) {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       appStateRef.current = nextState;
+      if (nextState !== 'active') {
+        resumeHandsFreeOnActiveRef.current = false;
+        handsFreeRestartRef.current = false;
+        setHandsFreeEnabled(false);
+        handsFreeEnabledRef.current = false;
+        if (['speaking', 'thinking', 'transcribing'].includes(statusRef.current)) {
+          endBillingAfterCurrentTurnRef.current = true;
+        } else {
+          pauseSpeechChatRef.current('app_background').catch(() => {});
+        }
+        return;
+      }
       if (nextState === 'active' && statusRef.current === 'speaking') {
         getTextToSpeech().resumeCurrentSpeech?.().catch?.(() => {});
         emitSpeechMetric('playback_resumed', { success: true, metadata: { app_state: nextState } });
-      }
-      if (
-        nextState === 'active'
-        && resumeHandsFreeOnActiveRef.current
-        && handsFreeEnabledRef.current
-      ) {
-        resumeHandsFreeOnActiveRef.current = false;
-        setTimeout(() => {
-          if (mountedRef.current && handsFreeEnabledRef.current) {
-            maybeRestartHandsFree();
-          }
-        }, POST_TTS_LISTEN_DELAY_MS);
       }
     });
     return () => subscription?.remove?.();
@@ -875,6 +898,7 @@ export default function SpeechChatScreen({ navigation, route }) {
             maybeStartAfterGreeting();
             return;
           }
+          if (!billingSessionRef.current?.session_id) endBillingAfterCurrentTurnRef.current = false;
           setStatus('idle');
         },
         onError: () => {
@@ -885,6 +909,7 @@ export default function SpeechChatScreen({ navigation, route }) {
             maybeStartAfterGreeting();
             return;
           }
+          if (!billingSessionRef.current?.session_id) endBillingAfterCurrentTurnRef.current = false;
           setStatus('idle');
         },
       });
@@ -1321,13 +1346,16 @@ export default function SpeechChatScreen({ navigation, route }) {
   };
 
   const maybeRestartHandsFree = async () => {
-    if (!mountedRef.current || !handsFreeEnabledRef.current) return;
+    if (!mountedRef.current || !handsFreeEnabledRef.current || endBillingAfterCurrentTurnRef.current) return;
     handsFreeRestartRef.current = false;
     if (appStateRef.current !== 'active') {
-      // Keep playback alive while locked, but defer the next microphone cycle
-      // until the app is visible again.
-      resumeHandsFreeOnActiveRef.current = true;
+      resumeHandsFreeOnActiveRef.current = false;
+      endBillingAfterCurrentTurnRef.current = false;
+      setHandsFreeEnabled(false);
+      handsFreeEnabledRef.current = false;
       setStatus('idle');
+      setErrorText(t('speechChat.sessionPaused', 'Talk To Tara is paused. Tap the mic when you are ready.'));
+      await endSpeechBillingSession('background_after_answer');
       return;
     }
     resumeHandsFreeOnActiveRef.current = false;
@@ -1352,6 +1380,7 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const maybeStartAfterGreeting = async () => {
     if (!mountedRef.current || !handsFreeEnabledRef.current) return;
+    if (appStateRef.current !== 'active') return;
     setErrorText('');
     if (IS_IOS_WEB && !iosWebMicPrimedRef.current) {
       setRequiresFirstMicTap(true);
@@ -2301,6 +2330,16 @@ export default function SpeechChatScreen({ navigation, route }) {
       updateSpeechTurn(conversationalAnswer, 'fallback');
       if (!mountedRef.current) return;
       setErrorText(t('speechChat.playbackError', 'Tara could not continue speaking, so the complete answer is shown on screen.'));
+      if (endBillingAfterCurrentTurnRef.current || appStateRef.current !== 'active') {
+        endBillingAfterCurrentTurnRef.current = false;
+        handsFreeRestartRef.current = false;
+        setHandsFreeEnabled(false);
+        handsFreeEnabledRef.current = false;
+        setStatus('idle');
+        setErrorText(t('speechChat.sessionPaused', 'Talk To Tara is paused. Tap the mic when you are ready.'));
+        await endSpeechBillingSession('background_after_answer');
+        return;
+      }
       if (handsFreeRestartRef.current && handsFreeEnabledRef.current) {
         await maybeRestartHandsFree();
         return;
@@ -2311,6 +2350,16 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
     updateSpeechTurn(conversationalAnswer, 'done');
     if (!mountedRef.current || activeTurnSerialRef.current !== turnSerial) return;
+    if (endBillingAfterCurrentTurnRef.current || appStateRef.current !== 'active') {
+      endBillingAfterCurrentTurnRef.current = false;
+      handsFreeRestartRef.current = false;
+      setHandsFreeEnabled(false);
+      handsFreeEnabledRef.current = false;
+      setStatus('idle');
+      setErrorText(t('speechChat.sessionPaused', 'Talk To Tara is paused. Tap the mic when you are ready.'));
+      await endSpeechBillingSession('background_after_answer');
+      return;
+    }
     if (handsFreeRestartRef.current && handsFreeEnabledRef.current) {
       await maybeRestartHandsFree();
       return;
@@ -2417,6 +2466,10 @@ export default function SpeechChatScreen({ navigation, route }) {
       if (!mountedRef.current) return;
       setErrorText(error?.message || t('speechChat.answerError', 'Answer failed. Please try again.'));
       setStatus('idle');
+      if (endBillingAfterCurrentTurnRef.current || appStateRef.current !== 'active') {
+        endBillingAfterCurrentTurnRef.current = false;
+        await endSpeechBillingSession('background_after_error');
+      }
     }
   };
 
@@ -2526,9 +2579,11 @@ export default function SpeechChatScreen({ navigation, route }) {
     await releaseSpeechRecognizer();
     stopSpeechUiImmediately();
     setCurrentTranscript('');
-    setErrorText('');
+    setErrorText(t('speechChat.sessionPaused', 'Talk To Tara is paused. Tap the mic when you are ready.'));
     setStatus('idle');
+    await endSpeechBillingSession(source);
   };
+  pauseSpeechChatRef.current = pauseSpeechChat;
 
   const handleMicPress = async () => {
     // This must run synchronously inside Chrome's click gesture. Awaiting
@@ -2835,6 +2890,19 @@ export default function SpeechChatScreen({ navigation, route }) {
               : 'Talk To Tara billing'}
             {callRemainingSeconds != null ? ` · ${formatCallTime(callRemainingSeconds)} left` : ''}
           </Text>
+          {billingSession ? (
+            <TouchableOpacity
+              onPress={() => pauseSpeechChat('user_ended').catch(() => {})}
+              style={[styles.endTalkButton, { borderColor: colors.error }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('speechChat.endTalk', 'End Talk')}
+            >
+              <Ionicons name="stop" size={11} color={colors.error} />
+              <Text style={[styles.endTalkButtonText, { color: colors.error }]}>
+                {t('speechChat.endTalk', 'End Talk')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         <View
@@ -3031,6 +3099,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         ) : null}
 
         {errorText ? <Text style={[styles.errorText, { color: colors.error }]}>{errorText}</Text> : null}
+        {billingReceipt ? <Text style={[styles.billingReceipt, { color: screenPalette.textSecondary }]}>{billingReceipt}</Text> : null}
         </View>
 
         <LinearGradient
@@ -3374,6 +3443,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  endTalkButton: {
+    minHeight: 28,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  endTalkButtonText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
   languageBar: {
     minHeight: 44,
     marginBottom: 6,
@@ -3577,6 +3660,13 @@ const styles = StyleSheet.create({
   errorText: {
     textAlign: 'center',
     fontSize: 13,
+    marginBottom: 8,
+    flexShrink: 0,
+  },
+  billingReceipt: {
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
     marginBottom: 8,
     flexShrink: 0,
   },

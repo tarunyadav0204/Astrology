@@ -42,7 +42,7 @@ GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_TTL_SECONDS = int(os.getenv("GOOGLE_PLAY_SU
 GOOGLE_PLAY_PRODUCTS_CACHE_MAX = 8
 GOOGLE_PLAY_SUBSCRIPTION_PRICE_CACHE_MAX = 32
 PLAY_PAYMENT_SERVICE_TIMEOUT_SECONDS = float(os.getenv("PLAY_PAYMENT_SERVICE_TIMEOUT_SECONDS", "8.0"))
-SPEECH_BILLING_MIN_START_MINUTES = 5
+SPEECH_BILLING_MIN_START_MINUTES = 2
 SPEECH_BILLING_HEARTBEAT_INTERVAL_SECONDS = 10
 SPEECH_BILLING_RECONNECT_GRACE_SECONDS = 45
 
@@ -2497,10 +2497,10 @@ async def end_instant_chat_billing_session(
 async def start_speech_billing_session(current_user: User = Depends(get_current_user)):
     """Start a live speech billing session.
 
-    Requires at least 5 minutes worth of the user's discounted per-minute price in wallet.
+    Requires at least 2 minutes worth of the user's discounted per-minute price in wallet.
     Actual deduction happens when /speech-session/end is called.
     """
-    base_cost = int(credit_service.get_credit_setting("speech_chat_per_minute_cost") or 1)
+    base_cost = int(credit_service.get_credit_setting("speech_chat_per_minute_cost") or 5)
     per_minute_cost = int(
         credit_service.get_effective_cost(
             current_user.userid,

@@ -546,7 +546,7 @@ export default function ChatScreen({ navigation, route }) {
   const [instantChatCost, setInstantChatCost] = useState(1);
   const [instantChatPerMinuteCost, setInstantChatPerMinuteCost] = useState(1);
   const [instantChatFirstMinuteCost, setInstantChatFirstMinuteCost] = useState(1);
-  const [speechChatPerMinuteCost, setSpeechChatPerMinuteCost] = useState(1);
+  const [speechChatPerMinuteCost, setSpeechChatPerMinuteCost] = useState(5);
   const [premiumChatCost, setPremiumChatCost] = useState(3);
   const [chatCostOriginal, setChatCostOriginal] = useState(null);
   const [instantChatCostOriginal, setInstantChatCostOriginal] = useState(null);
@@ -2324,7 +2324,7 @@ export default function ChatScreen({ navigation, route }) {
     );
     const speechMinuteVal = Number(priceMap.speech_chat_per_minute);
     setSpeechChatPerMinuteCost(
-      Number.isFinite(speechMinuteVal) && speechMinuteVal > 0 ? speechMinuteVal : 1
+      Number.isFinite(speechMinuteVal) && speechMinuteVal > 0 ? speechMinuteVal : 5
     );
     setInstantChatEnabled(Boolean(features.instant_chat_enabled));
     setSpeechChatEnabled(Boolean(features.speech_chat_enabled));

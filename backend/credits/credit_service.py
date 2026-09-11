@@ -440,7 +440,7 @@ class CreditService:
                 ("instant_chat_first_minute_cost", 1, "Credits for the first minute of Instant Chat"),
                 ("instant_chat_per_minute_cost", 1, "Credits per following started minute of Instant Chat"),
                 ("speech_chat_cost", 1, "Credits per Talk To Tara turn"),
-                ("speech_chat_per_minute_cost", 1, "Credits per minute for Talk To Tara"),
+                ("speech_chat_per_minute_cost", 5, "Credits per minute for Talk To Tara"),
                 ("wealth_analysis_cost", 5, "Credits per wealth analysis"),
                 ("marriage_analysis_cost", 3, "Credits per marriage analysis"),
                 ("health_analysis_cost", 3, "Credits per health analysis"),
@@ -4217,13 +4217,13 @@ class CreditService:
                         conn,
                         """
                         INSERT INTO credit_settings (setting_key, setting_value, description)
-                        VALUES ('speech_chat_per_minute_cost', 1, 'Credits per minute for Talk To Tara')
+                        VALUES ('speech_chat_per_minute_cost', 5, 'Credits per minute for Talk To Tara')
                         """,
                     )
                     conn.commit()
                     settings.append({
                         "key": "speech_chat_per_minute_cost",
-                        "value": 1,
+                        "value": 5,
                         "description": "Credits per minute for Talk To Tara",
                         "discount": None,
                     })

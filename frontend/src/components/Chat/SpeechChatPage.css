@@ -416,6 +416,17 @@
     flex-shrink: 0;
 }
 
+.speech-chat-receipt {
+    margin: 0;
+    border-radius: 14px;
+    background: rgba(15, 23, 42, 0.06);
+    color: #334155;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+}
+
 .speech-chat-privacy {
     flex-shrink: 0;
     border: 1px solid rgba(15, 23, 42, 0.08);
@@ -726,6 +737,22 @@
     font-weight: 600;
     color: #64748b;
     text-align: center;
+}
+
+.speech-chat-end-talk {
+    margin: 0 0 14px;
+    border: 1px solid rgba(220, 38, 38, 0.25);
+    border-radius: 999px;
+    padding: 8px 16px;
+    background: rgba(254, 226, 226, 0.82);
+    color: #b91c1c;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.speech-chat-end-talk:hover {
+    background: rgba(254, 202, 202, 0.92);
 }
 
 .speech-chat-mic-outer {

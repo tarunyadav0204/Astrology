@@ -18,7 +18,7 @@ const RECOGNITION_MAX_MS = 30000;
 const RECOGNITION_SILENCE_MS = 3000;
 const RECOGNITION_END_GRACE_MS = 1600;
 const BACKEND_RECORDING_MAX_MS = 20000;
-const SPEECH_BILLING_MIN_START_MINUTES = 5;
+const SPEECH_BILLING_MIN_START_MINUTES = 2;
 const HANDS_FREE_MAX_NO_SPEECH_RETRIES = 4;
 const TRANSCRIPT_SEND_GRACE_MS = 1800;
 
@@ -56,6 +56,8 @@ const WEB_SPEECH_COPY = {
         noSpeech: 'No speech was detected. Please try again.', micBlocked: 'Microphone permission was blocked for this site.',
         speechFailed: 'Speech recognition failed. Please try again.', recordingFailed: 'Microphone recording failed. Please try again.',
         transcriptionFailed: 'Speech transcription failed. Please try again.', inactivity: 'Talk To Tara paused after prolonged silence. Tap the mic when you are ready.',
+        endTalk: 'End Talk', sessionPaused: 'Talk To Tara is paused. Tap the mic when you are ready.',
+        sessionReceipt: '{time} · {credits} credits used',
     },
     hindi: {
         title: 'तारा से बात करें', live: 'लाइव', back: 'चैट पर वापस जाएँ', language: 'बातचीत की भाषा',
@@ -88,6 +90,8 @@ const WEB_SPEECH_COPY = {
         noSpeech: 'आवाज़ साफ़ समझ नहीं आई। कृपया फिर कोशिश करें।', micBlocked: 'इस साइट के लिए माइक्रोफ़ोन की अनुमति बंद है।',
         speechFailed: 'आवाज़ पहचानने में समस्या हुई। कृपया फिर कोशिश करें।', recordingFailed: 'माइक्रोफ़ोन रिकॉर्डिंग में समस्या हुई। कृपया फिर कोशिश करें।',
         transcriptionFailed: 'आवाज़ को लिखने में समस्या हुई। कृपया फिर कोशिश करें।', inactivity: 'लंबे समय तक आवाज़ न मिलने के कारण बातचीत रोक दी गई है। तैयार होने पर माइक दबाएँ।',
+        endTalk: 'बातचीत समाप्त करें', sessionPaused: 'तारा से बातचीत रोक दी गई है। तैयार होने पर माइक दबाएँ।',
+        sessionReceipt: '{time} · {credits} क्रेडिट उपयोग हुए',
     },
 };
 
@@ -179,6 +183,7 @@ const SpeechChatPage = () => {
     const [speechLanguage, setSpeechLanguage] = useState(() => getChatLanguage());
     const [displayUserName] = useState(() => readStoredWebUserName());
     const [billingSession, setBillingSession] = useState(null);
+    const [billingReceipt, setBillingReceipt] = useState('');
     const [callElapsedSeconds, setCallElapsedSeconds] = useState(0);
     const [pendingTranscript, setPendingTranscript] = useState('');
     const [transcriptAlternatives, setTranscriptAlternatives] = useState([]);
@@ -235,6 +240,9 @@ const SpeechChatPage = () => {
     const lastBillingHeartbeatSecondRef = useRef(0);
     const billingHeartbeatInFlightRef = useRef(false);
     const endSpeechBillingSessionRef = useRef(() => Promise.resolve());
+    const endBillingAfterCurrentTurnRef = useRef(false);
+    const pageHiddenRef = useRef(typeof document !== 'undefined' && document.visibilityState === 'hidden');
+    const statusRef = useRef(status);
     const consecutiveNoSpeechRef = useRef(0);
     const micRequestedAtRef = useRef(0);
     const firstPartialReportedRef = useRef(false);
@@ -253,6 +261,7 @@ const SpeechChatPage = () => {
 
     handsFreeRef.current = handsFree;
     speechLanguageRef.current = speechLanguage;
+    statusRef.current = status;
     const copy = (key) => (
         WEB_SPEECH_COPY[speechLanguage]?.[key]
         || WEB_SPEECH_COPY.english[key]
@@ -286,19 +295,51 @@ const SpeechChatPage = () => {
     }, [speechTtsProvider]);
 
     useEffect(() => {
-        const resumeInterruptedAnswer = () => {
-            if (document.visibilityState === 'visible' && status === 'speaking') {
+        const handleVisibilityChange = () => {
+            const hidden = document.visibilityState !== 'visible';
+            pageHiddenRef.current = hidden;
+            if (!hidden && statusRef.current === 'speaking') {
                 textToSpeech.resume();
                 emitSpeechMetric('playback_resumed', { success: true, metadata: { app_state: 'visible' } });
+                return;
             }
+            if (!hidden) return;
+
+            setHandsFree(false);
+            handsFreeRef.current = false;
+            if (autoRestartTimerRef.current) {
+                clearTimeout(autoRestartTimerRef.current);
+                autoRestartTimerRef.current = null;
+            }
+            if (['speaking', 'thinking', 'transcribing'].includes(statusRef.current)) {
+                endBillingAfterCurrentTurnRef.current = true;
+                return;
+            }
+            shouldAutoSendSpeechRef.current = false;
+            if (recognitionRef.current) {
+                recognitionRef.current.onresult = null;
+                recognitionRef.current.onend = null;
+                recognitionRef.current.onerror = null;
+                recognitionRef.current.abort?.();
+            }
+            recognitionRef.current = null;
+            if (mediaRecorderRef.current?.state === 'recording') {
+                discardedMediaRecordersRef.current.add(mediaRecorderRef.current);
+                mediaRecorderRef.current.stop();
+            }
+            mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+            mediaStreamRef.current = null;
+            setStatus('idle');
+            setErrorText(copy('sessionPaused'));
+            void endSpeechBillingSessionRef.current('page_hidden');
         };
-        document.addEventListener('visibilitychange', resumeInterruptedAnswer);
-        window.addEventListener('pageshow', resumeInterruptedAnswer);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('pageshow', handleVisibilityChange);
         return () => {
-            document.removeEventListener('visibilitychange', resumeInterruptedAnswer);
-            window.removeEventListener('pageshow', resumeInterruptedAnswer);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('pageshow', handleVisibilityChange);
         };
-    }, [status]);
+    }, [speechLanguage]);
 
     const taraStatusLabels = useMemo(() => ({
         idle: handsFree
@@ -411,7 +452,7 @@ const SpeechChatPage = () => {
 
     const endSpeechBillingSession = async (reason = 'ended', { keepalive = false } = {}) => {
         const current = billingSessionRef.current;
-        if (!current?.session_id) return;
+        if (!current?.session_id) return null;
         billingSessionRef.current = null;
         setBillingSession(null);
         if (billingTimerRef.current) {
@@ -420,7 +461,7 @@ const SpeechChatPage = () => {
         }
         try {
             const token = localStorage.getItem('token') || '';
-            await fetch(`/api/credits/speech-session/${encodeURIComponent(current.session_id)}/end`, {
+            const response = await fetch(`/api/credits/speech-session/${encodeURIComponent(current.session_id)}/end`, {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -429,9 +470,20 @@ const SpeechChatPage = () => {
                 body: JSON.stringify({ reason }),
                 keepalive,
             });
-            if (!keepalive) fetchBalance();
+            const result = keepalive ? null : await response.json().catch(() => null);
+            if (!keepalive) {
+                fetchBalance();
+                if (result && mountedRef.current) {
+                    const time = formatSpeechDuration(result.elapsed_seconds || callElapsedSeconds);
+                    setBillingReceipt(copy('sessionReceipt')
+                        .replace('{time}', time)
+                        .replace('{credits}', String(result.charged_credits ?? 0)));
+                }
+            }
+            return result;
         } catch {
             // The server heartbeat lease reconciles an interrupted close.
+            return null;
         }
     };
     endSpeechBillingSessionRef.current = endSpeechBillingSession;
@@ -456,6 +508,7 @@ const SpeechChatPage = () => {
                 billingStartMsRef.current = Date.now() - elapsed * 1000;
                 lastBillingHeartbeatSecondRef.current = elapsed;
                 setBillingSession(data);
+                setBillingReceipt('');
                 setCallElapsedSeconds(elapsed);
                 if (billingTimerRef.current) clearInterval(billingTimerRef.current);
                 billingTimerRef.current = setInterval(() => {
@@ -497,7 +550,7 @@ const SpeechChatPage = () => {
     };
 
     const scheduleHandsFreeRestart = ({ noSpeech = false } = {}) => {
-        if (!handsFreeRef.current || !mountedRef.current) return;
+        if (!handsFreeRef.current || !mountedRef.current || pageHiddenRef.current || endBillingAfterCurrentTurnRef.current) return;
         consecutiveNoSpeechRef.current = noSpeech ? consecutiveNoSpeechRef.current + 1 : 0;
         if (noSpeech && consecutiveNoSpeechRef.current >= HANDS_FREE_MAX_NO_SPEECH_RETRIES) {
             setHandsFree(false);
@@ -509,7 +562,7 @@ const SpeechChatPage = () => {
         }
         if (autoRestartTimerRef.current) clearTimeout(autoRestartTimerRef.current);
         autoRestartTimerRef.current = setTimeout(() => {
-            if (mountedRef.current && handsFreeRef.current) {
+            if (mountedRef.current && handsFreeRef.current && !pageHiddenRef.current && !endBillingAfterCurrentTurnRef.current) {
                 startListeningRef.current();
                 emitSpeechMetric('hands_free_restart', {
                     success: true,
@@ -544,6 +597,14 @@ const SpeechChatPage = () => {
                 : turn
         )));
         setStatus('idle');
+        if (endBillingAfterCurrentTurnRef.current || pageHiddenRef.current) {
+            endBillingAfterCurrentTurnRef.current = false;
+            setHandsFree(false);
+            handsFreeRef.current = false;
+            setErrorText(copy('sessionPaused'));
+            void endSpeechBillingSessionRef.current('background_after_answer');
+            return;
+        }
         scheduleHandsFreeRestart();
     };
 
@@ -979,6 +1040,14 @@ const SpeechChatPage = () => {
                 clearAnswerRevealFallback(activeTurnId);
                 revealAnswerText(activeTurnId, trimmed, { voiceState: 'done' });
                 setStatus('idle');
+                if (endBillingAfterCurrentTurnRef.current || pageHiddenRef.current) {
+                    endBillingAfterCurrentTurnRef.current = false;
+                    setHandsFree(false);
+                    handsFreeRef.current = false;
+                    setErrorText(copy('sessionPaused'));
+                    void endSpeechBillingSessionRef.current('background_after_answer');
+                    return;
+                }
                 scheduleHandsFreeRestart();
             },
             onError: () => {
@@ -986,6 +1055,14 @@ const SpeechChatPage = () => {
                 clearAnswerRevealFallback(activeTurnId);
                 revealAnswerText(activeTurnId, trimmed, { voiceState: 'fallback' });
                 setStatus('idle');
+                if (endBillingAfterCurrentTurnRef.current || pageHiddenRef.current) {
+                    endBillingAfterCurrentTurnRef.current = false;
+                    setHandsFree(false);
+                    handsFreeRef.current = false;
+                    setErrorText(copy('sessionPaused'));
+                    void endSpeechBillingSessionRef.current('background_after_answer');
+                    return;
+                }
                 scheduleHandsFreeRestart();
             },
         });
@@ -993,6 +1070,13 @@ const SpeechChatPage = () => {
             clearAnswerRevealFallback(activeTurnId);
             revealAnswerText(activeTurnId, trimmed, { voiceState: 'fallback' });
             setStatus('idle');
+            if (endBillingAfterCurrentTurnRef.current || pageHiddenRef.current) {
+                endBillingAfterCurrentTurnRef.current = false;
+                setHandsFree(false);
+                handsFreeRef.current = false;
+                setErrorText(copy('sessionPaused'));
+                void endSpeechBillingSessionRef.current('background_after_answer');
+            }
         }
     };
 
@@ -1465,6 +1549,20 @@ const SpeechChatPage = () => {
             }
             return;
         }
+        if (endBillingAfterCurrentTurnRef.current && pageHiddenRef.current) {
+            endBillingAfterCurrentTurnRef.current = false;
+            cancelProcessingBridge('background_answer_complete', { interruptCurrent: true });
+            revealAnswerText(turnId, conversationalAnswer, { voiceState: 'done' });
+            setTurns((prev) => prev.map((turn) => (
+                turn.id === turnId ? { ...turn, pending: false } : turn
+            )));
+            setHandsFree(false);
+            handsFreeRef.current = false;
+            setStatus('idle');
+            setErrorText(copy('sessionPaused'));
+            void endSpeechBillingSessionRef.current('background_after_answer');
+            return;
+        }
         textToSpeech.prefetch(conversationalAnswer, {
             lang: speechLocaleForLanguage(language),
         }).catch(() => null);
@@ -1760,6 +1858,38 @@ const SpeechChatPage = () => {
             return;
         }
         startListening();
+    };
+
+    const handleEndTalk = async () => {
+        endBillingAfterCurrentTurnRef.current = false;
+        setHandsFree(false);
+        handsFreeRef.current = false;
+        shouldAutoSendSpeechRef.current = false;
+        clearTranscriptSendTimer();
+        if (autoRestartTimerRef.current) {
+            clearTimeout(autoRestartTimerRef.current);
+            autoRestartTimerRef.current = null;
+        }
+        if (recognitionRef.current) {
+            recognitionRef.current.onresult = null;
+            recognitionRef.current.onend = null;
+            recognitionRef.current.onerror = null;
+            recognitionRef.current.abort?.();
+            recognitionRef.current = null;
+        }
+        if (mediaRecorderRef.current?.state === 'recording') {
+            discardedMediaRecordersRef.current.add(mediaRecorderRef.current);
+            mediaRecorderRef.current.stop();
+        }
+        mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        stopAudioMeter();
+        if (!cancelActiveTurn()) interruptAssistantSpeech();
+        setCurrentTranscript('');
+        setPendingTranscript('');
+        setStatus('idle');
+        setErrorText(copy('sessionPaused'));
+        await endSpeechBillingSession('user_ended');
     };
 
     const handleFollowUp = (question) => {
@@ -2058,6 +2188,7 @@ const SpeechChatPage = () => {
                             ) : null}
 
                             {errorText ? <p className="speech-chat-error speech-chat-error--inline">{errorText}</p> : null}
+                            {billingReceipt ? <p className="speech-chat-receipt">{billingReceipt}</p> : null}
                             <details className="speech-chat-privacy">
                                 <summary>{copy('privacyDetails')}</summary>
                                 <p>{copy('privacyBody')}</p>
@@ -2109,6 +2240,12 @@ const SpeechChatPage = () => {
                                     {billingSession ? `${formatSpeechDuration(callElapsedSeconds)} · ` : ''}
                                     {copy('credits')}: {credits} · {copy('title')}: {speechChatPerMinuteCost} {copy('perMinute')}
                                 </p>
+
+                                {billingSession ? (
+                                    <button type="button" className="speech-chat-end-talk" onClick={handleEndTalk}>
+                                        <span aria-hidden>■</span> {copy('endTalk')}
+                                    </button>
+                                ) : null}
 
                                 <div className="speech-chat-mic-outer">
                                     <button
