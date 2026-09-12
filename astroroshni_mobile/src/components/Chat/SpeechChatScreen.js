@@ -121,7 +121,10 @@ const createIOSWebRecording = async (stream) => {
       analyser.fftSize = 256;
       audioContext.createMediaStreamSource(stream).connect(analyser);
       meterSamples = new Uint8Array(analyser.fftSize);
-      await audioContext.resume?.();
+      // Do not await resume: some installed Safari PWAs leave this promise
+      // pending even though MediaRecorder itself can start immediately.
+      const resumePromise = audioContext.resume?.();
+      resumePromise?.catch?.(() => {});
     }
   } catch (_) {
     analyser = null;
@@ -192,6 +195,17 @@ const createIOSWebRecording = async (stream) => {
     },
     getURI: () => objectUrl,
   };
+};
+
+const discardWebRecording = async (recording) => {
+  if (!recording) return;
+  try {
+    await recording.stopAndUnloadAsync?.();
+  } catch (_) {
+    // Best-effort cleanup for a recorder that Safari already ended.
+  }
+  const uri = recording.getURI?.();
+  if (String(uri || '').startsWith('blob:')) URL.revokeObjectURL(uri);
 };
 
 const normalizeLanguageCode = (language) => {
@@ -401,7 +415,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const speakingWatchdogRef = useRef(null);
   const billingSessionRef = useRef(null);
   const iosWebMicPrimedRef = useRef(!IS_IOS_WEB);
-  const iosWebPrimedStreamRef = useRef(null);
+  const iosWebPrimedRecordingRef = useRef(null);
   const billingTimerRef = useRef(null);
   const billingHeartbeatInFlightRef = useRef(false);
   const lastBillingHeartbeatSecondRef = useRef(0);
@@ -778,8 +792,9 @@ export default function SpeechChatScreen({ navigation, route }) {
       } catch {
         // ignore teardown errors
       }
-      iosWebPrimedStreamRef.current?.getTracks?.().forEach((track) => track.stop());
-      iosWebPrimedStreamRef.current = null;
+      const primedIOSRecording = iosWebPrimedRecordingRef.current;
+      iosWebPrimedRecordingRef.current = null;
+      if (primedIOSRecording) discardWebRecording(primedIOSRecording).catch(() => {});
       clearNativeListeningTimers();
       handsFreeRestartRef.current = false;
       startListeningInFlightRef.current = false;
@@ -1088,8 +1103,7 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const primeIosWebMicrophone = async () => {
     if (!IS_IOS_WEB) return true;
-    if (iosWebPrimedStreamRef.current?.active) return true;
-    if (iosWebMicPrimedRef.current) return true;
+    if (iosWebPrimedRecordingRef.current) return true;
     if (!navigator?.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       throw new Error(t(
         'speechChat.safariMicUnavailable',
@@ -1100,7 +1114,10 @@ export default function SpeechChatScreen({ navigation, route }) {
       // Keep getUserMedia directly inside the tap call chain. Safari can reject
       // the first capture request when it starts later from greeting onDone.
       const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      iosWebPrimedStreamRef.current = permissionStream;
+      // Start MediaRecorder immediately as part of the permission gesture.
+      // Holding only an open stream can light the iPhone mic indicator without
+      // capturing any audio while billing/session setup completes.
+      iosWebPrimedRecordingRef.current = await createIOSWebRecording(permissionStream);
       iosWebMicPrimedRef.current = true;
       setRequiresFirstMicTap(false);
       return true;
@@ -1675,11 +1692,10 @@ export default function SpeechChatScreen({ navigation, route }) {
     recordingLastSpeechAtRef.current = 0;
     const createPromise = IS_IOS_WEB
       ? (async () => {
-        const primedStream = iosWebPrimedStreamRef.current;
-        iosWebPrimedStreamRef.current = null;
-        const stream = primedStream?.active
-          ? primedStream
-          : await navigator.mediaDevices.getUserMedia({ audio: true });
+        const primedRecording = iosWebPrimedRecordingRef.current;
+        iosWebPrimedRecordingRef.current = null;
+        if (primedRecording) return { recording: primedRecording };
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         return { recording: await createIOSWebRecording(stream) };
       })()
       : Audio.Recording.createAsync(SPEECH_RECORDING_OPTIONS);
@@ -2688,7 +2704,12 @@ export default function SpeechChatScreen({ navigation, route }) {
     await releaseSpeechRecognizer();
     if (!billingSessionRef.current?.session_id) {
       const billingOk = await startSpeechBillingSession();
-      if (!billingOk) return;
+      if (!billingOk) {
+        const primedIOSRecording = iosWebPrimedRecordingRef.current;
+        iosWebPrimedRecordingRef.current = null;
+        await discardWebRecording(primedIOSRecording);
+        return;
+      }
     }
     setErrorText('');
     setCurrentTranscript('');
@@ -2751,6 +2772,9 @@ export default function SpeechChatScreen({ navigation, route }) {
         await forceStartListening();
       }
     } catch (error) {
+      const primedIOSRecording = iosWebPrimedRecordingRef.current;
+      iosWebPrimedRecordingRef.current = null;
+      await discardWebRecording(primedIOSRecording);
       setErrorText(error?.message || t('speechChat.genericError', 'Something went wrong. Please try again.'));
       setStatus('idle');
     }
