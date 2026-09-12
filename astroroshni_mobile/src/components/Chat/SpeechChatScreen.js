@@ -101,7 +101,7 @@ const SPEECH_RECORDING_OPTIONS = {
     : {}),
 };
 
-const createWebRecording = async (stream) => {
+const createWebRecording = async (stream, sharedAudioContext = null) => {
   const recorderOptions = WEB_SPEECH_RECORDING_MIME_TYPE
     ? { mimeType: WEB_SPEECH_RECORDING_MIME_TYPE, audioBitsPerSecond: 128000 }
     : undefined;
@@ -119,16 +119,21 @@ const createWebRecording = async (stream) => {
   const startedAt = Date.now();
   let objectUrl = '';
   const chunks = [];
-  let audioContext = null;
+  let audioContext = sharedAudioContext;
+  const ownsAudioContext = !sharedAudioContext;
+  let mediaStreamSource = null;
   let analyser = null;
   let meterSamples = null;
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (AudioContextClass) {
+    if (AudioContextClass && (!audioContext || audioContext.state === 'closed')) {
       audioContext = new AudioContextClass();
+    }
+    if (audioContext) {
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 256;
-      audioContext.createMediaStreamSource(stream).connect(analyser);
+      mediaStreamSource = audioContext.createMediaStreamSource(stream);
+      mediaStreamSource.connect(analyser);
       meterSamples = new Uint8Array(analyser.fftSize);
       // Do not await resume: some installed Safari PWAs leave this promise
       // pending even though MediaRecorder itself can start immediately.
@@ -169,6 +174,7 @@ const createWebRecording = async (stream) => {
         isRecording: mediaRecorder.state === 'recording',
         durationMillis: Math.max(0, Date.now() - startedAt),
         metering,
+        meteringContextState: audioContext?.state || 'unavailable',
       };
     },
     setOnRecordingStatusUpdate: () => {},
@@ -193,7 +199,9 @@ const createWebRecording = async (stream) => {
       } finally {
         stream.getTracks().forEach((track) => track.stop());
         try {
-          await audioContext?.close?.();
+          mediaStreamSource?.disconnect?.();
+          analyser?.disconnect?.();
+          if (ownsAudioContext) await audioContext?.close?.();
         } catch (_) {
           // The recorder has already released the microphone stream.
         }
@@ -449,6 +457,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const billingSessionRef = useRef(null);
   const iosWebMicPrimedRef = useRef(!IS_IOS_WEB);
   const iosWebPrimedRecordingRef = useRef(null);
+  const iosWebMeterAudioContextRef = useRef(null);
   const billingTimerRef = useRef(null);
   const billingHeartbeatInFlightRef = useRef(false);
   const lastBillingHeartbeatSecondRef = useRef(0);
@@ -484,6 +493,30 @@ export default function SpeechChatScreen({ navigation, route }) {
         ...(options.metadata || {}),
       },
     }).catch(() => {});
+  };
+
+  const ensureIOSWebMeterAudioContext = () => {
+    if (!IS_IOS_WEB || typeof window === 'undefined') return null;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+    let context = iosWebMeterAudioContextRef.current;
+    if (!context || context.state === 'closed') {
+      context = new AudioContextClass();
+      iosWebMeterAudioContextRef.current = context;
+    }
+    if (context.state === 'suspended') {
+      try {
+        // Invoke resume inside the user's tap call stack, but do not await it:
+        // installed Safari PWAs can leave this promise pending while the
+        // MediaRecorder itself is already ready to capture.
+        context.resume()?.catch?.((error) => {
+          logSpeechDebug('iosWebMeter.resumeFailed', { message: error?.message }).catch(() => {});
+        });
+      } catch (error) {
+        logSpeechDebug('iosWebMeter.resumeFailed', { message: error?.message }).catch(() => {});
+      }
+    }
+    return context;
   };
 
   const buildGreetingText = () => {
@@ -828,6 +861,9 @@ export default function SpeechChatScreen({ navigation, route }) {
       const primedIOSRecording = iosWebPrimedRecordingRef.current;
       iosWebPrimedRecordingRef.current = null;
       if (primedIOSRecording) discardWebRecording(primedIOSRecording).catch(() => {});
+      const iosWebMeterContext = iosWebMeterAudioContextRef.current;
+      iosWebMeterAudioContextRef.current = null;
+      iosWebMeterContext?.close?.().catch?.(() => {});
       clearNativeListeningTimers();
       handsFreeRestartRef.current = false;
       startListeningInFlightRef.current = false;
@@ -1144,13 +1180,17 @@ export default function SpeechChatScreen({ navigation, route }) {
       ));
     }
     try {
+      // Safari only guarantees Web Audio activation from a direct user gesture.
+      // Keep this context alive across turns so hands-free silence detection
+      // also works when the next recording starts automatically after Tara.
+      const meterAudioContext = ensureIOSWebMeterAudioContext();
       // Keep getUserMedia directly inside the tap call chain. Safari can reject
       // the first capture request when it starts later from greeting onDone.
       const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       // Start MediaRecorder immediately as part of the permission gesture.
       // Holding only an open stream can light the iPhone mic indicator without
       // capturing any audio while billing/session setup completes.
-      iosWebPrimedRecordingRef.current = await createWebRecording(permissionStream);
+      iosWebPrimedRecordingRef.current = await createWebRecording(permissionStream, meterAudioContext);
       iosWebMicPrimedRef.current = true;
       setRequiresFirstMicTap(false);
       return true;
@@ -1739,8 +1779,9 @@ export default function SpeechChatScreen({ navigation, route }) {
             'Microphone recording is not available in this browser. Please allow microphone access and try again.'
           ));
         }
+        const meterAudioContext = IS_IOS_WEB ? ensureIOSWebMeterAudioContext() : null;
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        return { recording: await createWebRecording(stream) };
+        return { recording: await createWebRecording(stream, meterAudioContext) };
       })()
       : Audio.Recording.createAsync(SPEECH_RECORDING_OPTIONS);
     recordingStartPromiseRef.current = createPromise;
@@ -1858,7 +1899,11 @@ export default function SpeechChatScreen({ navigation, route }) {
             if (webNoiseCalibrationActive) {
               recordingNoiseSamplesRef.current.push(metering);
               const sortedNoise = [...recordingNoiseSamplesRef.current].sort((a, b) => a - b);
-              const noiseFloor = sortedNoise[Math.floor(sortedNoise.length / 2)];
+              // Use the quieter quartile instead of the median. iPhone users
+              // often begin speaking immediately after the mic opens; treating
+              // those first voice samples as room noise makes the threshold too
+              // high and prevents automatic end-of-speech detection.
+              const noiseFloor = sortedNoise[Math.floor((sortedNoise.length - 1) * 0.25)];
               // Stay comfortably above the current device/room noise while
               // retaining enough sensitivity for normal conversational speech.
               recordingSpeechThresholdRef.current = Math.max(
@@ -1971,6 +2016,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         isRecording: Boolean(statusBeforeStop?.isRecording),
         canRecord: Boolean(statusBeforeStop?.canRecord),
         metering: statusBeforeStop?.metering,
+        meteringContextState: statusBeforeStop?.meteringContextState,
         meteringMax,
         meteringAvg,
         meterSamples: meterSamples.length,
