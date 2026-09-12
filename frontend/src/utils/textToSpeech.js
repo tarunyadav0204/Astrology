@@ -1,5 +1,6 @@
 // Text-to-Speech utility for chat responses
 export const normalizeAstrologyPronunciation = (text) => String(text || '')
+    .replace(/\bLagna\b/gi, 'Lag-na')
     // Standalone Hindi planet names can be expanded by some voices into their
     // weekday names. Supplying the spoken context word disambiguates them;
     // visible chat text is never changed.

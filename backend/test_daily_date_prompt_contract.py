@@ -16,6 +16,7 @@ def test_relative_date_prompt_contract_supplies_exact_user_local_dates():
 def test_instant_router_prompt_contains_authoritative_calendar_contract():
     prompt = IntentRouter.__new__(IntentRouter)._build_compact_instant_router_prompt(
         user_question="HOW WILL BE MY DAY TODAY",
+        latest_user_reply="HOW WILL BE MY DAY TODAY",
         history_text="",
         app_language="english",
         current_date="2026-08-12",
@@ -24,6 +25,7 @@ def test_instant_router_prompt_contains_authoritative_calendar_contract():
         clarification_limit_text="",
         force_ready_instruction="",
         force_clarify_instruction="",
+        dialogue_state_text="{}",
     )
 
     assert "TODAY = 2026-08-12" in prompt

@@ -1,9 +1,11 @@
 import re
 
 from tts.routes import (
+    _fallback_spoken_tts_text,
     _podcast_audio_config,
     _replace_spoken_punctuation_with_breaks,
     _segment_text_to_ssml,
+    _strip_spoken_control_cues_for_plain_tts,
     _strip_literal_punctuation_words,
 )
 
@@ -23,6 +25,30 @@ def test_punctuation_becomes_breaks_not_spoken_chars():
     tagged = _replace_spoken_punctuation_with_breaks('<prosody pitch="+0.8st">Wait.</prosody>')
     assert 'pitch="+0.8st"' in tagged
     assert "Wait." not in tagged
+
+
+def test_plain_pause_cleanup_preserves_commas_without_adding_periods():
+    source = "centered on coordination, data, or commerce."
+    prepared = _fallback_spoken_tts_text(source, "en")
+    cleaned = _strip_spoken_control_cues_for_plain_tts(prepared)
+
+    assert cleaned == source
+    assert ",." not in cleaned
+
+
+def test_chirp_break_ssml_hides_commas_and_periods_from_voice():
+    source = _fallback_spoken_tts_text(
+        "centered on coordination, data, or commerce.",
+        "en",
+    )
+    ssml = _segment_text_to_ssml(source, ssml_mode="breaks")
+    spoken_nodes = re.sub(r"<[^>]+>", "", ssml)
+
+    assert "," not in spoken_nodes
+    assert "." not in spoken_nodes
+    assert "coordination" in spoken_nodes
+    assert "data" in spoken_nodes
+    assert "commerce" in spoken_nodes
 
 
 def test_segment_ssml_does_not_keep_commas_or_dots():

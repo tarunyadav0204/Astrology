@@ -301,7 +301,7 @@ _PRONUNCIATION_ALIASES: list[tuple[str, str]] = [
   ("Graha", "Gruh-ha"),
   ("Rashi", "Raa-shee"),
   ("Bhava", "Baa-va"),
-  ("Lagna", "Lug-na"),
+  ("Lagna", "Lag-na"),
   ("Panchang", "Pun-chung"),
   ("Sade Sati", "Saa-day Saa-tee"),
   ("Vipat Tara", "Vi-pat Ta-ra")
@@ -493,6 +493,15 @@ def _fallback_spoken_tts_text(text: str, lang: str) -> str:
 def _strip_spoken_control_cues_for_plain_tts(text: str) -> str:
   """Remove pause/emphasis control cues before sending text to non-SSML TTS."""
   cleaned = str(text or "")
+  # Preserve punctuation that already carries the pause. Replacing a cue after
+  # a comma with another period produced text such as `coordination,. data`,
+  # which some premium voices verbalize as "coordination dot data".
+  cleaned = re.sub(
+    r"([,.;:?!।])\s*\[\s*PAUS[EC]\s*:\s*(?:short|medium|long)\s*\]",
+    r"\1 ",
+    cleaned,
+    flags=re.IGNORECASE,
+  )
   cleaned = re.sub(
     r"\[\s*PAUS[EC]\s*:\s*(?:short|medium|long)\s*\]",
     ". ",
@@ -1399,12 +1408,23 @@ async def synthesize(
     else:
       if include_timepoints and not allow_word_mark_timing:
         timing_disabled_reason = "voice_family_prefers_smooth_audio"
-      audio_bytes = await _chunk_and_synthesize(
-        client,
-        voice,
-        audio_config,
-        _strip_spoken_control_cues_for_plain_tts(spoken_text),
-      )
+      if _voice_family(resolved_voice_name) == "chirp":
+        # Chirp can verbalize commas and periods supplied as plain text.
+        # Break-only SSML keeps the intended cadence without exposing literal
+        # punctuation tokens to the voice model.
+        audio_bytes = await _synthesize_ssml(
+          client,
+          voice,
+          audio_config,
+          _segment_text_to_ssml(spoken_text, role="female", ssml_mode="breaks"),
+        )
+      else:
+        audio_bytes = await _chunk_and_synthesize(
+          client,
+          voice,
+          audio_config,
+          _strip_spoken_control_cues_for_plain_tts(spoken_text),
+        )
     synth_ms = (time.perf_counter() - synth_started) * 1000.0
     total_ms = (time.perf_counter() - tts_total_started) * 1000.0
     logger.info(

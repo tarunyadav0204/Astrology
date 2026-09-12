@@ -371,9 +371,11 @@ export default function HomeScreen({
     safeBottom: tabSafeBottom,
     totalHeight: tabTotalHeight,
   } = getHomeBottomTabMetrics(insets.bottom);
+  const [showTaraDock, setShowTaraDock] = useState(false);
+  const taraDockAnim = useRef(new Animated.Value(0)).current;
   // The tab bar overlays the page. Reserve its full height plus a comfortable
   // reveal gap so the final Today/Explore card can scroll completely above it.
-  const homeScrollBottomInset = tabTotalHeight + 32;
+  const homeScrollBottomInset = tabTotalHeight + 32 + (showTaraDock ? 72 : 0);
   /** Web: portaled tabs only while Home is focused (hidden on BirthForm etc.). */
   const [homeTabsVisible, setHomeTabsVisible] = useState(true);
   useAnalytics('HomeScreen');
@@ -514,8 +516,21 @@ export default function HomeScreen({
   }, [infoModalPayload]);
 
   const handleScroll = (event) => {
-    lastScrollY.current = event.nativeEvent.contentOffset.y;
+    const nextScrollY = event.nativeEvent.contentOffset.y;
+    lastScrollY.current = nextScrollY;
+    setShowTaraDock((current) => {
+      const next = nextScrollY > 520;
+      return current === next ? current : next;
+    });
   };
+
+  useEffect(() => {
+    Animated.timing(taraDockAnim, {
+      toValue: showTaraDock ? 1 : 0,
+      duration: showTaraDock ? 240 : 170,
+      useNativeDriver: true,
+    }).start();
+  }, [showTaraDock, taraDockAnim]);
 
 
 
@@ -2286,6 +2301,7 @@ const loadHomeData = async (nativeData = null) => {
           onSelectNative={() => navigation.navigate('SelectNative', { returnTo: 'Home', returnParams: { stayOnGreeting: true } })}
           onCreateChart={() => navigation.navigate('BirthForm', { returnTo: 'Home' })}
           onAsk={() => onOptionSelect({ action: 'question' })}
+          firstQuestionFree={freeQuestionAvailable}
           onTalkToTara={onTalkToTara}
           speechPerMinuteCost={pricing.speech_chat_per_minute ?? 5}
           onOpenCharts={() => requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data }))}
@@ -3547,6 +3563,100 @@ const loadHomeData = async (nativeData = null) => {
           </View>
         </Animated.View>
       ) : null}
+
+      {(() => {
+        const dockAllowed = !showExploreCatalog
+          && !isPanditMode
+          && homeTabsVisible
+          && !showKnowYourselfPrompt
+          && !showFirstQuestionFreeModal
+          && !showMonthlyWelcomeModal
+          && !showMultiChartTipModal
+          && !showInfoOnlyModal
+          && !showHomeBannerSheet
+          && !showFomoHomeSheet
+          && !showNextPeakSheet
+          && !showTraitsModal
+          && !activeInsight;
+
+        if (!dockAllowed) return null;
+
+        const taraDock = (
+          <Animated.View
+            pointerEvents={showTaraDock ? 'box-none' : 'none'}
+            style={[
+              styles.taraActionDock,
+              {
+                bottom: tabTotalHeight + 12,
+                opacity: taraDockAnim,
+                transform: [
+                  {
+                    translateY: taraDockAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [16, 0],
+                    }),
+                  },
+                  {
+                    scale: taraDockAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.98, 1],
+                    }),
+                  },
+                ],
+                ...(Platform.OS === 'web'
+                  ? {
+                      position: 'fixed',
+                      left: 0,
+                      right: 0,
+                      width: 'calc(100% - 32px)',
+                      maxWidth: 488,
+                      marginLeft: 'auto',
+                      marginRight: 'auto',
+                    }
+                  : null),
+              },
+            ]}
+            {...(Platform.OS === 'web' ? { dataSet: { arTaraActionDock: '1' } } : null)}
+          >
+            <View style={[styles.taraActionDockInner, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
+              <TouchableOpacity
+                onPress={() => onOptionSelect({ action: 'question' })}
+                activeOpacity={0.84}
+                accessibilityRole="button"
+                accessibilityLabel={t('premiumUi.home.askTara')}
+                style={[styles.taraActionDockAsk, { backgroundColor: colors.accentSoft }]}
+              >
+                <Icon name="sparkles" size={17} color={colors.onAccent} />
+                <Text style={[styles.taraActionDockAskText, { color: colors.onAccent }]} numberOfLines={1}>
+                  {t('premiumUi.home.askTara')}
+                </Text>
+                <Icon name="arrow-forward" size={15} color={colors.onAccent} />
+              </TouchableOpacity>
+
+              {onTalkToTara ? (
+                <TouchableOpacity
+                  onPress={onTalkToTara}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('chat.modeIntro.speech.name', 'Talk To Tara')}
+                  style={[styles.taraActionDockTalk, { borderColor: colors.cosmicLine }]}
+                >
+                  <Icon name="mic" size={16} color={colors.accent} />
+                  <Text style={[styles.taraActionDockTalkText, { color: colors.textInverse }]} numberOfLines={1}>
+                    {t('chat.modeIntro.speech.name', 'Talk To Tara')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </Animated.View>
+        );
+
+        if (Platform.OS === 'web') {
+          if (!createPortal || typeof document === 'undefined') return null;
+          return createPortal(taraDock, document.body);
+        }
+        return taraDock;
+      })()}
 
       {/* Bottom Tabs — on web, portal to document.body with position:fixed so stack
           transforms after BirthForm cannot leave a purple gap under the bar. */}
@@ -6614,4 +6724,54 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 0.3,
   },
+  taraActionDock: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    borderRadius: 29,
+    zIndex: 10020,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.24,
+        shadowRadius: 16,
+      },
+      android: { elevation: 14 },
+      web: {},
+    }),
+  },
+  taraActionDockInner: {
+    minHeight: 58,
+    borderWidth: 1,
+    borderRadius: 29,
+    padding: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  taraActionDockAsk: {
+    flex: 1,
+    minWidth: 0,
+    height: 44,
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  taraActionDockAskText: { flexShrink: 1, fontSize: 13, fontWeight: '900' },
+  taraActionDockTalk: {
+    maxWidth: '43%',
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 22,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  taraActionDockTalkText: { flexShrink: 1, fontSize: 11, fontWeight: '800' },
 });

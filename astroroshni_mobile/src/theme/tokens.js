@@ -127,6 +127,8 @@ const base = {
   warning: '#9b661a',
   error: '#a12a47',
   info: '#315f82',
+  ctaShimmerCore: '#ffd65a',
+  ctaShimmerTrail: '#a96f12',
   radiusSm: 10,
   radiusMd: 16,
   radiusLg: 24,

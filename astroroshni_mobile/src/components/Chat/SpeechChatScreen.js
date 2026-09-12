@@ -7,6 +7,7 @@ import {
   Alert,
   Dimensions,
   Linking,
+  Modal,
   PermissionsAndroid,
   Platform,
   StyleSheet,
@@ -46,26 +47,34 @@ const IS_IOS_WEB = Platform.OS === 'web'
 // Use the platform recognizer for the real-time experience on installed apps.
 // The recorded-audio backend remains a compatibility fallback when a device
 // has no recognizer service or the native recognizer fails to initialize.
+// Chrome's recognizer is the only web path that can expose words while the
+// user is still speaking. Prefer it on supported web browsers for the live
+// conversational experience; iOS Safari/PWA is explicitly routed to the
+// recorded-audio backend below because its browser recognizer is unreliable.
 const PREFER_NATIVE_SPEECH_RECOGNITION = ['android', 'ios', 'web'].includes(Platform.OS);
 const REQUIRE_NATIVE_SPEECH_FOR_WEBSOCKET = Platform.OS === 'ios';
 const USE_SPEECH_WEBSOCKET = true;
 const HANDS_FREE_AUTO_STOP_MS = 45 * 1000;
-const BACKEND_RECORDING_UNDETECTED_SPEECH_MAX_MS = 18 * 1000;
+const BACKEND_RECORDING_UNDETECTED_SPEECH_MAX_MS = 8 * 1000;
 const BACKEND_RECORDING_MIN_MS = 2600;
-const BACKEND_RECORDING_SILENCE_STOP_MS = 4200;
-const BACKEND_RECORDING_LONG_SILENCE_STOP_MS = 7000;
+// Backend transcription has its own network/model latency, so keeping seven
+// seconds of silence here makes a completed utterance feel unresponsive. A
+// 2.8-second pause still tolerates normal thinking pauses; longer questions
+// receive extra room before capture is closed.
+const BACKEND_RECORDING_SILENCE_STOP_MS = 2800;
+const BACKEND_RECORDING_LONG_SILENCE_STOP_MS = 4200;
 const BACKEND_RECORDING_LONG_QUESTION_AFTER_MS = 5000;
 const BACKEND_RECORDING_SPEECH_THRESHOLD_DB = -55;
-// A brief pause often means the user is thinking, especially for a detailed
-// astrology question. Wait for a deliberate three-second pause before ending.
-const NATIVE_PARTIAL_STABLE_SUBMIT_MS = 3000;
+// Long enough for a natural thinking pause, while keeping Chrome's live
+// transcript substantially faster than record-upload-transcribe.
+const NATIVE_PARTIAL_STABLE_SUBMIT_MS = 2200;
 const NATIVE_MAX_LISTENING_MS = 30000;
 const NATIVE_READY_TIMEOUT_MS = 4500;
 const POST_TTS_LISTEN_DELAY_MS = Platform.OS === 'android' ? 1200 : 900;
 const POST_TTS_ECHO_GUARD_MS = Platform.OS === 'android' ? 250 : 200;
 const HANDS_FREE_NO_SPEECH_RETRY_DELAY_MS = Platform.OS === 'android' ? 1100 : 800;
 const HANDS_FREE_MAX_NO_SPEECH_RETRIES = 4;
-const TRANSCRIPT_SEND_GRACE_MS = 1800;
+const TRANSCRIPT_SEND_GRACE_MS = 800;
 const SPEECH_BILLING_MIN_START_MINUTES = 2;
 const SPEECH_CREDIT_WARNING_SECONDS = 60;
 const SPEECH_CREDIT_WARNING_INTERVAL_SECONDS = 10;
@@ -92,7 +101,7 @@ const SPEECH_RECORDING_OPTIONS = {
     : {}),
 };
 
-const createIOSWebRecording = async (stream) => {
+const createWebRecording = async (stream) => {
   const recorderOptions = WEB_SPEECH_RECORDING_MIME_TYPE
     ? { mimeType: WEB_SPEECH_RECORDING_MIME_TYPE, audioBitsPerSecond: 128000 }
     : undefined;
@@ -268,6 +277,20 @@ const logSpeechDebug = async (label, payload = {}) => {
   }
 };
 
+const readableErrorDetail = (detail, fallback = '') => {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (typeof item === 'string' ? item : item?.msg || item?.message || ''))
+      .filter(Boolean);
+    return messages.join(' ');
+  }
+  if (detail && typeof detail === 'object') {
+    return String(detail.msg || detail.message || detail.detail || fallback || '');
+  }
+  return String(detail || fallback || '');
+};
+
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -331,7 +354,13 @@ export default function SpeechChatScreen({ navigation, route }) {
     i18n.resolvedLanguage || i18n.language || route.params?.language || 'english'
   );
   const [userName, setUserName] = useState('');
-  const [birthData, setBirthData] = useState(route.params?.birthData || null);
+  // React Navigation serializes object params as "[object Object]" in a web
+  // URL. After a PWA reload that value is a string, not chart data; ignore it
+  // and restore the selected chart from storage in loadContext below.
+  const routeBirthData = route.params?.birthData;
+  const [birthData, setBirthData] = useState(
+    routeBirthData && typeof routeBirthData === 'object' ? routeBirthData : null
+  );
   // Reuse the text-chat thread when Speech was opened as a consultation mode.
   // Speech remains an Instant interaction, while both modalities share history.
   const [sessionId, setSessionId] = useState(route.params?.sessionId || null);
@@ -339,6 +368,8 @@ export default function SpeechChatScreen({ navigation, route }) {
   const [answerStyle, setAnswerStyle] = useState(
     route.params?.responseStyle === 'technical' ? 'technical' : 'simple'
   );
+  const [topSelector, setTopSelector] = useState(null);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [status, setStatus] = useState('idle');
   const [turns, setTurns] = useState([]);
   const [currentTranscript, setCurrentTranscript] = useState('');
@@ -378,7 +409,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   const processingBridgeEpochRef = useRef(0);
   const processingBridgeSpeakingRef = useRef(false);
   const recentProcessingBridgeLinesRef = useRef([]);
-  const pendingSpokenFollowUpRef = useRef('');
+  const pendingSpokenFollowUpRef = useRef(null);
   const recordingRef = useRef(null);
   const recordingStartPromiseRef = useRef(null);
   const recordingTeardownPromiseRef = useRef(Promise.resolve());
@@ -400,6 +431,8 @@ export default function SpeechChatScreen({ navigation, route }) {
   const recordingSpeechSampleCountRef = useRef(0);
   const recordingLastSpeechAtRef = useRef(0);
   const recordingMeterSamplesRef = useRef([]);
+  const recordingNoiseSamplesRef = useRef([]);
+  const recordingSpeechThresholdRef = useRef(BACKEND_RECORDING_SPEECH_THRESHOLD_DB);
   const startListeningInFlightRef = useRef(false);
   const appStateRef = useRef(AppState.currentState);
   const resumeHandsFreeOnActiveRef = useRef(false);
@@ -1117,7 +1150,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       // Start MediaRecorder immediately as part of the permission gesture.
       // Holding only an open stream can light the iPhone mic indicator without
       // capturing any audio while billing/session setup completes.
-      iosWebPrimedRecordingRef.current = await createIOSWebRecording(permissionStream);
+      iosWebPrimedRecordingRef.current = await createWebRecording(permissionStream);
       iosWebMicPrimedRef.current = true;
       setRequiresFirstMicTap(false);
       return true;
@@ -1469,7 +1502,10 @@ export default function SpeechChatScreen({ navigation, route }) {
         await stopBackendRecordingAndTranscribe();
       } catch (error) {
         if (!mountedRef.current) return;
-        setErrorText(error?.response?.data?.detail || error?.message || t('speechChat.noTranscript', 'I could not understand that. Please try again.'));
+        setErrorText(readableErrorDetail(
+          error?.response?.data?.detail,
+          error?.message || t('speechChat.noTranscript', 'I could not understand that. Please try again.')
+        ));
         setStatus('idle');
       }
       return;
@@ -1656,7 +1692,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   };
 
   const startBackendRecording = async () => {
-    if (!IS_IOS_WEB) {
+    if (Platform.OS !== 'web') {
       const permission = await Audio.requestPermissionsAsync();
       if (permission?.status !== 'granted') {
         throw new Error(t('speechChat.micPermissionBody', 'Please allow microphone access so AstroRoshni can hear your question.'));
@@ -1684,19 +1720,27 @@ export default function SpeechChatScreen({ navigation, route }) {
     });
 
     recordingMeterSamplesRef.current = [];
+    recordingNoiseSamplesRef.current = [];
+    recordingSpeechThresholdRef.current = BACKEND_RECORDING_SPEECH_THRESHOLD_DB;
     recordingAutoStoppingRef.current = false;
     recordingStartedAtRef.current = Date.now();
     recordingSpeechDetectedRef.current = false;
     recordingSpeechFirstDetectedAtRef.current = 0;
     recordingSpeechSampleCountRef.current = 0;
     recordingLastSpeechAtRef.current = 0;
-    const createPromise = IS_IOS_WEB
+    const createPromise = Platform.OS === 'web'
       ? (async () => {
         const primedRecording = iosWebPrimedRecordingRef.current;
         iosWebPrimedRecordingRef.current = null;
         if (primedRecording) return { recording: primedRecording };
+        if (!navigator?.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+          throw new Error(t(
+            'speechChat.webMicUnavailable',
+            'Microphone recording is not available in this browser. Please allow microphone access and try again.'
+          ));
+        }
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        return { recording: await createIOSWebRecording(stream) };
+        return { recording: await createWebRecording(stream) };
       })()
       : Audio.Recording.createAsync(SPEECH_RECORDING_OPTIONS);
     recordingStartPromiseRef.current = createPromise;
@@ -1720,7 +1764,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       });
       stopBackendRecordingAndTranscribe().catch((error) => {
         if (!mountedRef.current) return;
-        const detail = error?.response?.data?.detail || error?.message || '';
+        const detail = readableErrorDetail(error?.response?.data?.detail, error?.message || '');
         logSpeechDebug('backendRecording.autoStopError', {
           message: error?.message,
           status: error?.response?.status,
@@ -1810,14 +1854,33 @@ export default function SpeechChatScreen({ navigation, route }) {
             if (recordingMeterSamplesRef.current.length > 80) {
               recordingMeterSamplesRef.current = recordingMeterSamplesRef.current.slice(-80);
             }
-            const echoGuardActive = elapsedMs < POST_TTS_ECHO_GUARD_MS;
-            if (metering >= BACKEND_RECORDING_SPEECH_THRESHOLD_DB && !echoGuardActive) {
+            const webNoiseCalibrationActive = Platform.OS === 'web' && elapsedMs < 720;
+            if (webNoiseCalibrationActive) {
+              recordingNoiseSamplesRef.current.push(metering);
+              const sortedNoise = [...recordingNoiseSamplesRef.current].sort((a, b) => a - b);
+              const noiseFloor = sortedNoise[Math.floor(sortedNoise.length / 2)];
+              // Stay comfortably above the current device/room noise while
+              // retaining enough sensitivity for normal conversational speech.
+              recordingSpeechThresholdRef.current = Math.max(
+                -48,
+                Math.min(-24, noiseFloor + 12)
+              );
+            }
+            const echoGuardActive = elapsedMs < Math.max(POST_TTS_ECHO_GUARD_MS, Platform.OS === 'web' ? 720 : 0);
+            const speechThreshold = Platform.OS === 'web'
+              ? recordingSpeechThresholdRef.current
+              : BACKEND_RECORDING_SPEECH_THRESHOLD_DB;
+            if (metering >= speechThreshold && !echoGuardActive) {
               recordingSpeechSampleCountRef.current += 1;
               if (!recordingSpeechFirstDetectedAtRef.current) {
                 recordingSpeechFirstDetectedAtRef.current = now;
               }
               if (!recordingSpeechDetectedRef.current && recordingSpeechSampleCountRef.current >= 2) {
-                logSpeechDebug('backendRecording.speechDetected', { elapsedMs, metering });
+                logSpeechDebug('backendRecording.speechDetected', {
+                  elapsedMs,
+                  metering,
+                  speechThreshold,
+                });
                 recordingSpeechDetectedRef.current = true;
               }
               recordingLastSpeechAtRef.current = now;
@@ -1887,6 +1950,7 @@ export default function SpeechChatScreen({ navigation, route }) {
     let durationMs = 0;
     const meterSamples = recordingMeterSamplesRef.current || [];
     recordingMeterSamplesRef.current = [];
+    recordingNoiseSamplesRef.current = [];
     recordingAutoStoppingRef.current = false;
     recordingStartedAtRef.current = 0;
     const speechDetected = recordingSpeechDetectedRef.current;
@@ -2249,10 +2313,15 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const askInstant = async (question, turnLanguage = language, streamHandlers = {}) => {
     const clientRequestId = `speech_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const offeredFollowUp = pendingSpokenFollowUpRef.current;
-    pendingSpokenFollowUpRef.current = '';
+    const pendingFollowUp = pendingSpokenFollowUpRef.current;
+    pendingSpokenFollowUpRef.current = null;
     const speechQueryContext = buildQueryContext(
-      offeredFollowUp ? { speech_follow_up_offer: offeredFollowUp } : {}
+      pendingFollowUp?.question
+        ? {
+          speech_follow_up_offer: pendingFollowUp.question,
+          speech_follow_up_invitation: pendingFollowUp.invitation || '',
+        }
+        : {}
     );
     if (USE_SPEECH_WEBSOCKET) {
       try {
@@ -2391,7 +2460,9 @@ export default function SpeechChatScreen({ navigation, route }) {
       )));
     };
     setFollowUps(nextFollowUps);
-    pendingSpokenFollowUpRef.current = nextFollowUps[0] || '';
+    pendingSpokenFollowUpRef.current = nextFollowUps[0]
+      ? { question: nextFollowUps[0], invitation: closingLine }
+      : null;
     setTurns((prev) => [...prev, {
       id: speechTurnId,
       question,
@@ -2733,6 +2804,63 @@ export default function SpeechChatScreen({ navigation, route }) {
   };
   pauseSpeechChatRef.current = pauseSpeechChat;
 
+  useEffect(() => {
+    if (!route.params?.nativeSelectionReturn) return undefined;
+    const selectedNative = route.params?.birthData || route.params?.birthDetails;
+    if (!selectedNative?.name) return undefined;
+
+    let cancelled = false;
+    const applySelectedNative = async () => {
+      greetingPlaybackEpochRef.current += 1;
+      activeTurnSerialRef.current += 1;
+      greetedRef.current = false;
+      greetingPrefetchKeyRef.current = '';
+      handsFreeRestartRef.current = false;
+      startListeningInFlightRef.current = false;
+      clearTranscriptSendTimer();
+      await getTextToSpeech().stop();
+      await releaseSpeechRecognizer();
+      if (cancelled || !mountedRef.current) return;
+
+      const returnedLanguage = route.params?.language
+        ? normalizeLanguageCode(route.params.language)
+        : normalizeLanguageCode(language);
+      activeTurnLanguageRef.current = returnedLanguage;
+      setLanguage(returnedLanguage);
+      setBirthData(selectedNative);
+      setSessionId(null);
+      setTurns([]);
+      setCurrentTranscript('');
+      setPendingTranscript('');
+      setStreamingAnswer('');
+      setProcessingBridgeCaption('');
+      setFollowUps([]);
+      setErrorText('');
+      setBillingReceipt('');
+      setCallElapsedSeconds(0);
+      setCallRemainingSeconds(null);
+      setHandsFreeEnabled(true);
+      handsFreeEnabledRef.current = true;
+      setStatus('idle');
+      navigation.setParams({
+        nativeSelectionReturn: undefined,
+        birthData: undefined,
+        birthDetails: undefined,
+        birthChartId: undefined,
+      });
+    };
+
+    applySelectedNative().catch((error) => {
+      if (!cancelled && mountedRef.current) {
+        setErrorText(error?.message || t('speechChat.genericError', 'Something went wrong. Please try again.'));
+        setStatus('idle');
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [route.params?.nativeSelectionReturn, route.params?.birthChartId]);
+
   const handleMicPress = async () => {
     // This must run synchronously inside Chrome's click gesture. Awaiting
     // permission, billing, or generation first loses autoplay authorization.
@@ -2822,6 +2950,11 @@ export default function SpeechChatScreen({ navigation, route }) {
     }
   };
 
+  const handleAnswerStyleChange = (nextStyle) => {
+    setAnswerStyle(nextStyle);
+    chatAPI.updateAnswerStylePreference(nextStyle).catch(() => {});
+  };
+
   const speechPreparing = status === 'speaking' && avatarSpeech.active && !avatarSpeech.audioStarted;
   const nativeRecognizerStarting = status === 'listening'
     && nativeRecognizerPhase === 'starting'
@@ -2847,6 +2980,16 @@ export default function SpeechChatScreen({ navigation, route }) {
 
   const busy = ['transcribing', 'thinking'].includes(status) || speechPreparing || nativeRecognizerStarting;
   const languageSwitchDisabled = ['transcribing', 'thinking'].includes(status);
+  const selectedLanguageOption = SPEECH_LANGUAGE_OPTIONS.find(
+    (option) => option.key === normalizeLanguageCode(language)
+  ) || SPEECH_LANGUAGE_OPTIONS[0];
+  const selectedLanguageLabel = t(
+    selectedLanguageOption.labelKey,
+    selectedLanguageOption.fallback
+  );
+  const selectedAnswerStyleLabel = answerStyle === 'technical'
+    ? t('chat.answerStyle.technical', 'Technical')
+    : t('chat.answerStyle.simple', 'Simple');
   const screenPalette = {
     background: colors.background,
     backgroundAlt: colors.backgroundSecondary || colors.background,
@@ -3007,143 +3150,78 @@ export default function SpeechChatScreen({ navigation, route }) {
                 : t('speechChat.screenSubtitleDefault', 'A live voice conversation with Tara')}
             </Text>
           </View>
-          <View style={[
-            styles.liveBadge,
-            {
-              backgroundColor: screenPalette.selectionSurface,
-              borderColor: screenPalette.selectionBorder,
-            },
-          ]}>
-            <View style={[styles.liveDot, { backgroundColor: screenPalette.primary }]} />
-            <Text style={[styles.liveBadgeText, { color: screenPalette.selectionText }]}>
-              {t('speechChat.liveBadge', 'Live')}
-            </Text>
-          </View>
           <TouchableOpacity
-            onPress={() => navigation.navigate('AccountSecurity')}
-            style={[styles.privacyButton, { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong }]}
+            onPress={() => setHeaderMenuOpen(true)}
+            style={[styles.headerMenuButton, { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong }]}
             accessibilityRole="button"
-            accessibilityLabel={t('speechChat.privacyControls', 'Voice privacy and saved chat controls')}
+            accessibilityState={{ expanded: headerMenuOpen }}
+            accessibilityLabel={t('speechChat.moreOptions', 'More options')}
           >
-            <Ionicons name="shield-checkmark-outline" size={18} color={screenPalette.textSecondary} />
+            <Ionicons name="ellipsis-vertical" size={18} color={screenPalette.textSecondary} />
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.callMeter, { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong }]}>
-          <View style={styles.callMeterItem}>
-            <Ionicons name="time-outline" size={15} color={screenPalette.primary} />
-            <Text style={[styles.callMeterText, { color: screenPalette.text }]}>
+        <View style={[
+          styles.sessionToolbar,
+          { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong },
+        ]}>
+          <View style={styles.sessionSummary}>
+            <View style={[styles.liveDot, { backgroundColor: screenPalette.primary }]} />
+            <Text style={[styles.sessionTime, { color: screenPalette.text }]}>
               {formatCallTime(callElapsedSeconds)}
             </Text>
-          </View>
-          <View style={[styles.callMeterDivider, { backgroundColor: screenPalette.line }]} />
-          <Text style={[styles.callMeterSubtext, { color: screenPalette.textSecondary }]}>
-            {speechPerMinuteCost != null
-              ? `${speechPerMinuteCost} credits/min`
-              : 'Talk To Tara billing'}
-            {callRemainingSeconds != null ? ` · ${formatCallTime(callRemainingSeconds)} left` : ''}
-          </Text>
-          {billingSession ? (
-            <TouchableOpacity
-              onPress={() => pauseSpeechChat('user_ended').catch(() => {})}
-              style={[styles.endTalkButton, { borderColor: colors.error }]}
-              accessibilityRole="button"
-              accessibilityLabel={t('speechChat.endTalk', 'End Talk')}
+            <Text
+              numberOfLines={1}
+              style={[styles.sessionBilling, { color: screenPalette.textSecondary }]}
             >
-              <Ionicons name="stop" size={11} color={colors.error} />
-              <Text style={[styles.endTalkButtonText, { color: colors.error }]}>
-                {t('speechChat.endTalk', 'End Talk')}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <View
-          style={[styles.languageBar, { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong }]}
-          accessibilityRole="radiogroup"
-          accessibilityLabel={t('speechChat.languageLabel', 'Conversation language')}
-        >
-          <View style={styles.languageLabelWrap}>
-            <Ionicons name="language-outline" size={16} color={screenPalette.primary} />
-            <Text style={[styles.languageLabel, { color: screenPalette.textSecondary }]}>
-              {t('speechChat.languageLabel', 'Conversation language')}
+              {speechPerMinuteCost != null
+                ? `${speechPerMinuteCost}/min`
+                : t('speechChat.liveBadge', 'Live')}
+              {callRemainingSeconds != null ? ` · ${formatCallTime(callRemainingSeconds)} left` : ''}
             </Text>
           </View>
-          <View style={[styles.languageToggle, { borderColor: screenPalette.border }]}>
-            {SPEECH_LANGUAGE_OPTIONS.map((option) => {
-              const selected = normalizeLanguageCode(language) === option.key;
-              const label = t(option.labelKey, option.fallback);
-              return (
-                <TouchableOpacity
-                  key={option.key}
-                  disabled={languageSwitchDisabled}
-                  onPress={() => handleSpeechLanguageChange(option.key)}
-                  style={[
-                    styles.languageOption,
-                    selected && {
-                      backgroundColor: screenPalette.selectionSurface,
-                      borderColor: screenPalette.selectionBorder,
-                    },
-                    languageSwitchDisabled && !selected && styles.optionDisabled,
-                  ]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected, checked: selected, disabled: languageSwitchDisabled }}
-                  accessibilityLabel={label}
-                >
-                  <Text style={[
-                    styles.languageOptionText,
-                    { color: selected ? screenPalette.selectionText : screenPalette.textSecondary },
-                  ]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
 
-        <View
-          style={[styles.answerStyleBar, { borderColor: screenPalette.border, backgroundColor: screenPalette.surfaceStrong }]}
-          accessibilityRole="radiogroup"
-          accessibilityLabel={t('chat.answerStyle.label', 'Answer style')}
-        >
-          <Text style={[styles.answerStyleLabel, { color: screenPalette.textSecondary }]}>
-            {t('chat.answerStyle.label', 'Answer style')}
-          </Text>
-          <View style={[styles.answerStyleToggle, { borderColor: screenPalette.border }]}>
-            {['simple', 'technical'].map((styleKey) => {
-              const selected = answerStyle === styleKey;
-              const label = styleKey === 'simple'
-                ? t('chat.answerStyle.simple', 'Simple')
-                : t('chat.answerStyle.technical', 'Technical');
-              return (
-                <TouchableOpacity
-                  key={styleKey}
-                  onPress={() => {
-                    setAnswerStyle(styleKey);
-                    chatAPI.updateAnswerStylePreference(styleKey).catch(() => {});
-                  }}
-                  style={[
-                    styles.answerStyleOption,
-                    selected && {
-                      backgroundColor: screenPalette.selectionSurface,
-                      borderColor: screenPalette.selectionBorder,
-                    },
-                  ]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected, checked: selected }}
-                  accessibilityLabel={label}
-                >
-                  <Text style={[
-                    styles.answerStyleOptionText,
-                    { color: selected ? screenPalette.selectionText : screenPalette.textSecondary },
-                  ]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <TouchableOpacity
+            disabled={languageSwitchDisabled}
+            onPress={() => setTopSelector('language')}
+            style={[
+              styles.sessionControlChip,
+              {
+                backgroundColor: screenPalette.selectionSurface,
+                borderColor: screenPalette.selectionBorder,
+              },
+              languageSwitchDisabled && styles.sessionControlChipDisabled,
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: languageSwitchDisabled, expanded: topSelector === 'language' }}
+            accessibilityLabel={`${t('speechChat.languageLabel', 'Conversation language')}: ${selectedLanguageLabel}`}
+          >
+            <Ionicons name="language-outline" size={14} color={screenPalette.selectionText} />
+            <Text numberOfLines={1} style={[styles.sessionControlChipText, { color: screenPalette.selectionText }]}>
+              {selectedLanguageLabel}
+            </Text>
+            <Ionicons name="chevron-down" size={12} color={screenPalette.selectionText} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => setTopSelector('style')}
+            style={[
+              styles.sessionControlChip,
+              {
+                backgroundColor: screenPalette.selectionSurface,
+                borderColor: screenPalette.selectionBorder,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: topSelector === 'style' }}
+            accessibilityLabel={`${t('chat.answerStyle.label', 'Answer style')}: ${selectedAnswerStyleLabel}`}
+          >
+            <Text numberOfLines={1} style={[styles.sessionControlChipText, { color: screenPalette.selectionText }]}>
+              {selectedAnswerStyleLabel}
+            </Text>
+            <Ionicons name="chevron-down" size={12} color={screenPalette.selectionText} />
+          </TouchableOpacity>
+
         </View>
 
         <View style={styles.mainColumn}>
@@ -3497,6 +3575,168 @@ export default function SpeechChatScreen({ navigation, route }) {
         </View>
         </LinearGradient>
       </LinearGradient>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={topSelector != null}
+        onRequestClose={() => setTopSelector(null)}
+      >
+        <View style={styles.selectorBackdrop}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setTopSelector(null)}
+            style={StyleSheet.absoluteFill}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close', 'Close')}
+          />
+          <View style={[
+            styles.selectorSheet,
+            { backgroundColor: screenPalette.surfaceStrong, borderColor: screenPalette.border },
+          ]}>
+            <View style={[styles.selectorHandle, { backgroundColor: screenPalette.line }]} />
+            <Text style={[styles.selectorTitle, { color: screenPalette.text }]}>
+              {topSelector === 'language'
+                ? t('speechChat.languageLabel', 'Conversation language')
+                : t('chat.answerStyle.label', 'Answer style')}
+            </Text>
+
+            {(topSelector === 'language'
+              ? SPEECH_LANGUAGE_OPTIONS
+              : [
+                  { key: 'simple', labelKey: 'chat.answerStyle.simple', fallback: 'Simple' },
+                  { key: 'technical', labelKey: 'chat.answerStyle.technical', fallback: 'Technical' },
+                ]
+            ).map((option) => {
+              const selected = topSelector === 'language'
+                ? normalizeLanguageCode(language) === option.key
+                : answerStyle === option.key;
+              const label = t(option.labelKey, option.fallback);
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  onPress={() => {
+                    setTopSelector(null);
+                    if (topSelector === 'language') {
+                      handleSpeechLanguageChange(option.key);
+                    } else {
+                      handleAnswerStyleChange(option.key);
+                    }
+                  }}
+                  style={[
+                    styles.selectorOption,
+                    { borderColor: screenPalette.border },
+                    selected && {
+                      backgroundColor: screenPalette.selectionSurface,
+                      borderColor: screenPalette.selectionBorder,
+                    },
+                  ]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected, checked: selected }}
+                  accessibilityLabel={label}
+                >
+                  <Text style={[
+                    styles.selectorOptionText,
+                    { color: selected ? screenPalette.selectionText : screenPalette.text },
+                  ]}>
+                    {label}
+                  </Text>
+                  {selected ? (
+                    <Ionicons name="checkmark-circle" size={20} color={screenPalette.selectionText} />
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={headerMenuOpen}
+        onRequestClose={() => setHeaderMenuOpen(false)}
+      >
+        <View style={styles.headerMenuBackdrop}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setHeaderMenuOpen(false)}
+            style={StyleSheet.absoluteFill}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close', 'Close')}
+          />
+          <View style={[
+            styles.headerMenuCard,
+            {
+              top: insets.top + 58,
+              backgroundColor: screenPalette.surfaceStrong,
+              borderColor: screenPalette.border,
+            },
+          ]}>
+            <TouchableOpacity
+              onPress={async () => {
+                setHeaderMenuOpen(false);
+                await pauseSpeechChat('native_selector_opened');
+                navigation.navigate('SelectNative', {
+                  returnTo: 'SpeechChat',
+                  returnParams: {
+                    language,
+                    responseStyle: answerStyle,
+                  },
+                  selectionReturnParams: { nativeSelectionReturn: true },
+                });
+              }}
+              style={styles.headerMenuItem}
+              accessibilityRole="menuitem"
+            >
+              <Ionicons name="people-outline" size={19} color={screenPalette.primary} />
+              <View style={styles.headerMenuItemTextWrap}>
+                <Text style={[styles.headerMenuItemTitle, { color: screenPalette.text }]}>
+                  {t('speechChat.selectNative', 'Select native')}
+                </Text>
+                <Text style={[styles.headerMenuItemBody, { color: screenPalette.textSecondary }]}>
+                  {t('speechChat.selectNativeHint', 'Switch the chart for this conversation')}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={[styles.headerMenuDivider, { backgroundColor: screenPalette.line }]} />
+
+            <TouchableOpacity
+              onPress={() => {
+                setHeaderMenuOpen(false);
+                navigation.navigate('Support');
+              }}
+              style={styles.headerMenuItem}
+              accessibilityRole="menuitem"
+            >
+              <Ionicons name="help-circle-outline" size={20} color={screenPalette.primary} />
+              <Text style={[styles.headerMenuItemTitle, { color: screenPalette.text }]}>
+                {t('speechChat.helpSupport', 'Help & support')}
+              </Text>
+            </TouchableOpacity>
+
+            {billingSession ? (
+              <>
+                <View style={[styles.headerMenuDivider, { backgroundColor: screenPalette.line }]} />
+                <TouchableOpacity
+                  onPress={() => {
+                    setHeaderMenuOpen(false);
+                    pauseSpeechChat('user_ended').catch(() => {});
+                  }}
+                  style={styles.headerMenuItem}
+                  accessibilityRole="menuitem"
+                >
+                  <Ionicons name="stop-circle-outline" size={20} color={colors.error} />
+                  <Text style={[styles.headerMenuItemTitle, { color: colors.error }]}>
+                    {t('speechChat.endTalk', 'End Talk')}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -3530,27 +3770,12 @@ const styles = StyleSheet.create({
   headerTextWrap: {
     flex: 1,
   },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
   liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
-  liveBadgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  privacyButton: {
+  headerMenuButton: {
     width: 34,
     height: 34,
     borderWidth: 1,
@@ -3566,128 +3791,133 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  callMeter: {
-    minHeight: 38,
+  sessionToolbar: {
+    minHeight: 42,
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     marginBottom: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
+    gap: 6,
     flexShrink: 0,
   },
-  callMeterItem: {
+  sessionSummary: {
+    flex: 1,
+    minWidth: 48,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
   },
-  callMeterText: {
+  sessionTime: {
     fontSize: 14,
     fontWeight: '800',
   },
-  callMeterDivider: {
-    width: 1,
-    height: 18,
-  },
-  callMeterSubtext: {
+  sessionBilling: {
     flex: 1,
-    fontSize: 12,
+    minWidth: 0,
+    fontSize: 10,
     fontWeight: '700',
   },
-  endTalkButton: {
-    minHeight: 28,
+  sessionControlChip: {
+    maxWidth: 94,
+    minHeight: 30,
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 9,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
   },
-  endTalkButtonText: {
+  sessionControlChipDisabled: {
+    opacity: 0.5,
+  },
+  sessionControlChipText: {
+    flexShrink: 1,
     fontSize: 11,
     fontWeight: '800',
   },
-  languageBar: {
-    minHeight: 44,
-    marginBottom: 6,
-    paddingHorizontal: 10,
+  selectorBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+  },
+  selectorSheet: {
     borderWidth: 1,
-    borderRadius: 16,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 28,
+    gap: 10,
+  },
+  selectorHandle: {
+    alignSelf: 'center',
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 4,
+  },
+  selectorTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  selectorOption: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 15,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flexShrink: 0,
   },
-  languageLabelWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexShrink: 1,
-  },
-  languageLabel: {
-    fontSize: 12,
+  selectorOptionText: {
+    fontSize: 15,
     fontWeight: '800',
   },
-  languageToggle: {
-    padding: 2,
+  headerMenuBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.24)',
+  },
+  headerMenuCard: {
+    position: 'absolute',
+    right: 14,
+    width: 230,
     borderWidth: 1,
-    borderRadius: 999,
-    flexDirection: 'row',
+    borderRadius: 18,
+    paddingVertical: 6,
+    shadowColor: '#000000',
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  languageOption: {
-    minWidth: 70,
-    minHeight: 34,
-    paddingHorizontal: 9,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  languageOptionText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  optionDisabled: {
-    opacity: 0.5,
-  },
-  answerStyleBar: {
-    minHeight: 50,
-    marginBottom: 6,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderRadius: 16,
+  headerMenuItem: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    flexShrink: 0,
+    gap: 10,
   },
-  answerStyleLabel: {
-    fontSize: 12,
+  headerMenuItemTextWrap: {
+    flex: 1,
+  },
+  headerMenuItemTitle: {
+    fontSize: 14,
     fontWeight: '800',
   },
-  answerStyleToggle: {
-    padding: 2,
-    borderWidth: 1,
-    borderRadius: 999,
-    flexDirection: 'row',
+  headerMenuItemBody: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
   },
-  answerStyleOption: {
-    minWidth: 78,
-    minHeight: 44,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  answerStyleOptionText: {
-    fontSize: 12,
-    fontWeight: '800',
+  headerMenuDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 12,
   },
   conversation: {
     flex: 1,

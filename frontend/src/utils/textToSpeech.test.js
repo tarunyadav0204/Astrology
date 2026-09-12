@@ -35,6 +35,10 @@ describe('textToSpeech voice selection', () => {
 });
 
 describe('astrology speech pronunciation', () => {
+    test('pronounces Lagna with a short a sound', () => {
+        expect(normalizeAstrologyPronunciation('Cancer Lagna')).toBe('Cancer Lag-na');
+    });
+
     test('disambiguates standalone Mangal and Budh without changing weekday words', () => {
         expect(normalizeAstrologyPronunciation('मंगल दूसरे भाव में है और बुध मजबूत है।'))
             .toBe('मंगल ग्रह दूसरे भाव में है और बुध ग्रह मजबूत है।');

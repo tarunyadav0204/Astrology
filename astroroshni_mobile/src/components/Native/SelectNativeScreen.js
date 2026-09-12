@@ -255,6 +255,7 @@ export default function SelectNativeScreen({ navigation, route }) {
   const nativeGenderFilter = route.params?.nativeGenderFilter;
   const refreshAt = route.params?.refreshAt;
   const returnParams = route.params?.returnParams || {};
+  const selectionReturnParams = route.params?.selectionReturnParams || {};
 
   useFocusEffect(
     React.useCallback(() => {
@@ -423,6 +424,7 @@ export default function SelectNativeScreen({ navigation, route }) {
         setSelectedProfileKey(getChartSelectionKey(profileWithId));
         navigation.navigate(returnTo, {
           ...returnParams,
+          ...selectionReturnParams,
           birthData: profileWithId,
           birthDetails: profileWithId,
           birthChartId: profileWithId.id,

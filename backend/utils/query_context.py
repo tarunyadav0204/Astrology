@@ -460,10 +460,15 @@ def normalize_query_context(query_context: Optional[Dict[str, Any]]) -> Dict[str
         "marriage_timeline_disclosure",
         "marriage_timeline_source_message_id",
         "speech_follow_up_offer",
+        "speech_follow_up_invitation",
     ):
         if key in query_context and key not in out and query_context.get(key) is not None:
             value = query_context.get(key)
-            out[key] = str(value).strip()[:600] if key == "speech_follow_up_offer" else value
+            out[key] = (
+                str(value).strip()[:600]
+                if key in {"speech_follow_up_offer", "speech_follow_up_invitation"}
+                else value
+            )
 
     return out
 

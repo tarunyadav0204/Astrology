@@ -25,6 +25,7 @@ let lastServerTtsCachePruneAt = 0;
 const SPEECH_PROVIDER_LOCAL = 'local';
 const SPEECH_PROVIDER_GOOGLE = 'google';
 export const normalizeAstrologyPronunciation = (text) => String(text || '')
+  .replace(/\bLagna\b/gi, 'Lag-na')
   .replace(/(^|[^\u0900-\u097F])मंगल(?![\u0900-\u097F]|\s*(?:ग्रह|दोष))/g, '$1मंगल ग्रह')
   .replace(/(^|[^\u0900-\u097F])बुध(?![\u0900-\u097F]|\s*ग्रह)/g, '$1बुध ग्रह')
   .replace(/\bMangal\b(?!\s+(?:graha|dosh|vaar|war)\b)/gi, (name) => `${name} graha`)

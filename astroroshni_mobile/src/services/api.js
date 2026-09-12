@@ -544,7 +544,12 @@ export const speechAPI = {
     }
 
     const requestConfig = { timeout: API_TIMEOUT };
-    if (Platform.OS !== 'web') {
+    if (Platform.OS === 'web') {
+      // The shared Axios instance defaults to application/json. Explicitly
+      // clear it so the browser supplies multipart/form-data with its boundary;
+      // otherwise FastAPI receives no `audio` part and returns a 422 detail list.
+      requestConfig.headers = { 'Content-Type': undefined };
+    } else {
       requestConfig.headers = { 'Content-Type': 'multipart/form-data' };
     }
     return api.post(getEndpoint('/speech/transcribe'), form, requestConfig);

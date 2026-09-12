@@ -189,7 +189,7 @@ const SpeechChatPage = () => {
     const [transcriptAlternatives, setTranscriptAlternatives] = useState([]);
     const [micLevel, setMicLevel] = useState(0);
     const [processingBridgeCaption, setProcessingBridgeCaption] = useState('');
-    const pendingSpokenFollowUpRef = useRef('');
+    const pendingSpokenFollowUpRef = useRef(null);
 
     const recognitionRef = useRef(null);
     const recognitionSilenceTimerRef = useRef(null);
@@ -1533,7 +1533,9 @@ const SpeechChatPage = () => {
                 : turn
         )));
         setFollowUps(nextFollowUps);
-        pendingSpokenFollowUpRef.current = nextFollowUps[0] || '';
+        pendingSpokenFollowUpRef.current = nextFollowUps[0]
+            ? { question: nextFollowUps[0], invitation: closingQuestion }
+            : null;
         setCurrentTranscript('');
         fetchBalance();
         if (thinkingTurnIdRef.current === turnId) thinkingTurnIdRef.current = null;
@@ -1637,13 +1639,18 @@ const SpeechChatPage = () => {
         setCurrentTranscript('');
         setStatus('thinking');
 
-        const offeredFollowUp = pendingSpokenFollowUpRef.current;
-        pendingSpokenFollowUpRef.current = '';
+        const pendingFollowUp = pendingSpokenFollowUpRef.current;
+        pendingSpokenFollowUpRef.current = null;
         const requestBody = {
             session_id: activeSessionId,
             question,
             query_context: buildQueryContext(
-                offeredFollowUp ? { speech_follow_up_offer: offeredFollowUp } : {}
+                pendingFollowUp?.question
+                    ? {
+                        speech_follow_up_offer: pendingFollowUp.question,
+                        speech_follow_up_invitation: pendingFollowUp.invitation || '',
+                    }
+                    : {}
             ),
             language: turnLanguage,
             response_style: 'simple',

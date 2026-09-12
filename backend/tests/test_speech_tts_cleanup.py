@@ -1,4 +1,9 @@
-from tts.routes import _fallback_spoken_tts_text, _strip_markdown_for_speech
+from tts.routes import (
+    _apply_pronunciation_plain,
+    _apply_pronunciation_ssml,
+    _fallback_spoken_tts_text,
+    _strip_markdown_for_speech,
+)
 
 
 def test_speech_cleanup_removes_normal_and_escaped_markdown_markers():
@@ -29,3 +34,8 @@ def test_speech_cleanup_preserves_link_text_and_removes_other_markdown_syntax():
     assert "[[SH_" not in cleaned
     assert "**" not in cleaned
     assert "`" not in cleaned
+
+
+def test_english_lagna_uses_short_a_pronunciation_alias():
+    assert _apply_pronunciation_plain("Cancer Lagna") == "Cancer Lag-na"
+    assert 'alias="Lag-na"' in _apply_pronunciation_ssml("Cancer Lagna")

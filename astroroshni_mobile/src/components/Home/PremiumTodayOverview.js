@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Line } from 'react-native-svg';
@@ -21,9 +21,9 @@ function OrbitMark({ angle, radius, color, size = 7 }) {
   return <Circle cx={x} cy={y} r={size} fill={color} />;
 }
 
-function OrbitMotif({ colors }) {
+function OrbitMotif({ colors, subdued = false }) {
   return (
-    <View style={styles.orbitMotif} accessibilityElementsHidden>
+    <View style={[styles.orbitMotif, subdued && styles.orbitMotifSubdued]} accessibilityElementsHidden>
       <Svg width="152" height="152" viewBox="0 0 152 152">
         <Circle cx="76" cy="76" r="68" fill="none" stroke={colors.cosmicLine} strokeWidth="1" />
         <Circle cx="76" cy="76" r="50" fill="none" stroke={colors.cosmicLine} strokeWidth="1" />
@@ -113,6 +113,7 @@ export default function PremiumTodayOverview({
   onSelectNative,
   onCreateChart,
   onAsk,
+  firstQuestionFree = false,
   onTalkToTara,
   speechPerMinuteCost = 5,
   onOpenCharts,
@@ -139,10 +140,65 @@ export default function PremiumTodayOverview({
   const { colors, typography } = useTheme();
   const { t, i18n } = useTranslation();
   const displayName = name || t('premiumUi.home.explorer');
+  const taraCtaEntrance = React.useRef(new Animated.Value(0)).current;
+  const taraCtaShimmer = React.useRef(new Animated.Value(0)).current;
+  const taraShimmerAnimation = React.useRef(null);
   const dailyRecommendations = React.useMemo(
     () => buildKpHomeRecommendations(kpTodayData, t),
     [kpTodayData, t],
   );
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    AccessibilityInfo.isReduceMotionEnabled().then((reduceMotionEnabled) => {
+      if (!isMounted) return;
+      if (reduceMotionEnabled) {
+        taraCtaEntrance.setValue(1);
+        return;
+      }
+
+      Animated.spring(taraCtaEntrance, {
+        toValue: 1,
+        delay: 260,
+        damping: 15,
+        stiffness: 145,
+        mass: 0.8,
+        useNativeDriver: true,
+      }).start();
+
+      taraCtaShimmer.setValue(0);
+      taraShimmerAnimation.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(taraCtaShimmer, {
+            toValue: 1,
+            duration: 4500,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(taraCtaShimmer, {
+            toValue: 0,
+            duration: 4500,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+      taraShimmerAnimation.current.start();
+    });
+
+    return () => {
+      isMounted = false;
+      taraCtaEntrance.stopAnimation();
+      taraShimmerAnimation.current?.stop();
+      taraCtaShimmer.setValue(0);
+    };
+  }, [taraCtaEntrance, taraCtaShimmer]);
+
+  const taraEntranceScale = taraCtaEntrance.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.94, 1],
+  });
 
   return (
     <View style={styles.container}>
@@ -172,25 +228,138 @@ export default function PremiumTodayOverview({
       </View>
 
       <View style={[styles.hero, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
-        <View style={styles.heroCopy}>
+        <View style={[styles.heroCopy, hasChart && styles.heroCopyWithChart]}>
           <Text style={[styles.heroEyebrow, typography.eyebrow, { color: colors.accent }]}>{t('premiumUi.home.taraGuide')}</Text>
-          <Text style={[styles.heroTitle, typography.title, { color: colors.textInverse }]}>{t('premiumUi.home.meetTara')}{`\n`}{t('premiumUi.home.readLife')}</Text>
-          <Text style={[styles.heroBody, { color: colors.textInverseMuted }]}> 
+          <Text style={[styles.heroTitle, typography.title, hasChart && styles.heroTitleWithChart, { color: colors.textInverse }]}>
+            {hasChart
+              ? t('premiumUi.home.heroQuestionTitle', 'Your chart has something to say.')
+              : t('premiumUi.home.meetTara')}
+            {`\n`}
+            {hasChart
+              ? t('premiumUi.home.heroQuestionSubtitle', 'Ask Tara what it means.')
+              : t('premiumUi.home.readLife')}
+          </Text>
+          <Text style={[styles.heroBody, hasChart && styles.heroBodyWithChart, { color: colors.textInverseMuted }]}>
             {hasChart
               ? t('premiumUi.home.heroWithChart')
               : t('premiumUi.home.heroNoChart')}
           </Text>
         </View>
-        <OrbitMotif colors={colors} />
+        <OrbitMotif colors={colors} subdued={hasChart} />
         <View style={styles.heroActions}>
-          <TouchableOpacity onPress={onAsk} activeOpacity={0.86} style={[styles.primaryAction, { backgroundColor: colors.primary }]}>
-            <Ionicons name="sparkles-outline" size={17} color={colors.onPrimary} />
-            <Text style={[styles.primaryActionText, { color: colors.onPrimary }]}>{t('premiumUi.home.askTara')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={hasChart ? onOpenCharts : onCreateChart} activeOpacity={0.82} style={[styles.secondaryAction, { borderColor: colors.cosmicLine }]}>
-            <Text style={[styles.secondaryActionText, { color: colors.textInverse }]}>{hasChart ? t('premiumUi.home.openChart') : t('premiumUi.home.createChart')}</Text>
-            <Ionicons name="arrow-forward" size={16} color={colors.textInverse} />
-          </TouchableOpacity>
+          <Animated.View
+            style={[
+              styles.primaryActionShell,
+              {
+                opacity: taraCtaEntrance,
+                shadowColor: colors.accent,
+                transform: [{ scale: taraEntranceScale }],
+              },
+            ]}
+          >
+            {firstQuestionFree ? (
+              <View style={[styles.firstQuestionBadge, { backgroundColor: colors.cosmicSurface, borderColor: colors.accent }]}>
+                <Ionicons name="gift-outline" size={11} color={colors.accentSoft} />
+                <Text style={[styles.firstQuestionBadgeText, { color: colors.accentSoft }]}>
+                  {t('premiumUi.home.firstQuestionFreeBadge', 'First question free')}
+                </Text>
+              </View>
+            ) : null}
+            <TouchableOpacity
+              onPress={hasChart ? onAsk : onCreateChart}
+              activeOpacity={0.86}
+              accessibilityRole="button"
+              accessibilityLabel={hasChart
+                ? t('premiumUi.home.askTaraActive', "Ask Tara what's active now")
+                : t('premiumUi.home.createFreeChartCta', 'Create my free chart')}
+              accessibilityHint={t('premiumUi.home.askTaraPromise', 'Get a personal answer from your complete birth chart')}
+            >
+              <View style={[styles.primaryActionBorder, { backgroundColor: colors.ctaShimmerTrail || '#a96f12' }]}>
+                <LinearGradient
+                  colors={[colors.accentSoft, colors.selectionControl || colors.accentSoft]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.primaryAction}
+                >
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[
+                      styles.primaryActionGradientShift,
+                      {
+                        opacity: taraCtaShimmer.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.08, 0.72],
+                        }),
+                      },
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={[
+                        colors.ctaShimmerTrail || '#a96f12',
+                        colors.ctaShimmerCore || '#ffd65a',
+                        '#e7b64f',
+                      ]}
+                      locations={[0, 0.46, 1]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.primaryActionGradientLayer}
+                    />
+                  </Animated.View>
+                  <View
+                    style={[
+                      styles.primaryActionMark,
+                      {
+                        backgroundColor: colors.cosmicSurface,
+                        shadowColor: colors.ctaShimmerCore || '#ffd65a',
+                      },
+                    ]}
+                  >
+                    <Animated.View
+                      pointerEvents="none"
+                      style={[
+                        styles.primaryActionMarkGlow,
+                        {
+                          backgroundColor: colors.ctaShimmerCore || '#ffd65a',
+                          opacity: taraCtaShimmer.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.22, 0.68],
+                          }),
+                          transform: [{
+                            scale: taraCtaShimmer.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0.92, 1.16],
+                            }),
+                          }],
+                        },
+                      ]}
+                    />
+                    <Ionicons name="sparkles" size={17} color={colors.accentSoft} />
+                  </View>
+                  <View style={styles.primaryActionCopy}>
+                    <Text style={[styles.primaryActionText, { color: colors.onAccent }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
+                      {hasChart
+                        ? t('premiumUi.home.askTaraActive', "Ask Tara what's active now")
+                        : t('premiumUi.home.createFreeChartCta', 'Create my free chart')}
+                    </Text>
+                    <Text style={[styles.primaryActionSubtext, { color: colors.onAccent }]} numberOfLines={1}>
+                      {hasChart
+                        ? t('premiumUi.home.askTaraPromise', 'Personal guidance from your complete birth chart')
+                        : t('premiumUi.home.askTaraNoChartPromise', 'Then ask Tara your first question')}
+                    </Text>
+                  </View>
+                  <View style={[styles.primaryActionArrow, { backgroundColor: colors.cosmicSurface }]}>
+                    <Ionicons name="arrow-forward" size={17} color={colors.accentSoft} />
+                  </View>
+                </LinearGradient>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+          {hasChart ? (
+            <TouchableOpacity onPress={onOpenCharts} activeOpacity={0.72} style={styles.secondaryAction}>
+              <Text style={[styles.secondaryActionText, { color: colors.textInverseMuted }]}>{t('premiumUi.home.openChart')}</Text>
+              <Ionicons name="arrow-forward" size={14} color={colors.textInverseMuted} />
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 
@@ -549,17 +718,32 @@ const styles = StyleSheet.create({
   avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 15, fontWeight: '700' },
   profileButtonText: { maxWidth: 78, fontSize: 11, fontWeight: '800' },
-  hero: { minHeight: 350, borderWidth: 1, borderRadius: 30, padding: 24, overflow: 'hidden' },
+  hero: { minHeight: 410, borderWidth: 1, borderRadius: 30, padding: 24, overflow: 'hidden' },
   heroCopy: { maxWidth: '69%', zIndex: 2 },
+  heroCopyWithChart: { maxWidth: '100%' },
   heroEyebrow: { marginBottom: 14 },
   heroTitle: { fontSize: 40, lineHeight: 42, marginBottom: 14 },
+  heroTitleWithChart: { maxWidth: '88%', fontSize: 37, lineHeight: 40 },
   heroBody: { fontSize: 13, lineHeight: 20, fontWeight: '500' },
+  heroBodyWithChart: { maxWidth: '100%', paddingRight: 2 },
   orbitMotif: { position: 'absolute', right: -18, top: 44, opacity: 0.58 },
-  heroActions: { marginTop: 22, flexDirection: 'row', gap: 10, zIndex: 2 },
-  primaryAction: { height: 48, paddingHorizontal: 18, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flex: 1 },
-  primaryActionText: { fontSize: 14, fontWeight: '900' },
-  secondaryAction: { height: 48, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  secondaryActionText: { fontSize: 13, fontWeight: '800' },
+  orbitMotifSubdued: { right: -32, top: 48, opacity: 0.3 },
+  heroActions: { marginTop: 24, alignItems: 'center', zIndex: 2 },
+  primaryActionShell: { alignSelf: 'stretch', borderRadius: 999, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.34, shadowRadius: 18, elevation: 8 },
+  firstQuestionBadge: { position: 'absolute', alignSelf: 'center', top: -13, zIndex: 3, minHeight: 25, borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  firstQuestionBadgeText: { fontSize: 9, lineHeight: 11, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase' },
+  primaryActionBorder: { minHeight: 64, borderRadius: 999, padding: 1.5, overflow: 'hidden' },
+  primaryAction: { flex: 1, minHeight: 61, paddingHorizontal: 8, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 9, overflow: 'hidden' },
+  primaryActionGradientShift: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  primaryActionGradientLayer: { flex: 1 },
+  primaryActionMark: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.72, shadowRadius: 8, elevation: 6 },
+  primaryActionMarkGlow: { position: 'absolute', width: 42, height: 42, borderRadius: 21 },
+  primaryActionCopy: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
+  primaryActionText: { width: '100%', fontSize: 15, lineHeight: 19, fontWeight: '900', letterSpacing: 0.1 },
+  primaryActionSubtext: { width: '100%', marginTop: 2, fontSize: 9, lineHeight: 12, fontWeight: '700', opacity: 0.66 },
+  primaryActionArrow: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  secondaryAction: { minHeight: 38, marginTop: 4, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  secondaryActionText: { fontSize: 11, fontWeight: '800' },
   talkToTaraCard: { borderRadius: 24 },
   talkToTaraGradient: { minHeight: 168, borderWidth: 1, borderRadius: 24, padding: 18, overflow: 'hidden' },
   talkToTaraGlow: { position: 'absolute', width: 176, height: 176, borderRadius: 88, right: -54, top: -84 },
