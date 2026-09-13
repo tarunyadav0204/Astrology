@@ -347,8 +347,8 @@ export default function PremiumTodayOverview({
                         : t('premiumUi.home.askTaraNoChartPromise', 'Then ask Tara your first question')}
                     </Text>
                   </View>
-                  <View style={[styles.primaryActionArrow, { backgroundColor: colors.cosmicSurface }]}>
-                    <Ionicons name="arrow-forward" size={17} color={colors.accentSoft} />
+                  <View style={[styles.primaryActionArrow, { backgroundColor: colors.accentSoft }]}>
+                    <Ionicons name="arrow-forward" size={17} color={colors.onAccent} />
                   </View>
                 </LinearGradient>
               </View>

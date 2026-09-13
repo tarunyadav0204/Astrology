@@ -17,6 +17,7 @@ const accountSecurityActionsCopy = JSON.parse(fs.readFileSync(path.join(projectR
 const authDeepCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/auth-deep.json'), 'utf8'));
 const homeRecommendationsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/home-recommendations.json'), 'utf8'));
 const themeDiscoveryCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/theme-discovery.json'), 'utf8'));
+const ashtakavargaStudyCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/ashtakavarga-study.json'), 'utf8'));
 const chatScreenSource = {
   english: 'marathi', hindi: 'hindi', es: 'es', fr: 'fr', german: 'english', russian: 'german',
   chinese: 'russian', tamil: 'chinese', telugu: 'tamil', gujarati: 'telugu', marathi: 'gujarati',
@@ -77,6 +78,8 @@ const protectedFiles = [
   'src/components/Auth/screens/OTPScreen.js',
   'src/components/Auth/screens/EmailInputScreen.js',
   'src/components/Auth/screens/ForgotPasswordScreen.js',
+  'src/components/Ashtakvarga/AshtakvargaStudyScreen.js',
+  'src/components/CreditModal.js',
 ];
 
 const flatten = (value, prefix = '', result = {}) => {
@@ -266,6 +269,16 @@ Object.entries(themeDiscoveryCopy).forEach(([language, copy]) => {
   if (extra.length) failures.push(`theme-discovery/${language}: unexpected ${extra.join(', ')}`);
 });
 
+const ashtakavargaStudyEnglishKeys = Object.keys(flatten(ashtakavargaStudyCopy.english)).sort();
+const ashtakavargaStudyKeySet = new Set(ashtakavargaStudyEnglishKeys);
+Object.entries(ashtakavargaStudyCopy).forEach(([language, copy]) => {
+  const localized = flatten(copy);
+  const missing = ashtakavargaStudyEnglishKeys.filter((key) => !(key in localized) || !String(localized[key] || '').trim());
+  const extra = Object.keys(localized).filter((key) => !ashtakavargaStudyKeySet.has(key));
+  if (missing.length) failures.push(`ashtakavarga-study/${language}: missing ${missing.join(', ')}`);
+  if (extra.length) failures.push(`ashtakavarga-study/${language}: unexpected ${extra.join(', ')}`);
+});
+
 const authDeepEnglishKeys = Object.keys(flatten(authDeepCopy.english)).sort();
 const authDeepKeySet = new Set(authDeepEnglishKeys);
 Object.entries(authDeepCopy).forEach(([language, copy]) => {
@@ -347,4 +360,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`i18n audit passed: ${englishKeys.length} premium keys, ${lifeAnalysisEnglishKeys.length + lifeAnalysisPdfEnglishKeys.length} Life Analysis keys, ${historyUiEnglishKeys.length + historyDetailEnglishKeys.length} history keys, ${knowledgeSupportEnglishKeys.length} knowledge/support keys, ${accountNotificationsEnglishKeys.length} notification keys, and ${chatControlEnglishKeys.length} chat-control keys across ${Object.keys(premiumCopy).length} languages; ${protectedFiles.length} screens protected.`);
+console.log(`i18n audit passed: ${englishKeys.length} premium keys, ${lifeAnalysisEnglishKeys.length + lifeAnalysisPdfEnglishKeys.length} Life Analysis keys, ${ashtakavargaStudyEnglishKeys.length} Ashtakavarga Study keys, ${historyUiEnglishKeys.length + historyDetailEnglishKeys.length} history keys, ${knowledgeSupportEnglishKeys.length} knowledge/support keys, ${accountNotificationsEnglishKeys.length} notification keys, and ${chatControlEnglishKeys.length} chat-control keys across ${Object.keys(premiumCopy).length} languages; ${protectedFiles.length} screens protected.`);

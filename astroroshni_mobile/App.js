@@ -51,6 +51,7 @@ import UniversalMuhuratScreen from './src/components/UniversalMuhuratScreen';
 import EventScreen from './src/components/EventScreen';
 import MonthlyDeepScreen from './src/components/MonthlyDeepScreen';
 import AshtakvargaOracle from './src/components/Ashtakvarga/AshtakvargaOracle';
+import AshtakvargaStudyScreen from './src/components/Ashtakvarga/AshtakvargaStudyScreen';
 import AshtakvargaHistoryScreen from './src/components/Ashtakvarga/AshtakvargaHistoryScreen';
 import AshtakvargaHistoryDetailScreen from './src/components/Ashtakvarga/AshtakvargaHistoryDetailScreen';
 import NumerologyScreen from './src/components/Numerology/NumerologyScreen';
@@ -333,6 +334,7 @@ const linking = {
       NakshatraCalendar: 'nakshatras',
       NakshatraGuide: 'nakshatra-study',
       AnalysisHub: 'analysis',
+      AshtakvargaStudy: 'charts/ashtakavarga/study',
     },
   },
   getStateFromPath(path, options) {
@@ -1112,6 +1114,11 @@ export default function App() {
           <Stack.Screen 
             name="AshtakvargaOracle" 
             component={AshtakvargaOracle}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AshtakvargaStudy"
+            component={AshtakvargaStudyScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

@@ -7972,14 +7972,14 @@ export default function ChatScreen({ navigation, route }) {
                     accessibilityLabel={`Change chart. Currently reading for ${birthData?.name || 'your chart'}`}
                   >
                     <View style={styles.drawerContextCopy}>
-                      <Text style={[styles.drawerContextEyebrow, { color: colors.accentSoft }]}>{t('premiumUi.chatScreen.activeChart')}</Text>
+                      <Text style={[styles.drawerContextEyebrow, { color: colors.accent }]}>{t('premiumUi.chatScreen.activeChart')}</Text>
                       <Text style={[styles.drawerContextName, { color: colors.textInverse }]} numberOfLines={1}>
                         {birthData?.name || 'Your chart'}
                       </Text>
                       <Text style={[styles.drawerContextAction, { color: colors.textInverseMuted }]}>{t('premiumUi.chatScreen.tapChangeChart')}</Text>
                     </View>
                     <View style={[styles.drawerContextArrow, { borderColor: colors.cosmicLine }]}>
-                      <Ionicons name="swap-horizontal" size={18} color={colors.accentSoft} />
+                      <Ionicons name="swap-horizontal" size={18} color={colors.accent} />
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -8015,11 +8015,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>✨</Text>
+                          <Ionicons name="sparkles-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.myProfile')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.myProfile')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8046,11 +8046,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>👤</Text>
+                          <Ionicons name="person-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.selectNative')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.selectNative')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8069,11 +8069,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>➕</Text>
+                          <Ionicons name="person-add-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.newNative')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.newNative')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8092,11 +8092,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>📊</Text>
+                          <Ionicons name="bar-chart-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.viewChart')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.viewChart')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8116,11 +8116,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>⏰</Text>
+                          <Ionicons name="time-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.dashaBrowser')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.dashaBrowser')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8139,11 +8139,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>⊞</Text>
+                          <Ionicons name="grid-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.ashtakvarga')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.ashtakvarga')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -8161,11 +8161,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>⚖️</Text>
+                          <Ionicons name="scale-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.shadbala')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.shadbala')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8185,11 +8185,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>🏰</Text>
+                          <Ionicons name="business-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.kotaChakra')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.kotaChakra')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8208,11 +8208,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>🧘</Text>
+                          <Ionicons name="body-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.yogas')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.yogas')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8235,11 +8235,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>🔢</Text>
+                          <Ionicons name="calculator-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.kpSystem')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.kpSystem')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8258,13 +8258,13 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>🧘</Text>
+                          <Ionicons name="body-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>
+                      <Text style={[styles.menuText, { color: colors.text }]}>
                         {Platform.OS === 'ios' ? 'Chart Study' : t('menu.lifeAnalysis')}
                       </Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8284,11 +8284,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>🕉️</Text>
+                          <Ionicons name="infinite-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.pastLifeRegression')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.pastLifeRegression')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8307,11 +8307,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>🔢</Text>
+                          <Ionicons name="calculator-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.numerology')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.numerology')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8330,11 +8330,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>💬</Text>
+                          <Ionicons name="chatbubbles-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.chatHistory')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.chatHistory')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8354,11 +8354,11 @@ export default function ChatScreen({ navigation, route }) {
                             colors={menuAccentIconGradient}
                             style={styles.menuIconGradient}
                           >
-                            <Text style={styles.menuEmoji}>🔁</Text>
+                            <Ionicons name="refresh-outline" size={19} color={colors.selectionText} />
                           </LinearGradient>
                         </View>
-                        <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.newConversation', 'New conversation')}</Text>
-                        <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                        <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.newConversation', 'New conversation')}</Text>
+                        <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                       </LinearGradient>
                     </TouchableOpacity>
                   )}
@@ -8378,11 +8378,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>🎙️</Text>
+                          <Ionicons name="mic-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.podcastHistory', 'Podcast History')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.podcastHistory', 'Podcast History')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8401,11 +8401,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>📄</Text>
+                          <Ionicons name="document-text-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('reports.reportHistoryMenu', 'Report History')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('reports.reportHistoryMenu', 'Report History')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8435,11 +8435,11 @@ export default function ChatScreen({ navigation, route }) {
                             colors={partnershipMode ? [colors.selectionControl, colors.selectionControl] : menuAccentIconGradient}
                             style={styles.menuIconGradient}
                           >
-                            <Text style={styles.menuEmoji}>👥</Text>
+                            <Ionicons name="people-outline" size={19} color={colors.selectionText} />
                           </LinearGradient>
                         </View>
-                        <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t(partnershipMode ? 'menu.partnershipOn' : 'menu.partnershipOff')}</Text>
-                        <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                        <Text style={[styles.menuText, { color: colors.text }]}>{t(partnershipMode ? 'menu.partnershipOn' : 'menu.partnershipOff')}</Text>
+                        <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                       </LinearGradient>
                     </TouchableOpacity>
                   )}
@@ -8460,11 +8460,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>📚</Text>
+                          <Ionicons name="book-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.blog')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.blog')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8483,11 +8483,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>💳</Text>
+                          <Ionicons name="wallet-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.credits')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.credits')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8517,15 +8517,15 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>🕉️</Text>
+                          <Ionicons name="infinite-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>
+                      <Text style={[styles.menuText, { color: colors.text }]}>
                         {isPanditMode
                           ? t('menu.exitPanditMode', 'Exit Pandit mode')
                           : t('menu.panditDesk', 'I am a Pandit')}
                       </Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8544,11 +8544,11 @@ export default function ChatScreen({ navigation, route }) {
                           colors={menuAccentIconGradient}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>💬</Text>
+                          <Ionicons name="chatbubbles-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: theme === 'dark' ? '#ffffff' : '#1f2937' }]}>{t('menu.support')}</Text>
-                      <Ionicons name="chevron-forward" size={20} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(31, 41, 55, 0.6)'} />
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.support')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
 
@@ -8573,7 +8573,7 @@ export default function ChatScreen({ navigation, route }) {
                           colors={isGuest ? menuAccentIconGradient : [colors.surfaceMuted, colors.surfaceMuted]}
                           style={styles.menuIconGradient}
                         >
-                          <Text style={styles.menuEmoji}>{isGuest ? '🔑' : '🚪'}</Text>
+                          <Ionicons name={isGuest ? 'log-in-outline' : 'log-out-outline'} size={19} color={isGuest ? colors.selectionText : colors.error} />
                         </LinearGradient>
                       </View>
                       <Text style={[styles.menuText, { color: isGuest ? colors.text : colors.error }]}>
@@ -11311,9 +11311,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 0,
-  },
-  menuEmoji: {
-    fontSize: 17,
   },
   menuText: {
     flex: 1,

@@ -2009,7 +2009,7 @@ const CreditScreen = ({ navigation, route }) => {
               >
                 <View style={styles.balanceTopRow}>
                   <View style={[styles.balanceSeal, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicRaised }]}>
-                    <Ionicons name="sparkles-outline" size={21} color={colors.accentSoft} />
+                    <Ionicons name="sparkles-outline" size={21} color={colors.accent} />
                   </View>
                   <View style={styles.balanceStatus}>
                     <View style={[styles.balanceStatusDot, { backgroundColor: colors.accent }]} />

@@ -239,18 +239,6 @@ export default function YoginiDashaTab({ data }) {
         </LinearGradient>
       </View>
 
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity style={[styles.activeTab, { backgroundColor: colors.primary }]}>
-          <Text style={styles.activeTabText}>{t('dasha.periods', 'Periods')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.inactiveTab, { backgroundColor: isDark ? colors.surface : colors.cardBackground, borderColor: colors.cardBorder }]}>
-          <Text style={[styles.inactiveTabText, { color: colors.textSecondary }]}>{t('dasha.analysis', 'Analysis')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.inactiveTab, { backgroundColor: isDark ? colors.surface : colors.cardBackground, borderColor: colors.cardBorder }]}>
-          <Text style={[styles.inactiveTabText, { color: colors.textSecondary }]}>{t('dasha.remedies', 'Remedies')}</Text>
-        </TouchableOpacity>
-      </View>
-
       <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('dasha.yoginiCycle', 'Yogini Cycle (36 Years)')}</Text>
       
       <View style={styles.listContainer}>
@@ -381,38 +369,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   
-  // Tabs
-  tabsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    gap: 12,
-  },
-  activeTab: {
-    backgroundColor: '#8E2DE2',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-  },
-  activeTabText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  inactiveTab: {
-    backgroundColor: '#fff',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  inactiveTabText: {
-    color: '#666',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-
   // List
   sectionTitle: {
     fontSize: 16,

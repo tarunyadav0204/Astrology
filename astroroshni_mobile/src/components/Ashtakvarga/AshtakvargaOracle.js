@@ -1575,6 +1575,13 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
     gender: birthData.gender || '',
   });
 
+  const openLifePredictionsStudy = (result) => {
+    navigation.navigate('AshtakvargaStudy', {
+      birthName: birthData?.name || '',
+      birthData: buildLifePredictionsBirthPayload(),
+    });
+  };
+
   const generateLifePredictions = async (forceRegenerate = false) => {
     if (!birthData) {
       console.error('No birth data available for life study');
@@ -1624,7 +1631,7 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
             } else {
               setLoadingProgress(100);
               setLifePredictions(result);
-              setShowLifePredictions(true);
+              openLifePredictionsStudy(result);
               if (Number(result.credits_charged) > 0) {
                 fetchBalance();
               }
@@ -1646,7 +1653,7 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
           } else {
             setLoadingProgress(100);
             setLifePredictions(data);
-            setShowLifePredictions(true);
+            openLifePredictionsStudy(data);
             if (Number(data.credits_charged) > 0) {
               fetchBalance();
             }
@@ -1727,7 +1734,7 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
         !data.predictions?.error
       ) {
         setLifePredictions(data);
-        setShowLifePredictions(true);
+        openLifePredictionsStudy(data);
         return;
       }
 
@@ -1975,7 +1982,14 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
                     </View>
                   ) : null}
 
-                  <ScrollView showsVerticalScrollIndicator={false}>
+                  <ScrollView
+                    style={styles.predictionsScroll}
+                    contentContainerStyle={styles.predictionsScrollContent}
+                    showsVerticalScrollIndicator
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                    bounces
+                  >
                     <Text style={[styles.predictionsTitle, { color: colors.text }]}>{Platform.OS === 'ios' ? 'Life Study' : 'Life Insights'}</Text>
                     <Text style={[styles.predictionsSubtitle, { color: colors.primary }]}>{lifePredictions?.methodology || lifePredictions?.predictions?.methodology || (Platform.OS === 'ios' ? 'Vedic chart strength analysis' : 'Chart strength analysis')}</Text>
                     {lifePredictions?.cached ? (
@@ -3307,15 +3321,26 @@ const styles = {
 
   predictionsModal: {
     width: '95%',
-    maxHeight: '85%',
+    height: '85%',
+    maxHeight: 760,
     borderRadius: 28,
     borderWidth: 1,
     overflow: 'hidden',
   },
   predictionsGradient: {
+    flex: 1,
+    minHeight: 0,
     padding: 20,
     paddingTop: 50,
     position: 'relative',
+  },
+  predictionsScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  predictionsScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 28,
   },
   regeneratePredictionButton: {
     position: 'absolute',
