@@ -66,7 +66,6 @@ const HOME_DATA_TTL_MS = 5 * 60 * 1000;
 const BLOG_FETCH_TTL_MS = 15 * 60 * 1000;
 const MULTI_CHART_TIP_NEVER_KEY = 'home_multi_chart_tip_never';
 const MULTI_CHART_TIP_SNOOZE_KEY = 'home_multi_chart_tip_snooze_until';
-const KNOW_YOURSELF_DISMISS_KEY = 'home_know_yourself_dismissed_date';
 const HOME_BANNER_DISMISS_PREFIX = 'home_admin_banner_dismiss:';
 const HOME_APP_SESSION_ID = `home:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
 const FREE_PROMPT_HANDOFF_QUIET_MS = 12 * 60 * 60 * 1000;
@@ -410,7 +409,6 @@ export default function HomeScreen({
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
   const [showMultiChartTipModal, setShowMultiChartTipModal] = useState(false);
-  const [showKnowYourselfPrompt, setShowKnowYourselfPrompt] = useState(false);
   const [showFomoHomeSheet, setShowFomoHomeSheet] = useState(false);
   const [fomoHomeData, setFomoHomeData] = useState(null);
   const [fomoStatus, setFomoStatus] = useState(null);
@@ -429,7 +427,6 @@ export default function HomeScreen({
   });
   const [homeBanner, setHomeBanner] = useState(null);
   const [showHomeBannerSheet, setShowHomeBannerSheet] = useState(false);
-  const knowYourselfAnim = useRef(new Animated.Value(0)).current;
   /** One promotional home prompt per Home focus visit (info modal counts as the visit slot). */
   const homePromptShownThisVisitRef = useRef(false);
   const isHomeFocusedRef = useRef(false);
@@ -505,7 +502,6 @@ export default function HomeScreen({
     setShowFirstQuestionFreeModal(false);
     setShowMonthlyWelcomeModal(false);
     setShowMultiChartTipModal(false);
-    setShowKnowYourselfPrompt(false);
     const parsedInfoBody = extractFirstHttpsUrl(infoModalPayload.body);
     setInfoOnlyModalContent({
       title: String(infoModalPayload.title || '').trim(),
@@ -696,7 +692,6 @@ export default function HomeScreen({
     setShowFirstQuestionFreeModal(false);
     setShowMonthlyWelcomeModal(false);
     setShowMultiChartTipModal(false);
-    setShowKnowYourselfPrompt(false);
     setShowFomoHomeSheet(false);
   }, []);
 
@@ -898,22 +893,8 @@ export default function HomeScreen({
     // Home intentionally has one lightweight native prompt only. Notification
     // permission and admin information are handled independently by their own
     // themed surfaces; sales/FOMO/monthly/multi-chart prompts must not auto-open.
-    if (birthData?.id || birthData?.birth_chart_id || currentNativeData?.id || currentNativeData?.birth_chart_id) {
-      try {
-        const dismissedDate = await AsyncStorage.getItem(KNOW_YOURSELF_DISMISS_KEY);
-        if (dismissedDate !== todayDateKey()) return 'know_yourself';
-      } catch (e) {
-        /* ignore */
-      }
-    }
-
     return null;
-  }, [
-    birthData?.id,
-    birthData?.birth_chart_id,
-    currentNativeData?.id,
-    currentNativeData?.birth_chart_id,
-  ]);
+  }, []);
 
   // Focus boundary: reset the one-prompt-per-visit slot only on enter/leave.
   useFocusEffect(
@@ -954,7 +935,6 @@ export default function HomeScreen({
           recordHomepagePromptShown('monthly_events');
         }
         else if (prompt === 'multi_chart_tip') setShowMultiChartTipModal(true);
-        else if (prompt === 'know_yourself') setShowKnowYourselfPrompt(true);
       } catch (e) {
         /* ignore */
       }
@@ -1098,19 +1078,6 @@ export default function HomeScreen({
     setShowMultiChartTipModal(false);
   }, []);
 
-  const dismissKnowYourselfForToday = useCallback(async () => {
-    try {
-      await AsyncStorage.setItem(KNOW_YOURSELF_DISMISS_KEY, todayDateKey());
-    } catch (e) {
-      /* ignore */
-    }
-    Animated.timing(knowYourselfAnim, {
-      toValue: 0,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => setShowKnowYourselfPrompt(false));
-  }, [knowYourselfAnim]);
-
   const shouldShowHomeBanner = useCallback(async (banner) => {
     if (!banner?.enabled) return false;
     const title = String(banner.title || '').trim();
@@ -1215,33 +1182,6 @@ export default function HomeScreen({
       loadHomeBanner();
     }, [loadHomeBanner])
   );
-
-  const openKnowYourselfGuide = useCallback(async () => {
-    try {
-      await AsyncStorage.setItem(KNOW_YOURSELF_DISMISS_KEY, todayDateKey());
-    } catch (e) {
-      /* ignore */
-    }
-    setShowKnowYourselfPrompt(false);
-    navigation.navigate('NakshatraGuide', {
-      birthData: currentNativeData || birthData,
-      chartData,
-    });
-  }, [navigation, currentNativeData, birthData, chartData]);
-
-  useEffect(() => {
-    if (!showKnowYourselfPrompt) {
-      knowYourselfAnim.setValue(0);
-      return;
-    }
-    knowYourselfAnim.setValue(0);
-    Animated.spring(knowYourselfAnim, {
-      toValue: 1,
-      friction: 8,
-      tension: 68,
-      useNativeDriver: true,
-    }).start();
-  }, [showKnowYourselfPrompt, knowYourselfAnim]);
 
   useEffect(() => {
     // Update Panchang daily at midnight
@@ -3481,94 +3421,10 @@ const loadHomeData = async (nativeData = null) => {
 
       </LinearGradient>
 
-      {showKnowYourselfPrompt ? (
-        <Animated.View
-          pointerEvents="box-none"
-          style={[
-            styles.knowYourselfFloat,
-            {
-              bottom: 158 + insets.bottom,
-              opacity: knowYourselfAnim,
-              transform: [
-                {
-                  translateY: knowYourselfAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [18, 0],
-                  }),
-                },
-                {
-                  scale: knowYourselfAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.96, 1],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.knowYourselfFloatInner,
-              androidLightCardFixStyle,
-              {
-                backgroundColor: isDark ? 'rgba(28, 25, 23, 0.96)' : 'rgba(255, 251, 235, 0.98)',
-                borderColor: isDark ? 'rgba(245, 158, 11, 0.28)' : 'rgba(245, 158, 11, 0.35)',
-              },
-            ]}
-          >
-            <LinearGradient
-              colors={
-                isDark
-                  ? ['rgba(245,158,11,0.22)', 'rgba(249,115,22,0.08)', 'transparent']
-                  : ['rgba(253,230,138,0.95)', 'rgba(254,243,199,0.55)', 'rgba(255,251,235,0)']
-              }
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.knowYourselfFloatGlow}
-            />
-            <TouchableOpacity
-              activeOpacity={0.88}
-              onPress={openKnowYourselfGuide}
-              style={styles.knowYourselfFloatTap}
-            >
-              <View style={[styles.knowYourselfFloatIcon, { backgroundColor: isDark ? 'rgba(245,158,11,0.22)' : 'rgba(245, 158, 11, 0.18)' }]}>
-                <Icon name="play" size={14} color={isDark ? '#FBBF24' : '#B45309'} />
-              </View>
-              <View style={styles.knowYourselfFloatTextWrap}>
-                <Text style={[styles.knowYourselfFloatTitle, { color: colors.text }]} numberOfLines={1}>
-                  {t('home.nakshatraGuide.cardTitle', 'Know yourself')}
-                </Text>
-                <Text style={[styles.knowYourselfFloatSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {moonNakshatra?.name
-                    ? t('home.nakshatraGuide.floatMeta', '{{name}} · Pada {{pada}}', {
-                        name: moonNakshatra.name,
-                        pada: moonNakshatra.pada,
-                      })
-                    : t('home.nakshatraGuide.floatSubtitle', 'Short Moon Nakshatra video guide')}
-                </Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={dismissKnowYourselfForToday}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={[
-                styles.knowYourselfFloatClose,
-                { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(120, 53, 15, 0.08)' },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={t('home.nakshatraGuide.dismiss', 'Dismiss')}
-            >
-              <Icon name="close" size={14} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      ) : null}
-
       {(() => {
         const dockAllowed = !showExploreCatalog
           && !isPanditMode
           && homeTabsVisible
-          && !showKnowYourselfPrompt
           && !showFirstQuestionFreeModal
           && !showMonthlyWelcomeModal
           && !showMultiChartTipModal
@@ -4260,74 +4116,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 16,
     padding: 12,
-  },
-  knowYourselfFloat: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 1001,
-  },
-  knowYourselfFloatInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 22,
-    paddingVertical: 10,
-    paddingLeft: 10,
-    paddingRight: 8,
-    gap: 6,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#B45309',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.18,
-        shadowRadius: 14,
-      },
-      android: {
-        elevation: 10,
-      },
-    }),
-  },
-  knowYourselfFloatTap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    minWidth: 0,
-  },
-  knowYourselfFloatGlow: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  knowYourselfFloatIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  knowYourselfFloatTextWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  knowYourselfFloatTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.1,
-  },
-  knowYourselfFloatSubtitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  knowYourselfFloatClose: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
   },
   headerSignItem: {
     flexDirection: 'row',

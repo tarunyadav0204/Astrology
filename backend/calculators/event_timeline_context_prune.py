@@ -13,6 +13,7 @@ from typing import Any, Dict, FrozenSet
 # Divisionals referenced in event_predictor prompts (varga audit + sniper + disambiguation).
 _EVENT_TIMELINE_DIVISIONAL_KEYS: FrozenSet[str] = frozenset(
     {
+        "d2_hora",
         "d3_drekkana",
         "d4_chaturthamsa",
         "d7_saptamsa",

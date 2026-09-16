@@ -454,6 +454,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [parallelBranchPlannerModel, setParallelBranchPlannerModel] = useState('');
   const [parallelBranchWordLimits, setParallelBranchWordLimits] = useState(DEFAULT_PARALLEL_BRANCH_WORD_LIMITS);
   const [eventTimelineModel, setEventTimelineModel] = useState('');
+  const [eventTimelineRolloutMode, setEventTimelineRolloutMode] = useState('deterministic');
+  const [eventTimelineRolloutUserIds, setEventTimelineRolloutUserIds] = useState('');
+  const [eventTimelineRolloutSaving, setEventTimelineRolloutSaving] = useState(false);
   const [chatSubjectGateEnabled, setChatSubjectGateEnabled] = useState(false);
   const [chatSubjectGateUserAllowlist, setChatSubjectGateUserAllowlist] = useState('');
   const [chatSubjectGateSaving, setChatSubjectGateSaving] = useState(false);
@@ -953,6 +956,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         ),
       });
       setEventTimelineModel(data.event_timeline_model || data.gemini_premium_model || '');
+      setEventTimelineRolloutMode(
+        data.event_timeline_rollout_mode === 'legacy_ai' ? 'legacy_ai' : 'deterministic'
+      );
+      setEventTimelineRolloutUserIds(data.event_timeline_rollout_user_ids || '');
       setChatSubjectGateEnabled(Boolean(data.chat_subject_gate_enabled));
       setChatSubjectGateUserAllowlist(data.chat_subject_gate_user_allowlist || '');
       setHomepageFomoEnabled(Boolean(data.homepage_fomo_enabled));
@@ -1418,6 +1425,51 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save instant chat settings.');
     } finally {
       setGeminiModelsSaving(false);
+    }
+  };
+
+  const handleSaveEventTimelineRollout = async () => {
+    const rolloutTokens = eventTimelineRolloutUserIds.split(/[\s,]+/).filter(Boolean);
+    const invalidRolloutId = rolloutTokens.find((token) => !/^\d+$/.test(token) || Number(token) <= 0);
+    if (invalidRolloutId) {
+      alert(`Invalid user ID: ${invalidRolloutId}. Enter positive numeric IDs only.`);
+      return;
+    }
+    setEventTimelineRolloutSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const [modeResponse, userIdsResponse] = await Promise.all([
+        fetch('/api/admin/settings/event_timeline_rollout_mode', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'event_timeline_rollout_mode',
+            value: eventTimelineRolloutMode,
+            description: 'Selected Event Timeline lane: deterministic V3 or legacy AI',
+          }),
+        }),
+        fetch('/api/admin/settings/event_timeline_rollout_user_ids', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'event_timeline_rollout_user_ids',
+            value: eventTimelineRolloutUserIds,
+            description: 'Users receiving the selected Event Timeline mode. Empty applies it to everyone.',
+          }),
+        }),
+      ]);
+      if (!modeResponse.ok || !userIdsResponse.ok) {
+        const modeError = await modeResponse.json().catch(() => ({}));
+        const userIdsError = await userIdsResponse.json().catch(() => ({}));
+        throw new Error(modeError.detail || userIdsError.detail || 'Could not save rollout settings');
+      }
+      alert('Event Timeline rollout saved. It applies to new requests immediately.');
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving Event Timeline rollout:', error);
+      alert(`Failed to save Event Timeline rollout: ${error.message || 'check console'}`);
+    } finally {
+      setEventTimelineRolloutSaving(false);
     }
   };
 
@@ -6651,6 +6703,60 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       disabled={homepageFomoSaving}
                     >
                       {homepageFomoSaving ? 'Saving…' : 'Save homepage FOMO flag'}
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-section">
+                  <h3>Event Timeline engine rollout</h3>
+                  <p className="settings-hint">
+                    Choose which prediction engine receives new yearly and monthly Event Timeline requests. Existing cached results remain separated by engine, so changing this setting is reversible.
+                  </p>
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <strong>Selected mode</strong>
+                      <p>
+                        {eventTimelineRolloutUserIds.trim()
+                          ? 'This mode is used only for the listed users; every other user gets the other mode.'
+                          : 'No user IDs are listed, so this mode is used for everyone.'}
+                      </p>
+                    </div>
+                    <select
+                      value={eventTimelineRolloutMode}
+                      onChange={(event) => setEventTimelineRolloutMode(event.target.value)}
+                      style={{ minWidth: '280px' }}
+                    >
+                      <option value="deterministic">Deterministic V3 (no LLM)</option>
+                      <option value="legacy_ai">Legacy AI timeline</option>
+                    </select>
+                  </div>
+                  <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div className="setting-info">
+                      <strong>User IDs for selected mode</strong>
+                      <p>Comma, space, or line separated. Leave blank to apply the selected mode to everyone.</p>
+                    </div>
+                    <textarea
+                      value={eventTimelineRolloutUserIds}
+                      onChange={(event) => setEventTimelineRolloutUserIds(event.target.value)}
+                      placeholder="e.g. 12, 45, 78"
+                      rows={3}
+                      style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                    />
+                  </div>
+                  <p className="settings-hint">
+                    Current routing: {eventTimelineRolloutMode === 'deterministic' ? 'Deterministic V3' : 'Legacy AI'} for{' '}
+                    {eventTimelineRolloutUserIds.trim() ? 'the listed users' : 'everyone'}
+                    {eventTimelineRolloutUserIds.trim()
+                      ? `; ${eventTimelineRolloutMode === 'deterministic' ? 'Legacy AI' : 'Deterministic V3'} for all other users.`
+                      : '.'}
+                  </p>
+                  <div className="form-buttons" style={{ marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      className="create-btn"
+                      onClick={handleSaveEventTimelineRollout}
+                      disabled={eventTimelineRolloutSaving}
+                    >
+                      {eventTimelineRolloutSaving ? 'Saving…' : 'Save Event Timeline rollout'}
                     </button>
                   </div>
                 </div>

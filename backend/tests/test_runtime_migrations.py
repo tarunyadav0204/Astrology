@@ -2,8 +2,24 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from migrations.apply_runtime_migrations import RUNTIME_MIGRATIONS
+
 
 MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations"
+
+
+def test_event_timeline_migrations_run_during_deploy_in_dependency_order():
+    timeline_migrations = [
+        "add_event_timeline_engine_version.sql",
+        "add_event_timeline_v3_context.sql",
+        "add_event_timeline_calibration.sql",
+        "add_event_relative_profiles.sql",
+    ]
+    positions = [RUNTIME_MIGRATIONS.index(filename) for filename in timeline_migrations]
+
+    assert positions == sorted(positions)
+    for filename in timeline_migrations:
+        assert (MIGRATIONS / filename).is_file()
 
 
 def test_astrologer_subscription_seed_has_true_zero_row_guard():

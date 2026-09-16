@@ -382,7 +382,7 @@ class ChatContextBuilder:
             
             # Map codes to chart names
             chart_name_mapping = {
-                'D3': 'd3_drekkana', 'D4': 'd4_chaturthamsa', 'D7': 'd7_saptamsa',
+                'D2': 'd2_hora', 'D3': 'd3_drekkana', 'D4': 'd4_chaturthamsa', 'D7': 'd7_saptamsa',
                 'D9': 'd9_navamsa', 'D10': 'd10_dasamsa', 'D12': 'd12_dwadasamsa',
                 'D16': 'd16_shodasamsa', 'D20': 'd20_vimsamsa', 'D24': 'd24_chaturvimsamsa',
                 'D27': 'd27_nakshatramsa', 'D30': 'd30_trimsamsa', 'D40': 'd40_khavedamsa',
@@ -572,7 +572,7 @@ class ChatContextBuilder:
         # Calculate divisional charts with dignity analysis
         # Cache ALL standard charts to prevent stale cache issues when topics change
         requested_charts = [
-            'D1', 'D3', 'D4', 'D7', 'D9', 'D10', 'D12', 'D16', 
+            'D1', 'D2', 'D3', 'D4', 'D7', 'D9', 'D10', 'D12', 'D16',
             'D20', 'D24', 'D27', 'D30', 'D40', 'D45', 'D60'
         ]
         # print(f"📊 Calculating ALL Divisional Charts for Cache (prevents topic-switch bugs)...")
@@ -591,6 +591,7 @@ class ChatContextBuilder:
                 
                 # Map to standard names
                 chart_name_mapping = {
+                    2: 'd2_hora',
                     3: 'd3_drekkana',
                     4: 'd4_chaturthamsa', 
                     7: 'd7_saptamsa',

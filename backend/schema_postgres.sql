@@ -855,9 +855,62 @@ CREATE TABLE "event_timeline_jobs" (
     "started_at" TIMESTAMP,
     "completed_at" TIMESTAMP,
     "selected_month" INTEGER,
+    "engine_version" TEXT,
+    "context_fingerprint" TEXT,
     PRIMARY KEY ("job_id"),
     FOREIGN KEY ("birth_chart_id") REFERENCES "birth_charts" ("id"),
     FOREIGN KEY ("user_id") REFERENCES "users" ("userid")
+);
+
+DROP TABLE IF EXISTS "event_timeline_forecasts" CASCADE;
+CREATE TABLE "event_timeline_forecasts" (
+    "id" BIGSERIAL PRIMARY KEY,
+    "job_id" TEXT NOT NULL REFERENCES "event_timeline_jobs" ("job_id") ON DELETE CASCADE,
+    "user_id" BIGINT NOT NULL REFERENCES "users" ("userid") ON DELETE CASCADE,
+    "birth_chart_id" BIGINT NOT NULL REFERENCES "birth_charts" ("id") ON DELETE CASCADE,
+    "candidate_id" TEXT NOT NULL,
+    "target_year" INTEGER NOT NULL,
+    "target_month" INTEGER NOT NULL,
+    "display_rank" INTEGER NOT NULL,
+    "event_key" TEXT NOT NULL,
+    "engine_version" TEXT NOT NULL,
+    "methodology_version" TEXT,
+    "evidence_version" TEXT,
+    "accuracy_layer" TEXT,
+    "support_grade" TEXT,
+    "manifestation_phase" TEXT,
+    "forecast_start" DATE,
+    "forecast_end" DATE,
+    "prediction_hash" TEXT NOT NULL,
+    "forecast_json" JSONB NOT NULL,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE ("job_id", "candidate_id", "target_month")
+);
+
+DROP TABLE IF EXISTS "event_timeline_outcomes" CASCADE;
+CREATE TABLE "event_timeline_outcomes" (
+    "id" BIGSERIAL PRIMARY KEY,
+    "forecast_id" BIGINT NOT NULL UNIQUE REFERENCES "event_timeline_forecasts" ("id") ON DELETE CASCADE,
+    "user_id" BIGINT NOT NULL REFERENCES "users" ("userid") ON DELETE CASCADE,
+    "occurrence" TEXT NOT NULL CHECK ("occurrence" IN ('occurred', 'partly_occurred', 'did_not_occur')),
+    "actual_date" DATE,
+    "severity" INTEGER CHECK ("severity" IS NULL OR "severity" BETWEEN 1 AND 5),
+    "notes" TEXT NOT NULL DEFAULT '',
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+DROP TABLE IF EXISTS "event_timeline_unpredicted_events" CASCADE;
+CREATE TABLE "event_timeline_unpredicted_events" (
+    "id" BIGSERIAL PRIMARY KEY,
+    "job_id" TEXT NOT NULL REFERENCES "event_timeline_jobs" ("job_id") ON DELETE CASCADE,
+    "user_id" BIGINT NOT NULL REFERENCES "users" ("userid") ON DELETE CASCADE,
+    "event_key" TEXT NOT NULL,
+    "actual_date" DATE NOT NULL,
+    "severity" INTEGER CHECK ("severity" IS NULL OR "severity" BETWEEN 1 AND 5),
+    "notes" TEXT NOT NULL DEFAULT '',
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE ("job_id", "user_id", "event_key", "actual_date")
 );
 
 DROP TABLE IF EXISTS "message_feedback" CASCADE;
@@ -913,6 +966,10 @@ CREATE INDEX idx_timeline_birth_chart ON event_timeline_jobs (birth_chart_id);
 
 CREATE INDEX idx_timeline_status ON event_timeline_jobs (status);
 
+CREATE INDEX idx_timeline_forecasts_calibration ON event_timeline_forecasts (engine_version, accuracy_layer, event_key, target_year);
+
+CREATE INDEX idx_timeline_outcomes_user ON event_timeline_outcomes (user_id, updated_at DESC);
+
 CREATE INDEX idx_sessions_birth_chart ON chat_sessions (birth_chart_id);
 
 CREATE INDEX idx_user_facts_birth_chart ON user_facts (birth_chart_id);
@@ -953,3 +1010,25 @@ CREATE INDEX idx_podcast_history_userid ON podcast_history(userid);
 CREATE INDEX idx_podcast_history_created_at ON podcast_history(created_at DESC);
 
 CREATE INDEX idx_app_testimonials_status_order ON app_testimonials(status, display_order, review_updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS event_relative_profiles (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    birth_chart_id INTEGER NOT NULL REFERENCES birth_charts(id) ON DELETE CASCADE,
+    subject_key TEXT NOT NULL,
+    display_label TEXT NOT NULL,
+    life_status TEXT NOT NULL DEFAULT 'unknown',
+    age_years INTEGER,
+    birth_year INTEGER,
+    employment_state TEXT NOT NULL DEFAULT 'unknown',
+    location_context TEXT NOT NULL DEFAULT 'unknown',
+    relationship_status TEXT NOT NULL DEFAULT 'unknown',
+    linked_birth_chart_id INTEGER REFERENCES birth_charts(id) ON DELETE SET NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, birth_chart_id, subject_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_relative_profiles_chart
+    ON event_relative_profiles (user_id, birth_chart_id);

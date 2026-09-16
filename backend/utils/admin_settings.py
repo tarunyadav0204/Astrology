@@ -753,6 +753,67 @@ def is_instant_chat_enabled() -> bool:
     return _parse_bool_setting(get_setting("instant_chat_enabled"), default=False)
 
 
+EVENT_TIMELINE_MODE_DETERMINISTIC = "deterministic"
+EVENT_TIMELINE_MODE_LEGACY_AI = "legacy_ai"
+
+
+def get_event_timeline_rollout_mode() -> str:
+    """Mode selected in Admin for the event-timeline rollout."""
+    raw = str(get_setting("event_timeline_rollout_mode") or "").strip().lower()
+    aliases = {
+        "deterministic": EVENT_TIMELINE_MODE_DETERMINISTIC,
+        "accuracy_v3": EVENT_TIMELINE_MODE_DETERMINISTIC,
+        "v3": EVENT_TIMELINE_MODE_DETERMINISTIC,
+        "legacy": EVENT_TIMELINE_MODE_LEGACY_AI,
+        "legacy_ai": EVENT_TIMELINE_MODE_LEGACY_AI,
+        "legacy_v1": EVENT_TIMELINE_MODE_LEGACY_AI,
+    }
+    # Preserve the current deterministic behaviour until an administrator saves
+    # this new setting for the first time.
+    return aliases.get(raw, EVENT_TIMELINE_MODE_DETERMINISTIC)
+
+
+def get_event_timeline_rollout_user_ids() -> Set[int]:
+    """User IDs receiving the selected mode. Empty means every user."""
+    raw = (get_setting("event_timeline_rollout_user_ids") or "").strip()
+    if not raw:
+        return set()
+    user_ids: Set[int] = set()
+    for token in raw.replace("\n", ",").replace("\t", ",").replace(" ", ",").split(","):
+        cleaned = token.strip()
+        if not cleaned:
+            continue
+        try:
+            user_ids.add(int(cleaned))
+        except (TypeError, ValueError):
+            continue
+    return user_ids
+
+
+def get_event_timeline_mode_for_user(user_id: Optional[int]) -> str:
+    """
+    Resolve the timeline lane for one user.
+
+    With no IDs, the selected mode applies globally. With IDs, the selected
+    mode applies to those users and everyone else receives the opposite mode.
+    """
+    selected_mode = get_event_timeline_rollout_mode()
+    selected_user_ids = get_event_timeline_rollout_user_ids()
+    if not selected_user_ids:
+        return selected_mode
+    try:
+        is_selected = int(user_id) in selected_user_ids
+    except (TypeError, ValueError):
+        is_selected = False
+    if is_selected:
+        return selected_mode
+    return (
+        EVENT_TIMELINE_MODE_LEGACY_AI
+        if selected_mode == EVENT_TIMELINE_MODE_DETERMINISTIC
+        else EVENT_TIMELINE_MODE_DETERMINISTIC
+    )
+
+
 def is_instant_response_validation_enabled() -> bool:
     """Whether Live/Instant answers run post-generation fact validation and correction."""
     return _parse_bool_setting(

@@ -56,6 +56,47 @@ export function splitFreeAnswerContent(raw) {
   return { quick: s, detail: '', canBlur: false };
 }
 
+const cleanDetailHeading = (value) => String(value || '')
+  .replace(/<[^>]+>/g, ' ')
+  .replace(/[*_`#]+/g, '')
+  .replace(/\s+/g, ' ')
+  .replace(/\s*:\s*$/, '')
+  .trim();
+
+/**
+ * Pull the real section names out of the gated portion of a free answer.
+ * Answers can contain markdown headings, HTML headings, or labelled cards.
+ * Returning the authored labels keeps the purchase promise relevant to the
+ * user's question instead of hard-coding timing or another specific outcome.
+ */
+export function extractFreeAnswerDetailHeadings(raw, limit = 3) {
+  const source = String(raw || '');
+  if (!source.trim()) return [];
+
+  const candidates = [];
+  const collect = (pattern, group = 1) => {
+    let match;
+    while ((match = pattern.exec(source)) !== null) {
+      candidates.push(match[group]);
+    }
+  };
+
+  collect(/^\s*#{1,6}\s+([^\n]+)/gim);
+  collect(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]\s*>/gim);
+  collect(/(?:^|\n)\s*(?:\*\*|__)([^\n:*_][^\n]*?)(?:\*\*|__)\s*:/gim);
+
+  const excluded = /^(?:quick answer|direct answer|short answer|bottom line|executive summary|daily outlook|answer)$/i;
+  const unique = [];
+  for (const candidate of candidates) {
+    const heading = cleanDetailHeading(candidate);
+    if (!heading || heading.length > 72 || excluded.test(heading)) continue;
+    if (unique.some((item) => item.toLocaleLowerCase() === heading.toLocaleLowerCase())) continue;
+    unique.push(heading);
+    if (unique.length >= Math.max(1, Number(limit) || 3)) break;
+  }
+  return unique;
+}
+
 export function freeDetailUnlockStorageKey(messageId) {
   return `free_detail_unlocked:${String(messageId || '')}`;
 }

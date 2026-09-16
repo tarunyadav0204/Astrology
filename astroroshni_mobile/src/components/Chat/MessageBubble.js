@@ -110,6 +110,7 @@ import PodcastLanguageModal from './PodcastLanguageModal';
 import { creditAPI } from '../../services/api';
 import { sharePodcastBase64OnWeb } from '../../utils/sharePodcastWeb';
 import {
+  extractFreeAnswerDetailHeadings,
   freeDetailRevealClickedStorageKey,
   freeDetailUnlockStorageKey,
   splitFreeAnswerContent,
@@ -1906,6 +1907,15 @@ function MessageBubble({
   const freeSplit = isFreeQuestionAnswer ? splitFreeAnswerContent(contentStr) : null;
   const canBlurFreeDetail =
     Boolean(freeSplit?.canBlur) && !isInstantChatMessage;
+  const lockedDetailHeadings = canBlurFreeDetail
+    ? extractFreeAnswerDetailHeadings(freeSplit.detail, 3)
+    : [];
+  const firstPurchaseStarter = gateMetadata?.first_purchase_bonus?.starter_pack || null;
+  const firstPurchaseStarterEligible = Boolean(
+    firstPurchaseStarter?.enabled && firstPurchaseStarter?.eligible,
+  );
+  const firstPurchaseStarterPrice = firstPurchaseStarter?.amount_display || '₹24';
+  const firstPurchaseStarterCredits = Number(firstPurchaseStarter?.credits || 24);
 
   useEffect(() => {
     let cancelled = false;
@@ -2462,15 +2472,37 @@ function MessageBubble({
 
         {shouldBlurDetail && (
           <View style={styles.freeDetailPaywall}>
-            <View style={styles.freeDetailBlurBlock} pointerEvents="none">
-              <Text style={styles.freeDetailTeaser} numberOfLines={5}>
-                {detailTeaser ||
-                  t(
-                    'chat.freeDetailTeaserFallback',
-                    'Key Insights, Astrological Analysis, Timing & more…',
-                  )}
+            <View style={[styles.freeDetailOfferCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.freeDetailOfferEyebrow, { color: colors.primary }]}>
+                {t('chat.firstPurchaseOffer.continueEyebrow', 'CONTINUE THIS READING')}
               </Text>
-              <View style={styles.freeDetailBlurOverlay} />
+              <Text style={[styles.freeDetailOfferTitle, { color: colors.text }]}>
+                {t('chat.firstPurchaseOffer.completeAnswerTitle', "Unlock Tara's complete answer")}
+              </Text>
+              <Text style={[styles.freeDetailOfferBody, { color: colors.textSecondary }]}>
+                {t(
+                  'chat.firstPurchaseOffer.completeAnswerBody',
+                  'See everything Tara found beyond the central insight you just read.',
+                )}
+              </Text>
+              {lockedDetailHeadings.length > 0 ? (
+                <View style={styles.freeDetailSectionList}>
+                  <Text style={[styles.freeDetailSectionLabel, { color: colors.textTertiary }]}>
+                    {t('chat.firstPurchaseOffer.lockedSectionsTitle', 'Inside your complete answer')}
+                  </Text>
+                  {lockedDetailHeadings.map((heading) => (
+                    <View key={heading} style={styles.freeDetailSectionRow}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                      <Text style={[styles.freeDetailSectionText, { color: colors.text }]}>{heading}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.freeDetailBlurBlock} pointerEvents="none">
+                  <Text style={styles.freeDetailTeaser} numberOfLines={3}>{detailTeaser}</Text>
+                  <View style={styles.freeDetailBlurOverlay} />
+                </View>
+              )}
             </View>
             <TouchableOpacity
               style={styles.freeDetailRevealBtn}
@@ -2487,16 +2519,26 @@ function MessageBubble({
               >
                 <Ionicons name="lock-open-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
                 <Text style={styles.freeDetailRevealText}>
-                  {t('chat.revealDetailedAnswer', 'Reveal the detailed answer')}
+                  {firstPurchaseStarterEligible
+                    ? t('chat.firstPurchaseOffer.completeAnswerCta', {
+                        price: firstPurchaseStarterPrice,
+                        defaultValue: `Unlock complete answer + 1 more question · ${firstPurchaseStarterPrice}`,
+                      })
+                    : t('chat.firstPurchaseOffer.standardRevealCta', 'Unlock complete answer')}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
             <Text style={styles.freeDetailHint}>
-              {t(
-                'chat.revealDetailedAnswerHint',
-                'Standard mode · {{count}} credits',
-                { count: standardChatCost },
-              )}
+              {firstPurchaseStarterEligible
+                ? t('chat.firstPurchaseOffer.starterDisclosure', {
+                    credits: firstPurchaseStarterCredits,
+                    cost: standardChatCost,
+                    defaultValue: `One-time first purchase. Includes ${firstPurchaseStarterCredits} credits; one Detailed Question uses ${standardChatCost}.`,
+                  })
+                : t('chat.firstPurchaseOffer.standardDisclosure', {
+                    cost: standardChatCost,
+                    defaultValue: `Detailed Answer · ${standardChatCost} credits`,
+                  })}
             </Text>
           </View>
         )}
@@ -3064,16 +3106,26 @@ function MessageBubble({
       <ConfirmCreditsModal
         visible={showRevealCreditsModal}
         onClose={() => setShowRevealCreditsModal(false)}
-        title={t('chat.revealDetailedAnswer', 'Reveal the detailed answer')}
-        description={t(
-          'chat.revealDetailedAnswerDesc',
-          'Unlock Key Insights, Astrological Analysis, Timing & Guidance, and Final Verdict. Uses Standard mode credits.',
-        )}
+        title={t('chat.firstPurchaseOffer.completeAnswerTitle', "Unlock Tara's complete answer")}
+        description={firstPurchaseStarterEligible
+          ? t(
+              'chat.firstPurchaseOffer.starterCompleteDescription',
+              'Unlock everything Tara found for this question, plus enough credits to ask one more Detailed Question.',
+            )
+          : t(
+              'chat.firstPurchaseOffer.completeAnswerDescription',
+              'Unlock everything Tara found beyond the central insight you just read.',
+            )}
         cost={standardChatCost}
         credits={credits}
         confirmLabel={
           Number(credits) >= standardChatCost
             ? t('chat.unlockNow', 'Unlock now')
+            : firstPurchaseStarterEligible
+              ? t('chat.firstPurchaseOffer.continueForPrice', {
+                  price: firstPurchaseStarterPrice,
+                  defaultValue: `Continue for ${firstPurchaseStarterPrice}`,
+                })
             : t('chat.getCredits', 'Get credits')
         }
         onConfirm={async () => {
@@ -4381,6 +4433,54 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     marginTop: 12,
     marginBottom: 4,
   },
+  freeDetailOfferCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 10,
+  },
+  freeDetailOfferEyebrow: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginBottom: 6,
+  },
+  freeDetailOfferTitle: {
+    fontFamily: DISPLAY_FONT_FAMILY,
+    fontSize: 20,
+    lineHeight: 25,
+    fontWeight: '700',
+    marginBottom: 7,
+  },
+  freeDetailOfferBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '500',
+  },
+  freeDetailSectionList: {
+    marginTop: 14,
+    gap: 8,
+  },
+  freeDetailSectionLabel: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    marginBottom: 1,
+  },
+  freeDetailSectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  freeDetailSectionText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '650',
+  },
   freeDetailBlurBlock: {
     borderRadius: 12,
     overflow: 'hidden',
@@ -4417,6 +4517,8 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     color: '#fff',
     fontSize: 14,
     fontWeight: '800',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   freeDetailHint: {
     marginTop: 6,

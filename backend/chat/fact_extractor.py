@@ -6,6 +6,44 @@ from typing import Any, Dict, List, Tuple
 from db import get_conn, execute
 
 
+def get_user_facts_for_chart(birth_chart_id: int, user_id: int) -> Dict[str, List[str]]:
+    """Load active user-stated facts for one owned chart without initializing an LLM."""
+    from datetime import datetime, timedelta
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT uf.category, uf.fact, uf.extracted_at
+            FROM user_facts AS uf
+            INNER JOIN birth_charts AS bc
+                ON bc.id = uf.birth_chart_id
+               AND bc.userid = %s
+            WHERE uf.birth_chart_id = %s
+            ORDER BY uf.extracted_at DESC
+            """,
+            (user_id, birth_chart_id),
+        )
+        rows = cur.fetchall()
+
+    facts_by_category: Dict[str, List[str]] = {}
+    cutoff_date = datetime.now() - timedelta(days=7)
+    for category, fact, extracted_at in rows:
+        if category == "temporary_events":
+            try:
+                fact_date = (
+                    extracted_at
+                    if isinstance(extracted_at, datetime)
+                    else datetime.fromisoformat(str(extracted_at).replace("Z", "+00:00"))
+                )
+                if fact_date.replace(tzinfo=None) < cutoff_date:
+                    continue
+            except Exception:
+                pass
+        facts_by_category.setdefault(category, []).append(fact)
+    return facts_by_category
+
+
 def _normalize_for_match(text: str) -> str:
     s = (text or "").lower().strip()
     s = re.sub(r"\s+", " ", s)
@@ -241,42 +279,4 @@ If no USER-STATED facts found, return empty array: []
 
     def get_facts(self, birth_chart_id: int, user_id: int) -> Dict[str, List[str]]:
         """Retrieve facts only when the chart belongs to the requesting user."""
-        from datetime import datetime, timedelta
-
-        with get_conn() as conn:
-            cur = execute(
-                conn,
-                """
-                SELECT uf.category, uf.fact, uf.extracted_at
-                FROM user_facts AS uf
-                INNER JOIN birth_charts AS bc
-                    ON bc.id = uf.birth_chart_id
-                   AND bc.userid = %s
-                WHERE uf.birth_chart_id = %s
-                ORDER BY uf.extracted_at DESC
-                """,
-                (user_id, birth_chart_id),
-            )
-            rows = cur.fetchall()
-
-        facts_by_category = {}
-        cutoff_date = datetime.now() - timedelta(days=7)  # Filter temporary events older than 7 days
-
-        for category, fact, extracted_at in rows:
-            if category == "temporary_events":
-                try:
-                    fact_date = (
-                        extracted_at
-                        if isinstance(extracted_at, datetime)
-                        else datetime.fromisoformat(str(extracted_at).replace("Z", "+00:00"))
-                    )
-                    if fact_date.replace(tzinfo=None) < cutoff_date:
-                        continue
-                except Exception:
-                    pass
-
-            if category not in facts_by_category:
-                facts_by_category[category] = []
-            facts_by_category[category].append(fact)
-
-        return facts_by_category
+        return get_user_facts_for_chart(birth_chart_id, user_id)

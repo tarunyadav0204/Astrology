@@ -1,90 +1,57 @@
 {
   "english": {
-    "starterEyebrow": "FIRST PURCHASE OFFER",
-    "starterTitle": "24 CREDITS FOR ₹24",
-    "starterBody": "Your first top-up is just ₹1 per credit. This one-time pack is available after your free question.",
-    "starterChipLine": "₹1 per credit"
-    ,"packName": "First Light Pack"
-    ,"packBadge": "First purchase only"
+    "starterEyebrow": "CONTINUE YOUR READING", "starterTitle": "UNLOCK TARA'S COMPLETE ANSWER", "starterBody": "Unlock everything Tara found for this question, plus enough credits to ask one more Detailed Question.", "starterChipLine": "Complete answer + 1 more question", "packName": "Complete Reading Offer", "packBadge": "First purchase only",
+    "continueEyebrow": "CONTINUE THIS READING", "completeAnswerTitle": "Unlock Tara's complete answer", "completeAnswerBody": "See everything Tara found beyond the central insight you just read.", "lockedSectionsTitle": "Inside your complete answer", "completeAnswerCta": "Unlock complete answer + 1 more question · {{price}}", "standardRevealCta": "Unlock complete answer", "starterDisclosure": "One-time first purchase. Includes {{credits}} credits; one Detailed Question uses {{cost}}.", "standardDisclosure": "Detailed Answer · {{cost}} credits", "starterCompleteDescription": "Unlock everything Tara found for this question, plus enough credits to ask one more Detailed Question.", "completeAnswerDescription": "Unlock everything Tara found beyond the central insight you just read.", "continueForPrice": "Continue for {{price}}",
+    "freeInsightTitle": "Your first insight is free", "freeInsightBody": "Ask anything. Tara will give you the central insight from your chart.", "freeInsightCta": "Get my free insight", "authGateMessage": "Sign in to ask AstroRoshni — your first insight from Tara can be free.", "homeBadge": "First insight free", "priceLine": "One-time first purchase · {{price}}", "ctaWithPack": "Unlock complete answer · {{price}} →"
   },
   "hindi": {
-    "starterEyebrow": "पहली खरीद का ऑफ़र",
-    "starterTitle": "₹24 में 24 क्रेडिट",
-    "starterBody": "आपके पहले टॉप-अप में हर क्रेडिट सिर्फ़ ₹1 का है। यह एक बार मिलने वाला पैक आपके मुफ़्त सवाल के बाद उपलब्ध है।",
-    "starterChipLine": "₹1 प्रति क्रेडिट"
-    ,"packName": "फ़र्स्ट लाइट पैक"
-    ,"packBadge": "केवल पहली खरीद"
+    "starterEyebrow": "अपना अध्ययन जारी रखें", "starterTitle": "तारा का पूरा उत्तर अनलॉक करें", "starterBody": "इस प्रश्न के लिए तारा ने जो कुछ पाया है, वह सब अनलॉक करें—और एक और विस्तृत प्रश्न पूछने लायक क्रेडिट पाएँ।", "starterChipLine": "पूरा उत्तर + 1 और प्रश्न", "packName": "संपूर्ण अध्ययन ऑफ़र", "packBadge": "केवल पहली खरीद",
+    "continueEyebrow": "यह अध्ययन जारी रखें", "completeAnswerTitle": "तारा का पूरा उत्तर अनलॉक करें", "completeAnswerBody": "अभी पढ़ी मुख्य अंतर्दृष्टि के आगे तारा ने जो कुछ पाया है, वह सब देखें।", "lockedSectionsTitle": "आपके पूरे उत्तर में", "completeAnswerCta": "पूरा उत्तर + 1 और प्रश्न अनलॉक करें · {{price}}", "standardRevealCta": "पूरा उत्तर अनलॉक करें", "starterDisclosure": "पहली खरीद का एकमुश्त ऑफ़र। {{credits}} क्रेडिट शामिल; एक विस्तृत प्रश्न में {{cost}} लगते हैं।", "standardDisclosure": "विस्तृत उत्तर · {{cost}} क्रेडिट", "starterCompleteDescription": "इस प्रश्न के लिए तारा ने जो कुछ पाया है, वह सब अनलॉक करें—और एक और विस्तृत प्रश्न पूछने लायक क्रेडिट पाएँ।", "completeAnswerDescription": "अभी पढ़ी मुख्य अंतर्दृष्टि के आगे तारा ने जो कुछ पाया है, वह सब अनलॉक करें।", "continueForPrice": "{{price}} में जारी रखें",
+    "freeInsightTitle": "आपकी पहली अंतर्दृष्टि निःशुल्क है", "freeInsightBody": "कुछ भी पूछें। तारा आपकी कुंडली से मुख्य अंतर्दृष्टि देगी।", "freeInsightCta": "मेरी निःशुल्क अंतर्दृष्टि पाएँ", "authGateMessage": "AstroRoshni से पूछने के लिए साइन इन करें—तारा की आपकी पहली अंतर्दृष्टि निःशुल्क हो सकती है।", "homeBadge": "पहली अंतर्दृष्टि निःशुल्क", "priceLine": "पहली खरीद का एकमुश्त ऑफ़र · {{price}}", "ctaWithPack": "पूरा उत्तर अनलॉक करें · {{price}} →"
   },
   "es": {
-    "starterEyebrow": "OFERTA DE PRIMERA COMPRA",
-    "starterTitle": "24 CRÉDITOS POR ₹24",
-    "starterBody": "Tu primera recarga cuesta solo ₹1 por crédito. Este paquete único está disponible después de tu pregunta gratuita.",
-    "starterChipLine": "₹1 por crédito"
-    ,"packName": "Pack Primera Luz"
-    ,"packBadge": "Solo primera compra"
+    "starterEyebrow": "CONTINÚA TU LECTURA", "starterTitle": "DESBLOQUEA LA RESPUESTA COMPLETA DE TARA", "starterBody": "Desbloquea todo lo que Tara encontró para esta pregunta y obtén créditos suficientes para otra Pregunta Detallada.", "starterChipLine": "Respuesta completa + 1 pregunta más", "packName": "Oferta de Lectura Completa", "packBadge": "Solo primera compra",
+    "continueEyebrow": "CONTINÚA ESTA LECTURA", "completeAnswerTitle": "Desbloquea la respuesta completa de Tara", "completeAnswerBody": "Descubre todo lo que Tara encontró más allá de la idea central que acabas de leer.", "lockedSectionsTitle": "En tu respuesta completa", "completeAnswerCta": "Respuesta completa + 1 pregunta más · {{price}}", "standardRevealCta": "Desbloquear respuesta completa", "starterDisclosure": "Oferta única de primera compra. Incluye {{credits}} créditos; una Pregunta Detallada usa {{cost}}.", "standardDisclosure": "Respuesta Detallada · {{cost}} créditos", "starterCompleteDescription": "Desbloquea todo lo que Tara encontró para esta pregunta y obtén créditos suficientes para otra Pregunta Detallada.", "completeAnswerDescription": "Desbloquea todo lo que Tara encontró más allá de la idea central que acabas de leer.", "continueForPrice": "Continuar por {{price}}",
+    "freeInsightTitle": "Tu primera percepción es gratis", "freeInsightBody": "Pregunta lo que quieras. Tara te dará la percepción central de tu carta.", "freeInsightCta": "Obtener mi percepción gratis", "authGateMessage": "Inicia sesión para preguntar a AstroRoshni: tu primera percepción de Tara puede ser gratis.", "homeBadge": "Primera percepción gratis", "priceLine": "Oferta única de primera compra · {{price}}", "ctaWithPack": "Desbloquear respuesta completa · {{price}} →"
   },
   "fr": {
-    "starterEyebrow": "OFFRE PREMIER ACHAT",
-    "starterTitle": "24 CRÉDITS POUR ₹24",
-    "starterBody": "Votre première recharge ne coûte que ₹1 par crédit. Ce pack unique est disponible après votre question gratuite.",
-    "starterChipLine": "₹1 par crédit"
-    ,"packName": "Pack Première Lumière"
-    ,"packBadge": "Premier achat uniquement"
+    "starterEyebrow": "POURSUIVEZ VOTRE LECTURE", "starterTitle": "DÉBLOQUEZ LA RÉPONSE COMPLÈTE DE TARA", "starterBody": "Débloquez tout ce que Tara a trouvé pour cette question, avec assez de crédits pour poser une autre Question Détaillée.", "starterChipLine": "Réponse complète + 1 autre question", "packName": "Offre Lecture Complète", "packBadge": "Premier achat uniquement",
+    "continueEyebrow": "POURSUIVEZ CETTE LECTURE", "completeAnswerTitle": "Débloquez la réponse complète de Tara", "completeAnswerBody": "Découvrez tout ce que Tara a trouvé au-delà de l’idée centrale que vous venez de lire.", "lockedSectionsTitle": "Dans votre réponse complète", "completeAnswerCta": "Réponse complète + 1 autre question · {{price}}", "standardRevealCta": "Débloquer la réponse complète", "starterDisclosure": "Offre unique de premier achat. Inclut {{credits}} crédits ; une Question Détaillée en utilise {{cost}}.", "standardDisclosure": "Réponse Détaillée · {{cost}} crédits", "starterCompleteDescription": "Débloquez tout ce que Tara a trouvé pour cette question, avec assez de crédits pour poser une autre Question Détaillée.", "completeAnswerDescription": "Débloquez tout ce que Tara a trouvé au-delà de l’idée centrale que vous venez de lire.", "continueForPrice": "Continuer pour {{price}}",
+    "freeInsightTitle": "Votre première perception est gratuite", "freeInsightBody": "Posez votre question. Tara vous donnera la perception centrale de votre thème.", "freeInsightCta": "Obtenir ma perception gratuite", "authGateMessage": "Connectez-vous pour interroger AstroRoshni — votre première perception de Tara peut être gratuite.", "homeBadge": "Première perception gratuite", "priceLine": "Offre unique de premier achat · {{price}}", "ctaWithPack": "Débloquer la réponse complète · {{price}} →"
   },
   "german": {
-    "starterEyebrow": "ANGEBOT FÜR DEN ERSTKAUF",
-    "starterTitle": "24 CREDITS FÜR ₹24",
-    "starterBody": "Deine erste Aufladung kostet nur ₹1 pro Credit. Dieses einmalige Paket ist nach deiner kostenlosen Frage verfügbar.",
-    "starterChipLine": "₹1 pro Credit"
-    ,"packName": "First-Light-Paket"
-    ,"packBadge": "Nur beim Erstkauf"
+    "starterEyebrow": "SETZE DEINE DEUTUNG FORT", "starterTitle": "TARAS VOLLSTÄNDIGE ANTWORT FREISCHALTEN", "starterBody": "Schalte alles frei, was Tara zu dieser Frage gefunden hat, plus genug Credits für eine weitere Detaillierte Frage.", "starterChipLine": "Vollständige Antwort + 1 weitere Frage", "packName": "Angebot Vollständige Deutung", "packBadge": "Nur beim Erstkauf",
+    "continueEyebrow": "DIESE DEUTUNG FORTSETZEN", "completeAnswerTitle": "Taras vollständige Antwort freischalten", "completeAnswerBody": "Sieh alles, was Tara über die zentrale Erkenntnis hinaus gefunden hat.", "lockedSectionsTitle": "In deiner vollständigen Antwort", "completeAnswerCta": "Vollständige Antwort + 1 weitere Frage · {{price}}", "standardRevealCta": "Vollständige Antwort freischalten", "starterDisclosure": "Einmaliges Erstkaufangebot. Enthält {{credits}} Credits; eine Detaillierte Frage kostet {{cost}}.", "standardDisclosure": "Detaillierte Antwort · {{cost}} Credits", "starterCompleteDescription": "Schalte alles frei, was Tara zu dieser Frage gefunden hat, plus genug Credits für eine weitere Detaillierte Frage.", "completeAnswerDescription": "Schalte alles frei, was Tara über die zentrale Erkenntnis hinaus gefunden hat.", "continueForPrice": "Für {{price}} fortfahren",
+    "freeInsightTitle": "Deine erste Erkenntnis ist kostenlos", "freeInsightBody": "Frag alles. Tara gibt dir die zentrale Erkenntnis aus deinem Horoskop.", "freeInsightCta": "Kostenlose Erkenntnis erhalten", "authGateMessage": "Melde dich an, um AstroRoshni zu fragen — deine erste Erkenntnis von Tara kann kostenlos sein.", "homeBadge": "Erste Erkenntnis kostenlos", "priceLine": "Einmaliges Erstkaufangebot · {{price}}", "ctaWithPack": "Vollständige Antwort freischalten · {{price}} →"
   },
   "russian": {
-    "starterEyebrow": "ПРЕДЛОЖЕНИЕ НА ПЕРВУЮ ПОКУПКУ",
-    "starterTitle": "24 КРЕДИТА ЗА ₹24",
-    "starterBody": "Первое пополнение стоит всего ₹1 за кредит. Этот разовый пакет доступен после бесплатного вопроса.",
-    "starterChipLine": "₹1 за кредит"
-    ,"packName": "Пакет «Первый свет»"
-    ,"packBadge": "Только первая покупка"
+    "starterEyebrow": "ПРОДОЛЖИТЕ РАЗБОР", "starterTitle": "ОТКРОЙТЕ ПОЛНЫЙ ОТВЕТ ТАРЫ", "starterBody": "Откройте всё, что Тара нашла по этому вопросу, и получите достаточно кредитов ещё для одного Подробного Вопроса.", "starterChipLine": "Полный ответ + ещё 1 вопрос", "packName": "Предложение Полного Разбора", "packBadge": "Только первая покупка",
+    "continueEyebrow": "ПРОДОЛЖИТЕ ЭТОТ РАЗБОР", "completeAnswerTitle": "Откройте полный ответ Тары", "completeAnswerBody": "Узнайте всё, что Тара нашла помимо главного вывода, который вы уже прочитали.", "lockedSectionsTitle": "В полном ответе", "completeAnswerCta": "Полный ответ + ещё 1 вопрос · {{price}}", "standardRevealCta": "Открыть полный ответ", "starterDisclosure": "Разовое предложение на первую покупку. Включает {{credits}} кредитов; Подробный Вопрос стоит {{cost}}.", "standardDisclosure": "Подробный Ответ · {{cost}} кредитов", "starterCompleteDescription": "Откройте всё, что Тара нашла по этому вопросу, и получите достаточно кредитов ещё для одного Подробного Вопроса.", "completeAnswerDescription": "Откройте всё, что Тара нашла помимо главного вывода, который вы уже прочитали.", "continueForPrice": "Продолжить за {{price}}",
+    "freeInsightTitle": "Первая подсказка бесплатна", "freeInsightBody": "Задайте любой вопрос. Тара даст главный вывод из вашей карты.", "freeInsightCta": "Получить бесплатную подсказку", "authGateMessage": "Войдите, чтобы спросить AstroRoshni — первая подсказка Тары может быть бесплатной.", "homeBadge": "Первая подсказка бесплатно", "priceLine": "Разовое предложение на первую покупку · {{price}}", "ctaWithPack": "Открыть полный ответ · {{price}} →"
   },
   "chinese": {
-    "starterEyebrow": "首次购买优惠",
-    "starterTitle": "₹24 购买 24 积分",
-    "starterBody": "首次充值每积分仅需 ₹1。完成免费提问后即可购买此一次性套餐。",
-    "starterChipLine": "每积分 ₹1"
-    ,"packName": "初光套餐"
-    ,"packBadge": "仅限首次购买"
+    "starterEyebrow": "继续你的解读", "starterTitle": "解锁 TARA 的完整回答", "starterBody": "解锁 Tara 针对此问题发现的全部内容，并获得足够积分再问一个详细问题。", "starterChipLine": "完整回答 + 再问 1 个问题", "packName": "完整解读优惠", "packBadge": "仅限首次购买",
+    "continueEyebrow": "继续本次解读", "completeAnswerTitle": "解锁 Tara 的完整回答", "completeAnswerBody": "查看除了刚刚读到的核心见解之外，Tara 发现的全部内容。", "lockedSectionsTitle": "完整回答包含", "completeAnswerCta": "完整回答 + 再问 1 个问题 · {{price}}", "standardRevealCta": "解锁完整回答", "starterDisclosure": "首次购买专享一次。包含 {{credits}} 积分；一个详细问题需 {{cost}} 积分。", "standardDisclosure": "详细回答 · {{cost}} 积分", "starterCompleteDescription": "解锁 Tara 针对此问题发现的全部内容，并获得足够积分再问一个详细问题。", "completeAnswerDescription": "解锁除了刚刚读到的核心见解之外，Tara 发现的全部内容。", "continueForPrice": "{{price}} 继续",
+    "freeInsightTitle": "首次核心见解免费", "freeInsightBody": "可以问任何问题。Tara 会从你的星盘中给出核心见解。", "freeInsightCta": "获取免费见解", "authGateMessage": "登录后向 AstroRoshni 提问——首次 Tara 核心见解可免费获得。", "homeBadge": "首次见解免费", "priceLine": "首次购买专享一次 · {{price}}", "ctaWithPack": "解锁完整回答 · {{price}} →"
   },
   "tamil": {
-    "starterEyebrow": "முதல் வாங்குதல் சலுகை",
-    "starterTitle": "₹24-க்கு 24 கிரெடிட்கள்",
-    "starterBody": "உங்கள் முதல் டாப்-அப்பில் ஒரு கிரெடிட் வெறும் ₹1. இலவசக் கேள்விக்குப் பிறகு இந்த ஒருமுறை பேக் கிடைக்கும்.",
-    "starterChipLine": "ஒரு கிரெடிட் ₹1"
-    ,"packName": "முதல் ஒளி பேக்"
-    ,"packBadge": "முதல் வாங்குதலுக்கு மட்டும்"
+    "starterEyebrow": "உங்கள் வாசிப்பைத் தொடருங்கள்", "starterTitle": "தாராவின் முழுப் பதிலைத் திறக்கவும்", "starterBody": "இந்தக் கேள்விக்காக தாரா கண்ட அனைத்தையும் திறந்து, மேலும் ஒரு விரிவான கேள்வி கேட்கப் போதுமான கிரெடிட்களைப் பெறுங்கள்.", "starterChipLine": "முழுப் பதில் + மேலும் 1 கேள்வி", "packName": "முழு வாசிப்பு சலுகை", "packBadge": "முதல் வாங்குதலுக்கு மட்டும்",
+    "continueEyebrow": "இந்த வாசிப்பைத் தொடருங்கள்", "completeAnswerTitle": "தாராவின் முழுப் பதிலைத் திறக்கவும்", "completeAnswerBody": "நீங்கள் இப்போது படித்த முக்கிய உள்ளுணர்வுக்கு அப்பால் தாரா கண்ட அனைத்தையும் பாருங்கள்.", "lockedSectionsTitle": "உங்கள் முழுப் பதிலில்", "completeAnswerCta": "முழுப் பதில் + மேலும் 1 கேள்வி · {{price}}", "standardRevealCta": "முழுப் பதிலைத் திறக்கவும்", "starterDisclosure": "ஒருமுறை முதல் வாங்குதல். {{credits}} கிரெடிட்கள் அடங்கும்; ஒரு விரிவான கேள்விக்கு {{cost}} தேவை.", "standardDisclosure": "விரிவான பதில் · {{cost}} கிரெடிட்கள்", "starterCompleteDescription": "இந்தக் கேள்விக்காக தாரா கண்ட அனைத்தையும் திறந்து, மேலும் ஒரு விரிவான கேள்வி கேட்கப் போதுமான கிரெடிட்களைப் பெறுங்கள்.", "completeAnswerDescription": "நீங்கள் இப்போது படித்த முக்கிய உள்ளுணர்வுக்கு அப்பால் தாரா கண்ட அனைத்தையும் திறக்கவும்.", "continueForPrice": "{{price}}-க்கு தொடரவும்",
+    "freeInsightTitle": "உங்கள் முதல் உள்ளுணர்வு இலவசம்", "freeInsightBody": "எதையும் கேளுங்கள். உங்கள் ஜாதகத்தின் முக்கிய உள்ளுணர்வை தாரா தருவார்.", "freeInsightCta": "இலவச உள்ளுணர்வைப் பெறுங்கள்", "authGateMessage": "AstroRoshni-யிடம் கேட்க உள்நுழையுங்கள்—தாராவின் முதல் உள்ளுணர்வு இலவசமாக இருக்கலாம்.", "homeBadge": "முதல் உள்ளுணர்வு இலவசம்", "priceLine": "ஒருமுறை முதல் வாங்குதல் · {{price}}", "ctaWithPack": "முழுப் பதிலைத் திறக்கவும் · {{price}} →"
   },
   "telugu": {
-    "starterEyebrow": "మొదటి కొనుగోలు ఆఫర్",
-    "starterTitle": "₹24కి 24 క్రెడిట్లు",
-    "starterBody": "మీ మొదటి టాప్-అప్‌లో ఒక్కో క్రెడిట్ కేవలం ₹1. ఉచిత ప్రశ్న తర్వాత ఈ ఒక్కసారి ప్యాక్ అందుబాటులో ఉంటుంది.",
-    "starterChipLine": "ఒక్కో క్రెడిట్ ₹1"
-    ,"packName": "ఫస్ట్ లైట్ ప్యాక్"
-    ,"packBadge": "మొదటి కొనుగోలుకు మాత్రమే"
+    "starterEyebrow": "మీ విశ్లేషణను కొనసాగించండి", "starterTitle": "తార పూర్తి సమాధానాన్ని అన్‌లాక్ చేయండి", "starterBody": "ఈ ప్రశ్నపై తార కనుగొన్నదంతా అన్‌లాక్ చేసి, మరో వివరణాత్మక ప్రశ్న అడగడానికి సరిపడా క్రెడిట్లు పొందండి.", "starterChipLine": "పూర్తి సమాధానం + మరో 1 ప్రశ్న", "packName": "పూర్తి విశ్లేషణ ఆఫర్", "packBadge": "మొదటి కొనుగోలుకు మాత్రమే",
+    "continueEyebrow": "ఈ విశ్లేషణను కొనసాగించండి", "completeAnswerTitle": "తార పూర్తి సమాధానాన్ని అన్‌లాక్ చేయండి", "completeAnswerBody": "మీరు ఇప్పుడే చదివిన ప్రధాన అంతర్దృష్టికి మించి తార కనుగొన్నదంతా చూడండి.", "lockedSectionsTitle": "మీ పూర్తి సమాధానంలో", "completeAnswerCta": "పూర్తి సమాధానం + మరో 1 ప్రశ్న · {{price}}", "standardRevealCta": "పూర్తి సమాధానాన్ని అన్‌లాక్ చేయండి", "starterDisclosure": "ఒకసారి మాత్రమే మొదటి కొనుగోలు. {{credits}} క్రెడిట్లు ఉంటాయి; ఒక వివరణాత్మక ప్రశ్నకు {{cost}} అవసరం.", "standardDisclosure": "వివరణాత్మక సమాధానం · {{cost}} క్రెడిట్లు", "starterCompleteDescription": "ఈ ప్రశ్నపై తార కనుగొన్నదంతా అన్‌లాక్ చేసి, మరో వివరణాత్మక ప్రశ్న అడగడానికి సరిపడా క్రెడిట్లు పొందండి.", "completeAnswerDescription": "మీరు ఇప్పుడే చదివిన ప్రధాన అంతర్దృష్టికి మించి తార కనుగొన్నదంతా అన్‌లాక్ చేయండి.", "continueForPrice": "{{price}}కి కొనసాగించండి",
+    "freeInsightTitle": "మీ మొదటి అంతర్దృష్టి ఉచితం", "freeInsightBody": "ఏదైనా అడగండి. మీ జాతకం నుంచి ప్రధాన అంతర్దృష్టిని తార అందిస్తుంది.", "freeInsightCta": "నా ఉచిత అంతర్దృష్టిని పొందండి", "authGateMessage": "AstroRoshniని అడగడానికి సైన్ ఇన్ చేయండి—తార నుంచి మీ మొదటి అంతర్దృష్టి ఉచితం కావచ్చు.", "homeBadge": "మొదటి అంతర్దృష్టి ఉచితం", "priceLine": "ఒకసారి మాత్రమే మొదటి కొనుగోలు · {{price}}", "ctaWithPack": "పూర్తి సమాధానాన్ని అన్‌లాక్ చేయండి · {{price}} →"
   },
   "gujarati": {
-    "starterEyebrow": "પ્રથમ ખરીદીની ઓફર",
-    "starterTitle": "₹24માં 24 ક્રેડિટ",
-    "starterBody": "તમારા પ્રથમ ટોપ-અપમાં દરેક ક્રેડિટ માત્ર ₹1નો છે. મફત પ્રશ્ન પછી આ એક વખતનો પેક ઉપલબ્ધ છે.",
-    "starterChipLine": "₹1 પ્રતિ ક્રેડિટ"
-    ,"packName": "ફર્સ્ટ લાઇટ પેક"
-    ,"packBadge": "માત્ર પ્રથમ ખરીદી"
+    "starterEyebrow": "તમારું વાંચન ચાલુ રાખો", "starterTitle": "તારાનો સંપૂર્ણ જવાબ અનલૉક કરો", "starterBody": "આ પ્રશ્ન માટે તારાએ શોધેલું બધું અનલૉક કરો અને વધુ એક વિગતવાર પ્રશ્ન પૂછવા પૂરતા ક્રેડિટ મેળવો.", "starterChipLine": "સંપૂર્ણ જવાબ + વધુ 1 પ્રશ્ન", "packName": "સંપૂર્ણ વાંચન ઓફર", "packBadge": "માત્ર પ્રથમ ખરીદી",
+    "continueEyebrow": "આ વાંચન ચાલુ રાખો", "completeAnswerTitle": "તારાનો સંપૂર્ણ જવાબ અનલૉક કરો", "completeAnswerBody": "તમે હમણાં વાંચેલી મુખ્ય સમજથી આગળ તારાએ શોધેલું બધું જુઓ.", "lockedSectionsTitle": "તમારા સંપૂર્ણ જવાબમાં", "completeAnswerCta": "સંપૂર્ણ જવાબ + વધુ 1 પ્રશ્ન · {{price}}", "standardRevealCta": "સંપૂર્ણ જવાબ અનલૉક કરો", "starterDisclosure": "એક વખતની પ્રથમ ખરીદી. {{credits}} ક્રેડિટ સામેલ; એક વિગતવાર પ્રશ્નમાં {{cost}} વપરાય છે.", "standardDisclosure": "વિગતવાર જવાબ · {{cost}} ક્રેડિટ", "starterCompleteDescription": "આ પ્રશ્ન માટે તારાએ શોધેલું બધું અનલૉક કરો અને વધુ એક વિગતવાર પ્રશ્ન પૂછવા પૂરતા ક્રેડિટ મેળવો.", "completeAnswerDescription": "તમે હમણાં વાંચેલી મુખ્ય સમજથી આગળ તારાએ શોધેલું બધું અનલૉક કરો.", "continueForPrice": "{{price}}માં ચાલુ રાખો",
+    "freeInsightTitle": "તમારી પ્રથમ સમજ મફત છે", "freeInsightBody": "કંઈ પણ પૂછો. તારા તમારી કુંડળીમાંથી મુખ્ય સમજ આપશે.", "freeInsightCta": "મારી મફત સમજ મેળવો", "authGateMessage": "AstroRoshniને પૂછવા સાઇન ઇન કરો—તારા પાસેથી તમારી પ્રથમ સમજ મફત હોઈ શકે છે.", "homeBadge": "પ્રથમ સમજ મફત", "priceLine": "એક વખતની પ્રથમ ખરીદી · {{price}}", "ctaWithPack": "સંપૂર્ણ જવાબ અનલૉક કરો · {{price}} →"
   },
   "marathi": {
-    "starterEyebrow": "पहिल्या खरेदीची ऑफर",
-    "starterTitle": "₹24 मध्ये 24 क्रेडिट्स",
-    "starterBody": "तुमच्या पहिल्या टॉप-अपमध्ये प्रत्येक क्रेडिट फक्त ₹1 चे आहे. मोफत प्रश्नानंतर हा एकदाच मिळणारा पॅक उपलब्ध आहे.",
-    "starterChipLine": "₹1 प्रति क्रेडिट"
-    ,"packName": "फर्स्ट लाइट पॅक"
-    ,"packBadge": "फक्त पहिल्या खरेदीसाठी"
+    "starterEyebrow": "तुमचे वाचन पुढे सुरू ठेवा", "starterTitle": "ताराचे संपूर्ण उत्तर अनलॉक करा", "starterBody": "या प्रश्नासाठी ताराला सापडलेले सर्व अनलॉक करा आणि आणखी एक सविस्तर प्रश्न विचारण्याइतके क्रेडिट मिळवा.", "starterChipLine": "संपूर्ण उत्तर + आणखी 1 प्रश्न", "packName": "संपूर्ण वाचन ऑफर", "packBadge": "फक्त पहिल्या खरेदीसाठी",
+    "continueEyebrow": "हे वाचन पुढे सुरू ठेवा", "completeAnswerTitle": "ताराचे संपूर्ण उत्तर अनलॉक करा", "completeAnswerBody": "तुम्ही आत्ता वाचलेल्या मुख्य अंतर्दृष्टीपलीकडे ताराला सापडलेले सर्व पाहा.", "lockedSectionsTitle": "तुमच्या संपूर्ण उत्तरात", "completeAnswerCta": "संपूर्ण उत्तर + आणखी 1 प्रश्न · {{price}}", "standardRevealCta": "संपूर्ण उत्तर अनलॉक करा", "starterDisclosure": "एकदाच मिळणारी पहिली खरेदी. {{credits}} क्रेडिट समाविष्ट; एका सविस्तर प्रश्नासाठी {{cost}} लागतात.", "standardDisclosure": "सविस्तर उत्तर · {{cost}} क्रेडिट", "starterCompleteDescription": "या प्रश्नासाठी ताराला सापडलेले सर्व अनलॉक करा आणि आणखी एक सविस्तर प्रश्न विचारण्याइतके क्रेडिट मिळवा.", "completeAnswerDescription": "तुम्ही आत्ता वाचलेल्या मुख्य अंतर्दृष्टीपलीकडे ताराला सापडलेले सर्व अनलॉक करा.", "continueForPrice": "{{price}} मध्ये पुढे सुरू ठेवा",
+    "freeInsightTitle": "तुमची पहिली अंतर्दृष्टी मोफत आहे", "freeInsightBody": "काहीही विचारा. तारा तुमच्या कुंडलीतील मुख्य अंतर्दृष्टी देईल.", "freeInsightCta": "माझी मोफत अंतर्दृष्टी मिळवा", "authGateMessage": "AstroRoshni ला विचारण्यासाठी साइन इन करा—ताराकडून तुमची पहिली अंतर्दृष्टी मोफत असू शकते.", "homeBadge": "पहिली अंतर्दृष्टी मोफत", "priceLine": "एकदाच मिळणारी पहिली खरेदी · {{price}}", "ctaWithPack": "संपूर्ण उत्तर अनलॉक करा · {{price}} →"
   }
 }

@@ -65,6 +65,8 @@ export default function MonthlyDeepScreen() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const loadingIntervalRef = useRef(null);
   const progressIntervalRef = useRef(null);
+  const serverProgressRef = useRef(false);
+  const generationModeRef = useRef(null);
   const deepPollRef = useRef(null);
   const deepTimeoutRef = useRef(null);
   const TIMELINE_POLL_MS = 3000;
@@ -111,6 +113,8 @@ export default function MonthlyDeepScreen() {
   }, []);
 
   const startMonthlyLoadingUi = useCallback((startedAtInput = new Date().toISOString()) => {
+    serverProgressRef.current = false;
+    generationModeRef.current = null;
     const startedAtMs = new Date(startedAtInput || Date.now()).getTime();
     const safeStartedAt = Number.isFinite(startedAtMs) ? startedAtMs : Date.now();
     const elapsedMs = Math.max(0, Date.now() - safeStartedAt);
@@ -123,6 +127,7 @@ export default function MonthlyDeepScreen() {
     }, 3000);
     let elapsed = elapsedMs;
     progressIntervalRef.current = setInterval(() => {
+      if (serverProgressRef.current) return;
       elapsed += 100;
       if (elapsed <= 100000) {
         setLoadingProgress((elapsed / 100000) * 90);
@@ -218,6 +223,7 @@ export default function MonthlyDeepScreen() {
             month: Number(month),
             source: 'monthly_deep_screen',
             mode: 'cached',
+            engine_version: res.data.data?.engine_version || res.data?.engine_version || 'unknown',
           });
           await fetchBalance();
         }
@@ -247,6 +253,7 @@ export default function MonthlyDeepScreen() {
         month: Number(month),
         source: 'monthly_deep_screen',
         mode,
+        engine_version: data?.engine_version || 'unknown',
       });
       fetchBalance();
     };
@@ -304,10 +311,26 @@ export default function MonthlyDeepScreen() {
       );
     };
 
-    deepPollRef.current = setInterval(async () => {
+    const pollDeepMonthStatus = async () => {
       try {
         const statusResponse = await chatAPI.getMonthlyEventsStatus(jobId);
         const status = statusResponse.data.status;
+        const serverProgressValue = statusResponse.data?.progress_percent;
+        const serverPercent = serverProgressValue == null ? Number.NaN : Number(serverProgressValue);
+        if (statusResponse.data?.generation_mode) {
+          generationModeRef.current = statusResponse.data.generation_mode;
+        }
+        if (Number.isFinite(serverPercent)) {
+          serverProgressRef.current = true;
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+            progressIntervalRef.current = null;
+          }
+          setLoadingProgress((previous) => Math.max(
+            Number.isFinite(previous) && previous >= 0 ? previous : 0,
+            Math.max(0, Math.min(100, serverPercent))
+          ));
+        }
         if (status === 'completed' && statusResponse.data.data) {
           await finishSuccess(statusResponse.data.data);
         } else if (status === 'failed') {
@@ -320,7 +343,9 @@ export default function MonthlyDeepScreen() {
             'Connection error while checking status.'
         );
       }
-    }, TIMELINE_POLL_MS);
+    };
+    pollDeepMonthStatus();
+    deepPollRef.current = setInterval(pollDeepMonthStatus, TIMELINE_POLL_MS);
 
     const elapsedMs = Math.max(0, Date.now() - new Date(startedAt || Date.now()).getTime());
     const remainingMs = Math.max(5000, TIMELINE_MAX_WAIT_MS - elapsedMs);
@@ -420,6 +445,15 @@ export default function MonthlyDeepScreen() {
     setShowMonthlyCreditsModal(false);
     setShowGenerateButton(false);
     startMonthlyLoadingUi(pending.startedAt);
+    if (pending.generationMode === 'deterministic') {
+      generationModeRef.current = 'deterministic';
+      serverProgressRef.current = true;
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      setLoadingProgress((previous) => Math.max(Number(previous) || 0, 5));
+    }
     attachDeepMonthPolling(pending.jobId, pending.startedAt);
     return true;
   }, [
@@ -535,6 +569,7 @@ export default function MonthlyDeepScreen() {
           month: Number(month),
           source: 'monthly_deep_screen',
           mode: 'direct',
+          engine_version: startResponse.data.data?.engine_version || startResponse.data?.engine_version || 'unknown',
         });
         fetchBalance();
         stopDeepMonthJob();
@@ -542,12 +577,26 @@ export default function MonthlyDeepScreen() {
       }
       const jobId = startResponse.data?.job_id;
       if (!jobId) throw new Error('No job_id received.');
+      const generationMode = startResponse.data?.generation_mode || null;
+      generationModeRef.current = generationMode;
+      if (generationMode === 'deterministic') {
+        serverProgressRef.current = true;
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
+        }
+        setLoadingProgress((previous) => Math.max(
+          Number(previous) || 0,
+          Number(startResponse.data?.progress_percent || 5)
+        ));
+      }
       await savePendingDeepMonthJob({
         jobId,
         birthChartId,
         year: Number(year),
         month: Number(month),
         startedAt,
+        generationMode,
       });
       attachDeepMonthPolling(jobId, startedAt);
     } catch (e) {
@@ -805,7 +854,7 @@ export default function MonthlyDeepScreen() {
                   <View style={[styles.progressBarFill, { width: `${loadingProgress}%`, backgroundColor: colors.primary }]} />
                 </View>
                 <Text style={[styles.progressPercentText, { color: colors.primary }]}>
-                  {loadingProgress < 90 ? `${Math.round(loadingProgress)}%` : t('eventScreen.almostThere', 'Almost there...')}
+                  {`${Math.round(Math.max(0, Math.min(100, loadingProgress)))}%`}
                 </Text>
               </View>
             ) : (
@@ -825,6 +874,7 @@ export default function MonthlyDeepScreen() {
               onChatPress={() => navigateToChatWithMonth({ ...singleMonth, month: getMonthName(singleMonth.month_id) })}
               defaultExpanded
               hideDiveDeep
+              relativeProfiles={monthlyData?.desh_kaal_patra?.eligible_relative_subjects || []}
             />
           </ScrollView>
         ) : (

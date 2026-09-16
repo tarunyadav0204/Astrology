@@ -205,13 +205,32 @@ Object.entries(normalizedPremiumUi).forEach(([language, copy]) => {
 });
 
 [
-  [en, firstPurchaseStarter.english], [es, firstPurchaseStarter.es], [hi, firstPurchaseStarter.hindi],
-  [tamil, firstPurchaseStarter.tamil], [te, firstPurchaseStarter.telugu], [gu, firstPurchaseStarter.gujarati],
-  [mr, firstPurchaseStarter.marathi], [de, firstPurchaseStarter.german], [fr, firstPurchaseStarter.fr],
-  [ru, firstPurchaseStarter.russian], [zh, firstPurchaseStarter.chinese],
-].forEach(([baseCopy, starterCopy]) => {
+  [en, firstPurchaseStarter.english, 'english'], [es, firstPurchaseStarter.es, 'es'], [hi, firstPurchaseStarter.hindi, 'hindi'],
+  [tamil, firstPurchaseStarter.tamil, 'tamil'], [te, firstPurchaseStarter.telugu, 'telugu'], [gu, firstPurchaseStarter.gujarati, 'gujarati'],
+  [mr, firstPurchaseStarter.marathi, 'marathi'], [de, firstPurchaseStarter.german, 'german'], [fr, firstPurchaseStarter.fr, 'fr'],
+  [ru, firstPurchaseStarter.russian, 'russian'], [zh, firstPurchaseStarter.chinese, 'chinese'],
+].forEach(([baseCopy, starterCopy, language]) => {
   baseCopy.chat = baseCopy.chat || {};
   baseCopy.chat.firstPurchaseOffer = { ...(baseCopy.chat.firstPurchaseOffer || {}), ...starterCopy };
+  baseCopy.authGate = {
+    ...(baseCopy.authGate || {}),
+    messageChat: starterCopy.authGateMessage,
+  };
+  baseCopy.home = baseCopy.home || {};
+  baseCopy.home.firstQuestionFree = {
+    ...(baseCopy.home.firstQuestionFree || {}),
+    title: starterCopy.freeInsightTitle,
+    subtext: starterCopy.freeInsightBody,
+    cta: starterCopy.freeInsightCta,
+  };
+  const premiumCopy = normalizedPremiumUi[language];
+  if (premiumCopy?.chatScreen) {
+    premiumCopy.chatScreen.firstFree = starterCopy.freeInsightTitle;
+    premiumCopy.chatScreen.askAnythingFree = starterCopy.freeInsightBody;
+  }
+  if (premiumCopy?.home) {
+    premiumCopy.home.firstQuestionFreeBadge = starterCopy.homeBadge;
+  }
 });
 
 [

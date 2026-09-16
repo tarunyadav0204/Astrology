@@ -23,6 +23,7 @@ import { chatAPI, pricingAPI } from '../services/api';
 import { storage } from '../services/storage';
 import { useCredits } from '../credits/CreditContext';
 import MonthlyAccordion from './MonthlyAccordion';
+import RelativeProfilesPanel from './RelativeProfilesPanel';
 import NativeSelectorChip from './Common/NativeSelectorChip';
 import { API_BASE_URL } from '../utils/constants';
 import { useTheme } from '../context/ThemeContext';
@@ -97,7 +98,11 @@ const mergeCachedYearList = (...lists) => {
 export default function EventScreen({ route }) {
   useAnalytics('EventScreen');
   const navigation = useNavigation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const timelineLanguage = i18n.resolvedLanguage || i18n.language || 'english';
+  const timelineLanguageCode = String(timelineLanguage).toLowerCase().startsWith('hi') || String(timelineLanguage).toLowerCase() === 'hindi'
+    ? 'hi'
+    : 'en';
   const { credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
   const { theme, colors } = useTheme();
@@ -134,6 +139,8 @@ export default function EventScreen({ route }) {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [timelineProgress, setTimelineProgress] = useState({ monthsReady: 0, totalMonths: 12, completedQuarters: 0 });
   const progressIntervalRef = useRef(null);
+  const serverProgressRef = useRef(false);
+  const timelineGenerationModeRef = useRef(null);
   const [nativeName, setNativeName] = useState('');
   const [birthData, setBirthData] = useState(null);
   const [showRegenerateModal, setShowRegenerateModal] = useState(false);
@@ -141,13 +148,24 @@ export default function EventScreen({ route }) {
   const [cachedYears, setCachedYears] = useState([]);
   const [cachedMonths, setCachedMonths] = useState([]);
   const cachedYearsForChartRef = useRef(null);
+  const cachedYearsLanguageRef = useRef(null);
   const cachedYearsLoadPromiseRef = useRef(null);
+  const previousTimelineLanguageRef = useRef(timelineLanguageCode);
+
+  useEffect(() => {
+    if (previousTimelineLanguageRef.current === timelineLanguageCode) return;
+    previousTimelineLanguageRef.current = timelineLanguageCode;
+    setMonthlyData(null);
+    setAnalysisStarted(false);
+    setCachedYears([]);
+    setCachedMonths([]);
+  }, [timelineLanguageCode]);
 
   const persistCachedYearsLocal = useCallback(async (chartId, years) => {
     if (!chartId || !Array.isArray(years)) return;
     try {
       await AsyncStorage.setItem(
-        `${CACHED_YEARS_STORAGE_PREFIX}${chartId}`,
+        `${CACHED_YEARS_STORAGE_PREFIX}${chartId}:${timelineLanguage}`,
         JSON.stringify(mergeCachedYearList(years))
       );
     } catch (error) {
@@ -155,19 +173,7 @@ export default function EventScreen({ route }) {
         console.warn('[EventScreen] persist cached years', error?.message || error);
       }
     }
-  }, []);
-
-  const hydrateCachedYearsFromStorage = useCallback(async (chartId) => {
-    if (!chartId) return null;
-    try {
-      const raw = await AsyncStorage.getItem(`${CACHED_YEARS_STORAGE_PREFIX}${chartId}`);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? mergeCachedYearList(parsed) : null;
-    } catch {
-      return null;
-    }
-  }, []);
+  }, [timelineLanguage]);
 
   const markYearCached = useCallback((year) => {
     const y = Number(year);
@@ -243,11 +249,12 @@ export default function EventScreen({ route }) {
     { icon: '✅', text: isIOS ? 'Finalizing your chart study...' : 'Finalizing the timing study...' }
   ];
 
-  const getYearlyPendingPayload = useCallback((jobId, year, birthChartId, startedAt = new Date().toISOString()) => ({
+  const getYearlyPendingPayload = useCallback((jobId, year, birthChartId, startedAt = new Date().toISOString(), generationMode = null) => ({
     jobId,
     year: Number(year),
     birthChartId: Number(birthChartId),
     startedAt,
+    generationMode,
   }), []);
 
   const saveYearlyPendingJob = useCallback(async (payload) => {
@@ -278,6 +285,8 @@ export default function EventScreen({ route }) {
   }, []);
 
   const startYearlyLoadingUi = useCallback((startedAtInput = new Date().toISOString()) => {
+    serverProgressRef.current = false;
+    timelineGenerationModeRef.current = null;
     const startedAtMs = new Date(startedAtInput || Date.now()).getTime();
     const safeStartedAt = Number.isFinite(startedAtMs) ? startedAtMs : Date.now();
     const elapsedMs = Math.max(0, Date.now() - safeStartedAt);
@@ -293,6 +302,7 @@ export default function EventScreen({ route }) {
 
     let elapsed = elapsedMs;
     progressIntervalRef.current = setInterval(() => {
+      if (serverProgressRef.current) return;
       elapsed += 100;
       if (elapsed <= 100000) {
         setLoadingProgress((elapsed / 100000) * 90);
@@ -336,14 +346,11 @@ export default function EventScreen({ route }) {
       const chartId = resolveBirthChartId(birthData);
       if (chartId) {
         cachedYearsForChartRef.current = chartId;
-        const hydrated = await hydrateCachedYearsFromStorage(chartId);
-        if (hydrated?.length) {
-          setCachedYears(hydrated);
-        }
+        cachedYearsLanguageRef.current = timelineLanguage;
       }
     };
     loadBirthData();
-  }, [hydrateCachedYearsFromStorage, navigation]);
+  }, [navigation, timelineLanguage]);
 
   // Fetch credit cost (user-discounted via my-pricing when logged in)
   useEffect(() => {
@@ -408,6 +415,7 @@ export default function EventScreen({ route }) {
             year: Number(y),
             source: 'event_screen',
             mode: 'cached',
+            engine_version: res.data.data?.engine_version || res.data?.engine_version || 'unknown',
           });
           await fetchBalance();
           return true;
@@ -438,6 +446,7 @@ export default function EventScreen({ route }) {
         year: Number(year),
         source: 'event_screen',
         mode,
+        engine_version: data?.engine_version || 'unknown',
       });
       fetchBalance();
     };
@@ -489,11 +498,27 @@ export default function EventScreen({ route }) {
       setAnalysisStarted(false);
     };
 
-    timelinePollRef.current = setInterval(async () => {
+    const pollTimelineStatus = async () => {
       try {
         const statusResponse = await chatAPI.getMonthlyEventsStatus(jobId);
         const status = statusResponse.data.status;
         const partialData = statusResponse.data?.partial_data;
+        const serverProgressValue = statusResponse.data?.progress_percent;
+        const serverPercent = serverProgressValue == null ? Number.NaN : Number(serverProgressValue);
+        if (statusResponse.data?.generation_mode) {
+          timelineGenerationModeRef.current = statusResponse.data.generation_mode;
+        }
+        if (Number.isFinite(serverPercent)) {
+          serverProgressRef.current = true;
+          if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+            progressIntervalRef.current = null;
+          }
+          setLoadingProgress((previous) => Math.max(
+            Number.isFinite(previous) && previous >= 0 ? previous : 0,
+            Math.max(0, Math.min(100, serverPercent))
+          ));
+        }
 
         if (partialData && Array.isArray(partialData.monthly_predictions)) {
           setMonthlyData((prev) => ({
@@ -522,7 +547,10 @@ export default function EventScreen({ route }) {
             'Connection error while checking status.'
         );
       }
-    }, TIMELINE_POLL_MS);
+    };
+    // Deterministic runs can finish before the first interval tick.
+    pollTimelineStatus();
+    timelinePollRef.current = setInterval(pollTimelineStatus, TIMELINE_POLL_MS);
 
     const elapsedMs = Math.max(0, Date.now() - new Date(startedAt || Date.now()).getTime());
     const remainingMs = Math.max(5000, TIMELINE_MAX_WAIT_MS - elapsedMs);
@@ -615,6 +643,15 @@ export default function EventScreen({ route }) {
     }
     setSelectedYear(Number(pending.year) || selectedYear);
     startYearlyLoadingUi(pending.startedAt);
+    if (pending.generationMode === 'deterministic') {
+      timelineGenerationModeRef.current = 'deterministic';
+      serverProgressRef.current = true;
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      setLoadingProgress((previous) => Math.max(Number(previous) || 0, 5));
+    }
     attachYearlyTimelinePolling(
       pending.jobId,
       Number(pending.year) || selectedYear,
@@ -672,6 +709,7 @@ export default function EventScreen({ route }) {
           year: Number(year),
           source: 'event_screen',
           mode: 'direct',
+          engine_version: startResponse.data.data?.engine_version || startResponse.data?.engine_version || 'unknown',
         });
         fetchBalance();
         stopEventTimelineJob();
@@ -682,7 +720,20 @@ export default function EventScreen({ route }) {
       if (!jobId) {
         throw new Error('No job_id received from server.');
       }
-      await saveYearlyPendingJob(getYearlyPendingPayload(jobId, year, birthData.id, startedAt));
+      const generationMode = startResponse.data?.generation_mode || null;
+      timelineGenerationModeRef.current = generationMode;
+      if (generationMode === 'deterministic') {
+        serverProgressRef.current = true;
+        if (progressIntervalRef.current) {
+          clearInterval(progressIntervalRef.current);
+          progressIntervalRef.current = null;
+        }
+        setLoadingProgress((previous) => Math.max(
+          Number(previous) || 0,
+          Number(startResponse.data?.progress_percent || 5)
+        ));
+      }
+      await saveYearlyPendingJob(getYearlyPendingPayload(jobId, year, birthData.id, startedAt, generationMode));
       attachYearlyTimelinePolling(jobId, year, startedAt);
     } catch (error) {
       console.error('❌ EventScreen Error Details:', {
@@ -967,12 +1018,15 @@ export default function EventScreen({ route }) {
       const birthChartId = resolveBirthChartId(bd);
       if (!birthChartId) return;
 
-      if (cachedYearsForChartRef.current !== birthChartId) {
+      if (
+        cachedYearsForChartRef.current !== birthChartId
+        || cachedYearsLanguageRef.current !== timelineLanguage
+      ) {
         cachedYearsForChartRef.current = birthChartId;
-        const hydrated = await hydrateCachedYearsFromStorage(birthChartId);
-        if (hydrated?.length) {
-          setCachedYears(hydrated);
-        }
+        cachedYearsLanguageRef.current = timelineLanguage;
+        // Engine versions have separate server caches. Do not hydrate an
+        // unversioned local list that may belong to legacy_v1 after rollout or rollback.
+        setCachedYears([]);
       }
 
       let apiYears = [];
@@ -983,8 +1037,9 @@ export default function EventScreen({ route }) {
           : Array.isArray(res?.years)
             ? res.years
             : [];
+        const hasAuthoritativeYearList = Array.isArray(res?.data?.years) || Array.isArray(res?.years);
         apiYears = mergeCachedYearList(yearsFromApi);
-        if (apiYears.length > 0) {
+        if (hasAuthoritativeYearList) {
           setCachedYears(apiYears);
           await persistCachedYearsLocal(birthChartId, apiYears);
           if (__DEV__) {
@@ -1051,7 +1106,7 @@ export default function EventScreen({ route }) {
       cachedYearsLoadPromiseRef.current = null;
     });
     return cachedYearsLoadPromiseRef.current;
-  }, [birthData, deviceYear, hydrateCachedYearsFromStorage, persistCachedYearsLocal, startYear]);
+  }, [birthData, deviceYear, persistCachedYearsLocal, startYear, timelineLanguage]);
 
   useEffect(() => {
     loadCachedYears();
@@ -1116,7 +1171,7 @@ export default function EventScreen({ route }) {
     return () => {
       cancelled = true;
     };
-  }, [birthData, selectedYear]);
+  }, [birthData, selectedYear, timelineLanguage]);
 
   const scrollYearStripToIndex = useCallback((index, animated) => {
     const ref = yearSliderRef.current;
@@ -1426,6 +1481,17 @@ export default function EventScreen({ route }) {
     setShowEventCreditsModal(true);
   };
 
+  const handleRelativeProfileSaved = useCallback(() => {
+    setCachedYears([]);
+    setCachedMonths([]);
+    if (analysisStarted && monthlyData) {
+      Alert.alert(
+        t('relativeProfiles.savedTitle', 'Person saved'),
+        t('relativeProfiles.refreshNeeded', 'Refresh this study when you are ready to include the new family context. Your current result has not been changed.')
+      );
+    }
+  }, [analysisStarted, monthlyData, t]);
+
   const handleEventCreditsConfirm = () => {
     setShowEventCreditsModal(false);
     if (pendingAction === 'generate') {
@@ -1680,6 +1746,12 @@ export default function EventScreen({ route }) {
             </>
           )}
 
+          <RelativeProfilesPanel
+            birthChartId={resolveBirthChartId(birthData)}
+            compact
+            onSaved={handleRelativeProfileSaved}
+          />
+
           {/* What's Included */}
           <View style={[styles.featuresContainer, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
             <Text style={[styles.featuresTitle, { color: colors.text }]}>{t('eventScreen.whatsIncluded', "What you'll see:")}</Text>
@@ -1778,6 +1850,11 @@ export default function EventScreen({ route }) {
           </View>
         )}
 
+        <RelativeProfilesPanel
+          birthChartId={resolveBirthChartId(birthData)}
+          onSaved={handleRelativeProfileSaved}
+        />
+
         {/* SECTION 3: Monthly Guide (The "Details") */}
         {loadingMonthly ? (
           <View style={styles.section}>
@@ -1798,7 +1875,7 @@ export default function EventScreen({ route }) {
                     <View style={[styles.progressBarFill, { width: `${loadingProgress}%`, backgroundColor: colors.primary }]} />
                   </View>
                   <Text style={[styles.progressPercentText, { color: colors.primary }]}>
-                    {loadingProgress < 90 ? `${Math.round(loadingProgress)}%` : t('eventScreen.almostThere', 'Almost there...')}
+                    {`${Math.round(Math.max(0, Math.min(100, loadingProgress)))}%`}
                   </Text>
                 </View>
               ) : (
@@ -1812,6 +1889,7 @@ export default function EventScreen({ route }) {
                     key={`stream-${index}`}
                     data={{ ...month, month: getMonthName(month.month_id) }}
                     hideDiveDeep
+                    relativeProfiles={monthlyData?.desh_kaal_patra?.eligible_relative_subjects || []}
                   />
                 ))}
               </View>
@@ -1819,7 +1897,12 @@ export default function EventScreen({ route }) {
           </View>
         ) : monthlyData?.monthly_predictions && monthlyData.monthly_predictions.length > 0 ? (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>📅 {t('eventScreen.monthlyGuide', 'Monthly Chart Notes')}</Text>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="calendar-outline" size={24} color={colors.text} style={styles.sectionTitleIcon} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                {t('eventScreen.monthlyGuide', 'Monthly Chart Notes')}
+              </Text>
+            </View>
             <View style={styles.accordionContainer}>
               {monthlyData?.monthly_predictions?.map((month, index) => (
                 <MonthlyAccordion
@@ -1827,6 +1910,7 @@ export default function EventScreen({ route }) {
                   data={{ ...month, month: getMonthName(month.month_id) }}
                   onChatPress={() => navigateToChat({ ...month, month: getMonthName(month.month_id) }, 'monthly')}
                   onDiveDeepPress={(data) => navigation.navigate('MonthlyDeepScreen', { year: selectedYear, month: data.month_id })}
+                  relativeProfiles={monthlyData?.desh_kaal_patra?.eligible_relative_subjects || []}
                 />
               ))}
             </View>
@@ -1911,7 +1995,15 @@ const styles = StyleSheet.create({
   
   section: { marginTop: 24, marginBottom: 24 },
   sectionHeader: { paddingHorizontal: 20, marginBottom: 16 },
-  sectionTitle: { fontSize: 20, fontWeight: '700', marginBottom: 6, letterSpacing: 0.3 },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 6,
+    minWidth: 0,
+  },
+  sectionTitleIcon: { marginRight: 8, flexShrink: 0 },
+  sectionTitle: { flex: 1, minWidth: 0, fontSize: 20, lineHeight: 27, fontWeight: '700', letterSpacing: 0.3 },
   sectionSubtitle: { fontSize: 14, lineHeight: 20 },
   
   macroCard: {

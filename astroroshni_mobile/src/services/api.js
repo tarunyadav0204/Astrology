@@ -8,9 +8,18 @@ import { Alert } from 'react-native';
 import { calculateMudakkuLocal } from '../utils/mudakku';
 import { calculateGandantaLocal } from '../utils/gandanta';
 import { normalizeCalendarDateForApi } from '../utils/birthDateUtils';
+import i18n from '../locales/i18n';
 
 // Same JWT as Authorization; some CDNs/proxies strip Authorization on mobile — backend accepts this too.
 const AUTH_FALLBACK_HEADER = 'X-AstroRoshni-Authorization';
+
+const currentTimelineLanguage = () =>
+  i18n.resolvedLanguage || i18n.language || 'english';
+
+const withTimelineLanguage = (birthData) => ({
+  ...birthData,
+  language: birthData?.language || currentTimelineLanguage(),
+});
 
 const normalizeReportBirthData = (person) => {
   if (!person || typeof person !== 'object') return person;
@@ -396,13 +405,19 @@ export const chatAPI = {
   saveMessage: (sessionId, sender, content) => 
     api.post(getEndpoint('/chat/message'), { session_id: sessionId, sender, content }),
   getEventPeriods: (birthData) => api.post(getEndpoint('/chat/event-periods'), birthData),
-  getMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events'), birthData, GLOBAL_ERROR_CONFIG),
+  getMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events'), withTimelineLanguage(birthData), GLOBAL_ERROR_CONFIG),
   getMonthlyEventsStatus: (jobId) => api.get(getEndpoint(`/chat/monthly-events/status/${jobId}`)),
-  getCachedMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events/cached'), birthData),
+  getCachedMonthlyEvents: (birthData) => api.post(getEndpoint('/chat/monthly-events/cached'), withTimelineLanguage(birthData)),
   getCachedMonthlyEventYears: (birthChartId) =>
     api.get(getEndpoint('/chat/monthly-events/cached-years'), {
+      params: { birth_chart_id: Number(birthChartId), language: currentTimelineLanguage() },
+    }),
+  getRelativeProfiles: (birthChartId) =>
+    api.get(getEndpoint('/chat/relative-profiles'), {
       params: { birth_chart_id: Number(birthChartId) },
     }),
+  saveRelativeProfile: (subjectKey, profile) =>
+    api.put(getEndpoint(`/chat/relative-profiles/${encodeURIComponent(subjectKey)}`), profile, GLOBAL_ERROR_CONFIG),
   getYogas: (birthData) => api.post(getEndpoint('/chat/ask'), { ...birthData, question: 'yogas', include_context: true, query_context: buildQueryContext() }),
   deductCredits: (amount) => api.post(getEndpoint('/credits/spend'), { 
     amount, 

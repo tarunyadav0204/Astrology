@@ -9,7 +9,7 @@ import json
 import asyncio
 import html
 import re
-from datetime import datetime
+from datetime import date, datetime
 from auth import get_current_user, User
 from credits.credit_service import CreditService
 from db import get_conn, execute
@@ -24,12 +24,66 @@ from ai.response_parser import ResponseParser
 from calculators.chart_calculator import ChartCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from calculators.event_predictor_ai import EventPredictor
+from calculators.event_timeline_accuracy_v2 import (
+    ACCURACY_V3_ENGINE_VERSION,
+    LEGACY_ENGINE_VERSION,
+)
+from calculators.event_timeline_accuracy_v3 import user_fact_fingerprint
+from calculators.event_timeline_calibration import (
+    calculate_calibration_metrics,
+    ensure_calibration_schema,
+    freeze_forecast,
+    record_outcome,
+    record_unpredicted_event,
+)
+from chat.fact_extractor import get_user_facts_for_chart
+from chat.relative_profiles import (
+    RELATIVE_SUBJECTS,
+    ensure_relative_profiles_schema,
+    load_relative_profiles,
+    upsert_relative_profile,
+)
 from utils.user_facing_errors import user_facing_message_from_any
+from utils.admin_settings import (
+    EVENT_TIMELINE_MODE_DETERMINISTIC,
+    get_event_timeline_mode_for_user,
+)
 from calculators.ashtakavarga import AshtakavargaCalculator
 from chat.answer_style import normalize_chat_answer_style
 from shared.dasha_calculator import DashaCalculator
 
 logger = logging.getLogger(__name__)
+
+
+def _timeline_user_facts(birth_chart_id: int, user_id: int, engine_version: str) -> Dict[str, List[str]]:
+    if engine_version != ACCURACY_V3_ENGINE_VERSION:
+        return {}
+    try:
+        return get_user_facts_for_chart(int(birth_chart_id), int(user_id))
+    except Exception:
+        logger.exception("Event Timeline V3 could not load user facts; using unknown Desh-Kaal-Patra state")
+        return {}
+
+
+def _timeline_engine_version_for_user(user_id: Optional[int]) -> str:
+    """Map the Admin rollout lane to the immutable engine ID stored on jobs."""
+    mode = get_event_timeline_mode_for_user(user_id)
+    if mode == EVENT_TIMELINE_MODE_DETERMINISTIC:
+        return ACCURACY_V3_ENGINE_VERSION
+    return LEGACY_ENGINE_VERSION
+
+
+def _timeline_relative_profiles(birth_chart_id: int, user_id: int, engine_version: str) -> List[Dict]:
+    if engine_version != ACCURACY_V3_ENGINE_VERSION:
+        return []
+    try:
+        with get_conn() as conn:
+            return load_relative_profiles(
+                conn, user_id=int(user_id), birth_chart_id=int(birth_chart_id),
+            )
+    except Exception:
+        logger.exception("Event Timeline V3 could not load relative profiles")
+        return []
 
 class ChatRequest(BaseModel):
     name: Optional[str] = None
@@ -79,6 +133,7 @@ class ClearChatRequest(BaseModel):
     longitude: Optional[float] = None
     timezone: Optional[str] = None
     gender: Optional[str] = None
+    language: Optional[str] = "english"
     selectedYear: Optional[int] = None
     selectedMonth: Optional[int] = None  # 1-12 for monthly dive deep
     birth_chart_id: Optional[int] = None
@@ -90,6 +145,45 @@ class ClearChatRequest(BaseModel):
         if v is None:
             return v
         return int(float(v)) if isinstance(v, (int, float, str)) else v
+
+
+class RelativeProfileRequest(BaseModel):
+    birth_chart_id: int
+    display_label: Optional[str] = Field(default=None, max_length=80)
+    life_status: str = "unknown"
+    age_years: Optional[int] = Field(default=None, ge=0, le=125)
+    birth_year: Optional[int] = Field(default=None, ge=1900, le=2100)
+    employment_state: str = "unknown"
+    location_context: str = "unknown"
+    relationship_status: str = "unknown"
+    linked_birth_chart_id: Optional[int] = None
+    enabled: bool = True
+
+
+class EventTimelineOutcomeRequest(BaseModel):
+    job_id: str
+    candidate_id: str
+    month: int = Field(ge=1, le=12)
+    occurrence: str
+    actual_date: Optional[date] = None
+    severity: Optional[int] = Field(default=None, ge=1, le=5)
+    notes: str = Field(default="", max_length=1000)
+
+    @field_validator("occurrence")
+    @classmethod
+    def validate_occurrence(cls, value):
+        normalized = str(value or "").strip().lower()
+        if normalized not in {"occurred", "partly_occurred", "did_not_occur"}:
+            raise ValueError("occurrence must be occurred, partly_occurred, or did_not_occur")
+        return normalized
+
+
+class EventTimelineMissRequest(BaseModel):
+    job_id: str
+    event_key: str = Field(min_length=1, max_length=80)
+    actual_date: date
+    severity: Optional[int] = Field(default=None, ge=1, le=5)
+    notes: str = Field(default="", max_length=1000)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -877,7 +971,8 @@ async def scan_timeline(birth_chart_id: int, current_user: User = Depends(get_cu
             cur = execute(
                 conn,
                 """
-                    SELECT name, date, time, latitude, longitude, timezone, place, gender
+                    SELECT name, date, time, latitude, longitude, timezone, place, gender,
+                           is_rectified, calibration_year
                     FROM birth_charts
                     WHERE id = %s AND userid = %s
                 """,
@@ -899,7 +994,10 @@ async def scan_timeline(birth_chart_id: int, current_user: User = Depends(get_cu
                 'longitude': float(encryptor.decrypt(str(birth_row[4]))),
                 'timezone': birth_row[5],
                 'place': encryptor.decrypt(birth_row[6] or ''),
-                'gender': birth_row[7] or ''
+                'gender': birth_row[7] or '',
+                'birth_time_verified': bool(birth_row[8]),
+                'birth_time_source': 'rectified' if birth_row[8] else 'unknown',
+                'birth_time_calibration_year': birth_row[9],
             }
         except:
             birth_data = {
@@ -910,7 +1008,10 @@ async def scan_timeline(birth_chart_id: int, current_user: User = Depends(get_cu
                 'longitude': birth_row[4],
                 'timezone': birth_row[5],
                 'place': birth_row[6] or '',
-                'gender': birth_row[7] or ''
+                'gender': birth_row[7] or '',
+                'birth_time_verified': bool(birth_row[8]),
+                'birth_time_source': 'rectified' if birth_row[8] else 'unknown',
+                'birth_time_calibration_year': birth_row[9],
             }
         
         from calculators.life_event_scanner import LifeEventScanner
@@ -1015,7 +1116,9 @@ def init_event_timeline_table():
                     llm_cached_input_tokens BIGINT,
                     llm_non_cached_input_tokens BIGINT,
                     llm_cache_setup_input_tokens BIGINT,
-                    llm_total_tokens BIGINT
+                    llm_total_tokens BIGINT,
+                    engine_version TEXT,
+                    context_fingerprint TEXT
                 )
             """,
         )
@@ -1031,7 +1134,75 @@ def init_event_timeline_table():
         execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS llm_non_cached_input_tokens BIGINT")
         execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS llm_cache_setup_input_tokens BIGINT")
         execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS llm_total_tokens BIGINT")
+        execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS engine_version TEXT")
+        execute(conn, "ALTER TABLE event_timeline_jobs ADD COLUMN IF NOT EXISTS context_fingerprint TEXT")
+        ensure_relative_profiles_schema(conn)
+        ensure_calibration_schema(conn)
         conn.commit()
+
+
+@router.get("/relative-profiles")
+async def get_relative_profiles(
+    birth_chart_id: int = Query(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Return structured family context for one owned native chart."""
+    with get_conn() as conn:
+        owned = execute(
+            conn, "SELECT 1 FROM birth_charts WHERE id = %s AND userid = %s",
+            (birth_chart_id, current_user.userid),
+        ).fetchone()
+        if not owned:
+            raise HTTPException(status_code=404, detail="Birth chart not found")
+        profiles = load_relative_profiles(
+            conn, user_id=current_user.userid, birth_chart_id=birth_chart_id,
+        )
+    return {
+        "profiles": profiles,
+        "available_subjects": [
+            {"subject_key": key, **value} for key, value in RELATIVE_SUBJECTS.items()
+        ],
+        "prediction_scope": (
+            "Without a linked birth chart, events are family-context indications derived from the native's chart. "
+            "A linked chart can be used for stronger personal confirmation in a future calculation layer."
+        ),
+    }
+
+
+@router.put("/relative-profiles/{subject_key}")
+async def save_relative_profile(
+    subject_key: str,
+    request: RelativeProfileRequest,
+    current_user: User = Depends(get_current_user),
+):
+    allowed_life = {"living", "deceased", "unknown"}
+    allowed_work = {"employed", "self_employed", "homemaker", "student", "retired", "unemployed", "unknown"}
+    allowed_location = {"with_native", "same_city", "elsewhere_india", "abroad", "unknown"}
+    allowed_relationship = {"married", "partnered", "engaged", "single", "divorced", "widowed", "unknown"}
+    values = request.model_dump()
+    if request.life_status not in allowed_life:
+        raise HTTPException(status_code=400, detail="Invalid life status")
+    if request.employment_state not in allowed_work:
+        raise HTTPException(status_code=400, detail="Invalid work status")
+    if request.location_context not in allowed_location:
+        raise HTTPException(status_code=400, detail="Invalid location context")
+    if request.relationship_status not in allowed_relationship:
+        raise HTTPException(status_code=400, detail="Invalid relationship status")
+    try:
+        with get_conn() as conn:
+            ensure_relative_profiles_schema(conn)
+            profile = upsert_relative_profile(
+                conn,
+                user_id=current_user.userid,
+                birth_chart_id=request.birth_chart_id,
+                subject_key=subject_key,
+                values=values,
+            )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"profile": profile, "cache_invalidated": True}
 
 @router.post("/monthly-events")
 async def get_monthly_events(request: ClearChatRequest, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
@@ -1083,6 +1254,20 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
             print(f"❌ Missing birth_chart_id in request: {request}")
             raise HTTPException(status_code=400, detail="birth_chart_id is required. Please ensure birth chart is saved to database.")
 
+        engine_version = _timeline_engine_version_for_user(current_user.userid)
+        configured_narrator = str(os.getenv("EVENT_TIMELINE_V3_NARRATOR") or "deterministic").strip().lower()
+        generation_mode = (
+            "deterministic"
+            if engine_version == ACCURACY_V3_ENGINE_VERSION and configured_narrator != "llm"
+            else "llm"
+        )
+        timeline_language = request.language or "english"
+        user_facts = _timeline_user_facts(birth_chart_id, current_user.userid, engine_version)
+        relative_profiles = _timeline_relative_profiles(birth_chart_id, current_user.userid, engine_version)
+        context_fingerprint = user_fact_fingerprint(
+            user_facts, timeline_language, relative_profiles,
+        ) if engine_version == ACCURACY_V3_ENGINE_VERSION else ""
+
         with get_conn() as conn:
             # Verify birth chart exists and belongs to user
             cur = execute(
@@ -1100,22 +1285,32 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
             execute(
                 conn,
                 """
-                    INSERT INTO event_timeline_jobs (job_id, user_id, birth_chart_id, selected_year, selected_month, status)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    INSERT INTO event_timeline_jobs (
+                        job_id, user_id, birth_chart_id, selected_year, selected_month, status,
+                        engine_version, context_fingerprint
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (job_id, current_user.userid, birth_chart_id, target_year, target_month, 'pending'),
+                (
+                    job_id, current_user.userid, birth_chart_id, target_year, target_month,
+                    'pending', engine_version, context_fingerprint,
+                ),
             )
             conn.commit()
         
         # Start background processing
         background_tasks.add_task(
             process_event_timeline,
-            job_id, birth_chart_id, target_year, current_user.userid, event_timeline_cost, target_month
+            job_id, birth_chart_id, target_year, current_user.userid, event_timeline_cost,
+            target_month, user_facts, timeline_language, relative_profiles, engine_version,
         )
         
         return {
             "job_id": job_id,
             "status": "pending",
+            "engine_version": engine_version,
+            "generation_mode": generation_mode,
+            "progress_percent": 5 if generation_mode == "deterministic" else 0,
             "message": "Generating your cosmic timeline..." if target_month is None else "Generating deep dive for this month..."
         }
         
@@ -1148,8 +1343,14 @@ async def get_event_timeline_status(job_id: str, current_user: User = Depends(ge
     response = {"status": status}
     
     if status == "completed" and result_data:
-        response["data"] = json.loads(result_data)
+        completed_data = json.loads(result_data)
+        response["data"] = completed_data
         response["completed_at"] = completed_at
+        response["progress_percent"] = 100
+        response["progress_stage"] = "completed"
+        response["generation_mode"] = (
+            "deterministic" if completed_data.get("narrator_version") == "deterministic" else "llm"
+        )
     elif status == "processing" and result_data:
         try:
             partial = json.loads(result_data)
@@ -1157,6 +1358,9 @@ async def get_event_timeline_status(job_id: str, current_user: User = Depends(ge
             response["months_ready"] = len((partial or {}).get("monthly_predictions") or [])
             response["completed_quarters"] = (partial or {}).get("completed_quarters")
             response["total_quarters"] = (partial or {}).get("total_quarters")
+            response["progress_percent"] = (partial or {}).get("progress_percent")
+            response["progress_stage"] = (partial or {}).get("progress_stage")
+            response["generation_mode"] = (partial or {}).get("generation_mode")
         except Exception:
             pass
     elif status == "failed":
@@ -1245,6 +1449,7 @@ async def stream_event_timeline_status(job_id: str, current_user: User = Depends
 async def get_cached_timeline(request: ClearChatRequest, current_user: User = Depends(get_current_user)):
     """Get cached event timeline if exists for user and year"""
     try:
+        init_event_timeline_table()
         target_year = request.selectedYear or datetime.now().year
         # Handle both birth_chart_id and id fields, convert float to int
         birth_chart_id = request.birth_chart_id or request.id
@@ -1261,6 +1466,14 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
         if not birth_chart_id:
             logger.warning("monthly-events cache: no birth_chart_id")
             return {"cached": False}
+
+        engine_version = _timeline_engine_version_for_user(current_user.userid)
+        timeline_language = request.language or "english"
+        current_facts = _timeline_user_facts(birth_chart_id, current_user.userid, engine_version)
+        relative_profiles = _timeline_relative_profiles(birth_chart_id, current_user.userid, engine_version)
+        context_fingerprint = user_fact_fingerprint(
+            current_facts, timeline_language, relative_profiles,
+        ) if engine_version == ACCURACY_V3_ENGINE_VERSION else ""
         
         with get_conn() as conn:
             # Verify birth chart belongs to user
@@ -1285,11 +1498,17 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
                     """
                         SELECT result_data, completed_at, job_id
                         FROM event_timeline_jobs
-                        WHERE user_id = %s AND birth_chart_id = %s AND selected_year = %s AND selected_month = %s AND status = 'completed'
+                        WHERE user_id = %s AND birth_chart_id = %s AND selected_year = %s AND selected_month = %s
+                          AND status = 'completed'
+                          AND COALESCE(engine_version, 'legacy_v1') = %s
+                          AND (%s <> 'accuracy_v3' OR COALESCE(context_fingerprint, '') = %s)
                         ORDER BY completed_at DESC
                         LIMIT 1
                     """,
-                    (current_user.userid, birth_chart_id, target_year, target_month),
+                    (
+                        current_user.userid, birth_chart_id, target_year, target_month,
+                        engine_version, engine_version, context_fingerprint,
+                    ),
                 )
             else:
                 cur = execute(
@@ -1300,10 +1519,15 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
                         WHERE user_id = %s AND birth_chart_id = %s AND selected_year = %s
                           AND (selected_month IS NULL OR selected_month = 0)
                           AND status = 'completed'
+                          AND COALESCE(engine_version, 'legacy_v1') = %s
+                          AND (%s <> 'accuracy_v3' OR COALESCE(context_fingerprint, '') = %s)
                         ORDER BY completed_at DESC
                         LIMIT 1
                     """,
-                    (current_user.userid, birth_chart_id, target_year),
+                    (
+                        current_user.userid, birth_chart_id, target_year,
+                        engine_version, engine_version, context_fingerprint,
+                    ),
                 )
             result = cur.fetchone()
         
@@ -1316,7 +1540,8 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
             return {
                 "cached": True,
                 "data": json.loads(result[0]),
-                "cached_at": result[1]
+                "cached_at": result[1],
+                "engine_version": engine_version,
             }
 
         logger.debug(
@@ -1335,10 +1560,18 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
 @router.get("/monthly-events/cached-years")
 async def get_cached_timeline_years(
     birth_chart_id: int = Query(..., description="Birth chart id for current native"),
+    language: str = Query("english", description="Timeline output language"),
     current_user: User = Depends(get_current_user),
 ):
     """Return years that already have completed cached yearly timelines for this user+birth chart."""
     try:
+        init_event_timeline_table()
+        engine_version = _timeline_engine_version_for_user(current_user.userid)
+        current_facts = _timeline_user_facts(birth_chart_id, current_user.userid, engine_version)
+        relative_profiles = _timeline_relative_profiles(birth_chart_id, current_user.userid, engine_version)
+        context_fingerprint = user_fact_fingerprint(
+            current_facts, language, relative_profiles,
+        ) if engine_version == ACCURACY_V3_ENGINE_VERSION else ""
         with get_conn() as conn:
             cur = execute(
                 conn,
@@ -1358,17 +1591,138 @@ async def get_cached_timeline_years(
                       AND status = 'completed'
                       AND (selected_month IS NULL OR selected_month = 0)
                       AND selected_year IS NOT NULL
+                      AND COALESCE(engine_version, 'legacy_v1') = %s
+                      AND (%s <> 'accuracy_v3' OR COALESCE(context_fingerprint, '') = %s)
                     ORDER BY selected_year ASC
                 """,
-                (current_user.userid, birth_chart_id),
+                (
+                    current_user.userid, birth_chart_id, engine_version,
+                    engine_version, context_fingerprint,
+                ),
             )
             years = [int(r[0]) for r in (cur.fetchall() or []) if r and r[0] is not None]
-        return {"years": years}
+        return {"years": years, "engine_version": engine_version}
     except Exception as e:
         print(f"❌ Error fetching cached timeline years: {e}")
         return {"years": []}
 
-async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: int, user_id: int, cost: int, target_month: int = None):
+
+@router.post("/monthly-events/outcome-feedback")
+async def submit_event_timeline_outcome(
+    request: EventTimelineOutcomeRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Record what actually happened against an immutable forecast candidate."""
+    init_event_timeline_table()
+    with get_conn() as conn:
+        saved = record_outcome(
+            conn,
+            user_id=current_user.userid,
+            job_id=request.job_id,
+            candidate_id=request.candidate_id,
+            month=request.month,
+            occurrence=request.occurrence,
+            actual_date=request.actual_date,
+            severity=request.severity,
+            notes=request.notes,
+        )
+        if not saved:
+            raise HTTPException(status_code=404, detail="Forecast candidate not found")
+        conn.commit()
+    return {"status": "success", "message": "Outcome feedback saved"}
+
+
+@router.get("/monthly-events/calibration")
+async def get_event_timeline_calibration(
+    engine_version: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+):
+    """Return prospective calibration metrics; restricted to administrators."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    init_event_timeline_table()
+    with get_conn() as conn:
+        query = """
+            SELECT f.display_rank, f.event_key, f.engine_version, f.accuracy_layer,
+                   f.support_grade, f.forecast_start, f.forecast_end,
+                   o.occurrence, o.actual_date, o.severity
+            FROM event_timeline_forecasts f
+            JOIN event_timeline_outcomes o ON o.forecast_id = f.id
+        """
+        params = ()
+        if engine_version:
+            query += " WHERE f.engine_version = %s"
+            params = (engine_version,)
+        cur = execute(conn, query, params)
+        rows = [
+            {
+                "display_rank": row[0], "event_key": row[1], "engine_version": row[2],
+                "accuracy_layer": row[3], "support_grade": row[4],
+                "forecast_start": row[5], "forecast_end": row[6],
+                "occurrence": row[7], "actual_date": row[8], "severity": row[9],
+            }
+            for row in (cur.fetchall() or [])
+        ]
+        miss_query = """
+            SELECT m.event_key, m.actual_date, m.severity, j.engine_version,
+                   COALESCE((
+                       SELECT f.accuracy_layer
+                       FROM event_timeline_forecasts f
+                       WHERE f.job_id = m.job_id
+                       ORDER BY f.id ASC LIMIT 1
+                   ), 'unknown')
+            FROM event_timeline_unpredicted_events m
+            JOIN event_timeline_jobs j ON j.job_id = m.job_id
+        """
+        miss_params = ()
+        if engine_version:
+            miss_query += " WHERE j.engine_version = %s"
+            miss_params = (engine_version,)
+        miss_cursor = execute(conn, miss_query, miss_params)
+        misses = [
+            {
+                "event_key": row[0], "actual_date": row[1], "severity": row[2],
+                "engine_version": row[3], "accuracy_layer": row[4],
+            }
+            for row in (miss_cursor.fetchall() or [])
+        ]
+    return calculate_calibration_metrics(rows, misses)
+
+
+@router.post("/monthly-events/unpredicted-event")
+async def submit_unpredicted_timeline_event(
+    request: EventTimelineMissRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Record a material event that the saved forecast did not contain."""
+    init_event_timeline_table()
+    with get_conn() as conn:
+        saved = record_unpredicted_event(
+            conn,
+            user_id=current_user.userid,
+            job_id=request.job_id,
+            event_key=request.event_key.strip().lower(),
+            actual_date=request.actual_date,
+            severity=request.severity,
+            notes=request.notes,
+        )
+        if not saved:
+            raise HTTPException(status_code=404, detail="Timeline job not found")
+        conn.commit()
+    return {"status": "success", "message": "Unpredicted event saved"}
+
+async def process_event_timeline(
+    job_id: str,
+    birth_chart_id: int,
+    target_year: int,
+    user_id: int,
+    cost: int,
+    target_month: int = None,
+    user_facts: Optional[Dict] = None,
+    language: str = "english",
+    relative_profiles: Optional[List[Dict]] = None,
+    engine_version: Optional[str] = None,
+):
     """Background task to process event timeline (yearly or monthly dive deep)."""
     print("\n" + "*"*100)
     print(f"🚀 BACKGROUND TASK STARTED: process_event_timeline")
@@ -1397,7 +1751,8 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
             cur = execute(
                 conn,
                 """
-                    SELECT name, date, time, latitude, longitude, timezone, place, gender
+                    SELECT name, date, time, latitude, longitude, timezone, place, gender,
+                           is_rectified, calibration_year
                     FROM birth_charts WHERE id = %s
                 """,
                 (birth_chart_id,),
@@ -1421,7 +1776,10 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
                 'longitude': float(encryptor.decrypt(str(birth_row[4]))),
                 'timezone': birth_row[5],
                 'place': encryptor.decrypt(birth_row[6] or ''),
-                'gender': birth_row[7] or ''
+                'gender': birth_row[7] or '',
+                'birth_time_verified': bool(birth_row[8]),
+                'birth_time_source': 'rectified' if birth_row[8] else 'unknown',
+                'birth_time_calibration_year': birth_row[9],
             }
             print(f"✅ Birth data decrypted successfully")
         except Exception as decrypt_error:
@@ -1434,7 +1792,10 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
                 'longitude': birth_row[4],
                 'timezone': birth_row[5],
                 'place': birth_row[6] or '',
-                'gender': birth_row[7] or ''
+                'gender': birth_row[7] or '',
+                'birth_time_verified': bool(birth_row[8]),
+                'birth_time_source': 'rectified' if birth_row[8] else 'unknown',
+                'birth_time_calibration_year': birth_row[9],
             }
         
         print(f"📅 Birth data prepared: date={birth_data_dict['date']}, time={birth_data_dict['time']}, place={birth_data_dict['place'][:20]}...")
@@ -1445,7 +1806,16 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
         from shared.dasha_calculator import DashaCalculator
         dasha_calc = DashaCalculator()
         
-        predictor = EventPredictor(chart_calc, transit_calc, dasha_calc, AshtakavargaCalculator)
+        predictor = EventPredictor(
+            chart_calc,
+            transit_calc,
+            dasha_calc,
+            AshtakavargaCalculator,
+            user_facts=user_facts or {},
+            relative_profiles=relative_profiles or [],
+            language=language,
+            engine_version=engine_version,
+        )
         timeline_model_name = getattr(predictor, "model_name", None)
         
         async def _persist_yearly_progress(progress_payload: dict):
@@ -1462,7 +1832,12 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
 
         if target_month is not None:
             print(f"\n🚀 Calling predict_monthly_deep for year {target_year} month {target_month}...")
-            predictions = await predictor.predict_monthly_deep(birth_data_dict, target_year, target_month)
+            predictions = await predictor.predict_monthly_deep(
+                birth_data_dict,
+                target_year,
+                target_month,
+                progress_callback=_persist_yearly_progress,
+            )
         else:
             print(f"\n🚀 Calling predict_yearly_events for year {target_year}...")
             predictions = await predictor.predict_yearly_events(
@@ -1529,6 +1904,13 @@ async def process_event_timeline(job_id: str, birth_chart_id: int, target_year: 
                         llm_total_tokens,
                         job_id,
                     ),
+                )
+                freeze_forecast(
+                    conn,
+                    job_id=job_id,
+                    user_id=user_id,
+                    birth_chart_id=birth_chart_id,
+                    predictions=predictions,
                 )
                 conn.commit()
             print(f"✅ Result saved, task completed")

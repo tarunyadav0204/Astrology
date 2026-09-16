@@ -3038,6 +3038,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_deepseek_chat_model,
             get_deepseek_premium_model,
             is_instant_chat_enabled,
+            get_event_timeline_rollout_mode,
+            get_event_timeline_rollout_user_ids,
             is_instant_response_validation_enabled,
             is_chat_subject_gate_enabled,
             get_chat_subject_gate_user_allowlist,
@@ -3140,6 +3142,10 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "speech_tts_voice_en": get_speech_tts_voice("en"),
             "speech_tts_voice_hi": get_speech_tts_voice("hi"),
             "instant_chat_enabled": is_instant_chat_enabled(),
+            "event_timeline_rollout_mode": get_event_timeline_rollout_mode(),
+            "event_timeline_rollout_user_ids": ",".join(
+                str(uid) for uid in sorted(get_event_timeline_rollout_user_ids())
+            ),
             "instant_response_validation_enabled": is_instant_response_validation_enabled(),
             "chat_subject_gate_enabled": is_chat_subject_gate_enabled(),
             "chat_subject_gate_user_allowlist": ",".join(
@@ -3355,6 +3361,29 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
             is_credits_setting_key,
             update_setting_cache,
         )
+        if key == "event_timeline_rollout_mode" and setting.value not in {
+            "deterministic", "legacy_ai",
+        }:
+            raise HTTPException(
+                status_code=400,
+                detail="Event Timeline mode must be 'deterministic' or 'legacy_ai'.",
+            )
+        if key == "event_timeline_rollout_user_ids":
+            raw_user_ids = str(setting.value or "")
+            tokens = [
+                token.strip()
+                for token in re.split(r"[\s,]+", raw_user_ids)
+                if token.strip()
+            ]
+            invalid_tokens = [
+                token for token in tokens
+                if not token.isdigit() or int(token) <= 0
+            ]
+            if invalid_tokens:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid Event Timeline user ID: {invalid_tokens[0]}",
+                )
         settings_version = None
         credits_version = None
         with get_conn() as conn:
@@ -3387,6 +3416,8 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
                 settings_version=settings_version,
             )
         return {"message": "Setting updated", "key": key, "value": setting.value}
+    except HTTPException:
+        raise
     except Exception as e:
         err_name = type(e).__name__
         # psycopg2.pool.PoolError when many parallel admin PUTs exhaust DB_POOL_MAX_CONN (~4 on API).

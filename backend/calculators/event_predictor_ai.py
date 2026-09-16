@@ -10,10 +10,34 @@ import os
 import time
 import re
 import logging
-import google.generativeai as genai  # type: ignore[import-not-found]
-from google.generativeai import caching as genai_caching  # type: ignore[import-not-found]
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.event_timeline_context_prune import prune_for_event_timeline
+from calculators.event_timeline_accuracy_v2 import (
+    ACCURACY_ENGINE_VERSION,
+    ACCURACY_V3_ENGINE_VERSION,
+    EVIDENCE_VERSION,
+    METHODOLOGY_VERSION,
+    build_evidence_ledger,
+    build_month_transit_facts,
+    build_target_month_dasha_facts,
+    build_target_year_dasha_facts,
+    build_target_year_transit_facts,
+    selected_engine_version,
+    validate_v2_payload,
+)
+from calculators.event_timeline_accuracy_v3 import (
+    V3_EVIDENCE_VERSION,
+    V3_METHODOLOGY_VERSION,
+    accuracy_layer_mode,
+    build_v3_prediction_model,
+    validate_v3_payload,
+)
+from calculators.event_timeline_v3_context import (
+    build_minimal_v3_context,
+    build_birth_time_sensitivity,
+    build_target_year_supporting_context,
+    get_cached_v3_kp_evidence,
+)
 from ai.llm_roundtrip_log import log_llm_roundtrip
 from utils.admin_settings import is_debug_logging_enabled
 from utils.user_facing_errors import user_facing_message_from_any
@@ -87,7 +111,18 @@ class EventPredictor:
     Implements "Natal-Transit Resonance" logic with Age-Based Context (Desha Kala Patra).
     """
     
-    def __init__(self, chart_calculator, real_transit_calculator, dasha_calculator, ashtakavarga_calculator_cls):
+    def __init__(
+        self,
+        chart_calculator,
+        real_transit_calculator,
+        dasha_calculator,
+        ashtakavarga_calculator_cls,
+        *,
+        user_facts: Optional[Dict[str, Any]] = None,
+        relative_profiles: Optional[List[Dict[str, Any]]] = None,
+        language: str = "english",
+        engine_version: Optional[str] = None,
+    ):
         self.chart_calc = chart_calculator
         self.transit_calc = real_transit_calculator
         self.dasha_calc = dasha_calculator
@@ -96,6 +131,24 @@ class EventPredictor:
         self.model_name = None
         self._timeline_llm_vendor = "gemini"
         self._timeline_log_provider = "gemini"
+        # A request-scoped rollout decision must remain fixed for the complete
+        # background job, even if Admin changes the gate while it is running.
+        self.engine_version = engine_version or selected_engine_version()
+        self.user_facts = user_facts or {}
+        self.relative_profiles = relative_profiles or []
+        self.language = language or "english"
+        self.v3_pipeline = self._v3_mode("EVENT_TIMELINE_V3_PIPELINE", "optimized", {"optimized", "legacy_context"})
+        self.v3_narrator = self._v3_mode("EVENT_TIMELINE_V3_NARRATOR", "deterministic", {"deterministic", "llm"})
+        self._last_accuracy_ledger: Dict[str, Any] = {}
+        self._last_v3_model: Dict[str, Any] = {}
+        self._last_target_dasha_facts: Dict[str, Any] = {}
+        self._last_target_transit_facts: Dict[str, Any] = {}
+        if self.engine_version == ACCURACY_V3_ENGINE_VERSION and self.v3_narrator == "deterministic":
+            self.model_name = "deterministic_v3"
+            self._timeline_llm_vendor = "none"
+            self._timeline_log_provider = "none"
+            print("✅ EventPredictor using deterministic V3 narration (no LLM)")
+            return
         try:
             from ai.analysis_llm_backend import build_timeline_llm_model
             from utils.admin_settings import CHAT_LLM_DEEPSEEK
@@ -114,6 +167,11 @@ class EventPredictor:
         if not raw:
             return default
         return raw in ("1", "true", "yes", "on")
+
+    @staticmethod
+    def _v3_mode(name: str, default: str, allowed: set[str]) -> str:
+        value = str(os.getenv(name) or default).strip().lower()
+        return value if value in allowed else default
 
     @staticmethod
     def _safe_int_env(name: str, default: int) -> int:
@@ -238,12 +296,62 @@ class EventPredictor:
             birth_year = int(birth_data['date'].split('-')[0])
             current_age = year - birth_year
             print(f"📊 Birth year: {birth_year}, Current age: {current_age}")
+
+            generation_mode = (
+                "deterministic"
+                if self.engine_version == ACCURACY_V3_ENGINE_VERSION and self.v3_narrator == "deterministic"
+                else "llm"
+            )
+
+            async def report_progress(percent: int, stage: str, **extra: Any) -> None:
+                if not progress_callback:
+                    return
+                progress_payload = {
+                    "status": "processing",
+                    "year": year,
+                    "progress_percent": max(0, min(99, int(percent))),
+                    "progress_stage": stage,
+                    "generation_mode": generation_mode,
+                    "months_ready": 0,
+                    "monthly_predictions": [],
+                    **extra,
+                }
+                cb_result = progress_callback(progress_payload)
+                if asyncio.iscoroutine(cb_result):
+                    await cb_result
+
+            await report_progress(5, "preparing_chart")
             
             print("\n🔄 Preparing yearly data...")
-            raw_data = self._prepare_yearly_data(birth_data, year)
-            print(f"✅ Yearly data prepared (length: {len(raw_data)} chars)")
+            # The deterministic calculation is CPU-heavy and synchronous. Run
+            # it off the API event loop so status requests can observe the
+            # persisted 5% checkpoint instead of seeing 0% until completion.
+            worker_progress = None
+            if generation_mode == "deterministic" and progress_callback:
+                event_loop = asyncio.get_running_loop()
 
-            use_parallel_yearly = self._env_bool("EVENT_TIMELINE_PARALLEL_YEARLY", default=False)
+                def worker_progress(percent: int, stage: str) -> None:
+                    future = asyncio.run_coroutine_threadsafe(
+                        report_progress(percent, stage), event_loop,
+                    )
+                    future.result()
+
+            raw_data = await asyncio.to_thread(
+                self._prepare_yearly_data,
+                birth_data,
+                year,
+                progress_callback=worker_progress,
+            )
+            print(f"✅ Yearly data prepared (length: {len(raw_data)} chars)")
+            await report_progress(
+                93 if generation_mode == "deterministic" else 35,
+                "astrology_calculated",
+            )
+
+            use_parallel_yearly = (
+                self.engine_version not in {ACCURACY_ENGINE_VERSION, ACCURACY_V3_ENGINE_VERSION}
+                and self._env_bool("EVENT_TIMELINE_PARALLEL_YEARLY", default=False)
+            )
             from utils.admin_settings import CHAT_LLM_DEEPSEEK
 
             if use_parallel_yearly and self._timeline_llm_vendor != CHAT_LLM_DEEPSEEK:
@@ -254,6 +362,10 @@ class EventPredictor:
                     age=current_age,
                     progress_callback=progress_callback,
                 )
+            elif self.engine_version == ACCURACY_V3_ENGINE_VERSION and self.v3_narrator == "deterministic":
+                print("\n⚡ Using deterministic V3 output; skipping timeline LLM")
+                await report_progress(94, "resolving_events")
+                ai_response = {}
             else:
                 if use_parallel_yearly and self._timeline_llm_vendor == CHAT_LLM_DEEPSEEK:
                     print(
@@ -262,14 +374,21 @@ class EventPredictor:
                     )
                 # Pass Age to prompt generator for Desha Kala Patra logic
                 print("\n🔄 Creating prediction prompt...")
-                prompt = self._create_prediction_prompt(raw_data, year, current_age)
+                if self.engine_version == ACCURACY_V3_ENGINE_VERSION:
+                    prompt = self._create_accuracy_v3_yearly_prompt(raw_data, year, current_age)
+                elif self.engine_version == ACCURACY_ENGINE_VERSION:
+                    prompt = self._create_accuracy_v2_yearly_prompt(raw_data, year, current_age)
+                else:
+                    prompt = self._create_prediction_prompt(raw_data, year, current_age)
                 print(f"✅ Prompt created (length: {len(prompt)} chars)")
 
                 print("\n🔄 Calling timeline LLM...")
+                await report_progress(45, "writing_interpretation")
                 ai_response = await self._get_ai_prediction_async(prompt)
                 print("✅ Timeline LLM returned response")
+                await report_progress(90, "checking_interpretation")
 
-            if ai_response.pop("_timeline_invalid", False):
+            if ai_response.pop("_timeline_invalid", False) and self.engine_version != ACCURACY_V3_ENGINE_VERSION:
                 return {
                     "year": year,
                     "status": "error",
@@ -282,6 +401,23 @@ class EventPredictor:
                 }
 
             run_usage = ai_response.pop("_llm_usage", None)
+            if self.engine_version == ACCURACY_ENGINE_VERSION:
+                ai_response, validation_warnings = validate_v2_payload(
+                    ai_response,
+                    self._last_accuracy_ledger,
+                    year=year,
+                )
+                if validation_warnings:
+                    logger.info("Event Timeline V2 validation warnings: %s", validation_warnings)
+            elif self.engine_version == ACCURACY_V3_ENGINE_VERSION:
+                ai_response, validation_warnings = validate_v3_payload(
+                    ai_response,
+                    self._last_v3_model,
+                    narration_expected=self.v3_narrator == "llm",
+                )
+                if validation_warnings:
+                    logger.info("Event Timeline V3 validation warnings: %s", validation_warnings)
+            await report_progress(96, "finalizing_timeline")
             if isinstance(run_usage, dict):
                 print(
                     "\n📊 YEARLY TOKEN USAGE TOTAL (model-reported): "
@@ -292,7 +428,24 @@ class EventPredictor:
                     f"total_tokens={int(run_usage.get('total_tokens') or 0)}"
                 )
 
-            final_response = {"year": year, "status": "success", **ai_response}
+            final_response = {
+                "year": year,
+                "status": "success",
+                "engine_version": self.engine_version,
+                "methodology_version": (
+                    V3_METHODOLOGY_VERSION if self.engine_version == ACCURACY_V3_ENGINE_VERSION
+                    else METHODOLOGY_VERSION if self.engine_version == ACCURACY_ENGINE_VERSION
+                    else "legacy_prompt_v1"
+                ),
+                "evidence_version": (
+                    V3_EVIDENCE_VERSION if self.engine_version == ACCURACY_V3_ENGINE_VERSION
+                    else EVIDENCE_VERSION if self.engine_version == ACCURACY_ENGINE_VERSION
+                    else None
+                ),
+                "pipeline_version": self.v3_pipeline if self.engine_version == ACCURACY_V3_ENGINE_VERSION else None,
+                "narrator_version": self.v3_narrator if self.engine_version == ACCURACY_V3_ENGINE_VERSION else None,
+                **ai_response,
+            }
             final_response = self._attach_timeline_summary(year, final_response)
             if isinstance(run_usage, dict):
                 final_response["_llm_usage_totals"] = run_usage
@@ -323,6 +476,9 @@ class EventPredictor:
         age: int,
         progress_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None] | None]] = None,
     ) -> Dict[str, Any]:
+        import google.generativeai as genai  # type: ignore[import-not-found]
+        from google.generativeai import caching as genai_caching  # type: ignore[import-not-found]
+
         if not self.model:
             return {
                 "macro_trends": [],
@@ -455,6 +611,9 @@ class EventPredictor:
                         "year": year,
                         "completed_quarters": len(quarter_results_by_index),
                         "total_quarters": 4,
+                        "progress_percent": 35 + round(55 * len(quarter_results_by_index) / 4),
+                        "progress_stage": "writing_interpretation",
+                        "generation_mode": "llm",
                         "months_ready": len(monthly_predictions),
                         "macro_trends": macro_trends,
                         "monthly_predictions": monthly_predictions,
@@ -655,7 +814,13 @@ class EventPredictor:
         monthly_predictions.sort(key=lambda x: int(x.get("month_id", 0)))
         return {"macro_trends": macro_trends, "monthly_predictions": monthly_predictions}
 
-    async def predict_monthly_deep(self, birth_data: Dict, year: int, month: int) -> Dict[str, Any]:
+    async def predict_monthly_deep(
+        self,
+        birth_data: Dict,
+        year: int,
+        month: int,
+        progress_callback: Optional[Callable[[Dict[str, Any]], Awaitable[None] | None]] = None,
+    ) -> Dict[str, Any]:
         """Generate exhaustive predictions for a single month (all triggers, all manifestations)."""
         try:
             print("\n" + "#"*100)
@@ -663,10 +828,64 @@ class EventPredictor:
             print("#"*100)
             birth_year = int(birth_data['date'].split('-')[0])
             current_age = year - birth_year
-            raw_data = self._prepare_yearly_data(birth_data, year)
-            transit_facts = self._get_transit_facts_for_month(birth_data, year, month)
-            dasha_facts = self._get_dasha_facts_for_month(birth_data, year, month)
-            use_parallel_monthly = self._env_bool("EVENT_TIMELINE_PARALLEL_MONTHLY", default=False)
+            generation_mode = (
+                "deterministic"
+                if self.engine_version == ACCURACY_V3_ENGINE_VERSION and self.v3_narrator == "deterministic"
+                else "llm"
+            )
+
+            async def report_progress(percent: int, stage: str) -> None:
+                if not progress_callback:
+                    return
+                cb_result = progress_callback({
+                    "status": "processing",
+                    "year": year,
+                    "selected_month": month,
+                    "progress_percent": max(0, min(99, int(percent))),
+                    "progress_stage": stage,
+                    "generation_mode": generation_mode,
+                    "months_ready": 0,
+                    "monthly_predictions": [],
+                })
+                if asyncio.iscoroutine(cb_result):
+                    await cb_result
+
+            await report_progress(5, "preparing_chart")
+            worker_progress = None
+            if generation_mode == "deterministic" and progress_callback:
+                event_loop = asyncio.get_running_loop()
+
+                def worker_progress(percent: int, stage: str) -> None:
+                    future = asyncio.run_coroutine_threadsafe(
+                        report_progress(percent, stage), event_loop,
+                    )
+                    future.result()
+
+            raw_data = await asyncio.to_thread(
+                self._prepare_yearly_data,
+                birth_data,
+                year,
+                selected_month=month,
+                progress_callback=worker_progress,
+            )
+            await report_progress(93 if generation_mode == "deterministic" else 35, "astrology_calculated")
+            if self.engine_version == ACCURACY_V3_ENGINE_VERSION and self.v3_pipeline == "optimized":
+                transit_facts = (self._last_target_transit_facts.get(str(month)) or {})
+                month_ledger = ((self._last_accuracy_ledger.get("months") or {}).get(str(month)) or {})
+                dasha_stack = month_ledger.get("dasha_stack") or {}
+                dasha_facts = {
+                    **{level: dasha_stack.get(level) for level in ("mahadasha", "antardasha", "pratyantardasha", "sookshma")},
+                    "samples": self._last_target_dasha_facts.get("samples") or {},
+                    "changes": self._last_target_dasha_facts.get("changes") or [],
+                    "dasha_segments": month_ledger.get("dasha_segments") or [],
+                }
+            else:
+                transit_facts = self._get_transit_facts_for_month(birth_data, year, month)
+                dasha_facts = self._get_dasha_facts_for_month(birth_data, year, month)
+            use_parallel_monthly = (
+                self.engine_version not in {ACCURACY_ENGINE_VERSION, ACCURACY_V3_ENGINE_VERSION}
+                and self._env_bool("EVENT_TIMELINE_PARALLEL_MONTHLY", default=False)
+            )
             from utils.admin_settings import CHAT_LLM_DEEPSEEK
 
             if use_parallel_monthly and self._timeline_llm_vendor != CHAT_LLM_DEEPSEEK:
@@ -679,17 +898,28 @@ class EventPredictor:
                     transit_facts=transit_facts,
                     dasha_facts=dasha_facts,
                 )
+            elif self.engine_version == ACCURACY_V3_ENGINE_VERSION and self.v3_narrator == "deterministic":
+                print("\n⚡ Using deterministic V3 output; skipping timeline LLM")
+                await report_progress(94, "resolving_events")
+                ai_response = {}
             else:
                 if use_parallel_monthly and self._timeline_llm_vendor == CHAT_LLM_DEEPSEEK:
                     print(
                         "\n⚠️ EVENT_TIMELINE_PARALLEL_MONTHLY is ignored for DeepSeek "
                         "(Gemini context cache only). Using single-call monthly deep."
                     )
-                prompt = self._create_monthly_deep_prompt(
-                    raw_data, year, month, current_age, transit_facts, dasha_facts
-                )
+                if self.engine_version == ACCURACY_V3_ENGINE_VERSION:
+                    prompt = self._create_accuracy_v3_monthly_prompt(raw_data, year, month, current_age)
+                elif self.engine_version == ACCURACY_ENGINE_VERSION:
+                    prompt = self._create_accuracy_v2_monthly_prompt(raw_data, year, month, current_age)
+                else:
+                    prompt = self._create_monthly_deep_prompt(
+                        raw_data, year, month, current_age, transit_facts, dasha_facts
+                    )
+                await report_progress(45, "writing_interpretation")
                 ai_response = await self._get_ai_prediction_async(prompt)
-            if ai_response.pop("_timeline_invalid", False):
+                await report_progress(90, "checking_interpretation")
+            if ai_response.pop("_timeline_invalid", False) and self.engine_version != ACCURACY_V3_ENGINE_VERSION:
                 return {
                     "year": year,
                     "status": "error",
@@ -703,9 +933,41 @@ class EventPredictor:
                     "monthly_predictions": [],
                 }
             run_usage = ai_response.pop("_llm_usage", None) if isinstance(ai_response, dict) else None
+            if self.engine_version == ACCURACY_ENGINE_VERSION:
+                ai_response, validation_warnings = validate_v2_payload(
+                    ai_response,
+                    self._last_accuracy_ledger,
+                    year=year,
+                    selected_month=month,
+                )
+                if validation_warnings:
+                    logger.info("Monthly Event Timeline V2 validation warnings: %s", validation_warnings)
+            elif self.engine_version == ACCURACY_V3_ENGINE_VERSION:
+                ai_response, validation_warnings = validate_v3_payload(
+                    ai_response,
+                    self._last_v3_model,
+                    selected_month=month,
+                    narration_expected=self.v3_narrator == "llm",
+                )
+                if validation_warnings:
+                    logger.info("Monthly Event Timeline V3 validation warnings: %s", validation_warnings)
+            await report_progress(96, "finalizing_timeline")
             final_response = {
                 "year": year,
                 "status": "success",
+                "engine_version": self.engine_version,
+                "methodology_version": (
+                    V3_METHODOLOGY_VERSION if self.engine_version == ACCURACY_V3_ENGINE_VERSION
+                    else METHODOLOGY_VERSION if self.engine_version == ACCURACY_ENGINE_VERSION
+                    else "legacy_prompt_v1"
+                ),
+                "evidence_version": (
+                    V3_EVIDENCE_VERSION if self.engine_version == ACCURACY_V3_ENGINE_VERSION
+                    else EVIDENCE_VERSION if self.engine_version == ACCURACY_ENGINE_VERSION
+                    else None
+                ),
+                "pipeline_version": self.v3_pipeline if self.engine_version == ACCURACY_V3_ENGINE_VERSION else None,
+                "narrator_version": self.v3_narrator if self.engine_version == ACCURACY_V3_ENGINE_VERSION else None,
                 "dasha_facts": dasha_facts,
                 "transit_facts": transit_facts,
                 **ai_response,
@@ -745,6 +1007,9 @@ class EventPredictor:
         transit_facts: Dict[str, Any],
         dasha_facts: Dict[str, Any],
     ) -> Dict[str, Any]:
+        import google.generativeai as genai  # type: ignore[import-not-found]
+        from google.generativeai import caching as genai_caching  # type: ignore[import-not-found]
+
         if not self.model:
             return {
                 "macro_trends": [],
@@ -1181,6 +1446,11 @@ Now return a single JSON object with this structure:
         Compute interval-based transit facts for a month instead of a single 1st-of-month snapshot.
         This gives the model a better execution-window picture for month-level timing.
         """
+        if self.engine_version in {ACCURACY_ENGINE_VERSION, ACCURACY_V3_ENGINE_VERSION}:
+            try:
+                return build_month_transit_facts(self.transit_calc, birth_data, year, month)
+            except Exception as e:
+                return {"error": _user_timeline_error(e), "planets": {}}
         try:
             natal_positions = self.transit_calc._calculate_natal_positions(birth_data)  # uses Swiss Ephemeris + Lahiri
             asc_lon = float(natal_positions.get('ascendant_longitude', 0.0)) if natal_positions else 0.0
@@ -1480,11 +1750,147 @@ Now return a single JSON object with this structure:
         payload["timeline_summary"] = self._build_user_timeline_summary(year, monthly_predictions)
         return payload
 
-    def _prepare_yearly_data(self, birth_data: Dict, year: int) -> str:
+    def _prepare_v3_optimized_data(
+        self,
+        birth_data: Dict[str, Any],
+        year: int,
+        selected_month: Optional[int] = None,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
+    ) -> str:
+        """Build V3 evidence without constructing or serializing chat context."""
+        def report(percent: int, stage: str) -> None:
+            if progress_callback:
+                progress_callback(percent, stage)
+
+        context = build_minimal_v3_context(
+            birth_data,
+            chart_calculator=self.chart_calc,
+            ashtakavarga_calculator_cls=self.ashtakavarga_cls,
+        )
+        report(12, "natal_context_complete")
+        # Integrated monthly peak selection is comparative: a fast contact is a
+        # peak only when it is stronger than the same event's other months.
+        # Building only the requested month made every annual theme win its
+        # one-row comparison, so adjacent monthly deep dives looked alike.
+        compare_full_year = (
+            selected_month is None
+            or accuracy_layer_mode() == "integrated_v2"
+        )
+        if compare_full_year:
+            dasha_facts = build_target_year_dasha_facts(self.dasha_calc, birth_data, year)
+            report(22, "dasha_calendar_complete")
+            transit_facts = build_target_year_transit_facts(
+                self.transit_calc,
+                birth_data,
+                year,
+                month_completed_callback=lambda month: report(
+                    22 + round(38 * month / 12),
+                    f"transits_complete_month_{month}",
+                ),
+            )
+            month_ids = list(range(1, 13))
+        else:
+            dasha_facts = build_target_month_dasha_facts(
+                self.dasha_calc, birth_data, year, selected_month
+            )
+            transit_facts = {
+                str(selected_month): build_month_transit_facts(
+                    self.transit_calc, birth_data, year, selected_month
+                )
+            }
+            month_ids = [selected_month]
+            report(60, "selected_month_timing_complete")
+
+        context["supporting_systems"] = build_target_year_supporting_context(
+            birth_data,
+            chart=context.get("d1_chart") or {},
+            chart_calculator=self.chart_calc,
+            target_year=year,
+            month_ids=month_ids,
+        )
+        report(68, "supporting_systems_complete")
+        context["birth_time_sensitivity"] = build_birth_time_sensitivity(
+            birth_data,
+            chart_calculator=self.chart_calc,
+            dasha_calculator=self.dasha_calc,
+            target_year=year,
+        )
+        report(72, "birth_time_sensitivity_complete")
+
+        ledger = build_evidence_ledger(
+            context,
+            year,
+            dasha_facts,
+            transit_facts,
+            month_ids=month_ids,
+            # Integrated V3 must retain late-month fast-planet segments.  Older
+            # rollback engines keep their historical eight-segment contract.
+            max_transit_segments_per_planet=None,
+        )
+        report(80, "evidence_ledger_complete")
+        try:
+            from app.kp.services.chart_service import KPChartService
+
+            kp_evidence = get_cached_v3_kp_evidence(
+                birth_data,
+                lambda: KPChartService.calculate_kp_chart(
+                    birth_data.get("date"),
+                    birth_data.get("time"),
+                    birth_data.get("latitude"),
+                    birth_data.get("longitude"),
+                    birth_data.get("timezone"),
+                ),
+            )
+        except Exception:
+            logger.exception("Event Timeline V3 KP calculation failed; continuing without KP upgrade")
+            kp_evidence = {}
+        report(84, "kp_confirmation_complete")
+
+        selected_age = year - int(str(birth_data["date"]).split("-")[0])
+        self._last_v3_model = build_v3_prediction_model(
+            context,
+            ledger,
+            kp_evidence=kp_evidence,
+            user_facts=self.user_facts,
+            year=year,
+            age=selected_age,
+            language=self.language,
+            relative_profiles=self.relative_profiles,
+        )
+        report(92, "event_candidates_complete")
+        self._last_accuracy_ledger = ledger
+        self._last_target_dasha_facts = dasha_facts
+        self._last_target_transit_facts = transit_facts
+        # V3 prompts consume _v3_narration_payload(), not this return value.
+        # Keep a tiny audit marker for API/log compatibility.
+        return json.dumps({
+            "context_version": context.get("context_version"),
+            "year": year,
+            "selected_month": selected_month,
+            "comparison_scope": "full_year" if compare_full_year else "selected_month",
+            "engine_version": self.engine_version,
+        }, separators=(",", ":"))
+
+    def _prepare_yearly_data(
+        self,
+        birth_data: Dict,
+        year: int,
+        selected_month: Optional[int] = None,
+        progress_callback: Optional[Callable[[int, str], None]] = None,
+    ) -> str:
         """
         Use ChatContextBuilder for full chart math, then prune payload for event timeline only
         (yearly + monthly deep share this path). Pruning does not alter builder caches.
         """
+        if self.engine_version == ACCURACY_V3_ENGINE_VERSION and self.v3_pipeline == "optimized":
+            print(f"\n⚡ Using minimal V3 calculation context for {year}...")
+            return self._prepare_v3_optimized_data(
+                birth_data,
+                year,
+                selected_month,
+                progress_callback=progress_callback,
+            )
+
         print(f"\n📊 Using ChatContextBuilder for comprehensive {year} analysis...")
         
         from chat.chat_context_builder import ChatContextBuilder
@@ -1496,13 +1902,150 @@ Now return a single JSON object with this structure:
                 return super().default(obj)
         
         context_builder = ChatContextBuilder()
-        
-        full_context = context_builder.build_annual_context(
-            birth_data=birth_data,
-            target_year=year,
-            user_question=f"Predict life events for {year}",
-            intent_result={'mode': 'annual_prediction', 'category': 'yearly_events'}
-        )
+
+        if self.engine_version in {ACCURACY_ENGINE_VERSION, ACCURACY_V3_ENGINE_VERSION}:
+            period_request = {
+                "startYear": year,
+                "endYear": year,
+                "specificMonths": [],
+                "detailed_dashas": True,
+            }
+            intent = {
+                "mode": "annual_prediction",
+                "category": "yearly_events",
+                "needs_transits": True,
+                "transit_request": period_request,
+                "event_timeline_engine": self.engine_version,
+            }
+            if self.engine_version == ACCURACY_V3_ENGINE_VERSION:
+                # Prevent the generic context filter from discarding the event-
+                # specific confirmation charts before V3 resolves candidates.
+                intent["divisional_charts"] = ["D2", "D4", "D7", "D9", "D10", "D24", "D30"]
+            target_anchor = datetime(year, 7, 1, 12)
+            full_context = context_builder.build_complete_context(
+                birth_data=birth_data,
+                user_question=f"Predict life events for {year}",
+                target_date=target_anchor,
+                requested_period=period_request,
+                intent_result=intent,
+            )
+
+            # Replace every clock-sensitive legacy field with selected-year facts.
+            target_dashas = self.dasha_calc.calculate_current_dashas(
+                birth_data, target_anchor, strict=True
+            )
+            context_builder.augment_current_dashas_with_chart_hints(
+                target_dashas,
+                full_context.get("d1_chart") or {},
+                full_context.get("house_lordships") or {},
+            )
+            full_context["current_dashas"] = target_dashas
+            dasha_facts = build_target_year_dasha_facts(self.dasha_calc, birth_data, year)
+            transit_facts = build_target_year_transit_facts(self.transit_calc, birth_data, year)
+            self._last_target_dasha_facts = dasha_facts
+            self._last_target_transit_facts = transit_facts
+            full_context["target_year_dasha_facts"] = dasha_facts
+            # The evidence ledger retains exact supporting segments.  Keep only a
+            # compact audit summary here so the LLM does not receive hundreds of
+            # kilobytes of duplicate daily-scanned transit material.
+            full_context["target_year_transit_facts"] = {
+                month_key: {
+                    "year": month_data.get("year"),
+                    "month": month_data.get("month"),
+                    "resolution": month_data.get("resolution"),
+                    "planets": {
+                        planet: {
+                            "start": pdata.get("start"),
+                            "middle": pdata.get("middle"),
+                            "end": pdata.get("end"),
+                            "change_dates": pdata.get("change_dates") or [],
+                        }
+                        for planet, pdata in (month_data.get("planets") or {}).items()
+                    },
+                }
+                for month_key, month_data in transit_facts.items()
+            }
+            full_context["macro_transits_timeline"] = self.transit_calc.get_slow_planet_transits(
+                birth_data,
+                start_date=datetime(year, 1, 1, 12),
+                end_date=datetime(year, 12, 31, 12),
+            )
+            full_context["macro_transits_meta"] = {
+                "start": f"{year}-01-01",
+                "end": f"{year}-12-31",
+                "authority": "selected_year",
+            }
+            birth_year = int(str(birth_data["date"]).split("-")[0])
+            selected_age = year - birth_year
+            nadi_age_map = {
+                16: "Rohini", 24: "Pushya", 30: "Swati", 36: ["Rohini", "Pushya"],
+                45: "Magha", 46: ["Magha", "Swati"], 65: "Pushya", 69: "Swati", 83: "Rohini",
+            }
+            full_context["nadi_age_activation"] = {
+                "age": selected_age,
+                "activated_nakshatras": nadi_age_map.get(selected_age),
+                "interpretation": "supporting_evidence_only_not_a_guarantee",
+            }
+            ledger = build_evidence_ledger(
+                full_context, year, dasha_facts, transit_facts,
+                max_transit_segments_per_planet=(
+                    None if self.engine_version == ACCURACY_V3_ENGINE_VERSION else 8
+                ),
+            )
+            full_context["event_evidence_ledger"] = ledger
+            if self.engine_version == ACCURACY_V3_ENGINE_VERSION:
+                try:
+                    from app.kp.services.chart_service import KPChartService
+
+                    kp_evidence = KPChartService.calculate_kp_chart(
+                        birth_data.get("date"),
+                        birth_data.get("time"),
+                        birth_data.get("latitude"),
+                        birth_data.get("longitude"),
+                        birth_data.get("timezone"),
+                    )
+                except Exception:
+                    logger.exception("Event Timeline V3 KP chart calculation failed; continuing without KP upgrade")
+                    kp_evidence = {}
+                self._last_v3_model = build_v3_prediction_model(
+                    full_context,
+                    ledger,
+                    kp_evidence=kp_evidence,
+                    user_facts=getattr(self, "user_facts", {}) or {},
+                    year=year,
+                    age=selected_age,
+                    language=self.language,
+                    relative_profiles=self.relative_profiles,
+                )
+                full_context["event_prediction_model"] = self._last_v3_model
+            else:
+                self._last_v3_model = {}
+            full_context["target_period_integrity"] = {
+                "selected_year": year,
+                "dasha_authority": "target_year_dasha_facts",
+                "transit_authority": "target_year_transit_facts",
+                "status": "complete",
+            }
+            full_context["engine_version"] = self.engine_version
+            full_context["methodology_version"] = METHODOLOGY_VERSION
+            for stale_key in (
+                "unified_dasha_timeline",
+                "requested_dasha_summary",
+                "period_dasha_activations",
+                "transit_activations",
+                "target_date_dashas",
+                "navatara_warnings",
+            ):
+                full_context.pop(stale_key, None)
+            self._last_accuracy_ledger = ledger
+        else:
+            full_context = context_builder.build_annual_context(
+                birth_data=birth_data,
+                target_year=year,
+                user_question=f"Predict life events for {year}",
+                intent_result={'mode': 'annual_prediction', 'category': 'yearly_events'}
+            )
+            self._last_accuracy_ledger = {}
         
         slim = prune_for_event_timeline(full_context)
         print(
@@ -1510,7 +2053,198 @@ Now return a single JSON object with this structure:
             f"{len(slim)} after prune"
         )
         
+        if self.engine_version in {ACCURACY_ENGINE_VERSION, ACCURACY_V3_ENGINE_VERSION}:
+            return json.dumps(slim, separators=(",", ":"), cls=DateTimeEncoder)
         return json.dumps(slim, indent=2, cls=DateTimeEncoder)
+
+    def _v3_narration_payload(self, month: Optional[int] = None) -> Dict[str, Any]:
+        model = getattr(self, "_last_v3_model", {}) or {}
+        months = model.get("months") or {}
+        dkp = model.get("desh_kaal_patra") or {}
+        if month is not None:
+            months = {str(month): months.get(str(month)) or {}}
+        return {
+            "version": model.get("version"),
+            "explanation_version": model.get("explanation_version"),
+            "accuracy_layer": model.get("accuracy_layer"),
+            "desh_kaal_patra": {
+                key: dkp.get(key)
+                for key in (
+                    "target_year", "age", "life_stage", "employment_state",
+                    "relationship_state", "parenthood_state", "facts_present",
+                )
+            },
+            "node_doctrine": model.get("node_doctrine"),
+            "months": {
+                key: {
+                    "month_id": value.get("month_id"),
+                    "activated_houses": (value.get("activation_graph") or {}).get("all_activated_houses") or [],
+                    "candidates": [
+                        {
+                            field: candidate.get(field)
+                            for field in (
+                                "candidate_id", "event_key", "event_family", "prediction",
+                                "possible_manifestations", "activation_reasoning", "trigger_logic",
+                                "support_grade", "priority_score", "manifestation_phase",
+                                "claim_scope", "start_date", "end_date", "timing_windows",
+                                "timing_resolution", "outcome_dimensions", "natal_promise",
+                                "planet_delivery", "obstruction_profile", "kp_confirmation",
+                                "varga_confirmation", "exact_transit_contacts",
+                                "ashtakavarga_confirmation", "supporting_systems",
+                                "birth_time_reliability", "accuracy_limitations", "forbidden_terms",
+                            )
+                        }
+                        for candidate in value.get("publishable_candidates") or []
+                    ],
+                }
+                for key, value in months.items()
+                if isinstance(value, dict)
+            },
+        }
+
+    def _create_accuracy_v3_yearly_prompt(self, raw_data: str, year: int, age: int) -> str:
+        payload = self._v3_narration_payload()
+        return f"""
+You are only the plain-language narration layer for Event Timeline Accuracy V3 for {year}.
+The deterministic candidate packet below is sovereign. It already performed the multi-house,
+dasha, transit, KP, varga, and Desh-Kaal-Patra checks.
+
+RULES:
+- Return every supplied candidate exactly once under its supplied month. Do not select or omit candidates.
+- Copy candidate_id exactly. Never create an event, candidate_id, date, planet, house, or confidence grade.
+- Rephrase only `prediction` for clarity without changing the event family.
+- Copy `possible_manifestations`, `activation_reasoning`, and `trigger_logic` exactly. They are
+  deterministic astrological explanations tied to the calculation graph, not prose suggestions.
+- Obey forbidden_terms. Do not call a homemaker, student, retired, or unemployed person's activation a promotion.
+- User facts constrain wording only; never quote private facts unnecessarily.
+- Keep ambiguity where the candidate is broad. Do not turn health/work/debt alternatives into a diagnosis.
+- Do not claim certainty. Support grades are astrological evidence grades, not probabilities.
+- Return JSON only with all 12 month objects. Each event needs candidate_id, prediction, and possible_manifestations.
+
+AUTHORITATIVE V3 CANDIDATES:
+```json
+{json.dumps(payload, separators=(",", ":"))}
+```
+"""
+
+    def _create_accuracy_v3_monthly_prompt(self, raw_data: str, year: int, month: int, age: int) -> str:
+        payload = self._v3_narration_payload(month)
+        return f"""
+You are only the plain-language narration layer for Event Timeline Accuracy V3.
+Narrate all deterministic candidates supplied for {self._month_label(month)} {year}.
+
+RULES:
+- Return every supplied candidate exactly once. Copy candidate_id exactly.
+- Do not add, remove, merge, retime, or change the event family or support grade.
+- Rephrase only `prediction`. Copy `possible_manifestations`, `activation_reasoning`, and
+  `trigger_logic` exactly because they are deterministic evidence text.
+- Obey forbidden_terms and Desh-Kaal-Patra. Do not expose private stored facts unnecessarily.
+- Preserve broad alternatives; do not convert health-related activation into a diagnosis.
+- Use conditional language. Return JSON only with one month object.
+
+AUTHORITATIVE V3 CANDIDATES:
+```json
+{json.dumps(payload, separators=(",", ":"))}
+```
+"""
+
+    def _create_accuracy_v2_yearly_prompt(self, raw_data: str, year: int, age: int) -> str:
+        return f"""
+You are the narration layer for a conservative Vedic event-timing system.
+The deterministic calculation payload below is authoritative for {year}.
+
+RULES:
+- Use `event_evidence_ledger.months` as the only timing source.
+- An event MUST cite one or more exact `evidence_id` values from its own month.
+- Do not invent a planet, dasha, transit house, aspect, bindu value, or date.
+- Do not claim certainty. Never use guaranteed, definitely, must happen, supreme activation,
+  million-dollar window, or "on fire".
+- A transit is supporting timing evidence, not proof that a concrete event will occur.
+- Natal promise, dasha permission, and relevant varga evidence must agree before naming a
+  narrow event. When specificity is not justified, state a broader life-area development.
+- Return 0 to 3 non-overlapping event families per month. Quiet months are valid.
+- Do not multiply house meanings into many separate predictions.
+- `intensity` means relative astrological support, not an empirically measured probability.
+- Keep predictions conditional: "may", "could", "is more likely", or "watch for".
+- The native is approximately age {age}; do not assume marriage, employment, children,
+  pregnancy, illness, or property ownership without supplied personal context.
+
+Return JSON only with exactly 12 ordered month objects. Schema:
+{{
+  "macro_trends": ["up to 4 restrained, evidence-based themes"],
+  "monthly_predictions": [
+    {{
+      "month_id": 1,
+      "focus_areas": [],
+      "events": [
+        {{
+          "type": "event family",
+          "prediction": "plain-language conditional forecast",
+          "possible_manifestations": [
+            {{"scenario": "most likely expression", "reasoning": "brief evidence-based explanation"}}
+          ],
+          "activation_reasoning": "brief synthesis with no unsupported facts",
+          "trigger_logic": "brief source and timer summary",
+          "evidence_ids": ["exact ledger ID"],
+          "start_date": "{year}-01-DD",
+          "end_date": "{year}-01-DD",
+          "intensity": "High|Medium|Low"
+        }}
+      ]
+    }}
+  ]
+}}
+
+If a month has no defensible concrete candidate, return `events: []` for it.
+
+AUTHORITATIVE CALCULATION PAYLOAD:
+```json
+{raw_data}
+```
+"""
+
+    def _create_accuracy_v2_monthly_prompt(self, raw_data: str, year: int, month: int, age: int) -> str:
+        month_name = self._month_label(month)
+        return f"""
+You are the narration layer for a conservative Vedic event-timing system.
+Analyze only {month_name} {year}. The calculation payload is authoritative.
+
+RULES:
+- Use only `event_evidence_ledger.months["{month}"]`.
+- Every event must cite valid `evidence_ids` from that ledger month.
+- Return 1 to 6 ranked, non-overlapping event families; return zero if evidence is insufficient.
+- Give at most 2 ranked manifestations per event family.
+- Never invent timing facts or use certainty/guarantee language.
+- Keep all claims conditional and distinguish broad themes from concrete events.
+- Use the tightest date band supported by cited ledger rows, within {month_name} only.
+- Do not assume the native's relationship, job, health, education, parenthood, or property status.
+- `intensity` is relative astrological support, not measured probability.
+
+Return JSON only:
+{{
+  "macro_trends": [],
+  "monthly_predictions": [{{
+    "month_id": {month},
+    "focus_areas": [],
+    "events": [{{
+      "type": "event family",
+      "prediction": "conditional plain-language forecast",
+      "possible_manifestations": [{{"scenario": "ranked expression", "reasoning": "brief explanation"}}],
+      "activation_reasoning": "brief supported synthesis",
+      "trigger_logic": "source and timer",
+      "evidence_ids": ["exact ledger ID"],
+      "start_date": "{year}-{month:02d}-DD",
+      "end_date": "{year}-{month:02d}-DD",
+      "intensity": "High|Medium|Low"
+    }}]
+  }}]
+}}
+
+AUTHORITATIVE CALCULATION PAYLOAD:
+```json
+{raw_data}
+```
+"""
 
     def _create_prediction_prompt(self, raw_data: str, year: int, age: int) -> str:
         """

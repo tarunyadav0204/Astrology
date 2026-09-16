@@ -9,7 +9,7 @@ calculation trace without embedding event names in the algorithm.
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -32,6 +32,7 @@ class SignalGroup:
     weight: int
     required: bool = False
     require_all: bool = False
+    minimum_hits: int = 1
     description: str = ""
 
 
@@ -59,6 +60,84 @@ class EventDefinition:
     version: str
     independent_confirmation_required: bool = True
     score_activation_quality: bool = False
+    event_kind: str = "native"
+    subject_key: str = "self"
+    reference_house: int = 1
+    source_event_key: str = ""
+    subject_anchor: Optional[SignalGroup] = None
+
+
+def rotate_relative_house(reference_house: int, relative_house: int) -> int:
+    """Return a relative person's house in the native's D1 frame."""
+    if not 1 <= int(reference_house) <= 12 or not 1 <= int(relative_house) <= 12:
+        raise PredictionConfigurationError("Relative houses must be between 1 and 12")
+    return ((int(reference_house) + int(relative_house) - 2) % 12) + 1
+
+
+def build_relative_health_definition(
+    subject_key: str, subject_label: str, reference_house: int,
+) -> EventDefinition:
+    """Build a conservative, non-diagnostic medical theme for a known relative."""
+    return build_relative_event_definition(
+        HEALTH, subject_key, subject_label, reference_house,
+    )
+
+
+def build_relative_event_definition(
+    definition: EventDefinition,
+    subject_key: str,
+    subject_label: str,
+    reference_house: int,
+) -> EventDefinition:
+    """Rotate any native event definition into a known person's house frame."""
+    rotate = lambda houses: tuple(rotate_relative_house(reference_house, house) for house in houses)
+    classifications = tuple(
+        replace(
+            rule,
+            transition_any=rotate(rule.transition_any),
+            transition_all=rotate(rule.transition_all),
+        )
+        for rule in definition.classifications
+    )
+    relative_anchor = replace(definition.anchor, houses=rotate(definition.anchor.houses))
+    relative_transition = replace(definition.transition, houses=rotate(definition.transition.houses))
+    if definition.key == "health":
+        medical_houses = rotate((6, 8, 12))
+        relative_anchor = replace(
+            definition.anchor, houses=medical_houses, minimum_hits=1,
+            description="At least one subject-relative H6/H8/H12 must be opened by the dasha.",
+        )
+        relative_transition = replace(
+            definition.transition, houses=medical_houses, minimum_hits=2,
+            description="At least two subject-relative H6/H8/H12 houses must combine across dasha and transit.",
+        )
+    return replace(
+        definition,
+        key=f"relative_{subject_key}_{definition.key}",
+        label=f"{subject_label} · {definition.label}",
+        description=f"{definition.description} Read from the {subject_label.lower()}'s H1 at native H{reference_house}.",
+        varga_houses=rotate(definition.varga_houses),
+        anchor=relative_anchor,
+        transition=relative_transition,
+        outcome=replace(definition.outcome, houses=rotate(definition.outcome.houses)),
+        classifications=classifications,
+        version=f"relative.{subject_key}.{definition.version}",
+        event_kind="relative",
+        subject_key=subject_key,
+        reference_house=int(reference_house),
+        source_event_key=definition.key,
+        subject_anchor=SignalGroup(
+            key="subject_anchor",
+            label=f"{subject_label} reference",
+            houses=(int(reference_house),),
+            weight=15,
+            required=False,
+            description=(
+                f"Native H{reference_house} is the reference ascendant used to rotate the {subject_label.lower()}'s houses. "
+                "Its activation can support attribution but is not required for the rotated event houses to be evaluated."
+            ),
+        ),
+    )
 
 
 JOB_CHANGE = EventDefinition(
@@ -208,6 +287,7 @@ PROPERTY_PURCHASE = EventDefinition(
     ),
     outcome=SignalGroup(
         key="property_fulfilment", label="Property fulfilment", houses=(11,), weight=10,
+        required=True,
         description=(
             "H11 describes gaining the asset, fulfilment of the property objective and the benefit "
             "received. It classifies a completed-looking purchase but is not required for the window."
@@ -228,6 +308,41 @@ PROPERTY_PURCHASE = EventDefinition(
         ClassificationRule("property_purchase", "Property purchase window"),
     ),
     version="property_purchase.v1",
+)
+
+
+VEHICLE_PURCHASE = EventDefinition(
+    key="vehicle_purchase",
+    label="Buying a vehicle",
+    description=(
+        "A vehicle-acquisition window distinguished from property and general fourth-house activity. "
+        "The fourth house, purchase resources, and gain of the asset must combine."
+    ),
+    varga="D16",
+    varga_houses=(4, 11),
+    varga_description=(
+        "D16 distinguishes vehicles, conveyances and material comforts from land/property and mother. "
+        "It confirms the channel but never creates an acquisition without the D1 house combination."
+    ),
+    anchor=SignalGroup(
+        key="vehicle_anchor", label="Vehicle and comfort anchor", houses=(4,), weight=25,
+        required=True,
+        description="H4 opens conveyances and material comforts, but does not identify a vehicle by itself.",
+    ),
+    transition=SignalGroup(
+        key="vehicle_acquisition", label="Purchase and acquisition", houses=(2, 11), weight=20,
+        required=True, require_all=True,
+        description="H2 supplies purchase resources and H11 shows obtaining the asset; both are required for concrete acquisition wording.",
+    ),
+    outcome=SignalGroup(
+        key="vehicle_use", label="Movement or long-distance use", houses=(3, 9), weight=10,
+        description="H3/H9 classify local or long-distance use after the acquisition channel is established.",
+    ),
+    classifications=(
+        ClassificationRule("vehicle_with_travel", "Vehicle acquisition with travel use", outcome="present"),
+        ClassificationRule("vehicle_acquisition", "Vehicle-acquisition window"),
+    ),
+    version="vehicle_purchase.v1",
 )
 
 
@@ -666,6 +781,7 @@ EVENT_DEFINITIONS: Mapping[str, EventDefinition] = {
     PROPERTY_PURCHASE.key: PROPERTY_PURCHASE,
     RELOCATION.key: RELOCATION,
     PROPERTY_GAIN.key: PROPERTY_GAIN,
+    VEHICLE_PURCHASE.key: VEHICLE_PURCHASE,
     MARRIAGE.key: MARRIAGE,
     FOREIGN_TRAVEL.key: FOREIGN_TRAVEL,
     CHILDREN.key: CHILDREN,
@@ -854,11 +970,12 @@ def _group_trace(group: SignalGroup, rows: Mapping[int, HouseActivation]) -> Dic
     elif group.require_all:
         passed = len(matched) == len(group.houses)
     else:
-        passed = bool(matched)
+        passed = len(matched) >= max(1, int(group.minimum_hits))
     return {
         "key": group.key,
         "label": group.label,
         "required": group.required,
+        "minimum_hits": group.minimum_hits,
         "passed": passed,
         "score": group.weight if passed else 0,
         "maximum_score": group.weight,
