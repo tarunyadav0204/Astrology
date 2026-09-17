@@ -5384,13 +5384,6 @@ export default function ChatScreen({ navigation, route }) {
     return t('chat.modeIntro.standard.name', 'Standard');
   };
 
-  const getChatModeCompactName = (modeKey = getChatModeKey()) => {
-    if (modeKey === 'premium') return 'P';
-    if (modeKey === 'speech') return 'V';
-    if (modeKey === 'instant') return 'L';
-    return 'S';
-  };
-
   const getAnswerStyleName = (styleKey) => (
     styleKey === 'technical'
       ? t('chat.answerStyle.technical', 'Technical')
@@ -6503,84 +6496,121 @@ export default function ChatScreen({ navigation, route }) {
               )}
             </View>
 
-            <View style={[styles.headerRight, compactHeaderChrome && styles.headerRightCompact]}>
-              {isGuruMember && !(isInstantAnalysis && instantBilling.active) ? (
-                <View style={[styles.guruMemberBadge, { backgroundColor: theme === 'dark' ? 'rgba(255,107,53,0.2)' : 'rgba(255,107,53,0.12)', borderColor: colors.primary }]}>
-                  <Text style={[styles.guruMemberBadgeText, { color: colors.primary }]}>
-                    {t('credits.page.guruMemberBadge', 'Guru Member')}
-                  </Text>
-                </View>
-              ) : null}
-              <TouchableOpacity
-                style={[
-                  styles.creditButton,
-                  compactHeaderChrome && styles.creditButtonCompact,
-                  { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine },
-                  isPremiumAnalysis && styles.creditButtonPremium,
-                ]}
-                onPress={() => navigation.navigate('Credits')}
-                accessibilityRole="button"
-                accessibilityLabel={t('credits.label', 'Credits') + `: ${instantBilling.state?.balance ?? credits}`}
-              >
-                <Text
-                  style={[styles.creditText, compactHeaderChrome && styles.creditTextCompact, { color: colors.textInverse }]}
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={1.15}
-                >
-                  {isPremiumAnalysis ? '👑' : (isInstantAnalysis ? '⚡' : '💳')} {credits}
-                </Text>
-                {freeQuestionAvailable && !partnershipMode && !isMundane && (
-                  <View style={[styles.creditFreeBadge, { backgroundColor: colors.accent }]}>
+            <View style={[
+              styles.headerRight,
+              compactHeaderChrome && styles.headerRightCompact,
+              !showGreeting && styles.headerRightChat,
+            ]}>
+              {showGreeting ? (
+                <>
+                  {isGuruMember ? (
+                    <View style={[styles.guruMemberBadge, { backgroundColor: theme === 'dark' ? 'rgba(255,107,53,0.2)' : 'rgba(255,107,53,0.12)', borderColor: colors.primary }]}>
+                      <Text style={[styles.guruMemberBadgeText, { color: colors.primary }]}>
+                        {t('credits.page.guruMemberBadge', 'Guru Member')}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <TouchableOpacity
+                    style={[
+                      styles.creditButton,
+                      compactHeaderChrome && styles.creditButtonCompact,
+                      { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine },
+                    ]}
+                    onPress={() => navigation.navigate('Credits')}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('credits.label', 'Credits') + `: ${credits}`}
+                  >
                     <Text
-                      style={[styles.creditFreeBadgeText, { color: colors.onAccent }]}
+                      style={[styles.creditText, compactHeaderChrome && styles.creditTextCompact, { color: colors.textInverse }]}
                       numberOfLines={1}
                       maxFontSizeMultiplier={1.15}
                     >
-                      {t('premiumUi.home.free')}
+                      💳 {credits}
                     </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              {isInstantAnalysis && instantBilling.active ? (
-                <TouchableOpacity
-                  onPress={() => setShowInstantEndConfirm(true)}
-                  style={[styles.liveHeaderEndButton, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicGlow }]}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('instantBilling.endLive', 'End Live consultation')}
-                >
-                  <Ionicons name="stop-circle-outline" size={18} color={colors.textInverse} />
-                  {!compactHeaderChrome ? (
-                    <Text style={[styles.liveHeaderEndText, { color: colors.textInverse }]}>
-                      {t('instantBilling.end', 'End')}
-                    </Text>
-                  ) : null}
-                </TouchableOpacity>
-              ) : null}
-
-              <TouchableOpacity
-                style={styles.headerBellButton}
-                onPress={() => navigation.navigate('NudgeInbox')}
-                accessibilityRole="button"
-                accessibilityLabel={t('premiumUi.chatScreen.notificationHistory')}
-              >
-                {/* Fixed 40×40 box: icon + badge both live inside so nothing draws outside bounds (no clipping surprises). */}
-                <View style={styles.headerBellHitBox} pointerEvents="none">
-                  <Ionicons name="notifications-outline" size={22} color={colors.textInverse} />
-                  {nudgeUnreadCount > 0 && (
-                    <View style={styles.headerBellBadge}>
-                      <Text
-                        style={styles.headerBellBadgeText}
-                        numberOfLines={1}
-                        maxFontSizeMultiplier={1.35}
-                        allowFontScaling
-                      >
-                        {nudgeUnreadCount > 99 ? '99+' : String(nudgeUnreadCount)}
-                      </Text>
+                    {freeQuestionAvailable && !partnershipMode && !isMundane && (
+                      <View style={[styles.creditFreeBadge, { backgroundColor: colors.accent }]}>
+                        <Text
+                          style={[styles.creditFreeBadgeText, { color: colors.onAccent }]}
+                          numberOfLines={1}
+                          maxFontSizeMultiplier={1.15}
+                        >
+                          {t('premiumUi.home.free')}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.headerBellButton}
+                    onPress={() => navigation.navigate('NudgeInbox')}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('premiumUi.chatScreen.notificationHistory')}
+                  >
+                    <View style={styles.headerBellHitBox} pointerEvents="none">
+                      <Ionicons name="notifications-outline" size={22} color={colors.textInverse} />
+                      {nudgeUnreadCount > 0 && (
+                        <View style={styles.headerBellBadge}>
+                          <Text
+                            style={styles.headerBellBadgeText}
+                            numberOfLines={1}
+                            maxFontSizeMultiplier={1.35}
+                            allowFontScaling
+                          >
+                            {nudgeUnreadCount > 99 ? '99+' : String(nudgeUnreadCount)}
+                          </Text>
+                        </View>
+                      )}
                     </View>
-                  )}
-                </View>
-              </TouchableOpacity>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  {!partnershipMode && !isMundane && !(isInstantAnalysis && instantBilling.active) ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.headerModeChip,
+                        compactHeaderChrome && styles.headerModeChipCompact,
+                        { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine },
+                      ]}
+                      onPress={() => {
+                        if (Date.now() < modeIntroSuppressOpenUntilRef.current) {
+                          return;
+                        }
+                        setShowModeSelector(false);
+                        setShowChatModeIntro(true);
+                      }}
+                      delayPressIn={50}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('chat.modeIntro.openSelector', 'Change chat mode')}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.78}
+                        maxFontSizeMultiplier={1.15}
+                        style={[styles.headerModeChipText, { color: colors.textInverse }]}
+                      >
+                        {`${getChatModeName()} · ${getAnswerStyleName(getAnswerStyleForMode())}`}
+                      </Text>
+                      <Ionicons name="chevron-down" size={14} color={colors.textInverseMuted || colors.textInverse} />
+                    </TouchableOpacity>
+                  ) : null}
+                  {isInstantAnalysis && instantBilling.active ? (
+                    <TouchableOpacity
+                      onPress={() => setShowInstantEndConfirm(true)}
+                      style={[styles.liveHeaderEndButton, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicGlow }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('instantBilling.endLive', 'End Live consultation')}
+                    >
+                      <Ionicons name="stop-circle-outline" size={18} color={colors.textInverse} />
+                      {!compactHeaderChrome ? (
+                        <Text style={[styles.liveHeaderEndText, { color: colors.textInverse }]}>
+                          {t('instantBilling.end', 'End')}
+                        </Text>
+                      ) : null}
+                    </TouchableOpacity>
+                  ) : null}
+                </>
+              )}
 
               {!(isInstantAnalysis && instantBilling.active) ? (
                 <TouchableOpacity
@@ -7472,33 +7502,6 @@ export default function ChatScreen({ navigation, route }) {
                 textAlignVertical="center"
                 blurOnSubmit={false}
               />
-
-              {!partnershipMode && !isMundane && !freeQuestionAvailable && (
-                <TouchableOpacity
-                  style={[
-                    styles.chatModeIdentityButton,
-                    styles.chatModeIdentityButtonCompact,
-                    {
-                      backgroundColor: colors.surfaceRaised,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    if (Date.now() < modeIntroSuppressOpenUntilRef.current) {
-                      return;
-                    }
-                    setShowModeSelector(false);
-                    setShowChatModeIntro(true);
-                  }}
-                  delayPressIn={50}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('chat.modeIntro.openSelector', 'Change chat mode')}
-                >
-                  <Text numberOfLines={1} style={[styles.chatModeIdentityText, { color: colors.text }]}>
-                    {getChatModeCompactName()}
-                  </Text>
-                </TouchableOpacity>
-              )}
 
               {!isInstantAnalysis && !partnershipMode && !isMundane && instantChatEnabled && speechChatEnabled && birthData && (
                 <TouchableOpacity
@@ -9571,6 +9574,34 @@ const styles = StyleSheet.create({
   headerRightCompact: {
     gap: 5,
   },
+  headerRightChat: {
+    flexShrink: 1,
+    maxWidth: '58%',
+  },
+  headerModeChip: {
+    maxWidth: 210,
+    minHeight: 32,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 1,
+  },
+  headerModeChipCompact: {
+    maxWidth: 180,
+    minHeight: 30,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  headerModeChipText: {
+    flexShrink: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+  },
   guruMemberBadge: {
     borderWidth: 1,
     borderRadius: 12,
@@ -10191,30 +10222,6 @@ const styles = StyleSheet.create({
   },
   premiumToggleButton: {
     marginHorizontal: 4,
-  },
-  chatModeIdentityButton: {
-    minHeight: 40,
-    maxWidth: 142,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 9,
-    marginHorizontal: 3,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  chatModeIdentityButtonCompact: {
-    minWidth: 40,
-    maxWidth: 40,
-    paddingHorizontal: 0,
-    marginHorizontal: 2,
-    gap: 0,
-  },
-  chatModeIdentityText: {
-    flexShrink: 1,
-    fontSize: 11,
-    fontWeight: '800',
   },
   premiumToggleIcon: {
     width: 44,
