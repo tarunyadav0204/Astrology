@@ -2,11 +2,87 @@ import json
 import logging
 import os
 from datetime import datetime, date, timedelta, timezone
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Tuple
 
 # Sentinel: pass this as discount to mean "do not change discount column"
 _DISCOUNT_OMIT = object()
 logger = logging.getLogger(__name__)
+
+# Admin ledger feature filter: equality on reference_id (indexed), plus a
+# left-anchored description prefix only when Standard/Premium share chat_question.
+LEDGER_FEATURE_FILTERS = {
+    "standard_chat": (
+        {"reference_ids": ("chat_question",), "description_prefix": "Standard Chat"},
+    ),
+    "premium_chat": (
+        {"reference_ids": ("chat_question",), "description_prefix": "Premium Deep Analysis"},
+    ),
+    "live_chat": (
+        {"reference_ids": ("instant_chat", "instant_chat_minutes")},
+        {"reference_ids": ("chat_question",), "description_prefix": "Instant Chat"},
+    ),
+    "talk_to_tara": (
+        {"reference_ids": ("speech_chat", "speech_chat_minutes")},
+        {"reference_ids": ("chat_question",), "description_prefix": "Talk To Tara"},
+    ),
+    "partnership_chat": (
+        {"reference_ids": ("partnership_analysis",)},
+        {"reference_ids": ("chat_question",), "description_prefix": "Partnership"},
+    ),
+}
+
+_LEDGER_FEATURE_ALIASES = {
+    "standard": "standard_chat",
+    "standard_chat": "standard_chat",
+    "premium": "premium_chat",
+    "premium_chat": "premium_chat",
+    "live": "live_chat",
+    "live_chat": "live_chat",
+    "instant": "live_chat",
+    "instant_chat": "live_chat",
+    "talk_to_tara": "talk_to_tara",
+    "speech": "talk_to_tara",
+    "speech_chat": "talk_to_tara",
+    "partnership": "partnership_chat",
+    "partnership_chat": "partnership_chat",
+    "partnership_analysis": "partnership_chat",
+}
+
+
+def normalize_ledger_feature_filter(feature: Optional[str]) -> Optional[str]:
+    key = (feature or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if not key:
+        return None
+    mapped = _LEDGER_FEATURE_ALIASES.get(key)
+    if mapped is None:
+        raise ValueError(
+            "feature must be one of: standard_chat, live_chat, talk_to_tara, premium_chat, partnership_chat"
+        )
+    return mapped
+
+
+def ledger_feature_sql(feature: Optional[str]) -> Tuple[str, List[Any]]:
+    """Return (AND-clause, params) using indexed reference_id equality, not full-text search."""
+    key = normalize_ledger_feature_filter(feature)
+    if not key:
+        return "", []
+    groups = []
+    params: List[Any] = []
+    for clause in LEDGER_FEATURE_FILTERS[key]:
+        ids = tuple(clause["reference_ids"])
+        placeholders = ",".join(["?"] * len(ids))
+        sql = f"(ct.reference_id IN ({placeholders})"
+        params.extend(ids)
+        prefix = clause.get("description_prefix")
+        if prefix:
+            sql += " AND starts_with(COALESCE(ct.description, ''), ?)"
+            params.append(prefix)
+        sql += ")"
+        groups.append(sql)
+    return (
+        " AND ct.source = 'feature_usage' AND (" + " OR ".join(groups) + ")",
+        params,
+    )
 
 
 class CreditService:
@@ -405,6 +481,14 @@ class CreditService:
                     """
                     CREATE INDEX IF NOT EXISTS idx_credit_tx_source_type_created
                     ON credit_transactions(source, transaction_type, created_at DESC)
+                    """,
+                )
+                execute(
+                    conn,
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_credit_tx_feature_created
+                    ON credit_transactions(reference_id, created_at DESC)
+                    WHERE source = 'feature_usage'
                     """,
                 )
                 conn.commit()
@@ -4498,6 +4582,7 @@ class CreditService:
         cohort_filter: Optional[str] = None,
         buy_only: bool = False,
         non_admin_only: bool = False,
+        feature: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Search credit transactions across all users for a date range, with optional
@@ -4516,13 +4601,16 @@ class CreditService:
         non_admin_filter = (
             " AND ct.source <> 'admin_adjustment'" if non_admin_only else ""
         )
+        feature_sql, feature_params = ledger_feature_sql(feature)
         cohort = (cohort_filter or "").strip().lower()
+        range_start = f"{from_date} 00:00:00"
         where_sql = f"""
             FROM credit_transactions ct
             LEFT JOIN users u ON u.userid = ct.userid
-            WHERE date(ct.created_at) >= ? AND date(ct.created_at) <= ?{zero_filter}{buy_filter}{non_admin_filter}
+            WHERE ct.created_at >= ? AND ct.created_at < CAST(? AS DATE) + INTERVAL '1 day'{zero_filter}{buy_filter}{non_admin_filter}{feature_sql}
         """
-        params: List[Any] = [from_date, to_date]
+        params: List[Any] = [range_start, to_date]
+        params.extend(feature_params)
 
         if cohort == "new_users_bought_in_range":
             where_sql += """
@@ -4739,6 +4827,7 @@ class CreditService:
         *,
         exclude_zero_amount: bool = False,
         cohort_filter: Optional[str] = None,
+        feature: Optional[str] = None,
     ) -> Dict[str, int]:
         """
         Backend summary for admin credit ledger over the exact same filter as search_transactions.
@@ -4749,6 +4838,7 @@ class CreditService:
         range_start = f"{from_date} 00:00:00"
         range_end_exclusive_sql = f"CAST(? AS DATE) + INTERVAL '1 day'"
         zero_filter = " AND ct.amount <> 0" if exclude_zero_amount else ""
+        feature_sql, feature_params = ledger_feature_sql(feature)
         cohort = (cohort_filter or "").strip().lower()
         query_filter = ""
         query_params: List[Any] = []
@@ -4788,6 +4878,7 @@ class CreditService:
         params: List[Any] = [from_date, to_date, range_start, to_date]
         params.extend(cohort_params)
         params.extend(query_params)
+        params.extend(feature_params)
 
         sql = f"""
             SELECT
@@ -4967,6 +5058,7 @@ class CreditService:
               {zero_filter}
               {cohort_filter_sql}
               {query_filter}
+              {feature_sql}
         """
 
         with get_conn() as conn:

@@ -52,6 +52,51 @@ def test_credit_ledger_summary_nets_payment_reversals(monkeypatch):
     assert summary["refund_reversal_credits"] == 100
 
 
+def test_ledger_feature_sql_uses_indexed_equality_not_full_text():
+    from credits.credit_service import ledger_feature_sql, normalize_ledger_feature_filter
+
+    sql, params = ledger_feature_sql("talk_to_tara")
+    assert "ct.source = 'feature_usage'" in sql
+    assert "ct.reference_id IN" in sql
+    assert "starts_with" in sql
+    assert "ILIKE" not in sql
+    assert "%" not in "".join(str(p) for p in params)
+    assert "speech_chat" in params
+    assert "speech_chat_minutes" in params
+    assert "Talk To Tara" in params
+    assert normalize_ledger_feature_filter("Live Chat") == "live_chat"
+
+    try:
+        ledger_feature_sql("not_a_real_feature")
+        raise AssertionError("expected invalid feature to raise")
+    except ValueError:
+        pass
+
+
+def test_credit_ledger_summary_feature_filter_parameter_count(monkeypatch):
+    captured = {}
+
+    def _execute(_conn, sql, params):
+        captured["sql"] = sql
+        captured["params"] = list(params)
+        return _Cursor()
+
+    monkeypatch.setattr(db, "get_conn", _connection)
+    monkeypatch.setattr(db, "execute", _execute)
+
+    CreditService().get_search_transaction_summary(
+        "2026-08-01",
+        "2026-08-14",
+        feature="standard_chat",
+    )
+
+    adapted = db._adapt_query_for_postgres(captured["sql"])
+    assert adapted.count("%s") == len(captured["params"])
+    assert "starts_with" in captured["sql"]
+    assert "chat_question" in captured["params"]
+    assert "Standard Chat" in captured["params"]
+
+
 def test_credit_ledger_summary_query_has_matching_postgres_parameters(monkeypatch):
     captured = {}
 

@@ -12,3 +12,18 @@
 -keep class com.facebook.react.turbomodule.** { *; }
 
 # Add any project specific keep options here:
+
+# @generated begin expo-build-properties - expo prebuild (DO NOT MODIFY)
+# Keep enough native-bridge surface for release R8 without disabling obfuscation.
+-keepattributes SourceFile,LineNumberTable,Signature,*Annotation*,Exceptions,InnerClasses,EnclosingMethod,JavascriptInterface
+-renamesourcefileattribute SourceFile
+-keep class com.facebook.hermes.unicode.** { *; }
+-keep class com.facebook.jni.** { *; }
+-keep class com.razorpay.** { *; }
+-dontwarn com.razorpay.**
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keep class com.appsflyer.** { *; }
+-keep class com.margelo.nitro.** { *; }
+# @generated end expo-build-properties

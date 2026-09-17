@@ -94,7 +94,8 @@
 }
 
 .search-row input[type="date"],
-.search-row input[type="text"] {
+.search-row input[type="text"],
+.search-row select {
   padding: 8px 12px;
   color: var(--admin-text);
   background: var(--admin-surface);
@@ -108,7 +109,8 @@
   min-width: 160px;
 }
 
-.search-row input:focus {
+.search-row input:focus,
+.search-row select:focus {
   outline: none;
   border-color: var(--color-focus);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-focus) 20%, transparent);
@@ -454,7 +456,8 @@
   }
 
   .search-row input[type="date"],
-  .search-row input[type="text"] {
+  .search-row input[type="text"],
+  .search-row select {
     min-width: 0;
     width: 100%;
   }

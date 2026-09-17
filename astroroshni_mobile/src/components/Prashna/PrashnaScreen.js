@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { storage } from '../../services/storage';
 import { prashnaAPI } from '../../services/api';
-import LocationPicker from '../LocationPicker';
+import PlaceSearchField from '../PlaceSearchField';
 import {
   detectQuestionPlace,
   loadSavedQuestionPlace,
@@ -87,7 +87,6 @@ export default function PrashnaScreen({ navigation, route }) {
   const [time, setTime] = useState(initial.time);
   const [place, setPlace] = useState(null);
   const [placeLoading, setPlaceLoading] = useState(true);
-  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [horaryNumber, setHoraryNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -157,7 +156,6 @@ export default function PrashnaScreen({ navigation, route }) {
       const detected = await detectQuestionPlace();
       if (!detected) {
         setError(t('prashna.placeDetectError', 'Could not detect your current city. Search and select it.'));
-        setShowLocationPicker(true);
         return;
       }
       applyPlace(detected);
@@ -293,16 +291,34 @@ export default function PrashnaScreen({ navigation, route }) {
       </TouchableOpacity>
 
       <Text style={[styles.label, { color: colors.text }]}>{t('prashna.place', 'Place of asking')}</Text>
-      <TouchableOpacity
-        onPress={() => setShowLocationPicker(true)}
-        style={[styles.placeCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}
-      >
-        <Ionicons name="location-outline" size={18} color={colors.primary} />
-        <Text style={[styles.placeText, { color: colors.text }]}>
-          {placeLoading ? t('prashna.detectingPlace', 'Detecting current city…') : placeLabel}
+      {placeLoading ? (
+        <Text style={[styles.hint, { color: colors.textSecondary }]}>
+          {t('prashna.detectingPlace', 'Detecting current city…')}
         </Text>
-        <Text style={[styles.changeText, { color: colors.primary }]}>{t('prashna.changePlace', 'Change')}</Text>
-      </TouchableOpacity>
+      ) : null}
+      <PlaceSearchField
+        selectedName={place?.name || ''}
+        selectedLatitude={place?.latitude}
+        selectedLongitude={place?.longitude}
+        placeholder={t('prashna.placePlaceholder', 'City, State, Country')}
+        onDraftChange={(text) => {
+          setPlace((prev) => ({
+            ...(prev || {}),
+            name: text,
+            latitude: null,
+            longitude: null,
+            source: 'draft',
+          }));
+        }}
+        onSelect={(selected) => {
+          applyPlace({
+            latitude: selected.latitude,
+            longitude: selected.longitude,
+            name: selected.name,
+            source: selected.source || 'manual',
+          });
+        }}
+      />
       <TouchableOpacity onPress={useCurrentPlace} style={styles.linkBtn} disabled={placeLoading}>
         <Ionicons name="navigate-outline" size={16} color={colors.primary} />
         <Text style={[styles.linkText, { color: colors.primary }]}>{t('prashna.useCurrentPlace', 'Use current location')}</Text>
@@ -448,24 +464,10 @@ export default function PrashnaScreen({ navigation, route }) {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {renderHeader()}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="always">
           {result ? renderResult() : renderForm()}
         </ScrollView>
       </KeyboardAvoidingView>
-      {showLocationPicker ? (
-        <LocationPicker
-          onLocationSelect={(selected) => {
-            applyPlace({
-              latitude: selected.latitude,
-              longitude: selected.longitude,
-              name: selected.name,
-              source: 'manual',
-            });
-            setShowLocationPicker(false);
-          }}
-          onClose={() => setShowLocationPicker(false)}
-        />
-      ) : null}
     </SafeAreaView>
   );
 }
@@ -502,9 +504,6 @@ const styles = StyleSheet.create({
   rowItem: { flex: 1 },
   linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   linkText: { fontSize: 13, fontWeight: '600' },
-  placeCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, padding: 12 },
-  placeText: { flex: 1, fontSize: 14 },
-  changeText: { fontSize: 13, fontWeight: '700' },
   hint: { fontSize: 12, lineHeight: 18, marginTop: 6 },
   error: { color: '#b91c1c', marginTop: 12, fontSize: 13 },
   castBtn: { marginTop: 22, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },

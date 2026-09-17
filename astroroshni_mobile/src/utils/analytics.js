@@ -80,10 +80,50 @@ async function getStableGA4ClientId(AsyncStorage) {
   return id;
 }
 
+const COMMERCE_EVENT_NAMES = new Set(['purchase', 'subscribe', 'initiate_checkout']);
+
+function commerceNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** GA4 monetization reads `value` + `currency`, not Meta's `amount`. */
+function withGa4CommerceParams(eventName, params = {}) {
+  if (!COMMERCE_EVENT_NAMES.has(eventName)) return params;
+
+  const value = commerceNumber(params.value ?? params.amount);
+  const currency = String(params.currency || 'INR').toUpperCase().slice(0, 3);
+  const transactionId =
+    params.transaction_id || params.order_id || params.orderId || params.transactionId || null;
+  const itemId = params.content_id || params.productId || params.item_id || null;
+  const itemName =
+    params.item_name || params.content_type || (eventName === 'subscribe' ? 'subscription' : 'credits');
+
+  const next = { ...params, currency };
+  if (value != null) {
+    next.value = value;
+    next.amount = value;
+  }
+  if (transactionId) next.transaction_id = String(transactionId);
+  if (itemId && !Array.isArray(params.items)) {
+    next.items = [
+      {
+        item_id: String(itemId).slice(0, 100),
+        item_name: String(itemName).slice(0, 100),
+        item_category: String(params.content_type || itemName).slice(0, 100),
+        ...(value != null ? { price: value } : {}),
+        quantity: 1,
+      },
+    ];
+  }
+  return next;
+}
+
 const sendToGA4 = async (eventName, params = {}) => {
   if (Platform.OS === 'web') return;
 
-  const nativeOk = await logFirebaseEvent(eventName, params);
+  const commerceParams = withGa4CommerceParams(eventName, params);
+  const nativeOk = await logFirebaseEvent(eventName, commerceParams);
   if (nativeOk) return;
 
   try {
@@ -112,7 +152,7 @@ const sendToGA4 = async (eventName, params = {}) => {
       events: [{
         name: eventName,
         params: {
-          ...params,
+          ...commerceParams,
           platform: Platform.OS,
           os_version: `${Platform.OS} ${Platform.Version || 'unknown'}`,
           engagement_time_msec: 100
@@ -135,11 +175,12 @@ const sendToGA4 = async (eventName, params = {}) => {
 };
 
 export const trackGA4EventOnly = (eventName, params = {}) => {
-  console.log('📊 GA4 Event:', eventName, params);
+  const commerceParams = withGa4CommerceParams(eventName, params);
+  console.log('📊 GA4 Event:', eventName, commerceParams);
   if (Platform.OS === 'web') {
-    gtag('event', eventName, params);
+    gtag('event', eventName, commerceParams);
   } else {
-    return sendToGA4(eventName, params);
+    return sendToGA4(eventName, commerceParams);
   }
   return Promise.resolve();
 };
@@ -178,9 +219,10 @@ export const trackScreenView = (screenName, meta = {}) => {
 };
 
 export const trackEvent = (eventName, params = {}) => {
-  console.log('📊 Event:', eventName, params);
+  const commerceParams = withGa4CommerceParams(eventName, params);
+  console.log('📊 Event:', eventName, commerceParams);
   if (Platform.OS === 'web') {
-    gtag('event', eventName, params);
+    gtag('event', eventName, commerceParams);
     // Meta Pixel custom / mapped events for PWA.
     if (eventName === 'login') {
       trackMetaPixelEvent('Login', { method: params.method || 'mobile', ...params });
@@ -191,19 +233,19 @@ export const trackEvent = (eventName, params = {}) => {
       });
     }
   } else {
-    sendToGA4(eventName, params);
+    sendToGA4(eventName, commerceParams);
     if (eventName === 'login') {
-      logAppsFlyerStandardEvent('login', params);
+      logAppsFlyerStandardEvent('login', commerceParams);
     }
     // Meta standard events are dispatched via trackMetaStandard / logMetaAppEvent; avoid duplicate custom logs.
     if (!Object.values(MetaStandardEvent).includes(eventName)) {
-      logFacebookEvent(eventName, params);
+      logFacebookEvent(eventName, commerceParams);
     }
     // Mirror every analytics event to mobile journey events.
     trackMobileJourneyEvent('mobile_action', {
       resource_type: 'event',
       resource_id: eventName,
-      metadata: params || {},
+      metadata: commerceParams || {},
     });
   }
 };
@@ -223,21 +265,22 @@ const META_GA_EVENT_ALIAS = {
 /** Fire a Meta standard app event (+ GA4 + journey). Prefer for Events Manager checklist. */
 export const trackMetaStandard = (eventKey, params = {}) => {
   const gaEventName = META_GA_EVENT_ALIAS[eventKey] || eventKey;
-  console.log('📊 Meta standard:', eventKey, params);
+  const commerceParams = withGa4CommerceParams(gaEventName, params);
+  console.log('📊 Meta standard:', eventKey, commerceParams);
   if (Platform.OS === 'web') {
-    gtag('event', gaEventName, params);
-    trackMetaPixelFromStandardKey(eventKey, params);
+    gtag('event', gaEventName, commerceParams);
+    trackMetaPixelFromStandardKey(eventKey, commerceParams);
   } else {
-    sendToGA4(gaEventName, params);
-    logAppsFlyerStandardEvent(gaEventName, params);
+    sendToGA4(gaEventName, commerceParams);
+    logAppsFlyerStandardEvent(gaEventName, commerceParams);
     trackMobileJourneyEvent('mobile_action', {
       resource_type: 'meta_event',
       resource_id: gaEventName,
-      metadata: params || {},
+      metadata: commerceParams || {},
     });
     // Meta Ads optimization stays on the native Facebook SDK. Do not also
     // enable AppsFlyer → Meta event forwarding or purchases will double-count.
-    logMetaAppEvent(eventKey, params);
+    logMetaAppEvent(eventKey, commerceParams);
   }
 };
 
@@ -248,14 +291,18 @@ export const trackAstrologyEvent = {
   transitViewed: (date) => trackEvent('transit_viewed', { date }),
   analysisRequested: (analysisType) => trackEvent('analysis_requested', { analysis_type: analysisType }),
   chatMessageSent: (messageType) => trackEvent('chat_message_sent', { message_type: messageType }),
-  creditPurchased: (amount, opts = {}) =>
-    trackMetaStandard(MetaStandardEvent.PURCHASE, {
-      amount,
+  creditPurchased: (amount, opts = {}) => {
+    const value = commerceNumber(amount ?? opts.value ?? opts.amount) ?? 0;
+    return trackMetaStandard(MetaStandardEvent.PURCHASE, {
+      ...opts,
+      amount: value,
+      value,
       currency: opts.currency || 'INR',
       content_id: opts.content_id || opts.productId,
       content_type: opts.content_type || 'credits',
-      ...opts,
-    }),
+      transaction_id: opts.transaction_id || opts.order_id || opts.orderId,
+    });
+  },
   userRegistered: (method = 'mobile') =>
     trackMetaStandard(MetaStandardEvent.COMPLETE_REGISTRATION, {
       method,

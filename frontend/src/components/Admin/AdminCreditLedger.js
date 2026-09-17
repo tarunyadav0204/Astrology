@@ -8,6 +8,15 @@ const USER_LEDGER_LIMIT = 1500;
 const ACTION_MENU_WIDTH = 260;
 const PAGE_SIZE = 100;
 
+const LEDGER_FEATURE_OPTIONS = [
+  { value: '', label: 'All features' },
+  { value: 'standard_chat', label: 'Standard Chat' },
+  { value: 'live_chat', label: 'Live Chat' },
+  { value: 'talk_to_tara', label: 'Talk to Tara' },
+  { value: 'premium_chat', label: 'Premium Chat' },
+  { value: 'partnership_chat', label: 'Partnership Chat' },
+];
+
 /** 1 credit = ₹1 until 2026-07-14; ₹2 per credit from 2026-07-15 (IST calendar date). */
 const CREDIT_INR_RATE_CUTOVER_IST = '2026-07-15';
 
@@ -99,6 +108,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
   const [excludeZeroAmount, setExcludeZeroAmount] = useState(false);
   /** Server-side filter: hide admin_adjustment rows (bulk grants, manual adds/deducts). */
   const [nonAdminOnly, setNonAdminOnly] = useState(false);
+  const [featureFilter, setFeatureFilter] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -123,6 +133,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
     cohort = cohortFilter,
     buy = buyOnly,
     nonAdmin = nonAdminOnly,
+    feature = featureFilter,
     pageNum = page,
   } = {}) => {
     setSearchLoading(true);
@@ -135,6 +146,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
       if (excludeZero) params.append('exclude_zero_amount', 'true');
       if (buy) params.append('buy_only', 'true');
       if (nonAdmin) params.append('non_admin_only', 'true');
+      if (feature) params.append('feature', feature);
       if (cohort) params.append('cohort_filter', cohort);
       params.append('page', String(pageNum));
       params.append('page_size', String(PAGE_SIZE));
@@ -197,6 +209,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
     setBuyOnly(false);
     setExcludeZeroAmount(false);
     setNonAdminOnly(false);
+    setFeatureFilter('');
     setPage(1);
     loadTransactions({
       fromDate: today,
@@ -206,6 +219,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
       cohort: '',
       buy: false,
       nonAdmin: false,
+      feature: '',
       pageNum: 1,
     });
   }, [ledgerJumpNonce]);
@@ -220,6 +234,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
       cohort: cohortFilter,
       buy: buyOnly,
       nonAdmin: nonAdminOnly,
+      feature: featureFilter,
       pageNum: 1,
     });
   };
@@ -310,7 +325,12 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
     if (source === 'credit_request_approval') return 'Credit Request Approved';
     if (source === 'feature_usage') {
       const names = {
-        chat_question: 'Chat Question',
+        chat_question: 'Standard Chat',
+        instant_chat: 'Live Chat',
+        instant_chat_minutes: 'Live Chat',
+        speech_chat: 'Talk to Tara',
+        speech_chat_minutes: 'Talk to Tara',
+        partnership_analysis: 'Partnership Chat',
         marriage_analysis: 'Marriage Analysis',
         wealth_analysis: 'Wealth Analysis',
         health_analysis: 'Health Analysis',
@@ -476,6 +496,24 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </label>
+            <label>
+              <span className="label-text">Feature</span>
+              <select
+                value={featureFilter}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setFeatureFilter(next);
+                  setPage(1);
+                  loadTransactions({ feature: next, pageNum: 1 });
+                }}
+              >
+                {LEDGER_FEATURE_OPTIONS.map((opt) => (
+                  <option key={opt.value || 'all'} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button className="search-btn" onClick={handleSearch} disabled={searchLoading}>
               {searchLoading ? 'Searching…' : 'Search'}
             </button>
@@ -512,6 +550,11 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                 )}
                 {nonAdminOnly && (
                   <span className="results-filter"> · non-admin only</span>
+                )}
+                {featureFilter && (
+                  <span className="results-filter">
+                    {' '}· {LEDGER_FEATURE_OPTIONS.find((opt) => opt.value === featureFilter)?.label || featureFilter}
+                  </span>
                 )}
               </h2>
               <div className="ledger-summary">

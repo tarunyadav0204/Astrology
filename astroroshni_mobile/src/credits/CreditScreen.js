@@ -83,10 +83,22 @@ function normalizeIapProductForLegacyHelpers(raw) {
 }
 
 function getIapPriceNumber(iapProduct) {
-  const offer = iapProduct?.oneTimePurchaseOfferDetails || {};
-  const micros = offer.priceAmountMicros ? parseInt(offer.priceAmountMicros, 10) : 0;
+  if (!iapProduct) return 0;
+  const offer = iapProduct.oneTimePurchaseOfferDetails || {};
+  let micros = offer.priceAmountMicros ? parseInt(offer.priceAmountMicros, 10) : 0;
+  if (!(micros > 0) && iapProduct.priceAmountMicros) {
+    micros = parseInt(iapProduct.priceAmountMicros, 10);
+  }
+  if (!(micros > 0)) {
+    const phases = iapProduct.subscriptionOfferDetails?.[0]?.pricingPhases?.pricingPhaseList;
+    if (Array.isArray(phases) && phases.length) {
+      const paid = phases.find((phase) => parseInt(phase?.priceAmountMicros || '0', 10) > 0) || phases[0];
+      micros = parseInt(paid?.priceAmountMicros || '0', 10);
+    }
+  }
   if (micros > 0) return micros / 1_000_000;
-  const localized = iapProduct?.localizedPrice || iapProduct?.price;
+  const localized = iapProduct.localizedPrice || iapProduct.price;
+  if (typeof localized === 'number' && Number.isFinite(localized) && localized > 0) return localized;
   if (typeof localized === 'string') {
     const parsed = parseFloat(localized.replace(/[^\d.]/g, ''));
     return Number.isFinite(parsed) ? parsed : 0;
@@ -95,8 +107,14 @@ function getIapPriceNumber(iapProduct) {
 }
 
 function getIapCurrency(iapProduct) {
+  const offer = iapProduct?.oneTimePurchaseOfferDetails || {};
+  const phases = iapProduct?.subscriptionOfferDetails?.[0]?.pricingPhases?.pricingPhaseList;
+  const paid = Array.isArray(phases)
+    ? phases.find((phase) => parseInt(phase?.priceAmountMicros || '0', 10) > 0) || phases[0]
+    : null;
   return (
-    iapProduct?.oneTimePurchaseOfferDetails?.priceCurrencyCode ||
+    offer.priceCurrencyCode ||
+    paid?.priceCurrencyCode ||
     iapProduct?.currency ||
     'INR'
   );
@@ -625,10 +643,19 @@ const CreditScreen = ({ navigation, route }) => {
       await fetchHistory();
       const isAlreadyCredited = data.credits_added === 0 && (data.message || '').toLowerCase().includes('already credited');
       if (!isAlreadyCredited) {
-        trackAstrologyEvent.creditPurchased(getIapPriceNumber(iapProduct), {
+        const catalogProduct = googlePlayProducts.find(
+          (p) => String(p.product_id || p.id) === String(productId)
+        );
+        const micros = Number(pricingPayload.price_amount_micros);
+        const purchaseValue =
+          getIapPriceNumber(iapProduct) ||
+          (micros > 0 ? micros / 1_000_000 : 0) ||
+          Number(catalogProduct?.price_inr || catalogProduct?.price || 0);
+        trackAstrologyEvent.creditPurchased(purchaseValue, {
           content_id: productId,
           content_type: 'credits',
-          currency: getIapCurrency(iapProduct),
+          currency: getIapCurrency(iapProduct) || pricingPayload.price_currency || 'INR',
+          transaction_id: orderId,
         });
       }
       const successMsg = isAlreadyCredited
@@ -700,7 +727,8 @@ const CreditScreen = ({ navigation, route }) => {
         content_id: productId,
         content_type: 'subscription',
         currency: getIapCurrency(subscription),
-        value: getIapPriceNumber(subscription),
+        value: getIapPriceNumber(subscription) || Number(purchasedPlan?.price_inr || purchasedPlan?.price || 0),
+        transaction_id: orderId,
       };
       if (subscriptionHasFreeTrial(subscription)) {
         trackAstrologyEvent.startTrial(subPayload);
@@ -1070,11 +1098,15 @@ const CreditScreen = ({ navigation, route }) => {
                 const isAlready =
                   creditsAdded === 0 && (data.message || '').toLowerCase().includes('already credited');
                 
-                if (!isAlready && creditsAdded > 0 && iapProduct) {
-                  C.trackAstrologyEvent.creditPurchased(getIapPriceNumber(iapProduct), {
+                if (!isAlready && creditsAdded > 0) {
+                  const purchaseValue =
+                    getIapPriceNumber(iapProduct) ||
+                    Number(product?.price_inr || product?.price || 0);
+                  C.trackAstrologyEvent.creditPurchased(purchaseValue, {
                     content_id: creditSku,
                     content_type: 'credits',
                     currency: getIapCurrency(iapProduct),
+                    transaction_id: data?.order_id || data?.razorpay_order_id || externalTransactionToken,
                   });
                 }
                 
@@ -1129,7 +1161,8 @@ const CreditScreen = ({ navigation, route }) => {
                   content_id: subSku,
                   content_type: 'subscription',
                   currency: getIapCurrency(subscription),
-                  value: getIapPriceNumber(subscription),
+                  value: getIapPriceNumber(subscription) || Number(plan?.price_inr || plan?.price || 0),
+                  transaction_id: data?.subscription_id || data?.razorpay_subscription_id || externalTransactionToken,
                 };
                 
                 if (subscriptionHasFreeTrial(subscription)) {
@@ -1685,6 +1718,7 @@ const CreditScreen = ({ navigation, route }) => {
         credits: creditsAmount,
         credits_added: added,
         order_id: razorpayOrderId || undefined,
+        transaction_id: razorpayOrderId || undefined,
       });
       setPurchaseModal({
         visible: true,
@@ -1752,6 +1786,10 @@ const CreditScreen = ({ navigation, route }) => {
         currency: 'INR',
         value: subValue,
         tier_name: plan.tier_name || verifyData?.subscription?.tier_name,
+        transaction_id:
+          verifyData?.subscription_id ||
+          verifyData?.razorpay_subscription_id ||
+          subscriptionData?.id,
       });
       await fetchBalance();
       await fetchSubscriptionDetails();

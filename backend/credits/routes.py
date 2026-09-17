@@ -13,7 +13,7 @@ import requests
 from collections import OrderedDict
 from threading import Lock
 from auth import get_best_effort_analytics_user_id, get_current_user, User
-from .credit_service import CreditService
+from .credit_service import CreditService, normalize_ledger_feature_filter
 from .admin.promo_manager import PromoCodeManager
 from utils.env_json import parse_json_from_env
 from activity.publisher import publish_activity
@@ -3832,6 +3832,10 @@ async def search_credit_transactions(
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=500),
     cohort_filter: Optional[str] = None,
+    feature: Optional[str] = Query(
+        None,
+        description="Optional spend feature: standard_chat, live_chat, talk_to_tara, premium_chat, partnership_chat",
+    ),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -3858,6 +3862,11 @@ async def search_credit_transactions(
         fd = today - timedelta(days=30)
         td = today
 
+    try:
+        feature_key = normalize_ledger_feature_filter(feature)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     offset = (page - 1) * page_size
     summary = credit_service.get_search_transaction_summary(
         fd.isoformat(),
@@ -3865,6 +3874,7 @@ async def search_credit_transactions(
         query,
         exclude_zero_amount=exclude_zero_amount,
         cohort_filter=cohort_filter,
+        feature=feature_key,
     )
     result = credit_service.search_transactions(
         fd.isoformat(),
@@ -3876,6 +3886,7 @@ async def search_credit_transactions(
         cohort_filter=cohort_filter,
         buy_only=buy_only,
         non_admin_only=non_admin_only,
+        feature=feature_key,
     )
     total = int(result.get("total") or 0)
     total_pages = max(1, (total + page_size - 1) // page_size) if total else 1
@@ -3883,6 +3894,7 @@ async def search_credit_transactions(
         "from_date": fd.isoformat(),
         "to_date": td.isoformat(),
         "cohort_filter": cohort_filter,
+        "feature": feature_key,
         "summary": summary,
         "transactions": result.get("transactions") or [],
         "pagination": {

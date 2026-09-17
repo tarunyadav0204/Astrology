@@ -168,9 +168,15 @@
         {
           "ios": {
             "deploymentTarget": "15.1"
+          },
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keepattributes SourceFile,LineNumberTable,Signature,*Annotation*,Exceptions,InnerClasses,EnclosingMethod,JavascriptInterface\n-renamesourcefileattribute SourceFile\n-keep class com.facebook.hermes.unicode.** { *; }\n-keep class com.facebook.jni.** { *; }\n-keep class com.razorpay.** { *; }\n-dontwarn com.razorpay.**\n-keepclassmembers class * {\n    @android.webkit.JavascriptInterface <methods>;\n}\n-keep class com.appsflyer.** { *; }\n-keep class com.margelo.nitro.** { *; }\n"
           }
         }
       ],
+      "./plugins/withAndroidR8Optimize",
       "react-native-iap",
       "@sentry/react-native"
     ]

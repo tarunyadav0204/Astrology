@@ -41,6 +41,25 @@ function sanitizeEventName(eventName) {
   return raw;
 }
 
+function sanitizeItems(items) {
+  if (!Array.isArray(items)) return undefined;
+  const rows = items.slice(0, 25).map((item) => {
+    if (!item || typeof item !== 'object') return null;
+    const row = {};
+    for (const [key, value] of Object.entries(item)) {
+      if (value == null) continue;
+      const safeKey = String(key)
+        .replace(/[^A-Za-z0-9_]/g, '_')
+        .slice(0, 40);
+      if (!safeKey) continue;
+      if (typeof value === 'string') row[safeKey] = value.slice(0, 100);
+      else if (typeof value === 'number' && Number.isFinite(value)) row[safeKey] = value;
+    }
+    return Object.keys(row).length ? row : null;
+  }).filter(Boolean);
+  return rows.length ? rows : undefined;
+}
+
 function sanitizeParams(params = {}) {
   const out = {};
   let count = 0;
@@ -51,6 +70,14 @@ function sanitizeParams(params = {}) {
       .replace(/[^A-Za-z0-9_]/g, '_')
       .slice(0, 40);
     if (!safeKey) continue;
+    if (safeKey === 'items') {
+      const items = sanitizeItems(value);
+      if (items) {
+        out.items = items;
+        count += 1;
+      }
+      continue;
+    }
     if (typeof value === 'string') {
       out[safeKey] = value.slice(0, 100);
     } else if (typeof value === 'number' && Number.isFinite(value)) {
@@ -111,12 +138,23 @@ export async function logFirebaseEvent(eventName, params = {}) {
     const safeParams = sanitizeParams(params);
     if (name === 'purchase' && typeof instance.logPurchase === 'function') {
       const value = Number(params.amount ?? params.value ?? 0);
+      const currency = String(params.currency || 'INR');
+      const transactionId = params.transaction_id || params.order_id || params.orderId;
+      const itemId = params.content_id || params.productId;
+      const items = itemId
+        ? [{
+            item_id: String(itemId),
+            item_name: String(params.item_name || params.content_type || 'credits'),
+            item_category: String(params.content_type || 'credits'),
+            ...(Number.isFinite(value) ? { price: value } : {}),
+            quantity: 1,
+          }]
+        : sanitizeItems(params.items);
       await instance.logPurchase({
         value: Number.isFinite(value) ? value : 0,
-        currency: String(params.currency || 'INR'),
-        items: params.content_id
-          ? [{ item_id: String(params.content_id), item_name: String(params.content_type || 'credits') }]
-          : undefined,
+        currency,
+        ...(transactionId ? { transaction_id: String(transactionId) } : {}),
+        ...(items ? { items } : {}),
       });
       return true;
     }
