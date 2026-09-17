@@ -62,6 +62,7 @@ import KotaChakraScreen from './src/components/KotaChakra/KotaChakraScreen';
 import FactsScreen from './src/components/Facts/FactsScreen';
 import ShadbalaScreen from './src/components/Shadbala/ShadbalaScreen';
 import YogaScreen from './src/components/Yogas/YogaScreen';
+import PrashnaScreen from './src/components/Prashna/PrashnaScreen';
 import KPScreen from './src/screens/KPScreen';
 import SadeSatiScreen from './src/components/SadeSati/SadeSatiScreen';
 import NakshatraCalendarScreen from './src/components/NakshatraCalendar/NakshatraCalendarScreen';
@@ -92,6 +93,8 @@ import {
 } from './src/services/runtimeGuard';
 import { API_BASE_URL, getEndpoint } from './src/utils/constants';
 import { initFacebookAnalytics } from './src/services/facebookAnalytics';
+import { initAppsFlyerAnalytics } from './src/services/appsFlyerAnalytics';
+import { initFirebaseAnalytics } from './src/services/firebaseAnalytics';
 import { trackNavigationRoute } from './src/services/navigationAnalytics';
 import { trackGA4EventOnly } from './src/utils/analytics';
 import AddToHomeScreenPrompt from './src/platform/AddToHomeScreenPrompt';
@@ -578,6 +581,8 @@ export default function App() {
 
       if (Constants.appOwnership !== 'expo') {
         initFacebookAnalytics().catch(() => {});
+        initFirebaseAnalytics().catch(() => {});
+        initAppsFlyerAnalytics().catch(() => {});
       }
 
       try {
@@ -1179,6 +1184,11 @@ export default function App() {
           <Stack.Screen 
             name="Yogas" 
             component={YogaScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Prashna"
+            component={PrashnaScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

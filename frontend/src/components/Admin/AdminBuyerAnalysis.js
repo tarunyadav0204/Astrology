@@ -128,9 +128,9 @@ export default function AdminBuyerAnalysis() {
         <div>
           <h3>Buyer analysis</h3>
           <p>
-            Week-by-week credit purchases by UTM (first-touch install), new vs repeat buyers, and
-            return cohorts. Credits and INR match Credit Ledger net purchased (purchases − refunds;
-            ₹1/credit before 15 Jul 2026, ₹2 after).
+            Week-by-week credit purchases by first-touch install (UTM or AppsFlyer campaign),
+            new vs repeat buyers, and return cohorts. Credits and INR match Credit Ledger net
+            purchased (purchases − refunds; ₹1/credit before 15 Jul 2026, ₹2 after).
           </p>
         </div>
         <div className="aba-filters">
@@ -149,6 +149,9 @@ export default function AdminBuyerAnalysis() {
               <option value="medium">utm_medium</option>
               <option value="campaign">utm_campaign</option>
               <option value="source_medium">source / medium</option>
+              <option value="media_source">AppsFlyer media source</option>
+              <option value="af_campaign">AppsFlyer campaign</option>
+              <option value="paid_status">organic vs paid</option>
             </select>
           </label>
           <button type="button" onClick={load} disabled={loading}>
@@ -234,7 +237,7 @@ export default function AdminBuyerAnalysis() {
       </section>
 
       <section className="aba-section">
-        <h4>Week × UTM channel (top 8 by buyers)</h4>
+        <h4>Week × channel (top 8 by buyers)</h4>
         <div className="aba-table-wrap">
           <table className="aba-table aba-pivot">
             <thead>
@@ -357,6 +360,41 @@ export default function AdminBuyerAnalysis() {
               {!cohorts.length && !loading && (
                 <tr>
                   <td colSpan={maxCohortLag + 3}>No cohort data.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="aba-section">
+        <h4>Paid subscriptions by channel</h4>
+        <p className="aba-section-note">
+          First-touch install attribution for paid subscription starts in this range. Separate from
+          credit-pack revenue above.
+        </p>
+        <div className="aba-table-wrap">
+          <table className="aba-table">
+            <thead>
+              <tr>
+                <th>Channel</th>
+                <th>Subscribers</th>
+                <th>Subscriptions</th>
+                <th>Plan price total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.subscriptions_by_channel || []).map((row) => (
+                <tr key={row.channel}>
+                  <td>{row.channel}</td>
+                  <td>{formatInt(row.subscribers)}</td>
+                  <td>{formatInt(row.subscription_count)}</td>
+                  <td>{formatInr(row.revenue)}</td>
+                </tr>
+              ))}
+              {!(data?.subscriptions_by_channel || []).length && !loading && (
+                <tr>
+                  <td colSpan={4}>No paid subscriptions in this range.</td>
                 </tr>
               )}
             </tbody>

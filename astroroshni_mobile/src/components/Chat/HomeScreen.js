@@ -15,7 +15,6 @@ import {
   Linking,
 } from 'react-native';
 import AppScrollView, { VerticalPageScroll } from '../../platform/AppScrollView';
-import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
@@ -45,7 +44,10 @@ import PanditHomePanel from '../Pandit/PanditHomePanel';
 import PremiumTodayOverview, { PremiumExploreIntro } from '../Home/PremiumTodayOverview';
 import ComingUpDetailSheet from '../Home/ComingUpDetailSheet';
 import { buildComingUpAskMessage } from '../Home/ComingUpChartCard';
-import { getWebBottomInset, refreshWebShellHeight } from '../../platform/webSafeArea';
+import { refreshWebShellHeight } from '../../platform/webSafeArea';
+import HomeBottomTabs, { getHomeBottomTabMetrics } from './HomeBottomTabs';
+
+export { getHomeBottomTabMetrics };
 
 let createPortal = null;
 if (Platform.OS === 'web') {
@@ -335,23 +337,9 @@ const getCardScale = (index) => 1;
 /** Sign keys for ascendant description i18n (home.ascendantDescriptions.Aries etc.). */
 const ASCENDANT_SIGN_KEYS = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 
-export function getHomeBottomTabMetrics(bottomInset = 0) {
-  const contentHeight = Platform.OS === 'ios' ? 80 : Platform.OS === 'web' ? 56 : 70;
-  const safeBottom = Platform.OS === 'ios'
-    ? 10
-    : Platform.OS === 'web'
-      ? Math.min(getWebBottomInset(bottomInset), 12)
-      : Math.max(0, bottomInset || 0);
-
-  return {
-    contentHeight,
-    safeBottom,
-    totalHeight: contentHeight + safeBottom,
-  };
-}
-
 export default function HomeScreen({
   birthData,
+  initialTab = 'today',
   onOptionSelect,
   onTalkToTara,
   navigation,
@@ -365,11 +353,7 @@ export default function HomeScreen({
   const insets = useSafeAreaInsets();
   // Web: keep tab bar size normal. Home-indicator orange is applied via
   // setWebBottomSafeColor (CSS body::after below the safe edge) — not tab padding.
-  const {
-    contentHeight: tabContentHeight,
-    safeBottom: tabSafeBottom,
-    totalHeight: tabTotalHeight,
-  } = getHomeBottomTabMetrics(insets.bottom);
+  const { totalHeight: tabTotalHeight } = getHomeBottomTabMetrics(insets.bottom);
   const [showTaraDock, setShowTaraDock] = useState(false);
   const taraDockAnim = useRef(new Animated.Value(0)).current;
   // The tab bar overlays the page. Reserve its full height plus a comfortable
@@ -390,9 +374,6 @@ export default function HomeScreen({
   const { theme, colors, androidLightCardFixStyle, isPanditMode, exitPanditMode } = useTheme();
   // Pandit forces Hindi; soften weights/spacing so Devanagari isn't faux-bold/smudged.
   const isHindiUi = isPanditMode || isHindiLocale(i18n.language);
-  const tabActiveWeight = isHindiUi ? '600' : '800';
-  const tabIdleWeight = isHindiUi ? '500' : '600';
-  const tabSafeColor = colors.tabBarSurface || colors.headerSurface;
   const isDark = theme === 'dark';
   const homePageGradient = colors.homeGradient || [colors.background, colors.backgroundSecondary, colors.background];
   const homeHeaderGradient = isDark
@@ -400,9 +381,6 @@ export default function HomeScreen({
     : isPanditMode
       ? ['#FFFFFF', '#FFFFFF', '#FAFAFA']
       : ['rgba(255, 255, 255, 0.98)', 'rgba(255, 247, 237, 0.95)', 'rgba(255, 237, 213, 0.92)'];
-  const tabBarGradient = [colors.tabBarSurface || colors.headerSurface, colors.tabBarSurface || colors.headerSurface];
-  const tabActiveColor = colors.tabActiveColor || colors.accent;
-  const tabIdleColor = colors.tabIdleColor || colors.textInverseMuted;
   const isIOS = Platform.OS === 'ios';
   const { freeQuestionAvailable, pricing, pricingOriginal, fetchPricing } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
@@ -442,8 +420,8 @@ export default function HomeScreen({
   const nextPeakKeyRef = useRef('');
   const nextPeakDataRef = useRef(null);
   const nextPeakLoadPromiseRef = useRef(null);
-  const [activeTab, setActiveTab] = useState('today');
-  const [showExploreCatalog, setShowExploreCatalog] = useState(false);
+  const [activeTab, setActiveTab] = useState(initialTab === 'explore' ? 'explore' : 'today');
+  const [showExploreCatalog, setShowExploreCatalog] = useState(initialTab === 'explore');
   const premiumHomeScrollRef = useRef(null);
   const showTodaySurface = useCallback(() => {
     setShowExploreCatalog(false);
@@ -1885,6 +1863,19 @@ const loadHomeData = async (nativeData = null) => {
           ),
       },
       {
+        key: 'prashna',
+        title: t('menu.prashna', 'Prashna'),
+        accent: '#7C3AED',
+        tint: isLightSurface ? 'rgba(124, 58, 237, 0.12)' : 'rgba(167, 139, 250, 0.12)',
+        border: 'rgba(124, 58, 237, 0.28)',
+        icon: 'help-circle-outline',
+        badge: t('home.tools.horary', 'Horary'),
+        onPress: () =>
+          requireBirthChart((data) =>
+            navigation.navigate('Prashna', { birthData: data }),
+          ),
+      },
+      {
         key: 'kp',
         title: t('menu.kpSystem', 'KP System'),
         accent: '#059669',
@@ -2267,6 +2258,9 @@ const loadHomeData = async (nativeData = null) => {
             },
           })}
           onOpenExplore={showExploreSurface}
+          onOpenPrashna={() =>
+            requireBirthChart((data) => navigation.navigate('Prashna', { birthData: data }))
+          }
           onOpenAscendant={() => setActiveInsight(getSignInsight('ascendant', chartData?.houses?.[0]?.sign))}
           onOpenMoon={() => setActiveInsight(getSignInsight('moon', chartData?.planets?.Moon?.sign))}
           onOpenSun={() => setActiveInsight(getSignInsight('sun', chartData?.planets?.Sun?.sign))}
@@ -2306,6 +2300,9 @@ const loadHomeData = async (nativeData = null) => {
           onOpenMuhurat={() => navigation.navigate('MuhuratHub')}
           onOpenYearly={() => onOptionSelect({ action: 'events', readingMode: 'yearly' })}
           onOpenMonthly={() => onOptionSelect({ action: 'events', readingMode: 'monthly' })}
+          onOpenPrashna={() =>
+            requireBirthChart((data) => navigation.navigate('Prashna', { birthData: data }))
+          }
           eventsCost={pricing.events ?? 100}
           paths={options}
           analyses={analysisOptions}
@@ -3514,163 +3511,17 @@ const loadHomeData = async (nativeData = null) => {
         return taraDock;
       })()}
 
-      {/* Bottom Tabs — on web, portal to document.body with position:fixed so stack
-          transforms after BirthForm cannot leave a purple gap under the bar. */}
-      {(() => {
-        const bottomTabs = (
-      <View style={[
-        styles.bottomTabs,
-        {
-          bottom: 0,
-          height: tabContentHeight + tabSafeBottom,
-          paddingBottom: tabSafeBottom,
-          ...(Platform.OS === 'web'
-            ? {
-                position: 'fixed',
-                left: 0,
-                right: 0,
-                width: '100%',
-                maxWidth: 520,
-                marginLeft: 'auto',
-                marginRight: 'auto',
-                zIndex: 10000,
-                backgroundColor: tabSafeColor,
-              }
-            : null),
-        },
-      ]}
-      {...(Platform.OS === 'web' ? { dataSet: { arHomeBottomNav: '1' } } : null)}
-      >
-        <LinearGradient
-          colors={tabBarGradient}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-        />
-        {Platform.OS === 'ios' && (
-          <BlurView
-            intensity={theme === 'dark' ? 20 : 60}
-            style={StyleSheet.absoluteFill}
-            tint={theme === 'dark' ? 'dark' : 'light'}
-          />
-        )}
-
-        <TouchableOpacity
-          style={styles.tabItem}
-          onPress={showTodaySurface}
-          activeOpacity={0.7}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'today' }}
-          accessibilityLabel={t('premiumUi.home.tabs.today')}
-        >
-          <View style={styles.tabIconContainer}>
-            <Icon
-              name="today-outline"
-              size={22}
-              color={activeTab === 'today' ? tabActiveColor : tabIdleColor}
-            />
-          </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'today' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'today' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
-            {t('premiumUi.home.tabs.today')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.tabItem}
-          onPress={() => onOptionSelect({ action: 'question' })}
-          activeOpacity={0.7}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'ask' }}
-          accessibilityLabel={t('premiumUi.home.tabs.askTara')}
-        >
-          <View style={styles.tabIconContainer}>
-            <Icon
-              name="sparkles-outline"
-              size={22}
-              color={activeTab === 'ask' ? tabActiveColor : tabIdleColor}
-            />
-          </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'ask' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'ask' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
-            {t('premiumUi.home.tabs.askTara')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.tabItem}
-          onPress={showExploreSurface}
-          activeOpacity={0.7}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'explore' }}
-          accessibilityLabel={t('premiumUi.home.tabs.explore')}
-        >
-          <View style={styles.tabIconContainer}>
-            <Icon
-              name="compass-outline"
-              size={22}
-              color={activeTab === 'explore' ? tabActiveColor : tabIdleColor}
-            />
-          </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'explore' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'explore' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
-            {t('premiumUi.home.tabs.explore')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.tabItem}
-          onPress={() =>
-            requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data }))
-          }
-          activeOpacity={0.7}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'charts' }}
-          accessibilityLabel={t('premiumUi.home.tabs.charts')}
-        >
-          <View style={styles.tabIconContainer}>
-            <Svg width="22" height="22" viewBox="0 0 48 48">
-              {/* Outer square */}
-              <Rect x="2" y="2" width="44" height="44" fill="none" stroke={activeTab === 'charts' ? tabActiveColor : tabIdleColor} strokeWidth="3" />
-              {/* Inner diamond */}
-              <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke={activeTab === 'charts' ? (isPanditMode ? tabActiveColor : '#ffd700') : tabIdleColor} strokeWidth="2" />
-              {/* Diagonal lines creating triangular houses */}
-              <Line x1="2" y1="2" x2="46" y2="46" stroke={activeTab === 'charts' ? tabActiveColor : tabIdleColor} strokeWidth="1.5" />
-              <Line x1="46" y1="2" x2="2" y2="46" stroke={activeTab === 'charts' ? tabActiveColor : tabIdleColor} strokeWidth="1.5" />
-            </Svg>
-          </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'charts' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'charts' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
-            {t('premiumUi.home.tabs.charts')}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.tabItem}
-          onPress={() => navigation.navigate('Profile')}
-          activeOpacity={0.7}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'you' }}
-          accessibilityLabel={t('premiumUi.home.tabs.you')}
-        >
-          <View style={styles.tabIconContainer}>
-            <Icon
-              name="person-outline"
-              size={22}
-              color={activeTab === 'you' ? tabActiveColor : tabIdleColor}
-            />
-          </View>
-          <Text style={[styles.tabLabel, { color: activeTab === 'you' ? tabActiveColor : tabIdleColor, fontWeight: activeTab === 'you' ? tabActiveWeight : tabIdleWeight, letterSpacing: isHindiUi ? 0 : 0.3 }]}>
-            {t('premiumUi.home.tabs.you')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-        );
-
-        if (Platform.OS === 'web') {
-          if (!homeTabsVisible || !createPortal || typeof document === 'undefined') {
-            return null;
-          }
-          return createPortal(bottomTabs, document.body);
+      <HomeBottomTabs
+        activeTab={activeTab}
+        visible={Platform.OS !== 'web' || homeTabsVisible}
+        onToday={showTodaySurface}
+        onAskTara={() => onOptionSelect({ action: 'question' })}
+        onExplore={showExploreSurface}
+        onCharts={() =>
+          requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data }))
         }
-        return bottomTabs;
-      })()}
+        onYou={() => navigation.navigate('Profile')}
+      />
     </View>
   );
 }
@@ -6465,52 +6316,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  // Bottom Tabs Styles
-  bottomTabs: {
-    flexDirection: 'row',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10000,
-    overflow: Platform.OS === 'web' ? 'visible' : 'hidden',
-    ...Platform.select({
-      ios: {
-        height: 80,
-        paddingTop: 0,
-        paddingBottom: 0,
-      },
-      android: {
-        height: 70,
-        paddingTop: 0,
-        paddingBottom: 0,
-      },
-      web: {
-        height: undefined,
-        paddingTop: 0,
-        paddingBottom: 0,
-      },
-    }),
-  },
-  tabItem: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 0,
-  },
-  tabIconContainer: {
-    width: 42,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  tabLabel: {
-    fontSize: 11,
-    marginTop: 2,
-    letterSpacing: 0.3,
   },
   taraActionDock: {
     position: 'absolute',

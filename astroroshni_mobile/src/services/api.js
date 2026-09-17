@@ -1500,6 +1500,10 @@ export const kpAPI = {
   getFructification: (payload) => api.post(getEndpoint('/kp/fructification'), payload),
 };
 
+export const prashnaAPI = {
+  analyze: (payload) => api.post(getEndpoint('/prashna/analyze'), payload),
+};
+
 export const blogAPI = {
   getPosts: (status = 'published', category = null, limit = 10, offset = 0, config = {}) => {
     let url = `/blog/posts?status=${status}&limit=${limit}&offset=${offset}`;

@@ -144,6 +144,7 @@ from transits.routes import router as transits_router
 from Dashas.routes.chara_dasha_routes import router as chara_dasha_router
 from charts.routes import router as charts_router
 from charts.chart_cache import ensure_chart_response_cache_table
+from prashna.routes import router as prashna_router
 from chat_history.local_task_queue import ensure_local_chat_task_queue_table
 from birth_charts.routes import router as birth_charts_router
 from prediction_engine.routes import router as prediction_engine_router
@@ -1031,6 +1032,7 @@ app.include_router(childbirth_router, prefix="/api")
 # Note: childbirth_router already includes vehicle and griha pravesh endpoints
 app.include_router(health_router, prefix="/api")
 app.include_router(charts_router, prefix="/api")
+app.include_router(prashna_router, prefix="/api")
 app.include_router(birth_charts_router, prefix="/api")
 app.include_router(prediction_engine_router, prefix="/api")
 app.include_router(rectification_router, prefix="/api")

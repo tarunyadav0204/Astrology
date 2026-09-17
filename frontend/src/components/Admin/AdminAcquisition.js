@@ -20,6 +20,20 @@ function formatDateTimeIST(value) {
   });
 }
 
+function formatAttribution(row) {
+  if (!row) return '—';
+  const campaignBits = [
+    row.af_media_source || row.utm_source,
+    row.af_campaign || row.utm_campaign,
+    row.utm_medium,
+  ].filter(Boolean);
+  const label = campaignBits.join(' · ') || '—';
+  if (row.af_status) {
+    return `${row.af_status} · ${label}`;
+  }
+  return label;
+}
+
 function formatReferrerPreview(value) {
   const raw = String(value || '').trim();
   if (!raw) return '—';
@@ -116,6 +130,7 @@ const AdminAcquisition = () => {
     new_user_unregistered_installs: 0,
     unknown_anonymous_installs: 0,
     utm_sources: [],
+    af_sources: [],
   });
   const [referrerModal, setReferrerModal] = useState({ visible: false, text: '' });
   const [timelineModal, setTimelineModal] = useState({ visible: false, loading: false, error: '', data: null });
@@ -179,6 +194,7 @@ const AdminAcquisition = () => {
         new_user_unregistered_installs: analyticsRes.new_user_unregistered_installs || 0,
         unknown_anonymous_installs: analyticsRes.unknown_anonymous_installs || 0,
         utm_sources: Array.isArray(analyticsRes.utm_sources) ? analyticsRes.utm_sources : [],
+        af_sources: Array.isArray(analyticsRes.af_sources) ? analyticsRes.af_sources : [],
       });
     } catch (e) {
       setError(e?.message || 'Failed to load');
@@ -516,6 +532,40 @@ const AdminAcquisition = () => {
                 <div style={{ color: '#64748b', fontSize: 13 }}>No UTM attribution recorded for this range.</div>
               )}
             </div>
+            <div style={{ marginTop: 16 }}>
+              <h4 style={{ margin: '0 0 8px' }}>Installs by AppsFlyer campaign</h4>
+              {(analytics.af_sources || []).length ? (
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {analytics.af_sources.map((item) => (
+                    <div
+                      key={`${item.af_status}:${item.media_source}:${item.campaign}`}
+                      style={{
+                        minWidth: 150,
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 8,
+                        padding: '9px 11px',
+                        background: '#f8fafc',
+                      }}
+                    >
+                      <div style={{ fontWeight: 800, color: '#1e293b' }}>
+                        {item.media_source || 'unknown'}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                        {[item.af_status, item.campaign].filter(Boolean).join(' · ') || 'No campaign'}
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 13, color: '#334155' }}>
+                        <strong>{item.installs}</strong> installs · <strong>{item.registered}</strong> registered
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>{item.not_registered} not registered</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ color: '#64748b', fontSize: 13 }}>
+                  No AppsFlyer conversion data yet. Native rebuild + Dev Key required.
+                </div>
+              )}
+            </div>
           </div>
 
           <div style={{ marginBottom: 20 }}>
@@ -581,7 +631,7 @@ const AdminAcquisition = () => {
                   <th>First open (IST)</th>
                   <th>Platform</th>
                   <th>App version / build</th>
-                  <th>UTM source / medium / campaign</th>
+                  <th>UTM / AppsFlyer campaign</th>
                   <th>Opens</th>
                   <th>Last funnel event</th>
                   <th>User / lead</th>
@@ -627,7 +677,7 @@ const AdminAcquisition = () => {
                           </div>
                         </td>
                         <td>
-                          {[row.utm_source, row.utm_medium, row.utm_campaign].filter(Boolean).join(' · ') || '—'}
+                          {formatAttribution(row)}
                         </td>
                         <td>{row.open_count ?? '—'}</td>
                         <td
@@ -811,7 +861,7 @@ const AdminAcquisition = () => {
                         Build: {timelineModal.data.installation?.app_version || '—'} / {timelineModal.data.installation?.app_build || '—'}
                       </div>
                       <div style={{ fontSize: 13, color: '#475569' }}>
-                        Attribution: {[timelineModal.data.installation?.utm_source, timelineModal.data.installation?.utm_medium, timelineModal.data.installation?.utm_campaign].filter(Boolean).join(' · ') || '—'}
+                        Attribution: {formatAttribution(timelineModal.data.installation)}
                       </div>
                       <div style={{ fontSize: 13, color: timelineModal.data.installation?.userid ? '#166534' : '#c2410c' }}>
                         User: {timelineModal.data.installation?.userid

@@ -333,15 +333,9 @@ async function configureFacebookSdk() {
     if (Settings.setAutoLogAppEventsEnabled) {
       Settings.setAutoLogAppEventsEnabled(true);
     }
-    // Manifest keeps AdvertiserIDCollectionEnabled=false for store builds; for debug-flag builds,
-    // turn on at runtime so Test Events / attribution can see GAID (Android 13+ may still need AD_ID in manifest).
-    if (
-      Platform.OS === 'android' &&
-      extra.facebookDebugLog &&
-      Settings.setAdvertiserIDCollectionEnabled
-    ) {
+    if (Settings.setAdvertiserIDCollectionEnabled) {
       Settings.setAdvertiserIDCollectionEnabled(true);
-      fbLog('Android: setAdvertiserIDCollectionEnabled(true) for debug build');
+      fbLog('setAdvertiserIDCollectionEnabled(true)');
     }
     // AndroidManifest / Info.plist use AutoInit — do NOT call Settings.initializeSDK() or setAppID here;
     // double-init crashes the native Facebook SDK on startup.
@@ -358,12 +352,19 @@ async function configureFacebookSdk() {
           trackingPermissionPromptShownThisSession = true;
         }
         const { status } = await requestTrackingPermissionsAsync();
+        const granted = status === 'granted';
         if (Settings.setAdvertiserTrackingEnabled) {
-          await Settings.setAdvertiserTrackingEnabled(status === 'granted');
+          await Settings.setAdvertiserTrackingEnabled(granted);
+        }
+        if (Settings.setAdvertiserIDCollectionEnabled) {
+          Settings.setAdvertiserIDCollectionEnabled(granted);
         }
       } catch {
         if (Settings.setAdvertiserTrackingEnabled) {
           await Settings.setAdvertiserTrackingEnabled(false);
+        }
+        if (Settings.setAdvertiserIDCollectionEnabled) {
+          Settings.setAdvertiserIDCollectionEnabled(false);
         }
       }
     }

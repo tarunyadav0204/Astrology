@@ -13,6 +13,15 @@ import {
   trackMetaPixelEvent,
   trackMetaPixelFromStandardKey,
 } from '../services/metaPixel';
+import {
+  logFirebaseEvent,
+  logFirebaseScreenView,
+  setFirebaseUserId,
+} from '../services/firebaseAnalytics';
+import {
+  logAppsFlyerStandardEvent,
+  setAppsFlyerUserId,
+} from '../services/appsFlyerAnalytics';
 
 export { MetaStandardEvent, logMetaAppEvent };
 
@@ -73,9 +82,12 @@ async function getStableGA4ClientId(AsyncStorage) {
 
 const sendToGA4 = async (eventName, params = {}) => {
   if (Platform.OS === 'web') return;
-  
+
+  const nativeOk = await logFirebaseEvent(eventName, params);
+  if (nativeOk) return;
+
   try {
-    // Get stable client/user identity from AsyncStorage if available.
+    // Fallback until a native Firebase Analytics rebuild is shipped.
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     const clientId = await getStableGA4ClientId(AsyncStorage);
     let userName = null;
@@ -143,10 +155,14 @@ export const trackScreenView = (screenName, meta = {}) => {
       content_type: contentType,
     });
   } else {
-    sendToGA4('screen_view', {
-      screen_name: screenName,
-      content_id: contentId,
-      content_type: contentType,
+    logFirebaseScreenView(screenName, { content_id: contentId, content_type: contentType }).then((ok) => {
+      if (!ok) {
+        sendToGA4('screen_view', {
+          screen_name: screenName,
+          content_id: contentId,
+          content_type: contentType,
+        });
+      }
     });
     logMetaAppEvent(MetaStandardEvent.VIEW_CONTENT, {
       content_id: contentId,
@@ -176,6 +192,9 @@ export const trackEvent = (eventName, params = {}) => {
     }
   } else {
     sendToGA4(eventName, params);
+    if (eventName === 'login') {
+      logAppsFlyerStandardEvent('login', params);
+    }
     // Meta standard events are dispatched via trackMetaStandard / logMetaAppEvent; avoid duplicate custom logs.
     if (!Object.values(MetaStandardEvent).includes(eventName)) {
       logFacebookEvent(eventName, params);
@@ -210,11 +229,14 @@ export const trackMetaStandard = (eventKey, params = {}) => {
     trackMetaPixelFromStandardKey(eventKey, params);
   } else {
     sendToGA4(gaEventName, params);
+    logAppsFlyerStandardEvent(gaEventName, params);
     trackMobileJourneyEvent('mobile_action', {
       resource_type: 'meta_event',
       resource_id: gaEventName,
       metadata: params || {},
     });
+    // Meta Ads optimization stays on the native Facebook SDK. Do not also
+    // enable AppsFlyer → Meta event forwarding or purchases will double-count.
     logMetaAppEvent(eventKey, params);
   }
 };
@@ -314,7 +336,11 @@ export const setUserName = async (userName) => {
 export const setAnalyticsUserId = async (userId) => {
   if (userId != null && String(userId).trim()) {
     await setFacebookUserId(userId);
+    await setAppsFlyerUserId(userId);
+    await setFirebaseUserId(userId);
   } else {
     await clearFacebookUserId();
+    await setAppsFlyerUserId('');
+    await setFirebaseUserId(null);
   }
 };

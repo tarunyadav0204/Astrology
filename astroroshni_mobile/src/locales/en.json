@@ -72,6 +72,7 @@
     "yogas": "Yogas",
     "lifeAnalysis": "Life Analysis",
     "kpSystem": "KP System",
+    "prashna": "Prashna",
     "pastLifeRegression": "Past Life Regression",
     "numerology": "Numerology",
     "chatHistory": "Chat History",
@@ -840,6 +841,18 @@
     "insufficientCreditsMessage": "This question needs {{cost}} credits — you have {{balance}}. Add credits to continue the study.",
     "insufficientCreditsCta": "Get credits",
     "insufficientCreditsLater": "Not now",
+    "creditChoice": {
+      "title": "Not enough credits",
+      "needLine": "You need {{cost}} credits for {{mode}} and you have {{balance}}.",
+      "canUsePrefix": "You can use ",
+      "orWrapped": " or ",
+      "canUseSuffix": ".",
+      "neededLabel": "{{mode}} needs",
+      "askStandard": "Ask in Standard",
+      "goLive": "Go Live",
+      "talkToTara": "Talk to Tara",
+      "needsMore": "Needs {{count}} more"
+    },
     "firstPurchaseOffer": {
       "eyebrow": "LIMITED-TIME OFFER",
       "title": "BONUS CREDITS UNLOCKED",
@@ -852,6 +865,7 @@
       "discountWord": "off",
       "cta": "Get bonus credits",
       "ctaWithPack": "Claim {{credits}} credits for {{price}} →",
+      "continueForPrice": "Continue for {{price}}",
       "continueReading": "Continue reading",
       "expiresIn": "{{time}} left"
     },
@@ -1480,7 +1494,8 @@
       "cosmicRing": "Cosmic\nRing",
       "precise": "Precise",
       "safety": "Safety",
-      "fortune": "Fortune"
+      "fortune": "Fortune",
+      "horary": "Horary"
     },
     "cosmicRing": {
       "viewRing": "Ring"
@@ -2296,6 +2311,61 @@
       "openPlanners": "Open event muhurat planners",
       "now": "now",
       "newDelhi": "New Delhi"
+    }
+  },
+  "prashna": {
+    "title": "Prashna",
+    "eyebrow": "Question chart",
+    "lead": "This chart is cast for the question’s time and place, not your birth chart.",
+    "questionLabel": "Your question",
+    "questionPlaceholder": "Ask one clear question",
+    "topicLabel": "Topic",
+    "date": "Date",
+    "time": "Time",
+    "useNow": "Use current time",
+    "place": "Place of asking",
+    "placeFallback": "Saved birth place",
+    "placePlaceholder": "Select the place of asking",
+    "placeHint": "Prashna is cast for where the question is asked, not the birth place.",
+    "placeDetectError": "Could not detect your current city. Search and select it.",
+    "detectingPlace": "Detecting current city…",
+    "changePlace": "Change",
+    "useCurrentPlace": "Use current location",
+    "numberLabel": "KP number (optional)",
+    "numberPlaceholder": "1–249",
+    "numberHint": "Optional KP overlay. It does not replace the question-time chart.",
+    "numberError": "Horary number must be between 1 and 249.",
+    "cast": "Cast Prashna",
+    "loadError": "Could not cast the Prashna chart.",
+    "confidence": "Confidence",
+    "resultWhy": "Why this answer",
+    "resultCast": "Who stands for what",
+    "resultFit": "Is this chart fit to read?",
+    "showTechnical": "Show technical notes",
+    "hideTechnical": "Hide technical notes",
+    "clock": "Question clock",
+    "lagna": "Lagna",
+    "significators": "Significators",
+    "gates": "Readability",
+    "tajika": "Tajika yoga",
+    "tajikaNone": "Tajika yoga: none. The two planets are not applying to an exact aspect within orb.",
+    "kamboola": "Kamboola: Moon completes the yoga.",
+    "timing": "Timing",
+    "arudha": "Arudha",
+    "kpOverlay": "KP overlay",
+    "newQuestion": "New question",
+    "shortcutBody": "Yes or no from the question’s time",
+    "topics": {
+      "general": "General",
+      "career": "Career",
+      "marriage": "Marriage",
+      "wealth": "Wealth",
+      "health": "Health",
+      "property": "Property",
+      "children": "Children",
+      "education": "Education",
+      "travel": "Travel",
+      "legal": "Legal"
     }
   }
 }

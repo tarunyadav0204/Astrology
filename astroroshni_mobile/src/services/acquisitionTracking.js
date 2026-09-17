@@ -283,6 +283,44 @@ export async function updateAcquisitionLeadContact({ phone, email } = {}) {
 }
 
 /**
+ * First-touch AppsFlyer conversion data. Backend fills AF/UTM columns only if empty.
+ */
+export async function persistAcquisitionAttribution(payload = {}) {
+  try {
+    const installation_id = await getOrCreateInstallationId();
+    const client_install_key = await getClientInstallKey();
+    const url = `${API_BASE_URL.replace(/\/+$/, '')}${getEndpoint('/acquisition/attribution')}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        installation_id,
+        client_install_key,
+        af_status: payload.af_status || null,
+        media_source: payload.media_source || null,
+        campaign: payload.campaign || null,
+        campaign_id: payload.campaign_id || null,
+        adset: payload.adset || null,
+        ad: payload.ad || null,
+        channel: payload.channel || null,
+        attribution_raw: payload.attribution_raw && typeof payload.attribution_raw === 'object'
+          ? payload.attribution_raw
+          : {},
+      }),
+    });
+    if (!res.ok && __DEV__) {
+      const t = await res.text().catch(() => '');
+      console.warn('[acquisition] attribution failed', res.status, t.slice(0, 200));
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('[acquisition] attribution error', e?.message);
+  }
+}
+
+/**
  * After login / register; uses Bearer from storage (set by caller after setAuthToken).
  */
 export async function linkAcquisitionInstallationToUser() {

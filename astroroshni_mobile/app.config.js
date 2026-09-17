@@ -42,8 +42,16 @@ const facebookDebugLog = ['1', 'true', 'yes'].includes(
   String(env('EXPO_PUBLIC_FACEBOOK_DEBUG_LOG') || '').toLowerCase()
 );
 const metaPixelId = env('EXPO_PUBLIC_META_PIXEL_ID') || '1900398174159684';
+const appsFlyerDevKey = env('EXPO_PUBLIC_APPSFLYER_DEV_KEY') || '';
+const appsFlyerIosAppId = env('EXPO_PUBLIC_APPSFLYER_IOS_APP_ID') || '';
+const appsFlyerOnelinkHost = env('EXPO_PUBLIC_APPSFLYER_ONELINK_HOST') || '';
+const appsFlyerDebug = ['1', 'true', 'yes'].includes(
+  String(env('EXPO_PUBLIC_APPSFLYER_DEBUG') || '').toLowerCase()
+);
 
 const plugins = [...(appJson.expo.plugins || [])];
+
+plugins.push('@react-native-firebase/app', '@react-native-firebase/analytics');
 
 if (facebookAppId && facebookClientToken) {
   plugins.push([
@@ -55,25 +63,64 @@ if (facebookAppId && facebookClientToken) {
       scheme: `fb${facebookAppId}`,
       isAutoInitEnabled: true,
       autoLogAppEventsEnabled: true,
-      advertiserIDCollectionEnabled: false,
+      advertiserIDCollectionEnabled: true,
       iosUserTrackingPermission:
         'This identifier helps us measure app installs and improve AstroRoshni. You can change this anytime in Settings.',
     },
   ]);
 }
 
-module.exports = {
-  expo: {
-    ...appJson.expo,
-    plugins,
-    extra: {
-      ...(appJson.expo.extra || {}),
-      sentryDsn,
-      facebookAppId,
-      facebookClientToken,
-      facebookDisplayName,
-      facebookDebugLog,
-      metaPixelId,
-    },
+plugins.push(['react-native-appsflyer', { shouldUseStrictMode: false }]);
+
+const expoConfig = {
+  ...appJson.expo,
+  plugins,
+  extra: {
+    ...(appJson.expo.extra || {}),
+    sentryDsn,
+    facebookAppId,
+    facebookClientToken,
+    facebookDisplayName,
+    facebookDebugLog,
+    metaPixelId,
+    appsFlyerDevKey,
+    appsFlyerIosAppId,
+    appsFlyerOnelinkHost,
+    appsFlyerDebug,
   },
+};
+
+const onelinkHost = String(appsFlyerOnelinkHost || '')
+  .replace(/^https?:\/\//i, '')
+  .replace(/\/.*$/, '')
+  .trim();
+if (onelinkHost) {
+  const android = { ...(expoConfig.android || {}) };
+  const existingFilters = Array.isArray(android.intentFilters) ? android.intentFilters : [];
+  const hasOnelinkFilter = existingFilters.some((filter) =>
+    (filter?.data || []).some((entry) => entry?.host === onelinkHost)
+  );
+  if (!hasOnelinkFilter) {
+    android.intentFilters = [
+      ...existingFilters,
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [{ scheme: 'https', host: onelinkHost, pathPrefix: '/' }],
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
+    ];
+  }
+  expoConfig.android = android;
+
+  const ios = { ...(expoConfig.ios || {}) };
+  const associated = Array.isArray(ios.associatedDomains) ? [...ios.associatedDomains] : [];
+  const applinks = `applinks:${onelinkHost}`;
+  if (!associated.includes(applinks)) associated.push(applinks);
+  ios.associatedDomains = associated;
+  expoConfig.ios = ios;
+}
+
+module.exports = {
+  expo: expoConfig,
 };

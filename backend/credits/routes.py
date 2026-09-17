@@ -1571,7 +1571,7 @@ async def admin_first_purchase_offer_funnel(
 async def admin_buyer_analysis(
     from_date: Optional[str] = Query(default=None),
     to_date: Optional[str] = Query(default=None),
-    group_by: str = Query(default="source", pattern="^(source|medium|campaign|source_medium)$"),
+    group_by: str = Query(default="source", pattern="^(source|medium|campaign|source_medium|media_source|af_campaign|paid_status)$"),
     current_user: User = Depends(get_current_user),
 ):
     """

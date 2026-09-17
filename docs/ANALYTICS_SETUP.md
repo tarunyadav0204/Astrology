@@ -1,5 +1,56 @@
 # Google Analytics Setup for Mobile App
 
+## Partner UA (AppsFlyer + GA4)
+
+Paid user-acquisition partners (for example Appvestor) should use **standard tools**, not a custom SDK:
+
+1. **AppsFlyer** is the campaign source of truth (installs, `af_purchase`, registration, subscribe).
+2. **Firebase Analytics / GA4** (`G-M0C9B8LGMR`) is the Google Ads / Play reporting stream.
+3. **First-party** `app_installations` stores AppsFlyer conversion data so we can audit attributed revenue independently.
+
+Set these in `astroroshni_mobile/.env` then **rebuild native** (`expo run:android` / `expo run:ios`):
+
+```
+EXPO_PUBLIC_APPSFLYER_DEV_KEY=
+EXPO_PUBLIC_APPSFLYER_IOS_APP_ID=
+EXPO_PUBLIC_APPSFLYER_ONELINK_HOST=
+```
+
+Give the partner **AppsFlyer Agency** access and **GA4 Viewer**. Do not give Firebase Owner, Play Console owner, or AstroRoshni admin.
+
+All partner campaign URLs must use an AppsFlyer OneLink. Naming: `media_source=appvestor`, `campaign={campaign_id}`.
+
+Do **not** enable AppsFlyer → Meta event forwarding while native Facebook `Purchase` events are on, or Ads Manager will double-count.
+
+### Partner access (Appvestor)
+
+Do this in the consoles before any spend. Code cannot invite them for you.
+
+**Give**
+- AppsFlyer: **Agency** (or Team member with only this app). They need installs, in-app events, revenue, and retention by campaign.
+- Google Analytics 4 property `G-M0C9B8LGMR`: **Viewer**. Mark `sign_up`, `purchase`, and `subscribe` as key events.
+- Optional: Google Play Console **view** financials if the insertion order requires it.
+
+**Refuse unless a signed IO forces it**
+- Appvestor Billing Stats SDK, ad units, or call-screen overlays
+- Firebase **Owner**
+- AstroRoshni admin panel or production database
+- Play Console **owner** credentials
+
+**Written confirmation to request**
+> We will attribute Appvestor campaigns exclusively through AppsFlyer OneLinks (`pid`/`media_source=appvestor`) and GA4. We will not integrate the Appvestor Billing Stats SDK. Revenue share applies only to AppsFlyer Non-organic users from Appvestor media source.
+
+**Campaign rules**
+- Every Appvestor URL is a OneLink, never a raw Play Store link.
+- Naming: `media_source=appvestor` (or `pid=appvestor`), `c={campaign_id}`, plus `af_adset` / `af_ad` when available.
+- Optimize to **first purchase** (`af_purchase`), not cheap installs.
+- Android-first unless iOS is agreed separately.
+- Do not run the same geos/networks as Appvestor without a written split.
+
+The privacy policy at `/policy` discloses AppsFlyer, GA4, and Meta.
+
+---
+
 ## Current Website Implementation
 
 **Location:** `frontend/public/index.html` + `frontend/src/utils/analytics.js`
@@ -23,128 +74,21 @@ trackEvent('horoscope_period_changed', 'astrology', period);
 
 ## Mobile App Implementation
 
-### Option 1: Firebase Analytics (Recommended)
+Native events go through `astroroshni_mobile/src/utils/analytics.js`:
 
-**Step 1: Install Dependencies**
-```bash
-cd astroroshni_mobile
-npx expo install expo-firebase-analytics
-npx expo install expo-firebase-core
-```
+- Firebase Analytics when the native module is present after a rebuild
+- GA4 Measurement Protocol fallback until that rebuild ships
+- Meta App Events for Facebook/Instagram ads
+- AppsFlyer `af_*` conversion events when a Dev Key is configured
 
-**Step 2: Configure Firebase**
+### Firebase Analytics (native GA4)
 
-Create `google-services.json` (Android) and `GoogleService-Info.plist` (iOS) from Firebase Console:
-1. Go to https://console.firebase.google.com
-2. Create/select project
-3. Add Android app (package: com.astroroshni.mobile)
-4. Add iOS app (bundle ID: com.astroroshni.mobile)
-5. Download config files
+Packages: `@react-native-firebase/app` and `@react-native-firebase/analytics` (v25, old architecture). Config files already exist:
 
-Place files:
-- `google-services.json` → `android/app/`
-- `GoogleService-Info.plist` → `ios/AstroRoshni/`
+- `google-services.json` → Android
+- `GoogleService-Info.plist` → iOS
 
-**Step 3: Update app.json**
-```json
-{
-  "expo": {
-    "android": {
-      "googleServicesFile": "./google-services.json"
-    },
-    "ios": {
-      "googleServicesFile": "./GoogleService-Info.plist"
-    },
-    "plugins": [
-      "@react-native-firebase/app",
-      "@react-native-firebase/analytics"
-    ]
-  }
-}
-```
-
-**Step 4: Usage in Components**
-```javascript
-import { useAnalytics } from '../hooks/useAnalytics';
-import { trackAstrologyEvent } from '../utils/analytics';
-
-// In component
-const MyScreen = () => {
-  const { trackEvent } = useAnalytics('HomeScreen');
-  
-  const handleChartGenerate = () => {
-    trackAstrologyEvent.chartGenerated('lagna');
-  };
-  
-  return <View>...</View>;
-};
-```
-
----
-
-### Option 2: React Native Firebase (Alternative)
-
-**Step 1: Install**
-```bash
-npm install @react-native-firebase/app @react-native-firebase/analytics
-```
-
-**Step 2: Update analytics.js**
-```javascript
-import analytics from '@react-native-firebase/analytics';
-
-export const trackScreenView = async (screenName) => {
-  await analytics().logScreenView({
-    screen_name: screenName,
-    screen_class: screenName,
-  });
-};
-
-export const trackEvent = async (eventName, params = {}) => {
-  await analytics().logEvent(eventName, params);
-};
-```
-
----
-
-### Option 3: Expo Analytics (Simplest for Expo)
-
-**Already Created Files:**
-- ✅ `src/utils/analytics.js` - Analytics utility functions
-- ✅ `src/hooks/useAnalytics.js` - React hook for screen tracking
-
-**Step 1: Install**
-```bash
-npx expo install expo-firebase-analytics expo-firebase-core
-```
-
-**Step 2: Add to package.json**
-```json
-{
-  "dependencies": {
-    "expo-firebase-analytics": "~8.0.0",
-    "expo-firebase-core": "~7.0.0"
-  }
-}
-```
-
-**Step 3: Configure app.json**
-```json
-{
-  "expo": {
-    "android": {
-      "googleServicesFile": "./google-services.json",
-      "package": "com.astroroshni.mobile"
-    },
-    "ios": {
-      "googleServicesFile": "./GoogleService-Info.plist",
-      "bundleIdentifier": "com.astroroshni.mobile"
-    }
-  }
-}
-```
-
----
+Enable Analytics in the Firebase console for project `astroroshni-7c7ba` if it is still off, then ship a native build.
 
 ## Usage Examples
 
@@ -213,13 +157,12 @@ await setUserProperties({
 
 ## Next Steps
 
-1. **Choose Option 3 (Expo Analytics)** - Best for your Expo setup
-2. **Get Firebase config files** from Firebase Console
-3. **Install dependencies**: `npx expo install expo-firebase-analytics expo-firebase-core`
-4. **Add config files** to project
-5. **Update app.json** with googleServicesFile paths
-6. **Rebuild app**: `npm run android` or `npm run ios`
-7. **Test events** in Firebase Console (DebugView)
+1. Create the AppsFlyer app and OneLink; put the Dev Key in `.env`
+2. Enable Firebase Analytics in the console for `astroroshni-7c7ba`
+3. Rebuild native (`npm run android` / `npm run ios`)
+4. Invite Appvestor as AppsFlyer Agency + GA4 Viewer
+5. Confirm in writing they will use AppsFlyer/GA4 instead of their SDK
+6. Test `af_purchase` and `sign_up` in AppsFlyer and GA4 DebugView
 
 ---
 

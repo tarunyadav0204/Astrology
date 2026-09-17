@@ -56,6 +56,18 @@ const WEB_NATIVE_STUBS = {
   'expo-store-review': path.resolve(__dirname, 'src/platform/stubs/expo-store-review.js'),
   'expo-notifications': path.resolve(__dirname, 'src/platform/stubs/expo-notifications.js'),
   '@sentry/react-native': path.resolve(__dirname, 'src/platform/stubs/sentry-react-native.js'),
+  'react-native-appsflyer': path.resolve(
+    __dirname,
+    'src/platform/stubs/react-native-appsflyer.js'
+  ),
+  '@react-native-firebase/analytics': path.resolve(
+    __dirname,
+    'src/platform/stubs/react-native-firebase-analytics.js'
+  ),
+  '@react-native-firebase/app': path.resolve(
+    __dirname,
+    'src/platform/stubs/react-native-firebase-app.js'
+  ),
 };
 
 const previousResolveRequest = metroConfig.resolver.resolveRequest;

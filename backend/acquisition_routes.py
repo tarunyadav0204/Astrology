@@ -210,6 +210,19 @@ class AcquisitionContactBody(BaseModel):
     email: Optional[str] = Field(None, max_length=255)
 
 
+class AcquisitionAttributionBody(BaseModel):
+    installation_id: str = Field(..., min_length=36, max_length=36)
+    client_install_key: Optional[str] = Field(None, max_length=512)
+    af_status: Optional[str] = Field(None, max_length=64)
+    media_source: Optional[str] = Field(None, max_length=512)
+    campaign: Optional[str] = Field(None, max_length=512)
+    campaign_id: Optional[str] = Field(None, max_length=128)
+    adset: Optional[str] = Field(None, max_length=512)
+    ad: Optional[str] = Field(None, max_length=512)
+    channel: Optional[str] = Field(None, max_length=128)
+    attribution_raw: dict[str, Any] = Field(default_factory=dict)
+
+
 _GUEST_ACTIVITY_EVENTS = frozenset(
     {"guest_open", "guest_chart_created", "auth_gate_shown"}
 )
@@ -252,6 +265,78 @@ def _sanitize_event_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
         else:
             safe[safe_key] = str(value)[:300]
     return safe
+
+
+_AF_BLOCKED_RAW_KEYS = {
+    "idfa",
+    "idfv",
+    "advertising_id",
+    "advertisingid",
+    "gaid",
+    "amazon_aid",
+    "oaid",
+    "android_id",
+    "imei",
+}
+
+
+def _clip_attr(value: Optional[Any], max_len: int) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or text.lower() in {"null", "undefined", "none"}:
+        return None
+    return text[:max_len]
+
+
+def normalize_appsflyer_attribution(
+    *,
+    af_status: Optional[str] = None,
+    media_source: Optional[str] = None,
+    campaign: Optional[str] = None,
+    campaign_id: Optional[str] = None,
+    adset: Optional[str] = None,
+    ad: Optional[str] = None,
+    channel: Optional[str] = None,
+    attribution_raw: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """First-touch AppsFlyer conversion payload with advertising IDs stripped."""
+    raw = attribution_raw if isinstance(attribution_raw, dict) else {}
+    status = _clip_attr(af_status or raw.get("af_status") or raw.get("status"), 32)
+    media = _clip_attr(media_source or raw.get("media_source"), 512)
+    camp = _clip_attr(campaign or raw.get("campaign"), 512)
+    camp_id = _clip_attr(campaign_id or raw.get("campaign_id"), 128)
+    adset_val = _clip_attr(adset or raw.get("adset") or raw.get("af_adset"), 512)
+    ad_val = _clip_attr(ad or raw.get("ad") or raw.get("af_ad"), 512)
+    channel_val = _clip_attr(channel or raw.get("af_channel") or raw.get("channel"), 128)
+
+    cleaned_raw: dict[str, Any] = {}
+    for key, value in list(raw.items())[:40]:
+        name = str(key)
+        if name.lower() in _AF_BLOCKED_RAW_KEYS:
+            continue
+        if isinstance(value, (bool, int, float)) or value is None:
+            cleaned_raw[name[:80]] = value
+        elif isinstance(value, str):
+            cleaned_raw[name[:80]] = value.strip()[:300]
+        else:
+            cleaned_raw[name[:80]] = str(value)[:300]
+
+    paid = bool(status and status.lower() == "non-organic")
+    utm_medium = channel_val if channel_val else ("cpc" if paid else None)
+    return {
+        "af_status": status,
+        "af_media_source": media,
+        "af_campaign": camp,
+        "af_campaign_id": camp_id,
+        "af_adset": adset_val,
+        "af_ad": ad_val,
+        "af_channel": channel_val,
+        "utm_source": media,
+        "utm_medium": utm_medium,
+        "utm_campaign": camp,
+        "af_attribution_raw": cleaned_raw,
+    }
 
 
 def _normalize_client_install_key(value: Optional[str]) -> Optional[str]:
@@ -527,6 +612,81 @@ async def acquisition_contact(body: AcquisitionContactBody):
     return {"ok": True, "stored": True}
 
 
+@router.post("/acquisition/attribution")
+async def acquisition_attribution(body: AcquisitionAttributionBody):
+    """Store first-touch AppsFlyer conversion data. Existing AF/UTM values are not overwritten."""
+    iid = _validate_installation_id(body.installation_id)
+    parsed = normalize_appsflyer_attribution(
+        af_status=body.af_status,
+        media_source=body.media_source,
+        campaign=body.campaign,
+        campaign_id=body.campaign_id,
+        adset=body.adset,
+        ad=body.ad,
+        channel=body.channel,
+        attribution_raw=body.attribution_raw,
+    )
+    if not any(
+        parsed[key]
+        for key in (
+            "af_status",
+            "af_media_source",
+            "af_campaign",
+            "af_campaign_id",
+            "af_adset",
+            "af_ad",
+            "af_channel",
+        )
+    ):
+        return {"ok": True, "stored": False}
+
+    raw_json = json.dumps(parsed["af_attribution_raw"] or {})
+    with get_conn() as conn:
+        resolved_iid = _upsert_installation_stub(
+            conn,
+            iid=iid,
+            client_install_key=body.client_install_key,
+            platform="unknown",
+        )
+        execute(
+            conn,
+            """
+            UPDATE app_installations
+            SET
+                af_status = COALESCE(af_status, ?),
+                af_media_source = COALESCE(af_media_source, ?),
+                af_campaign = COALESCE(af_campaign, ?),
+                af_campaign_id = COALESCE(af_campaign_id, ?),
+                af_adset = COALESCE(af_adset, ?),
+                af_ad = COALESCE(af_ad, ?),
+                af_channel = COALESCE(af_channel, ?),
+                af_attribution_raw = COALESCE(af_attribution_raw, ?::jsonb),
+                utm_source = COALESCE(utm_source, ?),
+                utm_medium = COALESCE(utm_medium, ?),
+                utm_campaign = COALESCE(utm_campaign, ?),
+                last_open_at = NOW()
+            WHERE installation_id = ?::uuid
+            """,
+            (
+                parsed["af_status"],
+                parsed["af_media_source"],
+                parsed["af_campaign"],
+                parsed["af_campaign_id"],
+                parsed["af_adset"],
+                parsed["af_ad"],
+                parsed["af_channel"],
+                raw_json,
+                parsed["utm_source"],
+                parsed["utm_medium"],
+                parsed["utm_campaign"],
+                resolved_iid,
+            ),
+        )
+        conn.commit()
+
+    return {"ok": True, "stored": True}
+
+
 @router.post("/acquisition/link-user")
 async def acquisition_link_user(body: AcquisitionLinkBody, current_user: User = Depends(get_current_user)):
     """Attach the logged-in user to an installation row (first successful auth after install)."""
@@ -658,7 +818,11 @@ async def admin_acquisition_installations(
                 le.event_name AS last_event_name,
                 le.event_status AS last_event_status,
                 le.screen_name AS last_event_screen,
-                le.created_at AS last_event_at
+                le.created_at AS last_event_at,
+                ai.af_status,
+                ai.af_media_source,
+                ai.af_campaign,
+                ai.af_campaign_id
             FROM app_installations ai
             LEFT JOIN users u ON u.userid = ai.userid
             LEFT JOIN LATERAL (
@@ -701,6 +865,10 @@ async def admin_acquisition_installations(
                 "last_event_status": r[18],
                 "last_event_screen": r[19],
                 "last_event_at": r[20].isoformat() if r[20] else None,
+                "af_status": r[21],
+                "af_media_source": r[22],
+                "af_campaign": r[23],
+                "af_campaign_id": r[24],
             }
         )
 
@@ -862,7 +1030,11 @@ async def admin_acquisition_installations_export(
                     le.screen_name AS last_event_screen,
                     le.created_at AS last_event_at,
                     c.existing_user_install,
-                    c.registration_flow_install
+                    c.registration_flow_install,
+                    ai.af_status,
+                    ai.af_media_source,
+                    ai.af_campaign,
+                    ai.af_campaign_id
                 FROM app_installations ai
                 INNER JOIN classified c ON c.installation_id = ai.installation_id
                 LEFT JOIN users u ON u.userid = ai.userid
@@ -930,6 +1102,10 @@ async def admin_acquisition_installations_export(
                         registration_flow_install=bool(r[22]),
                     ),
                     "reached_steps": reached_by_install.get(str(iid), set()),
+                    "af_status": r[23],
+                    "af_media_source": r[24],
+                    "af_campaign": r[25],
+                    "af_campaign_id": r[26],
                 }
             )
 
@@ -988,7 +1164,11 @@ async def admin_acquisition_installation_events(
                 ai.lead_phone,
                 ai.lead_email,
                 u.phone,
-                u.name
+                u.name,
+                ai.af_status,
+                ai.af_media_source,
+                ai.af_campaign,
+                ai.af_campaign_id
             FROM app_installations ai
             LEFT JOIN users u ON u.userid = ai.userid
             WHERE ai.installation_id = ?::uuid
@@ -1026,6 +1206,10 @@ async def admin_acquisition_installation_events(
             "lead_email": install[10],
             "user_phone": install[11],
             "user_name": install[12],
+            "af_status": install[13],
+            "af_media_source": install[14],
+            "af_campaign": install[15],
+            "af_campaign_id": install[16],
         },
         "events": [
             {
@@ -1273,6 +1457,41 @@ def _acquisition_analytics_payload(
         for row in (cur.fetchall() or [])
     ]
 
+    cur = execute(
+        conn,
+        f"""
+        SELECT
+            COALESCE(NULLIF(BTRIM(ai.af_status), ''), 'unknown') AS af_status,
+            COALESCE(NULLIF(BTRIM(ai.af_media_source), ''), 'unknown') AS media_source,
+            COALESCE(NULLIF(BTRIM(ai.af_campaign), ''), '') AS campaign,
+            COUNT(*)::int AS installs,
+            COUNT(*) FILTER (WHERE ai.userid IS NOT NULL)::int AS registered,
+            COUNT(*) FILTER (WHERE ai.userid IS NULL)::int AS not_registered
+        FROM app_installations ai
+        WHERE {where_sql}
+          AND (
+            NULLIF(BTRIM(ai.af_status), '') IS NOT NULL
+            OR NULLIF(BTRIM(ai.af_media_source), '') IS NOT NULL
+            OR NULLIF(BTRIM(ai.af_campaign), '') IS NOT NULL
+          )
+        GROUP BY 1, 2, 3
+        ORDER BY installs DESC, media_source ASC
+        LIMIT 50
+        """,
+        params,
+    )
+    af_sources = [
+        {
+            "af_status": str(row[0] or "unknown"),
+            "media_source": str(row[1] or "unknown"),
+            "campaign": str(row[2] or ""),
+            "installs": int(row[3] or 0),
+            "registered": int(row[4] or 0),
+            "not_registered": int(row[5] or 0),
+        }
+        for row in (cur.fetchall() or [])
+    ]
+
     return {
         "installs": installs,
         "linked": linked,
@@ -1284,6 +1503,7 @@ def _acquisition_analytics_payload(
         "new_user_unregistered_installs": new_user_unregistered_installs,
         "unknown_anonymous_installs": unknown_anonymous_installs,
         "utm_sources": utm_sources,
+        "af_sources": af_sources,
         "funnel": funnel,
         "dropoff": dropoff,
     }
@@ -1411,6 +1631,10 @@ def _build_acquisition_export_zip(
             row.get("utm_source") or "",
             row.get("utm_medium") or "",
             row.get("utm_campaign") or "",
+            row.get("af_status") or "",
+            row.get("af_media_source") or "",
+            row.get("af_campaign") or "",
+            row.get("af_campaign_id") or "",
             row.get("open_count") or 0,
             "yes" if row.get("userid") is not None else "no",
             row.get("userid") or "",
@@ -1439,6 +1663,10 @@ def _build_acquisition_export_zip(
             "utm_source",
             "utm_medium",
             "utm_campaign",
+            "af_status",
+            "af_media_source",
+            "af_campaign",
+            "af_campaign_id",
             "open_count",
             "is_linked",
             "userid",

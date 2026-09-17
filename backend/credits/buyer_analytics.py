@@ -40,6 +40,19 @@ _CHANNEL_SQL = {
         " || ' / ' || "
         "COALESCE(NULLIF(btrim(u.utm_medium), ''), '(none)')"
     ),
+    "media_source": (
+        "COALESCE(NULLIF(btrim(u.af_media_source), ''), NULLIF(btrim(u.utm_source), ''), '(none)')"
+    ),
+    "af_campaign": (
+        "COALESCE(NULLIF(btrim(u.af_campaign), ''), NULLIF(btrim(u.utm_campaign), ''), '(none)')"
+    ),
+    "paid_status": (
+        "CASE"
+        " WHEN lower(COALESCE(u.af_status, '')) = 'non-organic' THEN 'non-organic'"
+        " WHEN lower(COALESCE(u.af_status, '')) = 'organic' THEN 'organic'"
+        " ELSE '(unknown)'"
+        " END"
+    ),
 }
 
 
@@ -233,7 +246,8 @@ def get_buyer_analytics(
 
     # v2: credits/INR aligned with Credit Ledger net purchased summary
     # v3: cohort lag is week count (days/7), not raw day diff mislabeled as W+N
-    cache_key = f"v3|{_cache_key(fd, td, gb)}"
+    # v4: AppsFlyer media_source / campaign / paid_status grouping
+    cache_key = f"v4|{_cache_key(fd, td, gb)}"
     cached = _cache_get(cache_key)
     if cached is not None:
         return cached
@@ -322,6 +336,9 @@ def get_buyer_analytics(
         ai.utm_source,
         ai.utm_medium,
         ai.utm_campaign,
+        ai.af_status,
+        ai.af_media_source,
+        ai.af_campaign,
         ai.first_open_at
       FROM app_installations ai
       INNER JOIN buyer_ids b ON b.userid = ai.userid
@@ -520,6 +537,8 @@ def get_buyer_analytics(
     )
 
     # Single pool checkout: catalog peek (cheap) + one analytics statement, then release.
+    payload: Dict[str, Any] = {}
+    subscription_rows: List[Tuple[Any, ...]] = []
     with get_conn() as conn:
         _note_helpful_indexes(conn)
         try:
@@ -530,6 +549,49 @@ def get_buyer_analytics(
             cur = execute(conn, sql, query_params)
             row = cur.fetchone()
             payload = _as_dict(row[0] if row else None)
+            try:
+                sub_sql = f"""
+                WITH user_utm AS (
+                  SELECT DISTINCT ON (ai.userid)
+                    ai.userid,
+                    ai.utm_source,
+                    ai.utm_medium,
+                    ai.utm_campaign,
+                    ai.af_status,
+                    ai.af_media_source,
+                    ai.af_campaign
+                  FROM app_installations ai
+                  WHERE ai.userid IS NOT NULL
+                  ORDER BY ai.userid, ai.first_open_at ASC NULLS LAST
+                )
+                SELECT
+                  {channel_sql} AS channel,
+                  COUNT(*)::bigint AS subscription_count,
+                  COUNT(DISTINCT us.userid)::bigint AS subscribers,
+                  COALESCE(SUM(sp.price), 0)::float8 AS revenue
+                FROM user_subscriptions us
+                JOIN subscription_plans sp ON sp.plan_id = us.plan_id
+                LEFT JOIN user_utm u ON u.userid = us.userid
+                WHERE us.start_date >= %s::timestamp
+                  AND us.start_date < (%s::date + INTERVAL '1 day')
+                  AND (
+                    (sp.google_play_product_id IS NOT NULL AND TRIM(sp.google_play_product_id) <> '')
+                    OR COALESCE(sp.price, 0) > 0
+                  )
+                GROUP BY 1
+                ORDER BY subscription_count DESC
+                LIMIT 50
+                """
+                sub_cur = execute(conn, sub_sql, (range_start, td.isoformat()))
+                subscription_rows = list(sub_cur.fetchall() or [])
+            except Exception:
+                logger.exception(
+                    "buyer_analytics subscriptions-by-channel failed from=%s to=%s group_by=%s",
+                    fd,
+                    td,
+                    gb,
+                )
+                subscription_rows = []
         except Exception:
             logger.exception("buyer_analytics query failed from=%s to=%s group_by=%s", fd, td, gb)
             raise
@@ -645,6 +707,15 @@ def get_buyer_analytics(
         "channel_leaderboard": leaderboard,
         "cohorts": cohorts_out,
         "by_billing": billing,
+        "subscriptions_by_channel": [
+            {
+                "channel": r[0] or "(none)",
+                "subscription_count": int(r[1] or 0),
+                "subscribers": int(r[2] or 0),
+                "revenue": int(round(float(r[3] or 0))),
+            }
+            for r in subscription_rows
+        ],
         "query_ms": round((time.perf_counter() - started) * 1000, 1),
         "cached": False,
         "cache_ttl_sec": int(_CACHE_TTL_SEC),

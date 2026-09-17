@@ -42,7 +42,7 @@
 	<key>CFBundleVersion</key>
 	<string>108</string>
 	<key>FacebookAdvertiserIDCollectionEnabled</key>
-	<false/>
+	<true/>
 	<key>FacebookAppID</key>
 	<string>1680930919891373</string>
 	<key>FacebookAutoInitEnabled</key>

@@ -126,6 +126,7 @@ export default function PremiumTodayOverview({
   onOpenRecommendedAnalysis,
   onAskRecommended,
   onOpenExplore,
+  onOpenPrashna,
   todayPredictions,
   onOpenAscendant,
   onOpenMoon,
@@ -524,6 +525,7 @@ export default function PremiumTodayOverview({
         <Metric label={t('premiumUi.home.activePeriod')} value={mahadasha ? t('premiumUi.home.mahadasha', { name: mahadasha }) : null} onPress={hasChart ? onOpenDasha : onCreateChart} colors={colors} icon="time-outline" calculating={t('premiumUi.home.calculating')} />
         <Metric label={t('premiumUi.home.todaysNakshatra')} value={nakshatra} onPress={onOpenNakshatra} colors={colors} icon="star-outline" calculating={t('premiumUi.home.calculating')} />
         <Metric label={t('premiumUi.home.dayWindow')} value={panchangWindow || t('premiumUi.home.openPanchang')} onPress={onOpenPanchang} colors={colors} icon="sunny-outline" calculating={t('premiumUi.home.calculating')} />
+        <Metric label={t('menu.prashna', 'Prashna')} value={t('prashna.eyebrow', 'Question chart')} onPress={hasChart ? onOpenPrashna : onCreateChart} colors={colors} icon="help-circle-outline" calculating={t('premiumUi.home.calculating')} />
       </View>
 
       <TouchableOpacity onPress={onOpenExplore} activeOpacity={0.82} style={[styles.exploreButton, { borderColor: colors.borderStrong }]}>
@@ -583,6 +585,7 @@ export function PremiumExploreIntro({
   onOpenMuhurat,
   onOpenYearly,
   onOpenMonthly,
+  onOpenPrashna,
   eventsCost = 100,
   paths = [],
   analyses = [],
@@ -593,6 +596,7 @@ export function PremiumExploreIntro({
   const { t } = useTranslation();
   const shortcuts = [
     ['grid-outline', t('premiumUi.home.chartsDashas'), t('premiumUi.home.technicalWorkbench'), onOpenCharts],
+    ['help-circle-outline', t('menu.prashna', 'Prashna'), t('prashna.shortcutBody', 'Yes or no from the question’s time'), onOpenPrashna],
     ['document-text-outline', t('premiumUi.home.premiumReports'), t('premiumUi.home.longReadings'), onOpenReports],
     ['sunny-outline', t('premiumUi.home.panchang'), t('premiumUi.home.dayRhythm'), onOpenPanchang],
     ['time-outline', t('premiumUi.home.muhurat'), t('premiumUi.home.supportiveTiming'), onOpenMuhurat],

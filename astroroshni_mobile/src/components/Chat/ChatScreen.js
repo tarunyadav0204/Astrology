@@ -29,7 +29,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getWebTabBottomPad, subscribeWebKeyboardOverlap } from '../../platform/webSafeArea';
+import { subscribeWebKeyboardOverlap } from '../../platform/webSafeArea';
 import { useFocusEffect } from '@react-navigation/native';
 
 import MessageBubble from './MessageBubble';
@@ -38,11 +38,13 @@ import LoadingBubble from '../LoadingBubble';
 import FeedbackComponent from './FeedbackComponent';
 import EventPeriods from './EventPeriods';
 import HomeScreen, { getHomeBottomTabMetrics } from './HomeScreen';
+import HomeBottomTabs from './HomeBottomTabs';
 import CalibrationCard from './CalibrationCard';
 import PremiumAnalysisModal from './PremiumAnalysisModal';
 import NotificationEnableReminderModal from '../Notifications/NotificationEnableReminderModal';
 import NotificationEnableBanner from '../Notifications/NotificationEnableBanner';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
+import ChatCreditChoiceModal from './ChatCreditChoiceModal';
 import PodcastPromoModal from './PodcastPromoModal';
 import ChatRatingPromptModal from './ChatRatingPromptModal';
 import { storage } from '../../services/storage';
@@ -63,6 +65,7 @@ import { useCredits } from '../../credits/CreditContext';
 import {
   FIRST_PURCHASE_STARTER_CREDITS,
   FIRST_PURCHASE_STARTER_PRICE,
+  formatCreditsInr,
 } from '../../credits/creditPackCatalog';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
@@ -524,8 +527,6 @@ export default function ChatScreen({ navigation, route }) {
   } = useCredits();
   const { requireAuthForPaid, isGuest, refreshAuthState } = useAuthGate();
   const insets = useSafeAreaInsets();
-  const webBottomInset =
-    Platform.OS === 'web' ? getWebTabBottomPad(insets.bottom) : Math.max(0, insets.bottom || 0);
   const homeBottomTabHeight = getHomeBottomTabMetrics(insets.bottom).totalHeight;
 
   // Mundane mode state
@@ -558,11 +559,6 @@ export default function ChatScreen({ navigation, route }) {
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showChatModeIntro, setShowChatModeIntro] = useState(false);
   const [isInstantAnalysis, setIsInstantAnalysis] = useState(false);
-  // Standard/Premium render the Quick Actions bar below the composer, and that
-  // bar owns the bottom safe-area padding. Live hides it, so the composer must
-  // own the inset or it falls into the home-indicator/navigation-gesture area.
-  const liveComposerBottomInset =
-    Platform.OS !== 'web' && isInstantAnalysis ? Math.max(8, insets.bottom || 0) : 0;
   const [answerStyle, setAnswerStyle] = useState('simple');
   const [answerStylePreferenceKnown, setAnswerStylePreferenceKnown] = useState(false);
   const [answerStylePreferenceHydrated, setAnswerStylePreferenceHydrated] = useState(false);
@@ -578,7 +574,6 @@ export default function ChatScreen({ navigation, route }) {
   const [showEnhancedPopup, setShowEnhancedPopup] = useState(false);
   const [showPremiumBadge, setShowPremiumBadge] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
-  const [modeIntroGateTick, setModeIntroGateTick] = useState(0);
   const freeUsedThisSendRef = useRef(false);
   const subjectGateOverrideRef = useRef(null);
   const subjectGateMemoryRef = useRef([]);
@@ -589,7 +584,6 @@ export default function ChatScreen({ navigation, route }) {
   /** Delivery group id from a tapped nudge (push/inbox); attached to the next /chat-v2/ask for conversion attribution. */
   const pendingNudgeIdRef = useRef(null);
   const chatModeIntroShownKeyRef = useRef(null);
-  const suppressModeIntroAfterFreeRef = useRef(false);
   const chatEntryStartedAtRef = useRef(0);
   /** After picking a mode in the bottom sheet, the same touch can fall through to the S/I/P control and reopen the sheet; ignore those opens until this timestamp (ms). */
   const modeIntroSuppressOpenUntilRef = useRef(0);
@@ -659,7 +653,7 @@ export default function ChatScreen({ navigation, route }) {
           chatAPI.updateAnswerStylePreference(localStyle).catch(() => {});
         } else if (active) {
           setAnswerStyle('simple');
-          setAnswerStylePreferenceKnown(false);
+          setAnswerStylePreferenceKnown(true);
         }
       } catch (_) {
         if (active) setAnswerStylePreferenceKnown(Boolean(localStyle));
@@ -776,9 +770,10 @@ export default function ChatScreen({ navigation, route }) {
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
-  const [isComposerFocused, setIsComposerFocused] = useState(false);
-  /** Expo Web: RN multiline TextInput defaults to 2 textarea rows → placeholder sits high. */
-  const [webComposerHeight, setWebComposerHeight] = useState(44);
+  /** Multiline input stays one line while empty; grows only when there is text. */
+  const [composerHeight, setComposerHeight] = useState(44);
+  const inputTextRef = useRef('');
+  inputTextRef.current = inputText;
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [waitSideReplying, setWaitSideReplying] = useState(false);
@@ -790,8 +785,9 @@ export default function ChatScreen({ navigation, route }) {
   const [suggestions, setSuggestions] = useState(DEFAULT_CHAT_SUGGESTIONS);
   /** Keeps suggestion chips off-screen until the user asks for them — saves vertical space for messages. */
   const [showTopicIdeas, setShowTopicIdeas] = useState(false);
-  /** Themed insufficient-credits popup when a suggestion card is tapped without enough balance. */
-  const [showInsufficientCreditsAlert, setShowInsufficientCreditsAlert] = useState(false);
+  const [showCreditChoice, setShowCreditChoice] = useState(false);
+  const [creditChoiceMode, setCreditChoiceMode] = useState('standard');
+  const [creditChoiceQuestion, setCreditChoiceQuestion] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   /** Soft push opt-in after a successful answer (Android; cadence in notificationReminder). */
   const [showChatNotifBanner, setShowChatNotifBanner] = useState(false);
@@ -801,6 +797,10 @@ export default function ChatScreen({ navigation, route }) {
       setShowTopicIdeas(false);
     }
   }, [messages.length]);
+
+  useEffect(() => {
+    if (!inputText) setComposerHeight(44);
+  }, [inputText]);
 
   const [language, setLanguage] = useState('english');
   const [instantWelcomeAreaIds, setInstantWelcomeAreaIds] = useState([]);
@@ -1012,33 +1012,36 @@ export default function ChatScreen({ navigation, route }) {
 
   const [showEventPeriods, setShowEventPeriods] = useState(false);
   const [showDashaBrowser, setShowDashaBrowser] = useState(false);
-  const [showGreeting, setShowGreeting] = useState(true);
+  const [showGreeting, setShowGreeting] = useState(false);
+  const [homeSurfaceTab, setHomeSurfaceTab] = useState('today');
   const hasScopedChatPalette = !showGreeting && themeId === 'amethystEmber' && themeColors.chatPalette;
   const colors = useMemo(
     () => hasScopedChatPalette ? { ...themeColors, ...themeColors.chatPalette } : themeColors,
     [hasScopedChatPalette, themeColors],
   );
-  const goldBarInk = colors.tabActiveColor || colors.text;
   const theme = hasScopedChatPalette ? 'light' : themeMode;
   const [fomoHomeOpen, setFomoHomeOpen] = useState(false);
   const [fomoNotificationPromptNonce, setFomoNotificationPromptNonce] = useState(0);
   const [homeInfoModalPayload, setHomeInfoModalPayload] = useState(null);
   const [nudgeUnreadCount, setNudgeUnreadCount] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [chatSurfaceFocused, setChatSurfaceFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setChatSurfaceFocused(true);
+      return () => setChatSurfaceFocused(false);
+    }, [])
+  );
   const [firstPurchaseBonusOffer, setFirstPurchaseBonusOffer] = useState(null);
   const [firstPurchaseBonusModalVisible, setFirstPurchaseBonusModalVisible] = useState(false);
   const [firstPurchaseBonusRemainingSeconds, setFirstPurchaseBonusRemainingSeconds] = useState(0);
   const firstPurchaseBonusModalTimerRef = useRef(null);
 
-  // Do not replace the free-answer offer with the mode chooser immediately
-  // after the answer arrives. Reset this only when the user returns to the
-  // chat entry screen, so the chooser remains available for the next question.
   useEffect(() => {
     showGreetingRef.current = showGreeting;
     const enteredChat = prevShowGreetingRef.current && !showGreeting;
     prevShowGreetingRef.current = showGreeting;
     if (showGreeting) {
-      suppressModeIntroAfterFreeRef.current = false;
       chatModeIntroShownKeyRef.current = null;
       pendingScrollToLastAnswerRef.current = false;
     } else {
@@ -1990,6 +1993,57 @@ export default function ChatScreen({ navigation, route }) {
   const menuRowBorder = colors.cardBorder;
   const menuAccentIconGradient = [colors.selectionSurface, colors.selectionSurface];
 
+  const exitSpecialChatModes = () => {
+    if (isMundane) {
+      setIsMundane(false);
+      setMundaneContext(null);
+    }
+    if (partnershipMode) {
+      setPartnershipMode(false);
+      setNativeChart(null);
+      setPartnerChart(null);
+      setPartnershipRelation('');
+      setIsTypingOtherRelation(false);
+      setOtherRelationText('');
+      setNativeSearchQuery('');
+    }
+    setShowModeSelector(false);
+  };
+
+  const openHomeSurface = (tab = 'today') => {
+    keepChatOpenAfterAskEntryRef.current = false;
+    setHomeSurfaceTab(tab === 'explore' ? 'explore' : 'today');
+    setShowGreeting(true);
+    exitSpecialChatModes();
+  };
+
+  const renderDrawerMenuRow = ({ icon, label, action, last = false, danger = false }) => (
+    <TouchableOpacity
+      style={[getMenuOptionStyle(), last && styles.menuOptionLast]}
+      onPress={() => closeMenuDrawer(action)}
+    >
+      <LinearGradient
+        colors={menuRowGradient}
+        style={[styles.menuGradient, { borderColor: danger ? colors.error : menuRowBorder }]}
+      >
+        <View style={styles.menuIconContainer}>
+          <LinearGradient
+            colors={danger ? [colors.surfaceMuted, colors.surfaceMuted] : menuAccentIconGradient}
+            style={styles.menuIconGradient}
+          >
+            <Ionicons name={icon} size={19} color={danger ? colors.error : colors.selectionText} />
+          </LinearGradient>
+        </View>
+        <Text style={[styles.menuText, { color: danger ? colors.error : colors.text }]}>{label}</Text>
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={danger ? colors.error : colors.textTertiary}
+        />
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+
   const getSignName = (signNumber) => {
     if (signNumber === undefined || signNumber === null) return t('common.unknown', 'Unknown');
     const signs = {
@@ -2261,37 +2315,26 @@ export default function ChatScreen({ navigation, route }) {
       })();
     }
 
-    // Handle back button
+    return () => {
+      clearInstantScrollRetries();
+      unsubscribe();
+    };
+  }, [navigation, showGreeting, route.params]);
+
+  useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (!showGreeting) {
-        // In chat mode, show greeting screen and reset special modes
-        keepChatOpenAfterAskEntryRef.current = false;
-        setShowGreeting(true);
-        if (isMundane) {
-          setIsMundane(false);
-          setMundaneContext(null);
-        }
-        if (partnershipMode) {
-          setPartnershipMode(false);
-          setNativeChart(null);
-          setPartnerChart(null);
-          setPartnershipRelation('');
-          setIsTypingOtherRelation(false);
-          setOtherRelationText('');
-          setNativeSearchQuery('');
-        }
-        setShowModeSelector(false);
+      if (showMenu) {
+        closeMenuDrawer();
+        return true;
+      }
+      if (!showGreeting && (partnershipMode || isMundane)) {
+        exitSpecialChatModes();
         return true;
       }
       return false;
     });
-
-    return () => {
-      clearInstantScrollRetries();
-      unsubscribe();
-      backHandler.remove();
-    };
-  }, [navigation, showGreeting, route.params]);
+    return () => backHandler.remove();
+  }, [showGreeting, showMenu, partnershipMode, isMundane]);
 
   // Remove problematic back handler that clears messages
 
@@ -2480,9 +2523,6 @@ export default function ChatScreen({ navigation, route }) {
             }
           } else {
             await hydrateSelectedChatMode([], personId);
-            if (!shouldReturnToChat && !partnershipPrefillInProgressRef.current && !partnershipMode) {
-              setShowGreeting(true);
-            }
           }
           if (shouldReturnToChat) {
             setShowGreeting(false);
@@ -2816,13 +2856,54 @@ export default function ChatScreen({ navigation, route }) {
     !isPremiumAnalysis &&
     credits < effectiveChatCost;
 
-  /** Suggestion cards: if the selected mode is unaffordable, offer credits instead of a dead tap. */
-  const handleSuggestionPress = (question) => {
-    if (!freeQuestionNotificationGate && credits < effectiveChatCost) {
-      setShowInsufficientCreditsAlert(true);
+  const currentChatModeKey = isPremiumAnalysis
+    ? 'premium'
+    : (instantChatEnabled && isInstantAnalysis ? 'instant' : 'standard');
+
+  const requiredCreditsForMode = (modeKey) => {
+    if (modeKey === 'premium') return Number(premiumChatCost) || 0;
+    if (modeKey === 'instant') return Number(instantChatFirstMinuteCost) || 0;
+    if (modeKey === 'speech') return Number(speechChatPerMinuteCost) || 0;
+    if (partnershipMode) return Number(partnershipCost) || 0;
+    if (!partnershipMode && !isMundane && freeQuestionAvailable) return 0;
+    return Number(chatCost) || 0;
+  };
+
+  const canAffordChatMode = (modeKey) => {
+    if (modeKey === 'instant' && (!instantChatEnabled || partnershipMode || isMundane)) return false;
+    if (modeKey === 'speech' && (!instantChatEnabled || !speechChatEnabled || !birthData || partnershipMode || isMundane)) {
       return false;
     }
+    if (modeKey === 'instant' && instantBilling.active) return true;
+    return Number(credits) >= requiredCreditsForMode(modeKey);
+  };
+
+  const sendRequiresCredits = (
+    instantChatEnabled && isInstantAnalysis && !instantBilling.active
+      ? requiredCreditsForMode('instant')
+      : effectiveChatCost
+  );
+  const composerBlockedByCredits = !freeQuestionNotificationGate && Number(credits) < sendRequiresCredits;
+
+  const openCreditChoice = (modeKey, question = '') => {
+    Keyboard.dismiss();
+    const nextMode = modeKey || currentChatModeKey;
+    const nextQuestion = String(question || '').trim();
+    setCreditChoiceMode(nextMode);
+    setCreditChoiceQuestion(nextQuestion);
+    if (nextQuestion && !String(inputText || '').trim()) {
+      setInputText(nextQuestion);
+    }
+    setShowCreditChoice(true);
+  };
+
+  /** Suggestion cards: keep the question, then convert if the selected mode is unaffordable. */
+  const handleSuggestionPress = (question) => {
     setInputText(question);
+    if (composerBlockedByCredits) {
+      openCreditChoice(currentChatModeKey, question);
+      return false;
+    }
     return true;
   };
 
@@ -4568,7 +4649,6 @@ export default function ChatScreen({ navigation, route }) {
               (freeUsedThisSendRef.current || serverConfirmedFreeQuestion) && !gatedNoCharge
             );
             if (wasFreeQuestion) {
-              suppressModeIntroAfterFreeRef.current = true;
               setShowChatModeIntro(false);
               setShowModeSelector(false);
               setPodcastPromoVisible(false);
@@ -5261,70 +5341,6 @@ export default function ChatScreen({ navigation, route }) {
     (msg) => msg.isTyping && msg.messageId && msg.waitConversation?.enabled && msg.waitConversation?.status === 'active'
   );
 
-  useEffect(() => {
-    const remainingSuppressMs = modeIntroSuppressOpenUntilRef.current - Date.now();
-    if (remainingSuppressMs > 0) {
-      const timer = setTimeout(() => {
-        setModeIntroGateTick((tick) => tick + 1);
-      }, remainingSuppressMs + 10);
-      return () => clearTimeout(timer);
-    }
-
-    const shouldShowModeIntro =
-      !showGreeting &&
-      !suppressModeIntroAfterFreeRef.current &&
-      birthData &&
-      !freeQuestionAvailable &&
-      answerStylePreferenceHydrated &&
-      (!chatModePreferenceLoadedRef.current || !answerStylePreferenceKnown) &&
-      pendingFomoQueryContextRef.current?.source !== 'homepage_fomo' &&
-      !partnershipMode &&
-      !isMundane &&
-      !loading &&
-      !isTyping &&
-      !activeWaitSideMessage &&
-      !showChatModeIntro;
-
-    if (!shouldShowModeIntro) return;
-
-    // This chooser belongs to entering chat, never to completion of a turn.
-    // Once a user message exists after the current entry began, do not open it
-    // even when loading/isTyping changes cause this effect to re-run.
-    const entryStartedAt = chatEntryStartedAtRef.current;
-    if (entryStartedAt > 0 && messages.some((msg) => {
-      if (msg?.role !== 'user') return false;
-      const timestamp = Date.parse(msg?.timestamp || msg?.created_at || '');
-      return Number.isFinite(timestamp) && timestamp >= entryStartedAt;
-    })) {
-      return;
-    }
-
-    // Keep the intro keyed to the active chat entry, not the transient session id.
-    // Session restoration can happen before the sheet opens, and gating on sessionId
-    // suppresses the default prompt entirely on real user entries.
-    const introKey = `chat-entry:${currentPersonId || birthData?.id || birthData?.name || 'native'}`;
-    if (chatModeIntroShownKeyRef.current === introKey) return;
-
-    chatModeIntroShownKeyRef.current = introKey;
-    setShowChatModeIntro(true);
-  }, [
-    activeWaitSideMessage,
-    answerStylePreferenceHydrated,
-    answerStylePreferenceKnown,
-    birthData,
-    currentPersonId,
-    freeQuestionAvailable,
-    isMundane,
-    isTyping,
-    loading,
-    messages,
-    modeIntroGateTick,
-    partnershipMode,
-    sessionId,
-    showChatModeIntro,
-    showGreeting,
-  ]);
-
   const getChatModeKey = () => {
     if (isPremiumAnalysis) return 'premium';
     if (instantChatEnabled && isInstantAnalysis) return 'instant';
@@ -5422,7 +5438,14 @@ export default function ChatScreen({ navigation, route }) {
       setShowInstantEndConfirm(true);
       return;
     }
+    if (modeKey === 'speech' && !canAffordChatMode('speech')) {
+      openCreditChoice('speech', inputText);
+      return;
+    }
     applyChatMode(modeKey);
+    if (!canAffordChatMode(modeKey)) {
+      openCreditChoice(modeKey, inputText);
+    }
   };
 
   const selectPendingChatMode = (modeKey) => {
@@ -5440,6 +5463,32 @@ export default function ChatScreen({ navigation, route }) {
     setShowModeSelector(false);
     setShowChatModeIntro(false);
     switchChatMode(modeKey);
+  };
+
+  const handleCreditChoiceBuy = () => {
+    setShowCreditChoice(false);
+    if (creditChoiceQuestion && !String(inputText || '').trim()) {
+      setInputText(creditChoiceQuestion);
+    }
+    if (firstPurchaseBonusOffer?.eligible) {
+      openCreditsForFirstPurchaseBonus();
+      return;
+    }
+    navigation.navigate('Credits');
+  };
+
+  const handleCreditChoiceMode = (modeKey) => {
+    const question = creditChoiceQuestion;
+    setShowCreditChoice(false);
+    chatModeIntroShownKeyRef.current = `chat-entry:${currentPersonId || birthData?.id || birthData?.name || 'native'}`;
+    setShowChatModeIntro(false);
+    setShowModeSelector(false);
+    if (question && !String(inputText || '').trim()) {
+      setInputText(question);
+    }
+    applyChatMode(modeKey);
+    // applyChatMode only suppresses the intro briefly; keep it closed after this switch.
+    modeIntroSuppressOpenUntilRef.current = Date.now() + 8000;
   };
 
   useEffect(() => {
@@ -5668,13 +5717,36 @@ export default function ChatScreen({ navigation, route }) {
     if (!messageText.trim() || !birthData) {
       return;
     }
+    const forceTier = sendOptions.forceTier || null;
+    const skipCreditGate = Boolean(sendOptions.skipCreditGate);
+    const usingPremium = forceTier ? forceTier === 'premium' : isPremiumAnalysis;
+    const usingInstant = forceTier
+      ? forceTier === 'instant'
+      : Boolean(instantChatEnabled && isInstantAnalysis);
+    if (!skipCreditGate && !freeQuestionNotificationGate) {
+      let required = 0;
+      if (usingInstant) {
+        required = instantBilling.active ? 0 : requiredCreditsForMode('instant');
+      } else if (usingPremium) {
+        required = requiredCreditsForMode('premium');
+      } else {
+        required = requiredCreditsForMode('standard');
+      }
+      if (Number(credits) < required) {
+        openCreditChoice(
+          usingPremium ? 'premium' : (usingInstant ? 'instant' : 'standard'),
+          messageText,
+        );
+        return;
+      }
+    }
     const wantsMeteredInstant =
-      !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
+      !partnershipMode && !isMundane && instantChatEnabled && usingInstant;
     let startedInstantBillingSessionId = null;
     let startedInstantChatSessionId = null;
     if (wantsMeteredInstant && !instantBilling.active) {
       if (credits < instantChatFirstMinuteCost) {
-        navigation.navigate('Credits');
+        openCreditChoice('instant', messageText);
         return;
       }
       startedInstantChatSessionId = sessionId || await createSession();
@@ -5717,12 +5789,12 @@ export default function ChatScreen({ navigation, route }) {
     const userMessageId = Date.now().toString();
     const chartName = partnershipMode ? nativeChart?.name : birthData?.name;
     const useFreeQuestion =
-      !partnershipMode && !isMundane && !isInstantAnalysis && freeQuestionAvailable;
-    const isProModelFlow = !useFreeQuestion && isPremiumAnalysis;
-    const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
+      !partnershipMode && !isMundane && !usingInstant && freeQuestionAvailable;
+    const isProModelFlow = !useFreeQuestion && usingPremium;
+    const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && usingInstant;
     const outgoingTier = useFreeQuestion
       ? 'standard'
-      : (useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard'));
+      : (useInstantChat ? 'instant' : (usingPremium ? 'premium' : 'standard'));
     const pendingSubjectGateOverride = subjectGateOverrideRef.current;
     subjectGateOverrideRef.current = null;
     const subjectGateOverride =
@@ -5878,7 +5950,7 @@ export default function ChatScreen({ navigation, route }) {
       }
 
       // Track if this send uses the free standard question (for post-success toast)
-      if (!partnershipMode && !isInstantAnalysis && freeQuestionAvailable) {
+      if (!partnershipMode && !usingInstant && freeQuestionAvailable) {
         freeUsedThisSendRef.current = true;
       }
 
@@ -5928,6 +6000,10 @@ export default function ChatScreen({ navigation, route }) {
       const insufficientCredits = isChatInsufficientCreditsError(error);
       if (insufficientCredits) {
         fetchBalance().catch(() => {});
+        openCreditChoice(
+          outgoingTier === 'instant' ? 'instant' : (outgoingTier === 'premium' ? 'premium' : 'standard'),
+          messageText,
+        );
       }
       const userMessage = formatChatSendErrorMessage(error, { expectedFreeQuestion: useFreeQuestion });
 
@@ -6032,6 +6108,11 @@ export default function ChatScreen({ navigation, route }) {
       const insufficientCredits = isChatInsufficientCreditsError(error);
       if (insufficientCredits) {
         fetchBalance().catch(() => {});
+        const failedTier = String(failedMessage?.chatTier || currentChatModeKey).toLowerCase();
+        openCreditChoice(
+          failedTier === 'instant' ? 'instant' : (failedTier === 'premium' ? 'premium' : 'standard'),
+          failedQuestion,
+        );
       }
       const userMessage = formatChatSendErrorMessage(error, {
         expectedFreeQuestion: !!failedMessage?.expectedFreeQuestion,
@@ -6276,7 +6357,7 @@ export default function ChatScreen({ navigation, route }) {
               }
             ]}
           >
-            {!showGreeting && (
+            {(!showGreeting && (partnershipMode || isMundane)) && (
               <TouchableOpacity
                 style={[styles.backButton, {
                   backgroundColor: theme === 'dark'
@@ -6285,24 +6366,7 @@ export default function ChatScreen({ navigation, route }) {
                       ? 'rgba(24, 24, 27, 0.08)'
                       : 'rgba(249, 115, 22, 0.25)',
                 }]}
-                onPress={() => {
-                  keepChatOpenAfterAskEntryRef.current = false;
-                  setShowGreeting(true);
-                  if (isMundane) {
-                    setIsMundane(false);
-                    setMundaneContext(null);
-                  }
-                  if (partnershipMode) {
-                    setPartnershipMode(false);
-                    setNativeChart(null);
-                    setPartnerChart(null);
-                    setPartnershipRelation('');
-                    setIsTypingOtherRelation(false);
-                    setOtherRelationText('');
-                    setNativeSearchQuery('');
-                  }
-                  setShowModeSelector(false);
-                }}
+                onPress={exitSpecialChatModes}
               >
                 <Ionicons name="arrow-back" size={20} color={colors.textInverse} />
               </TouchableOpacity>
@@ -6464,31 +6528,29 @@ export default function ChatScreen({ navigation, route }) {
                 </TouchableOpacity>
               ) : null}
 
-              {showGreeting && (
-                <TouchableOpacity
-                  style={styles.headerBellButton}
-                  onPress={() => navigation.navigate('NudgeInbox')}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('premiumUi.chatScreen.notificationHistory')}
-                >
-                  {/* Fixed 40×40 box: icon + badge both live inside so nothing draws outside bounds (no clipping surprises). */}
-                  <View style={styles.headerBellHitBox} pointerEvents="none">
-                    <Ionicons name="notifications-outline" size={22} color={colors.textInverse} />
-                    {nudgeUnreadCount > 0 && (
-                      <View style={styles.headerBellBadge}>
-                        <Text
-                          style={styles.headerBellBadgeText}
-                          numberOfLines={1}
-                          maxFontSizeMultiplier={1.35}
-                          allowFontScaling
-                        >
-                          {nudgeUnreadCount > 99 ? '99+' : String(nudgeUnreadCount)}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.headerBellButton}
+                onPress={() => navigation.navigate('NudgeInbox')}
+                accessibilityRole="button"
+                accessibilityLabel={t('premiumUi.chatScreen.notificationHistory')}
+              >
+                {/* Fixed 40×40 box: icon + badge both live inside so nothing draws outside bounds (no clipping surprises). */}
+                <View style={styles.headerBellHitBox} pointerEvents="none">
+                  <Ionicons name="notifications-outline" size={22} color={colors.textInverse} />
+                  {nudgeUnreadCount > 0 && (
+                    <View style={styles.headerBellBadge}>
+                      <Text
+                        style={styles.headerBellBadgeText}
+                        numberOfLines={1}
+                        maxFontSizeMultiplier={1.35}
+                        allowFontScaling
+                      >
+                        {nudgeUnreadCount > 99 ? '99+' : String(nudgeUnreadCount)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
 
               {!(isInstantAnalysis && instantBilling.active) ? (
                 <TouchableOpacity
@@ -6727,7 +6789,9 @@ export default function ChatScreen({ navigation, route }) {
             }}
           >
             <HomeScreen
+              key={homeSurfaceTab}
               birthData={birthData}
+              initialTab={homeSurfaceTab}
               onOptionSelect={handleGreetingOptionSelect}
               onTalkToTara={instantChatEnabled && speechChatEnabled ? () => {
                 if (!birthData) {
@@ -6735,6 +6799,11 @@ export default function ChatScreen({ navigation, route }) {
                   return;
                 }
                 if (Platform.OS === 'web') getTextToSpeech().unlockWebAudio?.();
+                if (!canAffordChatMode('speech')) {
+                  setShowGreeting(false);
+                  openCreditChoice('speech');
+                  return;
+                }
                 navigation.navigate('SpeechChat', {
                   birthData,
                   language,
@@ -7080,7 +7149,7 @@ export default function ChatScreen({ navigation, route }) {
             keyboardBottomInset > 0
               // Web overlap already equals covered pixels; native needs a little extra.
               ? (Platform.OS === 'web' ? keyboardBottomInset : keyboardBottomInset + 20)
-              : (Platform.OS === 'web' ? webBottomInset : liveComposerBottomInset),
+              : homeBottomTabHeight,
         }}
         >
         {/* Topic idea chips — opt-in so the message list keeps most of the screen */}
@@ -7230,6 +7299,7 @@ export default function ChatScreen({ navigation, route }) {
                         isInstantAnalysis && styles.modeSelectorPillActive,
                         isInstantAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(249, 115, 22, 0.30)' : 'rgba(249, 115, 22, 0.18)' },
                         !isInstantAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                        !canAffordChatMode('instant') && { opacity: 0.72 },
                       ]}
                       onPress={() => switchChatMode('instant')}
                       accessibilityRole="radio"
@@ -7245,7 +7315,11 @@ export default function ChatScreen({ navigation, route }) {
                           })}
                         </Text>
                         <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}>
-                          {t('instantBilling.prepaid', 'prepaid by started minute')}
+                          {canAffordChatMode('instant')
+                            ? t('instantBilling.prepaid', 'prepaid by started minute')
+                            : t('chat.creditChoice.needsMore', 'Needs {{count}} more', {
+                                count: Math.max(0, instantChatFirstMinuteCost - Number(credits || 0)),
+                              })}
                         </Text>
                       </View>
                     </TouchableOpacity>
@@ -7256,6 +7330,7 @@ export default function ChatScreen({ navigation, route }) {
                       !isPremiumAnalysis && !isInstantAnalysis && styles.modeSelectorPillActive,
                       !isPremiumAnalysis && !isInstantAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.35)' : 'rgba(255, 107, 53, 0.25)' },
                       (isPremiumAnalysis || isInstantAnalysis) && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                      !canAffordChatMode('standard') && { opacity: 0.72 },
                     ]}
                     onPress={() => switchChatMode('standard')}
                     accessibilityRole="radio"
@@ -7268,7 +7343,11 @@ export default function ChatScreen({ navigation, route }) {
                         {formatCreditsInr(chatCost)}
                       </Text>
                       <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}>
-                        {t('premiumUi.chatScreen.creditCount', { count: chatCost })}
+                        {canAffordChatMode('standard')
+                          ? t('premiumUi.chatScreen.creditCount', { count: chatCost })
+                          : t('chat.creditChoice.needsMore', 'Needs {{count}} more', {
+                              count: Math.max(0, Number(chatCost) - Number(credits || 0)),
+                            })}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -7278,6 +7357,7 @@ export default function ChatScreen({ navigation, route }) {
                       isPremiumAnalysis && styles.modeSelectorPillActivePremium,
                       isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 215, 0, 0.25)' : 'rgba(255, 215, 0, 0.2)' },
                       !isPremiumAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                      !canAffordChatMode('premium') && { opacity: 0.72 },
                     ]}
                     onPress={() => switchChatMode('premium')}
                     accessibilityRole="radio"
@@ -7290,7 +7370,11 @@ export default function ChatScreen({ navigation, route }) {
                         {formatCreditsInr(premiumChatCost)}
                       </Text>
                       <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}>
-                        {t('premiumUi.chatScreen.creditCount', { count: premiumChatCost })}
+                        {canAffordChatMode('premium')
+                          ? t('premiumUi.chatScreen.creditCount', { count: premiumChatCost })
+                          : t('chat.creditChoice.needsMore', 'Needs {{count}} more', {
+                              count: Math.max(0, Number(premiumChatCost) - Number(credits || 0)),
+                            })}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -7301,31 +7385,34 @@ export default function ChatScreen({ navigation, route }) {
                 key="chat-main-input"
                 style={[
                   styles.modernTextInput,
-                  { color: colors.text },
+                  {
+                    color: colors.text,
+                    height: !inputText || showModeSelector ? 44 : composerHeight,
+                    maxHeight: !inputText || showModeSelector ? 44 : 100,
+                  },
                   showModeSelector && styles.modernTextInputCollapsed,
-                  Platform.OS === 'web' && !showModeSelector
-                    ? { height: webComposerHeight }
+                  !inputText && Platform.OS === 'web'
+                    ? { whiteSpace: 'nowrap', overflow: 'hidden' }
                     : null,
                 ]}
                 value={inputText}
                 onFocus={() => {
-                  setIsComposerFocused(true);
                   markInstantActivity();
                 }}
-                onBlur={() => setIsComposerFocused(false)}
                 onChangeText={(text) => {
                   setInputText(text);
                   markInstantActivity();
-                  if (Platform.OS === 'web' && !text) {
-                    setWebComposerHeight(44);
-                  }
+                  if (!text) setComposerHeight(44);
                 }}
                 onContentSizeChange={(e) => {
-                  if (Platform.OS !== 'web' || showModeSelector) return;
+                  if (showModeSelector || !inputTextRef.current) {
+                    setComposerHeight(44);
+                    return;
+                  }
                   const next = Math.ceil(e?.nativeEvent?.contentSize?.height || 0);
                   if (!next) return;
                   const clamped = Math.min(100, Math.max(44, next));
-                  setWebComposerHeight((prev) => (prev === clamped ? prev : clamped));
+                  setComposerHeight((prev) => (prev === clamped ? prev : clamped));
                 }}
                 placeholder={
                   activeWaitSideMessage ? "Reply while the full answer is prepared..." :
@@ -7335,8 +7422,7 @@ export default function ChatScreen({ navigation, route }) {
                         : "Analyzing...") :
                   freeQuestionNotificationGate
                     ? "Turn on notifications to unlock your free question"
-                  : credits < effectiveChatCost ? "Insufficient credits" :
-                  partnershipMode && (partnershipStep === 0 || partnershipStep === 1) ? "Select a chart above..." :
+                  : partnershipMode && (partnershipStep === 0 || partnershipStep === 1) ? "Select a chart above..." :
                   partnershipMode && partnershipStep === 2 ? "Describe the relationship..." :
                   partnershipMode && partnershipStep === 3 ? "Click 'Ready' button above..." :
                   showModeSelector ? "Type here..." :
@@ -7347,11 +7433,12 @@ export default function ChatScreen({ navigation, route }) {
                 maxLength={500}
                 editable={
                   !!activeWaitSideMessage ||
-                  ((isInstantAnalysis || !loading) && !instantBilling.busy && (credits >= effectiveChatCost || freeQuestionNotificationGate) && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)))
+                  ((isInstantAnalysis || !loading) && !instantBilling.busy && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)))
                 }
                 multiline
                 // RN Web: without rows=1, <textarea> defaults to 2 rows and placeholder sits high.
-                {...(Platform.OS === 'web' ? { rows: 1, numberOfLines: 1 } : {})}
+                numberOfLines={inputText ? undefined : 1}
+                {...(Platform.OS === 'web' ? { rows: 1 } : {})}
                 textAlignVertical="center"
                 blurOnSubmit={false}
               />
@@ -7360,7 +7447,7 @@ export default function ChatScreen({ navigation, route }) {
                 <TouchableOpacity
                   style={[
                     styles.chatModeIdentityButton,
-                    (isComposerFocused || inputText.trim().length > 0) && styles.chatModeIdentityButtonCompact,
+                    styles.chatModeIdentityButtonCompact,
                     {
                       backgroundColor: colors.surfaceRaised,
                       borderColor: colors.border,
@@ -7377,21 +7464,9 @@ export default function ChatScreen({ navigation, route }) {
                   accessibilityRole="button"
                   accessibilityLabel={t('chat.modeIntro.openSelector', 'Change chat mode')}
                 >
-                  {!(isComposerFocused || inputText.trim().length > 0) && (
-                    <Ionicons
-                      name={isInstantAnalysis ? 'flash' : isPremiumAnalysis ? 'sparkles' : 'chatbubble-ellipses'}
-                      size={14}
-                      color={colors.primary}
-                    />
-                  )}
                   <Text numberOfLines={1} style={[styles.chatModeIdentityText, { color: colors.text }]}>
-                    {isComposerFocused || inputText.trim().length > 0
-                      ? getChatModeCompactName()
-                      : `${getChatModeName()} · ${getAnswerStyleName(getAnswerStyleForMode())}`}
+                    {getChatModeCompactName()}
                   </Text>
-                  {!(isComposerFocused || inputText.trim().length > 0) && (
-                    <Ionicons name="chevron-down" size={13} color={colors.textSecondary} />
-                  )}
                 </TouchableOpacity>
               )}
 
@@ -7400,6 +7475,10 @@ export default function ChatScreen({ navigation, route }) {
                   style={styles.speechMicButton}
                   onPress={() => {
                     if (Platform.OS === 'web') getTextToSpeech().unlockWebAudio?.();
+                    if (!canAffordChatMode('speech')) {
+                      openCreditChoice('speech', inputText);
+                      return;
+                    }
                     navigation.navigate('SpeechChat', {
                       birthData,
                       language,
@@ -7423,7 +7502,7 @@ export default function ChatScreen({ navigation, route }) {
               <TouchableOpacity
                 style={[
                   styles.modernSendButton,
-                  ((!activeWaitSideMessage && loading) || instantBilling.busy || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))) && styles.modernSendButtonDisabled
+                  ((!activeWaitSideMessage && loading) || instantBilling.busy || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))) && styles.modernSendButtonDisabled
                 ]}
                 onPress={() => {
                   if (!activeWaitSideMessage && freeQuestionNotificationGate) {
@@ -7438,7 +7517,7 @@ export default function ChatScreen({ navigation, route }) {
                     }, 250);
                   });
                 }}
-                disabled={(!activeWaitSideMessage && loading) || instantBilling.busy || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate)) || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
+                disabled={(!activeWaitSideMessage && loading) || instantBilling.busy || waitSideReplying || !inputText.trim() || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3))}
                 accessibilityRole="button"
                 accessibilityLabel={activeWaitSideMessage
                   ? t('chat.sendReply', 'Send reply')
@@ -7447,7 +7526,6 @@ export default function ChatScreen({ navigation, route }) {
                     : t('chat.sendQuestion', 'Send question')}
                 accessibilityState={{
                   disabled: (!activeWaitSideMessage && loading) || instantBilling.busy || waitSideReplying || !inputText.trim()
-                    || (!activeWaitSideMessage && (credits < effectiveChatCost && !freeQuestionNotificationGate))
                     || (!activeWaitSideMessage && partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)),
                 }}
               >
@@ -7463,7 +7541,7 @@ export default function ChatScreen({ navigation, route }) {
                     <Ionicons name="send" size={20} color={COLORS.white} />
                   ) : freeQuestionNotificationGate ? (
                     <Ionicons name="notifications-outline" size={20} color={COLORS.white} />
-                  ) : credits < effectiveChatCost ? (
+                  ) : composerBlockedByCredits ? (
                     <Text style={styles.modernSendText}>💳</Text>
                   ) : effectiveChatCost === 0 ? (
                     <Ionicons name="arrow-up" size={22} color={colors.onPrimary} />
@@ -7523,12 +7601,40 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
 
-            {credits < effectiveChatCost && !freeQuestionRequiresNotifications && !firstPurchaseBonusOffer && !isKeyboardVisible && (
+            {credits < sendRequiresCredits && !freeQuestionRequiresNotifications && !firstPurchaseBonusOffer && !isKeyboardVisible && (
               <TouchableOpacity
-                style={styles.lowCreditBanner}
+                style={[
+                  styles.firstQuestionFreeBanner,
+                  {
+                    backgroundColor: colors.selectionSurface,
+                    borderColor: colors.selectionBorder,
+                  },
+                ]}
                 onPress={() => navigation.navigate('Credits')}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={t('premiumUi.chatScreen.getCredits')}
               >
-                <Text style={styles.lowCreditText}>💳 {t('premiumUi.chatScreen.getCredits')}</Text>
+                <View
+                  style={[
+                    styles.firstQuestionFreeAccent,
+                    { backgroundColor: colors.primary },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.firstQuestionFreeIconWrap,
+                    { backgroundColor: colors.selectionControl },
+                  ]}
+                >
+                  <Ionicons name="wallet-outline" size={20} color={colors.selectionText} />
+                </View>
+                <View style={styles.firstQuestionFreeTextWrap}>
+                  <Text style={[styles.firstQuestionFreeTitle, { color: colors.selectionText }]}>
+                    {t('premiumUi.chatScreen.getCredits')}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.selectionText} />
               </TouchableOpacity>
             )}
 
@@ -7537,56 +7643,6 @@ export default function ChatScreen({ navigation, route }) {
         </View>
         </KeyboardAvoidingView>
 
-        {/* Quick Actions Bar - hide while keyboard is open so input isn't sandwiched above system keyboard */}
-        {!isInstantAnalysis && !showGreeting && !isKeyboardVisible && (
-          <View style={[styles.quickActionsBar, { paddingBottom: Math.max(8, webBottomInset) }]}>
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => setShowLanguageModal(true)}
-            >
-              <Ionicons name="language-outline" size={18} color={goldBarInk} />
-              <Text style={[styles.quickActionText, { color: goldBarInk }]}>{t('quickActions.language')}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => navigation.navigate('ChartsHub', { birthData })}
-            >
-              <Ionicons name="pie-chart-outline" size={18} color={goldBarInk} />
-              <Text style={[styles.quickActionText, { color: goldBarInk }]}>{t('quickActions.chart')}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => setShowDashaBrowser(true)}
-            >
-              <Ionicons name="time-outline" size={18} color={goldBarInk} />
-              <Text style={[styles.quickActionText, { color: goldBarInk }]}>{t('quickActions.dasha')}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.quickActionButton, partnershipMode && styles.quickActionButtonActive]}
-              onPress={() => {
-                if (!partnershipMode) {
-                  openPartnershipModal(partnershipCost);
-                } else {
-                  exitPartnershipMode();
-                }
-              }}
-            >
-              <Ionicons name="people-outline" size={18} color={goldBarInk} />
-              <Text style={[styles.quickActionText, { color: goldBarInk }]}>{t('quickActions.partner')}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={() => navigation.navigate('ChatHistory')}
-            >
-              <Ionicons name="chatbubbles-outline" size={18} color={goldBarInk} />
-              <Text style={[styles.quickActionText, { color: goldBarInk }]}>{t('quickActions.history')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
         </>
         )}
 
@@ -7791,6 +7847,13 @@ export default function ChatScreen({ navigation, route }) {
                   const isSelected = option.key === (pendingChatMode || getChatModeKey());
                   const isCurrent = option.key === getChatModeKey();
                   const hasDiscount = option.originalCost != null && Number(option.originalCost) > Number(option.cost || 0);
+                  const canAfford = canAffordChatMode(option.key);
+                  const optionCost = option.key === 'instant'
+                    ? instantChatFirstMinuteCost
+                    : option.key === 'speech'
+                      ? speechChatPerMinuteCost
+                      : Number(option.cost || 0);
+                  const shortfall = Math.max(0, optionCost - Number(credits || 0));
                   const titleColor = isSelected ? colors.selectionText : colors.text;
                   const bodyColor = isSelected ? colors.selectionTextMuted : colors.textSecondary;
                   const mutedColor = isSelected ? colors.selectionTextMuted : (colors.textTertiary || colors.textSecondary);
@@ -7809,6 +7872,7 @@ export default function ChatScreen({ navigation, route }) {
                           borderColor: isSelected
                             ? (colors.selectionBorder || colors.primary)
                             : (colors.cardBorder || colors.border),
+                          opacity: canAfford ? 1 : 0.72,
                         },
                       ]}
                     >
@@ -7843,6 +7907,11 @@ export default function ChatScreen({ navigation, route }) {
                                     cost: formatModeCost(option.cost),
                                   })}
                             </Text>
+                            {!canAfford && shortfall > 0 ? (
+                              <Text style={[styles.chatModeIntroCurrent, { color: colors.warning || colors.accent }]}>
+                                {t('chat.creditChoice.needsMore', 'Needs {{count}} more', { count: shortfall })}
+                              </Text>
+                            ) : null}
                           </View>
                         </View>
                         <Text style={[styles.chatModeIntroBenefit, { color: bodyColor }]}>{option.benefit}</Text>
@@ -7898,7 +7967,9 @@ export default function ChatScreen({ navigation, route }) {
           <View
             style={[
               styles.drawerOverlay,
-              showGreeting ? { bottom: homeBottomTabHeight } : null,
+              (showGreeting || (!isKeyboardVisible && chatSurfaceFocused))
+                ? { bottom: homeBottomTabHeight }
+                : null,
             ]}
           >
             <TouchableOpacity
@@ -7934,7 +8005,11 @@ export default function ChatScreen({ navigation, route }) {
                       </Animated.View>
                       <View style={styles.drawerBrandCopy}>
                         <Text style={[styles.drawerBrandEyebrow, { color: colors.primary }]}>{t('premiumUi.chatScreen.brand').toUpperCase()}</Text>
-                        <Text style={[styles.drawerTitle, { color: colors.text }]}>{t('premiumUi.chatScreen.explore')}</Text>
+                        <Text style={[styles.drawerTitle, { color: colors.text }]}>
+                          {showGreeting
+                            ? t('premiumUi.chatScreen.explore')
+                            : t('premiumUi.home.askTara')}
+                        </Text>
                       </View>
                     </View>
                     <View style={styles.drawerHeaderActions}>
@@ -7956,7 +8031,11 @@ export default function ChatScreen({ navigation, route }) {
                       </TouchableOpacity>
                     </View>
                   </View>
-                  <Text style={[styles.drawerSubtitle, { color: colors.textSecondary }]}>{t('premiumUi.chatScreen.chooseNext')}</Text>
+                  <Text style={[styles.drawerSubtitle, { color: colors.textSecondary }]}>
+                    {showGreeting
+                      ? t('premiumUi.chatScreen.chooseNext')
+                      : t('premiumUi.chatScreen.chatMenuBody', 'Language, chart, dasha, partner, and history.')}
+                  </Text>
                   <TouchableOpacity
                     style={[styles.drawerContextCard, { backgroundColor: colors.headerSurface, borderColor: colors.cosmicLine }]}
                     activeOpacity={0.86}
@@ -7999,6 +8078,58 @@ export default function ChatScreen({ navigation, route }) {
                   removeClippedSubviews={false}
                 >
                 <View style={styles.drawerMenuBody}>
+                  {!showGreeting ? (
+                    <>
+                      {!partnershipMode && !isMundane && !freeQuestionAvailable ? renderDrawerMenuRow({
+                        icon: 'options-outline',
+                        label: t('chat.modeIntro.eyebrow', 'Chat mode'),
+                        action: () => {
+                          modeIntroSuppressOpenUntilRef.current = 0;
+                          setShowModeSelector(false);
+                          setShowChatModeIntro(true);
+                        },
+                      }) : null}
+                      {renderDrawerMenuRow({
+                        icon: 'language-outline',
+                        label: t('quickActions.language'),
+                        action: () => setShowLanguageModal(true),
+                      })}
+                      {renderDrawerMenuRow({
+                        icon: 'pie-chart-outline',
+                        label: t('quickActions.chart'),
+                        action: () => {
+                          if (birthData) {
+                            navigation.navigate('ChartsHub', { birthData });
+                            return;
+                          }
+                          navigation.navigate('BirthForm', { returnTo: 'Home' });
+                        },
+                      })}
+                      {renderDrawerMenuRow({
+                        icon: 'time-outline',
+                        label: t('quickActions.dasha'),
+                        action: () => setShowDashaBrowser(true),
+                      })}
+                      {!isMundane ? renderDrawerMenuRow({
+                        icon: 'people-outline',
+                        label: t(partnershipMode ? 'menu.partnershipOn' : 'quickActions.partner'),
+                        action: () => {
+                          if (!partnershipMode) {
+                            openPartnershipModal(partnershipCost);
+                            return;
+                          }
+                          exitPartnershipMode();
+                        },
+                      }) : null}
+                      {renderDrawerMenuRow({
+                        icon: 'chatbubbles-outline',
+                        label: t('quickActions.history'),
+                        action: () => navigation.navigate('ChatHistory'),
+                        last: true,
+                      })}
+                    </>
+                  ) : (
+                    <>
                   <Text style={[styles.drawerSectionLabel, { color: colors.primary }]}>{t('premiumUi.chatScreen.yourSpace')}</Text>
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
@@ -8220,6 +8351,31 @@ export default function ChatScreen({ navigation, route }) {
                     style={getMenuOptionStyle()}
                     onPress={() => {
                       closeMenuDrawer(() => {
+                        navigation.navigate('Prashna', { birthData });
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={menuAccentIconGradient}
+                          style={styles.menuIconGradient}
+                        >
+                          <Ionicons name="help-circle-outline" size={19} color={colors.selectionText} />
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.prashna', 'Prashna')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
+                      closeMenuDrawer(() => {
                         if (birthData) {
                           navigation.navigate('KPSystem', { birthDetails: birthData });
                         }
@@ -8409,41 +8565,6 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
-                  {!isMundane && !showGreeting && (
-                    <TouchableOpacity
-                      style={getMenuOptionStyle()}
-                      onPress={() => {
-                        if (!partnershipMode) {
-                          openPartnershipModal(partnershipCost);
-                          closeMenuDrawer();
-                        } else {
-                          closeMenuDrawer();
-                          exitPartnershipMode();
-                        }
-                      }}
-                    >
-                      <LinearGradient
-                        colors={partnershipMode
-                          ? [colors.selectionSurface, colors.selectionSurface]
-                          : menuRowGradient}
-                        style={[styles.menuGradient, { borderColor: partnershipMode
-                          ? colors.selectionBorder
-                          : menuRowBorder }]}
-                      >
-                        <View style={styles.menuIconContainer}>
-                          <LinearGradient
-                            colors={partnershipMode ? [colors.selectionControl, colors.selectionControl] : menuAccentIconGradient}
-                            style={styles.menuIconGradient}
-                          >
-                            <Ionicons name="people-outline" size={19} color={colors.selectionText} />
-                          </LinearGradient>
-                        </View>
-                        <Text style={[styles.menuText, { color: colors.text }]}>{t(partnershipMode ? 'menu.partnershipOn' : 'menu.partnershipOff')}</Text>
-                        <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  )}
-
                   <Text style={[styles.drawerSectionLabel, styles.drawerSectionLabelSpaced, { color: colors.primary }]}>{t('premiumUi.chatScreen.more')}</Text>
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
@@ -8588,8 +8709,10 @@ export default function ChatScreen({ navigation, route }) {
                           isGuest ? colors.textTertiary : colors.error
                         }
                       />
-                    </LinearGradient>
-                  </TouchableOpacity>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                    </>
+                  )}
                 </View>
                 </GHScrollView>
               </LinearGradient>
@@ -8972,24 +9095,41 @@ export default function ChatScreen({ navigation, route }) {
         }}
       />
 
-      <AppAlertModal
-        visible={showInsufficientCreditsAlert}
-        variant="warning"
-        icon="wallet-outline"
-        title={t('chat.insufficientCreditsTitle', 'Not enough credits')}
-        message={t(
-          'chat.insufficientCreditsMessage',
-          'This question needs {{cost}} credits — you have {{balance}}. Add credits to continue the study.',
-          { cost: effectiveChatCost, balance: credits }
-        )}
-        primaryText={t('chat.insufficientCreditsCta', 'Get credits')}
-        secondaryText={t('chat.insufficientCreditsLater', 'Not now')}
-        onPrimaryPress={() => {
-          setShowInsufficientCreditsAlert(false);
-          navigation.navigate('Credits');
-        }}
-        onSecondaryPress={() => setShowInsufficientCreditsAlert(false)}
-        onRequestClose={() => setShowInsufficientCreditsAlert(false)}
+      <ChatCreditChoiceModal
+        visible={showCreditChoice}
+        onClose={() => setShowCreditChoice(false)}
+        onBuyCredits={handleCreditChoiceBuy}
+        cost={requiredCreditsForMode(creditChoiceMode)}
+        credits={credits}
+        modeName={getChatModeName(creditChoiceMode)}
+        buyLabel={
+          firstPurchaseBonusOffer?.eligible
+            ? t('chat.firstPurchaseOffer.continueForPrice', {
+                price: firstPurchaseOfferSummary.price,
+                defaultValue: `Continue for ${firstPurchaseOfferSummary.price}`,
+              })
+            : t('chat.insufficientCreditsCta', 'Get credits')
+        }
+        liveOption={
+          creditChoiceMode !== 'instant' && canAffordChatMode('instant')
+            ? {
+                rate: t('instantBilling.splitRateShort', '{{first}} first · {{following}}/min', {
+                  first: instantChatFirstMinuteCost,
+                  following: instantChatPerMinuteCost,
+                }),
+              }
+            : null
+        }
+        speechOption={
+          creditChoiceMode !== 'speech' && canAffordChatMode('speech')
+            ? {
+                rate: t('instantBilling.rateShort', '{{cost}} credits/min', {
+                  cost: speechChatPerMinuteCost,
+                }),
+              }
+            : null
+        }
+        onSelectMode={handleCreditChoiceMode}
       />
 
       <AppAlertModal
@@ -9108,6 +9248,21 @@ export default function ChatScreen({ navigation, route }) {
       />
       {renderPartnershipSetupModal()}
       </LinearGradient>
+      <HomeBottomTabs
+        activeTab="ask"
+        visible={!showGreeting && chatSurfaceFocused && !isKeyboardVisible}
+        onToday={() => openHomeSurface('today')}
+        onAskTara={() => {}}
+        onExplore={() => openHomeSurface('explore')}
+        onCharts={() => {
+          if (birthData) {
+            navigation.navigate('ChartsHub', { birthData });
+            return;
+          }
+          navigation.navigate('BirthForm', { returnTo: 'Home' });
+        }}
+        onYou={() => navigation.navigate('Profile')}
+      />
     </View>
     </ThemeColorsScope>
   );
@@ -9972,11 +10127,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.white,
     paddingHorizontal: 16,
+    minHeight: 44,
     maxHeight: 100,
     ...Platform.select({
       web: {
-        // Single-line box matching send button; height grows via webComposerHeight.
-        minHeight: 44,
+        // Single-line box matching send button; height grows via composerHeight.
         lineHeight: 22,
         // Slightly more top padding — Safari placeholder/glyphs sit optically high.
         paddingTop: 12,
@@ -9985,7 +10140,9 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
       },
       default: {
-        paddingVertical: 10,
+        paddingTop: 10,
+        paddingBottom: 10,
+        includeFontPadding: false,
       },
     }),
   },
@@ -10653,21 +10810,6 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 2,
     fontWeight: '600',
-  },
-  lowCreditBanner: {
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(255, 107, 53, 0.2)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
-  },
-  lowCreditText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
   },
   firstPurchaseStickyOffer: {
     marginTop: 10,

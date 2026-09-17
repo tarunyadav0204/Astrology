@@ -43,7 +43,7 @@ const PolicyPage = ({ user, onLogout, onLogin, onAdminClick }) => {
               </p>
             </div>
             <dl className="terms-hero__meta">
-              <div><dt>Last updated</dt><dd>June 7, 2026</dd></div>
+              <div><dt>Last updated</dt><dd>September 17, 2026</dd></div>
               <div><dt>Operated by</dt><dd>Apeiron Logic LLP</dd></div>
               <div><dt>Frameworks</dt><dd>DPDP · GDPR</dd></div>
             </dl>
@@ -99,6 +99,7 @@ const PolicyPage = ({ user, onLogout, onLogin, onAdminClick }) => {
                 <li><strong>Birth Data:</strong> Date of birth, Time of birth, Place of birth (Longitude/Latitude).</li>
                 <li><strong>App Activity:</strong> Chat history, consultation logs, horoscopes, Vedic Life Analysis, and preferences.</li>
                 <li><strong>Device Info:</strong> IP address, device model, and OS version (for security and crash reporting).</li>
+                <li><strong>Advertising identifiers:</strong> On Android, the Google Advertising ID may be collected for install attribution. On iOS, the Identifier for Advertisers (IDFA) is collected only if you grant App Tracking Transparency permission.</li>
                 <li><strong>Cookies &amp; Log Files:</strong> We collect browser type, screen resolution, and time spent on the website to analyze trends and improve our services. We track IP addresses to understand visitor demographics and geographic distribution.</li>
               </ul>
               <p><strong>Note:</strong> You do not have to provide personal information to browse our website. However, certain personalized services require registration.</p>
@@ -112,6 +113,7 @@ const PolicyPage = ({ user, onLogout, onLogin, onAdminClick }) => {
                 <li><strong>Personalization:</strong> To tailor AI insights to your specific planetary positions.</li>
                 <li><strong>Account Management:</strong> To allow you to access your history across devices.</li>
                 <li><strong>Analytics &amp; Improvements:</strong> To understand how users interact with our app and to improve performance, reliability, and features.</li>
+                <li><strong>Marketing attribution:</strong> To measure which advertising campaigns led to an install, registration, or in-app purchase, and to report campaign performance to user-acquisition partners.</li>
               </ul>
             </section>
 
@@ -141,6 +143,7 @@ const PolicyPage = ({ user, onLogout, onLogin, onAdminClick }) => {
               <p><strong>We do not sell or rent your data.</strong> Data is only shared with:</p>
               <ul>
                 <li><strong>Service Providers:</strong> Google Cloud/Firebase (Hosting) and Google Gemini (AI processing) under strict confidentiality.</li>
+                <li><strong>Analytics and advertising measurement:</strong> AppsFlyer (install and in-app purchase attribution), Google Analytics / Firebase Analytics, and Meta (Facebook) App Events or Pixel. These providers receive device and campaign identifiers, app events such as registration and purchase, and (where permitted) advertising IDs so we can measure paid campaigns. See <a href="https://www.appsflyer.com/legal/privacy-policy/" target="_blank" rel="noopener noreferrer">AppsFlyer Privacy Policy</a>, <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>, and <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer">Meta Privacy Policy</a>.</li>
                 <li><strong>Legal Necessity:</strong> Only if required by Indian Law.</li>
               </ul>
             </section>

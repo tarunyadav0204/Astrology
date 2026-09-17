@@ -43,9 +43,39 @@ ALTER TABLE app_installations
 ALTER TABLE app_installations
     ADD COLUMN IF NOT EXISTS lead_email VARCHAR(255);
 
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS af_status VARCHAR(32);
+
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS af_media_source VARCHAR(512);
+
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS af_campaign VARCHAR(512);
+
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS af_campaign_id VARCHAR(128);
+
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS af_adset VARCHAR(512);
+
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS af_ad VARCHAR(512);
+
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS af_channel VARCHAR(128);
+
+ALTER TABLE app_installations
+    ADD COLUMN IF NOT EXISTS af_attribution_raw JSONB;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_app_installations_client_install_key
     ON app_installations (client_install_key)
     WHERE client_install_key IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_app_installations_af_campaign
+    ON app_installations (af_campaign);
+
+CREATE INDEX IF NOT EXISTS idx_app_installations_af_media_source
+    ON app_installations (af_media_source);
 
 CREATE TABLE IF NOT EXISTS app_installation_events (
     id BIGSERIAL PRIMARY KEY,
