@@ -8067,7 +8067,7 @@ export default function ChatScreen({ navigation, route }) {
                   <Text style={[styles.drawerSubtitle, { color: colors.textSecondary }]}>
                     {showGreeting
                       ? t('premiumUi.chatScreen.chooseNext')
-                      : t('premiumUi.chatScreen.chatMenuBody', 'Language, chart, dasha, partner, and history.')}
+                      : t('premiumUi.chatScreen.chatMenuBody', 'Language, chart, dasha, partnership chat, chat history, and credits.')}
                   </Text>
                   <TouchableOpacity
                     style={[styles.drawerContextCard, { backgroundColor: colors.headerSurface, borderColor: colors.cosmicLine }]}
@@ -8145,7 +8145,7 @@ export default function ChatScreen({ navigation, route }) {
                       })}
                       {!isMundane ? renderDrawerMenuRow({
                         icon: 'people-outline',
-                        label: t(partnershipMode ? 'menu.partnershipOn' : 'quickActions.partner'),
+                        label: t(partnershipMode ? 'menu.partnershipOn' : 'quickActions.partnershipChat', 'Partnership Chat'),
                         action: () => {
                           if (!partnershipMode) {
                             openPartnershipModal(partnershipCost);
@@ -8156,8 +8156,13 @@ export default function ChatScreen({ navigation, route }) {
                       }) : null}
                       {renderDrawerMenuRow({
                         icon: 'chatbubbles-outline',
-                        label: t('quickActions.history'),
+                        label: t('menu.chatHistory', 'Chat History'),
                         action: () => navigation.navigate('ChatHistory'),
+                      })}
+                      {renderDrawerMenuRow({
+                        icon: 'wallet-outline',
+                        label: t('menu.credits', 'Credits'),
+                        action: () => navigation.navigate('Credits'),
                         last: true,
                       })}
                     </>
