@@ -36,6 +36,17 @@ def test_speech_cleanup_preserves_link_text_and_removes_other_markdown_syntax():
     assert "`" not in cleaned
 
 
+def test_english_commas_do_not_get_extra_short_pauses():
+    spoken = _fallback_spoken_tts_text("Moon in Cancer, Mars waits, then Saturn.", "en")
+    assert "[PAUSE:short]" not in spoken
+    assert "Cancer, Mars" in spoken
+
+
+def test_hindi_commas_keep_short_pauses():
+    spoken = _fallback_spoken_tts_text("चंद्र, मंगल, शनि", "hi")
+    assert spoken.count("[PAUSE:short]") >= 2
+
+
 def test_english_lagna_uses_short_a_pronunciation_alias():
     assert _apply_pronunciation_plain("Cancer Lagna") == "Cancer Lag-na"
     assert 'alias="Lag-na"' in _apply_pronunciation_ssml("Cancer Lagna")

@@ -22,6 +22,7 @@ def test_punctuation_becomes_breaks_not_spoken_chars():
     assert "," not in ssml
     assert "." not in ssml
     assert "<break time=" in ssml
+    assert 'time="70ms"' in ssml
     tagged = _replace_spoken_punctuation_with_breaks('<prosody pitch="+0.8st">Wait.</prosody>')
     assert 'pitch="+0.8st"' in tagged
     assert "Wait." not in tagged

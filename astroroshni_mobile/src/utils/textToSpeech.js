@@ -329,7 +329,7 @@ const hashText = (value) => {
 const getServerTtsCacheKey = (text, { language = 'english', voiceName, cacheKey, prepareSpoken = false } = {}) => (
   String(cacheKey || '').trim()
   || [
-    'v2',
+    'v3',
     playbackLangCode(language),
     String(voiceName || 'default').trim() || 'default',
     prepareSpoken ? 'prepared' : 'plain',
@@ -506,7 +506,7 @@ const speakLocally = async (text, { language = 'english', voiceName, onDone, onE
     Speech.speak(normalizeAstrologyPronunciation(text), {
       language: speechLanguage,
       voice: voice?.identifier,
-      rate: lang === 'hi' ? 0.92 : 0.95,
+      rate: lang === 'hi' ? 0.92 : 1.05,
       pitch: lang === 'hi' ? 1.02 : 1.06,
       onStart: () => {
         if (onStart) onStart();

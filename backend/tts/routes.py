@@ -170,7 +170,7 @@ def _build_voice_and_config(lang: str, voice_name: Optional[str] = None):
     "audio_encoding": texttospeech.AudioEncoding.MP3,
   }
   if _voice_family(resolved_voice_name) != "journey":
-    audio_kwargs["speaking_rate"] = 0.95
+    audio_kwargs["speaking_rate"] = 0.95 if lang.startswith("hi") else 1.08
   audio_config = texttospeech.AudioConfig(**audio_kwargs)
   return voice, audio_config
 
@@ -184,7 +184,7 @@ def _build_beta_voice_and_config(lang: str, voice_name: Optional[str] = None):
     voice = texttospeech_beta.VoiceSelectionParams(language_code=language_code, name=resolved_voice_name)
   audio_config = texttospeech_beta.AudioConfig(
     audio_encoding=texttospeech_beta.AudioEncoding.MP3,
-    speaking_rate=0.95,
+    speaking_rate=0.95 if lang.startswith("hi") else 1.08,
   )
   return voice, audio_config
 
@@ -384,7 +384,7 @@ def _replace_spoken_punctuation_with_breaks(text: str) -> str:
     chunk = re.sub(r"\.{3,}", '<break time="280ms"/>', chunk)
     chunk = chunk.replace("…", '<break time="280ms"/>')
     chunk = re.sub(r"[.?!।]+", '<break time="380ms"/>', chunk)
-    chunk = re.sub(r"[,;:]+", '<break time="160ms"/>', chunk)
+    chunk = re.sub(r"[,;:]+", '<break time="70ms"/>', chunk)
     chunk = re.sub(r"\s*[—–]\s*", '<break time="160ms"/>', chunk)
     chunk = re.sub(r"\s+-\s+", '<break time="160ms"/>', chunk)
     out.append(chunk)
@@ -433,6 +433,7 @@ def _tighten_male_breaks(text: str, *, extra_short: bool = False) -> str:
     ('<break time="420ms"/>', '<break time="160ms"/>' if extra_short else '<break time="220ms"/>'),
     ('<break time="380ms"/>', '<break time="160ms"/>' if extra_short else '<break time="240ms"/>'),
     ('<break time="160ms"/>', '<break time="70ms"/>' if extra_short else '<break time="90ms"/>'),
+    ('<break time="70ms"/>', '<break time="40ms"/>' if extra_short else '<break time="50ms"/>'),
   ]
   for old, new in replacements:
     text = text.replace(old, new)
@@ -484,7 +485,13 @@ def _fallback_spoken_tts_text(text: str, lang: str) -> str:
   spoken = raw
   spoken = re.sub(r"\s*:\s*", ": ", spoken)
   spoken = re.sub(r"\s*;\s*", ". [PAUSE:short] ", spoken)
-  spoken = re.sub(r"\s*,\s*", ", [PAUSE:short] ", spoken)
+  # English Chirp already pauses at commas. Adding [PAUSE:short] on top of the
+  # leftover comma break makes those gaps feel unnaturally long. Hindi delivery
+  # is already natural with the extra cue, so keep it there.
+  if str(lang or "").lower().startswith("hi"):
+    spoken = re.sub(r"\s*,\s*", ", [PAUSE:short] ", spoken)
+  else:
+    spoken = re.sub(r"\s*,\s*", ", ", spoken)
   spoken = re.sub(r"([.?!।])\s+", r"\1 [PAUSE:medium] ", spoken)
   spoken = re.sub(r"\s{2,}", " ", spoken).strip()
   return spoken
