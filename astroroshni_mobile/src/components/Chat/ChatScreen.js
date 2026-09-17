@@ -2523,6 +2523,11 @@ export default function ChatScreen({ navigation, route }) {
             }
           } else {
             await hydrateSelectedChatMode([], personId);
+            if (!partnershipMode && !partnershipPrefillInProgressRef.current && !isMundane) {
+              setMessagesWithStorage((prev) => (
+                prev.length > 0 ? prev : [buildFreshWelcomeMessage(birthData?.name || null)]
+              ));
+            }
           }
           if (shouldReturnToChat) {
             setShowGreeting(false);
@@ -2697,6 +2702,26 @@ export default function ChatScreen({ navigation, route }) {
     partnershipMode,
   ]);
 
+  // Cold-open Ask Tara with no stored thread: show the localized welcome + Try asking cards.
+  // Today → Ask Tara already injects this; opening chat first used to skip it.
+  useEffect(() => {
+    if (showGreeting || partnershipMode || isMundane) return;
+    if (loading || isTyping) return;
+    if (messages.length > 0) return;
+    setMessagesWithStorage((prev) => (
+      prev.length > 0 ? prev : [buildFreshWelcomeMessage(birthData?.name || null)]
+    ));
+  }, [
+    showGreeting,
+    partnershipMode,
+    isMundane,
+    loading,
+    isTyping,
+    messages.length,
+    birthData?.name,
+    i18n.language,
+  ]);
+
   const revealInstantReply = (messageId, pieces, fullContent, onFinished) => {
     const revealKey = String(messageId || '');
     const finish = () => {
@@ -2823,6 +2848,11 @@ export default function ChatScreen({ navigation, route }) {
             }
           } else {
             await hydrateSelectedChatMode([], currentPersonId);
+            if (!partnershipMode && !isMundane && !showGreeting) {
+              setMessagesWithStorage((prev) => (
+                prev.length > 0 ? prev : [buildFreshWelcomeMessage(birthData?.name || null)]
+              ));
+            }
           }
         });
         if (!partnershipMode && !shouldStayOnGreeting && !loading && !isTyping) {
