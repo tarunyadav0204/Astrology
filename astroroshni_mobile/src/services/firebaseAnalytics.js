@@ -92,6 +92,33 @@ function sanitizeParams(params = {}) {
   return out;
 }
 
+function buildEcommercePayload(params = {}, { includeTransaction = false, list = false } = {}) {
+  const value = Number(params.amount ?? params.value ?? 0);
+  const currency = String(params.currency || 'INR');
+  const transactionId = params.transaction_id || params.order_id || params.orderId;
+  const itemId = params.content_id || params.productId;
+  const items = Array.isArray(params.items) && params.items.length
+    ? sanitizeItems(params.items)
+    : itemId
+      ? [{
+          item_id: String(itemId),
+          item_name: String(params.item_name || params.content_type || 'credits'),
+          item_category: String(params.content_type || 'credits'),
+          ...(Number.isFinite(value) ? { price: value } : {}),
+          quantity: 1,
+        }]
+      : undefined;
+  return {
+    ...(Number.isFinite(value) ? { value } : {}),
+    currency,
+    ...(includeTransaction && transactionId ? { transaction_id: String(transactionId) } : {}),
+    ...(items ? { items } : {}),
+    ...(list && params.item_list_id ? { item_list_id: String(params.item_list_id).slice(0, 100) } : {}),
+    ...(list && params.item_list_name ? { item_list_name: String(params.item_list_name).slice(0, 100) } : {}),
+    ...(params.coupon ? { coupon: String(params.coupon).slice(0, 100) } : {}),
+  };
+}
+
 export async function initFirebaseAnalytics() {
   if (initTried) return sdkReady;
   initTried = true;
@@ -137,25 +164,28 @@ export async function logFirebaseEvent(eventName, params = {}) {
     const instance = analytics();
     const safeParams = sanitizeParams(params);
     if (name === 'purchase' && typeof instance.logPurchase === 'function') {
-      const value = Number(params.amount ?? params.value ?? 0);
-      const currency = String(params.currency || 'INR');
-      const transactionId = params.transaction_id || params.order_id || params.orderId;
-      const itemId = params.content_id || params.productId;
-      const items = itemId
-        ? [{
-            item_id: String(itemId),
-            item_name: String(params.item_name || params.content_type || 'credits'),
-            item_category: String(params.content_type || 'credits'),
-            ...(Number.isFinite(value) ? { price: value } : {}),
-            quantity: 1,
-          }]
-        : sanitizeItems(params.items);
-      await instance.logPurchase({
-        value: Number.isFinite(value) ? value : 0,
-        currency,
-        ...(transactionId ? { transaction_id: String(transactionId) } : {}),
-        ...(items ? { items } : {}),
-      });
+      const payload = buildEcommercePayload(params, { includeTransaction: true });
+      await instance.logPurchase(payload);
+      return true;
+    }
+    if (name === 'begin_checkout' && typeof instance.logBeginCheckout === 'function') {
+      await instance.logBeginCheckout(buildEcommercePayload(params));
+      return true;
+    }
+    if (name === 'view_item' && typeof instance.logViewItem === 'function') {
+      await instance.logViewItem(buildEcommercePayload(params));
+      return true;
+    }
+    if (name === 'view_item_list' && typeof instance.logViewItemList === 'function') {
+      await instance.logViewItemList(buildEcommercePayload(params, { list: true }));
+      return true;
+    }
+    if (name === 'add_to_cart' && typeof instance.logAddToCart === 'function') {
+      await instance.logAddToCart(buildEcommercePayload(params));
+      return true;
+    }
+    if (name === 'add_payment_info' && typeof instance.logAddPaymentInfo === 'function') {
+      await instance.logAddPaymentInfo(buildEcommercePayload(params));
       return true;
     }
     if ((name === 'sign_up' || name === 'complete_registration') && typeof instance.logSignUp === 'function') {

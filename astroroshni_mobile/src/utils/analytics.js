@@ -80,7 +80,16 @@ async function getStableGA4ClientId(AsyncStorage) {
   return id;
 }
 
-const COMMERCE_EVENT_NAMES = new Set(['purchase', 'subscribe', 'initiate_checkout']);
+const COMMERCE_EVENT_NAMES = new Set([
+  'purchase',
+  'subscribe',
+  'initiate_checkout',
+  'begin_checkout',
+  'view_item',
+  'view_item_list',
+  'add_to_cart',
+  'add_payment_info',
+]);
 
 function commerceNumber(value) {
   const n = Number(value);
@@ -256,7 +265,7 @@ const META_GA_EVENT_ALIAS = {
   [MetaStandardEvent.COMPLETE_REGISTRATION]: 'sign_up',
   [MetaStandardEvent.VIEW_CONTENT]: 'view_content',
   [MetaStandardEvent.SUBSCRIBE]: 'subscribe',
-  [MetaStandardEvent.INITIATE_CHECKOUT]: 'initiate_checkout',
+  [MetaStandardEvent.INITIATE_CHECKOUT]: 'begin_checkout',
   [MetaStandardEvent.START_TRIAL]: 'start_trial',
   [MetaStandardEvent.PURCHASE]: 'purchase',
   [MetaStandardEvent.ADD_PAYMENT_INFO]: 'add_payment_info',
@@ -330,8 +339,42 @@ export const trackAstrologyEvent = {
       content_type: opts.content_type || 'credits',
       currency: opts.currency || 'INR',
       value: opts.value ?? opts.amount,
+      item_name: opts.item_name,
       ...opts,
     }),
+  viewItem: (opts = {}) =>
+    trackGA4EventOnly('view_item', {
+      content_id: opts.content_id || opts.productId,
+      content_type: opts.content_type || 'credits',
+      currency: opts.currency || 'INR',
+      value: opts.value ?? opts.amount,
+      item_name: opts.item_name,
+      items: opts.items,
+      ...opts,
+    }),
+  viewItemList: (opts = {}) =>
+    trackGA4EventOnly('view_item_list', {
+      item_list_id: opts.item_list_id || 'credit_packs',
+      item_list_name: opts.item_list_name || 'Credit packs',
+      items: opts.items || [],
+      currency: opts.currency || 'INR',
+      value: opts.value,
+      ...opts,
+    }),
+  addToCart: (opts = {}) =>
+    trackGA4EventOnly('add_to_cart', {
+      content_id: opts.content_id || opts.productId,
+      content_type: opts.content_type || 'credits',
+      currency: opts.currency || 'INR',
+      value: opts.value ?? opts.amount,
+      item_name: opts.item_name,
+      items: opts.items,
+      ...opts,
+    }),
+  selectCreditPack: (opts = {}) => {
+    trackAstrologyEvent.viewItem(opts);
+    trackAstrologyEvent.addToCart(opts);
+  },
   subscribe: (opts = {}) =>
     trackMetaStandard(MetaStandardEvent.SUBSCRIBE, {
       content_id: opts.content_id || opts.productId,

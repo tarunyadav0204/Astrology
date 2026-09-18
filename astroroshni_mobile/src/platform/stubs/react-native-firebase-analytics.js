@@ -2,6 +2,11 @@
 const analytics = () => ({
   logEvent: async () => {},
   logPurchase: async () => {},
+  logBeginCheckout: async () => {},
+  logViewItem: async () => {},
+  logViewItemList: async () => {},
+  logAddToCart: async () => {},
+  logAddPaymentInfo: async () => {},
   logSignUp: async () => {},
   logLogin: async () => {},
   logScreenView: async () => {},

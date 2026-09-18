@@ -209,6 +209,7 @@ export function logAppsFlyerStandardEvent(eventKey, params = {}) {
       });
       return;
     case 'initiate_checkout':
+    case 'begin_checkout':
       logAppsFlyerEvent('af_initiated_checkout', {
         af_content_id: params.content_id || params.productId,
         af_currency: params.currency || 'INR',

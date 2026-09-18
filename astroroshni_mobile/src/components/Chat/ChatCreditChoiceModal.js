@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Modal,
   Pressable,
@@ -11,6 +11,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { typographyTokens } from '../../theme/tokens';
+import { trackAstrologyEvent } from '../../utils/analytics';
 
 /**
  * Credit conversion sheet: buy credits, or tap Live / Talk to Tara
@@ -30,6 +31,18 @@ export default function ChatCreditChoiceModal({
 }) {
   const { colors, getCardElevation } = useTheme();
   const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    trackAstrologyEvent.viewItem({
+      content_id: 'credit_paywall',
+      item_name: modeName || 'Credit paywall',
+      content_type: 'credits',
+      currency: 'INR',
+      value: 0,
+    });
+    return undefined;
+  }, [visible, modeName]);
 
   if (!visible) return null;
 
