@@ -242,50 +242,11 @@ function gaPackCommerce(product, iapCatalog, extra = {}) {
   const iap = Array.isArray(iapCatalog)
     ? iapCatalog.find((p) => String(p.productId || p.product_id) === String(productId))
     : null;
-  const value =
-    extra.value ??
-    getIapPriceNumber(iap) ||
-    Number(product?.price_inr || product?.amount_inr || product?.price || 0) ||
-    0;
-  return {
-    content_id: productId,
-    item_name: extra.item_name || product?.name || product?.title || product?.tier_name || productId,
-    content_type: extra.content_type || 'credits',
-    currency: extra.currency || getIapCurrency(iap),
-    value,
-  };
-}
-
-function trackCreditCatalogImpression(packs, iapCatalog) {
-  if (!Array.isArray(packs) || packs.length === 0) return;
-  const items = packs.map((product) => {
-    const row = gaPackCommerce(product, iapCatalog);
-    return {
-      item_id: String(row.content_id || ''),
-      item_name: String(row.item_name || row.content_id || 'credits'),
-      item_category: 'credits',
-      price: row.value || 0,
-      quantity: 1,
-    };
-  });
-  trackAstrologyEvent.viewItemList({
-    item_list_id: 'credit_packs',
-    item_list_name: 'Credit packs',
-    items,
-    value: items.reduce((sum, item) => sum + (Number(item.price) || 0), 0),
-  });
-}
-
-function gaPackCommerce(product, iapCatalog, extra = {}) {
-  const productId = extra.content_id || product?.product_id || product?.id || product?.plan_id;
-  const iap = Array.isArray(iapCatalog)
-    ? iapCatalog.find((p) => String(p.productId || p.product_id) === String(productId))
-    : null;
-  const value =
-    extra.value ??
-    getIapPriceNumber(iap) ||
-    Number(product?.price_inr || product?.amount_inr || product?.price || 0) ||
-    0;
+  const extraValue = Number(extra.value);
+  const catalogPrice = getIapPriceNumber(iap)
+    || Number(product?.price_inr || product?.amount_inr || product?.price || 0)
+    || 0;
+  const value = Number.isFinite(extraValue) && extraValue > 0 ? extraValue : catalogPrice;
   return {
     content_id: productId,
     item_name: extra.item_name || product?.name || product?.title || product?.tier_name || productId,
