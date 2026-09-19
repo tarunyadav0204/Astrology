@@ -5,7 +5,7 @@ const PLACE_KEY = 'prashna_question_place';
 const asPlace = (latitude, longitude, name, source) => {
   const lat = parseFloat(latitude);
   const lon = parseFloat(longitude);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
   return {
     latitude: lat,
     longitude: lon,

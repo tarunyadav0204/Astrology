@@ -285,7 +285,7 @@ export default function PhoneInputScreen({
             ]}
           >
             <TouchableOpacity
-              style={[styles.continueButton, !isValid && styles.buttonDisabled]}
+              style={[styles.continueButton, { shadowColor: colors.accent }, !isValid && styles.buttonDisabled]}
               onPress={() => handleContinue()}
               disabled={!isValid || loading}
             >
@@ -293,7 +293,7 @@ export default function PhoneInputScreen({
               colors={isValid ? [colors.accent, colors.accent] : [colors.surfaceMuted, colors.surfaceMuted]}
                 style={styles.buttonGradient}
               >
-                <Text style={styles.buttonText}>
+                <Text style={[styles.buttonText, { color: isValid ? colors.onAccent : colors.textTertiary }]}>
                   {loading ? 'Checking...' : 'Continue'}
                 </Text>
                 <Ionicons name="arrow-forward" size={20} color={isValid ? colors.onAccent : colors.textTertiary} />
@@ -518,7 +518,6 @@ const styles = StyleSheet.create({
   continueButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -535,7 +534,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buttonText: {
-    color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
   },

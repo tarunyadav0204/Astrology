@@ -1,5 +1,5 @@
-"""Question-time Prashna. Chat can import analyze_prashna later; this package does not import chat."""
+"""Question-time Praśnatantra–Tājika package.
 
-from prashna.service import analyze_prashna
-
-__all__ = ["analyze_prashna"]
+Import the service from :mod:`prashna.service`; this package intentionally has
+no eager imports so calculators can read the source ledger without a cycle.
+"""

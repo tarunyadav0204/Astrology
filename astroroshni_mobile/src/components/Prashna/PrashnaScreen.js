@@ -1,529 +1,358 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+  ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
-import { storage } from '../../services/storage';
 import { prashnaAPI } from '../../services/api';
+import { useCredits } from '../../credits/CreditContext';
+import { useAuthGate } from '../../auth/AuthGateContext';
+import AnalysisCreditModal from '../Analysis/AnalysisCreditModal';
 import PlaceSearchField from '../PlaceSearchField';
-import {
-  detectQuestionPlace,
-  loadSavedQuestionPlace,
-  saveQuestionPlace,
-} from '../../utils/questionPlace';
-
-const CATEGORIES = [
-  { id: 'general', house: 11 },
-  { id: 'career', house: 10 },
-  { id: 'marriage', house: 7 },
-  { id: 'wealth', house: 2 },
-  { id: 'health', house: 6 },
-  { id: 'property', house: 4 },
-  { id: 'children', house: 5 },
-  { id: 'education', house: 5 },
-  { id: 'travel', house: 9 },
-  { id: 'legal', house: 6 },
-];
+import { detectQuestionPlace, loadSavedQuestionPlace, saveQuestionPlace } from '../../utils/questionPlace';
 
 const pad = (value) => String(value).padStart(2, '0');
-
 const nowStamp = () => {
   const now = new Date();
+  const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
   return {
     date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
-    time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+    time: `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
+    timezone: detected === 'Asia/Calcutta' ? 'Asia/Kolkata' : detected,
   };
 };
 
-const verdictTone = (answer, colors) => {
-  if (answer === 'yes') return { bg: 'rgba(22, 163, 74, 0.14)', border: 'rgba(22, 163, 74, 0.35)', text: '#15803d' };
-  if (answer === 'no') return { bg: 'rgba(220, 38, 38, 0.12)', border: 'rgba(220, 38, 38, 0.32)', text: '#b91c1c' };
-  return { bg: colors.surfaceMuted || 'rgba(245, 158, 11, 0.14)', border: 'rgba(180, 83, 9, 0.32)', text: '#b45309' };
-};
+const tone = (result, colors) => ({
+  favorable: { bg: 'rgba(22,163,74,.12)', border: 'rgba(22,163,74,.35)', text: '#15803d' },
+  unfavorable: { bg: 'rgba(220,38,38,.10)', border: 'rgba(220,38,38,.30)', text: '#b91c1c' },
+  mixed: { bg: 'rgba(217,119,6,.10)', border: 'rgba(217,119,6,.32)', text: '#b45309' },
+  cannot_judge: { bg: colors.surfaceMuted, border: colors.cardBorder, text: colors.text },
+}[result] || { bg: colors.surfaceMuted, border: colors.cardBorder, text: colors.text });
 
-const CONFIDENCE_LABEL = { high: 'Clear', medium: 'Fairly clear', low: 'Tentative' };
+// API details are developer-facing and may be English or framework-generated.
+// Keep the customer-facing error stable and localized.
+const apiError = (_error, fallback) => fallback;
 
-const GATE_STATUS = { pass: 'pass', warn: 'caution', block: 'block' };
-
-const tajikaTechnicalLine = (result) => {
-  const direct = result?.tajika?.direct || {};
-  const you = result?.significators?.lagnesha?.planet;
-  const matter = result?.significators?.karyesha?.planet;
-  const names = you && matter ? `${you} and ${matter}` : 'the two planets';
-  const yoga = direct.type;
-  if (!yoga || yoga === 'None') {
-    return `Tajika yoga: none. ${names} are not applying to an exact aspect within orb.`;
-  }
-  if (yoga === 'SamePlanet') {
-    return `Tajika yoga: same planet (${you || 'one graha'}) stands for both you and the matter.`;
-  }
-  const parts = [`Tajika yoga: ${yoga}`];
-  if (direct.aspect && direct.aspect !== 'None') parts.push(direct.aspect);
-  if (direct.remaining_degrees != null) parts.push(`${direct.remaining_degrees}° remaining`);
-  if (direct.detail) parts.push(direct.detail);
-  return parts.join(' · ');
-};
-
-export default function PrashnaScreen({ navigation, route }) {
-  const { t } = useTranslation();
+export default function PrashnaScreen({ navigation }) {
+  const { t, i18n } = useTranslation();
   const { colors } = useTheme();
-  const [birthData, setBirthData] = useState(route.params?.birthData || null);
-  const initial = nowStamp();
-
-  const [question, setQuestion] = useState('');
-  const [category, setCategory] = useState('general');
-  const [date, setDate] = useState(initial.date);
-  const [time, setTime] = useState(initial.time);
+  const { credits, pricing, pricingOriginal, fetchBalance, fetchPricing } = useCredits();
+  const { requireAuthForPaid } = useAuthGate();
+  const [questionId, setQuestionId] = useState('');
+  const [topics, setTopics] = useState([]);
+  const [topic, setTopic] = useState('');
+  const [catalogueLoading, setCatalogueLoading] = useState(true);
   const [place, setPlace] = useState(null);
   const [placeLoading, setPlaceLoading] = useState(true);
-  const [horaryNumber, setHoraryNumber] = useState('');
+  const placeEdited = useRef(false);
+  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState(null);
-  const [showTechnical, setShowTechnical] = useState(false);
-
-  const applyPlace = (next) => {
-    if (!next) return;
-    setPlace(next);
-    saveQuestionPlace(next);
-  };
+  const [showWorking, setShowWorking] = useState(false);
+  const [castMoment, setCastMoment] = useState(null);
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [gateCost, setGateCost] = useState(3);
+  const [gateCredits, setGateCredits] = useState(credits);
 
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
     (async () => {
       try {
-        const detected = await detectQuestionPlace();
-        if (!cancelled && detected) {
-          applyPlace(detected);
-          return;
-        }
-        const saved = await loadSavedQuestionPlace();
-        if (!cancelled && saved) {
-          applyPlace(saved);
-        }
+        const found = await detectQuestionPlace() || await loadSavedQuestionPlace();
+        if (active && !placeEdited.current && found) setPlace(found);
       } finally {
-        if (!cancelled) setPlaceLoading(false);
+        if (active) setPlaceLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
-    if (birthData?.name) return;
-    let cancelled = false;
+    let active = true;
     (async () => {
       try {
-        let data = await storage.getBirthDetails();
-        if (!data) {
-          const profiles = await storage.getBirthProfiles();
-          if (profiles?.length) data = profiles.find((profile) => profile.relation === 'self') || profiles[0];
-        }
-        if (!cancelled && data?.name) setBirthData(data);
-      } catch {
-        // Birth profile is optional for Prashna; the question place is what matters.
-      }
+        const response = await prashnaAPI.getTopics();
+        const rows = (response?.data || response)?.topics;
+        if (!Array.isArray(rows) || rows.length === 0) throw new Error('empty_prashna_catalogue');
+        if (active) { setTopics(rows); setTopic(rows[0].id); }
+      } catch (err) {
+        if (active) setError(apiError(err, t('prashna.screen.topicsLoadError')));
+      } finally { if (active) setCatalogueLoading(false); }
     })();
-    return () => {
-      cancelled = true;
+    return () => { active = false; };
+  }, [t]);
+
+  const localizedTopics = useMemo(() => topics.map((item) => ({
+    ...item,
+    label: t(`prashna.topics.${item.id}`, { defaultValue: item.label }),
+    questions: (item.questions || []).map((question) => ({
+      ...question,
+      text: t(`prashna.questions.${question.id}`, { defaultValue: question.text }),
+    })),
+  })), [topics, t, i18n.language]);
+  const selected = useMemo(() => localizedTopics.find((item) => item.id === topic), [localizedTopics, topic]);
+  const selectedQuestion = useMemo(() => selected?.questions?.find((item) => item.id === questionId), [selected, questionId]);
+  const locationReady = Number.isFinite(Number(place?.latitude)) && Number.isFinite(Number(place?.longitude));
+  const displayedCost = Number(pricing?.prashna ?? 3);
+  const displayedOriginalCost = Number(pricingOriginal?.prashna);
+
+  const castQuestion = async (attempt) => {
+    const response = await prashnaAPI.analyze({ question_id: questionId, ...attempt });
+    const data = response?.data || response;
+    if (!['favorable', 'unfavorable', 'mixed', 'cannot_judge'].includes(data?.verdict?.result)) {
+      throw new Error('invalid_prashna_result');
+    }
+    setResult(data);
+    await fetchBalance();
+  };
+
+  const openCreditGate = async () => {
+    if (!questionId || !locationReady || loading) return;
+    const authOk = await requireAuthForPaid({
+      feature: t('prashna.screen.authFeature'),
+      message: t('prashna.screen.authMessage'),
+      resume: { resumeRoute: 'Prashna', resumeParams: {} },
+    });
+    if (!authOk) return;
+    const requestedMoment = castMoment || {
+      ...nowStamp(), latitude: Number(place.latitude), longitude: Number(place.longitude), place: place.name || '',
     };
-  }, [birthData]);
-
-  const placeLabel = place?.name || t('prashna.placePlaceholder', 'Select the place of asking');
-
-  const canCast = useMemo(() => {
-    const lat = parseFloat(place?.latitude);
-    const lon = parseFloat(place?.longitude);
-    return question.trim().length >= 3 && Number.isFinite(lat) && Number.isFinite(lon);
-  }, [question, place]);
-
-  const useCurrentPlace = async () => {
-    setPlaceLoading(true);
-    setError('');
+    let checkedCost = displayedCost;
+    setLoading(true); setError('');
     try {
-      const detected = await detectQuestionPlace();
-      if (!detected) {
-        setError(t('prashna.placeDetectError', 'Could not detect your current city. Search and select it.'));
+      const [priceResult, balanceResult] = await Promise.all([
+        fetchPricing({ force: true }), fetchBalance(),
+      ]);
+      checkedCost = Number(priceResult?.pricing?.prashna ?? displayedCost);
+      const currentBalance = Number.isFinite(Number(balanceResult)) ? Number(balanceResult) : Number(credits || 0);
+      setGateCost(checkedCost);
+      setGateCredits(currentBalance);
+      if (currentBalance < checkedCost) {
+        setShowCreditModal(true);
         return;
       }
-      applyPlace(detected);
-    } finally {
-      setPlaceLoading(false);
-    }
-  };
-
-  const useNow = () => {
-    const stamp = nowStamp();
-    setDate(stamp.date);
-    setTime(stamp.time);
-  };
-
-  const castQuestion = async () => {
-    if (!canCast || loading) return;
-    setLoading(true);
-    setError('');
-    try {
-      const number = horaryNumber.trim() ? parseInt(horaryNumber.trim(), 10) : null;
-      if (number != null && (number < 1 || number > 249 || Number.isNaN(number))) {
-        setError(t('prashna.numberError', 'Horary number must be between 1 and 249.'));
-        setLoading(false);
-        return;
-      }
-      const response = await prashnaAPI.analyze({
-        question: question.trim(),
-        category,
-        date,
-        time,
-        latitude: parseFloat(place.latitude),
-        longitude: parseFloat(place.longitude),
-        timezone: '',
-        place: place.name || '',
-        horary_number: number,
-        name: birthData?.name || 'Prashna',
-      });
-      setResult(response?.data || response);
+      setCastMoment(requestedMoment);
+      await castQuestion(requestedMoment);
     } catch (err) {
-      const detail = err?.response?.data?.detail || err?.message;
-      setError(detail || t('prashna.loadError', 'Could not cast the Prashna chart.'));
-    } finally {
-      setLoading(false);
-    }
+      if (err?.response?.status === 402) {
+        const latestBalance = await fetchBalance();
+        setGateCost(checkedCost);
+        setGateCredits(Number(latestBalance || 0));
+        setShowCreditModal(true);
+      } else {
+        setError(apiError(err, t('prashna.screen.calculationError')));
+      }
+    } finally { setLoading(false); }
   };
 
-  const resetForm = () => {
-    setResult(null);
-    setError('');
-    setShowTechnical(false);
-    const stamp = nowStamp();
-    setDate(stamp.date);
-    setTime(stamp.time);
-  };
-
-  const renderHeader = () => (
-    <View style={[styles.header, { backgroundColor: colors.cardBackground, borderBottomColor: colors.cardBorder }]}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} accessibilityLabel={t('premiumUi.common.goBack', 'Back')}>
-        <Ionicons name="arrow-back" size={22} color={colors.text} />
-      </TouchableOpacity>
-      <View style={styles.headerCopy}>
-        <Text style={[styles.eyebrow, { color: colors.primary }]}>{t('prashna.eyebrow', 'Question chart')}</Text>
-        <Text style={[styles.title, { color: colors.text }]}>{t('prashna.title', 'Prashna')}</Text>
-      </View>
-    </View>
-  );
-
-  const renderForm = () => (
-    <>
-      <Text style={[styles.lead, { color: colors.textSecondary }]}>
-        {t('prashna.lead', 'The chart is cast for this question’s time and place, not your birth chart. Chat can use the same engine later.')}
-      </Text>
-
-      <Text style={[styles.label, { color: colors.text }]}>{t('prashna.questionLabel', 'Your question')}</Text>
-      <TextInput
-        value={question}
-        onChangeText={setQuestion}
-        placeholder={t('prashna.questionPlaceholder', 'Ask one clear question')}
-        placeholderTextColor={colors.textSecondary}
-        multiline
-        style={[styles.input, styles.questionInput, { color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.cardBackground }]}
-      />
-
-      <Text style={[styles.label, { color: colors.text }]}>{t('prashna.topicLabel', 'Topic')}</Text>
-      <View style={styles.chipWrap}>
-        {CATEGORIES.map((item) => {
-          const selected = category === item.id;
-          return (
-            <TouchableOpacity
-              key={item.id}
-              onPress={() => setCategory(item.id)}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: selected ? colors.primary : colors.cardBackground,
-                  borderColor: selected ? colors.primary : colors.cardBorder,
-                },
-              ]}
-            >
-              <Text style={[styles.chipText, { color: selected ? colors.onPrimary || '#fff' : colors.text }]}>
-                {t(`prashna.topics.${item.id}`, item.id)}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <View style={styles.row}>
-        <View style={styles.rowItem}>
-          <Text style={[styles.label, { color: colors.text }]}>{t('prashna.date', 'Date')}</Text>
-          <TextInput
-            value={date}
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.textSecondary}
-            style={[styles.input, { color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.cardBackground }]}
-          />
-        </View>
-        <View style={styles.rowItem}>
-          <Text style={[styles.label, { color: colors.text }]}>{t('prashna.time', 'Time')}</Text>
-          <TextInput
-            value={time}
-            onChangeText={setTime}
-            placeholder="HH:MM"
-            placeholderTextColor={colors.textSecondary}
-            style={[styles.input, { color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.cardBackground }]}
-          />
-        </View>
-      </View>
-      <TouchableOpacity onPress={useNow} style={styles.linkBtn}>
-        <Ionicons name="time-outline" size={16} color={colors.primary} />
-        <Text style={[styles.linkText, { color: colors.primary }]}>{t('prashna.useNow', 'Use current time')}</Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.label, { color: colors.text }]}>{t('prashna.place', 'Place of asking')}</Text>
-      {placeLoading ? (
-        <Text style={[styles.hint, { color: colors.textSecondary }]}>
-          {t('prashna.detectingPlace', 'Detecting current city…')}
-        </Text>
-      ) : null}
-      <PlaceSearchField
-        selectedName={place?.name || ''}
-        selectedLatitude={place?.latitude}
-        selectedLongitude={place?.longitude}
-        placeholder={t('prashna.placePlaceholder', 'City, State, Country')}
-        onDraftChange={(text) => {
-          setPlace((prev) => ({
-            ...(prev || {}),
-            name: text,
-            latitude: null,
-            longitude: null,
-            source: 'draft',
-          }));
-        }}
-        onSelect={(selected) => {
-          applyPlace({
-            latitude: selected.latitude,
-            longitude: selected.longitude,
-            name: selected.name,
-            source: selected.source || 'manual',
-          });
-        }}
-      />
-      <TouchableOpacity onPress={useCurrentPlace} style={styles.linkBtn} disabled={placeLoading}>
-        <Ionicons name="navigate-outline" size={16} color={colors.primary} />
-        <Text style={[styles.linkText, { color: colors.primary }]}>{t('prashna.useCurrentPlace', 'Use current location')}</Text>
-      </TouchableOpacity>
-      <Text style={[styles.hint, { color: colors.textSecondary }]}>
-        {t('prashna.placeHint', 'Prashna is cast for where the question is asked, not the birth place.')}
-      </Text>
-
-      <Text style={[styles.label, { color: colors.text }]}>{t('prashna.numberLabel', 'KP number (optional)')}</Text>
-      <TextInput
-        value={horaryNumber}
-        onChangeText={setHoraryNumber}
-        keyboardType="number-pad"
-        placeholder={t('prashna.numberPlaceholder', '1–249')}
-        placeholderTextColor={colors.textSecondary}
-        style={[styles.input, { color: colors.text, borderColor: colors.cardBorder, backgroundColor: colors.cardBackground }]}
-      />
-      <Text style={[styles.hint, { color: colors.textSecondary }]}>
-        {t('prashna.numberHint', 'Optional KP overlay. It does not replace the question-time chart.')}
-      </Text>
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <TouchableOpacity
-        onPress={castQuestion}
-        disabled={!canCast || loading}
-        style={[styles.castBtn, { backgroundColor: colors.primary, opacity: !canCast || loading ? 0.55 : 1 }]}
-      >
-        {loading ? (
-          <ActivityIndicator color={colors.onPrimary || '#fff'} />
-        ) : (
-          <Text style={[styles.castText, { color: colors.onPrimary || '#fff' }]}>{t('prashna.cast', 'Cast Prashna')}</Text>
-        )}
-      </TouchableOpacity>
-    </>
-  );
+  const chooseTopic = (id) => { setTopic(id); setQuestionId(''); setCastMoment(null); setError(''); };
+  const reset = () => { setQuestionId(''); setResult(null); setCastMoment(null); setError(''); setShowWorking(false); };
 
   const renderResult = () => {
-    if (!result) return null;
-    const verdict = result.verdict || {};
-    const explanation = result.explanation || {};
-    const tone = verdictTone(verdict.answer, colors);
-    const snapshot = result.chart_snapshot || {};
-    const people = [
-      explanation.you ? { key: 'you', ...explanation.you } : null,
-      explanation.matter ? { key: 'matter', ...explanation.matter } : null,
-      explanation.moon ? { key: 'moon', ...explanation.moon } : null,
-    ].filter(Boolean);
-    const confidenceLabel =
-      explanation.confidence_label || CONFIDENCE_LABEL[verdict.confidence] || '';
-    return (
-      <>
-        <View style={[styles.verdictCard, { backgroundColor: tone.bg, borderColor: tone.border }]}>
-          <Text style={[styles.verdictLabel, { color: tone.text }]}>
-            {explanation.headline || verdict.label || verdict.answer}
-          </Text>
-          {confidenceLabel || explanation.confidence_why ? (
-            <Text style={[styles.confidence, { color: colors.textSecondary }]}>
-              {confidenceLabel}
-              {explanation.confidence_why ? ` — ${explanation.confidence_why}` : ''}
-            </Text>
-          ) : null}
-        </View>
-
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('prashna.resultWhy', 'Why this answer')}</Text>
-        <Text style={[styles.body, { color: colors.text }]}>{explanation.why || verdict.summary}</Text>
-
-        {people.length ? (
-          <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('prashna.resultCast', 'Who stands for what')}</Text>
-            {people.map((row) => (
-              <View key={row.key} style={[styles.sigRow, { borderColor: colors.cardBorder, backgroundColor: colors.cardBackground }]}>
-                <Text style={[styles.sigPlanet, { color: colors.text }]}>{row.title}</Text>
-                <Text style={[styles.sigMeta, { color: colors.textSecondary }]}>{row.body}</Text>
-              </View>
-            ))}
-          </>
-        ) : null}
-
-        {explanation.readable ? (
-          <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('prashna.resultFit', 'Is this chart fit to read?')}</Text>
-            <Text style={[styles.body, { color: colors.text }]}>{explanation.readable}</Text>
-          </>
-        ) : null}
-
-        {explanation.timing ? (
-          <>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('prashna.timing', 'Timing')}</Text>
-            <Text style={[styles.body, { color: colors.text }]}>{explanation.timing}</Text>
-          </>
-        ) : null}
-
-        {explanation.setup ? (
-          <Text style={[styles.setup, { color: colors.textSecondary }]}>{explanation.setup}</Text>
-        ) : null}
-
-        {explanation.arudha ? <Text style={[styles.body, { color: colors.textSecondary }]}>{explanation.arudha}</Text> : null}
-        {explanation.kp ? <Text style={[styles.body, { color: colors.textSecondary }]}>{explanation.kp}</Text> : null}
-
-        {explanation.caveat ? (
-          <View style={[styles.noteCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
-            <Text style={[styles.body, { color: colors.text }]}>{explanation.caveat}</Text>
-          </View>
-        ) : null}
-
-        <TouchableOpacity onPress={() => setShowTechnical((open) => !open)} style={styles.linkBtn}>
-          <Ionicons name={showTechnical ? 'chevron-up' : 'chevron-down'} size={16} color={colors.primary} />
-          <Text style={[styles.linkText, { color: colors.primary }]}>
-            {showTechnical
-              ? t('prashna.hideTechnical', 'Hide technical notes')
-              : t('prashna.showTechnical', 'Show technical notes')}
-          </Text>
-        </TouchableOpacity>
-
-        {showTechnical ? (
-          <View style={[styles.techBox, { borderColor: colors.cardBorder }]}>
-            <Text style={[styles.techLine, { color: colors.textSecondary }]}>
-              {result.clock?.date} {result.clock?.time} · {result.clock?.place || placeLabel}
-            </Text>
-            <Text style={[styles.techLine, { color: colors.textSecondary }]}>
-              {t('prashna.lagna', 'Lagna')}: {snapshot.ascendant?.sign_name} {snapshot.ascendant?.degree}°
-            </Text>
-            <Text style={[styles.techLine, { color: colors.textSecondary }]}>
-              {tajikaTechnicalLine(result)}
-            </Text>
-            {(result.gates || []).map((gate) => (
-              <Text key={gate.id} style={[styles.techLine, { color: colors.textSecondary }]}>
-                {t('prashna.gates', 'Readability')}: {GATE_STATUS[gate.status] || gate.status} — {gate.label}
-              </Text>
-            ))}
-          </View>
-        ) : null}
-
-        <TouchableOpacity onPress={resetForm} style={[styles.secondaryBtn, { borderColor: colors.cardBorder }]}>
-          <Text style={[styles.secondaryText, { color: colors.text }]}>{t('prashna.newQuestion', 'New question')}</Text>
-        </TouchableOpacity>
-      </>
+    const code = result.verdict.result;
+    const visual = tone(code, colors);
+    const questionTopic = result.question?.topic || result.classical?.topic || topic;
+    const intent = result.question?.intent || result.classical?.intent || 'outcome';
+    const outcomeKey = `prashna.outcomes.${questionTopic}.${intent}`;
+    const outcome = t(outcomeKey, {
+      defaultValue: t(`prashna.outcomes.${questionTopic}.outcome`, { defaultValue: t('prashna.outcomes.career.outcome') }),
+    });
+    const matched = (result.classical?.rules || []).filter((row) => row.matched);
+    const supports = matched.filter((row) => row.polarity === 'support');
+    const obstructions = matched.filter((row) => row.polarity === 'obstruction');
+    const localizedQuestion = t(`prashna.questions.${result.question?.question_id || questionId}`, {
+      defaultValue: selectedQuestion?.text || result.question?.original_question,
+    });
+    const evidenceCard = (polarity, rules, color) => rules.length > 0 && (
+      <View style={[styles.card, { borderColor: colors.cardBorder, backgroundColor: colors.cardBackground }]}>
+        <Text style={[styles.cardTitle, { color }]}>{t(`prashna.screen.${polarity === 'support' ? 'supports' : 'obstructs'}`)}</Text>
+        <Text style={[styles.point, { color: colors.text }]}>• {t(`prashna.evidence.${questionTopic}.${polarity}`)}</Text>
+        <Text style={[styles.tech, { color: colors.textSecondary }]}>
+          {t('prashna.screen.matchedRuleRefs', { rules: rules.map((rule) => `${rule.id} · ${rule.source_section}`).join('; ') })}
+        </Text>
+      </View>
     );
+    return <>
+      <Text style={[styles.kicker, { color: colors.primary }]}>{t('prashna.screen.selectedQuestion')}</Text>
+      <Text style={[styles.confirmedQuestion, { color: colors.text }]}>{localizedQuestion}</Text>
+      <Text style={[styles.meta, { color: colors.textSecondary }]}>
+        {t('prashna.screen.fixedMoment', {
+          date: result.clock.date,
+          time: result.clock.time,
+          place: result.clock.place || t('prashna.screen.selectedLocation'),
+        })}
+      </Text>
+
+      <View style={[styles.verdict, { backgroundColor: visual.bg, borderColor: visual.border }]}>
+        <Text style={[styles.verdictTitle, { color: visual.text }]}>{t(`prashna.result.headings.${code}`, { outcome })}</Text>
+        <Text style={[styles.body, { color: colors.text }]}>{t(`prashna.result.summaries.${code}`, { outcome })}</Text>
+      </View>
+
+      {evidenceCard('support', supports, '#15803d')}
+      {evidenceCard('obstruction', obstructions, '#b91c1c')}
+
+      <View style={[styles.meaning, { backgroundColor: colors.surfaceMuted }]}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{t('prashna.screen.decisionMeaning')}</Text>
+        <Text style={[styles.body, { color: colors.text }]}>{t(`prashna.result.decisions.${code}`)}</Text>
+        <Text style={[styles.limit, { color: colors.textSecondary }]}>{t('prashna.result.limits')}</Text>
+      </View>
+
+      <TouchableOpacity style={styles.workingButton} onPress={() => setShowWorking(!showWorking)}>
+        <Ionicons name={showWorking ? 'chevron-up' : 'chevron-down'} color={colors.primary} size={17} />
+        <Text style={[styles.workingText, { color: colors.primary }]}>{t(`prashna.screen.${showWorking ? 'hideWorking' : 'showWorking'}`)}</Text>
+      </TouchableOpacity>
+      {showWorking && <View style={[styles.technical, { borderColor: colors.cardBorder }]}>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>{t('prashna.screen.methodCalculation')}</Text>
+        <Text style={[styles.tech, { color: colors.textSecondary }]}>Praśnatantra–Tājika · {result.classical.ruleset_version}</Text>
+        <Text style={[styles.tech, { color: colors.textSecondary }]}>{t('prashna.calculation.ayanamsha')} · {t('prashna.calculation.houseSystem')}</Text>
+        <Text style={[styles.tech, { color: colors.textSecondary }]}>UTC {result.clock.utc} · {(result.calculation.ephemeris || []).join(', ')}</Text>
+        <Text style={[styles.cardTitle, { color: colors.text, marginTop: 12 }]}>{t('prashna.screen.classicalRoles')}</Text>
+        {(result.classical.roles || []).map((role) => <Text key={`${role.house}-${role.role}`} style={[styles.tech, { color: colors.textSecondary }]}>
+          {t('prashna.screen.houseRole', {
+            house: role.house,
+            role: t(`prashna.roles.${questionTopic}.${role.house}`, { defaultValue: role.role }),
+            lord: t(`prashna.planets.${String(role.lord).toLowerCase()}`, { defaultValue: role.lord }),
+          })}
+        </Text>)}
+        <Text style={[styles.cardTitle, { color: colors.text, marginTop: 12 }]}>{t('prashna.screen.matchedRules')}</Text>
+        {matched.map((rule) => <Text key={rule.id} style={[styles.tech, { color: colors.textSecondary }]}>{rule.id} · {rule.source_section}</Text>)}
+      </View>}
+      <TouchableOpacity onPress={reset} style={[styles.secondary, { borderColor: colors.cardBorder }]}>
+        <Text style={{ color: colors.text, fontWeight: '700' }}>{t('prashna.screen.askNew')}</Text>
+      </TouchableOpacity>
+    </>;
   };
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {renderHeader()}
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="always">
-          {result ? renderResult() : renderForm()}
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
+  const renderForm = () => <>
+    <Text style={[styles.pageTitle, { color: colors.text }]}>{t('prashna.screen.pageTitle')}</Text>
+    <Text style={[styles.brandLine, { color: colors.primary }]}>{t('prashna.screen.brandLine')}</Text>
+    <Text style={[styles.lead, { color: colors.textSecondary }]}>{t('prashna.screen.lead')}</Text>
+    <TouchableOpacity onPress={() => setShowHowItWorks(true)} style={styles.howLink} accessibilityRole="button" accessibilityLabel={t('prashna.screen.howLink')}>
+      <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
+      <Text style={[styles.howLinkText, { color: colors.primary }]}>{t('prashna.screen.howLink')}</Text>
+    </TouchableOpacity>
+    <View style={[styles.info, { backgroundColor: colors.surfaceMuted }]}>
+      <Text style={[styles.cardTitle, { color: colors.text }]}>{t('prashna.screen.goodUses')}</Text>
+      <Text style={[styles.body, { color: colors.textSecondary }]}>{t('prashna.screen.goodUsesBody')}</Text>
+      <Text style={[styles.cardTitle, { color: colors.text, marginTop: 10 }]}>{t('prashna.screen.notAvailable')}</Text>
+      <Text style={[styles.body, { color: colors.textSecondary }]}>{t('prashna.screen.notAvailableBody')}</Text>
+    </View>
+    <Text style={[styles.label, { color: colors.text }]}>{t('prashna.screen.categoryLabel')}</Text>
+    {catalogueLoading ? <ActivityIndicator color={colors.primary} /> : <View style={styles.chips}>{localizedTopics.map((item) => <TouchableOpacity key={item.id} onPress={() => chooseTopic(item.id)} style={[styles.chip, { borderColor: topic === item.id ? colors.primary : colors.cardBorder, backgroundColor: topic === item.id ? colors.primary : colors.cardBackground }]}><Text style={{ color: topic === item.id ? '#fff' : colors.text, fontWeight: '600' }}>{item.label}</Text></TouchableOpacity>)}</View>}
+    <Text style={[styles.label, { color: colors.text }]}>{t('prashna.screen.questionLabel')}</Text>
+    <Text style={[styles.hint, { color: colors.textSecondary }]}>{t('prashna.screen.questionHint')}</Text>
+    <View style={styles.questionList}>{(selected?.questions || []).map((question) => {
+      const active = questionId === question.id;
+      return <TouchableOpacity key={question.id} onPress={() => { setQuestionId(question.id); setCastMoment(null); setError(''); }}
+        style={[styles.questionOption, { borderColor: active ? colors.primary : colors.cardBorder,
+          backgroundColor: active ? colors.surfaceMuted : colors.cardBackground }]}>
+        <Ionicons name={active ? 'radio-button-on' : 'radio-button-off'} size={20} color={active ? colors.primary : colors.textSecondary} />
+        <Text style={[styles.questionText, { color: colors.text }]}>{question.text}</Text>
+      </TouchableOpacity>;
+    })}</View>
+    {selectedQuestion ? <Text style={[styles.notice, { color: colors.textSecondary }]}>{t('prashna.screen.castNotice')}</Text> : null}
+    <Text style={[styles.label, { color: colors.text }]}>{t('prashna.screen.placeLabel')}</Text>
+    {castMoment ? <View style={[styles.fixedPlace, { borderColor: colors.cardBorder }]}><Text style={{ color: colors.text }}>{castMoment.place || t('prashna.screen.selectedLocation')}</Text></View> : placeLoading ? <ActivityIndicator color={colors.primary} /> : <PlaceSearchField
+      selectedName={place?.name || ''} selectedLatitude={place?.latitude} selectedLongitude={place?.longitude}
+      placeholder={t('prashna.screen.placePlaceholder')}
+      onDraftChange={(name) => { placeEdited.current = true; setPlace({ name, latitude: null, longitude: null, source: 'draft' }); }}
+      onSelect={(next) => { placeEdited.current = true; const saved = { ...next, source: next.source || 'manual' }; setPlace(saved); saveQuestionPlace(saved); }}
+    />}
+    {error ? <Text style={styles.error}>{error}</Text> : null}
+    <TouchableOpacity disabled={!questionId || !locationReady || loading} onPress={openCreditGate} style={[styles.primary, { backgroundColor: colors.primary, opacity: questionId && locationReady && !loading ? 1 : .5 }]}>
+      {loading ? <ActivityIndicator color="#fff" /> : <View style={styles.castButtonContent}>
+        <Text style={styles.primaryText}>{t('prashna.screen.castButton')}</Text>
+        <View style={styles.castPrice}><Ionicons name="diamond-outline" size={13} color="#fff" />
+          {Number.isFinite(displayedOriginalCost) && displayedOriginalCost > displayedCost ? <Text style={styles.originalPrice}>{displayedOriginalCost}</Text> : null}
+          <Text style={styles.primaryText}>{displayedCost}</Text>
+        </View>
+      </View>}
+    </TouchableOpacity>
+  </>;
+
+  return <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <View style={[styles.header, { borderBottomColor: colors.cardBorder }]}><TouchableOpacity onPress={() => navigation.goBack()}><Ionicons name="arrow-back" size={23} color={colors.text} /></TouchableOpacity><View><Text style={[styles.kicker, { color: colors.primary }]}>{t('prashna.screen.headerEyebrow')}</Text><Text style={[styles.headerTitle, { color: colors.text }]}>Prashna</Text></View></View>
+    <Modal visible={showHowItWorks} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowHowItWorks(false)}>
+      <Pressable style={[styles.modalOverlay, { backgroundColor: colors.overlay }]} onPress={() => setShowHowItWorks(false)}>
+        <Pressable style={[styles.howSheet, { backgroundColor: colors.surfaceRaised || colors.cardBackground, borderColor: colors.cardBorder }]} onPress={(event) => event.stopPropagation()}>
+          <View style={styles.howHeader}>
+            <View style={styles.howHeaderCopy}>
+              <Text style={[styles.kicker, { color: colors.primary }]}>{t('prashna.how.eyebrow')}</Text>
+              <Text style={[styles.howTitle, { color: colors.text }]}>{t('prashna.how.title')}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowHowItWorks(false)} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('prashna.screen.close')}>
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={styles.howContent} showsVerticalScrollIndicator={false}>
+            <Text style={[styles.howIntro, { color: colors.text }]}>{t('prashna.how.intro')}</Text>
+            {[1, 2, 3, 4].map((step) => <View key={step} style={styles.howStep}>
+              <View style={[styles.stepNumber, { backgroundColor: colors.primary }]}><Text style={styles.stepNumberText}>{step}</Text></View>
+              <View style={styles.stepCopy}><Text style={[styles.stepTitle, { color: colors.text }]}>{t(`prashna.how.step${step}Title`)}</Text><Text style={[styles.stepBody, { color: colors.textSecondary }]}>{t(`prashna.how.step${step}Body`)}</Text></View>
+            </View>)}
+            <View style={[styles.howNote, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.stepTitle, { color: colors.text }]}>{t('prashna.how.recastTitle')}</Text>
+              <Text style={[styles.stepBody, { color: colors.textSecondary }]}>{t('prashna.how.recastBody')}</Text>
+            </View>
+            <Text style={[styles.howLimit, { color: colors.textSecondary }]}>{t('prashna.how.limits')}</Text>
+          </ScrollView>
+          <TouchableOpacity onPress={() => setShowHowItWorks(false)} style={[styles.gotItButton, { backgroundColor: colors.primary }]}>
+            <Text style={styles.gotItText}>{t('prashna.how.gotIt')}</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+    <AnalysisCreditModal visible={showCreditModal} onClose={() => setShowCreditModal(false)}
+      onConfirm={() => setShowCreditModal(false)}
+      onGetCredits={() => { setShowCreditModal(false); navigation.navigate('Credits'); }}
+      credits={gateCredits} cost={gateCost} canAfford={false}
+      title={t('prashna.screen.moreCredits')}
+      description={t('prashna.screen.creditBody', { cost: gateCost, credits: gateCredits })}
+      getCreditsLabel={t('prashna.screen.getCredits')} cancelLabel={t('prashna.screen.cancel')} />
+    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">{result ? renderResult() : renderForm()}</ScrollView>
+  </SafeAreaView>;
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerCopy: { marginLeft: 8, flex: 1 },
-  eyebrow: { fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase' },
-  title: { fontSize: 20, fontWeight: '700' },
-  content: { padding: 18, paddingBottom: 48 },
-  lead: { fontSize: 14, lineHeight: 20, marginBottom: 18 },
-  label: { fontSize: 13, fontWeight: '600', marginBottom: 8, marginTop: 12 },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    fontSize: 15,
-  },
-  questionInput: { minHeight: 92, textAlignVertical: 'top' },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
-  chipText: { fontSize: 13, fontWeight: '600', textTransform: 'capitalize' },
-  row: { flexDirection: 'row', gap: 10 },
-  rowItem: { flex: 1 },
-  linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  linkText: { fontSize: 13, fontWeight: '600' },
-  hint: { fontSize: 12, lineHeight: 18, marginTop: 6 },
-  error: { color: '#b91c1c', marginTop: 12, fontSize: 13 },
-  castBtn: { marginTop: 22, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
-  castText: { fontSize: 16, fontWeight: '700' },
-  verdictCard: { borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 8 },
-  verdictLabel: { fontSize: 22, fontWeight: '800', lineHeight: 28 },
-  confidence: { marginTop: 8, fontSize: 13, lineHeight: 19 },
-  summary: { marginTop: 10, fontSize: 15, lineHeight: 22 },
-  noteCard: { borderWidth: 1, borderRadius: 12, padding: 14, marginTop: 16 },
-  techBox: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 8, gap: 6 },
-  techLine: { fontSize: 12, lineHeight: 18 },
-  sectionTitle: { marginTop: 20, marginBottom: 8, fontSize: 16, fontWeight: '700' },
-  body: { fontSize: 15, lineHeight: 23 },
-  setup: { fontSize: 13, lineHeight: 20, marginTop: 16 },
-  sigRow: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 8 },
-  sigPlanet: { fontSize: 16, fontWeight: '700' },
-  sigMeta: { marginTop: 4, fontSize: 13 },
-  gateRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 8 },
-  gateDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
-  gateText: { flex: 1, fontSize: 13, lineHeight: 19 },
-  secondaryBtn: { marginTop: 24, borderWidth: 1, borderRadius: 14, paddingVertical: 13, alignItems: 'center' },
-  secondaryText: { fontSize: 15, fontWeight: '700' },
+  container: { flex: 1 }, header: { padding: 15, flexDirection: 'row', gap: 14, alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
+  headerTitle: { fontSize: 20, fontWeight: '800' }, kicker: { fontSize: 10, fontWeight: '800', letterSpacing: .8 },
+  content: { padding: 18, paddingBottom: 50 }, pageTitle: { fontSize: 25, lineHeight: 31, fontWeight: '800', marginBottom: 8 },
+  brandLine: { fontSize: 10, lineHeight: 15, fontWeight: '900', letterSpacing: .65, marginBottom: 7 },
+  lead: { fontSize: 14, lineHeight: 21, marginBottom: 6 },
+  howLink: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 5, marginBottom: 12 },
+  howLinkText: { fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
+  info: { borderRadius: 14, padding: 14, marginBottom: 8 },
+  card: { borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 12 }, cardTitle: { fontSize: 15, fontWeight: '800', marginBottom: 6 },
+  body: { fontSize: 14, lineHeight: 21 }, label: { fontSize: 14, fontWeight: '700', marginTop: 17, marginBottom: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, chip: { borderWidth: 1, borderRadius: 22, paddingHorizontal: 12, paddingVertical: 8 },
+  hint: { fontSize: 12, lineHeight: 18, marginBottom: 7 }, questionList: { gap: 8 },
+  questionOption: { borderWidth: 1, borderRadius: 13, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
+  questionText: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: '600' },
+  notice: { fontSize: 13, lineHeight: 20, marginTop: 14 }, error: { color: '#b91c1c', marginTop: 12, lineHeight: 19 },
+  primary: { marginTop: 20, borderRadius: 14, minHeight: 50, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 }, primaryText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  castButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  castPrice: { flexDirection: 'row', alignItems: 'center', gap: 4 }, originalPrice: { color: 'rgba(255,255,255,.65)', textDecorationLine: 'line-through', fontSize: 12 },
+  secondary: { marginTop: 12, borderWidth: 1, borderRadius: 14, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  roleLabel: { marginTop: 13, marginBottom: 4, fontSize: 12, fontWeight: '700' }, point: { fontSize: 14, lineHeight: 21, marginTop: 5 },
+  confirmedQuestion: { fontSize: 20, lineHeight: 27, fontWeight: '700', marginTop: 5 }, meta: { fontSize: 12, lineHeight: 18, marginTop: 5, marginBottom: 14 },
+  verdict: { borderWidth: 1, borderRadius: 16, padding: 16 }, verdictTitle: { fontSize: 22, lineHeight: 28, fontWeight: '800', marginBottom: 8 },
+  meaning: { borderRadius: 14, padding: 14, marginTop: 12 }, limit: { fontSize: 12, lineHeight: 18, marginTop: 10 },
+  workingButton: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 17, paddingVertical: 5 }, workingText: { fontSize: 13, fontWeight: '700' },
+  technical: { borderWidth: 1, borderRadius: 13, padding: 13, marginTop: 5 }, tech: { fontSize: 12, lineHeight: 18, marginTop: 4 },
+  fixedPlace: { borderWidth: 1, borderRadius: 12, padding: 13 },
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 18 },
+  howSheet: { width: '100%', maxWidth: 500, maxHeight: '88%', borderWidth: 1, borderRadius: 22, overflow: 'hidden' },
+  howHeader: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12 },
+  howHeaderCopy: { flex: 1, paddingRight: 12 }, howTitle: { fontSize: 26, lineHeight: 32, fontWeight: '800', marginTop: 3 },
+  howContent: { paddingHorizontal: 20, paddingBottom: 16 }, howIntro: { fontSize: 15, lineHeight: 23, marginBottom: 18 },
+  emphasis: { fontStyle: 'italic', fontWeight: '800' }, howStep: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, marginBottom: 16 },
+  stepNumber: { width: 25, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  stepNumberText: { color: '#fff', fontSize: 12, fontWeight: '900' }, stepCopy: { flex: 1 },
+  stepTitle: { fontSize: 14, lineHeight: 19, fontWeight: '800', marginBottom: 3 }, stepBody: { fontSize: 13, lineHeight: 20 },
+  howNote: { borderWidth: 1, borderRadius: 13, padding: 13, marginTop: 2 }, howLimit: { fontSize: 12, lineHeight: 18, marginTop: 14 },
+  gotItButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', marginHorizontal: 20, marginBottom: 18, borderRadius: 13 },
+  gotItText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 });

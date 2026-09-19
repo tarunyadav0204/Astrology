@@ -1,6 +1,5 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { COLORS } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -12,21 +11,12 @@ const NativeSelectorChip = ({
   iconColor,
   showIcon = true
 }) => {
-  const { theme, colors, isPanditMode } = useTheme();
+  const { colors } = useTheme();
   if (!birthData) return null;
 
   const displayName = String(birthData.name || 'Selected chart');
-
-  const chipBg = theme === 'dark'
-    ? 'rgba(255, 255, 255, 0.15)'
-    : isPanditMode
-      ? 'rgba(24, 24, 27, 0.06)'
-      : 'rgba(249, 115, 22, 0.15)';
-  const chipBorder = theme === 'dark'
-    ? 'rgba(255, 255, 255, 0.2)'
-    : isPanditMode
-      ? 'rgba(24, 24, 27, 0.12)'
-      : 'rgba(249, 115, 22, 0.2)';
+  const labelColor = colors.selectionText || colors.text;
+  const mutedColor = colors.selectionTextMuted || colors.textSecondary;
 
   return (
     <TouchableOpacity
@@ -34,8 +24,8 @@ const NativeSelectorChip = ({
       style={[
         styles.nameChip,
         {
-          backgroundColor: chipBg,
-          borderColor: chipBorder,
+          backgroundColor: colors.selectionSurface,
+          borderColor: colors.selectionBorder || colors.cardBorder,
         },
         style
       ]}
@@ -47,7 +37,7 @@ const NativeSelectorChip = ({
     >
       {showIcon && <Text style={styles.chipIcon}>👤</Text>}
       <Text
-        style={[styles.nameChipText, { color: colors.textSecondary }, textStyle]}
+        style={[styles.nameChipText, { color: labelColor }, textStyle]}
         numberOfLines={1}
         ellipsizeMode="tail"
         adjustsFontSizeToFit
@@ -57,14 +47,13 @@ const NativeSelectorChip = ({
       >
         {displayName}
       </Text>
-      <Ionicons name="chevron-down" size={12} color={iconColor || colors.textTertiary} style={styles.dropdownIcon} />
+      <Ionicons name="chevron-down" size={12} color={iconColor || mutedColor} style={styles.dropdownIcon} />
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   nameChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     paddingHorizontal: 12,
     minHeight: 44,
     paddingVertical: 6,
@@ -72,12 +61,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   chipIcon: {
     fontSize: 12,

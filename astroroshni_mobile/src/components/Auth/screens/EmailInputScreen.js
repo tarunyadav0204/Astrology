@@ -192,7 +192,7 @@ export default function EmailInputScreen({
           ]}
         >
           <TouchableOpacity
-            style={[styles.continueButton, !isValid && styles.buttonDisabled]}
+            style={[styles.continueButton, { shadowColor: colors.accent }, !isValid && styles.buttonDisabled]}
             onPress={handleContinue}
             disabled={!isValid || loading}
           >
@@ -321,7 +321,6 @@ const styles = StyleSheet.create({
   continueButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -338,7 +337,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buttonText: {
-    color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
   },

@@ -112,6 +112,16 @@ const INSTANT_LOADER_WORD_MS = 2200;
 // and should only appear after the usual Instant response window has passed.
 const INSTANT_LOADER_MAX_WORDS = INSTANT_LOADER_LINES.length + 7;
 const INSTANT_REPLY_FIRST_PIECE_MS = 0;
+const COMPOSER_LINE_HEIGHT = 22;
+const COMPOSER_MIN_HEIGHT = 44;
+const COMPOSER_MAX_LINES = 3;
+const COMPOSER_MAX_HEIGHT = COMPOSER_MIN_HEIGHT + COMPOSER_LINE_HEIGHT * (COMPOSER_MAX_LINES - 1);
+
+function clampComposerHeight(contentHeight) {
+  const raw = Math.ceil(Number(contentHeight) || 0);
+  if (raw <= 0) return COMPOSER_MIN_HEIGHT;
+  return Math.min(COMPOSER_MAX_HEIGHT, Math.max(COMPOSER_MIN_HEIGHT, raw));
+}
 
 const shouldPaceInstantAnswer = ({ chatTier, messageType, content } = {}) => {
   const tier = String(chatTier || '').toLowerCase();
@@ -799,7 +809,7 @@ export default function ChatScreen({ navigation, route }) {
   }, [messages.length]);
 
   useEffect(() => {
-    if (!inputText) setComposerHeight(44);
+    if (!inputText) setComposerHeight(COMPOSER_MIN_HEIGHT);
   }, [inputText]);
 
   const [language, setLanguage] = useState('english');
@@ -7445,34 +7455,44 @@ export default function ChatScreen({ navigation, route }) {
                 key="chat-main-input"
                 style={[
                   styles.modernTextInput,
-                  {
-                    color: colors.text,
-                    height: !inputText || showModeSelector ? 44 : composerHeight,
-                    maxHeight: !inputText || showModeSelector ? 44 : 100,
-                  },
+                  { color: colors.text },
                   showModeSelector && styles.modernTextInputCollapsed,
-                  !inputText && Platform.OS === 'web'
-                    ? { whiteSpace: 'nowrap', overflow: 'hidden' }
-                    : null,
+                  Platform.OS === 'web'
+                    ? ((!inputText || showModeSelector)
+                      ? {
+                          height: COMPOSER_MIN_HEIGHT,
+                          maxHeight: COMPOSER_MIN_HEIGHT,
+                          overflow: 'hidden',
+                          whiteSpace: 'nowrap',
+                        }
+                      : {
+                          height: 'auto',
+                          minHeight: COMPOSER_MIN_HEIGHT,
+                          maxHeight: COMPOSER_MAX_HEIGHT,
+                          overflow: 'auto',
+                        })
+                    : {
+                        height: (!inputText || showModeSelector) ? COMPOSER_MIN_HEIGHT : composerHeight,
+                        maxHeight: (!inputText || showModeSelector) ? COMPOSER_MIN_HEIGHT : COMPOSER_MAX_HEIGHT,
+                      },
                 ]}
                 value={inputText}
                 onFocus={() => {
                   markInstantActivity();
                 }}
                 onChangeText={(text) => {
+                  inputTextRef.current = text;
                   setInputText(text);
                   markInstantActivity();
-                  if (!text) setComposerHeight(44);
+                  if (!text) setComposerHeight(COMPOSER_MIN_HEIGHT);
                 }}
                 onContentSizeChange={(e) => {
-                  if (showModeSelector || !inputTextRef.current) {
-                    setComposerHeight(44);
+                  if (showModeSelector || !String(inputTextRef.current || '').length) {
+                    setComposerHeight(COMPOSER_MIN_HEIGHT);
                     return;
                   }
-                  const next = Math.ceil(e?.nativeEvent?.contentSize?.height || 0);
-                  if (!next) return;
-                  const clamped = Math.min(100, Math.max(44, next));
-                  setComposerHeight((prev) => (prev === clamped ? prev : clamped));
+                  const next = clampComposerHeight(e?.nativeEvent?.contentSize?.height);
+                  setComposerHeight((prev) => (prev === next ? prev : next));
                 }}
                 placeholder={
                   activeWaitSideMessage ? "Reply while the full answer is prepared..." :
@@ -7495,11 +7515,13 @@ export default function ChatScreen({ navigation, route }) {
                   !!activeWaitSideMessage ||
                   ((isInstantAnalysis || !loading) && !instantBilling.busy && !(partnershipMode && (partnershipStep === 0 || partnershipStep === 1 || partnershipStep === 3)))
                 }
+                nativeID="chat-composer-input"
+                {...(Platform.OS === 'web' ? { id: 'chat-composer-input' } : {})}
                 multiline
-                // RN Web: without rows=1, <textarea> defaults to 2 rows and placeholder sits high.
-                numberOfLines={inputText ? undefined : 1}
-                {...(Platform.OS === 'web' ? { rows: 1 } : {})}
-                textAlignVertical="center"
+                scrollEnabled={Boolean(inputText) && !showModeSelector}
+                {...(Platform.OS === 'web' && (!inputText || showModeSelector) ? { rows: 1 } : {})}
+                {...(Platform.OS !== 'web' && (!inputText || showModeSelector) ? { numberOfLines: 1 } : {})}
+                textAlignVertical={(!inputText || showModeSelector) ? 'center' : 'top'}
                 blurOnSubmit={false}
               />
 
@@ -8389,7 +8411,7 @@ export default function ChatScreen({ navigation, route }) {
                     style={getMenuOptionStyle()}
                     onPress={() => {
                       closeMenuDrawer(() => {
-                        navigation.navigate('Prashna', { birthData });
+                        navigation.navigate('Prashna');
                       });
                     }}
                   >
@@ -8405,7 +8427,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Ionicons name="help-circle-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.prashna', 'Prashna')}</Text>
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('prashna.discoveryTitle', 'Question Guidance')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -10171,7 +10193,7 @@ const styles = StyleSheet.create({
   },
   inputBarGradient: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     borderRadius: 22,
     paddingHorizontal: 7,
     paddingVertical: 7,
@@ -10193,17 +10215,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.white,
     paddingHorizontal: 16,
-    minHeight: 44,
-    maxHeight: 100,
+    minHeight: COMPOSER_MIN_HEIGHT,
+    maxHeight: COMPOSER_MAX_HEIGHT,
     ...Platform.select({
       web: {
-        // Single-line box matching send button; height grows via composerHeight.
-        lineHeight: 22,
-        // Slightly more top padding — Safari placeholder/glyphs sit optically high.
+        lineHeight: COMPOSER_LINE_HEIGHT,
         paddingTop: 12,
         paddingBottom: 10,
         outlineStyle: 'none',
-        overflow: 'hidden',
       },
       default: {
         paddingTop: 10,
@@ -10213,9 +10232,9 @@ const styles = StyleSheet.create({
     }),
   },
   modernTextInputCollapsed: {
-    height: 44,
-    maxHeight: 44,
-    minHeight: 44,
+    height: COMPOSER_MIN_HEIGHT,
+    maxHeight: COMPOSER_MIN_HEIGHT,
+    minHeight: COMPOSER_MIN_HEIGHT,
     ...Platform.select({
       web: {
         lineHeight: 22,

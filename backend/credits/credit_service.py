@@ -8,6 +8,12 @@ from typing import Optional, Dict, List, Any, Tuple
 _DISCOUNT_OMIT = object()
 logger = logging.getLogger(__name__)
 
+# Safe prices used only while a newly deployed setting has not yet been seeded.
+# Most legacy settings intentionally retain the historical one-credit fallback.
+_CREDIT_SETTING_FALLBACKS = {
+    "prashna_analysis_cost": 3,
+}
+
 # Admin ledger feature filter: equality on reference_id (indexed), plus a
 # left-anchored description prefix only when Standard/Premium share chat_question.
 LEDGER_FEATURE_FILTERS = {
@@ -550,6 +556,7 @@ class CreditService:
                 ("karma_analysis_cost", 25, "Credits per karma analysis"),
                 ("ashtakavarga_life_predictions_cost", 15, "Credits per Ashtakavarga life predictions (Dots of Destiny)"),
                 ("podcast_cost", 2, "Credits per podcast (listen to message as audio)"),
+                ("prashna_analysis_cost", 3, "Credits per classical Prashna question chart"),
             ]
             for key, value, desc in defaults:
                 cur = execute(conn, "SELECT COUNT(*) FROM credit_settings WHERE setting_key = ?", (key,))
@@ -4023,7 +4030,8 @@ class CreditService:
             )
             result = cursor.fetchone()
         if not result:
-            return (1, 1, None)
+            fallback = _CREDIT_SETTING_FALLBACKS.get(setting_key, 1)
+            return (fallback, fallback, None)
         value = result[0]
         discount = result[1] if len(result) > 1 else None
         effective = discount if (discount is not None and discount >= 0) else value
@@ -4040,6 +4048,7 @@ class CreditService:
         descriptions = {
             "instant_chat_first_minute_cost": "Credits for the first minute of Instant Chat",
             "instant_chat_per_minute_cost": "Credits per following started minute of Instant Chat",
+            "prashna_analysis_cost": "Credits per classical Prashna question chart",
         }
         description = descriptions.get(setting_key, setting_key.replace("_", " ").strip().capitalize())
         with get_conn() as conn:
@@ -4252,7 +4261,8 @@ class CreditService:
             'progeny_analysis_cost', 'partnership_report_cost', 'career_report_cost', 'wealth_report_cost',
             'health_report_cost', 'janam_kundli_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
             'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost',
-            'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost'
+            'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost',
+            'prashna_analysis_cost'
         )
         placeholders = ", ".join(["?"] * len(keys))
         with get_conn() as conn:
@@ -4364,6 +4374,26 @@ class CreditService:
                         "key": "podcast_cost",
                         "value": 2,
                         "description": "Credits per podcast (listen to message as audio)",
+                        "discount": None,
+                    })
+                except Exception:
+                    pass
+            # Existing installations may skip startup table seeding. Ensure the
+            # Prashna price is still available in Admin > Credits > Management.
+            if not any(s["key"] == "prashna_analysis_cost" for s in settings):
+                try:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (setting_key, setting_value, description)
+                        VALUES ('prashna_analysis_cost', 3, 'Credits per classical Prashna question chart')
+                        """,
+                    )
+                    conn.commit()
+                    settings.append({
+                        "key": "prashna_analysis_cost",
+                        "value": 3,
+                        "description": "Credits per classical Prashna question chart",
                         "discount": None,
                     })
                 except Exception:

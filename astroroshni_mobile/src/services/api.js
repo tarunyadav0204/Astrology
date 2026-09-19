@@ -1501,6 +1501,7 @@ export const kpAPI = {
 };
 
 export const prashnaAPI = {
+  getTopics: () => api.get(getEndpoint('/prashna/topics')),
   analyze: (payload) => api.post(getEndpoint('/prashna/analyze'), payload),
 };
 

@@ -1864,16 +1864,13 @@ const loadHomeData = async (nativeData = null) => {
       },
       {
         key: 'prashna',
-        title: t('menu.prashna', 'Prashna'),
+        title: t('prashna.discoveryTitle', 'Question Guidance'),
         accent: '#7C3AED',
         tint: isLightSurface ? 'rgba(124, 58, 237, 0.12)' : 'rgba(167, 139, 250, 0.12)',
         border: 'rgba(124, 58, 237, 0.28)',
         icon: 'help-circle-outline',
-        badge: t('home.tools.horary', 'Horary'),
-        onPress: () =>
-          requireBirthChart((data) =>
-            navigation.navigate('Prashna', { birthData: data }),
-          ),
+        badge: t('prashna.toolBadge', { count: pricing.prashna ?? 3, defaultValue: 'Prashna · {{count}} cr' }),
+        onPress: () => navigation.navigate('Prashna'),
       },
       {
         key: 'kp',
@@ -2258,9 +2255,7 @@ const loadHomeData = async (nativeData = null) => {
             },
           })}
           onOpenExplore={showExploreSurface}
-          onOpenPrashna={() =>
-            requireBirthChart((data) => navigation.navigate('Prashna', { birthData: data }))
-          }
+          onOpenPrashna={() => navigation.navigate('Prashna')}
           onOpenAscendant={() => setActiveInsight(getSignInsight('ascendant', chartData?.houses?.[0]?.sign))}
           onOpenMoon={() => setActiveInsight(getSignInsight('moon', chartData?.planets?.Moon?.sign))}
           onOpenSun={() => setActiveInsight(getSignInsight('sun', chartData?.planets?.Sun?.sign))}
@@ -2300,9 +2295,9 @@ const loadHomeData = async (nativeData = null) => {
           onOpenMuhurat={() => navigation.navigate('MuhuratHub')}
           onOpenYearly={() => onOptionSelect({ action: 'events', readingMode: 'yearly' })}
           onOpenMonthly={() => onOptionSelect({ action: 'events', readingMode: 'monthly' })}
-          onOpenPrashna={() =>
-            requireBirthChart((data) => navigation.navigate('Prashna', { birthData: data }))
-          }
+          onOpenPrashna={() => navigation.navigate('Prashna')}
+          prashnaCost={pricing.prashna ?? 3}
+          prashnaOriginalCost={pricingOriginal.prashna}
           eventsCost={pricing.events ?? 100}
           paths={options}
           analyses={analysisOptions}

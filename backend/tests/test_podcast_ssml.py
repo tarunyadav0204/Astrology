@@ -105,7 +105,7 @@ def test_neural2_keeps_punctuation_instead_of_stacking_breaks():
     assert "<prosody" not in male
     assert "Moon in Cancer, that's the big one." in male
     assert male.count("<break") == 1
-    assert 'time="320ms"' in male
+    assert 'time="260ms"' in male
     assert "Daa-sha" not in _segment_text_to_ssml("This Dasha is strong", "male", ssml_mode="cues")
     assert "Daasha" in _segment_text_to_ssml("This Dasha is strong", "male", ssml_mode="cues")
 
@@ -119,3 +119,54 @@ def test_ssml_does_not_emit_apostrophe_entity():
     assert "&#x27;" not in ssml.lower()
     assert "&#39;" not in ssml
     assert "that's" in ssml
+
+
+def _spoken_ssml_text(ssml: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", ssml or "")).strip().lower()
+
+
+def test_malformed_pause_cues_are_not_spoken():
+    samples = [
+        "Moon in Cancer. [PAUSE: short] Mars is strong.",
+        "Moon in Cancer. PAUSE short Mars is strong.",
+        "Moon in Cancer. pause short Mars is strong.",
+        "Moon in Cancer. [pause] Mars is strong.",
+        "Moon in Cancer. short pause Mars is strong.",
+        "Moon in Cancer. (pause) Mars is strong.",
+        "Yeah. pause. Mars is strong.",
+        "Moon in Cancer. pause, pause short pause long Mars is strong.",
+        "Moon in Cancer. [PAUSE:long] Mars is strong.",
+    ]
+    for source in samples:
+        ssml = _segment_text_to_ssml(source, "female", ssml_mode="breaks")
+        spoken = _spoken_ssml_text(ssml)
+        assert "pause" not in spoken, source
+        assert "<break time=" in ssml
+        plain = _strip_spoken_control_cues_for_plain_tts(source).lower()
+        assert "pause" not in plain, source
+        assert "mars is strong" in spoken
+        assert "mars is strong" in plain
+
+
+def test_pause_breaks_stay_short_and_do_not_stack():
+    short = _segment_text_to_ssml("Moon. [PAUSE:short] Mars.", "female", ssml_mode="breaks")
+    assert "[<" not in short
+    assert 'time="240ms"' in short or 'time="380ms"' in short
+    stacked = _segment_text_to_ssml(
+        "Moon. pause, pause short pause long Mars.",
+        "female",
+        ssml_mode="breaks",
+    )
+    assert "[<" not in stacked
+    times = [int(value) for value in re.findall(r'time="(\d+)ms"', stacked)]
+    assert times
+    assert max(times) <= 380
+    assert stacked.count("<break") <= 3
+
+
+def test_real_pause_verb_is_kept():
+    source = "Pause before you send that message. Then wait."
+    plain = _strip_spoken_control_cues_for_plain_tts(source)
+    assert "Pause before you send that message" in plain
+    ssml = _segment_text_to_ssml(source, "female", ssml_mode="breaks")
+    assert "Pause before you send that message" in re.sub(r"<[^>]+>", " ", ssml)

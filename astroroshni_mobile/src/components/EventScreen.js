@@ -1511,7 +1511,10 @@ export default function EventScreen({ route }) {
 
   return (
     <LinearGradient colors={bgGradient} style={{ flex: 1 }}>
-      <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
+      <FocusedStatusBar
+        backgroundColor={colors.background}
+        barStyle={colors.statusBarStyle || (theme === 'dark' ? 'light-content' : 'dark-content')}
+      />
       <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
       {/* Regenerate Confirmation Modal */}
       <Modal

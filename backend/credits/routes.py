@@ -3399,6 +3399,7 @@ def _get_pricing_with_originals():
         ("karma", "karma_analysis_cost"),
         ("ashtakavarga", "ashtakavarga_life_predictions_cost"),
         ("podcast", "podcast_cost"),
+        ("prashna", "prashna_analysis_cost"),
     ]
     pricing = {}
     pricing_original = {}
@@ -3499,6 +3500,7 @@ _PRICING_KEYS_MAP = [
     ("karma", "karma_analysis_cost"),
     ("ashtakavarga", "ashtakavarga_life_predictions_cost"),
     ("podcast", "podcast_cost"),
+    ("prashna", "prashna_analysis_cost"),
 ]
 
 

@@ -64,6 +64,15 @@ def test_instant_billing_settings_seeds_support_legacy_credit_settings_schema():
         assert f"WHERE setting_key = '{setting_key}'" in sql
 
 
+def test_prashna_credit_setting_is_seeded_idempotently_during_deploy():
+    filename = "add_prashna_credit_setting.sql"
+    assert filename in RUNTIME_MIGRATIONS
+    sql = (MIGRATIONS / filename).read_text(encoding="utf-8")
+    assert "'prashna_analysis_cost', 3" in sql
+    assert "WHERE NOT EXISTS" in sql
+    assert "ON CONFLICT (setting_key)" not in sql
+
+
 def test_talk_to_tara_rate_correction_runs_only_once_and_preserves_future_admin_changes():
     sql = (MIGRATIONS / "set_talk_to_tara_rate_five.sql").read_text(encoding="utf-8")
     assert "runtime_data_migrations" in sql

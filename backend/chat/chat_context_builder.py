@@ -31,7 +31,6 @@ from calculators.sniper_points_calculator import SniperPointsCalculator
 from calculators.shoola_dasha_calculator import ShoolaDashaCalculator
 from calculators.yogini_dasha_calculator import YoginiDashaCalculator
 from calculators.kota_chakra_calculator import KotaChakraCalculator
-from calculators.prashna_calculator import PrashnaCalculator
 from calculators.varshphal_calculator import VarshphalCalculator
 from calculators.chara_dasha_calculator import CharaDashaCalculator
 from calculators.jaimini_point_calculator import JaiminiPointCalculator

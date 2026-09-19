@@ -18,6 +18,7 @@ const authDeepCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/loca
 const homeRecommendationsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/home-recommendations.json'), 'utf8'));
 const themeDiscoveryCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/theme-discovery.json'), 'utf8'));
 const ashtakavargaStudyCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/ashtakavarga-study.json'), 'utf8'));
+const prashnaCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/prashna-v2.json'), 'utf8'));
 const chatScreenSource = {
   english: 'marathi', hindi: 'hindi', es: 'es', fr: 'fr', german: 'english', russian: 'german',
   chinese: 'russian', tamil: 'chinese', telugu: 'tamil', gujarati: 'telugu', marathi: 'gujarati',
@@ -99,6 +100,22 @@ const mergedPremiumCopy = Object.fromEntries(Object.entries(normalizedPremiumCop
   { ...copy, homeRecommendations: homeRecommendationsCopy[language] || homeRecommendationsCopy.english },
 ]));
 const failures = [];
+const prashnaEnglish = flatten(prashnaCopy.english);
+const prashnaEnglishKeys = Object.keys(prashnaEnglish).sort();
+const prashnaKeySet = new Set(prashnaEnglishKeys);
+const interpolationTokens = (value) => String(value || '').match(/\{\{[^{}]+\}\}/g)?.sort() || [];
+Object.entries(prashnaCopy).forEach(([language, copy]) => {
+  const localized = flatten(copy);
+  const missing = prashnaEnglishKeys.filter((key) => !(key in localized) || !String(localized[key] || '').trim());
+  const extra = Object.keys(localized).filter((key) => !prashnaKeySet.has(key));
+  if (missing.length) failures.push(`prashna/${language}: missing ${missing.join(', ')}`);
+  if (extra.length) failures.push(`prashna/${language}: unexpected ${extra.join(', ')}`);
+  prashnaEnglishKeys.forEach((key) => {
+    if (key in localized && interpolationTokens(prashnaEnglish[key]).join('|') !== interpolationTokens(localized[key]).join('|')) {
+      failures.push(`prashna/${language}: interpolation mismatch in ${key}`);
+    }
+  });
+});
 const requiredSharedLocaleKeys = ['common.notNow'];
 const appLocaleFiles = {
   english: 'en', hindi: 'hi', es: 'es', fr: 'fr', german: 'de', russian: 'ru',
@@ -360,4 +377,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`i18n audit passed: ${englishKeys.length} premium keys, ${lifeAnalysisEnglishKeys.length + lifeAnalysisPdfEnglishKeys.length} Life Analysis keys, ${ashtakavargaStudyEnglishKeys.length} Ashtakavarga Study keys, ${historyUiEnglishKeys.length + historyDetailEnglishKeys.length} history keys, ${knowledgeSupportEnglishKeys.length} knowledge/support keys, ${accountNotificationsEnglishKeys.length} notification keys, and ${chatControlEnglishKeys.length} chat-control keys across ${Object.keys(premiumCopy).length} languages; ${protectedFiles.length} screens protected.`);
+console.log(`i18n audit passed: ${englishKeys.length} premium keys, ${prashnaEnglishKeys.length} Prashna keys, ${lifeAnalysisEnglishKeys.length + lifeAnalysisPdfEnglishKeys.length} Life Analysis keys, ${ashtakavargaStudyEnglishKeys.length} Ashtakavarga Study keys, ${historyUiEnglishKeys.length + historyDetailEnglishKeys.length} history keys, ${knowledgeSupportEnglishKeys.length} knowledge/support keys, ${accountNotificationsEnglishKeys.length} notification keys, and ${chatControlEnglishKeys.length} chat-control keys across ${Object.keys(premiumCopy).length} languages; ${protectedFiles.length} screens protected.`);

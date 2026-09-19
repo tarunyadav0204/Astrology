@@ -1,0 +1,2521 @@
+{
+  "english": {
+    "discoveryTitle": "Question Guidance",
+    "exploreTitle": "Ask About a Situation",
+    "homeLabel": "Ask a Question",
+    "methodLabel": "Classical Prashna",
+    "toolBadge": "Prashna · {{count}} cr",
+    "discoveryBody": "Classical Prashna · Will they contact you? Will a relationship, job, payment, or journey work out?",
+    "screen": {
+      "noQuestions": "No supported Prashna questions were returned.",
+      "topicsLoadError": "The supported question list could not be loaded.",
+      "invalidResult": "The calculation returned an invalid result and was stopped.",
+      "calculationError": "The question chart could not be calculated.",
+      "authFeature": "Prashna question chart",
+      "authMessage": "Sign in to cast a classical Prashna question chart. Credits are charged only when the chart is produced.",
+      "selectedQuestion": "YOUR SELECTED QUESTION",
+      "fixedMoment": "Fixed {{date}} at {{time}} · {{place}}",
+      "selectedLocation": "selected location",
+      "supports": "What supports it",
+      "obstructs": "What obstructs it",
+      "decisionMeaning": "What this means for your decision",
+      "showWorking": "Show classical working",
+      "hideWorking": "Hide classical working",
+      "methodCalculation": "Method and calculation",
+      "classicalRoles": "Classical roles",
+      "houseRole": "House {{house}}: {{role}} — {{lord}}",
+      "matchedRules": "Rules that matched",
+      "askNew": "Ask a new question",
+      "pageTitle": "Ask about one real situation",
+      "brandLine": "PRASHNA · ONE QUESTION. ONE MEANINGFUL MOMENT.",
+      "lead": "Classical guidance for one sincere question that has become important now. Choose the category and the one sentence that exactly matches what you are asking, then cast the chart for your current time and place.",
+      "howLink": "How Prashna works",
+      "goodUses": "Good uses",
+      "goodUsesBody": "A call or message from a specific person, being unblocked, reconciliation after a fight, marriage with a specific person, a particular job, payment, journey, missing possession, or property transaction.",
+      "notAvailable": "Not available here",
+      "notAvailableBody": "Health, pregnancy, death, court outcomes, speculative trading, broad life readings, or repeated versions of the same question.",
+      "categoryLabel": "What is the question about?",
+      "questionLabel": "Which question are you asking?",
+      "questionHint": "Keep one real situation clearly in mind and choose only if the sentence matches it exactly.",
+      "castNotice": "Keep the specific matter clearly in mind. The chart time will be fixed when you confirm and cast it. Do not recast the unchanged question.",
+      "placeLabel": "Place where you are asking now",
+      "placePlaceholder": "City, State, Country",
+      "castButton": "Cast this question chart",
+      "headerEyebrow": "CLASSICAL QUESTION CHART",
+      "moreCredits": "More credits needed",
+      "creditBody": "This Prashna chart costs {{cost}} credits. You currently have {{credits}}.",
+      "getCredits": "Get credits",
+      "cancel": "Cancel",
+      "matchedRuleRefs": "Matched rules: {{rules}}",
+      "close": "Close"
+    },
+    "how": {
+      "eyebrow": "THE IDEA IN SIMPLE WORDS",
+      "title": "How Prashna works",
+      "intro": "Prashna means ‘question.’ The classical text says that when a real concern becomes urgent, a person is moved by daiva—fate or divine order—to seek an answer. In everyday language, the tradition treats your sincere urge to ask and the moment you ask as connected.",
+      "step1Title": "Hold one sincere question",
+      "step1Body": "Choose one real situation that matters now. Do not combine several questions or test the system with the same question repeatedly.",
+      "step2Title": "The asking moment becomes the chart",
+      "step2Body": "When you confirm and cast the chart, the app fixes that exact time and your current place. Prashna reads this moment; it does not use your birth chart.",
+      "step3Title": "The chart gives everyone a role",
+      "step3Body": "The rising sign and its ruler represent you. A particular house and its ruler represent the matter—for example, the other person in a relationship, a job, a payment, or a journey. The Moon helps show whether the matter connects and develops.",
+      "step4Title": "Classical rules judge the connection",
+      "step4Body": "The calculation checks whether the relevant planets come together, separate, receive help, or meet obstruction. It can show support, serious obstacles, mixed testimony, or that the chart does not give a dependable answer.",
+      "recastTitle": "Why the same question should not be recast",
+      "recastBody": "The first sincere asking moment is the chart being judged. Recasting until a preferred answer appears breaks the method rather than improving it.",
+      "limits": "This is a traditional reading of a meaningful moment. It can guide reflection, but it cannot guarantee another person’s actions or replace practical facts and judgment.",
+      "gotIt": "Got it"
+    },
+    "topics": {
+      "relationship": "Love, contact & reconciliation",
+      "career": "Job or career outcome",
+      "wealth": "Payment or gain",
+      "travel": "Planned journey",
+      "lost": "Missing possession",
+      "property": "Property transaction"
+    },
+    "questions": {
+      "career_job_offer": "Will I receive the specific job offer I am considering?",
+      "career_promotion": "Will I receive the specific promotion I am asking about?",
+      "career_application": "Will my application for this specific position succeed?",
+      "career_employer_change": "Will changing to this specific employer work out?",
+      "wealth_overdue_payment": "Will this specific overdue payment be received?",
+      "wealth_money_owed": "Will the specific money owed to me be recovered?",
+      "wealth_expected_gain": "Will this defined expected financial gain be received?",
+      "relationship_contact": "Will this specific person call or message me?",
+      "relationship_unblock": "Will this specific person unblock me?",
+      "relationship_reconcile": "Will this specific person and I reconcile after our fight?",
+      "relationship_return": "Will this specific person return to our relationship?",
+      "relationship_marriage": "Will this specific person marry me?",
+      "marriage_proposal": "Will this specific marriage proposal proceed?",
+      "marriage_prospective_spouse": "Will marriage with this specific prospective spouse proceed?",
+      "travel_planned_journey": "Will this specific planned journey take place?",
+      "travel_visa_journey": "Will this specific visa-related journey take place?",
+      "lost_recovery": "Will this specific missing possession be recovered?",
+      "lost_find_item": "Will I find the specific item that is currently missing?",
+      "property_purchase": "Will this specific property purchase complete?",
+      "property_sale": "Will this specific property sale complete profitably?"
+    },
+    "outcomes": {
+      "career": {
+        "outcome": "this professional outcome"
+      },
+      "wealth": {
+        "outcome": "receiving this money"
+      },
+      "relationship": {
+        "contact": "renewed contact",
+        "unblock": "contact being reopened",
+        "reconcile": "reconciliation after the conflict",
+        "return": "a return to the relationship"
+      },
+      "marriage": {
+        "marriage": "marriage with this person",
+        "proposal": "this marriage proposal"
+      },
+      "travel": {
+        "outcome": "this planned journey"
+      },
+      "lost": {
+        "outcome": "recovering this missing possession"
+      },
+      "property": {
+        "buy": "this property purchase",
+        "sell": "a profitable property sale"
+      }
+    },
+    "result": {
+      "headings": {
+        "favorable": "The chart supports {{outcome}}",
+        "unfavorable": "The chart shows serious obstacles to {{outcome}}",
+        "mixed": "The chart is mixed about {{outcome}}",
+        "cannot_judge": "The chart does not give a dependable answer about {{outcome}}"
+      },
+      "summaries": {
+        "favorable": "The applicable rules support {{outcome}}, and no decisive obstruction was found in this topic module.",
+        "unfavorable": "The applicable rules show obstruction, and no supporting rule resolved it.",
+        "mixed": "Some applicable rules support {{outcome}} and others obstruct it. The selected text supplies no precedence that resolves this conflict.",
+        "cannot_judge": "None of the implemented rules for this question produces a decisive indication. The system will not manufacture an answer."
+      },
+      "decisions": {
+        "favorable": "You may treat this as traditional support for proceeding, while still checking the real-world facts.",
+        "unfavorable": "Do not treat the hoped-for outcome as secure. Address the practical obstacle or keep another option ready.",
+        "mixed": "Proceed only if the practical facts are acceptable. This chart does not justify a confident yes or no.",
+        "cannot_judge": "Decide from practical evidence or ask a qualified practitioner to examine the preserved chart. Do not recast the same question for a different answer."
+      },
+      "limits": "Use this traditional reading together with the facts of your situation. It cannot guarantee what will happen."
+    },
+    "roles": {
+      "career": {
+        "1": "You",
+        "10": "The job or professional outcome"
+      },
+      "wealth": {
+        "1": "You",
+        "2": "The payment or gain"
+      },
+      "relationship": {
+        "1": "You",
+        "7": "The other person or relationship"
+      },
+      "marriage": {
+        "1": "You",
+        "7": "The prospective spouse or proposal"
+      },
+      "travel": {
+        "1": "You",
+        "9": "The journey",
+        "7": "The destination",
+        "4": "How it concludes",
+        "10": "Its purpose"
+      },
+      "lost": {
+        "1": "You",
+        "2": "Your possession",
+        "4": "The missing item",
+        "7": "Another party"
+      },
+      "property": {
+        "1": "The buyer",
+        "4": "The property",
+        "7": "The seller",
+        "11": "Profit from sale"
+      }
+    },
+    "calculation": {
+      "ayanamsha": "Hayanaratna 1.9 textual precession",
+      "houseSystem": "Hayanaratna quadrant cusps and junctions (Sripati geometry)"
+    },
+    "evidence": {
+      "career": {
+        "support": "The classical rules show a constructive connection between you and the professional outcome.",
+        "obstruction": "A classical condition weakens or obstructs the professional outcome."
+      },
+      "wealth": {
+        "support": "The payment or gain is connected to you or receives help.",
+        "obstruction": "Difficulty or an accompanying problem affects the expected gain."
+      },
+      "relationship": {
+        "support": "The chart shows a connection between you, the other person, and the requested outcome.",
+        "obstruction": "Conflict, pressure, or a missing connection weighs on the relationship."
+      },
+      "marriage": {
+        "support": "The chart connects you with the prospective spouse or proposal.",
+        "obstruction": "The prospective-spouse indicator or proposal is seriously weakened."
+      },
+      "travel": {
+        "support": "The planned journey has a supportive connection and can proceed.",
+        "obstruction": "The journey, destination, or purpose meets obstruction."
+      },
+      "lost": {
+        "support": "The possession remains connected to you and recovery receives support.",
+        "obstruction": "A classical condition works against recovery of the item."
+      },
+      "property": {
+        "support": "The buyer, property, or sale has the strength required by this rule.",
+        "obstruction": "The purchase or profitable sale lacks the strength required by this rule."
+      }
+    },
+    "planets": {
+      "sun": "Sun",
+      "moon": "Moon",
+      "mars": "Mars",
+      "mercury": "Mercury",
+      "jupiter": "Jupiter",
+      "venus": "Venus",
+      "saturn": "Saturn",
+      "rahu": "Rahu",
+      "ketu": "Ketu"
+    }
+  },
+  "es": {
+    "discoveryTitle": "Orientación para Preguntas",
+    "exploreTitle": "Pregunta sobre una Situación",
+    "homeLabel": "Haz una Pregunta",
+    "methodLabel": "Prashna Clásico",
+    "toolBadge": "Prashna · {{count}} cr",
+    "discoveryBody": "Prashna Clásico · ¿Se pondrán en contacto contigo? ¿Funcionará una relación, trabajo, pago o viaje?",
+    "screen": {
+      "noQuestions": "No se encontraron preguntas Prashna compatibles.",
+      "topicsLoadError": "No se pudo cargar la lista de preguntas compatibles.",
+      "invalidResult": "El cálculo devolvió un resultado inválido y se detuvo.",
+      "calculationError": "No se pudo calcular la carta de preguntas.",
+      "authFeature": "Carta de preguntas Prashna",
+      "authMessage": "Inicia sesión para calcular una carta Prashna clásica. Los créditos se cobran solo cuando se crea la carta.",
+      "selectedQuestion": "TU PREGUNTA SELECCIONADA",
+      "fixedMoment": "Fijo el {{date}} a las {{time}} · {{place}}",
+      "selectedLocation": "ubicación seleccionada",
+      "supports": "¿Qué lo apoya",
+      "obstructs": "¿Qué lo obstaculiza",
+      "decisionMeaning": "¿Qué significa esto para tu decisión",
+      "showWorking": "Mostrar el cálculo clásico",
+      "hideWorking": "Ocultar el cálculo clásico",
+      "methodCalculation": "Método y cálculo",
+      "classicalRoles": "Roles clásicos",
+      "houseRole": "Casa {{house}}: {{role}} — {{lord}}",
+      "matchedRules": "Reglas que coincidieron",
+      "askNew": "Preguntar una nueva pregunta",
+      "pageTitle": "Pregunta sobre una situación real",
+      "brandLine": "PRASHNA · UNA PREGUNTA. UN MOMENTO SIGNIFICATIVO.",
+      "lead": "Orientación clásica para una pregunta sincera que se ha vuelto importante ahora. Elige la categoría y la frase que coincide exactamente con lo que preguntas; después, calcula la carta para tu hora y lugar actuales.",
+      "howLink": "Cómo funciona Prashna",
+      "goodUses": "Buenos usos",
+      "goodUsesBody": "Una llamada o mensaje de una persona específica, ser desbloqueado, reconciliación después de una pelea, matrimonio con una persona específica, un trabajo particular, un pago, un viaje, una posesión faltante o una transacción de propiedad.",
+      "notAvailable": "No disponible aquí",
+      "notAvailableBody": "Salud, embarazo, muerte, resultados judiciales, comercio especulativo, lecturas generales de la vida o versiones repetidas de la misma pregunta.",
+      "categoryLabel": "¿De qué se trata la pregunta?",
+      "questionLabel": "¿Qué pregunta estás haciendo?",
+      "questionHint": "Mantén una situación real claramente en mente y elige solo si la oración coincide exactamente con ella.",
+      "castNotice": "Mantén claramente en mente el asunto concreto. La hora de la carta quedará fijada cuando confirmes y la calcules. No vuelvas a calcular la misma pregunta sin cambios.",
+      "placeLabel": "Lugar donde estás preguntando ahora",
+      "placePlaceholder": "Ciudad, Estado, País",
+      "castButton": "Calcular esta carta de la pregunta",
+      "headerEyebrow": "MAPA DE PREGUNTA CLÁSICO",
+      "moreCredits": "Se necesitan más créditos",
+      "creditBody": "Esta carta Prashna cuesta {{cost}} créditos. Actualmente tienes {{credits}}.",
+      "getCredits": "Obtener créditos",
+      "cancel": "Cancelar",
+      "matchedRuleRefs": "Reglas coincidentes: {{rules}}",
+      "close": "Cerrar"
+    },
+    "how": {
+      "eyebrow": "LA IDEA EN PALABRAS SIMPLES",
+      "title": "Cómo funciona Prashna",
+      "intro": "Prashna significa 'pregunta'. El texto clásico dice que cuando una preocupación real se vuelve urgente, una persona es movida por daiva —destino o orden divino— a buscar una respuesta. En el lenguaje cotidiano, la tradición trata tu sincero impulso de preguntar y el momento en que preguntas como conectados.",
+      "step1Title": "Mantén una pregunta sincera",
+      "step1Body": "Elige una situación real que importe ahora. No combines varias preguntas ni pruebes el sistema con la misma pregunta repetidamente.",
+      "step2Title": "El momento de la pregunta se convierte en la carta",
+      "step2Body": "Cuando confirmas y calculas la carta, la aplicación fija ese momento exacto y tu ubicación actual. Prashna interpreta este momento; no utiliza tu carta natal.",
+      "step3Title": "La carta asigna un rol a cada uno",
+      "step3Body": "El signo ascendente y su regente representan a ti. Una casa particular y su regente representan el asunto —por ejemplo, la otra persona en una relación, un trabajo, un pago o un viaje. La Luna ayuda a mostrar si el asunto se conecta y se desarrolla.",
+      "step4Title": "Las reglas clásicas juzgan la conexión",
+      "step4Body": "El cálculo comprueba si los planetas relevantes se juntan, separan, reciben ayuda o encuentran obstrucción. Puede mostrar apoyo, obstáculos serios, testimonio mixto o que la carta no da una respuesta confiable.",
+      "recastTitle": "Por qué la misma pregunta no debe recalcularse",
+      "recastBody": "El primer momento en que haces la pregunta con sinceridad es la carta que se juzga. Volver a calcularla hasta obtener la respuesta deseada rompe el método en vez de mejorarlo.",
+      "limits": "Esta es una lectura tradicional de un momento significativo. Puede guiar la reflexión, pero no puede garantizar las acciones de otra persona ni reemplazar los hechos y el juicio prácticos.",
+      "gotIt": "Entendido"
+    },
+    "topics": {
+      "relationship": "Amor, contacto y reconciliación",
+      "career": "Resultado del trabajo o carrera",
+      "wealth": "Pago o ganancia",
+      "travel": "Viaje planificado",
+      "lost": "Posesión faltante",
+      "property": "Transacción de propiedad"
+    },
+    "questions": {
+      "career_job_offer": "¿Recibiré la oferta de trabajo específica que estoy considerando?",
+      "career_promotion": "¿Recibiré la promoción específica que estoy preguntando?",
+      "career_application": "¿Tendrá éxito mi solicitud para este puesto específico?",
+      "career_employer_change": "¿Funcionará el cambio a este empleador específico?",
+      "wealth_overdue_payment": "¿Se recibirá este pago atrasado específico?",
+      "wealth_money_owed": "¿Se recuperará el dinero específico que se me debe?",
+      "wealth_expected_gain": "¿Se recibirá esta ganancia financiera esperada definida?",
+      "relationship_contact": "¿Esta persona específica me llamará o me enviará un mensaje?",
+      "relationship_unblock": "¿Esta persona específica me desbloqueará?",
+      "relationship_reconcile": "¿Esta persona específica y yo nos reconciliaremos después de nuestra pelea?",
+      "relationship_return": "¿Esta persona específica regresará a nuestra relación?",
+      "relationship_marriage": "¿Esta persona específica se casará conmigo?",
+      "marriage_proposal": "¿Procederá esta propuesta de matrimonio específica?",
+      "marriage_prospective_spouse": "¿Procederá el matrimonio con este cónyuge potencial específico?",
+      "travel_planned_journey": "¿Tendrá lugar este viaje planificado específico?",
+      "travel_visa_journey": "¿Tendrá lugar este viaje relacionado con la visa específico?",
+      "lost_recovery": "¿Se recuperará esta posesión faltante específica?",
+      "lost_find_item": "¿Encontraré el artículo específico que actualmente falta?",
+      "property_purchase": "¿Se completará esta compra de propiedad específica?",
+      "property_sale": "¿Se completará esta venta de propiedad específica de manera rentable?"
+    },
+    "outcomes": {
+      "career": {
+        "outcome": "este resultado profesional"
+      },
+      "wealth": {
+        "outcome": "recibir este dinero"
+      },
+      "relationship": {
+        "contact": "contacto renovado",
+        "unblock": "reapertura del contacto",
+        "reconcile": "reconciliación después del conflicto",
+        "return": "un regreso a la relación"
+      },
+      "marriage": {
+        "marriage": "matrimonio con esta persona",
+        "proposal": "esta propuesta de matrimonio"
+      },
+      "travel": {
+        "outcome": "este viaje planificado"
+      },
+      "lost": {
+        "outcome": "recuperando esta posesión faltante"
+      },
+      "property": {
+        "buy": "esta compra de propiedad",
+        "sell": "una venta rentable de propiedad"
+      }
+    },
+    "result": {
+      "headings": {
+        "favorable": "La carta apoya {{outcome}}",
+        "unfavorable": "La carta muestra serios obstáculos a {{outcome}}",
+        "mixed": "La carta es mixto sobre {{outcome}}",
+        "cannot_judge": "La carta no da una respuesta confiable sobre {{outcome}}"
+      },
+      "summaries": {
+        "favorable": "Las reglas aplicables apoyan {{outcome}} y no se encontró un obstáculo decisivo en este módulo de tema.",
+        "unfavorable": "Las reglas aplicables muestran obstrucción y ninguna regla de apoyo la resolvió.",
+        "mixed": "Algunas reglas aplicables apoyan {{outcome}} y otras lo obstaculizan. El texto seleccionado no proporciona precedencia que resuelva este conflicto.",
+        "cannot_judge": "Ninguna de las reglas implementadas para esta pregunta produce una indicación decisiva. El sistema no fabricará una respuesta."
+      },
+      "decisions": {
+        "favorable": "Puedes tratar esto como un apoyo tradicional para proceder, mientras aún verificas los hechos del mundo real.",
+        "unfavorable": "No trates el resultado esperado como seguro. Aborda el obstáculo práctico o mantén otra opción lista.",
+        "mixed": "Procede solo si los hechos prácticos son aceptables. Esta carta no justifica un sí o un no confiado.",
+        "cannot_judge": "Decide según la evidencia práctica o pide a un practicante calificado que examine la carta preservado. No recalcules la misma pregunta para obtener una respuesta diferente."
+      },
+      "limits": "Utiliza esta lectura tradicional junto con los hechos de tu situación. No puede garantizar lo que sucederá."
+    },
+    "roles": {
+      "career": {
+        "1": "Tú",
+        "10": "El resultado profesional"
+      },
+      "wealth": {
+        "1": "Tú",
+        "2": "El pago o ganancia"
+      },
+      "relationship": {
+        "1": "Tú",
+        "7": "La otra persona o relación"
+      },
+      "marriage": {
+        "1": "Tú",
+        "7": "El cónyuge potencial o propuesta"
+      },
+      "travel": {
+        "1": "Tú",
+        "9": "El viaje",
+        "7": "El destino",
+        "4": "Cómo concluye",
+        "10": "Su propósito"
+      },
+      "lost": {
+        "1": "Tú",
+        "2": "Tu posesión",
+        "4": "El artículo faltante",
+        "7": "Otra parte"
+      },
+      "property": {
+        "1": "El comprador",
+        "4": "La propiedad",
+        "7": "El vendedor",
+        "11": "Beneficio de la venta"
+      }
+    },
+    "calculation": {
+      "ayanamsha": "precesión textual Hayanaratna 1.9",
+      "houseSystem": "Cúspides cuadrantes y uniones según Hayanaratna (geometría Sripati)"
+    },
+    "evidence": {
+      "career": {
+        "support": "Las reglas clásicas muestran una conexión constructiva entre tú y el resultado profesional.",
+        "obstruction": "Una condición clásica debilita u obstaculiza el resultado profesional."
+      },
+      "wealth": {
+        "support": "El pago o la ganancia está conectado contigo o recibe ayuda.",
+        "obstruction": "La dificultad o un problema acompañante afecta la ganancia esperada."
+      },
+      "relationship": {
+        "support": "La carta muestra una conexión entre tú, la otra persona y el resultado solicitado.",
+        "obstruction": "El conflicto, la presión o una conexión faltante pesan sobre la relación."
+      },
+      "marriage": {
+        "support": "La carta conecta a ti con el cónyuge potencial o la propuesta.",
+        "obstruction": "El indicador del cónyuge potencial o la propuesta está seriamente debilitado."
+      },
+      "travel": {
+        "support": "El viaje planificado tiene una conexión de apoyo y puede proceder.",
+        "obstruction": "El viaje, el destino o el propósito se encuentra con una obstrucción."
+      },
+      "lost": {
+        "support": "La posesión permanece conectada contigo y la recuperación recibe apoyo.",
+        "obstruction": "Una condición clásica trabaja en contra de la recuperación del artículo."
+      },
+      "property": {
+        "support": "El comprador, la propiedad o la venta tiene la fuerza requerida por esta regla.",
+        "obstruction": "La compra o la venta rentable carece de la fuerza requerida por esta regla."
+      }
+    },
+    "planets": {
+      "sun": "Sol",
+      "moon": "Luna",
+      "mars": "Marte",
+      "mercury": "Mercurio",
+      "jupiter": "Júpiter",
+      "venus": "Venus",
+      "saturn": "Saturno",
+      "rahu": "Rahu",
+      "ketu": "Ketu"
+    }
+  },
+  "hindi": {
+    "discoveryTitle": "प्रश्न मार्गदर्शन",
+    "exploreTitle": "स्थिति के बारे में पूछें",
+    "homeLabel": "एक प्रश्न पूछें",
+    "methodLabel": "शास्त्रीय प्रश्न",
+    "toolBadge": "प्रश्न · {{count}} cr",
+    "discoveryBody": "शास्त्रीय प्रश्न · क्या वे आपसे संपर्क करेंगे? क्या रिश्ता, नौकरी, भुगतान या यात्रा सफल होगी?",
+    "screen": {
+      "noQuestions": "कोई समर्थित प्रश्न प्रश्न नहीं लौटाए गए।",
+      "topicsLoadError": "समर्थित प्रश्न सूची लोड नहीं हो सकी।",
+      "invalidResult": "गणना से एक अमान्य परिणाम लौटाया गया और रोक दिया गया।",
+      "calculationError": "प्रश्न कुंडली की गणना नहीं की जा सकी।",
+      "authFeature": "प्रश्न कुंडली",
+      "authMessage": "शास्त्रीय प्रश्न कुंडली डालने के लिए साइन इन करें। कुंडली बनने पर ही क्रेडिट लिए जाते हैं।",
+      "selectedQuestion": "आपका चयनित प्रश्न",
+      "fixedMoment": "निश्चित {{date}} को {{time}} · {{place}}",
+      "selectedLocation": "चयनित स्थान",
+      "supports": "क्या इसका समर्थन करता है",
+      "obstructs": "क्या इसमें बाधा डालता है",
+      "decisionMeaning": "यह आपके निर्णय के लिए क्या मायने रखता है",
+      "showWorking": "शास्त्रीय कार्य दिखाएं",
+      "hideWorking": "शास्त्रीय कार्य छिपाएं",
+      "methodCalculation": "विधि और गणना",
+      "classicalRoles": "शास्त्रीय भूमिकाएँ",
+      "houseRole": "घर {{house}}: {{role}} — {{lord}}",
+      "matchedRules": "मिलान किए गए नियम",
+      "askNew": "एक नया प्रश्न पूछें",
+      "pageTitle": "एक वास्तविक स्थिति के बारे में पूछें",
+      "brandLine": "प्रश्न · एक प्रश्न। एक सार्थक क्षण।",
+      "lead": "एक सच्चे प्रश्न के लिए शास्त्रीय मार्गदर्शन जो अब महत्वपूर्ण हो गया है। श्रेणी और उस वाक्य को चुनें जो बिल्कुल वही है जो आप पूछ रहे हैं, फिर अपने वर्तमान समय और स्थान के लिए कुंडली बनाएँ।",
+      "howLink": "प्रश्न कैसे काम करता है",
+      "goodUses": "अच्छे उपयोग",
+      "goodUsesBody": "किसी विशिष्ट व्यक्ति से कॉल या संदेश, अनब्लॉक होना, लड़ाई के बाद सुलह, किसी विशिष्ट व्यक्ति से विवाह, कोई विशेष नौकरी, भुगतान, यात्रा, लापता संपत्ति या संपत्ति लेनदेन।",
+      "notAvailable": "यहाँ उपलब्ध नहीं है",
+      "notAvailableBody": "स्वास्थ्य, गर्भावस्था, मृत्यु, अदालती परिणाम, सट्टेबाजी का व्यापार, व्यापक जीवन पठन या एक ही प्रश्न के बार-बार संस्करण।",
+      "categoryLabel": "प्रश्न किस बारे में है?",
+      "questionLabel": "आप कौन सा प्रश्न पूछ रहे हैं?",
+      "questionHint": "एक वास्तविक स्थिति को स्पष्ट रूप से ध्यान में रखें और केवल तभी चुनें जब वाक्य बिल्कुल मेल खाता हो।",
+      "castNotice": "विशिष्ट विषय को स्पष्ट रूप से मन में रखें। पुष्टि करके कुंडली बनाते ही उसका समय तय हो जाएगा। बिना बदलाव के उसी प्रश्न की कुंडली दोबारा न बनाएँ।",
+      "placeLabel": "आप अभी कहाँ से पूछ रहे हैं",
+      "placePlaceholder": "शहर, राज्य, देश",
+      "castButton": "इस प्रश्न की कुंडली बनाएँ",
+      "headerEyebrow": "शास्त्रीय प्रश्न कुंडली",
+      "moreCredits": "अधिक क्रेडिट की आवश्यकता है",
+      "creditBody": "इस प्रश्न कुंडली के लिए {{cost}} क्रेडिट की आवश्यकता है। आपके पास वर्तमान में {{credits}} हैं।",
+      "getCredits": "क्रेडिट प्राप्त करें",
+      "cancel": "रद्द करें",
+      "matchedRuleRefs": "मिलान किए गए नियम: {{rules}}",
+      "close": "बंद करें"
+    },
+    "how": {
+      "eyebrow": "सरल शब्दों में विचार",
+      "title": "प्रश्न कैसे काम करता है",
+      "intro": "प्रश्न का अर्थ है 'प्रश्न'। शास्त्रीय पाठ कहता है कि जब कोई वास्तविक चिंता जरूरी हो जाती है, तो एक व्यक्ति को दाiva—भाग्य या दैवीय आदेश—से उत्तर पाने के लिए प्रेरित किया जाता है। रोजमर्रा की भाषा में, परंपरा आपकी ईमानदार आग्रह से पूछने और पूछने के क्षण को जोड़ती है।",
+      "step1Title": "एक सच्चे प्रश्न को पकड़ो",
+      "step1Body": "उस वास्तविक स्थिति को चुनें जो अभी मायने रखती है। कई प्रश्न न मिलाएं या सिस्टम को एक ही प्रश्न के साथ बार-बार परीक्षण न करें।",
+      "step2Title": "पूछने का क्षण कुंडली बन जाता है",
+      "step2Body": "जब आप पुष्टि करते हैं और कुंडली बनाते हैं, तो ऐप उस सटीक समय और आपके वर्तमान स्थान को तय करता है। प्रश्न इस क्षण को पढ़ता है; यह आपके जन्म कुंडली का उपयोग नहीं करता है।",
+      "step3Title": "कुंडली हर किसी के लिए एक भूमिका देता है",
+      "step3Body": "उदय का चिन्ह और इसका स्वामी आपको दर्शाता है। एक विशेष घर और इसका स्वामी मामले का प्रतिनिधित्व करता है - उदाहरण के लिए, रिश्ते में दूसरा व्यक्ति, नौकरी, भुगतान या यात्रा। चंद्रमा यह दिखाने में मदद करता है कि मामला कैसे जुड़ता है और विकसित होता है।",
+      "step4Title": "शास्त्रीय नियम कनेक्शन का न्याय करते हैं",
+      "step4Body": "गणना जाँच करती है कि क्या प्रासंगिक ग्रह एक साथ आते हैं, अलग हो जाते हैं, मदद प्राप्त करते हैं या बाधाओं का सामना करते हैं। यह समर्थन, गंभीर बाधाओं, मिश्रित गवाही दिखा सकता है या यह कि कुंडली एक विश्वसनीय उत्तर नहीं देता है।",
+      "recastTitle": "एक ही प्रश्न की कुंडली दोबारा क्यों नहीं बनानी चाहिए",
+      "recastBody": "पहली बार ईमानदारी से पूछे गए क्षण की कुंडली का ही निर्णय किया जाता है। मनचाहा उत्तर मिलने तक दोबारा कुंडली बनाना विधि को बेहतर नहीं, बल्कि कमजोर करता है।",
+      "limits": "यह एक सार्थक क्षण की पारंपरिक पठन है। यह प्रतिबिंब को निर्देशित कर सकता है, लेकिन यह किसी अन्य व्यक्ति के कार्यों की गारंटी नहीं दे सकता है या व्यावहारिक तथ्यों और निर्णय को प्रतिस्थापित नहीं कर सकता है।",
+      "gotIt": "समझ गया"
+    },
+    "topics": {
+      "relationship": "प्यार, संपर्क और सुलह",
+      "career": "नौकरी या करियर का परिणाम",
+      "wealth": "भुगतान या लाभ",
+      "travel": "योजनाबद्ध यात्रा",
+      "lost": "लापता संपत्ति",
+      "property": "संपत्ति लेनदेन"
+    },
+    "questions": {
+      "career_job_offer": "क्या मुझे वह विशिष्ट नौकरी का प्रस्ताव मिलेगा जिस पर मैं विचार कर रहा हूं?",
+      "career_promotion": "क्या मुझे वह विशिष्ट पदोन्नति मिलेगी जिसके बारे में मैं पूछ रहा हूं?",
+      "career_application": "क्या इस विशिष्ट पद के लिए मेरी आवेदन सफल होगी?",
+      "career_employer_change": "क्या इस विशिष्ट नियोक्ता में बदलना काम करेगा?",
+      "wealth_overdue_payment": "क्या यह विशिष्ट बकाया भुगतान प्राप्त होगा?",
+      "wealth_money_owed": "क्या मेरे बकाया विशिष्ट धन की वसूली होगी?",
+      "wealth_expected_gain": "क्या यह परिभाषित अपेक्षित वित्तीय लाभ प्राप्त होगा?",
+      "relationship_contact": "क्या यह विशिष्ट व्यक्ति मुझसे संपर्क करेगा?",
+      "relationship_unblock": "क्या यह विशिष्ट व्यक्ति मुझे अनब्लॉक करेगा?",
+      "relationship_reconcile": "क्या यह विशिष्ट व्यक्ति और मैं हमारी लड़ाई के बाद सुलह करेंगे?",
+      "relationship_return": "क्या यह विशिष्ट व्यक्ति हमारे रिश्ते में वापस आएगा?",
+      "relationship_marriage": "क्या यह विशिष्ट व्यक्ति मुझसे शादी करेगा?",
+      "marriage_proposal": "क्या यह विशिष्ट विवाह प्रस्ताव आगे बढ़ेगा?",
+      "marriage_prospective_spouse": "क्या इस विशिष्ट संभावित जीवनसाथी के साथ विवाह आगे बढ़ेगा?",
+      "travel_planned_journey": "क्या यह विशिष्ट योजनाबद्ध यात्रा होगी?",
+      "travel_visa_journey": "क्या यह विशिष्ट वीजा-संबंधित यात्रा होगी?",
+      "lost_recovery": "क्या यह विशिष्ट लापता संपत्ति की वसूली होगी?",
+      "lost_find_item": "क्या मुझे वह विशिष्ट वस्तु मिलेगी जो वर्तमान में लापता है?",
+      "property_purchase": "क्या यह विशिष्ट संपत्ति खरीद पूरी होगी?",
+      "property_sale": "क्या यह विशिष्ट संपत्ति बिक्री लाभदायक होगी?"
+    },
+    "outcomes": {
+      "career": {
+        "outcome": "यह पेशेवर परिणाम"
+      },
+      "wealth": {
+        "outcome": "यह पैसा प्राप्त करना"
+      },
+      "relationship": {
+        "contact": "नया संपर्क",
+        "unblock": "संपर्क फिर से खुलना",
+        "reconcile": "संघर्ष के बाद सुलह",
+        "return": "रिश्ते में वापसी"
+      },
+      "marriage": {
+        "marriage": "इस व्यक्ति से विवाह",
+        "proposal": "यह विवाह प्रस्ताव"
+      },
+      "travel": {
+        "outcome": "यह योजनाबद्ध यात्रा"
+      },
+      "lost": {
+        "outcome": "लापता संपत्ति की वसूली"
+      },
+      "property": {
+        "buy": "यह संपत्ति खरीद",
+        "sell": "एक लाभदायक संपत्ति बिक्री"
+      }
+    },
+    "result": {
+      "headings": {
+        "favorable": "कुंडली {{outcome}} का समर्थन करती है",
+        "unfavorable": "कुंडली {{outcome}} के लिए गंभीर बाधाएँ दर्शाती है",
+        "mixed": "कुंडली {{outcome}} के बारे में मिश्रित है",
+        "cannot_judge": "कुंडली {{outcome}} के बारे में विश्वसनीय उत्तर नहीं देती है"
+      },
+      "summaries": {
+        "favorable": "लागू नियम {{outcome}} का समर्थन करते हैं, और इस विषय मॉड्यूल में कोई निर्णायक बाधा नहीं मिली।",
+        "unfavorable": "लागू नियम बाधाओं को दर्शाते हैं, और इस संघर्ष को हल करने वाला कोई सहायक नियम नहीं था।",
+        "mixed": "कुछ लागू नियम {{outcome}} का समर्थन करते हैं और अन्य में बाधा डालते हैं। चयनित पाठ इस संघर्ष को हल करने के लिए कोई प्राथमिकता प्रदान नहीं करता है।",
+        "cannot_judge": "इस प्रश्न के लिए लागू किए गए नियमों में से कोई भी निर्णायक संकेत नहीं देता है। सिस्टम एक उत्तर तैयार नहीं करेगा।"
+      },
+      "decisions": {
+        "favorable": "आप इसे आगे बढ़ने के लिए पारंपरिक समर्थन के रूप में मान सकते हैं, जबकि अभी भी वास्तविक दुनिया के तथ्यों की जांच कर रहे हैं।",
+        "unfavorable": "उम्मीद किए गए परिणाम को सुरक्षित न मानें। व्यावहारिक बाधा को संबोधित करें या एक और विकल्प तैयार रखें।",
+        "mixed": "केवल तभी आगे बढ़ें जब व्यावहारिक तथ्य स्वीकार्य हों। यह कुंडली एक निश्चित हाँ या नहीं को उचित नहीं ठहराता है।",
+        "cannot_judge": "व्यावहारिक साक्ष्य से निर्णय लें या संरक्षित कुंडली की जांच करने के लिए एक योग्य व्यवसायी से संपर्क करें। एक अलग उत्तर के लिए एक ही प्रश्न को फिर से न डालें।"
+      },
+      "limits": "अपनी स्थिति के तथ्यों के साथ इस पारंपरिक पठन का उपयोग करें। यह क्या होगा इसकी गारंटी नहीं दे सकता है।"
+    },
+    "roles": {
+      "career": {
+        "1": "तुम",
+        "10": "नौकरी या पेशेवर परिणाम"
+      },
+      "wealth": {
+        "1": "तुम",
+        "2": "भुगतान या लाभ"
+      },
+      "relationship": {
+        "1": "तुम",
+        "7": "दूसरा व्यक्ति या रिश्ता"
+      },
+      "marriage": {
+        "1": "तुम",
+        "7": "संभावित जीवनसाथी या प्रस्ताव"
+      },
+      "travel": {
+        "1": "तुम",
+        "9": "यात्रा",
+        "7": "गंतव्य",
+        "4": "यह कैसे समाप्त होता है",
+        "10": "इसका उद्देश्य"
+      },
+      "lost": {
+        "1": "तुम",
+        "2": "आपकी संपत्ति",
+        "4": "गायब वस्तु",
+        "7": "अन्य पार्टी"
+      },
+      "property": {
+        "1": "खरीदार",
+        "4": "संपत्ति",
+        "7": "विक्रेता",
+        "11": "बिक्री से लाभ"
+      }
+    },
+    "calculation": {
+      "ayanamsha": "Hayanaratna 1.9 पाठाधारित अयनचलन",
+      "houseSystem": "Hayanaratna चतुर्थांश भाव-मध्य और संधियाँ (Sripati ज्यामिति)"
+    },
+    "evidence": {
+      "career": {
+        "support": "शास्त्रीय नियम आपके और पेशेवर परिणाम के बीच एक रचनात्मक संबंध दिखाते हैं।",
+        "obstruction": "एक शास्त्रीय स्थिति पेशेवर परिणाम को कमजोर या बाधित करती है।"
+      },
+      "wealth": {
+        "support": "भुगतान या लाभ आपके से जुड़ा है या मदद प्राप्त करता है।",
+        "obstruction": "अपेक्षित लाभ को प्रभावित करने वाली कठिनाई या एक साथ समस्या है।"
+      },
+      "relationship": {
+        "support": "कुंडली आपको, दूसरे व्यक्ति और अनुरोधित परिणाम के बीच एक कनेक्शन दिखाता है।",
+        "obstruction": "संघर्ष, दबाव या एक लापता कनेक्शन रिश्ते पर भार डालता है।"
+      },
+      "marriage": {
+        "support": "कुंडली आपको संभावित जीवनसाथी या प्रस्ताव से जोड़ता है।",
+        "obstruction": "संभावित-जीवनसाथी संकेतक या प्रस्ताव गंभीर रूप से कमजोर है।"
+      },
+      "travel": {
+        "support": "योजनाबद्ध यात्रा में एक सहायक कनेक्शन है और यह आगे बढ़ सकती है।",
+        "obstruction": "यात्रा, गंतव्य या उद्देश्य में बाधा आती है।"
+      },
+      "lost": {
+        "support": "संपत्ति आपके से जुड़ी रहती है और वसूली को समर्थन मिलता है।",
+        "obstruction": "एक शास्त्रीय स्थिति वस्तु की वसूली के खिलाफ काम करती है।"
+      },
+      "property": {
+        "support": "खरीदार, संपत्ति या बिक्री के लिए आवश्यक शक्ति है।",
+        "obstruction": "खरीद या लाभदायक बिक्री के लिए आवश्यक शक्ति का अभाव है।"
+      }
+    },
+    "planets": {
+      "sun": "सूर्य",
+      "moon": "चंद्र",
+      "mars": "मंगल",
+      "mercury": "बुध",
+      "jupiter": "बृहस्पति",
+      "venus": "शुक्र",
+      "saturn": "शनि",
+      "rahu": "राहु",
+      "ketu": "केतु"
+    }
+  },
+  "tamil": {
+    "discoveryTitle": "கேள்விக்கு வழிகாட்டுதல்",
+    "exploreTitle": "ஒரு சூழ்நிலையைப் பற்றி கேளுங்கள்",
+    "homeLabel": "ஒரு கேள்வி கேளுங்கள்",
+    "methodLabel": "பாரம்பரிய பிரஷ்ணா",
+    "toolBadge": "பிரஷ்ணா · {{count}} cr",
+    "discoveryBody": "பாரம்பரிய பிரஷ்ணா · அவர்கள் உங்களைத் தொடர்புகொள்வார்களா? உறவு, வேலை, பணம் அல்லது பயணம் நன்றாக இருக்குமா?",
+    "screen": {
+      "noQuestions": "ஆதரவு பிரஷ்ணா கேள்விகள் எதுவும் திரும்பவில்லை.",
+      "topicsLoadError": "ஆதரவு கேள்வி பட்டியல் ஏற்ற முடியவில்லை.",
+      "invalidResult": "கணக்கீடு தவறான முடிவை திருப்பி, நிறுத்தப்பட்டது.",
+      "calculationError": "பிரசன்ன ஜாதகம் கணக்கிட முடியவில்லை.",
+      "authFeature": "பிரஷ்ணா பிரசன்ன ஜாதகம்",
+      "authMessage": "ஒரு பாரம்பரிய பிரஷ்ணா கேள்வி பிரசன்ன ஜாதகத்தைக் கணிக்க உள்நுழையவும். பிரசன்ன ஜாதகம் உருவாக்கப்பட்டவுடன் மட்டுமே கிரெடிட்கள் வசூலிக்கப்படும்.",
+      "selectedQuestion": "நீங்கள் தேர்ந்தெடுத்த கேள்வி",
+      "fixedMoment": "நிலையான {{date}} அன்று {{time}} · {{place}}",
+      "selectedLocation": "தேர்ந்தெடுக்கப்பட்ட இடம்",
+      "supports": "எதை ஆதரிக்கிறது",
+      "obstructs": "என்ன தடுக்கிறது",
+      "decisionMeaning": "உங்கள் முடிவுக்கு இது என்ன அர்த்தம்",
+      "showWorking": "பாரம்பரிய வேலைகளைக் காட்டு",
+      "hideWorking": "பாரம்பரிய வேலைகளை மறை",
+      "methodCalculation": "முறை மற்றும் கணக்கீடு",
+      "classicalRoles": "பாரம்பரிய பாத்திரங்கள்",
+      "houseRole": "வீடு {{house}}: {{role}} — {{lord}}",
+      "matchedRules": "பொருந்திய விதிகள்",
+      "askNew": "புதிய கேள்வி கேளுங்கள்",
+      "pageTitle": "ஒரு உண்மையான சூழ்நிலையைப் பற்றி கேளுங்கள்",
+      "brandLine": "பிரஷ்ணா · ஒரு கேள்வி. ஒரு அர்த்தமுள்ள தருணம்.",
+      "lead": "இப்போது முக்கியமானதாக மாறிய ஒரு நேர்மையான கேள்விக்கான பாரம்பரிய வழிகாட்டுதல். வகையைத் தேர்ந்தெடுத்து, நீங்கள் கேட்கும் விஷயத்துடன் சரியாகப் பொருந்தக்கூடிய ஒரு வாக்கியத்தைத் தேர்ந்தெடுத்து, உங்கள் தற்போதைய நேரம் மற்றும் இடத்திற்கு பிரசன்ன ஜாதகத்தைக் கணிக்கவும்.",
+      "howLink": "பிரஷ்ணா எப்படி வேலை செய்கிறது",
+      "goodUses": "நல்ல பயன்பாடுகள்",
+      "goodUsesBody": "ஒரு குறிப்பிட்ட நபரிடமிருந்து அழைப்பு அல்லது செய்தி, தடுக்கப்படுதல், சண்டைக்குப் பிறகு சமாதானம், ஒரு குறிப்பிட்ட நபருடன் திருமணம், ஒரு குறிப்பிட்ட வேலை, பணம், பயணம், காணாமல் போன உடைமைகள் அல்லது சொத்து பரிவர்த்தனை.",
+      "notAvailable": "இங்கே கிடைக்கவில்லை",
+      "notAvailableBody": "சுகாதாரம், கர்ப்பம், மரணம், நீதிமன்ற முடிவுகள், ஊக வணிகம், பரந்த வாழ்க்கை வாசிப்புகள் அல்லது அதே கேள்வியின் மீண்டும் மீண்டும் வரும் பதிப்புகள்.",
+      "categoryLabel": "கேள்வி எதைப் பற்றியது?",
+      "questionLabel": "நீங்கள் என்ன கேள்வியைக் கேட்கிறீர்கள்?",
+      "questionHint": "ஒரு உண்மையான சூழ்நிலையை மனதில் வைத்து, வாக்கியம் சரியாகப் பொருந்தினால் மட்டுமே தேர்ந்தெடுக்கவும்.",
+      "castNotice": "குறிப்பிட்ட விஷயத்தைத் தெளிவாக மனதில் வைத்திருங்கள். உறுதிசெய்து ஜாதகத்தைக் கணிக்கும் போது அதன் நேரம் நிர்ணயிக்கப்படும். மாறாத அதே கேள்வியை மீண்டும் கணிக்க வேண்டாம்.",
+      "placeLabel": "நீங்கள் இப்போது கேட்கும் இடம்",
+      "placePlaceholder": "நகரம், மாநிலம், நாடு",
+      "castButton": "இந்தப் பிரசன்ன ஜாதகத்தைக் கணிக்கவும்",
+      "headerEyebrow": "பாரம்பரிய பிரசன்ன ஜாதகம்",
+      "moreCredits": "மேலும் கிரெடிட்கள் தேவை",
+      "creditBody": "இந்த பிரஷ்ணா பிரசன்ன ஜாதகம் {{cost}} கிரெடிட்கள் செலவாகும். உங்களிடம் தற்போது {{credits}} உள்ளது.",
+      "getCredits": "கிரெடிட்கள் பெறு",
+      "cancel": "ரத்து செய்",
+      "matchedRuleRefs": "பொருந்திய விதிகள்: {{rules}}",
+      "close": "மூடு"
+    },
+    "how": {
+      "eyebrow": "எளிமையான வார்த்தைகளில் யோசனை",
+      "title": "பிரஷ்ணா எப்படி வேலை செய்கிறது",
+      "intro": "பிரஷ்ணா என்றால் ‘கேள்வி’. ஒரு உண்மையான கவலை அவசரமானதாக மாறும் போது, ஒரு நபர் விதியின் மூலம் ஒரு பதிலைத் தேட தூண்டப்படுகிறார் என்று பாரம்பரிய உரை கூறுகிறது. அன்றாட மொழியில், பாரம்பரியம் உங்கள் உண்மையான உந்துதலைக் கேட்டு, நீங்கள் கேட்கும் தருணத்தை இணைக்கிறது.",
+      "step1Title": "ஒரு நேர்மையான கேள்வியைப் பிடித்துக் கொள்ளுங்கள்",
+      "step1Body": "இப்போது முக்கியமான ஒரு உண்மையான சூழ்நிலையைத் தேர்ந்தெடுக்கவும். பல கேள்விகளை இணைக்கவோ அல்லது அதே கேள்வியைக் கொண்டு மீண்டும் மீண்டும் சோதிக்கவோ வேண்டாம்.",
+      "step2Title": "கேள்வி கேட்கும் தருணம் பிரசன்ன ஜாதகம்",
+      "step2Body": "நீங்கள் உறுதிசெய்து பிரசன்ன ஜாதகத்தைக் கணிக்கும்போது, ​​அந்த சரியான நேரம் மற்றும் உங்கள் தற்போதைய இடம் பயன்பாட்டால் சரி செய்யப்படுகிறது. பிரஷ்ணா இந்த தருணத்தைப் படிக்கிறது; இது உங்கள் பிறப்பு விளக்கப்படத்தைப் பயன்படுத்துவதில்லை.",
+      "step3Title": "பிரசன்ன ஜாதகம் அனைவருக்கும் ஒரு பங்கைக் கொடுக்கிறது",
+      "step3Body": "உயரும் அடையாளம் மற்றும் அதன் ஆட்சியாளர் உங்களை பிரதிபலிக்கிறது. ஒரு குறிப்பிட்ட வீடு மற்றும் அதன் ஆட்சியாளர் பொருள் பிரதிபலிக்கிறது - உதாரணமாக, உறவில் உள்ள மற்றொரு நபர், ஒரு வேலை, ஒரு பணம் அல்லது ஒரு பயணம். சந்திரன் பொருள் இணைக்கப்பட்டுள்ளதா மற்றும் வளர்ச்சியடைகிறதா என்பதைக் காட்ட உதவுகிறது.",
+      "step4Title": "பாரம்பரிய விதிகள் இணைப்பை மதிப்பிடுகின்றன",
+      "step4Body": "கணக்கீடு பொருத்தமான கிரகங்கள் ஒன்றிணைந்து, பிரிக்கப்பட்டு, உதவி பெறுகிறதா அல்லது தடைகளைச் சந்திக்கிறதா என்பதைச் சரிபார்க்கிறது. இது ஆதரவு, தீவிர தடைகள், கலவையான சான்றுகள் அல்லது பிரசன்ன ஜாதகம் நம்பகமான பதிலைக் கொடுக்கவில்லை என்பதைக் காட்டலாம்.",
+      "recastTitle": "ஏன் அதே கேள்வியை மீண்டும் கணிக்கக்கூடாது",
+      "recastBody": "முதல் நேர்மையான கேள்வி கேட்கும் தருணம் பிரசன்ன ஜாதகமாக மதிப்பிடப்படுகிறது. விரும்பிய பதில் கிடைக்கும் வரை மீண்டும் கணிக்குவது முறையை மேம்படுத்துவதற்குப் பதிலாக உடைக்கிறது.",
+      "limits": "இது ஒரு அர்த்தமுள்ள தருணத்தின் பாரம்பரிய வாசிப்பு. இது பிரதிபலிப்பை வழிநடத்தக்கூடும், ஆனால் அது மற்றொரு நபரின் செயல்களை உத்தரவாதம் செய்யவோ அல்லது நடைமுறை உண்மைகள் மற்றும் தீர்ப்பை மாற்றவோ முடியாது.",
+      "gotIt": "புரிந்தது"
+    },
+    "topics": {
+      "relationship": "காதல், தொடர்பு & சமாதானம்",
+      "career": "வேலை அல்லது தொழில் முடிவு",
+      "wealth": "பணம் அல்லது ஆதாயம்",
+      "travel": "திட்டமிடப்பட்ட பயணம்",
+      "lost": "காணாமல் போன உடைமை",
+      "property": "சொத்து பரிவர்த்தனை"
+    },
+    "questions": {
+      "career_job_offer": "நான் கருத்தில் கொண்டுள்ள குறிப்பிட்ட வேலை வாய்ப்பைப் பெறுவேனா?",
+      "career_promotion": "நான் கேட்கும் குறிப்பிட்ட பதவி உயர்வைப் பெறுவேனா?",
+      "career_application": "இந்த குறிப்பிட்ட பதவிக்கு எனது விண்ணப்பம் வெற்றி பெறுமா?",
+      "career_employer_change": "இந்த குறிப்பிட்ட முதலாளியுக்கு மாறுவது நன்றாக இருக்குமா?",
+      "wealth_overdue_payment": "இந்த குறிப்பிட்ட நிலுவைத் தொகை பெறப்படுமா?",
+      "wealth_money_owed": "எனக்கு கடன்பட்ட குறிப்பிட்ட பணம் திரும்பப் பெறுமா?",
+      "wealth_expected_gain": "இந்த வரையறுக்கப்பட்ட நிதி ஆதாயம் பெறப்படுமா?",
+      "relationship_contact": "இந்த குறிப்பிட்ட நபர் என்னை அழைப்பாரா அல்லது எனக்கு செய்தி அனுப்புவாரா?",
+      "relationship_unblock": "இந்த குறிப்பிட்ட நபர் என்னைத் தடுப்பாரா?",
+      "relationship_reconcile": "எங்கள் சண்டைக்குப் பிறகு இந்த நபரும் நானும் மீண்டும் சமாதானமாவோமா?",
+      "relationship_return": "இந்த குறிப்பிட்ட நபர் எங்கள் உறவுக்குத் திரும்புவாரா?",
+      "relationship_marriage": "இந்த குறிப்பிட்ட நபர் என்னை திருமணம் செய்வாரா?",
+      "marriage_proposal": "இந்த குறிப்பிட்ட திருமண முன்மொழிவு தொடருமா?",
+      "marriage_prospective_spouse": "இந்த குறிப்பிட்ட எதிர்கால வாழ்க்கைத் துணைவருடன் திருமணம் தொடருமா?",
+      "travel_planned_journey": "இந்த குறிப்பிட்ட திட்டமிடப்பட்ட பயணம் நடக்குமா?",
+      "travel_visa_journey": "இந்த குறிப்பிட்ட விசா தொடர்பான பயணம் நடக்குமா?",
+      "lost_recovery": "இந்த குறிப்பிட்ட காணாமல் போன உடைமை திரும்பப் பெறுமா?",
+      "lost_find_item": "நான் தற்போது காணாமல் போன குறிப்பிட்ட பொருளைக் கண்டுபிடிப்பேனா?",
+      "property_purchase": "இந்த குறிப்பிட்ட சொத்து வாங்குதல் நிறைவு பெறுமா?",
+      "property_sale": "இந்த குறிப்பிட்ட சொத்து விற்பனை லாபகரமாக இருக்குமா?"
+    },
+    "outcomes": {
+      "career": {
+        "outcome": "இந்த தொழில்முறை முடிவு"
+      },
+      "wealth": {
+        "outcome": "இந்த பணத்தைப் பெறுதல்"
+      },
+      "relationship": {
+        "contact": "மீண்டும் தொடர்பு",
+        "unblock": "தடை மீண்டும் திறக்கப்படுதல்",
+        "reconcile": "சண்டைக்குப் பிறகு சமாதானம்",
+        "return": "உறவு திரும்புகிறது"
+      },
+      "marriage": {
+        "marriage": "இந்த நபருடன் திருமணம்",
+        "proposal": "இந்த திருமண முன்மொழிவு"
+      },
+      "travel": {
+        "outcome": "இந்த திட்டமிடப்பட்ட பயணம்"
+      },
+      "lost": {
+        "outcome": "காணாமல் போன உடைமையை திரும்பப் பெறுதல்"
+      },
+      "property": {
+        "buy": "இந்த சொத்து வாங்குதல்",
+        "sell": "லாபகரமான சொத்து விற்பனை"
+      }
+    },
+    "result": {
+      "headings": {
+        "favorable": "பிரசன்ன ஜாதகம் {{outcome}} ஆதரிக்கிறது",
+        "unfavorable": "பிரசன்ன ஜாதகம் {{outcome}} க்கு தீவிர தடைகளைக் காட்டுகிறது",
+        "mixed": "பிரசன்ன ஜாதகம் {{outcome}} பற்றி கலந்ததாக உள்ளது",
+        "cannot_judge": "பிரசன்ன ஜாதகம் {{outcome}} பற்றி நம்பகமான பதில் அளிக்கவில்லை"
+      },
+      "summaries": {
+        "favorable": "பொருந்தக்கூடிய விதிகள் {{outcome}} ஆதரிக்கின்றன, மேலும் இந்த தலைப்பு தொகுதியில் எந்த உறுதியான தடையும் காணப்படவில்லை.",
+        "unfavorable": "பொருந்தக்கூடிய விதிகள் தடைகளைக் காட்டுகின்றன, மேலும் அதைத் தீர்க்க எந்த ஆதரவு விதியும் இல்லை.",
+        "mixed": "சில பொருந்தக்கூடிய விதிகள் {{outcome}} ஆதரிக்கின்றன, மற்றவை அதைத் தடுக்கின்றன. இந்தத் தேர்ந்தெடுக்கப்பட்ட உரை இந்த முரண்பாட்டைத் தீர்க்க எந்த முன்னுரிமையும் வழங்கவில்லை.",
+        "cannot_judge": "இந்த அமைப்பு ஒரு பதில் உருவாக்காது. நடைமுறை ஆதாரங்களின்படி தீர்மானிக்கவும் அல்லது பாதுகாக்கப்பட்ட விளக்கப்படத்தை ஆய்வு செய்ய தகுதிவாய்ந்த பயிற்சியாளரை அணுகவும். அதே கேள்வியை வேறு பதில் பெற மீண்டும் கணிக்க வேண்டாம்."
+      },
+      "decisions": {
+        "favorable": "இதை முன்னேறுவதற்கான பாரம்பரிய ஆதரவாகக் கருதுங்கள், அதே நேரத்தில் உண்மையான உலக உண்மைகளையும் சரிபார்க்கவும்.",
+        "unfavorable": "நம்பிக்கையான முடிவை உறுதிப்படுத்த வேண்டாம். நடைமுறைத் தடையை நிவர்த்தி செய்யுங்கள் அல்லது மற்றொரு விருப்பத்தைத் தயாராக வைத்திருங்கள்.",
+        "mixed": "நடைமுறை உண்மைகள் ஏற்றுக்கொள்ளத்தக்கதாக இருந்தால் மட்டுமே தொடரவும். இந்த பிரசன்ன ஜாதகம் உறுதியான ஆம் அல்லது இல்லை என்று உத்தரவாதம் அளிக்காது.",
+        "cannot_judge": "நடைமுறை சான்றுகள் அல்லது பாதுகாக்கப்பட்ட விளக்கப்படத்தை ஆய்வு செய்ய தகுதிவாய்ந்த பயிற்சியாளரை அணுகி முடிவு செய்யுங்கள். வேறு பதில் பெற அதே கேள்வியை மீண்டும் கணிக்க வேண்டாம்."
+      },
+      "limits": "உங்கள் சூழ்நிலையின் உண்மைகளுடன் இந்த பாரம்பரிய வாசிப்பைப் பயன்படுத்தவும். இது என்ன நடக்கும் என்பதை உத்தரவாதம் செய்ய முடியாது."
+    },
+    "roles": {
+      "career": {
+        "1": "நீங்கள்",
+        "10": "வேலை அல்லது தொழில்முறை முடிவு"
+      },
+      "wealth": {
+        "1": "நீங்கள்",
+        "2": "பணம் அல்லது ஆதாயம்"
+      },
+      "relationship": {
+        "1": "நீங்கள்",
+        "7": "மற்ற நபர் அல்லது உறவு"
+      },
+      "marriage": {
+        "1": "நீங்கள்",
+        "7": "எதிர்கால வாழ்க்கைத் துணை அல்லது முன்மொழிவு"
+      },
+      "travel": {
+        "1": "நீங்கள்",
+        "9": "பயணம்",
+        "7": "சேருமிடம்",
+        "4": "எப்படி முடிவடைகிறது",
+        "10": "அதன் நோக்கம்"
+      },
+      "lost": {
+        "1": "நீங்கள்",
+        "2": "உங்கள் உடைமை",
+        "4": "காணாமல் போன பொருள்",
+        "7": "மற்றொரு கட்சி"
+      },
+      "property": {
+        "1": "வாங்குபவர்",
+        "4": "சொத்து",
+        "7": "விற்பனையாளர்",
+        "11": "விற்பனையில் லாபம்"
+      }
+    },
+    "calculation": {
+      "ayanamsha": "Hayanaratna 1.9 உரைசார் அயனச்சலனம்",
+      "houseSystem": "Hayanaratna நாற்பகுதி பாவ முனைகளும் சந்திகளும் (Sripati வடிவியல்)"
+    },
+    "evidence": {
+      "career": {
+        "support": "பாரம்பரிய விதிகள் உங்களுக்கும் தொழில்முறை முடிவுக்கும் இடையிலான ஒரு ஆக்கபூர்வமான தொடர்பைக் காட்டுகின்றன.",
+        "obstruction": "ஒரு பாரம்பரிய நிலைமை தொழில்முறை முடிவை பலவீனப்படுத்துகிறது அல்லது தடுக்கிறது."
+      },
+      "wealth": {
+        "support": "பணம் அல்லது ஆதாயம் உங்களுடன் இணைக்கப்பட்டுள்ளது அல்லது உதவி பெறுகிறது.",
+        "obstruction": "ஒரு சிக்கல் அல்லது ஒரு உடன் வரும் பிரச்சனை எதிர்பார்க்கப்படும் ஆதாயத்தை பாதிக்கிறது."
+      },
+      "relationship": {
+        "support": "பிரசன்ன ஜாதகம் உங்களுக்கும், மற்ற நபருக்கும், கோரப்பட்ட முடிவுக்கும் இடையே ஒரு தொடர்பைக் காட்டுகிறது.",
+        "obstruction": "முரண்பாடு, அழுத்தம் அல்லது ஒரு காணாமல் போன இணைப்பு உறவை பாதிக்கிறது."
+      },
+      "marriage": {
+        "support": "பிரசன்ன ஜாதகம் உங்களையும், எதிர்கால வாழ்க்கைத் துணை அல்லது முன்மொழிவையும் இணைக்கிறது.",
+        "obstruction": "எதிர்கால வாழ்க்கைத் துணை சுட்டிக்காட்டி அல்லது முன்மொழிவு தீவிரமாக பலவீனமடைகிறது."
+      },
+      "travel": {
+        "support": "திட்டமிடப்பட்ட பயணம் ஒரு ஆதரவான தொடர்பைக் கொண்டுள்ளது மற்றும் தொடர முடியும்.",
+        "obstruction": "பயணம், சேருமிடம் அல்லது நோக்கம் தடைகளைச் சந்திக்கிறது."
+      },
+      "lost": {
+        "support": "உடைமை உங்களுடன் இணைக்கப்பட்டுள்ளது மற்றும் மீட்பதற்கு ஆதரவு உள்ளது.",
+        "obstruction": "ஒரு பாரம்பரிய நிலைமை மீட்புக்கு எதிராக செயல்படுகிறது."
+      },
+      "property": {
+        "support": "வாங்குபவர், சொத்து அல்லது விற்பனை இந்த விதியின் மூலம் தேவையான வலிமையைக் கொண்டுள்ளது.",
+        "obstruction": "வாங்குதல் அல்லது லாபகரமான விற்பனை இந்த விதியால் தேவையான வலிமையைக் கொண்டிருக்கவில்லை."
+      }
+    },
+    "planets": {
+      "sun": "சூரியன்",
+      "moon": "சந்திரன்",
+      "mars": "செவ்வாய்",
+      "mercury": "புதன்",
+      "jupiter": "வியாழன்",
+      "venus": "வெள்ளி",
+      "saturn": "சனி",
+      "rahu": "ராகு",
+      "ketu": "கேது"
+    }
+  },
+  "telugu": {
+    "discoveryTitle": "ప్రశ్న మార్గదర్శకం",
+    "exploreTitle": "ఒక పరిస్థితి గురించి అడగండి",
+    "homeLabel": "ఒక ప్రశ్న అడగండి",
+    "methodLabel": "శాస్త్రీయ ప్రశ్న",
+    "toolBadge": "ప్రశ్న · {{count}} cr",
+    "discoveryBody": "శాస్త్రీయ ప్రశ్న · వారు మిమ్మల్ని సంప్రదిస్తారా? సంబంధం, ఉద్యోగం, చెల్లింపు లేదా ప్రయాణం పని చేస్తుందా?",
+    "screen": {
+      "noQuestions": "మద్దతు ఉన్న ప్రశ్నలు ఏవీ తిరిగి ఇవ్వబడలేదు.",
+      "topicsLoadError": "మద్దతు ఉన్న ప్రశ్నల జాబితాను లోడ్ చేయలేకపోయాము.",
+      "invalidResult": "లెక్క చెల్లని ఫలితాన్ని ఇచ్చింది మరియు ఆగిపోయింది.",
+      "calculationError": "ప్రశ్న కుండలి‌ను లెక్కించలేకపోయాము.",
+      "authFeature": "ప్రశ్న కుండలి",
+      "authMessage": "ఒక శాస్త్రీయ ప్రశ్న కుండలి‌ను వేయడానికి సైన్ ఇన్ చేయండి. కుండలి ఉత్పత్తి అయినప్పుడు మాత్రమే క్రెడిట్‌లు ఛార్జ్ చేయబడతాయి.",
+      "selectedQuestion": "మీరు ఎంచుకున్న ప్రశ్న",
+      "fixedMoment": "స్థిరంగా {{date}} న {{time}} · {{place}} వద్ద",
+      "selectedLocation": "ఎంచుకున్న స్థానం",
+      "supports": "ఏది మద్దతు ఇస్తుంది",
+      "obstructs": "ఏది అడ్డుకుంటుంది",
+      "decisionMeaning": "ఇది మీ నిర్ణయం కోసం ఏమి సూచిస్తుంది",
+      "showWorking": "శాస్త్రీయ పనిని చూపించు",
+      "hideWorking": "శాస్త్రీయ పనిని దాచు",
+      "methodCalculation": "విధానం మరియు గణన",
+      "classicalRoles": "శాస్త్రీయ పాత్రలు",
+      "houseRole": "ఇల్లు {{house}}: {{role}} — {{lord}}",
+      "matchedRules": "సరిపోయిన నియమాలు",
+      "askNew": "కొత్త ప్రశ్న అడగండి",
+      "pageTitle": "ఒక నిజమైన పరిస్థితి గురించి అడగండి",
+      "brandLine": "ప్రశ్న · ఒక ప్రశ్న. ఒక అర్ధవంతమైన క్షణం.",
+      "lead": "ఇప్పుడు ముఖ్యమైన ఒక నిజమైన ప్రశ్నకు శాస్త్రీయ మార్గదర్శకం. వర్గం మరియు మీరు అడుగుతున్న దానికి సరిగ్గా సరిపోయే ఒక వాక్యాన్ని ఎంచుకోండి, ఆపై మీ ప్రస్తుత సమయం మరియు స్థానం కోసం కుండలి‌ను వేయండి.",
+      "howLink": "ప్రశ్న ఎలా పనిచేస్తుంది",
+      "goodUses": "మంచి ఉపయోగాలు",
+      "goodUsesBody": "ఒక నిర్దిష్ట వ్యక్తి నుండి కాల్ లేదా సందేశం, అన్‌బ్లాక్ చేయడం, పోరాటం తర్వాత రాజీ పడటం, ఒక నిర్దిష్ట వ్యక్తితో వివాహం, ఒక నిర్దిష్ట ఉద్యోగం, చెల్లింపు, ప్రయాణం, తప్పిపోయిన ఆస్తి లేదా ఆస్తి లావాదేవీ.",
+      "notAvailable": "ఇక్కడ అందుబాటులో లేదు",
+      "notAvailableBody": "ఆరోగ్యం, గర్భం, మరణం, కోర్టు ఫలితాలు, ఊహాజనిత వ్యాపారం, జీవితానికి సంబంధించిన సాధారణ రీడింగ్‌లు లేదా ఒకే ప్రశ్న యొక్క పునరావృత వెర్షన్‌లు.",
+      "categoryLabel": "ప్రశ్న ఏమిటి?",
+      "questionLabel": "మీరు ఏ ప్రశ్న అడుగుతున్నారు?",
+      "questionHint": "ఒక నిజమైన పరిస్థితిని స్పష్టంగా గుర్తుంచుకోండి మరియు వాక్యం సరిగ్గా సరిపోలితే మాత్రమే ఎంచుకోండి.",
+      "castNotice": "నిర్దిష్ట విషయాన్ని స్పష్టంగా మనసులో ఉంచుకోండి. నిర్ధారించి కుండలిని రూపొందించినప్పుడు దాని సమయం స్థిరపడుతుంది. మారని అదే ప్రశ్నకు మళ్లీ కుండలి వేయవద్దు.",
+      "placeLabel": "మీరు ఇప్పుడు అడుగుతున్న స్థలం",
+      "placePlaceholder": "నగరం, రాష్ట్రం, దేశం",
+      "castButton": "ఈ ప్రశ్న కుండలిని రూపొందించండి",
+      "headerEyebrow": "శాస్త్రీయ ప్రశ్న కుండలి",
+      "moreCredits": "మరింత క్రెడిట్‌లు అవసరం",
+      "creditBody": "ఈ ప్రశ్న కుండలి {{cost}} క్రెడిట్‌లు ఖర్చవుతుంది. మీకు ప్రస్తుతం {{credits}} ఉన్నాయి.",
+      "getCredits": "క్రెడిట్‌లు పొందండి",
+      "cancel": "రద్దు చేయండి",
+      "matchedRuleRefs": "సరిపోయిన నియమాలు: {{rules}}",
+      "close": "మూసివేయండి"
+    },
+    "how": {
+      "eyebrow": "సులభమైన పదాలలో ఆలోచన",
+      "title": "ప్రశ్న ఎలా పనిచేస్తుంది",
+      "intro": "ప్రశ్న అంటే ‘ప్రశ్న’. ఒక నిజమైన ఆందోళన అత్యవసరంగా మారినప్పుడు, ఒక వ్యక్తి దైవం లేదా దైవిక క్రమం ద్వారా సమాధానం కోరుకునేలా కదులుతాడు. సాధారణ భాషలో, ఈ సంప్రదాయం మీ నిజాయితీగల కోరికను అడగడం మరియు మీరు అడిగే క్షణం కనెక్ట్ అయి ఉన్నాయని భావిస్తుంది.",
+      "step1Title": "ఒక నిజాయితీగల ప్రశ్నను పట్టుకోండి",
+      "step1Body": "ఇప్పుడు ముఖ్యమైన ఒక నిజమైన పరిస్థితిని ఎంచుకోండి. అనేక ప్రశ్నలను కలపకండి లేదా అదే ప్రశ్నతో సిస్టమ్‌ను పదే పదే పరీక్షించకండి.",
+      "step2Title": "అడుగుతున్న క్షణం కుండలి‌ను ఫిక్స్ చేస్తుంది",
+      "step2Body": "మీరు నిర్ధారించి కుండలి‌ను వేసినప్పుడు, యాప్ ఆ ఖచ్చితమైన సమయాన్ని మరియు మీ ప్రస్తుత స్థానాన్ని ఫిక్స్ చేస్తుంది. ప్రశ్న ఈ క్షణాన్ని చదువుతుంది; ఇది మీ జన్మ కుండలి‌ను ఉపయోగించదు.",
+      "step3Title": "కుండలి ప్రతి ఒక్కరికీ ఒక పాత్రను ఇస్తుంది",
+      "step3Body": "రైజింగ్ సైన్ మరియు దాని పాలకుడు మిమ్మల్ని సూచిస్తారు. ఒక నిర్దిష్ట ఇల్లు మరియు దాని పాలకుడు విషయం యొక్క ప్రాతినిధ్యం వహిస్తారు - ఉదాహరణకు, సంబంధంలోని మరొక వ్యక్తి, ఉద్యోగం, చెల్లింపు లేదా ప్రయాణం. చంద్రుడు విషయం కనెక్ట్ అవుతుందో లేదో చూపించడానికి సహాయపడుతుంది.",
+      "step4Title": "శాస్త్రీయ నియమాలు కనెక్షన్‌ను అంచనా వేస్తాయి",
+      "step4Body": "లెక్క సంబంధిత గ్రహాలు కలిసి వస్తాయా, వేరు చేయబడతాయా, సహాయం పొందుతాయా లేదా అడ్డంకులు ఎదుర్కొంటాయో లేదో తనిఖీ చేస్తుంది. ఇది మద్దతు, తీవ్రమైన అడ్డంకులు, మిశ్రమ సాక్ష్యం లేదా కుండలి నమ్మదగిన సమాధానాన్ని ఇవ్వలేదని చూపవచ్చు.",
+      "recastTitle": "అదే ప్రశ్నను ఎందుకు మళ్లీ వేయకూడదు",
+      "recastBody": "మొదటి నిజాయితీగల అడుగుతున్న క్షణం కుండలి. ఒక ప్రాధాన్య సమాధానం కోసం మళ్లీ వేయడం పద్ధతిని మెరుగుపరచడానికి బదులుగా విచ్ఛిన్నం చేస్తుంది.",
+      "limits": "ఇది ఒక అర్ధవంతమైన క్షణం యొక్క సాంప్రదాయ పఠనం. ఇది ప్రతిబింబానికి మార్గనిర్దేశం చేయగలదు, కానీ ఇది మరొక వ్యక్తి యొక్క చర్యలను హామీ ఇవ్వలేదు లేదా ఆచరణాత్మక వాస్తవాలు మరియు తీర్పును భర్తీ చేయదు.",
+      "gotIt": "తెచ్చుకున్నాను"
+    },
+    "topics": {
+      "relationship": "ప్రేమ, సంప్రదింపు & రాజీ",
+      "career": "ఉద్యోగం లేదా కెరీర్ ఫలితం",
+      "wealth": "చెల్లింపు లేదా లాభం",
+      "travel": "ప్రణాళిక చేసిన ప్రయాణం",
+      "lost": "తప్పిపోయిన ఆస్తి",
+      "property": "ఆస్తి లావాదేవీ"
+    },
+    "questions": {
+      "career_job_offer": "నేను పరిశీలిస్తున్న నిర్దిష్ట ఉద్యోగ ప్రతిపాదనను నేను అందుకుంటానా?",
+      "career_promotion": "నేను అడుగుతున్న నిర్దిష్ట పదోన్నతిని నేను అందుకుంటానా?",
+      "career_application": "ఈ నిర్దిష్ట స్థానం కోసం నా దరఖాస్తు విజయవంతమవుతుందా?",
+      "career_employer_change": "ఈ నిర్దిష్ట యజమానికి మారడం పని చేస్తుందా?",
+      "wealth_overdue_payment": "ఈ నిర్దిష్ట బకాయి చెల్లింపు అందుకుంటున్నారా?",
+      "wealth_money_owed": "నాకు అప్పుగా ఉన్న డబ్బు తిరిగి వస్తుందా?",
+      "wealth_expected_gain": "ఈ నిర్వచించబడిన ఊహించిన ఆర్థిక లాభం అందుకుంటున్నారా?",
+      "relationship_contact": "ఈ నిర్దిష్ట వ్యక్తి నాకు కాల్ లేదా సందేశం పంపుతారా?",
+      "relationship_unblock": "ఈ నిర్దిష్ట వ్యక్తి నన్ను అన్‌బ్లాక్ చేస్తారా?",
+      "relationship_reconcile": "మా పోరాటం తరువాత ఈ నిర్దిష్ట వ్యక్తి మరియు నేను రాజీ పడతామా?",
+      "relationship_return": "ఈ నిర్దిష్ట వ్యక్తి మా సంబంధానికి తిరిగి వస్తారా?",
+      "relationship_marriage": "ఈ నిర్దిష్ట వ్యక్తి నన్ను వివాహం చేస్తారా?",
+      "marriage_proposal": "ఈ నిర్దిష్ట వివాహ ప్రతిపాదన కొనసాగుతుందా?",
+      "marriage_prospective_spouse": "ఈ నిర్దిష్ట వివాహ అనుచూడితో వివాహం కొనసాగుతుందా?",
+      "travel_planned_journey": "ఈ నిర్దిష్ట ప్రణాళిక చేసిన ప్రయాణం జరుగుతుందా?",
+      "travel_visa_journey": "ఈ నిర్దిష్ట వీసా సంబంధిత ప్రయాణం జరుగుతుందా?",
+      "lost_recovery": "ఈ నిర్దిష్ట తప్పిపోయిన ఆస్తి తిరిగి వస్తుందా?",
+      "lost_find_item": "నేను ప్రస్తుతం తప్పిపోయిన నిర్దిష్ట వస్తువును కనుగొంటానా?",
+      "property_purchase": "ఈ నిర్దిష్ట ఆస్తి కొనుగోలు పూర్తవుతుందా?",
+      "property_sale": "ఈ నిర్దిష్ట ఆస్తి అమ్మకం లాభదాయకంగా జరుగుతుందా?"
+    },
+    "outcomes": {
+      "career": {
+        "outcome": "ఈ వృత్తిపరమైన ఫలితం"
+      },
+      "wealth": {
+        "outcome": "ఈ డబ్బును స్వీకరించడం"
+      },
+      "relationship": {
+        "contact": "పునరుద్ధరించిన సంప్రదింపు",
+        "unblock": "సంప్రదింపు తిరిగి తెరవడం",
+        "reconcile": "పోరాటం తరువాత రాజీ",
+        "return": "సంబంధానికి తిరిగి రావడం"
+      },
+      "marriage": {
+        "marriage": "ఈ వ్యక్తితో వివాహం",
+        "proposal": "ఈ వివాహ ప్రతిపాదన"
+      },
+      "travel": {
+        "outcome": "ఈ ప్రణాళిక చేసిన ప్రయాణం"
+      },
+      "lost": {
+        "outcome": "తప్పిపోయిన ఆస్తిని తిరిగి పొందడం"
+      },
+      "property": {
+        "buy": "ఈ ఆస్తి కొనుగోలు",
+        "sell": "లాభదాయకమైన ఆస్తి అమ్మకం"
+      }
+    },
+    "result": {
+      "headings": {
+        "favorable": "కుండలి {{outcome}}కి మద్దతు ఇస్తుంది",
+        "unfavorable": "కుండలి {{outcome}}కి తీవ్రమైన అడ్డంకులను చూపుతుంది",
+        "mixed": "కుండలి {{outcome}} గురించి మిశ్రమంగా ఉంది",
+        "cannot_judge": "కుండలి {{outcome}} గురించి నమ్మదగిన సమాధానాన్ని ఇవ్వదు"
+      },
+      "summaries": {
+        "favorable": "వర్తించే నియమాలు {{outcome}}కి మద్దతు ఇస్తాయి మరియు ఈ అంశం మాడ్యూల్‌లో నిర్ణయాత్మక అడ్డంకి ఏదీ కనుగొనబడలేదు.",
+        "unfavorable": "వర్తించే నియమాలు అడ్డంకిని చూపుతాయి మరియు దానిని పరిష్కరించే సహాయక నియమం ఏదీ లేదు.",
+        "mixed": "కొన్ని వర్తించే నియమాలు {{outcome}}కి మద్దతు ఇస్తాయి మరియు మరికొన్ని అడ్డుకుంటాయి. ఎంచుకున్న టెక్స్ట్ ఈ సంఘర్షణను పరిష్కరించడానికి ప్రాధాన్యతను అందించదు.",
+        "cannot_judge": "అమలు చేసిన నియమాలేవీ ఈ ప్రశ్నకు నిర్ణయాత్మక సూచనను ఉత్పత్తి చేయవు. సిస్టమ్ సమాధానాన్ని తయారు చేయదు."
+      },
+      "decisions": {
+        "favorable": "దీనిని కొనసాగించడానికి సాంప్రదాయ మద్దతుగా పరిగణించండి, అయితే వాస్తవ ప్రపంచ వాస్తవాలను కూడా తనిఖీ చేయండి.",
+        "unfavorable": "ఆశించిన ఫలితాన్ని సురక్షితంగా పరిగణించకండి. ఆచరణాత్మక అడ్డంకిని పరిష్కరించండి లేదా మరొక ఎంపికను సిద్ధంగా ఉంచుకోండి.",
+        "mixed": "ఆచరణాత్మక వాస్తవాలు ఆమోదయోగ్యంగా ఉంటే మాత్రమే కొనసాగించండి. ఈ కుండలి నమ్మకంగా అవును లేదా కాదు అని సమర్థించదు.",
+        "cannot_judge": "ఆచరణాత్మక సాక్ష్యం నుండి నిర్ణయించుకోండి లేదా సంరక్షించబడిన కుండలి‌ను పరిశీలించడానికి అర్హత కలిగిన నిపుణుడిని అడగండి. వేరే సమాధానం కోసం అదే ప్రశ్నను మళ్లీ వేయకండి."
+      },
+      "limits": "మీ పరిస్థితి యొక్క వాస్తవాలతో కలిసి ఈ సాంప్రదాయ పఠనాన్ని ఉపయోగించండి. ఇది ఏమి జరుగుతుందో హామీ ఇవ్వలేదు."
+    },
+    "roles": {
+      "career": {
+        "1": "మీరు",
+        "10": "ఉద్యోగం లేదా వృత్తిపరమైన ఫలితం"
+      },
+      "wealth": {
+        "1": "మీరు",
+        "2": "చెల్లింపు లేదా లాభం"
+      },
+      "relationship": {
+        "1": "మీరు",
+        "7": "మరొక వ్యక్తి లేదా సంబంధం"
+      },
+      "marriage": {
+        "1": "మీరు",
+        "7": "అనుచూడి లేదా ప్రతిపాదన"
+      },
+      "travel": {
+        "1": "మీరు",
+        "9": "ప్రయాణం",
+        "7": "గమ్యం",
+        "4": "ఇది ఎలా ముగుస్తుంది",
+        "10": "దీని ఉద్దేశ్యం"
+      },
+      "lost": {
+        "1": "మీరు",
+        "2": "మీ ఆస్తి",
+        "4": "తప్పిపోయిన వస్తువు",
+        "7": "మరొక వ్యక్తి"
+      },
+      "property": {
+        "1": "కొనుగోలుదారు",
+        "4": "ఆస్తి",
+        "7": "అమ్మకం చేసే వ్యక్తి",
+        "11": "అమ్మకం నుండి లాభం"
+      }
+    },
+    "calculation": {
+      "ayanamsha": "Hayanaratna 1.9 గ్రంథాధారిత అయనచలనం",
+      "houseSystem": "Hayanaratna చతుర్భాగ భావ మధ్యాలు, సంధులు (Sripati జ్యామితి)"
+    },
+    "evidence": {
+      "career": {
+        "support": "శాస్త్రీయ నియమాలు మీరు మరియు వృత్తిపరమైన ఫలితం మధ్య నిర్మాణాత్మక సంబంధాన్ని చూపుతాయి.",
+        "obstruction": "ఒక శాస్త్రీయ పరిస్థితి వృత్తిపరమైన ఫలితాన్ని బలహీనపరుస్తుంది లేదా అడ్డుకుంటుంది."
+      },
+      "wealth": {
+        "support": "చెల్లింపు లేదా లాభం మీకు కనెక్ట్ అయి ఉంది లేదా సహాయం పొందుతుంది.",
+        "obstruction": "కష్టం లేదా అనుబంధ సమస్య ఊహించిన లాభాన్ని ప్రభావితం చేస్తుంది."
+      },
+      "relationship": {
+        "support": "కుండలి మీరు, మరొక వ్యక్తి మరియు అభ్యర్థించిన ఫలితం మధ్య కనెక్షన్‌ను చూపుతుంది.",
+        "obstruction": "సంఘర్షణ, ఒత్తిడి లేదా తప్పిపోయిన కనెక్షన్ సంబంధంపై బరువు వేస్తుంది."
+      },
+      "marriage": {
+        "support": "కుండలి మిమ్మల్ని అనుచూడి లేదా ప్రతిపాదనతో కలుపుతుంది.",
+        "obstruction": "అనుచూడి సూచిక లేదా ప్రతిపాదన తీవ్రంగా బలహీనపడుతుంది."
+      },
+      "travel": {
+        "support": "ప్రణాళిక చేసిన ప్రయాణం సహాయక కనెక్షన్‌ను కలిగి ఉంది మరియు కొనసాగించవచ్చు.",
+        "obstruction": "ప్రయాణం, గమ్యం లేదా ఉద్దేశం అడ్డంకిని ఎదుర్కొంటుంది."
+      },
+      "lost": {
+        "support": "ఆస్తి మీతో కనెక్ట్ అయి ఉంది మరియు రికవరీకి మద్దతు ఉంది.",
+        "obstruction": "ఒక శాస్త్రీయ పరిస్థితి వస్తువును తిరిగి పొందడానికి వ్యతిరేకంగా పనిచేస్తుంది."
+      },
+      "property": {
+        "support": "కొనుగోలుదారు, ఆస్తి లేదా అమ్మకం ఈ నియమం ద్వారా అవసరమైన బలాన్ని కలిగి ఉంది.",
+        "obstruction": "కొనుగోలు లేదా లాభదాయకమైన అమ్మకం ఈ నియమం ద్వారా అవసరమైన బలాన్ని కలిగి లేదు."
+      }
+    },
+    "planets": {
+      "sun": "సూర్యుడు",
+      "moon": "చంద్రుడు",
+      "mars": "కుజుడు",
+      "mercury": "బుధుడు",
+      "jupiter": "గురుడు",
+      "venus": "శుక్రుడు",
+      "saturn": "శని",
+      "rahu": "రాహు",
+      "ketu": "కేతు"
+    }
+  },
+  "gujarati": {
+    "discoveryTitle": "પ્રશ્ન માર્ગદર્શન",
+    "exploreTitle": "પરિસ્થિતિ વિશે પૂછો",
+    "homeLabel": "પ્રશ્ન પૂછો",
+    "methodLabel": "શાસ્ત્રીય પ્રશ્ન",
+    "toolBadge": "પ્રશ્ન · {{count}} cr",
+    "discoveryBody": "શાસ્ત્રીય પ્રશ્ન · શું તેઓ તમારો સંપર્ક કરશે? શું સંબંધ, નોકરી, ચુકવણી અથવા પ્રવાસ સફળ થશે?",
+    "screen": {
+      "noQuestions": "કોઈ સપોર્ટેડ પ્રશ્ન પ્રશ્નો પાછા મળ્યા નથી.",
+      "topicsLoadError": "સપોર્ટેડ પ્રશ્ન સૂચિ લોડ કરી શકાઈ નથી.",
+      "invalidResult": "ગણતરીથી અમાન્ય પરિણામ મળ્યું અને તે બંધ થઈ ગઈ.",
+      "calculationError": "પ્રશ્ન કુંડળીની ગણતરી કરી શકાઈ નથી.",
+      "authFeature": "પ્રશ્ન પ્રશ્ન કુંડળી",
+      "authMessage": "શાસ્ત્રીય પ્રશ્ન કુંડળી કાસ્ટ કરવા માટે સાઇન ઇન કરો. કુંડળી તૈયાર થાય ત્યારે જ ક્રેડિટ્સ ચાર્જ કરવામાં આવશે.",
+      "selectedQuestion": "તમારો પસંદ કરેલો પ્રશ્ન",
+      "fixedMoment": "{{date}} ના રોજ {{time}} · {{place}} પર નિશ્ચિત",
+      "selectedLocation": "પસંદ કરેલું સ્થાન",
+      "supports": "તેને શું સમર્થન આપે છે",
+      "obstructs": "તેને શું અવરોધે છે",
+      "decisionMeaning": "તમારા નિર્ણય માટે આનો અર્થ શું છે",
+      "showWorking": "શાસ્ત્રીય કાર્ય બતાવો",
+      "hideWorking": "શાસ્ત્રીય કાર્ય છુપાવો",
+      "methodCalculation": "પદ્ધતિ અને ગણતરી",
+      "classicalRoles": "શાસ્ત્રીય ભૂમિકાઓ",
+      "houseRole": "ઘર {{house}}: {{role}} — {{lord}}",
+      "matchedRules": "મેળ ખાતી નિયમો",
+      "askNew": "નવો પ્રશ્ન પૂછો",
+      "pageTitle": "એક વાસ્તવિક પરિસ્થિતિ વિશે પૂછો",
+      "brandLine": "પ્રશ્ન · એક પ્રશ્ન. એક અર્થપૂર્ણ ક્ષણ.",
+      "lead": "હવે મહત્વપૂર્ણ બની ગયેલા એક નિષ્ઠાવાન પ્રશ્ન માટે શાસ્ત્રીય માર્ગદર્શન. શ્રેણી અને એક વાક્ય પસંદ કરો જે તમે જે પૂછી રહ્યા છો તેને બરાબર મેચ કરે છે, પછી તમારા વર્તમાન સમય અને સ્થાન માટે કુંડળી બનાવો.",
+      "howLink": "પ્રશ્ન કેવી રીતે કાર્ય કરે છે",
+      "goodUses": "સારા ઉપયોગો",
+      "goodUsesBody": "ચોક્કસ વ્યક્તિ તરફથી કૉલ અથવા સંદેશ, અનબ્લોક થવું, લડાઈ પછી સમાધાન, ચોક્કસ વ્યક્તિ સાથે લગ્ન, ચોક્કસ નોકરી, ચુકવણી, પ્રવાસ, ગુમ થયેલ માલસામાન અથવા મિલકત વ્યવહાર.",
+      "notAvailable": "અહીં ઉપલબ્ધ નથી",
+      "notAvailableBody": "આરોગ્ય, ગર્ભાવસ્થા, મૃત્યુ, કોર્ટના પરિણામો, અનુમાનિત ટ્રેડિંગ, જીવન વાંચન અથવા સમાન પ્રશ્નોના વારંવાર આવતા વર્ઝન.",
+      "categoryLabel": "પ્રશ્ન શું છે?",
+      "questionLabel": "તમે કયો પ્રશ્ન પૂછી રહ્યા છો?",
+      "questionHint": "એક વાસ્તવિક પરિસ્થિતિને સ્પષ્ટપણે ધ્યાનમાં રાખો અને ફક્ત ત્યારે જ પસંદ કરો જો વાક્ય તેને બરાબર મેચ કરે છે.",
+      "castNotice": "ચોક્કસ બાબતને સ્પષ્ટ રીતે મનમાં રાખો. પુષ્ટિ કરીને કુંડળી બનાવતાં જ તેનો સમય નિશ્ચિત થશે. બદલાયા વગરના એ જ પ્રશ્નની કુંડળી ફરી ન બનાવો.",
+      "placeLabel": "તમે અત્યારે કયા સ્થળે પૂછી રહ્યા છો",
+      "placePlaceholder": "શહેર, રાજ્ય, દેશ",
+      "castButton": "આ પ્રશ્ન કુંડળી બનાવો",
+      "headerEyebrow": "શાસ્ત્રીય પ્રશ્ન કુંડળી",
+      "moreCredits": "વધુ ક્રેડિટ્સની જરૂર છે",
+      "creditBody": "આ પ્રશ્ન કુંડળી {{cost}} ક્રેડિટ્સ ખર્ચે છે. તમારી પાસે હાલમાં {{credits}} છે.",
+      "getCredits": "ક્રેડિટ્સ મેળવો",
+      "cancel": "રદ કરો",
+      "matchedRuleRefs": "મેળ ખાતા નિયમો: {{rules}}",
+      "close": "બંધ કરો"
+    },
+    "how": {
+      "eyebrow": "સરળ શબ્દોમાં વિચાર",
+      "title": "પ્રશ્ન કેવી રીતે કાર્ય કરે છે",
+      "intro": "પ્રશ્નનો અર્થ ‘પ્રશ્ન’ થાય છે. શાસ્ત્રીય ગ્રંથ કહે છે કે જ્યારે કોઈ વાસ્તવિક ચિંતા તાત્કાલિક બને છે, ત્યારે કોઈ વ્યક્તિ દૈવા — ભાગ્ય અથવા દૈવી આદેશ — દ્વારા જવાબ મેળવવા માટે પ્રેરિત થાય છે. રોજિંદા ભાષામાં, પરંપરા તમારા નિષ્ઠાવાન આગ્રહને પૂછવા અને પૂછવાનો ક્ષણ સાથે જોડે છે.",
+      "step1Title": "એક નિષ્ઠાવાન પ્રશ્ન રાખો",
+      "step1Body": "એક વાસ્તવિક પરિસ્થિતિ પસંદ કરો જે હમણાં મહત્વપૂર્ણ છે. બહુવિધ પ્રશ્નોને જોડશો નહીં અથવા સમાન પ્રશ્ન સાથે સિસ્ટમનું પરીક્ષણ કરશો નહીં.",
+      "step2Title": "પૂછવાનો ક્ષણ કુંડળી બને છે",
+      "step2Body": "જ્યારે તમે પુષ્ટિ કરો છો અને કુંડળી બનાવો છો, ત્યારે એપ્લિકેશન તે ચોક્કસ સમય અને તમારું વર્તમાન સ્થાન નિશ્ચિત કરે છે. પ્રશ્ન આ ક્ષણને વાંચે છે; તે તમારા જન્મ કુંડળીનો ઉપયોગ કરતો નથી.",
+      "step3Title": "કુંડળી દરેકને ભૂમિકા આપે છે",
+      "step3Body": "આrising સાઇન અને તેનો શાસક તમને રજૂ કરે છે. એક ચોક્કસ ઘર અને તેનો શાસક વિષયનું પ્રતિનિધિત્વ કરે છે - ઉદાહરણ તરીકે, સંબંધમાં અન્ય વ્યક્તિ, નોકરી, ચુકવણી અથવા પ્રવાસ. ચંદ્ર જોડે છે કે વિષય કેવી રીતે જોડાય છે અને વિકસિત થાય છે.",
+      "step4Title": "શાસ્ત્રીય નિયમો જોડાણનું મૂલ્યાંકન કરે છે",
+      "step4Body": "ગણતરી તપાસે છે કે સંબંધિત ગ્રહો એકસાથે આવે છે, અલગ પડે છે, મદદ મેળવે છે અથવા અવરોધનો સામનો કરે છે. તે સમર્થન, ગંભીર અવરોધો, મિશ્રિત સાક્ષી અથવા કુંડળી કે જે વિશ્વસનીય જવાબ આપતો નથી તે બતાવી શકે છે.",
+      "recastTitle": "એ જ પ્રશ્નની કુંડળી ફરી કેમ ન બનાવવી",
+      "recastBody": "પ્રથમ નિષ્ઠાપૂર્વક પૂછેલી ક્ષણની કુંડળીનું જ મૂલ્યાંકન થાય છે. મનગમતો જવાબ મળે ત્યાં સુધી કુંડળી ફરી બનાવવાથી પદ્ધતિ સુધરતી નથી, પરંતુ તૂટે છે.",
+      "limits": "આ એક અર્થપૂર્ણ ક્ષણનું પરંપરાગત વાંચન છે. તે પ્રતિબિંબને માર્ગદર્શન આપી શકે છે, પરંતુ તે અન્ય વ્યક્તિની ક્રિયાઓની ખાતરી આપી શકતું નથી અથવા વ્યવહારિક તથ્યો અને નિર્ણયને બદલી શકતું નથી.",
+      "gotIt": "સમજાયું"
+    },
+    "topics": {
+      "relationship": "પ્રેમ, સંપર્ક અને સમાધાન",
+      "career": "નોકરી અથવા કારકિર્દીનું પરિણામ",
+      "wealth": "ચુકવણી અથવા લાભ",
+      "travel": "આયોજિત પ્રવાસ",
+      "lost": "ગુમ થયેલ માલસામાન",
+      "property": "મિલકત વ્યવહાર"
+    },
+    "questions": {
+      "career_job_offer": "શું મને ધ્યાનમાં લેવામાં આવી રહેલી ચોક્કસ નોકરીની ઓફર મળશે?",
+      "career_promotion": "શું મને જે પ્રશ્ન પૂછી રહ્યો છું તે ચોક્કસ પ્રમોશન મળશે?",
+      "career_application": "શું આ ચોક્કસ સ્થિતિ માટે મારી અરજી સફળ થશે?",
+      "career_employer_change": "શું આ ચોક્કસ એમ્પ્લોયર પર જવું યોગ્ય રહેશે?",
+      "wealth_overdue_payment": "શું આ ચોક્કસ બાકી ચુકવણી પ્રાપ્ત થશે?",
+      "wealth_money_owed": "શું મારા દેવું એ પૈસા પાછા મળશે?",
+      "wealth_expected_gain": "શું આ અપેક્ષિત નાણાકીય લાભ પ્રાપ્ત થશે?",
+      "relationship_contact": "શું આ ચોક્કસ વ્યક્તિ મને કૉલ અથવા મેસેજ કરશે?",
+      "relationship_unblock": "શું આ ચોક્કસ વ્યક્તિ મને બ્લોક કરશે?",
+      "relationship_reconcile": "શું હું અને આ ચોક્કસ વ્યક્તિ સમાધાન કરીશું?",
+      "relationship_return": "શું આ ચોક્કસ વ્યક્તિ અમારા સંબંધમાં પાછા ફરશે?",
+      "relationship_marriage": "શું આ ચોક્કસ વ્યક્તિ મારી સાથે લગ્ન કરશે?",
+      "marriage_proposal": "શું આ ચોક્કસ લગ્ન પ્રસ્તાવ આગળ વધશે?",
+      "marriage_prospective_spouse": "શું આ ચોક્કસ સંભવિત જીવનસાથી સાથે લગ્ન આગળ વધશે?",
+      "travel_planned_journey": "શું આયોજિત આ ચોક્કસ પ્રવાસ થશે?",
+      "travel_visa_journey": "શું આ વિઝા સંબંધિત ચોક્કસ પ્રવાસ થશે?",
+      "lost_recovery": "શું આ ગુમ થયેલ માલસામાન પાછું મળશે?",
+      "lost_find_item": "શું મને હાલમાં ગુમ થયેલ આઇટમ મળશે?",
+      "property_purchase": "શું આ ચોક્કસ મિલકતની ખરીદી પૂર્ણ થશે?",
+      "property_sale": "શું આ ચોક્કસ મિલકતનું વેચાણ નફાકારક રીતે પૂર્ણ થશે?"
+    },
+    "outcomes": {
+      "career": {
+        "outcome": "આ વ્યાવસાયિક પરિણામ"
+      },
+      "wealth": {
+        "outcome": "આ પૈસા મેળવવું"
+      },
+      "relationship": {
+        "contact": "નવો સંપર્ક",
+        "unblock": "સંપર્ક ફરીથી શરૂ થશે",
+        "reconcile": "સંઘર્ષ પછી સમાધાન",
+        "return": "સંબંધમાં પાછા ફરવું"
+      },
+      "marriage": {
+        "marriage": "આ વ્યક્તિ સાથે લગ્ન",
+        "proposal": "આ લગ્ન પ્રસ્તાવ"
+      },
+      "travel": {
+        "outcome": "આયોજિત પ્રવાસ"
+      },
+      "lost": {
+        "outcome": "ગુમ થયેલ માલસામાન પાછું મેળવવું"
+      },
+      "property": {
+        "buy": "મિલકતની ખરીદી",
+        "sell": "મિલકતનું નફાકારક વેચાણ"
+      }
+    },
+    "result": {
+      "headings": {
+        "favorable": "{{outcome}} ને સમર્થન છે",
+        "unfavorable": "{{outcome}} ને ગંભીર અવરોધો છે",
+        "mixed": "{{outcome}} વિશે મિશ્રિત પ્રતિસાદ છે",
+        "cannot_judge": "{{outcome}} વિશે કુંડળી વિશ્વસનીય જવાબ આપતો નથી"
+      },
+      "summaries": {
+        "favorable": "લાગુ નિયમો {{outcome}} ને સમર્થન આપે છે, અને આ વિષય મોડ્યુલમાં કોઈ નિર્ણાયક અવરોધ જોવા મળ્યો નથી.",
+        "unfavorable": "લાગુ નિયમો અવરોધ દર્શાવે છે, અને આ સંઘર્ષને ઉકેલવા માટે કોઈ સમર્થન નિયમ મળ્યો નથી.",
+        "mixed": "કેટલાક લાગુ નિયમો {{outcome}} ને સમર્થન આપે છે અને અન્ય અવરોધે છે. પસંદ કરેલો ટેક્સ્ટ આ સંઘર્ષને ઉકેલવા માટે કોઈ અગ્રતા પ્રદાન કરતો નથી.",
+        "cannot_judge": "અમલમાં મૂકાયેલા નિયમો પૈસા માટે કોઈ નિર્ણાયક સંકેત ઉત્પન્ન કરતા નથી. સિસ્ટમ જવાબ ઉત્પન્ન કરશે નહીં."
+      },
+      "decisions": {
+        "favorable": "આને આગળ વધવા માટે પરંપરાગત સમર્થન તરીકે ગણો, જ્યારે હજી પણ વાસ્તવિક દુનિયાના તથ્યો તપાસો.",
+        "unfavorable": "આશાવાદી પરિણામને સુરક્ષિત ગણશો નહીં. વ્યવહારિક અવરોધને સંબોધિત કરો અથવા અન્ય વિકલ્પ તૈયાર રાખો.",
+        "mixed": "માત્ર વ્યવહારિક તથ્યો સ્વીકાર્ય હોય તો જ આગળ વધો. આ કુંડળી કોઈ આત્મવિશ્વાસપૂર્ણ હા અથવા નાને ન્યાયી ઠેરવતો નથી.",
+        "cannot_judge": "સચવાયેલ કુંડળીની તપાસ કરવા માટે વ્યવહારિક પુરાવા અથવા લાયક પ્રેક્ટિશનર દ્વારા નક્કી કરો. સમાન પ્રશ્ન માટે અલગ જવાબ મેળવવા માટે ફરીથી કાસ્ટ કરશો નહીં."
+      },
+      "limits": "તમારી પરિસ્થિતિના તથ્યો સાથે આ પરંપરાગત વાંચનનો ઉપયોગ કરો. તે શું થશે તેની ખાતરી આપી શકતું નથી."
+    },
+    "roles": {
+      "career": {
+        "1": "તમે",
+        "10": "નોકરી અથવા વ્યાવસાયિક પરિણામ"
+      },
+      "wealth": {
+        "1": "તમે",
+        "2": "ચુકવણી અથવા લાભ"
+      },
+      "relationship": {
+        "1": "તમે",
+        "7": "અન્ય વ્યક્તિ અથવા સંબંધ"
+      },
+      "marriage": {
+        "1": "તમે",
+        "7": "સંભવિત જીવનસાથી અથવા પ્રસ્તાવ"
+      },
+      "travel": {
+        "1": "તમે",
+        "9": "પ્રવાસ",
+        "7": "ગંતવ્ય",
+        "4": "તે કેવી રીતે સમાપ્ત થાય છે",
+        "10": "તેનો હેતુ"
+      },
+      "lost": {
+        "1": "તમે",
+        "2": "તમારું માલસામાન",
+        "4": "ગુમ થયેલ આઇટમ",
+        "7": "અન્ય પાર્ટી"
+      },
+      "property": {
+        "1": "ખરીદનાર",
+        "4": "મિલકત",
+        "7": "વેચનાર",
+        "11": "વેચાણથી નફો"
+      }
+    },
+    "calculation": {
+      "ayanamsha": "Hayanaratna 1.9 પાઠાધારિત અયનચલન",
+      "houseSystem": "Hayanaratna ચતુર્થાંશ ભાવ-મધ્ય અને સંધિઓ (Sripati ભૂમિતિ)"
+    },
+    "evidence": {
+      "career": {
+        "support": "શાસ્ત્રીય નિયમો તમે અને વ્યાવસાયિક પરિણામ વચ્ચે રચનાત્મક જોડાણ દર્શાવે છે.",
+        "obstruction": "શાસ્ત્રીય શરત વ્યાવસાયિક પરિણામને નબળું પાડે છે અથવા અવરોધે છે."
+      },
+      "wealth": {
+        "support": "ચુકવણી અથવા લાભ તમારાથી જોડાયેલ છે અથવા મદદ મેળવે છે.",
+        "obstruction": "મુશ્કેલી અથવા સંલગ્ન સમસ્યા અપેક્ષિત લાભને અસર કરે છે."
+      },
+      "relationship": {
+        "support": "કુંડળી તમે, અન્ય વ્યક્તિ અને વિનંતી કરેલા પરિણામ વચ્ચે જોડાણ દર્શાવે છે.",
+        "obstruction": "સંઘર્ષ, દબાણ અથવા ગુમ થયેલ જોડાણ સંબંધ પર ભાર મૂકે છે."
+      },
+      "marriage": {
+        "support": "કુંડળી તમને સંભવિત જીવનસાથી અથવા પ્રસ્તાવ સાથે જોડે છે.",
+        "obstruction": "સંભવિત-spouse સૂચક અથવા પ્રસ્તાવ ગંભીર રીતે નબળું છે."
+      },
+      "travel": {
+        "support": "આયોજિત પ્રવાસમાં સહાયક જોડાણ છે અને તે આગળ વધી શકે છે.",
+        "obstruction": "પ્રવાસ, ગંતવ્ય અથવા હેતુ અવરોધનો સામનો કરે છે."
+      },
+      "lost": {
+        "support": "માલસામાન તમારાથી જોડાયેલ રહે છે અને પુનઃપ્રાપ્તિને સમર્થન મળે છે.",
+        "obstruction": "શાસ્ત્રીય શરત આઇટમની પુનઃપ્રાપ્તિની વિરુદ્ધ કામ કરે છે."
+      },
+      "property": {
+        "support": "ખરીદનાર, મિલકત અથવા વેચાણ પાસે આ નિયમ દ્વારા જરૂરી શક્તિ છે.",
+        "obstruction": "ખરીદી અથવા નફાકારક વેચાણ પાસે આ નિયમ દ્વારા જરૂરી શક્તિનો અભાવ છે."
+      }
+    },
+    "planets": {
+      "sun": "સૂર્ય",
+      "moon": "ચંદ્ર",
+      "mars": "મંગળ",
+      "mercury": "બુધ",
+      "jupiter": "ગુરુ",
+      "venus": "શુક્ર",
+      "saturn": "શનિ",
+      "rahu": "રાહુ",
+      "ketu": "કેતુ"
+    }
+  },
+  "marathi": {
+    "discoveryTitle": "प्रश्ना मार्गदर्शन",
+    "exploreTitle": "परिस्थितीबद्दल विचारा",
+    "homeLabel": "प्रश्न विचारा",
+    "methodLabel": "पारंपरिक प्रश्न",
+    "toolBadge": "प्रश्ना · {{count}} cr",
+    "discoveryBody": "पारंपरिक प्रश्न · ते संपर्क साधतील का? नाते, नोकरी, पेमेंट किंवा प्रवासाचे काम बनेल का?",
+    "screen": {
+      "noQuestions": "कोणतेही समर्थित प्रश्न परत आले नाहीत.",
+      "topicsLoadError": "समर्थित प्रश्नांची यादी लोड होऊ शकली नाही.",
+      "invalidResult": "गणनेतून अवैध परिणाम मिळाला आणि थांबले.",
+      "calculationError": "प्रश्नाचा कुंडली काढता आला नाही.",
+      "authFeature": "प्रश्ना प्रश्नकुंडली",
+      "authMessage": "क्लासिक प्रश्नकुंडली काढण्यासाठी साइन इन करा. कुंडली तयार झाल्यावरच क्रेडिट्स charged केले जातील.",
+      "selectedQuestion": "तुमचा निवडलेला प्रश्न",
+      "fixedMoment": "फिक्स {{date}} रोजी {{time}} · {{place}}",
+      "selectedLocation": "निवडलेले स्थान",
+      "supports": "कशाचे समर्थन आहे",
+      "obstructs": "काय अडवते",
+      "decisionMeaning": "तुमच्या निर्णयासाठी याचा अर्थ काय",
+      "showWorking": "क्लासिक काम दाखवा",
+      "hideWorking": "क्लासिक काम लपवा",
+      "methodCalculation": "पद्धत आणि गणना",
+      "classicalRoles": "क्लासिक भूमिका",
+      "houseRole": "घर {{house}}: {{role}} — {{lord}}",
+      "matchedRules": "जुळलेले नियम",
+      "askNew": "नवीन प्रश्न विचारा",
+      "pageTitle": "एका वास्तविक परिस्थितीबद्दल विचारा",
+      "brandLine": "प्रश्ना · एक प्रश्न. एक अर्थपूर्ण क्षण.",
+      "lead": "एका प्रामाणिक प्रश्नासाठी क्लासिक मार्गदर्शन जे आता महत्त्वाचे झाले आहे. श्रेणी निवडा आणि फक्त ते वाक्य निवडा जे तुम्ही जे विचारत आहात त्याला तंतोतंत जुळते, नंतर तुमच्या वर्तमान वेळ आणि स्थानासाठी कुंडली तयार करा.",
+      "howLink": "प्रश्ना कसे कार्य करते",
+      "goodUses": "चांगले उपयोग",
+      "goodUsesBody": "एखाद्या विशिष्ट व्यक्तीकडून कॉल किंवा संदेश, अनब्लॉक करणे, भांडणानंतर समेट, विशिष्ट व्यक्तीशी विवाह, विशिष्ट नोकरी, पेमेंट, प्रवास, हरवलेली मालमत्ता किंवा मालमत्ता व्यवहार.",
+      "notAvailable": "येथे उपलब्ध नाही",
+      "notAvailableBody": "आरोग्य, गर्भधारणा, मृत्यू, कोर्टाचे निकाल, सट्टेबाजीचे व्यापार, व्यापक जीवन वाचन किंवा समान प्रश्नांची वारंवार आवृत्ती.",
+      "categoryLabel": "प्रश्न कशाबद्दल आहे?",
+      "questionLabel": "तुम्ही कोणता प्रश्न विचारत आहात?",
+      "questionHint": "एक वास्तविक परिस्थिती स्पष्टपणे लक्षात ठेवा आणि फक्त तेव्हाच निवडा जेव्हा वाक्य तंतोतंत जुळेल.",
+      "castNotice": "विशिष्ट मुद्दा स्पष्टपणे मनात ठेवा. पुष्टी करून कुंडली तयार करताच तिची वेळ निश्चित होईल. प्रश्न बदललेला नसताना पुन्हा कुंडली तयार करू नका.",
+      "placeLabel": "तुम्ही सध्या कोणत्या ठिकाणी प्रश्न विचारत आहात",
+      "placePlaceholder": "शहर, राज्य, देश",
+      "castButton": "ही प्रश्नकुंडली तयार करा",
+      "headerEyebrow": "क्लासिक प्रश्नकुंडली",
+      "moreCredits": "अधिक क्रेडिट्स आवश्यक",
+      "creditBody": "या प्रश्ना कुंडलीसाठी {{cost}} क्रेडिट्स लागतील. तुमच्याकडे सध्या {{credits}} क्रेडिट्स आहेत.",
+      "getCredits": "क्रेडिट्स मिळवा",
+      "cancel": "रद्द करा",
+      "matchedRuleRefs": "जुळलेले नियम: {{rules}}",
+      "close": "बंद करा"
+    },
+    "how": {
+      "eyebrow": "सोप्या भाषेत कल्पना",
+      "title": "प्रश्ना कसे कार्य करते",
+      "intro": "प्रश्ना म्हणजे ‘प्रश्न’. शास्त्रीय ग्रंथ सांगतात की जेव्हा एखादी वास्तविक चिंता urgent होते, तेव्हा दैवी आदेशामुळे (daiva) व्यक्तीला उत्तरासाठी विचार करण्यास प्रवृत्त होते. रोजच्या भाषेत, ही परंपरा तुमच्या प्रामाणिक विचारण्याची इच्छा आणि तुम्ही विचारल्याच्या क्षणाशी जोडलेली आहे.",
+      "step1Title": "एक प्रामाणिक प्रश्न धरा",
+      "step1Body": "एक वास्तविक परिस्थिती निवडा जी आता महत्त्वाची आहे. अनेक प्रश्न एकत्र करू नका किंवा समान प्रश्नासह सिस्टमची चाचणी करू नका.",
+      "step2Title": "विचारण्याचा क्षण कुंडली बनवतो",
+      "step2Body": "जेव्हा तुम्ही पुष्टी आणि कुंडली तयार करता, तेव्हा ॲप तो अचूक वेळ आणि तुमचे वर्तमान स्थान निश्चित करते. प्रश्नासाठी हा क्षण वाचला जातो; ते तुमच्या जन्मकुंडलीचा वापर करत नाही.",
+      "step3Title": "कुंडली प्रत्येकाला भूमिका देतो",
+      "step3Body": "उदय होणारी राशी आणि त्याचा शासक म्हणजे तुम्ही. विशिष्ट घर आणि त्याचा शासक म्हणजे मुद्दा - उदाहरणार्थ, नात्यातील दुसरा व्यक्ती, नोकरी, पेमेंट किंवा प्रवास. चंद्र हे प्रकरण कसे जोडले जाते आणि विकसित होते हे दर्शण्यास मदत करते.",
+      "step4Title": "क्लासिक नियम कनेक्शनचे परीक्षण करतात",
+      "step4Body": "गणना तपासते की संबंधित ग्रह एकत्र येतात, वेगळे होतात, मदत मिळवतात किंवा अडथळा येतात. हे समर्थन, गंभीर अडथळे, मिश्रित साक्ष किंवा कुंडली विश्वसनीय उत्तर देत नाही हे दर्शवू शकते.",
+      "recastTitle": "त्याच प्रश्नाची कुंडली पुन्हा का तयार करू नये",
+      "recastBody": "पहिल्यांदा प्रामाणिकपणे विचारलेल्या क्षणाची कुंडलीच तपासली जाते. मनासारखे उत्तर मिळेपर्यंत पुन्हा कुंडली तयार केल्याने पद्धत सुधारत नाही; ती बिघडते.",
+      "limits": "हे एका अर्थपूर्ण क्षणाचे पारंपरिक वाचन आहे. हे चिंतन करण्यास मार्गदर्शन करू शकते, परंतु ते दुसर्‍या व्यक्तीच्या कृतींची हमी देऊ शकत नाही किंवा व्यावहारिक तथ्ये आणि निर्णयांची जागा घेऊ शकत नाही.",
+      "gotIt": "समजले"
+    },
+    "topics": {
+      "relationship": "प्रेम, संपर्क आणि समेट",
+      "career": "नोकरी किंवा करिअरचा परिणाम",
+      "wealth": "पेमेंट किंवा कमाई",
+      "travel": "नियोजित प्रवास",
+      "lost": "हरवलेली मालमत्ता",
+      "property": "मालमत्ता व्यवहार"
+    },
+    "questions": {
+      "career_job_offer": "तुम्ही ज्या विशिष्ट नोकरीच्या ऑफरचा विचार करत आहात, ती मिळेल का?",
+      "career_promotion": "तुम्ही ज्या विशिष्ट प्रमोशनबद्दल विचारत आहात, ते मिळेल का?",
+      "career_application": "या विशिष्ट पदासाठी तुमचा अर्ज यशस्वी होईल का?",
+      "career_employer_change": "या विशिष्ट Employer मध्ये बदल फायदेशीर ठरेल का?",
+      "wealth_overdue_payment": "हे विशिष्ट overdue पेमेंट मिळेल का?",
+      "wealth_money_owed": "माझ्याकडे असलेले विशिष्ट पैसे वसूल होतील का?",
+      "wealth_expected_gain": "अपेक्षित आर्थिक लाभ मिळेल का?",
+      "relationship_contact": "हा विशिष्ट व्यक्ती संपर्क साधेल का?",
+      "relationship_unblock": "हा विशिष्ट व्यक्ती तुम्हाला अनब्लॉक करेल का?",
+      "relationship_reconcile": "आमच्या भांडणानंतर हा विशिष्ट व्यक्ती आणि मी समेट करू का?",
+      "relationship_return": "हा विशिष्ट व्यक्ती आमच्या नात्यात परत येईल का?",
+      "relationship_marriage": "हा विशिष्ट व्यक्तीशी विवाह करेल का?",
+      "marriage_proposal": "हे विशिष्ट marriage proposal पुढे जाईल का?",
+      "marriage_prospective_spouse": "या विशिष्ट prospective spouse सोबत विवाह पुढे जाईल का?",
+      "travel_planned_journey": "हा विशिष्ट नियोजित प्रवास होईल का?",
+      "travel_visa_journey": "या विशिष्ट व्हिसा-संबंधित प्रवास होईल का?",
+      "lost_recovery": "ही विशिष्ट हरवलेली मालमत्ता वसूल होईल का?",
+      "lost_find_item": "मी हे विशिष्ट item शोधू शकेन का?",
+      "property_purchase": "ही विशिष्ट मालमत्ता खरेदी पूर्ण होईल का?",
+      "property_sale": "ही विशिष्ट मालमत्ता विक्री फायदेशीर होईल का?"
+    },
+    "outcomes": {
+      "career": {
+        "outcome": "हा व्यावसायिक परिणाम"
+      },
+      "wealth": {
+        "outcome": "हे पैसे मिळवणे"
+      },
+      "relationship": {
+        "contact": "पुनर्स्थापित संपर्क",
+        "unblock": "संपर्क पुन्हा सुरू करणे",
+        "reconcile": "संघर्षा नंतर समेट",
+        "return": "नात्यात परतणे"
+      },
+      "marriage": {
+        "marriage": "या व्यक्तीशी विवाह",
+        "proposal": "हे marriage proposal"
+      },
+      "travel": {
+        "outcome": "हा नियोजित प्रवास"
+      },
+      "lost": {
+        "outcome": "हरवलेली मालमत्ता वसूल करणे"
+      },
+      "property": {
+        "buy": "ही मालमत्ता खरेदी",
+        "sell": "मालमत्तेची फायदेशीर विक्री"
+      }
+    },
+    "result": {
+      "headings": {
+        "favorable": "कुंडली {{outcome}} ला समर्थन देते",
+        "unfavorable": "कुंडली {{outcome}} ला गंभीर अडथळे दर्शवते",
+        "mixed": "कुंडली {{outcome}} बद्दल मिश्रित आहे",
+        "cannot_judge": "कुंडली {{outcome}} बद्दल विश्वसनीय उत्तर देत नाही"
+      },
+      "summaries": {
+        "favorable": "लागू नियम {{outcome}} ला समर्थन देतात आणि या मॉड्यूलमध्ये कोणताही निर्णायक अडथळा आढळला नाही.",
+        "unfavorable": "लागू नियम अडथळे दर्शवतात आणि कोणतीही सहाय्यक नियमांनी ते निराकरण केले नाही.",
+        "mixed": "काही लागू नियम {{outcome}} ला समर्थन देतात आणि काही अडथळा आणतात. निवडलेल्या मजकुरात या संघर्षाचे निराकरण करण्यासाठी प्राधान्य नाही.",
+        "cannot_judge": "सिस्टम उत्तराचे उत्पादन करणार नाही."
+      },
+      "decisions": {
+        "favorable": "तुम्ही याला पुढे जाण्यासाठी पारंपरिक समर्थन म्हणून गृहीत धरू शकता, तरीही वास्तविक-जगातील तथ्ये तपासा.",
+        "unfavorable": "अपेक्षित परिणाम सुरक्षित मानू नका. व्यावहारिक अडथळा दूर करा किंवा दुसरा पर्याय तयार ठेवा.",
+        "mixed": "फक्त व्यावहारिक तथ्ये स्वीकार्य असल्यास पुढे जा. हा कुंडली आत्मविश्वासपूर्ण होकार किंवा नकार योग्य ठरवत नाही.",
+        "cannot_judge": "व्यवहारीय पुराव्यांवर आधारित निर्णय घ्या किंवा जतन केलेल्या कुंडलीचे परीक्षण करण्यासाठी पात्र व्यावसायिकाला भेटा. समान प्रश्नाचे वेगळे उत्तर मिळवण्यासाठी पुन्हा कास्ट करू नका."
+      },
+      "limits": "हे पारंपरिक वाचन तुमच्या परिस्थितीच्या तथ्यांसह वापरा. ते काय घडेल याची हमी देऊ शकत नाही."
+    },
+    "roles": {
+      "career": {
+        "1": "तुम्ही",
+        "10": "नोकरी किंवा व्यावसायिक परिणाम"
+      },
+      "wealth": {
+        "1": "तुम्ही",
+        "2": "पेमेंट किंवा कमाई"
+      },
+      "relationship": {
+        "1": "तुम्ही",
+        "7": "दुसरा व्यक्ती किंवा नाते"
+      },
+      "marriage": {
+        "1": "तुम्ही",
+        "7": "अपेक्षित जीवनसाथी किंवा प्रस्ताव"
+      },
+      "travel": {
+        "1": "तुम्ही",
+        "9": "प्रवास",
+        "7": "गंतव्यस्थान",
+        "4": "ते कसे संपेल",
+        "10": "त्याचा उद्देश"
+      },
+      "lost": {
+        "1": "तुम्ही",
+        "2": "तुमची मालमत्ता",
+        "4": "गहाळ वस्तू",
+        "7": "इतर पक्ष"
+      },
+      "property": {
+        "1": "खरेदीदार",
+        "4": "मालमत्ता",
+        "7": "विक्रेता",
+        "11": "विक्रीतून नफा"
+      }
+    },
+    "calculation": {
+      "ayanamsha": "Hayanaratna 1.9 पाठाधारित अयनचलन",
+      "houseSystem": "Hayanaratna चतुर्थांश भावमध्य आणि संधी (Sripati भूमिती)"
+    },
+    "evidence": {
+      "career": {
+        "support": "क्लासिक नियम तुमच्या आणि व्यावसायिक परिणामांमध्ये रचनात्मक कनेक्शन दर्शवतात.",
+        "obstruction": "क्लासिक स्थिती व्यावसायिक परिणामाला कमजोर किंवा अडथळा आणते."
+      },
+      "wealth": {
+        "support": "पेमेंट किंवा कमाई तुमच्याशी जोडलेली आहे किंवा मदत मिळवते.",
+        "obstruction": "अडचणी किंवा सोबतची समस्या अपेक्षित लाभावर परिणाम करते."
+      },
+      "relationship": {
+        "support": "कुंडली तुमच्या, दुसर्‍या व्यक्ती आणि विनंती केलेल्या परिणामामध्ये कनेक्शन दर्शवते.",
+        "obstruction": "संघर्ष, दबाव किंवा गहाळ कनेक्शन नात्यावर परिणाम करते."
+      },
+      "marriage": {
+        "support": "कुंडली तुम्हाला संभाव्य जीवनसाथी किंवा प्रस्तावाशी जोडतो.",
+        "obstruction": "संभाव्य-जीवनसाथी इंडिकेटर किंवा प्रस्ताव गंभीरपणे कमजोर आहे."
+      },
+      "travel": {
+        "support": "नियोजित प्रवासाला सहाय्यक कनेक्शन आहे आणि तो पुढे जाऊ शकतो.",
+        "obstruction": "प्रवास, गंतव्यस्थान किंवा उद्देश अडथळा आणतो."
+      },
+      "lost": {
+        "support": "मालमत्ता तुमच्याशी जोडलेली आहे आणि पुनर्प्राप्तीला समर्थन आहे.",
+        "obstruction": "क्लासिक अट वस्तू पुनर्प्राप्तीच्या विरोधात कार्य करते."
+      },
+      "property": {
+        "support": "खरेदीदार, मालमत्ता किंवा विक्रीसाठी आवश्यक ताकद आहे.",
+        "obstruction": "खरेदी किंवा फायदेशीर विक्रीसाठी आवश्यक ताकद नाही."
+      }
+    },
+    "planets": {
+      "sun": "सूर्य",
+      "moon": "चंद्र",
+      "mars": "मंगळ",
+      "mercury": "बुध",
+      "jupiter": "गुरु",
+      "venus": "शुक्र",
+      "saturn": "शनि",
+      "rahu": "राहू",
+      "ketu": "केतू"
+    }
+  },
+  "german": {
+    "discoveryTitle": "Frageweisung",
+    "exploreTitle": "Fragen Sie nach einer Situation",
+    "homeLabel": "Eine Frage stellen",
+    "methodLabel": "Klassische Prashna-Methode",
+    "toolBadge": "Prashna · {{count}} cr",
+    "discoveryBody": "Klassische Prashna · Werden sie sich melden? Wird eine Beziehung, ein Job, eine Zahlung oder eine Reise funktionieren?",
+    "screen": {
+      "noQuestions": "Es wurden keine unterstützten Prashna-Fragen gefunden.",
+      "topicsLoadError": "Die Liste der unterstützten Fragen konnte nicht geladen werden.",
+      "invalidResult": "Die Berechnung ergab ein ungültiges Ergebnis und wurde abgebrochen.",
+      "calculationError": "Das Fragehoroskop konnte nicht berechnet werden.",
+      "authFeature": "Prashna-Fragehoroskop",
+      "authMessage": "Melden Sie sich an, um ein klassisches Prashna-Fragehoroskop zu erstellen. Guthaben werden nur dann belastet, wenn das Horoskop erstellt wird.",
+      "selectedQuestion": "Ihre ausgewählte Frage",
+      "fixedMoment": "Festgelegt am {{date}} um {{time}} · {{place}}",
+      "selectedLocation": "ausgewählter Ort",
+      "supports": "Was unterstützt es",
+      "obstructs": "Was es behindert",
+      "decisionMeaning": "Was das für Ihre Entscheidung bedeutet",
+      "showWorking": "Klassische Berechnung anzeigen",
+      "hideWorking": "Klassische Berechnung ausblenden",
+      "methodCalculation": "Methode und Berechnung",
+      "classicalRoles": "Klassische Rollen",
+      "houseRole": "Haus {{house}}: {{role}} — {{lord}}",
+      "matchedRules": "Übereinstimmende Regeln",
+      "askNew": "Eine neue Frage stellen",
+      "pageTitle": "Fragen Sie nach einer realen Situation",
+      "brandLine": "PRASHNA · EINE FRAGE. EINE SINNVOLLEN MOMENT.",
+      "lead": "Klassische Beratung für eine aufrichtige Frage, die jetzt wichtig geworden ist. Wählen Sie die Kategorie und den Satz, der genau das wiedergibt, was Sie fragen, und erstellen Sie dann das Horoskop für Ihre aktuelle Zeit und Ihren Ort.",
+      "howLink": "Wie Prashna funktioniert",
+      "goodUses": "Gute Anwendungen",
+      "goodUsesBody": "Ein Anruf oder eine Nachricht von einer bestimmten Person, eine Entblockierung, eine Versöhnung nach einem Streit, eine Ehe mit einer bestimmten Person, ein bestimmter Job, eine Zahlung, eine Reise, ein fehlender Besitz oder ein Immobilienverkauf.",
+      "notAvailable": "Nicht verfügbar",
+      "notAvailableBody": "Gesundheit, Schwangerschaft, Tod, Gerichtsausgänge, Spekulationshandel, umfassende Lebensberatungen oder wiederholte Versionen derselben Frage.",
+      "categoryLabel": "Worüber ist die Frage?",
+      "questionLabel": "Welche Frage stellen Sie?",
+      "questionHint": "Halten Sie eine reale Situation klar im Auge und wählen Sie nur, wenn der Satz genau dazu passt.",
+      "castNotice": "Halten Sie die spezifische Angelegenheit klar im Auge. Die Zeit des Horoskops wird festgelegt, wenn Sie bestätigen und es erstellen. Erstellen Sie die unveränderte Frage nicht erneut.",
+      "placeLabel": "Ort, an dem Sie gerade fragen",
+      "placePlaceholder": "Stadt, Bundesland, Land",
+      "castButton": "Dieses Fragehoroskop erstellen",
+      "headerEyebrow": "KLASSISCHES FRAGENHOROSKOP",
+      "moreCredits": "Weitere Guthaben benötigt",
+      "creditBody": "Dieses Prashna-Horoskop kostet {{cost}} Guthaben. Sie haben derzeit {{credits}}.",
+      "getCredits": "Guthaben erhalten",
+      "cancel": "Abbrechen",
+      "matchedRuleRefs": "Übereinstimmende Regeln: {{rules}}",
+      "close": "Schließen"
+    },
+    "how": {
+      "eyebrow": "DIE IDEE IN EINFACHEN WORTEN",
+      "title": "Wie Prashna funktioniert",
+      "intro": "Prashna bedeutet ‚Frage‘. Der klassische Text besagt, dass eine Person, wenn eine echte Sorge dringend ist, von daiva – Schicksal oder göttlichem Auftrag – dazu bewogen wird, eine Antwort zu suchen. In der Alltagssprache behandelt die Tradition Ihren aufrichtigen Wunsch zu fragen und den Moment, in dem Sie fragen, als miteinander verbunden.",
+      "step1Title": "Halten Sie eine aufrichtige Frage",
+      "step1Body": "Wählen Sie eine reale Situation, die jetzt wichtig ist. Kombinieren Sie keine mehrere Fragen oder testen Sie das System wiederholt mit derselben Frage.",
+      "step2Title": "Der Fragestunde-Moment wird zum Horoskop",
+      "step2Body": "Wenn Sie bestätigen und das Horoskop erstellen, fixiert die App diesen genauen Zeitpunkt und Ihren aktuellen Ort. Prashna liest diesen Moment; es verwendet nicht Ihr Geburtshoroskop.",
+      "step3Title": "Das Horoskop weist jedem eine Rolle zu",
+      "step3Body": "Der aufsteigende Stern und sein Herrscher repräsentieren Sie. Ein bestimmtes Haus und sein Herrscher repräsentieren die Angelegenheit – zum Beispiel die andere Person in einer Beziehung, ein Job, eine Zahlung oder eine Reise. Der Mond hilft zu zeigen, ob die Angelegenheit verbunden ist und sich entwickelt.",
+      "step4Title": "Klassische Regeln beurteilen die Verbindung",
+      "step4Body": "Die Berechnung prüft, ob die relevanten Planeten zusammenkommen, sich trennen, Hilfe erhalten oder Hindernisse begegnen. Es kann Unterstützung, ernsthafte Hindernisse, gemischte Aussagen oder dass das Horoskop keine zuverlässige Antwort gibt, zeigen.",
+      "recastTitle": "Warum dieselbe Frage nicht erneut gestellt werden sollte",
+      "recastBody": "Beurteilt wird der Zeitpunkt der ersten aufrichtig gestellten Frage. Das Horoskop so oft neu zu erstellen, bis eine gewünschte Antwort erscheint, untergräbt die Methode.",
+      "limits": "Dies ist eine traditionelle Deutung eines bedeutsamen Moments. Es kann die Reflexion leiten, kann aber nicht die Handlungen einer anderen Person garantieren oder praktische Fakten und Urteilsvermögen ersetzen.",
+      "gotIt": "Verstanden"
+    },
+    "topics": {
+      "relationship": "Liebe, Kontakt & Versöhnung",
+      "career": "Job- oder Karriereergebnis",
+      "wealth": "Zahlung oder Gewinn",
+      "travel": "Geplante Reise",
+      "lost": "Fehlender Besitz",
+      "property": "Immobilientransaktion"
+    },
+    "questions": {
+      "career_job_offer": "Werde ich das spezifische Jobangebot erhalten, das ich in Betracht ziehe?",
+      "career_promotion": "Werde ich die spezifische Beförderung erhalten, nach der ich frage?",
+      "career_application": "Wird meine Bewerbung für diese spezifische Position erfolgreich sein?",
+      "career_employer_change": "Wird ein Wechsel zu diesem spezifischen Arbeitgeber funktionieren?",
+      "wealth_overdue_payment": "Wird diese spezifische überfällige Zahlung erhalten?",
+      "wealth_money_owed": "Wird das mir geschuldete Geld zurückerhalten?",
+      "wealth_expected_gain": "Wird dieser definierte erwartete finanzielle Gewinn erhalten?",
+      "relationship_contact": "Wird diese bestimmte Person mich anrufen oder eine Nachricht senden?",
+      "relationship_unblock": "Wird diese bestimmte Person mich entblockieren?",
+      "relationship_reconcile": "Werden diese Person und ich uns nach unserem Streit versöhnen?",
+      "relationship_return": "Wird diese bestimmte Person zu unserer Beziehung zurückkehren?",
+      "relationship_marriage": "Wird diese bestimmte Person mich heiraten?",
+      "marriage_proposal": "Wird dieser bestimmte Heiratsantrag erfolgreich sein?",
+      "marriage_prospective_spouse": "Wird eine Ehe mit diesem bestimmten Heiratsanwärter erfolgreich sein?",
+      "travel_planned_journey": "Wird diese spezifische geplante Reise stattfinden?",
+      "travel_visa_journey": "Wird diese spezifische visumbezogene Reise stattfinden?",
+      "lost_recovery": "Wird dieser bestimmte fehlende Besitz wiedergefunden?",
+      "lost_find_item": "Werde ich den bestimmten Artikel finden, der derzeit fehlt?",
+      "property_purchase": "Wird dieser bestimmte Immobilienkauf abgeschlossen?",
+      "property_sale": "Wird dieser bestimmte Immobilienverkauf profitabel abgeschlossen?"
+    },
+    "outcomes": {
+      "career": {
+        "outcome": "dieses berufliche Ergebnis"
+      },
+      "wealth": {
+        "outcome": "das Erhalten dieses Geldes"
+      },
+      "relationship": {
+        "contact": "erneuter Kontakt",
+        "unblock": "Wiederherstellung des Kontakts",
+        "reconcile": "Versöhnung nach dem Konflikt",
+        "return": "eine Rückkehr in die Beziehung"
+      },
+      "marriage": {
+        "marriage": "Ehe mit dieser Person",
+        "proposal": "dieser Heiratsantrag"
+      },
+      "travel": {
+        "outcome": "diese geplante Reise"
+      },
+      "lost": {
+        "outcome": "das Wiederfinden dieses fehlenden Besitzes"
+      },
+      "property": {
+        "buy": "dieser Immobilienkauf",
+        "sell": "ein profitabler Immobilienverkauf"
+      }
+    },
+    "result": {
+      "headings": {
+        "favorable": "Das Horoskop unterstützt {{outcome}}",
+        "unfavorable": "Das Horoskop zeigt ernsthafte Hindernisse für {{outcome}}",
+        "mixed": "Das Horoskop ist bezüglich {{outcome}} uneindeutig",
+        "cannot_judge": "Das Horoskop gibt keine zuverlässige Antwort bezüglich {{outcome}}"
+      },
+      "summaries": {
+        "favorable": "Die anwendbaren Regeln unterstützen {{outcome}}, und es wurde kein entscheidender Hindernis in diesem Themamodul gefunden.",
+        "unfavorable": "Die anwendbaren Regeln zeigen Hindernisse, und keine unterstützende Regel hat dies aufgelöst.",
+        "mixed": "Einige anwendbare Regeln unterstützen {{outcome}}, während andere sie behindern. Der ausgewählte Text liefert keine Vorrangigkeit, die diesen Konflikt auflöst.",
+        "cannot_judge": "Keine der implementierten Regeln für diese Frage erzeugt eine entscheidende Anzeige. Das System wird keine Antwort erzeugen."
+      },
+      "decisions": {
+        "favorable": "Behandeln Sie dies als traditionelle Unterstützung für die Fortsetzung, während Sie gleichzeitig die Fakten der realen Welt überprüfen.",
+        "unfavorable": "Behandeln Sie das erhoffte Ergebnis nicht als sicher. Beheben Sie das praktische Hindernis oder halten Sie eine andere Option bereit.",
+        "mixed": "Fahren Sie nur fort, wenn die praktischen Fakten akzeptabel sind. Dieses Horoskop rechtfertigt weder ein klares Ja noch ein Nein.",
+        "cannot_judge": "Treffen Sie eine Entscheidung anhand von Fakten oder bitten Sie einen qualifizierten Praktiker, das gespeicherte Horoskop zu prüfen. Erstellen Sie dieselbe Frage nicht erneut, um eine andere Antwort zu erhalten."
+      },
+      "limits": "Verwenden Sie diese traditionelle Deutung zusammen mit den Fakten Ihrer Situation. Es kann nicht garantieren, was passieren wird."
+    },
+    "roles": {
+      "career": {
+        "1": "Sie",
+        "10": "Das Job- oder Berufsergebnis"
+      },
+      "wealth": {
+        "1": "Sie",
+        "2": "Die Zahlung oder der Gewinn"
+      },
+      "relationship": {
+        "1": "Sie",
+        "7": "Die andere Person oder Beziehung"
+      },
+      "marriage": {
+        "1": "Sie",
+        "7": "Der Heiratsanwärter oder der Antrag"
+      },
+      "travel": {
+        "1": "Sie",
+        "9": "Die Reise",
+        "7": "Das Ziel",
+        "4": "Wie es endet",
+        "10": "Ihr Zweck"
+      },
+      "lost": {
+        "1": "Sie",
+        "2": "Ihr Besitz",
+        "4": "Der fehlende Artikel",
+        "7": "Eine andere Partei"
+      },
+      "property": {
+        "1": "Der Käufer",
+        "4": "Das Grundstück",
+        "7": "Der Verkäufer",
+        "11": "Profit aus dem Verkauf"
+      }
+    },
+    "calculation": {
+      "ayanamsha": "Hayanaratna 1.9 textuelle Präzession",
+      "houseSystem": "Hayanaratna-Quadranten-Häuserspitzen und -grenzen (Sripati-Geometrie)"
+    },
+    "evidence": {
+      "career": {
+        "support": "Die klassischen Regeln zeigen eine konstruktive Verbindung zwischen Ihnen und dem beruflichen Ergebnis.",
+        "obstruction": "Eine klassische Bedingung schwächt oder behindert das berufliche Ergebnis."
+      },
+      "wealth": {
+        "support": "Die Zahlung oder der Gewinn ist mit Ihnen verbunden oder erhält Hilfe.",
+        "obstruction": "Schwierigkeiten oder ein begleitendes Problem beeinträchtigen den erwarteten Gewinn."
+      },
+      "relationship": {
+        "support": "Das Horoskop zeigt eine Verbindung zwischen Ihnen, der anderen Person und dem gewünschten Ergebnis.",
+        "obstruction": "Konflikte, Druck oder eine fehlende Verbindung belasten die Beziehung."
+      },
+      "marriage": {
+        "support": "Das Horoskop verbindet Sie mit dem Heiratsanwärter oder dem Antrag.",
+        "obstruction": "Der Heiratsanwärter-Indikator oder der Antrag ist ernsthaft geschwächt."
+      },
+      "travel": {
+        "support": "Die geplante Reise hat eine unterstützende Verbindung und kann durchgeführt werden.",
+        "obstruction": "Die Reise, das Ziel oder der Zweck erfährt Hindernisse."
+      },
+      "lost": {
+        "support": "Der Besitz bleibt mit Ihnen verbunden und die Wiederherstellung erhält Unterstützung.",
+        "obstruction": "Eine klassische Bedingung wirkt der Wiederherstellung des Artikels entgegen."
+      },
+      "property": {
+        "support": "Der Käufer, das Grundstück oder der Verkauf hat die für diese Regel erforderliche Stärke.",
+        "obstruction": "Der Kauf oder der profitable Verkauf hat nicht die für diese Regel erforderliche Stärke."
+      }
+    },
+    "planets": {
+      "sun": "Sonne",
+      "moon": "Mond",
+      "mars": "Mars",
+      "mercury": "Merkur",
+      "jupiter": "Jupiter",
+      "venus": "Venus",
+      "saturn": "Saturn",
+      "rahu": "Rahu",
+      "ketu": "Ketu"
+    }
+  },
+  "french": {
+    "discoveryTitle": "Conseils pour votre question",
+    "exploreTitle": "Posez une question sur une situation",
+    "homeLabel": "Poser une question",
+    "methodLabel": "Prashna Classique",
+    "toolBadge": "Prashna · {{count}} cr",
+    "discoveryBody": "Prashna Classique · Vont-ils vous contacter ? Une relation, un emploi, un paiement ou un voyage vont-ils fonctionner ?",
+    "screen": {
+      "noQuestions": "Aucune question Prashna prise en charge n'a été trouvée.",
+      "topicsLoadError": "La liste des questions prises en charge n'a pas pu être chargée.",
+      "invalidResult": "Le calcul a renvoyé un résultat invalide et a été interrompu.",
+      "calculationError": "Le thème horaire de la question n'a pas pu être calculé.",
+      "authFeature": "Thème natal Prashna",
+      "authMessage": "Connectez-vous pour établir un thème horaire Prashna classique. Les crédits ne sont débités qu'en cas de production du thème.",
+      "selectedQuestion": "VOTRE QUESTION SÉLECTIONNÉE",
+      "fixedMoment": "Fixé le {{date}} à {{time}} · {{place}}",
+      "selectedLocation": "emplacement sélectionné",
+      "supports": "Ce qui le soutient",
+      "obstructs": "Ce qui l'entrave",
+      "decisionMeaning": "Ce que cela signifie pour votre décision",
+      "showWorking": "Afficher le calcul classique",
+      "hideWorking": "Masquer le calcul classique",
+      "methodCalculation": "Méthode et calcul",
+      "classicalRoles": "Rôles classiques",
+      "houseRole": "Maison {{house}}: {{role}} — {{lord}}",
+      "matchedRules": "Règles correspondantes",
+      "askNew": "Poser une nouvelle question",
+      "pageTitle": "Posez une question sur une situation réelle",
+      "brandLine": "PRASHNA · UNE QUESTION. UN MOMENT SIGNIFICATIF.",
+      "lead": "Conseils classiques pour une question sincère devenue importante maintenant. Choisissez la catégorie et la phrase qui correspond exactement à ce que vous demandez, puis établissez le thème horaire pour votre heure et votre lieu actuels.",
+      "howLink": "Comment fonctionne le Prashna",
+      "goodUses": "Bons usages",
+      "goodUsesBody": "Un appel ou un message d'une personne spécifique, être débloqué, réconciliation après une dispute, mariage avec une personne spécifique, un emploi particulier, un paiement, un voyage, un bien ou un bien immobilier manquant, ou une transaction immobilière.",
+      "notAvailable": "Non disponible ici",
+      "notAvailableBody": "Santé, grossesse, décès, résultats de justice, spéculation boursière, lectures générales sur la vie ou versions répétées de la même question.",
+      "categoryLabel": "De quoi parle la question ?",
+      "questionLabel": "Quelle question posez-vous ?",
+      "questionHint": "Gardez une situation réelle clairement à l'esprit et choisissez uniquement si la phrase correspond exactement.",
+      "castNotice": "Gardez la question spécifique clairement à l'esprit. L'heure du thème horaire sera fixée lorsque vous confirmerez et établirez le thème horaire. Ne refaites pas le même thème horaire sans changement.",
+      "placeLabel": "Lieu où vous posez la question actuellement",
+      "placePlaceholder": "Ville, État, Pays",
+      "castButton": "Établir ce thème horaire",
+      "headerEyebrow": "THÈME NATAL DE QUESTION",
+      "moreCredits": "Plus de crédits nécessaires",
+      "creditBody": "Ce thème horaire Prashna coûte {{cost}} crédits. Vous disposez actuellement de {{credits}}.",
+      "getCredits": "Obtenir des crédits",
+      "cancel": "Annuler",
+      "matchedRuleRefs": "Règles correspondantes : {{rules}}",
+      "close": "Fermer"
+    },
+    "how": {
+      "eyebrow": "L'IDÉE EN TERMES SIMPLES",
+      "title": "Comment fonctionne le Prashna",
+      "intro": "Prashna signifie « question ». Le texte classique indique que lorsqu'une préoccupation réelle devient urgente, une personne est poussée par le daiva—le destin ou l’ordre divin—à chercher une réponse. Dans le langage courant, la tradition considère votre désir sincère de poser une question et le moment où vous posez la question comme étant liés.",
+      "step1Title": "Tenez-vous à une question sincère",
+      "step1Body": "Choisissez une situation réelle qui compte maintenant. Ne combinez pas plusieurs questions ou ne testez pas le système avec la même question à plusieurs reprises.",
+      "step2Title": "Le moment de la question devient le thème horaire",
+      "step2Body": "Lorsque vous confirmez et établissez le thème horaire, l’application fixe cet instant précis et votre lieu actuel. Prashna interprète ce moment ; il n’utilise pas votre thème natal.",
+      "step3Title": "Le thème horaire attribue un rôle à chacun",
+      "step3Body": "Le signe ascendant et son seigneur représentent vous. Une maison particulière et son seigneur représentent la question—par exemple, l’autre personne dans une relation, un emploi, un paiement ou un voyage. La Lune aide à montrer si la question se connecte et se développe.",
+      "step4Title": "Les règles classiques jugent la connexion",
+      "step4Body": "Le calcul vérifie si les planètes pertinentes se rapprochent, se séparent, reçoivent de l’aide ou rencontrent un obstacle. Il peut montrer un soutien, des obstacles sérieux, un témoignage mitigé ou que le thème horaire ne donne pas de réponse fiable.",
+      "recastTitle": "Pourquoi la même question ne devrait pas être refaite",
+      "recastBody": "Le premier moment sincère de question est le thème horaire qui est jugé. Refaire le thème horaire jusqu’à obtenir une réponse préférée rompt la méthode plutôt que de l’améliorer.",
+      "limits": "Il s’agit d’une lecture traditionnelle d’un moment significatif. Elle peut guider la réflexion, mais ne peut ni garantir les actions d’une autre personne ni remplacer les faits et le jugement pratiques.",
+      "gotIt": "Compris"
+    },
+    "topics": {
+      "relationship": "Amour, contact et réconciliation",
+      "career": "Résultat de l'emploi ou de la carrière",
+      "wealth": "Paiement ou gain",
+      "travel": "Voyage planifié",
+      "lost": "Bien perdu",
+      "property": "Transaction immobilière"
+    },
+    "questions": {
+      "career_job_offer": "Vais-je recevoir l'offre d'emploi spécifique que je considère ?",
+      "career_promotion": "Vais-je recevoir la promotion spécifique que je demande ?",
+      "career_application": "Ma candidature pour ce poste spécifique réussira-t-elle ?",
+      "career_employer_change": "Changer d'employeur spécifique fonctionnera-t-il ?",
+      "wealth_overdue_payment": "Ce paiement en souffrance spécifique sera-t-il reçu ?",
+      "wealth_money_owed": "L'argent spécifique qui me sera dû sera-t-il récupéré ?",
+      "wealth_expected_gain": "Ce gain financier attendu sera-t-il reçu ?",
+      "relationship_contact": "Cette personne spécifique m'appellera-t-elle ou m'enverra-t-elle un message ?",
+      "relationship_unblock": "Cette personne spécifique me débloquera-t-elle ?",
+      "relationship_reconcile": "Cette personne et moi nous réconcilierons-nous après notre dispute ?",
+      "relationship_return": "Cette personne spécifique reviendra-t-elle dans notre relation ?",
+      "relationship_marriage": "Cette personne spécifique va-t-elle m'épouser ?",
+      "marriage_proposal": "Cette demande en mariage spécifique se concrétisera-t-elle ?",
+      "marriage_prospective_spouse": "Le mariage avec ce conjoint potentiel spécifique se concrétisera-t-il ?",
+      "travel_planned_journey": "Ce voyage planifié spécifique aura-t-il lieu ?",
+      "travel_visa_journey": "Ce voyage lié à un visa spécifique aura-t-il lieu ?",
+      "lost_recovery": "Ce bien perdu spécifique sera-t-il récupéré ?",
+      "lost_find_item": "Trouverai-je l'objet spécifique qui est actuellement manquant ?",
+      "property_purchase": "Cet achat immobilier spécifique sera-t-il finalisé ?",
+      "property_sale": "Cette vente immobilière spécifique sera-t-elle finalisée de manière rentable ?"
+    },
+    "outcomes": {
+      "career": {
+        "outcome": "ce résultat professionnel"
+      },
+      "wealth": {
+        "outcome": "recevoir cet argent"
+      },
+      "relationship": {
+        "contact": "contact renouvelé",
+        "unblock": "contact rouvert",
+        "reconcile": "réconciliation après le conflit",
+        "return": "un retour à la relation"
+      },
+      "marriage": {
+        "marriage": "mariage avec cette personne",
+        "proposal": "cette demande en mariage"
+      },
+      "travel": {
+        "outcome": "ce voyage planifié"
+      },
+      "lost": {
+        "outcome": "récupérer ce bien perdu"
+      },
+      "property": {
+        "buy": "cet achat immobilier",
+        "sell": "une vente immobilière rentable"
+      }
+    },
+    "result": {
+      "headings": {
+        "favorable": "Le thème horaire soutient {{outcome}}",
+        "unfavorable": "Le thème horaire montre de sérieux obstacles à {{outcome}}",
+        "mixed": "Le thème horaire est mitigé concernant {{outcome}}",
+        "cannot_judge": "Le thème horaire ne donne pas de réponse fiable concernant {{outcome}}"
+      },
+      "summaries": {
+        "favorable": "Les règles applicables soutiennent {{outcome}} et aucun obstacle décisif n’a été trouvé dans le module correspondant à ce sujet.",
+        "unfavorable": "Les règles applicables montrent un obstacle et aucune règle de soutien ne l'a résolu.",
+        "mixed": "Certaines règles applicables soutiennent {{outcome}} et d’autres l’entravent. Le texte sélectionné ne fournit aucune priorité qui résoudrait ce conflit.",
+        "cannot_judge": "Aucune des règles mises en œuvre pour cette question ne produit d’indication décisive. Le système ne fabriquera pas de réponse."
+      },
+      "decisions": {
+        "favorable": "Vous pouvez considérer cela comme un soutien traditionnel pour procéder, tout en vérifiant les faits réels.",
+        "unfavorable": "Ne considérez pas le résultat espéré comme acquis. Résolvez l’obstacle pratique ou gardez une autre option prête.",
+        "mixed": "Procédez uniquement si les faits pratiques sont acceptables. Ce thème horaire ne justifie ni un oui ni un non confiant.",
+        "cannot_judge": "Décidez en fonction des preuves pratiques ou demandez à un praticien qualifié d’examiner le thème horaire conservé. Ne refaites pas la même question pour obtenir une réponse différente."
+      },
+      "limits": "Utilisez cette lecture traditionnelle avec les faits de votre situation. Elle ne peut ni garantir ce qui va se passer."
+    },
+    "roles": {
+      "career": {
+        "1": "Vous",
+        "10": "Le résultat professionnel"
+      },
+      "wealth": {
+        "1": "Vous",
+        "2": "Le paiement ou le gain"
+      },
+      "relationship": {
+        "1": "Vous",
+        "7": "L’autre personne ou la relation"
+      },
+      "marriage": {
+        "1": "Vous",
+        "7": "Le conjoint potentiel ou la demande"
+      },
+      "travel": {
+        "1": "Vous",
+        "9": "Le voyage",
+        "7": "La destination",
+        "4": "Comment cela se termine",
+        "10": "Son but"
+      },
+      "lost": {
+        "1": "Vous",
+        "2": "Votre bien",
+        "4": "L'objet manquant",
+        "7": "Une autre partie"
+      },
+      "property": {
+        "1": "L'acheteur",
+        "4": "Le bien immobilier",
+        "7": "Le vendeur",
+        "11": "Profit de la vente"
+      }
+    },
+    "calculation": {
+      "ayanamsha": "précession textuelle Hayanaratna 1.9",
+      "houseSystem": "cuspides et jonctions Hayanaratna (géométrie Sripati)"
+    },
+    "evidence": {
+      "career": {
+        "support": "Les règles classiques montrent une connexion constructive entre vous et le résultat professionnel.",
+        "obstruction": "Une condition classique affaiblit ou entrave le résultat professionnel."
+      },
+      "wealth": {
+        "support": "Le paiement ou le gain est connecté à vous ou reçoit de l’aide.",
+        "obstruction": "Une difficulté ou un problème accompagnant affecte le gain attendu."
+      },
+      "relationship": {
+        "support": "Le thème horaire montre une connexion entre vous, l’autre personne et le résultat demandé.",
+        "obstruction": "Un conflit, une pression ou un manque de connexion pèse sur la relation."
+      },
+      "marriage": {
+        "support": "Le thème horaire connecte vous avec le conjoint potentiel ou la demande.",
+        "obstruction": "L’indicateur du conjoint potentiel ou la demande est sérieusement affaibli."
+      },
+      "travel": {
+        "support": "Le voyage planifié a une connexion de soutien et peut se dérouler.",
+        "obstruction": "Le voyage, la destination ou le but rencontre un obstacle."
+      },
+      "lost": {
+        "support": "Le bien reste connecté à vous et la récupération reçoit un soutien.",
+        "obstruction": "Une condition classique s’oppose à la récupération de l’objet."
+      },
+      "property": {
+        "support": "L'acheteur, le bien immobilier ou la vente ont la force requise par cette règle.",
+        "obstruction": "L'achat ou la vente rentable ne possède pas la force requise par cette règle."
+      }
+    },
+    "planets": {
+      "sun": "Soleil",
+      "moon": "Lune",
+      "mars": "Mars",
+      "mercury": "Mercure",
+      "jupiter": "Jupiter",
+      "venus": "Vénus",
+      "saturn": "Saturne",
+      "rahu": "Rahu",
+      "ketu": "Ketu"
+    }
+  },
+  "russian": {
+    "discoveryTitle": "Руководство по вопросам",
+    "exploreTitle": "Спросите о ситуации",
+    "homeLabel": "Задать вопрос",
+    "methodLabel": "Классическая Прашна",
+    "toolBadge": "Прашна · {{count}} cr",
+    "discoveryBody": "Классическая Прашна · Позвонит ли он/она? Сработает ли отношения, работа, оплата или путешествие?",
+    "screen": {
+      "noQuestions": "Не найдено поддерживаемых вопросов Прашна.",
+      "topicsLoadError": "Не удалось загрузить список поддерживаемых вопросов.",
+      "invalidResult": "Расчет вернул неверный результат и был остановлен.",
+      "calculationError": "Карту Прашна не удалось рассчитать.",
+      "authFeature": "Карта вопроса Прашна",
+      "authMessage": "Войдите, чтобы рассчитать карту вопроса Прашна. Кредиты списываются только при создании карты.",
+      "selectedQuestion": "ВАШ ВЫБРАННЫЙ ВОПРОС",
+      "fixedMoment": "Зафиксировано {{date}} в {{time}} · {{place}}",
+      "selectedLocation": "выбранное местоположение",
+      "supports": "Что поддерживает это",
+      "obstructs": "Что препятствует этому",
+      "decisionMeaning": "Что это значит для вашего решения",
+      "showWorking": "Показать классическую работу",
+      "hideWorking": "Скрыть классическую работу",
+      "methodCalculation": "Метод и расчет",
+      "classicalRoles": "Классические роли",
+      "houseRole": "Дом {{house}}: {{role}} — {{lord}}",
+      "matchedRules": "Совпавшие правила",
+      "askNew": "Задать новый вопрос",
+      "pageTitle": "Спросите об одной реальной ситуации",
+      "brandLine": "PRASHNA · ОДИН ВОПРОС. ОДИН СМЫСЛЕННЫЙ МОМЕНТ.",
+      "lead": "Классическое руководство для одного искреннего вопроса, который сейчас стал важным. Выберите категорию и предложение, которое точно соответствует вашему вопросу, затем рассчитайте карту для вашего текущего времени и места.",
+      "howLink": "Как работает Прашна",
+      "goodUses": "Полезные применения",
+      "goodUsesBody": "Звонок или сообщение от конкретного человека, снятие блокировки, примирение после ссоры, брак с конкретным человеком, конкретная работа, оплата, путешествие, пропавшее имущество или сделка с недвижимостью.",
+      "notAvailable": "Недоступно здесь",
+      "notAvailableBody": "Здоровье, беременность, смерть, судебные решения, спекулятивная торговля, широкие жизненные прогнозы или повторяющиеся версии одного и того же вопроса.",
+      "categoryLabel": "О чем вопрос?",
+      "questionLabel": "Какой вопрос вы задаете?",
+      "questionHint": "Помните об одной реальной ситуации и выбирайте только если предложение точно соответствует ей.",
+      "castNotice": "Помните о конкретном вопросе. Время карты будет зафиксировано при подтверждении и расчете. Не пересчитывайте неизменный вопрос.",
+      "placeLabel": "Место, где вы задаете вопрос",
+      "placePlaceholder": "Город, Область, Страна",
+      "castButton": "Рассчитать карту вопроса",
+      "headerEyebrow": "КАРТА КЛАССИЧЕСКОГО ВОПРОСА",
+      "moreCredits": "Требуется больше кредитов",
+      "creditBody": "Эта карта Прашна стоит {{cost}} кредитов. У вас в настоящее время есть {{credits}}.",
+      "getCredits": "Получить кредиты",
+      "cancel": "Отменить",
+      "matchedRuleRefs": "Совпавшие правила: {{rules}}",
+      "close": "Закрыть"
+    },
+    "how": {
+      "eyebrow": "ИДЕЯ ПРОСТЫМИ СЛОВАМИ",
+      "title": "Как работает Прашна",
+      "intro": "Прашна означает «вопрос». Классический текст гласит, что когда реальная проблема становится острой, человека движет даива — судьба или божественный порядок — к поиску ответа. В повседневной жизни традиция рассматривает ваше искреннее желание задать вопрос и момент, когда вы задаете его, как связанные.",
+      "step1Title": "Удерживайте один искренний вопрос",
+      "step1Body": "Выберите одну реальную ситуацию, которая сейчас важна. Не объединяйте несколько вопросов или тестируйте систему, повторяя один и тот же вопрос.",
+      "step2Title": "Момент вопроса становится картой",
+      "step2Body": "Когда вы подтверждаете и рассчитываете карту, приложение фиксирует это точное время и ваше текущее местоположение. Прашна читает этот момент; она не использует вашу натальную карту.",
+      "step3Title": "Карта дает всем роль",
+      "step3Body": "Восходящий знак и его правитель представляют вас. Определенный дом и его правитель представляют собой вопрос — например, другого человека в отношениях, работу, оплату или путешествие. Луна помогает показать, соединяется ли вопрос и развивается ли он.",
+      "step4Title": "Классические правила оценивают связь",
+      "step4Body": "Расчет проверяет, собираются ли соответствующие планеты вместе, разделяются, получают помощь или сталкиваются с препятствиями. Это может показать поддержку, серьезные препятствия, смешанное свидетельство или то, что карта не дает надежного ответа.",
+      "recastTitle": "Почему один и тот же вопрос не должен быть пересчитан",
+      "recastBody": "Первый искренний момент вопроса — это карта, которая оценивается. Пересчет до получения предпочтительного ответа нарушает метод, а не улучшает его.",
+      "limits": "Это традиционная интерпретация значимого момента. Она может помочь в размышлениях, но не может гарантировать действия другого человека или заменить практические факты и суждения.",
+      "gotIt": "Понятно"
+    },
+    "topics": {
+      "relationship": "Любовь, контакт и примирение",
+      "career": "Исход работы или карьеры",
+      "wealth": "Оплата или доход",
+      "travel": "Запланированное путешествие",
+      "lost": "Пропавшее имущество",
+      "property": "Сделка с недвижимостью"
+    },
+    "questions": {
+      "career_job_offer": "Получу ли я конкретное предложение о работе, которое я рассматриваю?",
+      "career_promotion": "Получу ли я конкретное повышение, о котором я спрашиваю?",
+      "career_application": "Успеет ли мое заявление на эту конкретную должность?",
+      "career_employer_change": "Сработает ли переход на этого конкретного работодателя?",
+      "wealth_overdue_payment": "Будет ли получен этот конкретный просроченный платеж?",
+      "wealth_money_owed": "Будет ли возвращен конкретный долг мне?",
+      "wealth_expected_gain": "Будет ли получен этот определенный ожидаемый финансовый доход?",
+      "relationship_contact": "Позвонит или напишет ли этот конкретный человек мне?",
+      "relationship_unblock": "Снимет ли этот конкретный человек со мной блокировку?",
+      "relationship_reconcile": "Примиримся ли мы с этим конкретным человеком после нашей ссоры?",
+      "relationship_return": "Вернется ли этот конкретный человек в наши отношения?",
+      "relationship_marriage": "Выйдет ли этот конкретный человек за меня замуж?",
+      "marriage_proposal": "Будет ли сделано это конкретное предложение руки и сердца?",
+      "marriage_prospective_spouse": "Будет ли брак с этим конкретным потенциальным супругом?",
+      "travel_planned_journey": "Состоится ли это конкретное запланированное путешествие?",
+      "travel_visa_journey": "Состоится ли это конкретное путешествие, связанное с получением визы?",
+      "lost_recovery": "Будет ли возвращено это конкретное пропавшее имущество?",
+      "lost_find_item": "Найду ли я конкретный предмет, который сейчас пропал?",
+      "property_purchase": "Будет ли завершена эта конкретная покупка недвижимости?",
+      "property_sale": "Будет ли завершена эта конкретная продажа недвижимости с прибылью?"
+    },
+    "outcomes": {
+      "career": {
+        "outcome": "этот профессиональный исход"
+      },
+      "wealth": {
+        "outcome": "получение этих денег"
+      },
+      "relationship": {
+        "contact": "возобновленный контакт",
+        "unblock": "восстановление контакта",
+        "reconcile": "примирение после конфликта",
+        "return": "возвращение в отношения"
+      },
+      "marriage": {
+        "marriage": "брак с этим человеком",
+        "proposal": "это предложение руки и сердца"
+      },
+      "travel": {
+        "outcome": "это запланированное путешествие"
+      },
+      "lost": {
+        "outcome": "восстановление этого пропавшего имущества"
+      },
+      "property": {
+        "buy": "эта покупка недвижимости",
+        "sell": "прибыльная продажа недвижимости"
+      }
+    },
+    "result": {
+      "headings": {
+        "favorable": "Карта поддерживает {{outcome}}",
+        "unfavorable": "Карта показывает серьезные препятствия для {{outcome}}",
+        "mixed": "Карта неоднозначна относительно {{outcome}}",
+        "cannot_judge": "Карта не дает надежного ответа о {{outcome}}"
+      },
+      "summaries": {
+        "favorable": "Применимые правила поддерживают {{outcome}}, и в этом модуле темы не было обнаружено решающих препятствий.",
+        "unfavorable": "Применимые правила показывают препятствие, и ни одно поддерживающее правило не разрешило его.",
+        "mixed": "Некоторые применимые правила поддерживают {{outcome}}, а другие препятствуют ему. Выбранный текст не предоставляет прецедента, который разрешил бы этот конфликт.",
+        "cannot_judge": "Ни один из реализованных правил для этого вопроса не дает решительной индикации. Система не будет генерировать ответ."
+      },
+      "decisions": {
+        "favorable": "Вы можете рассматривать это как традиционную поддержку для продолжения, при этом проверяя факты реального мира.",
+        "unfavorable": "Не рассматривайте ожидаемый исход как безопасный. Решите практическое препятствие или подготовьте другой вариант.",
+        "mixed": "Продолжайте только в том случае, если практические факты приемлемы. Эта карта не оправдывает уверенное «да» или «нет».",
+        "cannot_judge": "Принимайте решение на основе практических доказательств или попросите квалифицированного специалиста изучить сохраненную карту. Не пересчитывайте один и тот же вопрос для получения другого ответа."
+      },
+      "limits": "Используйте это традиционное чтение вместе с обстоятельствами вашей ситуации. Оно не может гарантировать, что произойдет."
+    },
+    "roles": {
+      "career": {
+        "1": "Вы",
+        "10": "Работа или профессиональный исход"
+      },
+      "wealth": {
+        "1": "Вы",
+        "2": "Оплата или доход"
+      },
+      "relationship": {
+        "1": "Вы",
+        "7": "Другой человек или отношения"
+      },
+      "marriage": {
+        "1": "Вы",
+        "7": "Потенциальный супруг или предложение"
+      },
+      "travel": {
+        "1": "Вы",
+        "9": "Путешествие",
+        "7": "Назначение",
+        "4": "Как это заканчивается",
+        "10": "Его цель"
+      },
+      "lost": {
+        "1": "Вы",
+        "2": "Ваше имущество",
+        "4": "Пропавший предмет",
+        "7": "Другая сторона"
+      },
+      "property": {
+        "1": "Покупатель",
+        "4": "Недвижимость",
+        "7": "Продавец",
+        "11": "Прибыль от продажи"
+      }
+    },
+    "calculation": {
+      "ayanamsha": "Hayanaratna 1.9: текстовая прецессия",
+      "houseSystem": "Квадрантные куспиды и границы домов по Hayanaratna (геометрия Sripati)"
+    },
+    "evidence": {
+      "career": {
+        "support": "Классические правила показывают конструктивную связь между вами и профессиональным исходом.",
+        "obstruction": "Классическое условие ослабляет или препятствует профессиональному исходу."
+      },
+      "wealth": {
+        "support": "Оплата или доход связана с вами или получает помощь.",
+        "obstruction": "Трудности или сопутствующая проблема влияют на ожидаемый доход."
+      },
+      "relationship": {
+        "support": "Карта показывает связь между вами, другим человеком и запрошенным исходом.",
+        "obstruction": "Конфликт, давление или отсутствие связи оказывают влияние на отношения."
+      },
+      "marriage": {
+        "support": "Карта соединяет вас с потенциальным супругом или предложением.",
+        "obstruction": "Индикатор потенциального супруга или предложение серьезно ослаблены."
+      },
+      "travel": {
+        "support": "Запланированное путешествие имеет поддерживающую связь и может пройти.",
+        "obstruction": "Путешествие, пункт назначения или цель сталкиваются с препятствиями."
+      },
+      "lost": {
+        "support": "Имущество остается связанным с вами, и восстановление получает поддержку.",
+        "obstruction": "Классическое условие работает против восстановления предмета."
+      },
+      "property": {
+        "support": "Покупатель, недвижимость или продажа имеют силу, необходимую этому правилу.",
+        "obstruction": "Покупка или прибыльная продажа не хватает силы, необходимой этому правилу."
+      }
+    },
+    "planets": {
+      "sun": "Солнце",
+      "moon": "Луна",
+      "mars": "Марс",
+      "mercury": "Меркурий",
+      "jupiter": "Юпитер",
+      "venus": "Венера",
+      "saturn": "Сатурн",
+      "rahu": "Раху",
+      "ketu": "Кету"
+    }
+  },
+  "chinese": {
+    "discoveryTitle": "问题指引",
+    "exploreTitle": "询问情况",
+    "homeLabel": "提问",
+    "methodLabel": "古典占卜",
+    "toolBadge": "占卜 · {{count}} cr",
+    "discoveryBody": "古典占卜 · 他们会联系你吗？ 关系、工作、付款或旅行会成功吗？",
+    "screen": {
+      "noQuestions": "没有返回支持的占卜问题。",
+      "topicsLoadError": "无法加载支持的问题列表。",
+      "invalidResult": "计算返回无效结果并已停止。",
+      "calculationError": "无法计算占卜图。",
+      "authFeature": "占卜问事星盘",
+      "authMessage": "登录以计算古典占卜问事星盘。问事星盘仅在生成时收取费用。",
+      "selectedQuestion": "您选择的问题",
+      "fixedMoment": "固定在 {{date}} {{time}} · {{place}}",
+      "selectedLocation": "已选位置",
+      "supports": "支持因素",
+      "obstructs": "阻碍因素",
+      "decisionMeaning": "对您的决定意味着什么",
+      "showWorking": "显示古典计算过程",
+      "hideWorking": "隐藏古典计算过程",
+      "methodCalculation": "方法和计算",
+      "classicalRoles": "古典角色",
+      "houseRole": "宫位 {{house}}: {{role}} — {{lord}}",
+      "matchedRules": "匹配的规则",
+      "askNew": "提新问题",
+      "pageTitle": "询问一个真实情况",
+      "brandLine": "占卜 · 一个问题。一个有意义的时刻。",
+      "lead": "针对当下一个真诚而重要的问题，提供古典占星指引。请选择类别和与您所问事项完全相符的句子，再按您当前的时间与地点计算问事星盘。",
+      "howLink": "占卜如何运作",
+      "goodUses": "适用场景",
+      "goodUsesBody": "收到特定人的来电或消息，解除阻碍，在争吵后和解，与特定人结婚，获得特定工作，收到付款，进行旅行，找回丢失的物品或进行房产交易。",
+      "notAvailable": "不适用",
+      "notAvailableBody": "健康、怀孕、死亡、法庭结果、投机性交易、广泛的人生解读或重复相同的问题。",
+      "categoryLabel": "问题是关于什么的？",
+      "questionLabel": "您要问什么问题？",
+      "questionHint": "请牢记一个真实情况，仅当句子完全匹配时才选择。",
+      "castNotice": "请牢记具体事项。确认并计算后，时间将被固定。不要对未改变的问题重新计算。",
+      "placeLabel": "您现在询问的地点",
+      "placePlaceholder": "城市，州，国家",
+      "castButton": "计算这张问事星盘",
+      "headerEyebrow": "古典问事星盘",
+      "moreCredits": "需要更多积分",
+      "creditBody": "此占卜图需要 {{cost}} 积分。您目前有 {{credits}}。",
+      "getCredits": "获取积分",
+      "cancel": "取消",
+      "matchedRuleRefs": "匹配规则：{{rules}}",
+      "close": "关闭"
+    },
+    "how": {
+      "eyebrow": "用简单的语言解释",
+      "title": "占卜如何运作",
+      "intro": "占卜意味着‘问题’。 古典文本说，当一个真实的担忧变得紧急时，一个人会受到命运或神圣秩序的驱使来寻求答案。 在日常语言中，传统将您真诚的询问冲动和询问的时刻联系起来。",
+      "step1Title": "持有真诚的问题",
+      "step1Body": "选择一个现在重要的事情。不要组合多个问题或重复使用相同的问题测试系统。",
+      "step2Title": "询问的时刻成为问事星盘",
+      "step2Body": "确认并计算问事星盘时，应用会固定当下的准确时间和您所在的地点。Prashna 解读的是这一刻，不使用您的出生星盘。",
+      "step3Title": "问事星盘赋予每个人一个角色",
+      "step3Body": "上升星座及其统治者代表您。一个特定的宫位及其统治者代表事项——例如，一段关系中的另一人、一份工作、一笔付款或一次旅行。月亮有助于显示事项是否连接和发展。",
+      "step4Title": "古典规则判断连接",
+      "step4Body": "计算检查相关行星是否汇聚、分离、获得帮助或遇到阻碍。它可以显示支持、严重的障碍、混合的证词或问事星盘无法提供可靠的答案。",
+      "recastTitle": "为什么不应该重新计算相同的问题",
+      "recastBody": "第一个真诚的询问时刻是正在被判断的问事星盘。重新计算直到出现首选答案会破坏方法，而不是改进它。",
+      "limits": "这是一个对有意义时刻的传统解读。它可以指导反思，但不能保证他人的行为或取代实际的事实和判断。",
+      "gotIt": "明白了"
+    },
+    "topics": {
+      "relationship": "爱情、联系与和解",
+      "career": "工作或职业结果",
+      "wealth": "付款或收益",
+      "travel": "计划中的旅行",
+      "lost": "丢失的物品",
+      "property": "房产交易"
+    },
+    "questions": {
+      "career_job_offer": "我会收到我正在考虑的具体工作邀请吗？",
+      "career_promotion": "我会收到我询问的具体晋升吗？",
+      "career_application": "我申请这个特定职位会成功吗？",
+      "career_employer_change": "更换到这个特定雇主会成功吗？",
+      "wealth_overdue_payment": "我会收到这笔具体的逾期付款吗？",
+      "wealth_money_owed": "我会收回这笔欠我的钱吗？",
+      "wealth_expected_gain": "我会收到这笔预期的财务收益吗？",
+      "relationship_contact": "这个特定的人会联系我吗？",
+      "relationship_unblock": "这个特定的人会解除我的屏蔽吗？",
+      "relationship_reconcile": "我和这个特定的人会在争吵后和解吗？",
+      "relationship_return": "这个特定的人会回到我们的关系中吗？",
+      "relationship_marriage": "这个特定的人会嫁给我吗？",
+      "marriage_proposal": "这个婚姻提议会继续进行吗？",
+      "marriage_prospective_spouse": "我和这位潜在配偶的婚姻会继续进行吗？",
+      "travel_planned_journey": "这次计划中的旅行会发生吗？",
+      "travel_visa_journey": "这次与签证相关的旅行会发生吗？",
+      "lost_recovery": "我会找回这个丢失的物品吗？",
+      "lost_find_item": "我会找到目前丢失的物品吗？",
+      "property_purchase": "这次房产购买会完成吗？",
+      "property_sale": "这次房产销售会盈利完成吗？"
+    },
+    "outcomes": {
+      "career": {
+        "outcome": "这个职业结果"
+      },
+      "wealth": {
+        "outcome": "收到这笔钱"
+      },
+      "relationship": {
+        "contact": "重新联系",
+        "unblock": "解除屏蔽",
+        "reconcile": "争吵后的和解",
+        "return": "回到关系中"
+      },
+      "marriage": {
+        "marriage": "与此人结婚",
+        "proposal": "这个婚姻提议"
+      },
+      "travel": {
+        "outcome": "这次计划中的旅行"
+      },
+      "lost": {
+        "outcome": "找回丢失的物品"
+      },
+      "property": {
+        "buy": "这次房产购买",
+        "sell": "盈利的房产销售"
+      }
+    },
+    "result": {
+      "headings": {
+        "favorable": "问事星盘支持 {{outcome}}",
+        "unfavorable": "问事星盘显示对 {{outcome}} 存在严重障碍",
+        "mixed": "问事星盘对 {{outcome}} 意见不一",
+        "cannot_judge": "问事星盘无法对 {{outcome}} 给出可靠的答案"
+      },
+      "summaries": {
+        "favorable": "适用的规则支持 {{outcome}}，并且没有发现此主题模块中的决定性障碍。",
+        "unfavorable": "适用的规则显示障碍，并且没有解决规则。",
+        "mixed": "一些适用的规则支持 {{outcome}}，而另一些规则则会阻碍它。所选文本没有提供可以解决此冲突的优先顺序。",
+        "cannot_judge": "用于此问题的任何实现的规则都没有产生明确的指示。系统将不会生成答案。"
+      },
+      "decisions": {
+        "favorable": "您可以将其视为对继续进行的支持，同时仍检查现实世界的实际情况。",
+        "unfavorable": "不要将期望的结果视为安全。解决实际的障碍或准备另一个选项。",
+        "mixed": "仅在实际情况可接受的情况下继续。此问事星盘不能证明肯定或否定的信心。",
+        "cannot_judge": "根据实际证据做出决定或请合格的从业者检查保存的问事星盘。不要重新计算相同的问题以获得不同的答案。"
+      },
+      "limits": "将此传统解读与您的情况的事实结合使用。它不能保证会发生什么。"
+    },
+    "roles": {
+      "career": {
+        "1": "您",
+        "10": "工作或职业结果"
+      },
+      "wealth": {
+        "1": "您",
+        "2": "付款或收益"
+      },
+      "relationship": {
+        "1": "您",
+        "7": "另一人或关系"
+      },
+      "marriage": {
+        "1": "您",
+        "7": "潜在配偶或提议"
+      },
+      "travel": {
+        "1": "您",
+        "9": "旅行",
+        "7": "目的地",
+        "4": "如何结束",
+        "10": "其目的"
+      },
+      "lost": {
+        "1": "您",
+        "2": "您的物品",
+        "4": "丢失的物品",
+        "7": "另一方"
+      },
+      "property": {
+        "1": "买家",
+        "4": "房产",
+        "7": "卖家",
+        "11": "销售利润"
+      }
+    },
+    "calculation": {
+      "ayanamsha": "Hayanaratna 1.9 文本岁差法",
+      "houseSystem": "Hayanaratna 四分象限宫位中点与交界（Sripati 几何法）"
+    },
+    "evidence": {
+      "career": {
+        "support": "古典规则显示您和职业结果之间存在建设性联系。",
+        "obstruction": "一种古典条件削弱或阻碍了职业结果。"
+      },
+      "wealth": {
+        "support": "付款或收益与您相关或获得帮助。",
+        "obstruction": "困难或伴随问题影响了预期的收益。"
+      },
+      "relationship": {
+        "support": "问事星盘显示您、另一人以及请求的结果之间存在联系。",
+        "obstruction": "冲突、压力或缺乏联系影响了关系。"
+      },
+      "marriage": {
+        "support": "问事星盘将您与潜在配偶或提议联系起来。",
+        "obstruction": "潜在配偶指示器或提议严重减弱。"
+      },
+      "travel": {
+        "support": "计划中的旅行具有支持性联系，可以继续进行。",
+        "obstruction": "旅行、目的地或目的会遇到阻碍。"
+      },
+      "lost": {
+        "support": "物品仍然与您相关，并且恢复得到支持。",
+        "obstruction": "一种古典条件反对物品的恢复。"
+      },
+      "property": {
+        "support": "买家、房产或销售具有此规则所需的强度。",
+        "obstruction": "购买或盈利销售缺乏此规则所需的强度。"
+      }
+    },
+    "planets": {
+      "sun": "太阳",
+      "moon": "月亮",
+      "mars": "火星",
+      "mercury": "水星",
+      "jupiter": "木星",
+      "venus": "金星",
+      "saturn": "土星",
+      "rahu": "罗睺",
+      "ketu": "计都"
+    }
+  }
+}

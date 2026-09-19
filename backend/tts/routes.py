@@ -428,9 +428,9 @@ def _apply_pronunciation_plain(text: str, *, compact_hyphens: bool = False) -> s
 def _tighten_male_breaks(text: str, *, extra_short: bool = False) -> str:
   """SSML <break> is wall-clock silence and does not scale with speaking_rate."""
   replacements = [
-    ('<break time="1300ms"/>', '<break time="700ms"/>' if extra_short else '<break time="950ms"/>'),
-    ('<break time="900ms"/>', '<break time="320ms"/>' if extra_short else '<break time="650ms"/>'),
-    ('<break time="420ms"/>', '<break time="160ms"/>' if extra_short else '<break time="220ms"/>'),
+    ('<break time="720ms"/>', '<break time="400ms"/>' if extra_short else '<break time="480ms"/>'),
+    ('<break time="480ms"/>', '<break time="260ms"/>' if extra_short else '<break time="300ms"/>'),
+    ('<break time="240ms"/>', '<break time="120ms"/>' if extra_short else '<break time="140ms"/>'),
     ('<break time="380ms"/>', '<break time="160ms"/>' if extra_short else '<break time="240ms"/>'),
     ('<break time="160ms"/>', '<break time="70ms"/>' if extra_short else '<break time="90ms"/>'),
     ('<break time="70ms"/>', '<break time="40ms"/>' if extra_short else '<break time="50ms"/>'),
@@ -497,30 +497,144 @@ def _fallback_spoken_tts_text(text: str, lang: str) -> str:
   return spoken
 
 
+_PAUSE_DURATION_ALIASES = {
+  "short": "short",
+  "brief": "short",
+  "beat": "short",
+  "tiny": "short",
+  "small": "short",
+  "medium": "medium",
+  "mid": "medium",
+  "normal": "medium",
+  "long": "long",
+  "extended": "long",
+}
+
+
+def _pause_duration_from_blob(blob: str) -> str:
+  tokens = re.sub(r"[^a-z]+", " ", (blob or "").lower()).split()
+  for token in tokens:
+    if token in _PAUSE_DURATION_ALIASES:
+      return _PAUSE_DURATION_ALIASES[token]
+  return "short"
+
+
+def _normalize_pause_cues(text: str) -> str:
+  """Rewrite spoken/malformed pause stage directions into [PAUSE:short|medium|long]."""
+  if not text:
+    return text
+
+  def _from_groups(match: re.Match) -> str:
+    blob = next((group for group in match.groups() if group is not None), "")
+    return f"[PAUSE:{_pause_duration_from_blob(blob)}]"
+
+  cleaned = re.sub(
+    r"\[\s*PAUS[EC]\s*:?\s*([^\]]*)\]",
+    _from_groups,
+    str(text),
+    flags=re.IGNORECASE,
+  )
+  cleaned = re.sub(
+    r"\(\s*PAUS[EC]\s*:?\s*([^)]*)\)",
+    _from_groups,
+    cleaned,
+    flags=re.IGNORECASE,
+  )
+  cleaned = re.sub(
+    r"(?<!\[)\bPAUS[EC][\s:_-]+(short|medium|long|brief|beat|mid)\b",
+    lambda match: f"[PAUSE:{_pause_duration_from_blob(match.group(1))}]",
+    cleaned,
+    flags=re.IGNORECASE,
+  )
+  cleaned = re.sub(
+    r"\b(short|medium|long|brief)\s+PAUS[EC](?:es|s)?\b",
+    lambda match: f"[PAUSE:{_pause_duration_from_blob(match.group(1))}]",
+    cleaned,
+    flags=re.IGNORECASE,
+  )
+  # "Yeah. pause. Mars" / ", pause," — a cue, not the verb "pause before you send".
+  cleaned = re.sub(
+    r"(?:(?<=[.!?:,;।])\s+|\A)pause(?:s|es)?(?=\s*[.!?:,;।]|\s*$)",
+    "[PAUSE:short]",
+    cleaned,
+    flags=re.IGNORECASE,
+  )
+  # Spoken stage-direction runs like "pause, pause short pause long" should
+  # become one breath, not a stack of silences.
+  cleaned = re.sub(
+    r"(?:\[PAUSE:(?:short|medium|long)\]\s*[,;:]?\s*){2,}",
+    "[PAUSE:short]",
+    cleaned,
+  )
+  return cleaned
+
+
+def _replace_pause_cues_with_ssml_breaks(text: str) -> str:
+  cleaned = _normalize_pause_cues(text)
+  cleaned = re.sub(r"\[\s*PAUSE:short\s*\]", '<break time="240ms"/>', cleaned, flags=re.IGNORECASE)
+  cleaned = re.sub(r"\[\s*PAUSE:medium\s*\]", '<break time="480ms"/>', cleaned, flags=re.IGNORECASE)
+  cleaned = re.sub(r"\[\s*PAUSE:long\s*\]", '<break time="720ms"/>', cleaned, flags=re.IGNORECASE)
+  # Any leftover pause tag must never reach the voice as spoken words.
+  cleaned = re.sub(r"\[\s*PAUS[EC][^\]]*\]", '<break time="240ms"/>', cleaned, flags=re.IGNORECASE)
+  cleaned = re.sub(r"\[\s*(<break time=\"\d+ms\"/>)\s*\]", r"\1", cleaned)
+  return _collapse_adjacent_breaks(cleaned)
+
+
+def _strip_residual_spoken_pause_words(text: str) -> str:
+  """Drop pause-cue leftovers in text nodes so Chirp cannot vocalize them."""
+  cleaned = re.sub(r"\[\s*PAUS[EC][^\]]*\]", " ", text or "", flags=re.IGNORECASE)
+  cleaned = re.sub(r"\(\s*PAUS[EC][^)]*\)", " ", cleaned, flags=re.IGNORECASE)
+  cleaned = re.sub(
+    r"\bPAUS[EC][\s:_-]+(?:short|medium|long|brief|beat|mid)\b",
+    " ",
+    cleaned,
+    flags=re.IGNORECASE,
+  )
+  cleaned = re.sub(
+    r"\b(?:short|medium|long|brief)\s+PAUS[EC](?:es|s)?\b",
+    " ",
+    cleaned,
+    flags=re.IGNORECASE,
+  )
+  cleaned = re.sub(
+    r"(?:(?<=[.!?:,;।])\s+|\A)pause(?:s|es)?(?=\s*[.!?:,;।]|\s*$)",
+    " ",
+    cleaned,
+    flags=re.IGNORECASE,
+  )
+  return cleaned
+
+
+def _strip_residual_pause_cues_preserving_ssml(text: str) -> str:
+  parts = re.split(r"(<[^>]+>)", text or "")
+  out: list[str] = []
+  for part in parts:
+    if part.startswith("<") and part.endswith(">"):
+      out.append(part)
+    else:
+      out.append(_strip_residual_spoken_pause_words(part))
+  return "".join(out)
+
+
 def _strip_spoken_control_cues_for_plain_tts(text: str) -> str:
   """Remove pause/emphasis control cues before sending text to non-SSML TTS."""
-  cleaned = str(text or "")
+  cleaned = _normalize_pause_cues(str(text or ""))
   # Preserve punctuation that already carries the pause. Replacing a cue after
   # a comma with another period produced text such as `coordination,. data`,
   # which some premium voices verbalize as "coordination dot data".
   cleaned = re.sub(
-    r"([,.;:?!।])\s*\[\s*PAUS[EC]\s*:\s*(?:short|medium|long)\s*\]",
+    r"([,.;:?!।])\s*\[\s*PAUSE:(?:short|medium|long)\s*\]",
     r"\1 ",
     cleaned,
     flags=re.IGNORECASE,
   )
   cleaned = re.sub(
-    r"\[\s*PAUS[EC]\s*:\s*(?:short|medium|long)\s*\]",
+    r"\[\s*PAUSE:(?:short|medium|long)\s*\]",
     ". ",
     cleaned,
     flags=re.IGNORECASE,
   )
-  cleaned = re.sub(
-    r"\bPAUS[EC][\s:_-]+(?:short|medium|long)\b",
-    ". ",
-    cleaned,
-    flags=re.IGNORECASE,
-  )
+  cleaned = _strip_residual_spoken_pause_words(cleaned)
   cleaned = re.sub(
     r"\[\s*(?:EMPHASIS|RISE|FALL|SLOW)\s*:\s*([^\]]+)\]",
     r"\1",
@@ -598,6 +712,7 @@ Original answer:
     if not shaped:
       return base_text
     shaped = _strip_followups_block(shaped)
+    shaped = _normalize_pause_cues(shaped)
     shaped = re.sub(r"\s{2,}", " ", shaped).strip()
     if not shaped:
       return base_text
@@ -613,6 +728,7 @@ Original answer:
 
 def _segment_text_to_plain(segment_text: str) -> str:
   text = html.unescape(str(segment_text or ""))
+  text = _normalize_pause_cues(text)
   text = _strip_literal_punctuation_words(text)
   text = _apply_pronunciation_plain(text)
   text = re.sub(r"\[PAUSE:(?:short|medium|long)\]", ". ", text, flags=re.IGNORECASE)
@@ -633,7 +749,7 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female", ssml_mode: st
   base_hash = sum(ord(ch) for ch in segment_text)
 
   # Escape XML in the text so we can safely insert SSML tags
-  text = _escape_ssml_text(_strip_literal_punctuation_words(segment_text.strip()))
+  text = _escape_ssml_text(_strip_literal_punctuation_words(_normalize_pause_cues(segment_text.strip())))
   if ssml_mode in ("breaks", "cues"):
     # Neural2 treats "Daa-sha" hyphens as extra pauses; compact those aliases.
     text = _apply_pronunciation_plain(text, compact_hyphens=(ssml_mode == "cues"))
@@ -641,9 +757,8 @@ def _segment_text_to_ssml(segment_text: str, role: str = "female", ssml_mode: st
     # Improve pronunciation of Sanskrit/astrology terms via SSML <sub alias="...">
     text = _apply_pronunciation_ssml(text)
   # Pauses — defaults; we will further tighten them for the male host below so he sounds less choppy.
-  text = re.sub(r"\[PAUSE:short\]", '<break time="420ms"/>', text, flags=re.IGNORECASE)
-  text = re.sub(r"\[PAUSE:medium\]", '<break time="900ms"/>', text, flags=re.IGNORECASE)
-  text = re.sub(r"\[PAUSE:long\]", '<break time="1300ms"/>', text, flags=re.IGNORECASE)
+  text = _replace_pause_cues_with_ssml_breaks(text)
+  text = _strip_residual_pause_cues_preserving_ssml(text)
   if ssml_mode in ("breaks", "cues"):
     text = re.sub(r"\[(?:EMPHASIS|RISE|FALL|SLOW):([^\]]+)\]", r"\1", text, flags=re.IGNORECASE)
     if ssml_mode == "breaks":
@@ -979,7 +1094,7 @@ def _wrap_marked_ssml(content_parts: list[str]) -> str:
 
 
 def _build_marked_ssml_chunks_and_timeline(text: str) -> list[dict]:
-  raw = _strip_literal_punctuation_words(text or "").strip()
+  raw = _strip_literal_punctuation_words(_normalize_pause_cues(text or "")).strip()
   if not raw:
     return []
 
@@ -2009,7 +2124,8 @@ def _podcast_native_name_hint(source: dict) -> str:
   opening = " ".join(
     str(item.get("text") or "") for item in (segments or [])[:3] if isinstance(item, dict)
   )
-  opening = re.sub(r"\[(?:PAUSE|EMPHASIS|RISE|FALL|SLOW):([^\]]*)\]", r"\1", opening, flags=re.IGNORECASE)
+  opening = re.sub(r"\[PAUSE:[^\]]*\]", " ", opening, flags=re.IGNORECASE)
+  opening = re.sub(r"\[(?:EMPHASIS|RISE|FALL|SLOW):([^\]]*)\]", r"\1", opening, flags=re.IGNORECASE)
   patterns = (
     r"today(?:'|’)s\s+personal\s+reading\s+is\s+for\s+([^.!?]+)",
     r"आज\s+की\s+यह\s+व्यक्तिगत\s+रीडिंग\s+(.+?)\s+के\s+लिए\s+है",

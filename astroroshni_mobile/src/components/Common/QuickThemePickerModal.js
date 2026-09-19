@@ -17,7 +17,7 @@ export default function QuickThemePickerModal({ visible, onClose, onViewAll, dis
           <View style={[styles.handle, { backgroundColor: colors.cardBorder }]} />
           <View style={styles.header}>
             <View style={[styles.icon, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
-              <Ionicons name="color-palette-outline" size={23} color={colors.primary} />
+              <Ionicons name="color-palette-outline" size={23} color={colors.selectionText} />
             </View>
             <View style={styles.headerCopy}>
               <Text style={[styles.eyebrow, { color: colors.primary }]}>

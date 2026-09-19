@@ -525,7 +525,7 @@ export default function PremiumTodayOverview({
         <Metric label={t('premiumUi.home.activePeriod')} value={mahadasha ? t('premiumUi.home.mahadasha', { name: mahadasha }) : null} onPress={hasChart ? onOpenDasha : onCreateChart} colors={colors} icon="time-outline" calculating={t('premiumUi.home.calculating')} />
         <Metric label={t('premiumUi.home.todaysNakshatra')} value={nakshatra} onPress={onOpenNakshatra} colors={colors} icon="star-outline" calculating={t('premiumUi.home.calculating')} />
         <Metric label={t('premiumUi.home.dayWindow')} value={panchangWindow || t('premiumUi.home.openPanchang')} onPress={onOpenPanchang} colors={colors} icon="sunny-outline" calculating={t('premiumUi.home.calculating')} />
-        <Metric label={t('menu.prashna', 'Prashna')} value={t('prashna.eyebrow', 'Question chart')} onPress={hasChart ? onOpenPrashna : onCreateChart} colors={colors} icon="help-circle-outline" calculating={t('premiumUi.home.calculating')} />
+        <Metric label={t('prashna.homeLabel', 'Ask a Question')} value={t('prashna.methodLabel', 'Classical Prashna')} onPress={onOpenPrashna} colors={colors} icon="help-circle-outline" calculating={t('premiumUi.home.calculating')} />
       </View>
 
       <TouchableOpacity onPress={onOpenExplore} activeOpacity={0.82} style={[styles.exploreButton, { borderColor: colors.borderStrong }]}>
@@ -586,6 +586,8 @@ export function PremiumExploreIntro({
   onOpenYearly,
   onOpenMonthly,
   onOpenPrashna,
+  prashnaCost = 3,
+  prashnaOriginalCost = null,
   eventsCost = 100,
   paths = [],
   analyses = [],
@@ -596,7 +598,7 @@ export function PremiumExploreIntro({
   const { t } = useTranslation();
   const shortcuts = [
     ['grid-outline', t('premiumUi.home.chartsDashas'), t('premiumUi.home.technicalWorkbench'), onOpenCharts],
-    ['help-circle-outline', t('menu.prashna', 'Prashna'), t('prashna.shortcutBody', 'Yes or no from the question’s time'), onOpenPrashna],
+    ['help-circle-outline', t('prashna.exploreTitle', 'Ask About a Situation'), t('prashna.discoveryBody', 'Classical Prashna · Will they contact you? Will a relationship, job, payment, or journey work out?'), onOpenPrashna, prashnaCost, prashnaOriginalCost],
     ['document-text-outline', t('premiumUi.home.premiumReports'), t('premiumUi.home.longReadings'), onOpenReports],
     ['sunny-outline', t('premiumUi.home.panchang'), t('premiumUi.home.dayRhythm'), onOpenPanchang],
     ['time-outline', t('premiumUi.home.muhurat'), t('premiumUi.home.supportiveTiming'), onOpenMuhurat],
@@ -694,15 +696,20 @@ export function PremiumExploreIntro({
       <CatalogueGroup eyebrow={t('premiumUi.home.waysBegin')} title={t('premiumUi.home.guidedExperiences')} items={guidedPaths} onSelect={onSelectPath} colors={colors} typography={typography} t={t} />
       <CatalogueGroup eyebrow={t('premiumUi.home.completeChart')} title={t('premiumUi.home.personalReadings')} items={personalAnalyses} onSelect={onSelectAnalysis} colors={colors} typography={typography} t={t} />
       <View style={[styles.studioDirectory, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-        {shortcuts.map(([icon, title, body, onPress]) => (
+        {shortcuts.map(([icon, title, body, onPress, cost, originalCost]) => (
           <TouchableOpacity key={title} onPress={onPress} activeOpacity={0.82} style={[styles.shortcut, { borderBottomColor: colors.cardBorder }]}>
             <View style={[styles.shortcutIcon, { backgroundColor: colors.accentSoft }]}>
               <Ionicons name={icon} size={17} color={colors.onAccent} />
             </View>
             <View style={styles.shortcutCopy}>
               <Text style={[styles.shortcutTitle, { color: colors.text }]}>{title}</Text>
-              <Text style={[styles.shortcutBody, { color: colors.textSecondary }]} numberOfLines={1}>{body}</Text>
+              <Text style={[styles.shortcutBody, { color: colors.textSecondary }]} numberOfLines={2}>{body}</Text>
             </View>
+            {Number(cost) > 0 ? <View style={styles.shortcutCostWrap}>
+              <Ionicons name="diamond-outline" size={11} color={colors.primaryStrong} />
+              {Number(originalCost) > Number(cost) ? <Text style={[styles.shortcutOriginalCost, { color: colors.textTertiary }]}>{originalCost}</Text> : null}
+              <Text style={[styles.shortcutCost, { color: colors.primaryStrong }]}>{cost}</Text>
+            </View> : null}
             <Ionicons name="arrow-forward" size={16} color={colors.textTertiary} />
           </TouchableOpacity>
         ))}
@@ -825,6 +832,9 @@ const styles = StyleSheet.create({
   shortcut: { minHeight: 72, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
   shortcutIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   shortcutCopy: { flex: 1 },
+  shortcutCostWrap: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  shortcutOriginalCost: { fontSize: 10, textDecorationLine: 'line-through' },
+  shortcutCost: { fontSize: 12, fontWeight: '900' },
   shortcutTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 17, marginBottom: 3 },
   shortcutBody: { fontSize: 11, lineHeight: 15, fontWeight: '500' },
   catalogueSection: { gap: 0 },

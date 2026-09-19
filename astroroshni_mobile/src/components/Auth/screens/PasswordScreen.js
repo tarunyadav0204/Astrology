@@ -373,7 +373,7 @@ export default function PasswordScreen({
           ]}
         >
           <TouchableOpacity
-            style={[styles.continueButton, !isValid && styles.buttonDisabled]}
+            style={[styles.continueButton, { shadowColor: colors.accent }, !isValid && styles.buttonDisabled]}
             onPress={handleContinue}
             disabled={!isValid || loading}
           >
@@ -381,7 +381,7 @@ export default function PasswordScreen({
               colors={isValid ? [colors.accent, colors.accent] : [colors.surfaceMuted, colors.surfaceMuted]}
               style={styles.buttonGradient}
             >
-              <Text style={styles.buttonText}>
+              <Text style={[styles.buttonText, { color: isValid ? colors.onAccent : colors.textTertiary }]}>
                 {loading ? (isLogin ? 'Signing In...' : 'Continue') : (isLogin ? 'Sign In' : 'Continue')}
               </Text>
               <Ionicons name="arrow-forward" size={20} color={isValid ? colors.onAccent : colors.textTertiary} />
@@ -484,7 +484,7 @@ export default function PasswordScreen({
             style={styles.forgotButton}
             onPress={() => navigateToScreen('forgotPassword')}
           >
-            <Text style={styles.forgotText}>Forgot Password?</Text>
+            <Text style={[styles.forgotText, { color: colors.onSurfaceInverse }]}>Forgot Password?</Text>
           </TouchableOpacity>
         )}
       </Animated.View>
@@ -584,7 +584,6 @@ const styles = StyleSheet.create({
   continueButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#ff6b35',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -601,7 +600,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buttonText: {
-    color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
   },
@@ -610,8 +608,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   forgotText: {
-    color: '#ff6b35',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '700',
   },
 });

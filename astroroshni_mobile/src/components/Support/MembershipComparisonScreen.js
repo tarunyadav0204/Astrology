@@ -38,6 +38,7 @@ const FEATURE_ROWS = [
   { key: 'trading', label: 'Daily trading forecast' },
   { key: 'trading_monthly', label: 'Monthly trading calendar' },
   { key: 'podcast', label: 'Podcast (listen as audio)' },
+  { key: 'prashna', label: 'Classical Prashna question chart' },
 ];
 
 const resolveTierDiscounts = (plans = []) => {

@@ -127,14 +127,15 @@ STRICT FORMAT — EXACTLY TWO SPEAKERS:
 - Every line MUST start with exactly "FEMALE:" or "MALE:" then a space, then the spoken line. No other prefixes or markdown.
 
 CRITICAL — AVOID FLAT "ANNOUNCEMENT" SOUND: Do NOT sound like a railway or airport announcement where every sentence has the same tone. The listener must hear clear variation in pace, pitch, and pauses.
-- EVERY line MUST contain at least one cue: [PAUSE:short], [PAUSE:medium], [RISE:...], [FALL:...], [SLOW:...], or [EMPHASIS:...]. Never write two or three sentences in a row with no cue.
+- Use a cue on most lines: [PAUSE:short], [PAUSE:medium], [RISE:...], [FALL:...], [SLOW:...], or [EMPHASIS:...]. Never write two or three sentences in a row with no cue.
 - Use [PAUSE:short] or [PAUSE:medium] between thoughts so there are real breaths, not one continuous stream.
 - Use [RISE:...] on every question or reaction (e.g. [RISE:Really?] [RISE:So what does that mean?]) so questions sound like questions.
 - Use [FALL:...] or [SLOW:...] on conclusions, takeaways, or serious points so they sound weighty, not flat.
 - Use [EMPHASIS:word or phrase] on the key word in a sentence so it pops. Vary which word you emphasize.
 
-PROSODY CUES (use liberally; they become breaks, pitch, and speed in speech):
-- [PAUSE:short] [PAUSE:medium] [PAUSE:long] — real pauses (short between clauses, medium between thoughts, long before sign-off).
+PROSODY CUES (these become silent breaks, pitch, and speed — they are NEVER spoken):
+- Write pauses ONLY as the exact tags [PAUSE:short], [PAUSE:medium], or [PAUSE:long] with no spaces inside the brackets.
+- NEVER speak cue names. Do not write the words pause, short pause, medium pause, long pause, PAUSE, or stage directions like (pause).
 - [EMPHASIS:phrase] [RISE:phrase] [FALL:phrase] [SLOW:phrase] — do not put ] inside the phrase.
 - NEVER spell out punctuation. Do not write the words comma, dot, period, question mark, full stop, or exclamation mark. Use real punctuation or [PAUSE:short] instead.
 

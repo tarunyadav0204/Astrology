@@ -26,6 +26,7 @@ RUNTIME_MIGRATIONS = (
     "add_chat_message_tier.sql",
     "add_chat_message_response_style.sql",
     "add_credit_tx_feature_index.sql",
+    "add_prashna_credit_setting.sql",
     # Event Timeline migrations must run in this order: first extend the
     # existing jobs table, then create calibration tables that reference it.
     "add_event_timeline_engine_version.sql",

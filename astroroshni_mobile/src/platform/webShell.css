@@ -120,16 +120,28 @@ body:has([role='dialog']) [data-ar-home-bottom-nav='1'] {
 }
 
 /*
- * RN multiline TextInput → <textarea>. Without rows=1 it defaults to 2 rows and
- * the placeholder sits high vs. the send button. Force single-line intrinsic size.
+ * Chat composer only. Empty stays one row (placeholder vs send button).
+ * Filled grows with content up to three lines.
  */
-#root textarea {
+#chat-composer-input {
   margin: 0;
   resize: none;
   vertical-align: middle;
   box-sizing: border-box;
-  /* Override UA 2-row default if rows attr is missing on any composer */
+}
+
+#chat-composer-input:placeholder-shown {
   field-sizing: fixed;
+  height: 44px !important;
+  max-height: 44px !important;
+  overflow: hidden;
+}
+
+#chat-composer-input:not(:placeholder-shown) {
+  field-sizing: content;
+  min-height: 44px;
+  max-height: 88px;
+  overflow-y: auto;
 }
 
 input:focus,

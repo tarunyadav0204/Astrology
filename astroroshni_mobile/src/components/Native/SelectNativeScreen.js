@@ -157,7 +157,7 @@ const ProfileCard = ({ profile, selectedProfileKey, onSelect, onMore, getZodiacS
                 },
               ]}
             >
-              <Text style={[styles.zodiacText, { color: selected ? colors.accent : colors.onAccent }]}>{getZodiacSign(profile)}</Text>
+              <Text style={[styles.zodiacText, { color: selected ? colors.selectionText : colors.onAccent }]}>{getZodiacSign(profile)}</Text>
             </View>
             <View style={styles.profileDetails}>
               <Text style={[styles.relationKicker, { color: selected ? colors.selectionText : colors.primary }]}>
