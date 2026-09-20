@@ -1,5 +1,41 @@
 # Release Tracker
 
+## Version 247
+
+- Status: In progress
+- App version: 1.2.5
+- Android version code: 247
+- Started: 2026-09-20
+
+### Google Play release notes
+
+Introducing Prashna: choose a focused question and receive a clear, classically grounded Vedic reading with supporting factors and timing guidance. Preview complete sample Monthly and Yearly Event Timelines before using credits. Ask Tara now suggests personalized questions from your chart, recent readings and active themes, without forcing a today-only interpretation. Also includes localized Prashna content, clearer credit information, usability improvements and reliability fixes.
+
+### Included changes
+
+- [x] Rebuild Prashna around a focused, classical question-chart workflow with guided categories and selectable questions.
+- [x] Present Prashna results in clear language while retaining the supporting classical testimony and chart factors.
+- [x] Add relationship questions such as contact, unblocking, reconciliation, commitment, and marriage.
+- [x] Add a layman-friendly “How Prashna works” explanation.
+- [x] Add Prashna credit pricing, balance checks, purchase gating, and the credit price on its Explore card.
+- [x] Localize the Prashna experience across the app's supported languages.
+- [x] Add full watermarked Monthly and Yearly Event Timeline samples before the credit purchase step.
+- [x] Add a shared manifestation knowledge graph and broaden event coverage for travel paperwork, family members, education, vehicles, staff, legal matters, occult study, remarriage, and children.
+- [x] Improve Event Timeline wording and generate readable prediction copy from deterministic evidence.
+- [x] Add chart-specific Ask Tara question suggestions from recent chat follow-ups, monthly manifestations, and KP activations.
+- [x] Generate missing Chat suggestions immediately after a user-triggered refresh instead of waiting for the production scheduler.
+- [x] Keep KP-derived Chat suggestions time-neutral so Tara does not assume the question is specifically about today.
+- [x] Add storage, ranking, deduplication, cooldown, interaction tracking, and notification-ready delivery fields for future push, WhatsApp, SMS, and email use.
+
+### Validation
+
+- [x] Prashna backend and mobile regression tests passed.
+- [x] Manifestation ontology and Event Timeline integration tests passed.
+- [x] Dynamic Chat suggestion tests passed.
+- [x] Corrected suggestions were verified on the local TestNZ chart.
+- [ ] Android release build and physical-device smoke test.
+- [ ] Release build uploaded to Play Console.
+
 ## Version 209
 
 - Status: In progress

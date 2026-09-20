@@ -17,6 +17,7 @@ import { useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { supportAPI } from '../../services/api';
@@ -37,7 +38,7 @@ export default function SupportScreen({ navigation }) {
   const route = useRoute();
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const source = Platform.OS === 'ios' ? 'ios' : 'android';
+  const source = Platform.OS === 'web' ? 'web' : Platform.OS === 'ios' ? 'ios' : 'android';
 
   const [view, setView] = useState('list');
   const [tickets, setTickets] = useState([]);
@@ -49,6 +50,8 @@ export default function SupportScreen({ navigation }) {
 
   const [subject, setSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
+  const [composeImage, setComposeImage] = useState(null);
+  const [replyImage, setReplyImage] = useState(null);
 
   const [activeId, setActiveId] = useState(null);
   const [ticketMeta, setTicketMeta] = useState(null);
@@ -80,6 +83,7 @@ export default function SupportScreen({ navigation }) {
     setThreadLoading(true);
     setError('');
     setReplyText('');
+    setReplyImage(null);
     try {
       const { data } = await supportAPI.getTicket(id);
       setTicketMeta(data.ticket);
@@ -133,6 +137,66 @@ export default function SupportScreen({ navigation }) {
     return src;
   };
 
+  const pickImage = async (setImage) => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/jpeg', 'image/png'], multiple: false,
+        copyToCacheDirectory: true, base64: false,
+      });
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (!asset || (asset.size || asset.file?.size || 0) > 5 * 1024 * 1024) {
+        throw new Error(t('support.imageTooLarge', 'Choose a JPEG or PNG image up to 5 MB.'));
+      }
+      setImage(asset);
+      setError('');
+    } catch (e) {
+      setError(formatApiError(e, t));
+    }
+  };
+
+  const encodeImage = async (asset) => {
+    if (!asset) return undefined;
+    if (Platform.OS === 'web') {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = () => reject(new Error('Could not read image. Please choose it again.'));
+        reader.readAsDataURL(asset.file);
+      });
+    }
+    const info = await FileSystem.getInfoAsync(asset.uri);
+    if (!info.exists || info.size > 5 * 1024 * 1024) {
+      throw new Error('Choose a JPEG or PNG image up to 5 MB.');
+    }
+    return FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+  };
+
+  const renderImagePicker = (asset, setImage) => (
+    <View style={{ marginBottom: 16 }}>
+      <TouchableOpacity
+        style={[styles.attachmentCard, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceRaised }]}
+        onPress={() => pickImage(setImage)}
+        disabled={submitting}
+        accessibilityRole="button"
+        accessibilityLabel={t('support.attachImage', 'Attach image')}
+      >
+        <Ionicons name="image-outline" size={20} color={colors.primary} />
+        <Text style={{ color: colors.text, flex: 1 }} numberOfLines={1}>
+          {asset?.name || t('support.attachImage', 'Attach image')}
+        </Text>
+      </TouchableOpacity>
+      <Text style={{ color: colors.textSecondary, marginTop: 6 }}>
+        {t('support.imageHint', 'Optional · One JPEG or PNG, up to 5 MB')}
+      </Text>
+      {asset ? (
+        <TouchableOpacity onPress={() => setImage(null)} disabled={submitting} accessibilityRole="button">
+          <Text style={{ color: colors.primary, paddingVertical: 8 }}>{t('support.removeImage', 'Remove image')}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+
   const submitNew = async () => {
     const sub = sanitizeSupportSubject(subject);
     const msg = sanitizeSupportBody(composeBody);
@@ -143,10 +207,11 @@ export default function SupportScreen({ navigation }) {
     setSubmitting(true);
     setError('');
     try {
-      await supportAPI.createTicket({ subject: sub, message: msg, source });
+      await supportAPI.createTicket({ subject: sub, message: msg, source, image_base64: await encodeImage(composeImage) });
       trackAstrologyEvent.contact();
       setSubject('');
       setComposeBody('');
+      setComposeImage(null);
       setView('list');
       await loadTickets();
     } catch (e) {
@@ -169,7 +234,8 @@ export default function SupportScreen({ navigation }) {
     setSubmitting(true);
     setError('');
     try {
-      await supportAPI.postMessage(activeId, msg);
+      await supportAPI.postMessage(activeId, msg, await encodeImage(replyImage));
+      setReplyImage(null);
       setReplyText('');
       await refreshThread();
       await loadTickets();
@@ -191,11 +257,26 @@ export default function SupportScreen({ navigation }) {
       const filename = attachment.filename || `support_attachment_${attachment.id}.pdf`;
       const targetPath = `${FileSystem.cacheDirectory}${Date.now()}_${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
       const url = `${API_BASE_URL}${getEndpoint(`/support/attachments/${attachment.id}/download`)}`;
+      if (Platform.OS === 'web') {
+        const response = await fetch(url, { headers: {
+          Authorization: `Bearer ${token}`, 'X-AstroRoshni-Authorization': `Bearer ${token}`,
+        } });
+        if (!response.ok) throw new Error(t('knowledgeSupport.downloadFailed'));
+        const blobUrl = URL.createObjectURL(await response.blob());
+        const anchor = document.createElement('a');
+        anchor.href = blobUrl;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        return;
+      }
       const { status, uri } = await FileSystem.downloadAsync(url, targetPath, {
         headers: {
           Authorization: `Bearer ${token}`,
           'X-AstroRoshni-Authorization': `Bearer ${token}`,
-          Accept: 'application/pdf',
+          Accept: attachment.mime_type || 'application/pdf',
         },
       });
       if (status < 200 || status >= 300) {
@@ -209,7 +290,7 @@ export default function SupportScreen({ navigation }) {
       await Sharing.shareAsync(uri, {
         mimeType: attachment.mime_type || 'application/pdf',
         dialogTitle: filename,
-        UTI: 'com.adobe.pdf',
+        UTI: attachment.mime_type === 'image/jpeg' ? 'public.jpeg' : 'com.adobe.pdf',
       });
     } catch (e) {
       Alert.alert(t('knowledgeSupport.downloadFailed'), e?.message || t('knowledgeSupport.downloadFailedBody'));
@@ -295,6 +376,7 @@ export default function SupportScreen({ navigation }) {
         placeholder={t('support.messagePlaceholder')}
         placeholderTextColor={colors.textSecondary}
       />
+      {renderImagePicker(composeImage, setComposeImage)}
       <TouchableOpacity
         style={[styles.primaryBtn, { backgroundColor: submitting ? colors.textTertiary : colors.primary }]}
         onPress={submitNew}
@@ -347,7 +429,7 @@ export default function SupportScreen({ navigation }) {
                             {att.filename}
                           </Text>
                           <Text style={[styles.attachmentMeta, { color: colors.textSecondary }]}>
-                            {`PDF · ${Math.max(1, Math.round((Number(att.size_bytes || 0) / 1024) || 0))} KB`}
+                            {`${att.mime_type?.startsWith('image/') ? 'Image' : 'PDF'} · ${Math.max(1, Math.round((Number(att.size_bytes || 0) / 1024) || 0))} KB`}
                           </Text>
                         </View>
                         {isDownloading ? (
@@ -374,6 +456,7 @@ export default function SupportScreen({ navigation }) {
                 placeholder={t('support.replyPlaceholder')}
                 placeholderTextColor={colors.textSecondary}
               />
+              {renderImagePicker(replyImage, setReplyImage)}
               <TouchableOpacity
                 style={[styles.primaryBtn, { backgroundColor: submitting ? colors.textTertiary : colors.primary }]}
                 onPress={sendReply}

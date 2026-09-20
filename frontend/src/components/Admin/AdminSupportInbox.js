@@ -567,7 +567,7 @@ export default function AdminSupportInbox() {
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: '#223' }}>{att.filename}</div>
                                 <div style={{ fontSize: 12, color: '#667' }}>
-                                  PDF · {Math.max(1, Math.round((Number(att.size_bytes || 0) / 1024) || 0))} KB
+                                  {att.mime_type?.startsWith('image/') ? 'Image' : 'PDF'} · {Math.max(1, Math.round((Number(att.size_bytes || 0) / 1024) || 0))} KB
                                 </div>
                               </div>
                               <button

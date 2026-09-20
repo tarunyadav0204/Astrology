@@ -3091,6 +3091,7 @@ export default function ChatScreen({ navigation, route }) {
               : chatCost
       );
   const freeQuestionNotificationGate =
+    !isGuest &&
     freeQuestionRequiresNotifications &&
     !partnershipMode &&
     !isMundane &&
@@ -3125,10 +3126,18 @@ export default function ChatScreen({ navigation, route }) {
       ? requiredCreditsForMode('instant')
       : effectiveChatCost
   );
-  const composerBlockedByCredits = !freeQuestionNotificationGate && Number(credits) < sendRequiresCredits;
+  const composerBlockedByCredits = !isGuest && !freeQuestionNotificationGate && Number(credits) < sendRequiresCredits;
 
-  const openCreditChoice = (modeKey, question = '') => {
+  const openCreditChoice = async (modeKey, question = '') => {
     Keyboard.dismiss();
+    // All entry points (send, suggestions, and mode selection) must authenticate
+    // before offering credits. A guest has no account balance to top up.
+    const authOk = await requireAuthForPaid({
+      feature: t('authGate.featureChat'),
+      message: t('authGate.messageChat'),
+      resume: { resumeRoute: 'Home', resumeParams: {} },
+    });
+    if (!authOk) return;
     const nextMode = modeKey || currentChatModeKey;
     const nextQuestion = String(question || '').trim();
     setCreditChoiceMode(nextMode);
@@ -7832,6 +7841,8 @@ export default function ChatScreen({ navigation, route }) {
                     <Text style={styles.modernSendText}>⏳</Text>
                   ) : activeWaitSideMessage ? (
                     <Ionicons name="send" size={20} color={COLORS.white} />
+                  ) : isGuest ? (
+                    <Ionicons name="send" size={20} color={COLORS.white} />
                   ) : freeQuestionNotificationGate ? (
                     <Ionicons name="notifications-outline" size={20} color={COLORS.white} />
                   ) : composerBlockedByCredits ? (
@@ -7894,7 +7905,7 @@ export default function ChatScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
 
-            {credits < sendRequiresCredits && !freeQuestionRequiresNotifications && !firstPurchaseBonusOffer && !isKeyboardVisible && (
+            {!isGuest && credits < sendRequiresCredits && !freeQuestionRequiresNotifications && !firstPurchaseBonusOffer && !isKeyboardVisible && (
               <TouchableOpacity
                 style={[
                   styles.firstQuestionFreeBanner,
@@ -8423,6 +8434,25 @@ export default function ChatScreen({ navigation, route }) {
                         icon: 'wallet-outline',
                         label: t('menu.credits', 'Credits'),
                         action: () => navigation.navigate('Credits'),
+                      })}
+                      {renderDrawerMenuRow({
+                        icon: 'help-circle-outline',
+                        label: t('menu.support', 'Support'),
+                        action: () => navigation.navigate('Support'),
+                      })}
+                      {renderDrawerMenuRow({
+                        icon: isGuest ? 'log-in-outline' : 'log-out-outline',
+                        label: isGuest
+                          ? t('menu.signIn', 'Sign in / Register')
+                          : t('menu.logout', 'Log out'),
+                        action: () => {
+                          if (isGuest) {
+                            navigation.navigate('Login');
+                            return;
+                          }
+                          logout();
+                        },
+                        danger: !isGuest,
                         last: true,
                       })}
                     </>

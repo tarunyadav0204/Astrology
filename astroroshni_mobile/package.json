@@ -42,6 +42,7 @@
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~17.0.5",
     "expo-device": "~7.0.2",
+    "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.19",
     "expo-linear-gradient": "~15.0.8",
     "expo-notifications": "^0.31.5",

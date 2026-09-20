@@ -7,13 +7,17 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
+from fastapi.exceptions import RequestValidationError
+from starlette.concurrency import run_in_threadpool
+from utils.support_images import MAX_BASE64_LENGTH, normalize_support_image, read_support_json
 
 from auth import User, get_current_user
 from db import get_conn, execute
@@ -35,6 +39,8 @@ USER_SOURCES = frozenset({"web", "ios", "android", "whatsapp"})
 _TICKETS_TABLE_READY = False
 SUPPORT_ATTACHMENT_DIR = Path(os.getenv("SUPPORT_ATTACHMENT_DIR") or Path(__file__).resolve().parent / "storage" / "support_attachments")
 SUPPORT_ATTACHMENT_MAX_BYTES = int(os.getenv("SUPPORT_ATTACHMENT_MAX_BYTES") or str(15 * 1024 * 1024))
+SUPPORT_USER_IMAGE_STORAGE_BYTES = 50 * 1024 * 1024
+SUPPORT_USER_IMAGES_PER_DAY = 20
 
 
 def _ensure_tables(conn) -> None:
@@ -445,12 +451,14 @@ def _rate_limit_user_messages(conn, userid: int, max_per_hour: int = 40) -> None
 
 
 class CreateTicketBody(BaseModel):
+    image_base64: Optional[str] = Field(default=None, max_length=MAX_BASE64_LENGTH)
     subject: str = Field(..., min_length=1, max_length=500)
     message: str = Field(..., min_length=1, max_length=12000)
     source: str = Field(default="web", max_length=20)
 
 
 class PostMessageBody(BaseModel):
+    image_base64: Optional[str] = Field(default=None, max_length=MAX_BASE64_LENGTH)
     message: str = Field(..., min_length=1, max_length=12000)
 
 
@@ -468,7 +476,58 @@ def _require_admin(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
-def create_support_ticket_for_user(userid: int, subject: str, message: str, source: str = "web") -> int:
+@contextmanager
+def _user_support_transaction():
+    files = []
+    try:
+        with get_conn() as conn:
+            yield conn, files
+    except Exception:
+        for path in files:
+            path.unlink(missing_ok=True)
+        raise
+
+
+def _prepare_user_image(conn, userid, encoded):
+    if encoded is None:
+        return None
+    # Serialize this user's image quota checks with writes, across API workers.
+    execute(conn, "SELECT pg_advisory_xact_lock(%s, %s)", (73104, userid))
+    daily = execute(conn, """
+        SELECT COUNT(*) FROM support_message_attachments
+        WHERE uploaded_by_role = 'user' AND uploaded_by_userid = %s
+          AND created_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
+    """, (userid,)).fetchone()[0]
+    used = execute(conn, """
+        SELECT COALESCE(SUM(size_bytes), 0) FROM support_message_attachments
+        WHERE uploaded_by_role = 'user' AND uploaded_by_userid = %s
+    """, (userid,)).fetchone()[0]
+    if daily >= SUPPORT_USER_IMAGES_PER_DAY or used >= SUPPORT_USER_IMAGE_STORAGE_BYTES:
+        raise HTTPException(429, 'Support image limit reached. Send your message without an image.')
+    image = normalize_support_image(encoded)
+    if used + len(image) > SUPPORT_USER_IMAGE_STORAGE_BYTES:
+        raise HTTPException(429, 'Support image storage limit reached. Send your message without an image.')
+    return image
+
+
+def _attach_user_image(conn, files, ticket_id, message_id, userid, image):
+    if image is None:
+        return
+    SUPPORT_ATTACHMENT_DIR.mkdir(parents=True, exist_ok=True)
+    path = SUPPORT_ATTACHMENT_DIR / f"{secrets.token_hex(16)}.jpg"
+    files.append(path)
+    with path.open('xb') as output:
+        output.write(image)
+    path.chmod(0o600)
+    execute(conn, """
+        INSERT INTO support_message_attachments (
+            ticket_id, message_id, filename, mime_type, storage_path, size_bytes,
+            uploaded_by_role, uploaded_by_userid
+        ) VALUES (%s, %s, %s, %s, %s, %s, 'user', %s)
+    """, (ticket_id, message_id, 'support-image.jpg', 'image/jpeg', str(path), len(image), userid))
+
+
+def create_support_ticket_for_user(userid: int, subject: str, message: str, source: str = "web", image_base64: Optional[str] = None) -> int:
     subject = sanitize_support_subject(subject)
     message = sanitize_support_body(message)
     if not subject or not message:
@@ -477,9 +536,10 @@ def create_support_ticket_for_user(userid: int, subject: str, message: str, sour
     if src not in USER_SOURCES:
         src = "web"
 
-    with get_conn() as conn:
+    with _user_support_transaction() as (conn, files):
         _ensure_tables(conn)
         _rate_limit_new_tickets(conn, userid)
+        image = _prepare_user_image(conn, userid, image_base64)
         cur = execute(
             conn,
             """
@@ -490,14 +550,16 @@ def create_support_ticket_for_user(userid: int, subject: str, message: str, sour
             (userid, subject, src, _preview(message)),
         )
         tid = int(cur.fetchone()[0])
-        execute(
+        message_cur = execute(
             conn,
             """
             INSERT INTO support_messages (ticket_id, author_role, author_userid, body)
             VALUES (%s, 'user', %s, %s)
+            RETURNING id
             """,
             (tid, userid, message),
         )
+        _attach_user_image(conn, files, tid, int(message_cur.fetchone()[0]), userid, image)
         u_email, u_name, u_phone = _fetch_user_contact(conn, userid)
         conn.commit()
 
@@ -505,12 +567,12 @@ def create_support_ticket_for_user(userid: int, subject: str, message: str, sour
     return tid
 
 
-def post_support_message_for_user(userid: int, ticket_id: int, message: str) -> None:
+def post_support_message_for_user(userid: int, ticket_id: int, message: str, image_base64: Optional[str] = None) -> None:
     message = sanitize_support_body(message)
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
 
-    with get_conn() as conn:
+    with _user_support_transaction() as (conn, files):
         _ensure_tables(conn)
         _rate_limit_user_messages(conn, userid)
         cur = execute(
@@ -527,14 +589,18 @@ def post_support_message_for_user(userid: int, ticket_id: int, message: str) -> 
         if status == "closed":
             raise HTTPException(status_code=400, detail="Ticket is closed. Open a new ticket if needed.")
 
-        execute(
+        image = _prepare_user_image(conn, userid, image_base64)
+
+        message_cur = execute(
             conn,
             """
             INSERT INTO support_messages (ticket_id, author_role, author_userid, body)
             VALUES (%s, 'user', %s, %s)
+            RETURNING id
             """,
             (ticket_id, userid, message),
         )
+        _attach_user_image(conn, files, ticket_id, int(message_cur.fetchone()[0]), userid, image)
         execute(
             conn,
             """
@@ -555,9 +621,19 @@ def post_support_message_for_user(userid: int, ticket_id: int, message: str) -> 
     _notify_help_staff_user_reply(ticket_id, ticket_subject, userid, u_name, u_phone, u_email, message)
 
 
+async def _support_request_body(request, model):
+    try:
+        return model(**(await read_support_json(request)))
+    except ValidationError as error:
+        # Never echo the uploaded base64 image into error responses/logs.
+        raise RequestValidationError(error.errors(include_input=False))
+
+
 @router.post("/tickets")
-async def create_ticket(body: CreateTicketBody, current_user: User = Depends(get_current_user)):
-    tid = create_support_ticket_for_user(current_user.userid, body.subject, body.message, body.source)
+async def create_ticket(request: Request, current_user: User = Depends(get_current_user)):
+    body = await _support_request_body(request, CreateTicketBody)
+    tid = await run_in_threadpool(create_support_ticket_for_user, current_user.userid,
+                                 body.subject, body.message, body.source, body.image_base64)
     return {"ticket_id": tid, "message": "Ticket created"}
 
 
@@ -651,9 +727,10 @@ async def get_ticket_detail(ticket_id: int, current_user: User = Depends(get_cur
 
 @router.post("/tickets/{ticket_id}/messages")
 async def post_user_message(
-    ticket_id: int, body: PostMessageBody, current_user: User = Depends(get_current_user)
+    ticket_id: int, request: Request, current_user: User = Depends(get_current_user)
 ):
-    post_support_message_for_user(current_user.userid, ticket_id, body.message)
+    body = await _support_request_body(request, PostMessageBody)
+    await run_in_threadpool(post_support_message_for_user, current_user.userid, ticket_id, body.message, body.image_base64)
     return {"message": "Sent"}
 
 
@@ -686,7 +763,9 @@ async def download_support_attachment(
         if current_user.role != "admin" and owner_userid != current_user.userid:
             raise HTTPException(status_code=403, detail="Access denied")
 
-    file_path = Path(row[3])
+    file_path = Path(row[3]).resolve()
+    if file_path.parent != SUPPORT_ATTACHMENT_DIR.resolve():
+        raise HTTPException(status_code=404, detail="Attachment not found")
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="Attachment file missing")
 
@@ -694,6 +773,8 @@ async def download_support_attachment(
         path=str(file_path),
         media_type=row[2] or "application/pdf",
         filename=row[1] or "attachment.pdf",
+        headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store",
+                 "Content-Security-Policy": "default-src 'none'; sandbox"},
     )
 
 
