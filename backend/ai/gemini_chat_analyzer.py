@@ -129,6 +129,8 @@ def generate_content_rest_v1beta_result(
     api_key: str,
     thinking_level: Optional[str] = None,
     system_prompt: Optional[str] = None,
+    response_mime_type: Optional[str] = None,
+    timeout_s: float = 120,
 ) -> Dict[str, Any]:
     """Modern Gemini generateContent transport used by latency-sensitive calls.
 
@@ -148,6 +150,8 @@ def generate_content_rest_v1beta_result(
     normalized_level = str(thinking_level or "").strip().lower()
     if normalized_level and _model_supports_gemini3_thinking_level(mid):
         generation_config["thinkingConfig"] = {"thinkingLevel": normalized_level}
+    if str(response_mime_type or "").strip():
+        generation_config["responseMimeType"] = str(response_mime_type).strip()
     body = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": generation_config,
@@ -155,7 +159,12 @@ def generate_content_rest_v1beta_result(
     if str(system_prompt or "").strip():
         body["systemInstruction"] = {"parts": [{"text": str(system_prompt).strip()}]}
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{mid}:generateContent"
-    response = requests.post(url, params={"key": api_key}, json=body, timeout=120)
+    response = requests.post(
+        url,
+        params={"key": api_key},
+        json=body,
+        timeout=max(3.0, float(timeout_s or 120)),
+    )
     if not response.ok:
         try:
             detail = response.json()

@@ -21,6 +21,8 @@ from utils.admin_settings import (
     get_deepseek_analysis_model,
     get_deepseek_report_model,
     get_deepseek_timeline_model,
+    get_event_timeline_narration_model,
+    get_event_timeline_narration_thinking_level,
     get_event_timeline_model,
     get_gemini_analysis_model,
     get_gemini_report_model,
@@ -112,6 +114,52 @@ class DeepSeekGenerativeAdapter:
         return await asyncio.to_thread(self.generate_content, prompt, **kwargs)
 
 
+class GeminiRestGenerativeAdapter:
+    """Small Gemini 3 REST adapter with explicit thinking-level control."""
+
+    __slots__ = ("model_name", "thinking_level")
+
+    def __init__(self, model_id: str, thinking_level: str) -> None:
+        self.model_name = str(model_id).strip()
+        self.thinking_level = str(thinking_level).strip().lower()
+
+    def generate_content(
+        self,
+        prompt: Any,
+        generation_config: Any = None,
+        safety_settings: Any = None,
+        **kwargs: Any,
+    ) -> Any:
+        del safety_settings
+        from ai.gemini_chat_analyzer import generate_content_rest_v1beta_result
+
+        api_key = os.getenv("GEMINI_API_KEY") or ""
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable is not set")
+        config = generation_config if isinstance(generation_config, dict) else {}
+        request_options = kwargs.get("request_options") or {}
+        timeout_s = request_options.get("timeout", 120) if isinstance(request_options, dict) else 120
+        result = generate_content_rest_v1beta_result(
+            self.model_name,
+            prompt if isinstance(prompt, str) else str(prompt),
+            api_key,
+            thinking_level=self.thinking_level,
+            response_mime_type=config.get("response_mime_type") or config.get("responseMimeType"),
+            timeout_s=timeout_s,
+        )
+        usage = result.get("usage") or {}
+        usage_metadata = SimpleNamespace(
+            prompt_token_count=int(usage.get("input_tokens") or 0),
+            candidates_token_count=int(usage.get("output_tokens") or 0),
+            cached_content_token_count=int(usage.get("cached_tokens") or 0),
+            total_token_count=int(usage.get("total_tokens") or 0),
+        )
+        return SimpleNamespace(text=str(result.get("text") or ""), usage_metadata=usage_metadata)
+
+    async def generate_content_async(self, prompt: Any, **kwargs: Any) -> Any:
+        return await asyncio.to_thread(self.generate_content, prompt, **kwargs)
+
+
 def _build_gemini_with_fallbacks(preferred: str) -> Tuple[Any, str]:
     import google.generativeai as genai
 
@@ -176,3 +224,14 @@ def build_timeline_llm_model() -> Tuple[Any, str, str]:
     preferred = get_event_timeline_model()
     m, name = _build_gemini_with_fallbacks(preferred)
     return m, name, CHAT_LLM_GEMINI
+
+
+def build_timeline_narration_llm_model() -> Tuple[Any, str, str]:
+    """Dedicated fast Gemini lane for V3 Event Timeline presentation text."""
+    model_id = get_event_timeline_narration_model()
+    thinking_level = get_event_timeline_narration_thinking_level()
+    return (
+        GeminiRestGenerativeAdapter(model_id, thinking_level),
+        model_id,
+        CHAT_LLM_GEMINI,
+    )

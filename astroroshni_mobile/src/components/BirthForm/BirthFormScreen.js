@@ -668,11 +668,19 @@ export default function BirthFormScreen({ navigation, route }) {
         console.log('⏭️ [DEBUG] BirthForm: Skipping addBirthProfile (update/edit mode)');
       }
 
-      // 5. Save chart data
-      await storage.setChartData({
-        birthData: birthData,
-        chartData: chartData
-      });
+      // 5. Cache a slim D1 snapshot. The PWA uses localStorage (~5MB); a full
+      // axios/chart payload (D3/D9/D10 + request metadata) overflows that quota.
+      const persistedChart = chartData?.data?.planets || chartData?.data?.houses
+        ? chartData.data
+        : chartData;
+      try {
+        await storage.setChartData({
+          birthData,
+          chartData: persistedChart,
+        });
+      } catch (_) {
+        /* Chart is already saved on the server; local cache must not fail Complete. */
+      }
 
       if (isGuest || isGuestId(birthChartId)) {
         try {

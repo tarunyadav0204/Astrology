@@ -42,16 +42,16 @@ Weak natal promise restricts wording to a broad theme; unavailable D1 data does 
 The default V3 runtime is now:
 
 - `EVENT_TIMELINE_V3_PIPELINE=optimized`
-- `EVENT_TIMELINE_V3_NARRATOR=deterministic`
+- `EVENT_TIMELINE_V3_NARRATOR=llm`
 
 The optimized builder calculates only D1, classical house lordships, D2/D4/D7/D9/D10/D24/D30, D1 Sarvashtakavarga, requested-period Vimshottari/transits, and KP. It does not build the general chat context or serialize that unused payload. A monthly deep dive scans only its selected month.
 
 Natal D1/vargas/SAV and KP are cached independently in each backend process by hashed calculation inputs. Running another year for the same birth chart reuses them and recalculates the year-specific dasha and transit evidence. Defaults are a 12-hour TTL and 128 entries; `EVENT_TIMELINE_V3_NATAL_CACHE_TTL_S` and `EVENT_TIMELINE_V3_NATAL_CACHE_MAX_ENTRIES` can override them.
 
-Deterministic narration returns the resolver's curated prediction, explanation, scenarios, dates, and grades directly and does not initialize or call an LLM. To compare or roll back independently:
+The default LLM narration layer receives a compact structured event brief rather than a deterministic draft sentence. The brief contains the already-resolved real-life channel, allowed manifestation facts, subject, stage, and outcome context. The LLM writes fresh copy and must cite the allowed fact IDs it used; invalid citations restore deterministic copy. Raw activated houses are not delegated to the LLM because a house has several competing meanings and channel selection belongs to the deterministic resolver. Every card rendered in the annual overview or selected-month deep dive is narrated, including ongoing, annual-context, relative, and weak-signal cards. Annual generation sends one month per request with bounded concurrency so the full year is never placed in one model context. It cannot select events or change subjects, dates, grades, timing, scenarios, or calculation explanations. Invalid or missing narration falls back only for the affected card or month and is exposed through `narration_source`, `narration_status`, and validation warnings. Narration has a 45-second request deadline by default; `EVENT_TIMELINE_V3_NARRATION_TIMEOUT_S` may set 10–120 seconds. To compare or roll back independently:
 
 - Full previous context path: `EVENT_TIMELINE_V3_PIPELINE=legacy_context`
-- LLM wording layer: `EVENT_TIMELINE_V3_NARRATOR=llm`
+- Deterministic wording without an LLM: `EVENT_TIMELINE_V3_NARRATOR=deterministic`
 
 Pipeline and narrator modes are included in the V3 cache fingerprint. In a cold local January parity run, the optimized calculation took 0.81 seconds versus 20.24 seconds for the corrected full-context path, reduced the unused serialized context from about 802 KB to 117 bytes, and produced identical activation graphs and candidate fields. This is a development benchmark, not a production latency guarantee.
 

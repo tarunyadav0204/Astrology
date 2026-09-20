@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Callable, Awaitable, Optional
+from typing import Dict, List, Any, Callable, Awaitable, Optional, Mapping
 from types import SimpleNamespace
 import calendar
 import json
@@ -138,9 +138,11 @@ class EventPredictor:
         self.relative_profiles = relative_profiles or []
         self.language = language or "english"
         self.v3_pipeline = self._v3_mode("EVENT_TIMELINE_V3_PIPELINE", "optimized", {"optimized", "legacy_context"})
-        self.v3_narrator = self._v3_mode("EVENT_TIMELINE_V3_NARRATOR", "deterministic", {"deterministic", "llm"})
+        self.v3_narrator = self._v3_mode("EVENT_TIMELINE_V3_NARRATOR", "llm", {"deterministic", "llm"})
         self._last_accuracy_ledger: Dict[str, Any] = {}
         self._last_v3_model: Dict[str, Any] = {}
+        self._last_v3_narration_ids: Dict[int, set[str]] = {}
+        self._last_v3_narration_fact_ids: Dict[int, Dict[str, set[str]]] = {}
         self._last_target_dasha_facts: Dict[str, Any] = {}
         self._last_target_transit_facts: Dict[str, Any] = {}
         if self.engine_version == ACCURACY_V3_ENGINE_VERSION and self.v3_narrator == "deterministic":
@@ -150,10 +152,18 @@ class EventPredictor:
             print("✅ EventPredictor using deterministic V3 narration (no LLM)")
             return
         try:
-            from ai.analysis_llm_backend import build_timeline_llm_model
+            from ai.analysis_llm_backend import (
+                build_timeline_llm_model,
+                build_timeline_narration_llm_model,
+            )
             from utils.admin_settings import CHAT_LLM_DEEPSEEK
 
-            self.model, self.model_name, self._timeline_llm_vendor = build_timeline_llm_model()
+            builder = (
+                build_timeline_narration_llm_model
+                if self.engine_version == ACCURACY_V3_ENGINE_VERSION
+                else build_timeline_llm_model
+            )
+            self.model, self.model_name, self._timeline_llm_vendor = builder()
             self._timeline_log_provider = (
                 "deepseek" if self._timeline_llm_vendor == CHAT_LLM_DEEPSEEK else "gemini"
             )
@@ -167,6 +177,98 @@ class EventPredictor:
         if not raw:
             return default
         return raw in ("1", "true", "yes", "on")
+
+    @staticmethod
+    def _v3_narration_timeout_s() -> float:
+        try:
+            return max(
+                10.0,
+                min(120.0, float(os.getenv("EVENT_TIMELINE_V3_NARRATION_TIMEOUT_S") or 45)),
+            )
+        except (TypeError, ValueError):
+            return 45.0
+
+    async def _get_v3_narration(self, prompt: str) -> Dict[str, Any]:
+        timeout_s = self._v3_narration_timeout_s()
+        try:
+            return await asyncio.wait_for(
+                self._get_ai_prediction_async(
+                    prompt,
+                    request_timeout_s=timeout_s,
+                    debug_payload_logging=False,
+                ),
+                timeout=timeout_s,
+            )
+        except asyncio.TimeoutError:
+            logger.error("Event Timeline V3 narration timed out after %.1fs", timeout_s)
+            return {
+                "macro_trends": [],
+                "monthly_predictions": [],
+                "_timeline_invalid": True,
+                "error": f"Timeline narration exceeded the {timeout_s:.0f}-second deadline.",
+            }
+
+    async def _get_v3_yearly_narration_batched(self, year: int, age: int) -> Dict[str, Any]:
+        """Narrate annual cards per month so one slow response cannot discard the year."""
+        full_packet = self._v3_narration_payload()
+        month_packets = []
+        for month_key, month_payload in (full_packet.get("months") or {}).items():
+            if not (month_payload.get("candidates") or []):
+                continue
+            month_packets.append({
+                **{key: value for key, value in full_packet.items() if key != "months"},
+                "months": {month_key: month_payload},
+            })
+
+        concurrency = max(
+            1,
+            min(6, self._safe_int_env("EVENT_TIMELINE_V3_NARRATION_CONCURRENCY", 4)),
+        )
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def narrate(packet: Dict[str, Any]) -> Dict[str, Any]:
+            async with semaphore:
+                prompt = self._create_accuracy_v3_yearly_prompt(
+                    "", year, age, payload_override=packet,
+                )
+                return await self._get_v3_narration(prompt)
+
+        responses = await asyncio.gather(
+            *(narrate(packet) for packet in month_packets),
+            return_exceptions=True,
+        )
+        monthly_predictions: List[Dict[str, Any]] = []
+        usage_totals = {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cached_tokens": 0,
+            "non_cached_input_tokens": 0,
+            "total_tokens": 0,
+        }
+        failed_batches = 0
+        for response in responses:
+            if isinstance(response, BaseException):
+                failed_batches += 1
+                logger.error("Event Timeline V3 narration batch failed: %s", response)
+                continue
+            if response.get("_timeline_invalid"):
+                failed_batches += 1
+                logger.error("Event Timeline V3 narration batch invalid: %s", response.get("error"))
+                continue
+            monthly_predictions.extend(response.get("monthly_predictions") or [])
+            usage = response.get("_llm_usage") or {}
+            for key in usage_totals:
+                usage_totals[key] += int(usage.get(key) or 0)
+        return {
+            "macro_trends": [],
+            "monthly_predictions": monthly_predictions,
+            "_llm_usage": usage_totals,
+            "_narration_batches": {
+                "requested": len(month_packets),
+                "completed": len(month_packets) - failed_batches,
+                "failed": failed_batches,
+            },
+        }
 
     @staticmethod
     def _v3_mode(name: str, default: str, allowed: set[str]) -> str:
@@ -375,16 +477,21 @@ class EventPredictor:
                 # Pass Age to prompt generator for Desha Kala Patra logic
                 print("\n🔄 Creating prediction prompt...")
                 if self.engine_version == ACCURACY_V3_ENGINE_VERSION:
-                    prompt = self._create_accuracy_v3_yearly_prompt(raw_data, year, current_age)
+                    prompt = None
                 elif self.engine_version == ACCURACY_ENGINE_VERSION:
                     prompt = self._create_accuracy_v2_yearly_prompt(raw_data, year, current_age)
                 else:
                     prompt = self._create_prediction_prompt(raw_data, year, current_age)
-                print(f"✅ Prompt created (length: {len(prompt)} chars)")
+                if prompt is not None:
+                    print(f"✅ Prompt created (length: {len(prompt)} chars)")
 
                 print("\n🔄 Calling timeline LLM...")
                 await report_progress(45, "writing_interpretation")
-                ai_response = await self._get_ai_prediction_async(prompt)
+                ai_response = (
+                    await self._get_v3_yearly_narration_batched(year, current_age)
+                    if self.engine_version == ACCURACY_V3_ENGINE_VERSION
+                    else await self._get_ai_prediction_async(prompt)
+                )
                 print("✅ Timeline LLM returned response")
                 await report_progress(90, "checking_interpretation")
 
@@ -401,6 +508,7 @@ class EventPredictor:
                 }
 
             run_usage = ai_response.pop("_llm_usage", None)
+            narration_batches = ai_response.pop("_narration_batches", None)
             if self.engine_version == ACCURACY_ENGINE_VERSION:
                 ai_response, validation_warnings = validate_v2_payload(
                     ai_response,
@@ -414,9 +522,13 @@ class EventPredictor:
                     ai_response,
                     self._last_v3_model,
                     narration_expected=self.v3_narrator == "llm",
+                    expected_narration_ids=self._last_v3_narration_ids,
+                    expected_narration_fact_ids=self._last_v3_narration_fact_ids,
                 )
                 if validation_warnings:
                     logger.info("Event Timeline V3 validation warnings: %s", validation_warnings)
+                if isinstance(narration_batches, dict):
+                    ai_response["narration_batches"] = narration_batches
             await report_progress(96, "finalizing_timeline")
             if isinstance(run_usage, dict):
                 print(
@@ -917,7 +1029,11 @@ class EventPredictor:
                         raw_data, year, month, current_age, transit_facts, dasha_facts
                     )
                 await report_progress(45, "writing_interpretation")
-                ai_response = await self._get_ai_prediction_async(prompt)
+                ai_response = (
+                    await self._get_v3_narration(prompt)
+                    if self.engine_version == ACCURACY_V3_ENGINE_VERSION
+                    else await self._get_ai_prediction_async(prompt)
+                )
                 await report_progress(90, "checking_interpretation")
             if ai_response.pop("_timeline_invalid", False) and self.engine_version != ACCURACY_V3_ENGINE_VERSION:
                 return {
@@ -933,6 +1049,7 @@ class EventPredictor:
                     "monthly_predictions": [],
                 }
             run_usage = ai_response.pop("_llm_usage", None) if isinstance(ai_response, dict) else None
+            narration_batches = ai_response.pop("_narration_batches", None) if isinstance(ai_response, dict) else None
             if self.engine_version == ACCURACY_ENGINE_VERSION:
                 ai_response, validation_warnings = validate_v2_payload(
                     ai_response,
@@ -948,9 +1065,13 @@ class EventPredictor:
                     self._last_v3_model,
                     selected_month=month,
                     narration_expected=self.v3_narrator == "llm",
+                    expected_narration_ids=self._last_v3_narration_ids,
+                    expected_narration_fact_ids=self._last_v3_narration_fact_ids,
                 )
                 if validation_warnings:
                     logger.info("Monthly Event Timeline V3 validation warnings: %s", validation_warnings)
+                if isinstance(narration_batches, dict):
+                    ai_response["narration_batches"] = narration_batches
             await report_progress(96, "finalizing_timeline")
             final_response = {
                 "year": year,
@@ -2063,63 +2184,148 @@ Now return a single JSON object with this structure:
         dkp = model.get("desh_kaal_patra") or {}
         if month is not None:
             months = {str(month): months.get(str(month)) or {}}
-        return {
-            "version": model.get("version"),
-            "explanation_version": model.get("explanation_version"),
-            "accuracy_layer": model.get("accuracy_layer"),
-            "desh_kaal_patra": {
+
+        # Every rendered tier gets the same narration treatment. Yearly
+        # generation remains bounded because _get_v3_yearly_narration_batched
+        # sends one month per request instead of this complete packet at once.
+        visible_lists = (
+            "publishable_candidates", "also_possible_candidates",
+            "ongoing_background_candidates", "annual_context_candidates",
+            "weak_signal_candidates", "people_candidates",
+            "people_also_possible_candidates", "people_ongoing_background_candidates",
+            "people_annual_context_candidates", "people_weak_signal_candidates",
+        )
+        phase_meanings = {
+            "result_window": "A visible development or decision is better supported in this window.",
+            "developing": "The matter can move forward but may not finish in this window.",
+            "preparatory": "Planning, discussion, paperwork, or groundwork is more likely than completion.",
+            "obstructed": "The matter is active but may face delay, friction, or a change of plan.",
+        }
+
+        def visible_candidates(value: Mapping[str, Any]) -> List[Dict[str, Any]]:
+            unique: Dict[str, Mapping[str, Any]] = {}
+            for list_name in visible_lists:
+                for candidate in value.get(list_name) or []:
+                    if not isinstance(candidate, Mapping) or not candidate.get("candidate_id"):
+                        continue
+                    unique.setdefault(str(candidate["candidate_id"]), candidate)
+            compact: List[Dict[str, Any]] = []
+            for candidate in unique.values():
+                possibilities = [
+                    str(row.get("scenario") or "").strip()
+                    for row in candidate.get("possible_manifestations") or []
+                    if isinstance(row, Mapping) and str(row.get("scenario") or "").strip()
+                ][:2]
+                outcome = candidate.get("outcome_dimensions") or {}
+                disambiguation = candidate.get("bhava_disambiguation") or {}
+                allowed_facts = [
+                    {"fact_id": f"F{index + 1}", "text": text}
+                    for index, text in enumerate(possibilities)
+                ]
+                if not allowed_facts:
+                    # Some newer KG patterns do not yet carry scenario rows.
+                    # Their curated deterministic sentence is retained as an
+                    # allowed factual boundary, but is not presented as copy
+                    # for the model to paraphrase.
+                    factual_boundary = " ".join(str(candidate.get("prediction") or "").split())
+                    # Alternative event families are separate cards. Never let
+                    # their deterministic cross-reference become a narration
+                    # fact for this card.
+                    factual_boundary = re.split(
+                        r"\s+Other supported readings from the same active houses:",
+                        factual_boundary,
+                        maxsplit=1,
+                        flags=re.I,
+                    )[0].strip()
+                    if factual_boundary:
+                        allowed_facts.append({"fact_id": "F1", "text": factual_boundary})
+                compact.append({
+                    "candidate_id": candidate.get("candidate_id"),
+                    "subject": candidate.get("subject_label") or "You",
+                    "title": str(candidate.get("event_family") or "").split(" · ", 1)[-1],
+                    "resolved_channel": disambiguation.get("selected_channel"),
+                    "allowed_facts": allowed_facts,
+                    "stage": {
+                        "phase": candidate.get("manifestation_phase"),
+                        "meaning": phase_meanings.get(str(candidate.get("manifestation_phase") or "")),
+                    },
+                    "outcome_context": {
+                        "ease": outcome.get("ease"),
+                        "completion": outcome.get("completion"),
+                        "permanence": outcome.get("permanence"),
+                    },
+                    "forbidden_claims": list(candidate.get("forbidden_terms") or []),
+                })
+            return compact
+
+        packet = {
+            "language": model.get("language") or "en",
+            "task": "Rewrite only the supplied fallback predictions as clear user-facing event-card copy.",
+            "life_context": {
                 key: dkp.get(key)
                 for key in (
-                    "target_year", "age", "life_stage", "employment_state",
-                    "relationship_state", "parenthood_state", "facts_present",
+                    "age", "life_stage", "employment_state",
+                    "relationship_state", "parenthood_state",
                 )
             },
-            "node_doctrine": model.get("node_doctrine"),
             "months": {
                 key: {
                     "month_id": value.get("month_id"),
-                    "activated_houses": (value.get("activation_graph") or {}).get("all_activated_houses") or [],
-                    "candidates": [
-                        {
-                            field: candidate.get(field)
-                            for field in (
-                                "candidate_id", "event_key", "event_family", "prediction",
-                                "possible_manifestations", "activation_reasoning", "trigger_logic",
-                                "support_grade", "priority_score", "manifestation_phase",
-                                "claim_scope", "start_date", "end_date", "timing_windows",
-                                "timing_resolution", "outcome_dimensions", "natal_promise",
-                                "planet_delivery", "obstruction_profile", "kp_confirmation",
-                                "varga_confirmation", "exact_transit_contacts",
-                                "ashtakavarga_confirmation", "supporting_systems",
-                                "birth_time_reliability", "accuracy_limitations", "forbidden_terms",
-                            )
-                        }
-                        for candidate in value.get("publishable_candidates") or []
-                    ],
+                    "candidates": visible_candidates(value),
                 }
                 for key, value in months.items()
                 if isinstance(value, dict)
             },
         }
+        self._last_v3_narration_ids = {
+            int(value.get("month_id") or key): {
+                str(candidate.get("candidate_id"))
+                for candidate in value.get("candidates") or []
+                if candidate.get("candidate_id")
+            }
+            for key, value in packet["months"].items()
+        }
+        self._last_v3_narration_fact_ids = {
+            int(value.get("month_id") or key): {
+                str(candidate.get("candidate_id")): {
+                    str(fact.get("fact_id"))
+                    for fact in candidate.get("allowed_facts") or []
+                    if fact.get("fact_id")
+                }
+                for candidate in value.get("candidates") or []
+                if candidate.get("candidate_id")
+            }
+            for key, value in packet["months"].items()
+        }
+        return packet
 
-    def _create_accuracy_v3_yearly_prompt(self, raw_data: str, year: int, age: int) -> str:
-        payload = self._v3_narration_payload()
+    def _create_accuracy_v3_yearly_prompt(
+        self,
+        raw_data: str,
+        year: int,
+        age: int,
+        payload_override: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        payload = payload_override if payload_override is not None else self._v3_narration_payload()
         return f"""
 You are only the plain-language narration layer for Event Timeline Accuracy V3 for {year}.
-The deterministic candidate packet below is sovereign. It already performed the multi-house,
-dasha, transit, KP, varga, and Desh-Kaal-Patra checks.
+The deterministic candidate packet below is authoritative. You are a copy editor, not a predictor.
 
 RULES:
 - Return every supplied candidate exactly once under its supplied month. Do not select or omit candidates.
-- Copy candidate_id exactly. Never create an event, candidate_id, date, planet, house, or confidence grade.
-- Rephrase only `prediction` for clarity without changing the event family.
-- Copy `possible_manifestations`, `activation_reasoning`, and `trigger_logic` exactly. They are
-  deterministic astrological explanations tied to the calculation graph, not prose suggestions.
-- Obey forbidden_terms. Do not call a homemaker, student, retired, or unemployed person's activation a promotion.
-- User facts constrain wording only; never quote private facts unnecessarily.
-- Keep ambiguity where the candidate is broad. Do not turn health/work/debt alternatives into a diagnosis.
-- Do not claim certainty. Support grades are astrological evidence grades, not probabilities.
-- Return JSON only with all 12 month objects. Each event needs candidate_id, prediction, and possible_manifestations.
+- Copy candidate_id exactly. Write fresh copy from the structured event brief; there is no draft sentence to paraphrase.
+- Use only the subject, resolved channel, allowed facts, stage, and outcome context supplied for that candidate.
+- Cite at least one used `fact_id` in `used_fact_ids`. Every cited ID must exist in that candidate's `allowed_facts`.
+- Write exactly one natural sentence with no more than 28 words.
+- Use conditional language such as may, might, could, possible, or likely. Never raise certainty.
+- Do not add a person, event, outcome, date, cause, diagnosis, advice, or promise not present in that candidate.
+- Never mention another candidate, related event family, or alternative reading in this card. Each candidate receives its own separate card.
+- Obey forbidden_claims. Do not expose stored facts or mention astrology, houses, planets, dashas, scores, gates, systems, candidates, or implementation details.
+- Prefer concrete human situations from allowed_facts. Avoid generic filler such as “a development may occur”, “may become active”, or “this matter may progress”.
+- Vary sentence construction naturally across cards. Do not append the same stage sentence to every prediction.
+- Write in the packet's language.
+- Return JSON only in this exact shape:
+  {{"monthly_predictions":[{{"month_id":1,"narrations":[{{"candidate_id":"exact-id","prediction":"fresh copy","used_fact_ids":["F1"]}}]}}]}}
 
 AUTHORITATIVE V3 CANDIDATES:
 ```json
@@ -2131,16 +2337,22 @@ AUTHORITATIVE V3 CANDIDATES:
         payload = self._v3_narration_payload(month)
         return f"""
 You are only the plain-language narration layer for Event Timeline Accuracy V3.
-Narrate all deterministic candidates supplied for {self._month_label(month)} {year}.
+The deterministic candidates for {self._month_label(month)} {year} are authoritative.
+You are a copy editor, not a predictor.
 
 RULES:
 - Return every supplied candidate exactly once. Copy candidate_id exactly.
-- Do not add, remove, merge, retime, or change the event family or support grade.
-- Rephrase only `prediction`. Copy `possible_manifestations`, `activation_reasoning`, and
-  `trigger_logic` exactly because they are deterministic evidence text.
-- Obey forbidden_terms and Desh-Kaal-Patra. Do not expose private stored facts unnecessarily.
-- Preserve broad alternatives; do not convert health-related activation into a diagnosis.
-- Use conditional language. Return JSON only with one month object.
+- Write fresh copy from the structured event brief; do not add, remove, merge, retime, or reinterpret an event.
+- Use only the subject, resolved channel, allowed facts, stage, and outcome context supplied for that candidate.
+- Cite at least one valid `fact_id` in `used_fact_ids`.
+- Never mention another candidate, related event family, or alternative reading in this card.
+- Write exactly one natural sentence with no more than 28 words.
+- Use conditional language. Never increase certainty or turn a possibility into a diagnosis or promise.
+- Do not add a person, event, outcome, date, cause, or advice that the candidate does not contain.
+- Obey forbidden_claims. Do not expose stored facts or mention astrology, houses, planets, dashas, scores, gates, systems, candidates, or implementation details.
+- Prefer a concrete situation from allowed_facts and vary sentence construction. Do not use generic filler such as “may become active” or “this matter may progress”. Write in the packet's language.
+- Return JSON only in this exact shape:
+  {{"monthly_predictions":[{{"month_id":{month},"narrations":[{{"candidate_id":"exact-id","prediction":"fresh copy","used_fact_ids":["F1"]}}]}}]}}
 
 AUTHORITATIVE V3 CANDIDATES:
 ```json
@@ -2837,10 +3049,12 @@ Plain-language style for `prediction`:
         prompt: str,
         model_override: Any = None,
         llm_log_tag: str = "event_timeline_generation",
+        request_timeout_s: Optional[float] = None,
+        debug_payload_logging: bool = True,
     ) -> Dict[str, Any]:
         """Gemini API call for event timeline generation."""
         llm_start = time.time()
-        debug_logging = is_debug_logging_enabled()
+        debug_logging = is_debug_logging_enabled() and debug_payload_logging
         token_usage: Dict[str, Any] = {"input_tokens": 0, "output_tokens": 0}
         selected_model = model_override or self.model
         model_name = getattr(selected_model, "model_name", None) or self.model_name
@@ -2879,7 +3093,8 @@ Plain-language style for `prediction`:
             resp = selected_model.generate_content(
                 prompt,
                 generation_config={"response_mime_type": "application/json"},
-                safety_settings=safety
+                safety_settings=safety,
+                **({"request_options": {"timeout": request_timeout_s}} if request_timeout_s else {}),
             )
             print("✅ Gemini API call completed")
 

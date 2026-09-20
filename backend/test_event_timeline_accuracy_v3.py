@@ -56,6 +56,7 @@ def _january_ledger():
         _evidence("saturn", "mahadasha", "Saturn", 2, [7, 8], 9, [11, 3, 6]),
         _evidence("rahu", "antardasha", "Rahu", 2, [], 8, [2]),
         _evidence("jupiter", "pratyantardasha", "Jupiter", 2, [6, 9], 12, [4, 6, 8]),
+        _evidence("mercury", "sookshma", "Mercury", 3, [3, 12], 12, [6]),
     ]
     return {
         "months": {
@@ -74,13 +75,26 @@ def test_engine_selection_supports_v3_and_rollbacks(monkeypatch):
     assert selected_engine_version() == LEGACY_ENGINE_VERSION
 
 
-def test_v3_defaults_to_optimized_pipeline_without_llm_initialization(monkeypatch):
+def test_v3_defaults_to_optimized_pipeline_with_llm_narration(monkeypatch):
     monkeypatch.delenv("EVENT_TIMELINE_ENGINE_VERSION", raising=False)
     monkeypatch.delenv("EVENT_TIMELINE_V3_PIPELINE", raising=False)
     monkeypatch.delenv("EVENT_TIMELINE_V3_NARRATOR", raising=False)
+    model = object()
+    monkeypatch.setattr(
+        "ai.analysis_llm_backend.build_timeline_narration_llm_model",
+        lambda: (model, "test-model", "gemini"),
+    )
     predictor = EventPredictor(None, None, None, None)
     assert predictor.engine_version == ACCURACY_V3_ENGINE_VERSION
     assert predictor.v3_pipeline == "optimized"
+    assert predictor.v3_narrator == "llm"
+    assert predictor.model is model
+    assert predictor.model_name == "test-model"
+
+
+def test_v3_can_roll_back_to_deterministic_narration(monkeypatch):
+    monkeypatch.setenv("EVENT_TIMELINE_V3_NARRATOR", "deterministic")
+    predictor = EventPredictor(None, None, None, None)
     assert predictor.v3_narrator == "deterministic"
     assert predictor.model is None
     assert predictor.model_name == "deterministic_v3"
@@ -88,7 +102,7 @@ def test_v3_defaults_to_optimized_pipeline_without_llm_initialization(monkeypatc
 
 def test_deterministic_yearly_reports_real_pipeline_progress(monkeypatch):
     monkeypatch.delenv("EVENT_TIMELINE_ENGINE_VERSION", raising=False)
-    monkeypatch.delenv("EVENT_TIMELINE_V3_NARRATOR", raising=False)
+    monkeypatch.setenv("EVENT_TIMELINE_V3_NARRATOR", "deterministic")
     predictor = EventPredictor(None, None, None, None)
     predictor._last_v3_model = build_v3_prediction_model(
         {"divisional_charts": {}}, {"months": {}}, kp_evidence={},
@@ -127,6 +141,7 @@ def test_deterministic_yearly_reports_real_pipeline_progress(monkeypatch):
 
 def test_integrated_monthly_deep_compares_against_the_full_year(monkeypatch):
     monkeypatch.setenv("EVENT_TIMELINE_V3_ACCURACY_LAYER", "integrated_v2")
+    monkeypatch.setenv("EVENT_TIMELINE_V3_NARRATOR", "deterministic")
     predictor = EventPredictor(None, None, None, None)
     captured = {}
 
@@ -313,7 +328,7 @@ def test_core_dasha_direct_transit_is_background_permission_not_its_own_trigger(
     )
 
     mercury_trigger = _evidence(
-        "mercury", "pratyantardasha", "Mercury", 2, [3, 12], 4, [10]
+        "mercury", "pratyantardasha", "Mercury", 2, [3, 12], 12, [10]
     )
     with_trigger = build_v3_prediction_model(
         {"divisional_charts": {}},
@@ -327,6 +342,8 @@ def test_core_dasha_direct_transit_is_background_permission_not_its_own_trigger(
     assert travel["anchor_natal_dasha_hits"] == []
     assert travel["anchor_dasha_transit_hits"] == [9]
     assert travel["background_permission_houses"] == [9]
+    assert travel["required_direct_transit_houses"] == [9, 12]
+    assert any(row["house"] == 12 and row["planet"] == "Mercury" for row in travel["direct_timing_channels"])
     assert any(row["planet"] == "Mercury" for row in travel["independent_timing_channels"])
     assert "persistent background permission" in travel["activation_reasoning"]
 
@@ -375,7 +392,7 @@ def test_persistent_permission_keeps_only_peak_corridor_primary_for_self_and_rel
     monkeypatch.setenv("EVENT_TIMELINE_V3_ACCURACY_LAYER", "integrated_v2")
     native_evidence = [
         _evidence("saturn", "mahadasha", "Saturn", 2, [7, 8], 9, [11, 3, 6]),
-        _evidence("mercury", "pratyantardasha", "Mercury", 2, [3, 12], 4, [10]),
+        _evidence("mercury", "pratyantardasha", "Mercury", 2, [3, 12], 12, [10]),
     ]
     native = build_v3_prediction_model(
         {"divisional_charts": {}},
@@ -419,7 +436,7 @@ def test_exhaustive_mode_really_publishes_recurring_permission_events(monkeypatc
     monkeypatch.setenv("EVENT_TIMELINE_V3_PUBLICATION_MODE", "exhaustive")
     evidence = [
         _evidence("saturn", "mahadasha", "Saturn", 2, [7, 8], 9, [11, 3, 6]),
-        _evidence("mercury", "pratyantardasha", "Mercury", 2, [3, 12], 4, [10]),
+        _evidence("mercury", "pratyantardasha", "Mercury", 2, [3, 12], 12, [10]),
     ]
     model = build_v3_prediction_model(
         {"divisional_charts": {}},
@@ -520,7 +537,20 @@ def test_relative_house_rotation_and_spouse_health_requires_explicit_subject_fac
         "rest_or_hospital_setting": 6,
     }
     assert "not a diagnosis" in event["prediction"]
+    assert "Your spouse" not in event["prediction"]
+    assert "This prediction is about" not in event["prediction"]
+    assert "More than one kind of event" not in event["prediction"]
     assert "H2, H6, and H12" in event["activation_reasoning"]
+
+    ranked_relative_events = [
+        row for row in with_fact["months"]["1"]["qualified_candidates"]
+        if row.get("subject_key") == "spouse"
+        and row.get("claim_scope") == "ranked_manifestation_channel"
+    ]
+    for row in ranked_relative_events:
+        if row["alternative_event_labels"]:
+            assert "Other supported readings from the same active houses:" in row["prediction"]
+            assert any(label in row["prediction"] for label in row["alternative_event_labels"])
 
     january = with_fact["months"]["1"]
     relative_source_keys = {
@@ -623,7 +653,9 @@ def test_v3_resolves_multiple_coherent_events_and_restores_llm_omissions():
     assert january["published_candidate_count"] == 0
     assert january["qualified_candidate_count"] == january["candidate_count"]
 
-    checked, warnings = validate_v3_payload({}, model, selected_month=1)
+    checked, warnings = validate_v3_payload(
+        {}, model, selected_month=1, narration_expected=False,
+    )
     assert checked["accuracy_layer"] == model["accuracy_layer"]
     assert len(checked["monthly_predictions"][0]["events"]) == january["published_candidate_count"]
     assert len(checked["monthly_predictions"][0]["background_candidates"]) == len(january["background_candidates"])
@@ -637,6 +669,236 @@ def test_v3_resolves_multiple_coherent_events_and_restores_llm_omissions():
         assert background["possible_manifestations"]
     assert checked["macro_trends"] == []
     assert warnings == []
+
+
+def test_v3_llm_packet_contains_all_visible_cards_without_astrology_internals():
+    model = build_v3_prediction_model(
+        {"divisional_charts": {}}, _january_ledger(), kp_evidence={},
+        user_facts={"relationships": ["I am married"]}, year=2030, age=40,
+    )
+    predictor = EventPredictor.__new__(EventPredictor)
+    predictor._last_v3_model = model
+    packet = predictor._v3_narration_payload(1)
+    candidates = packet["months"]["1"]["candidates"]
+    expected_ids = {
+        str(candidate["candidate_id"])
+        for list_name in (
+            "publishable_candidates", "also_possible_candidates",
+            "ongoing_background_candidates", "annual_context_candidates",
+            "weak_signal_candidates", "people_candidates",
+            "people_also_possible_candidates", "people_ongoing_background_candidates",
+            "people_annual_context_candidates", "people_weak_signal_candidates",
+        )
+        for candidate in model["months"]["1"].get(list_name) or []
+    }
+    assert {str(row["candidate_id"]) for row in candidates} == expected_ids
+    assert all("fallback_prediction" not in row for row in candidates)
+    assert all("alternative_event_labels" not in row for row in candidates)
+    assert all(row["allowed_facts"] for row in candidates)
+    assert all(row["stage"].get("phase") for row in candidates)
+    assert all(
+        "Other supported readings from the same active houses:" not in fact["text"]
+        for row in candidates
+        for fact in row["allowed_facts"]
+    )
+    serialized = json.dumps(packet).lower()
+    for private_field in (
+        "activated_houses", "activation_reasoning", "trigger_logic", "dasha",
+        "kp_confirmation", "varga_confirmation", "planet_delivery", "natal_promise",
+    ):
+        assert private_field not in serialized
+
+
+def test_v3_yearly_llm_packet_includes_every_rendered_tier_but_batches_stay_monthly():
+    model = build_v3_prediction_model(
+        {"divisional_charts": {}}, _january_ledger(), kp_evidence={},
+        user_facts={}, year=2030, age=40,
+    )
+    predictor = EventPredictor.__new__(EventPredictor)
+    predictor._last_v3_model = model
+    predictor._month_label = lambda month: "January"
+    packet = predictor._v3_narration_payload()
+    requested_ids = {
+        str(candidate["candidate_id"])
+        for month in packet["months"].values()
+        for candidate in month["candidates"]
+    }
+    expected_ids = {
+        str(candidate["candidate_id"])
+        for month in model["months"].values()
+        for list_name in (
+            "publishable_candidates", "also_possible_candidates",
+            "ongoing_background_candidates", "annual_context_candidates",
+            "weak_signal_candidates", "people_candidates",
+            "people_also_possible_candidates", "people_ongoing_background_candidates",
+            "people_annual_context_candidates", "people_weak_signal_candidates",
+        )
+        for candidate in month.get(list_name) or []
+    }
+    assert requested_ids == expected_ids
+    for month_key, month_payload in packet["months"].items():
+        month_packet = {**packet, "months": {month_key: month_payload}}
+        assert len(predictor._create_accuracy_v3_yearly_prompt(
+            "", 2030, 40, payload_override=month_packet,
+        )) < 40_000
+
+
+def test_v3_timeout_returns_explicit_invalid_result(monkeypatch):
+    predictor = EventPredictor.__new__(EventPredictor)
+    predictor._v3_narration_timeout_s = lambda: 0.01
+
+    async def slow_call(*_args, **_kwargs):
+        await asyncio.sleep(0.1)
+        return {"monthly_predictions": []}
+
+    predictor._get_ai_prediction_async = slow_call
+    result = asyncio.run(predictor._get_v3_narration("test"))
+    assert result["_timeline_invalid"] is True
+    assert "deadline" in result["error"]
+
+
+def test_v3_yearly_narration_is_split_into_parallel_month_batches(monkeypatch):
+    monkeypatch.setenv("EVENT_TIMELINE_V3_NARRATION_CONCURRENCY", "2")
+    predictor = EventPredictor.__new__(EventPredictor)
+    predictor._last_v3_model = {
+        "language": "en",
+        "desh_kaal_patra": {},
+        "months": {
+            str(month): {
+                "month_id": month,
+                "publishable_candidates": [{
+                    "candidate_id": f"C-{month}",
+                    "event_family": "Work decision",
+                    "prediction": "A work decision may need attention.",
+                    "possible_manifestations": [{"scenario": "A work discussion may move forward."}],
+                    "manifestation_phase": "developing",
+                    "outcome_dimensions": {"ease": "mixed"},
+                }],
+            }
+            for month in (1, 6, 9)
+        },
+    }
+    prompts = []
+    active = 0
+    max_active = 0
+
+    async def fake_narration(prompt):
+        nonlocal active, max_active
+        prompts.append(prompt)
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        month_id = next(month for month in (1, 6, 9) if f'"month_id":{month}' in prompt)
+        return {
+            "monthly_predictions": [{"month_id": month_id, "narrations": []}],
+            "_llm_usage": {"input_tokens": 10, "output_tokens": 2, "total_tokens": 12},
+        }
+
+    predictor._get_v3_narration = fake_narration
+    result = asyncio.run(predictor._get_v3_yearly_narration_batched(2030, 40))
+    assert len(prompts) == 3
+    assert max_active == 2
+    assert all(prompt.count('"candidate_id":"C-') == 1 for prompt in prompts)
+    assert result["_narration_batches"] == {"requested": 3, "completed": 3, "failed": 0}
+    assert result["_llm_usage"]["input_tokens"] == 30
+
+
+def test_v3_llm_narration_applies_to_background_cards_and_rejects_unsafe_copy():
+    model = build_v3_prediction_model(
+        {"divisional_charts": {}}, _january_ledger(), kp_evidence={},
+        user_facts={}, year=2030, age=40,
+    )
+    january = model["months"]["1"]
+    background = (january.get("background_candidates") or [])[0]
+    narrated = {
+        "monthly_predictions": [{
+            "month_id": 1,
+            "narrations": [{
+                "candidate_id": background["candidate_id"],
+                "prediction": "You may notice a practical development in this area of life.",
+            }],
+        }],
+    }
+    checked, _warnings = validate_v3_payload(narrated, model, selected_month=1)
+    rendered = next(
+        row for row in checked["monthly_predictions"][0]["background_candidates"]
+        if row["candidate_id"] == background["candidate_id"]
+    )
+    assert rendered["prediction"] == "You may notice a practical development in this area of life."
+    assert rendered["narration_source"] == "llm"
+
+    narrated["monthly_predictions"][0]["narrations"][0]["prediction"] = (
+        "This event will certainly happen on 2030-01-15 because Saturn guarantees it."
+    )
+    checked, warnings = validate_v3_payload(narrated, model, selected_month=1)
+    rendered = next(
+        row for row in checked["monthly_predictions"][0]["background_candidates"]
+        if row["candidate_id"] == background["candidate_id"]
+    )
+    assert rendered["prediction"] == background["prediction"]
+    assert rendered["narration_source"] == "deterministic_fallback"
+    assert any("unsafe or over-specific" in warning or "technical" in warning for warning in warnings)
+    assert checked["narration_status"] == "partial_fallback"
+
+
+def test_v3_structured_narration_requires_valid_fact_citations():
+    model = build_v3_prediction_model(
+        {"divisional_charts": {}}, _january_ledger(), kp_evidence={},
+        user_facts={}, year=2030, age=40,
+    )
+    predictor = EventPredictor.__new__(EventPredictor)
+    predictor._last_v3_model = model
+    packet = predictor._v3_narration_payload(1)
+    brief = packet["months"]["1"]["candidates"][0]
+    candidate_id = str(brief["candidate_id"])
+    valid_fact_id = brief["allowed_facts"][0]["fact_id"]
+    payload = {"monthly_predictions": [{"month_id": 1, "narrations": [{
+        "candidate_id": candidate_id,
+        "prediction": "A practical conversation may bring this situation into clearer focus.",
+        "used_fact_ids": [valid_fact_id],
+    }]}]}
+    checked, warnings = validate_v3_payload(
+        payload,
+        model,
+        selected_month=1,
+        expected_narration_ids=predictor._last_v3_narration_ids,
+        expected_narration_fact_ids=predictor._last_v3_narration_fact_ids,
+    )
+    rendered = next(
+        row for list_name in (
+            "events", "also_possible_candidates", "ongoing_background_candidates",
+            "annual_context_candidates", "weak_signal_candidates", "people_candidates",
+            "people_also_possible_candidates", "people_ongoing_background_candidates",
+            "people_annual_context_candidates", "people_weak_signal_candidates",
+        )
+        for row in checked["monthly_predictions"][0].get(list_name) or []
+        if row["candidate_id"] == candidate_id
+    )
+    assert rendered["prediction"] == payload["monthly_predictions"][0]["narrations"][0]["prediction"]
+    assert rendered["narration_source"] == "llm"
+    assert not any("invalid fact citations" in warning for warning in warnings)
+
+    payload["monthly_predictions"][0]["narrations"][0]["used_fact_ids"] = ["F999"]
+    checked, warnings = validate_v3_payload(
+        payload,
+        model,
+        selected_month=1,
+        expected_narration_ids=predictor._last_v3_narration_ids,
+        expected_narration_fact_ids=predictor._last_v3_narration_fact_ids,
+    )
+    assert any("invalid fact citations" in warning for warning in warnings)
+    rendered = next(
+        row for list_name in (
+            "events", "also_possible_candidates", "ongoing_background_candidates",
+            "annual_context_candidates", "weak_signal_candidates", "people_candidates",
+            "people_also_possible_candidates", "people_ongoing_background_candidates",
+            "people_annual_context_candidates", "people_weak_signal_candidates",
+        )
+        for row in checked["monthly_predictions"][0].get(list_name) or []
+        if row["candidate_id"] == candidate_id
+    )
+    assert rendered["narration_source"] == "deterministic_fallback"
 
 
 def test_v3_foreign_travel_has_auditable_why_and_distinct_scenarios():
@@ -654,14 +916,14 @@ def test_v3_foreign_travel_has_auditable_why_and_distinct_scenarios():
     assert "Jupiter Pratyantardasha" in why
     assert "natal lordship" in why
     assert "transit placement" in why
-    assert "H9" in why and "H3" in why and "H12" in why
+    assert "H9" in why and "H12" in why
     assert "KP confirmation is unavailable" in why
     assert "D9 confirmation is unavailable" in why
 
     scenarios = event["possible_manifestations"]
-    assert len(scenarios) == 2
+    assert len(scenarios) == 1
     assert scenarios[0]["scenario"] != event["event_family"]
-    assert scenarios[0]["scenario"] != scenarios[1]["scenario"]
+    assert "temporary stay away" in scenarios[0]["scenario"]
     assert "passed the dasha-house" not in scenarios[0]["reasoning"]
     assert "Pratyantardasha" in scenarios[0]["reasoning"]
 
@@ -793,6 +1055,33 @@ def test_event_card_predictions_use_plain_language_and_keep_astrology_in_why():
     assert "saturn" not in rendered["prediction"].lower()
     assert "kp" not in rendered["prediction"].lower()
     assert any("technical user-facing narration" in warning for warning in warnings)
+
+
+def test_possible_scenarios_never_expose_engine_implementation_details():
+    repeated = {
+        "candidate_id": "kg-private-intimacy",
+        "event_family": "Private closeness, intimacy or bed-comfort development",
+        "prediction": "Private closeness may develop.",
+        "explanation_version": "detailed_v2",
+        "possible_manifestations": [{
+            "scenario": "Private closeness, intimacy or bed-comfort development",
+            "reasoning": "KG pattern pattern.relationship.private_intimacy supplied the event structure.",
+        }],
+    }
+    rendered, _warnings = _safe_narration(repeated, None)
+    assert rendered["possible_manifestations"] == []
+
+    distinct = {
+        **repeated,
+        "possible_manifestations": [{
+            "scenario": "A private relationship may become warmer or more affectionate.",
+            "reasoning": "Internal calculation details that must not reach the app.",
+        }],
+    }
+    rendered, _warnings = _safe_narration(distinct, None)
+    assert rendered["possible_manifestations"] == [{
+        "scenario": "A private relationship may become warmer or more affectionate."
+    }]
 
 
 def test_hindi_templates_preserve_astrology_and_localize_user_facing_copy():

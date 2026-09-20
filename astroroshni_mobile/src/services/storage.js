@@ -1,6 +1,96 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setAnalyticsUserId, clearFacebookUserId } from '../utils/analytics';
 
+const DISPOSABLE_CACHE_PREFIXES = [
+  'chart_only_cache:',
+  'home_chart_cache:',
+  'home_panchang_cache:',
+  'nakshatra_year_',
+  'karma_analysis_',
+];
+
+const CHAT_CACHE_PREFIXES = [
+  'chatMessages_',
+  'chatSessions_',
+  'pendingChatMessages_',
+  'pendingFeedback_',
+  'chat-entry:',
+];
+
+const isQuotaExceeded = (error) => {
+  const name = error?.name || '';
+  const message = String(error?.message || error || '');
+  return (
+    name === 'QuotaExceededError' ||
+    name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+    /quota/i.test(message)
+  );
+};
+
+const unwrapChartPayload = (value) => {
+  if (!value || typeof value !== 'object') return value;
+  if (value.data && typeof value.data === 'object' && (value.data.planets || value.data.houses)) {
+    return value.data;
+  }
+  return value;
+};
+
+const slimChartSnapshot = (value) => {
+  const chart = unwrapChartPayload(value);
+  if (!chart || typeof chart !== 'object') return chart;
+  const slim = {};
+  if (chart.planets) slim.planets = chart.planets;
+  if (chart.houses) slim.houses = chart.houses;
+  if (chart.ascendant != null) slim.ascendant = chart.ascendant;
+  if (chart.birth_chart_id != null) slim.birth_chart_id = chart.birth_chart_id;
+  return Object.keys(slim).length ? slim : chart;
+};
+
+const toPersistedChartCache = (value) => {
+  if (!value || typeof value !== 'object') return value;
+  if (value.birthData || value.chartData) {
+    return {
+      ...(value.birthData ? { birthData: value.birthData } : {}),
+      chartData: slimChartSnapshot(value.chartData || value),
+    };
+  }
+  return slimChartSnapshot(value);
+};
+
+const removeKeysWithPrefixes = async (prefixes) => {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const matches = (keys || []).filter((key) => prefixes.some((prefix) => key?.startsWith(prefix)));
+    if (!matches.length) return;
+    try {
+      await AsyncStorage.multiRemove(matches);
+    } catch (_) {
+      await Promise.all(matches.map((key) => AsyncStorage.removeItem(key).catch(() => {})));
+    }
+  } catch (_) {
+    /* ignore */
+  }
+};
+
+const persistJson = async (key, value) => {
+  const payload = JSON.stringify(value);
+  try {
+    await AsyncStorage.setItem(key, payload);
+    return;
+  } catch (error) {
+    if (!isQuotaExceeded(error)) throw error;
+  }
+  await removeKeysWithPrefixes(DISPOSABLE_CACHE_PREFIXES);
+  try {
+    await AsyncStorage.setItem(key, payload);
+    return;
+  } catch (error) {
+    if (!isQuotaExceeded(error)) throw error;
+  }
+  await removeKeysWithPrefixes(CHAT_CACHE_PREFIXES);
+  await AsyncStorage.setItem(key, payload);
+};
+
 export const storage = {
   // Auth
   setAuthToken: async (token) => {
@@ -87,8 +177,15 @@ export const storage = {
     }
   },
   
-  // Chart data
-  setChartData: (chartData) => AsyncStorage.setItem('chartData', JSON.stringify(chartData)),
+  // Chart data. On web this is localStorage (~5MB origin quota). Never block
+  // a successful server save if the cache write cannot fit.
+  setChartData: async (chartData) => {
+    try {
+      await persistJson('chartData', toPersistedChartCache(chartData));
+    } catch (_) {
+      /* optional cache */
+    }
+  },
   getChartData: async () => {
     const data = await AsyncStorage.getItem('chartData');
     return data ? JSON.parse(data) : null;

@@ -42,8 +42,9 @@ from calculators.event_timeline_delivery_v1 import (
 
 
 ACCURACY_V3_ENGINE_VERSION = "accuracy_v3"
-V3_METHODOLOGY_VERSION = "event_timeline_rotated_relative_lagna_2026_09_v3_20"
+V3_METHODOLOGY_VERSION = "event_timeline_flash_low_all_cards_narration_2026_09_v3_31"
 V3_EVIDENCE_VERSION = "activation_graph_event_resolver_v20_rotated_relative_lagna"
+V3_NARRATION_CONTRACT_VERSION = "flash_low_all_cards_event_brief_v7"
 
 _CORE_LEVELS = {"mahadasha", "antardasha", "pratyantardasha"}
 _SLOW_TRANSIT_PLANETS = {"Jupiter", "Saturn", "Rahu", "Ketu"}
@@ -87,6 +88,11 @@ def user_fact_fingerprint(
     # Include the presentation contract so cached V3.0 rows cannot mask a V3.1
     # explanation upgrade. Setting the explanation version to legacy_v1 remains
     # an immediate, reversible rollback without changing the astrology engine.
+    from manifestation_kg.store import default_manifestation_store
+    from utils.admin_settings import (
+        get_event_timeline_narration_model,
+        get_event_timeline_narration_thinking_level,
+    )
     canonical = json.dumps({
         "facts": user_facts or {},
         "relative_profiles": relative_profiles or [],
@@ -94,9 +100,16 @@ def user_fact_fingerprint(
         "contract_version": V3_EVIDENCE_VERSION,
         "explanation_version": v3_explanation_version(),
         "pipeline": str(os.getenv("EVENT_TIMELINE_V3_PIPELINE") or "optimized").strip().lower(),
-        "narrator": str(os.getenv("EVENT_TIMELINE_V3_NARRATOR") or "deterministic").strip().lower(),
+        "narrator": str(os.getenv("EVENT_TIMELINE_V3_NARRATOR") or "llm").strip().lower(),
+        "narration_contract": V3_NARRATION_CONTRACT_VERSION,
+        "narration_model": get_event_timeline_narration_model(),
+        "narration_thinking_level": get_event_timeline_narration_thinking_level(),
         "publication_mode": v3_publication_mode(),
         "accuracy_layer": accuracy_layer_mode(),
+        "manifestation_kg_timeline": str(
+            os.getenv("MANIFESTATION_KG_EVENT_TIMELINE") or "review"
+        ).strip().lower(),
+        "manifestation_kg_version": default_manifestation_store().ontology_version,
     }, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode("utf-8", "ignore")).hexdigest()[:20]
 
@@ -186,6 +199,20 @@ def derive_desh_kaal_patra(
         for category in (user_facts or {})
         for line in _fact_lines(user_facts, str(category))
     ]
+    explicit_topics: List[str] = []
+    if any(re.search(r"\b(court|lawsuit|litigation|legal case|court case|dispute|tribunal)\b", line, re.I) for line in all_fact_lines):
+        explicit_topics.append("legal")
+    if any(re.search(r"\b(astrology|jyotish|occult|esoteric|hidden science|tantra|tarot)\b", line, re.I) for line in all_fact_lines):
+        explicit_topics.append("occult")
+    explicit_child_orders: List[str] = []
+    child_order_patterns = (
+        ("first", r"\b(first|1st) child\b"),
+        ("second", r"\b(second|2nd) child\b"),
+        ("third", r"\b(third|3rd) child\b"),
+    )
+    for order, pattern in child_order_patterns:
+        if any(re.search(pattern, line, re.I) for line in all_fact_lines):
+            explicit_child_orders.append(order)
     living_fact_lines = [
         line for line in all_fact_lines
         if not re.search(r"\b(died|deceased|late (?:mother|father|parent|brother|sister|spouse)|passed away)\b", line)
@@ -251,6 +278,8 @@ def derive_desh_kaal_patra(
         "employment_state": employment,
         "relationship_state": relationship,
         "parenthood_state": parenthood,
+        "explicit_topics": explicit_topics,
+        "explicit_child_orders": explicit_child_orders,
         "eligible_relative_subjects": relative_subjects,
         "relative_contexts": relative_contexts,
         "relative_profiles_enabled": profiles_enabled,
@@ -485,6 +514,21 @@ _PREDICTIONS = {
     "children": "A matter involving children, care, or a creative project may need attention.",
     "education": "Study, training, or an exam may move forward.",
     "income_gain": "Money, savings, or a payment may improve or move forward.",
+    "kg_family_mother_development": "A conversation, home matter, or practical responsibility involving your mother may need attention.",
+    "kg_family_sibling_development": "A conversation, responsibility, or shared plan involving a sibling may move forward.",
+    "kg_family_in_law_development": "A conversation, visit, practical responsibility, or family decision involving your spouse's family may arise.",
+    "kg_legal_dispute_activity": "A disagreement, formal complaint, negotiation, or legal matter may require active attention.",
+    "kg_legal_resolution": "A dispute may move toward settlement, judgment, compromise, or another clear resolution.",
+    "kg_legal_contract_agreement": "A negotiation may move toward signing, approval, or a clear shared commitment.",
+    "kg_legal_competition_result": "An exam, selection, dispute, or competitive effort may move toward a result.",
+    "kg_spirituality_occult_study": "Astrology, spiritual practice, research, or another hidden subject may draw deeper study.",
+    "kg_career_staff_hiring": "You may find or appoint an employee, helper, contractor, or other practical support.",
+    "kg_career_staff_change": "A staff member or practical helper may change, leave, face pressure, or need a new arrangement.",
+    "kg_relationship_remarriage_development": "A relationship may move toward a serious discussion or commitment involving remarriage.",
+    "kg_children_first_child_development": "A decision, responsibility, or milestone involving your first child may need attention.",
+    "kg_children_second_child_development": "A decision, responsibility, or milestone involving your second child may need attention.",
+    "kg_children_third_child_development": "A decision, responsibility, or milestone involving your third child may need attention.",
+    "kg_relationship_private_intimacy": "You and your partner may find more privacy, affection, physical closeness, or restful time together.",
 }
 
 _LEVEL_LABELS = {
@@ -702,8 +746,10 @@ def _manifestation_specs(event_key: str, dkp: Mapping[str, Any]) -> List[Tuple[s
             ("Romance, reconciliation, or a meaningful development in an existing relationship may occur.", (7, 5, 9)),
         ],
         "foreign_travel": [
-            ("A long-distance journey, pilgrimage, or important trip may require bookings and paperwork.", (9, 3)),
             ("A temporary stay away from the present base for study, work, family, or retreat may develop.", (9, 12, 11)),
+        ],
+        "kg_travel_documentation": [
+            ("A visa, travel permission, application, booking, or other journey paperwork may move forward.", (3, 9, 11)),
         ],
         "children": [
             ("A child-related milestone, education decision, or added caregiving responsibility may arise.", (5, 9, 11)),
@@ -825,6 +871,22 @@ def _hindi_label(event_key: str, dkp: Mapping[str, Any]) -> str:
         "property_gain": "घर या संपत्ति से लाभ", "relocation": "स्थान परिवर्तन",
         "foreign_travel": "लंबी दूरी या विदेश यात्रा", "education": "पढ़ाई, प्रशिक्षण या योग्यता",
         "income_gain": "आय, बचत या संसाधनों में वृद्धि",
+        "kg_travel_documentation": "वीज़ा, यात्रा दस्तावेज़ या अनुमति",
+        "kg_family_mother_development": "माता, उनके घर या सहयोग से जुड़ा घटनाक्रम",
+        "kg_family_sibling_development": "भाई-बहन से जुड़ा संवाद या घटनाक्रम",
+        "kg_family_in_law_development": "ससुराल या जीवनसाथी के परिवार से जुड़ा घटनाक्रम",
+        "kg_legal_dispute_activity": "विवाद, विरोध या कानूनी मामला",
+        "kg_legal_resolution": "विवाद का समझौता, निर्णय या समाधान",
+        "kg_legal_contract_agreement": "अनुबंध, समझौता या बातचीत से बनी सहमति",
+        "kg_legal_competition_result": "प्रतियोगिता या बाधा पर परिणाम",
+        "kg_spirituality_occult_study": "ज्योतिष, गूढ़ या रहस्य-विज्ञान का अध्ययन",
+        "kg_career_staff_hiring": "कर्मचारी या व्यावहारिक सहायता की नियुक्ति",
+        "kg_career_staff_change": "कर्मचारी या सेवा-सहयोग में बदलाव",
+        "kg_relationship_remarriage_development": "पुनर्विवाह से जुड़ा घटनाक्रम",
+        "kg_children_first_child_development": "पहली संतान से जुड़ा घटनाक्रम",
+        "kg_children_second_child_development": "दूसरी संतान से जुड़ा घटनाक्रम",
+        "kg_children_third_child_development": "तीसरी संतान से जुड़ा घटनाक्रम",
+        "kg_relationship_private_intimacy": "रिश्ते में निजी निकटता और अंतरंगता",
     }.get(event_key, event_key)
 
 
@@ -964,9 +1026,19 @@ _EVENT_CHANNELS: Dict[str, Dict[str, Any]] = {
     "relocation": {"channel": "residence change", "karakas": ("Moon", "Mars", "Rahu"), "varga": "D4"},
     "marriage": {"channel": "spouse/partnership", "karakas": ("Venus", "Jupiter"), "varga": "D9"},
     "foreign_travel": {"channel": "long-distance travel/foreign stay", "karakas": ("Jupiter", "Rahu", "Saturn"), "varga": "D9"},
+    "travel_documentation": {"channel": "visa/travel documentation or permission", "karakas": ("Mercury", "Jupiter", "Rahu"), "varga": "D9"},
     "children": {"channel": "children/creative progeny", "karakas": ("Jupiter", "Sun"), "varga": "D7"},
     "education": {"channel": "education/qualification", "karakas": ("Mercury", "Jupiter"), "varga": "D24"},
     "income_gain": {"channel": "income/accumulated resources", "karakas": ("Jupiter", "Venus", "Mercury"), "varga": "D2"},
+    "family_member": {"channel": "family-member development", "karakas": ("Moon", "Jupiter"), "varga": "D12"},
+    "legal": {"channel": "legal dispute or resolution", "karakas": ("Saturn", "Mars", "Jupiter"), "varga": "D30"},
+    "agreement": {"channel": "contract or negotiated agreement", "karakas": ("Mercury", "Venus", "Jupiter"), "varga": "D9"},
+    "competition": {"channel": "competition and result", "karakas": ("Mars", "Saturn", "Jupiter"), "varga": "D10"},
+    "occult_study": {"channel": "astrology or occult study", "karakas": ("Jupiter", "Mercury", "Ketu"), "varga": "D24"},
+    "staff": {"channel": "staff or service support", "karakas": ("Saturn", "Mercury"), "varga": "D10"},
+    "remarriage": {"channel": "remarriage development", "karakas": ("Venus", "Jupiter"), "varga": "D9"},
+    "numbered_child": {"channel": "numbered-child development", "karakas": ("Jupiter", "Sun"), "varga": "D7"},
+    "intimacy": {"channel": "private relationship closeness", "karakas": ("Venus", "Moon"), "varga": "D9"},
 }
 
 
@@ -1163,7 +1235,7 @@ def _relative_event_copy(
                 "कोर्स, साधना या मार्गदर्शित अध्ययन शुरू करना",
                 "अपने अनुभव से किसी को सिखाना या मार्गदर्शन देना",
             )
-        prediction = f"{subject_text} के जीवन में {theme} हो सकता है। यह भविष्यवाणी {subject_text} के बारे में है।"
+        prediction = f"{theme} से जुड़ा घटनाक्रम हो सकता है।"
         if source_key == "health":
             prediction += " यह केवल स्वास्थ्य पर अधिक ध्यान देने का समय है। यह किसी बीमारी की पक्की जानकारी नहीं है।"
         scenarios = [
@@ -1240,7 +1312,7 @@ def _relative_event_copy(
             "Beginning a course, practice, or guided study",
             "Sharing experience through teaching or mentoring",
         )
-    prediction = f"Your {subject.lower()} may experience {theme}. This prediction is about your {subject.lower()}."
+    prediction = f"{theme[:1].upper()}{theme[1:]} may become relevant."
     if source_key == "health":
         prediction += " This is only a time to pay extra attention to health. It is not a diagnosis or a certain surgery."
     scenarios = [
@@ -1355,7 +1427,9 @@ def _deterministic_prediction(
         ],
         "foreign_travel": [
             ({12}, "A long journey or temporary stay away may happen for work, study, family, pilgrimage, or rest."),
-            ({3}, "Travel bookings, applications, permission, or paperwork may move forward."),
+        ],
+        "kg_travel_documentation": [
+            ({3}, "A visa, travel permission, application, booking, or other journey paperwork may move forward."),
         ],
         "children": [
             ({11}, "A matter involving children, care, teaching, or a creative project may receive support."),
@@ -1373,12 +1447,7 @@ def _deterministic_prediction(
         (text for houses, text in pathways.get(event_key, []) if houses & transition),
         _PREDICTIONS.get(event_key, f"{label} may become active."),
     )
-    endings = {
-        "result_window": "There is a better chance of seeing a clear result during this time.",
-        "developing": "The matter may move forward, but the final result may take more time.",
-        "preparatory": "This time is better for planning and preparation than for a final result.",
-    }
-    return f"{base} {endings[phase]}"
+    return base
 
 
 def _hindi_prediction(
@@ -1417,7 +1486,9 @@ def _hindi_prediction(
         ],
         "foreign_travel": [
             ({12}, "काम, पढ़ाई, परिवार, तीर्थ या आराम के लिए लंबी यात्रा हो सकती है।"),
-            ({3}, "यात्रा की बुकिंग, अनुमति या कागज़ी काम आगे बढ़ सकता है।"),
+        ],
+        "kg_travel_documentation": [
+            ({3}, "वीज़ा, यात्रा अनुमति, आवेदन, बुकिंग या अन्य यात्रा दस्तावेज़ आगे बढ़ सकते हैं।"),
         ],
         "children": [
             ({11}, "संतान, रचनात्मक परियोजना, मार्गदर्शन या परिवार-विस्तार की चर्चा को सहयोग मिल सकता है।"),
@@ -1435,16 +1506,27 @@ def _hindi_prediction(
         "vehicle_purchase": "वाहन खरीदने की योजना आगे बढ़ सकती है।",
         "property_gain": "घर या संपत्ति का लक्ष्य आगे बढ़ सकता है।", "relocation": "घर या जगह बदलने की योजना बन सकती है।",
         "marriage": "रिश्ते से जुड़ा महत्वपूर्ण मामला आगे बढ़ सकता है।", "foreign_travel": "लंबी यात्रा या घर से दूर रहना संभव हो सकता है।",
+        "kg_travel_documentation": "वीज़ा, यात्रा अनुमति या यात्रा से जुड़ा कागज़ी काम आगे बढ़ सकता है।",
+        "kg_family_mother_development": "माता से जुड़ी बातचीत, उनके घर का मामला या कोई व्यावहारिक जिम्मेदारी ध्यान मांग सकती है।",
+        "kg_family_sibling_development": "भाई-बहन से जुड़ी बातचीत, जिम्मेदारी या साझा योजना आगे बढ़ सकती है।",
+        "kg_family_in_law_development": "ससुराल पक्ष से जुड़ी बातचीत, मुलाकात, जिम्मेदारी या पारिवारिक फैसला सामने आ सकता है।",
+        "kg_legal_dispute_activity": "मतभेद, औपचारिक शिकायत, बातचीत या कानूनी मामला सक्रिय ध्यान मांग सकता है।",
+        "kg_legal_resolution": "विवाद समझौते, निर्णय, सहमति या किसी स्पष्ट समाधान की ओर बढ़ सकता है।",
+        "kg_legal_contract_agreement": "बातचीत हस्ताक्षर, मंजूरी या स्पष्ट साझा सहमति की ओर बढ़ सकती है।",
+        "kg_legal_competition_result": "परीक्षा, चयन, विवाद या प्रतिस्पर्धी प्रयास किसी नतीजे की ओर बढ़ सकता है।",
+        "kg_spirituality_occult_study": "ज्योतिष, आध्यात्मिक अभ्यास, शोध या किसी गूढ़ विषय का गहरा अध्ययन आकर्षित कर सकता है।",
+        "kg_career_staff_hiring": "कर्मचारी, सहायक, ठेकेदार या दूसरी व्यावहारिक मदद मिल सकती है।",
+        "kg_career_staff_change": "कर्मचारी या व्यावहारिक सहायक बदल सकता है, काम छोड़ सकता है या नई व्यवस्था की जरूरत पड़ सकती है।",
+        "kg_relationship_remarriage_development": "कोई रिश्ता पुनर्विवाह से जुड़ी गंभीर बातचीत या प्रतिबद्धता की ओर बढ़ सकता है।",
+        "kg_children_first_child_development": "पहली संतान से जुड़ा फैसला, जिम्मेदारी या महत्वपूर्ण पड़ाव ध्यान मांग सकता है।",
+        "kg_children_second_child_development": "दूसरी संतान से जुड़ा फैसला, जिम्मेदारी या महत्वपूर्ण पड़ाव ध्यान मांग सकता है।",
+        "kg_children_third_child_development": "तीसरी संतान से जुड़ा फैसला, जिम्मेदारी या महत्वपूर्ण पड़ाव ध्यान मांग सकता है।",
+        "kg_relationship_private_intimacy": "आप और आपके साथी को अधिक निजता, स्नेह, शारीरिक निकटता या साथ आराम का समय मिल सकता है।",
         "children": "संतान, रचनात्मकता या पारिवारिक जिम्मेदारी महत्वपूर्ण हो सकती है।", "education": "पढ़ाई या प्रशिक्षण आगे बढ़ सकता है।",
         "income_gain": "आय, बचत या संसाधनों की गतिविधि सक्रिय हो सकती है।",
     }
     base = next((text for houses, text in pathways.get(event_key, []) if houses & transition), fallback.get(event_key, "यह विषय सक्रिय हो सकता है।"))
-    ending = {
-        "result_window": "इस समय साफ़ नतीजा मिलने की संभावना बेहतर है।",
-        "developing": "मामला आगे बढ़ सकता है, लेकिन अंतिम नतीजे में समय लग सकता है।",
-        "preparatory": "यह समय अंतिम नतीजे से अधिक योजना और तैयारी के लिए अच्छा है।",
-    }[phase]
-    return f"{base} {ending}"
+    return base
 
 
 def _hindi_activation_reasoning(
@@ -1775,6 +1857,14 @@ def _candidate_from_definition(
     transit = {int(h) for h in graph.get("transit_triggered_houses") or []}
     anchor = set(int(h) for h in definition.anchor.houses)
     transition = set(int(h) for h in definition.transition.houses)
+    legacy_source_key = str(getattr(definition, "source_event_key", "") or definition.key)
+    if selected_accuracy_layer == "legacy_v3_6" and legacy_source_key == "foreign_travel":
+        legacy_document_house = (
+            rotate_relative_house(int(definition.reference_house), 3)
+            if str(getattr(definition, "event_kind", "native")) == "relative"
+            else 3
+        )
+        transition.add(legacy_document_house)
     outcome = set(int(h) for h in definition.outcome.houses)
     subject_anchor = set(int(h) for h in ((definition.subject_anchor.houses if definition.subject_anchor else ())))
     # The relative's reference house is the origin for house rotation, not an
@@ -1805,6 +1895,23 @@ def _candidate_from_definition(
         outcome_ok = True
     if not (anchor_ok and transition_ok and outcome_ok and transit_hits):
         return None
+    required_direct_transit_houses = {
+        int(house) for house in getattr(definition, "required_direct_transit_houses", ())
+    }
+    direct_timing_channels: List[Dict[str, Any]] = []
+    if integrated_mode and required_direct_transit_houses:
+        direct_timing_channels = [
+            {**channel, "house": int(house)}
+            for house in required_direct_transit_houses
+            for channel in (houses.get(str(house)) or {}).get("transit_channels") or []
+            if channel.get("mechanism") == "transit_occupation"
+            and (
+                not getattr(definition, "direct_transit_excludes_slow_planets", False)
+                or channel.get("planet") not in _SLOW_TRANSIT_PLANETS
+            )
+        ]
+        if not direct_timing_channels:
+            return None
     is_relative = str(getattr(definition, "event_kind", "native")) == "relative"
     source_event_key = str(getattr(definition, "source_event_key", "") or definition.key)
     subject_anchor_natal_hits = sorted(subject_anchor & dasha_open)
@@ -2097,6 +2204,8 @@ def _candidate_from_definition(
             for planet, level in sorted(background_permission_sources)
         ],
         "independent_timing_channels": independent_timing_channels,
+        "required_direct_transit_houses": sorted(required_direct_transit_houses),
+        "direct_timing_channels": direct_timing_channels,
         "transition_houses": sorted(transition),
         "transition_hits": transition_hits,
         "transition_dasha_hits": transition_dasha,
@@ -2148,6 +2257,23 @@ def _candidate_from_definition(
         "forbidden_terms": personal.get("forbidden_terms") or [],
         "explanation_version": v3_explanation_version(),
     }
+    if getattr(definition, "knowledge_pattern_id", ""):
+        candidate["life_domain"] = str(definition.knowledge_domain).removeprefix("domain.")
+        candidate["manifestation_kg"] = {
+            "pattern_id": definition.knowledge_pattern_id,
+            "manifestation_id": definition.knowledge_manifestation_id,
+            "ontology_version": definition.knowledge_ontology_version,
+            "review_status": definition.knowledge_review_status,
+            "claim_basis": definition.knowledge_claim_basis,
+            "source_ids": list(definition.knowledge_source_ids),
+            "timeline_profile": source_event_key,
+            "role_mapping": {
+                "anchor_houses": sorted(anchor),
+                "transition_houses": sorted(transition),
+                "outcome_houses": sorted(outcome),
+            },
+            "evidence_gate_result": "qualified_candidate",
+        }
     if delivery_mode:
         closest_contact = min(
             exact_transits.get("event_contacts") or [],
@@ -2293,12 +2419,6 @@ def _candidate_from_definition(
     )
     if bhava_disambiguation["specificity"] != "channel_distinguished":
         candidate["claim_scope"] = "ranked_manifestation_channel"
-        if _language_code(language) == "hi":
-            candidate["prediction"] += " इससे जुड़े एक से अधिक जीवन-विषय संभव हैं। ऊपर बताया गया नतीजा उनमें से एक है।"
-        else:
-            candidate["prediction"] += (
-                " More than one kind of event is possible here. The outcome above is one of the stronger possibilities."
-            )
     if background_permission_houses:
         source_text = _natural_join([
             f"{planet} {level.replace('dasha', ' dasha')}"
@@ -2319,6 +2439,49 @@ def _candidate_from_definition(
     return candidate
 
 
+def _attach_supported_alternatives(candidates: Sequence[Dict[str, Any]], language: str) -> None:
+    """Name qualified peer readings instead of displaying a vague ambiguity warning."""
+    for candidate in candidates:
+        candidate["alternative_event_labels"] = []
+        if str(candidate.get("claim_scope") or "") != "ranked_manifestation_channel":
+            continue
+        subject_key = str(candidate.get("subject_key") or "self")
+        anchors = {
+            int(house)
+            for house in ((candidate.get("bhava_disambiguation") or {}).get("semantic_anchor_houses") or [])
+        }
+        labels: List[str] = []
+        for peer in candidates:
+            if peer is candidate or str(peer.get("subject_key") or "self") != subject_key:
+                continue
+            peer_anchors = {
+                int(house)
+                for house in ((peer.get("bhava_disambiguation") or {}).get("semantic_anchor_houses") or [])
+            }
+            if anchors and peer_anchors and not (anchors & peer_anchors):
+                continue
+            label = str(peer.get("event_family") or "").split(" · ", 1)[-1].strip()
+            if label and label not in labels:
+                labels.append(label)
+            if len(labels) == 3:
+                break
+        candidate["alternative_event_labels"] = labels
+        if not labels:
+            continue
+        if _language_code(language) == "hi":
+            candidate["prediction"] += f" इन्हीं सक्रिय भावों से समर्थित दूसरे संकेत: {_hi_join(labels)}।"
+        else:
+            candidate["prediction"] += (
+                f" Other supported readings from the same active houses: {_natural_join(labels)}."
+            )
+
+
+def _candidate_family_key(candidate: Mapping[str, Any]) -> str:
+    if candidate.get("manifestation_kg"):
+        return str(candidate.get("event_key") or "event")
+    return str(candidate.get("source_event_key") or candidate.get("event_key") or "event")
+
+
 def _annotate_event_windows(months: Mapping[str, Any]) -> None:
     """Merge adjacent monthly instances into auditable event windows.
 
@@ -2331,7 +2494,7 @@ def _annotate_event_windows(months: Mapping[str, Any]) -> None:
         for candidate in month.get("qualified_candidates") or []:
             key = (
                 str(candidate.get("subject_key") or "self"),
-                str(candidate.get("source_event_key") or candidate.get("event_key") or "event"),
+                _candidate_family_key(candidate),
             )
             for window in candidate.get("timing_windows") or []:
                 start = _parse_iso_date(window.get("start_date"))
@@ -2390,7 +2553,7 @@ def _apply_persistent_permission_peak_policy(months: Mapping[str, Any]) -> None:
                 continue
             key = (
                 str(candidate.get("subject_key") or "self"),
-                str(candidate.get("source_event_key") or candidate.get("event_key") or "event"),
+                _candidate_family_key(candidate),
             )
             grouped.setdefault(key, []).append((int(month_id), candidate))
 
@@ -2600,7 +2763,7 @@ def _apply_general_monthly_peak_policy(months: Mapping[str, Any]) -> None:
             candidate["distinctive_fast_contact_count"] = len(contacts)
             key = (
                 str(candidate.get("subject_key") or "self"),
-                str(candidate.get("source_event_key") or candidate.get("event_key") or "event"),
+                _candidate_family_key(candidate),
             )
             grouped.setdefault(key, []).append((int(month_id), candidate, signature))
 
@@ -2745,6 +2908,8 @@ def build_v3_prediction_model(
     dkp = derive_desh_kaal_patra(
         user_facts, age=age, target_year=year, relative_profiles=relative_profiles,
     )
+    from manifestation_kg.timeline import build_timeline_definitions
+    kg_timeline = build_timeline_definitions(dkp)
     relative_definitions = [
         build_relative_event_definition(
             definition, str(subject["key"]), str(subject["label"]), int(subject["reference_house"]),
@@ -2753,7 +2918,8 @@ def build_v3_prediction_model(
         for definition in EVENT_DEFINITIONS.values()
         if not (str(subject["key"]) == "spouse" and definition.key in {"marriage", "children"})
     ]
-    definitions = [*EVENT_DEFINITIONS.values(), *relative_definitions]
+    kg_definitions = () if accuracy_layer_mode() == "legacy_v3_6" else kg_timeline.definitions
+    definitions = [*EVENT_DEFINITIONS.values(), *kg_definitions, *relative_definitions]
     months: Dict[str, Any] = {}
     for month in range(1, 13):
         month_ledger = ((ledger.get("months") or {}).get(str(month)) or {})
@@ -2767,6 +2933,7 @@ def build_v3_prediction_model(
             )) is not None
         ]
         candidates.sort(key=lambda row: (-int(row["priority_score"]), row["event_key"]))
+        _attach_supported_alternatives(candidates, language)
         native_candidates = [row for row in candidates if str(row.get("subject_key") or "self") == "self"]
         relative_candidates = [row for row in candidates if str(row.get("subject_key") or "self") != "self"]
         people_evaluations = []
@@ -2816,6 +2983,7 @@ def build_v3_prediction_model(
         "node_doctrine": "Nodes have no direct house lordship; use occupation, dispositor/conjunction evidence when available, and seventh aspect only.",
         "house_systems": {"parashari": "whole_sign", "kp": "placidus_independent_confirmation"},
         "desh_kaal_patra": dkp,
+        "manifestation_kg": dict(kg_timeline.audit),
         "user_fact_fingerprint": user_fact_fingerprint(user_facts, language, relative_profiles),
         "months": months,
     }
@@ -2826,32 +2994,71 @@ _USER_FACING_ASTROLOGY_TERMS = re.compile(
     r"ashtakavarga|kakshya|sun|moon|mars|mercury|jupiter|venus|saturn|rahu|ketu|d\d{1,2})\b",
     re.I,
 )
+_CERTAINTY_TERMS = re.compile(
+    r"\b(?:definitely|guaranteed|certainly|will certainly|must happen|is certain to)\b|"
+    r"(?:निश्चित रूप से|गारंटी|अवश्य होगा|पक्का होगा)",
+    re.I,
+)
+_CONDITIONAL_TERMS = re.compile(
+    r"\b(?:may|might|could|possible|possibly|likely|chance|watch for|can)\b|"
+    r"(?:हो सकता|हो सकती|हो सकते|संभावना|संभव|दिख सकती|दिख सकता)",
+    re.I,
+)
+_DATE_LITERAL = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 
 
 def _safe_narration(candidate: Mapping[str, Any], supplied: Mapping[str, Any] | None) -> Tuple[Dict[str, Any], List[str]]:
     warnings: List[str] = []
     supplied = supplied or {}
-    prediction = " ".join(str(supplied.get("prediction") or candidate.get("prediction") or "").split())
+    fallback = " ".join(str(candidate.get("prediction") or "").split())
+    supplied_prediction = " ".join(str(supplied.get("prediction") or "").split())
+    prediction = supplied_prediction or fallback
+    narration_source = "llm" if supplied_prediction else "deterministic"
     lowered = prediction.lower()
     for term in candidate.get("forbidden_terms") or []:
         if term.lower() in lowered:
-            prediction = str(candidate.get("prediction") or "")
+            prediction = fallback
+            narration_source = "deterministic_fallback"
             warnings.append(f"Replaced narration violating Desh-Kaal-Patra gate for {candidate.get('candidate_id')}")
             break
     if _USER_FACING_ASTROLOGY_TERMS.search(prediction):
-        prediction = str(candidate.get("prediction") or "")
+        prediction = fallback
+        narration_source = "deterministic_fallback"
         warnings.append(
             f"Replaced technical user-facing narration for {candidate.get('candidate_id')}"
         )
+    if supplied_prediction and (
+        len(prediction.split()) > 32
+        or _CERTAINTY_TERMS.search(prediction)
+        or not _CONDITIONAL_TERMS.search(prediction)
+        or _DATE_LITERAL.search(prediction)
+    ):
+        prediction = fallback
+        narration_source = "deterministic_fallback"
+        warnings.append(
+            f"Replaced unsafe or over-specific narration for {candidate.get('candidate_id')}"
+        )
     if candidate.get("explanation_version") == "detailed_v2":
-        # These are curated alternative manifestations tied to exact house
-        # channels. They are evidence, not free-form LLM copy.
         manifestations = candidate.get("possible_manifestations") or []
     else:
         manifestations = supplied.get("possible_manifestations")
         if not isinstance(manifestations, list) or not manifestations:
             manifestations = candidate.get("possible_manifestations") or []
-    manifestations = [row for row in manifestations[:2] if isinstance(row, Mapping)]
+    # Scenario cards only name real-life possibilities. Their calculation
+    # details belong in the prediction-level Show Why, not in another nested
+    # implementation explanation.
+    public_manifestations = [
+        {"scenario": str(row.get("scenario") or "").strip()}
+        for row in manifestations[:2]
+        if isinstance(row, Mapping) and str(row.get("scenario") or "").strip()
+    ]
+    event_label = str(candidate.get("event_family") or "").split(" · ", 1)[-1]
+    normalize = lambda value: re.sub(r"[^a-z0-9]+", "", str(value).lower())
+    if (
+        len(public_manifestations) == 1
+        and normalize(public_manifestations[0]["scenario"]) == normalize(event_label)
+    ):
+        public_manifestations = []
     return ({
         "candidate_id": candidate.get("candidate_id"),
         "event_key": candidate.get("event_key"),
@@ -2862,7 +3069,8 @@ def _safe_narration(candidate: Mapping[str, Any], supplied: Mapping[str, Any] | 
         "source_event_key": candidate.get("source_event_key") or candidate.get("event_key"),
         "type": candidate.get("event_family"),
         "prediction": prediction,
-        "possible_manifestations": [dict(row) for row in manifestations],
+        "narration_source": narration_source,
+        "possible_manifestations": public_manifestations,
         "activation_reasoning": candidate.get("activation_reasoning"),
         "trigger_logic": candidate.get("trigger_logic"),
         "evidence_ids": list(candidate.get("evidence_ids") or []),
@@ -2885,6 +3093,7 @@ def _safe_narration(candidate: Mapping[str, Any], supplied: Mapping[str, Any] | 
         "priority_factors": list(candidate.get("priority_factors") or []),
         "manifestation_phase": candidate.get("manifestation_phase"),
         "claim_scope": candidate.get("claim_scope"),
+        "alternative_event_labels": list(candidate.get("alternative_event_labels") or []),
         "timing_windows": list(candidate.get("timing_windows") or []),
         "event_window": candidate.get("event_window"),
         "event_windows": list(candidate.get("event_windows") or []),
@@ -2914,6 +3123,7 @@ def _safe_narration(candidate: Mapping[str, Any], supplied: Mapping[str, Any] | 
         "bhava_disambiguation": candidate.get("bhava_disambiguation"),
         "desh_kaal_patra": candidate.get("desh_kaal_patra"),
         "explanation_version": candidate.get("explanation_version"),
+        "manifestation_kg": candidate.get("manifestation_kg"),
     }, warnings)
 
 
@@ -3085,6 +3295,8 @@ def validate_v3_payload(
     *,
     selected_month: Optional[int] = None,
     narration_expected: bool = True,
+    expected_narration_ids: Mapping[int, Set[str]] | None = None,
+    expected_narration_fact_ids: Mapping[int, Mapping[str, Set[str]]] | None = None,
 ) -> Tuple[Dict[str, Any], List[str]]:
     """Make deterministic candidates sovereign over LLM selection and timing."""
     payload = payload if isinstance(payload, Mapping) else {}
@@ -3096,9 +3308,10 @@ def validate_v3_payload(
             month_id = int(month_row.get("month_id"))
         except (TypeError, ValueError):
             continue
+        supplied_rows = list(month_row.get("events") or []) + list(month_row.get("narrations") or [])
         supplied_by_month[month_id] = {
             str(row.get("candidate_id")): row
-            for row in month_row.get("events") or []
+            for row in supplied_rows
             if isinstance(row, Mapping) and row.get("candidate_id")
         }
 
@@ -3107,14 +3320,41 @@ def validate_v3_payload(
     month_ids = [selected_month] if selected_month else list(range(1, 13))
     for month_id in month_ids:
         model_month = ((prediction_model.get("months") or {}).get(str(month_id)) or {})
+        warned_missing: Set[str] = set()
+
+        def render(candidate: Mapping[str, Any]) -> Dict[str, Any]:
+            candidate_id = str(candidate.get("candidate_id") or "")
+            supplied = supplied_by_month.get(month_id, {}).get(candidate_id)
+            allowed_fact_ids = (
+                (expected_narration_fact_ids.get(month_id) or {}).get(candidate_id) or set()
+                if expected_narration_fact_ids is not None
+                else set()
+            )
+            if supplied is not None and allowed_fact_ids:
+                cited_fact_ids = {
+                    str(value) for value in supplied.get("used_fact_ids") or [] if str(value)
+                }
+                if not cited_fact_ids or not cited_fact_ids.issubset(allowed_fact_ids):
+                    warnings.append(
+                        f"Replaced narration with missing or invalid fact citations for {candidate_id}"
+                    )
+                    supplied = None
+            should_be_narrated = narration_expected and (
+                expected_narration_ids is None
+                or candidate_id in (expected_narration_ids.get(month_id) or set())
+            )
+            if supplied is None and should_be_narrated and candidate_id not in warned_missing:
+                warnings.append(f"Restored deterministic candidate omitted by narration: {candidate_id}")
+                warned_missing.add(candidate_id)
+            event, event_warnings = _safe_narration(candidate, supplied)
+            if should_be_narrated and supplied is None:
+                event["narration_source"] = "deterministic_fallback"
+            warnings.extend(event_warnings)
+            return event
+
         events: List[Dict[str, Any]] = []
         for candidate in model_month.get("publishable_candidates") or []:
-            supplied = supplied_by_month.get(month_id, {}).get(str(candidate.get("candidate_id")))
-            if supplied is None and narration_expected:
-                warnings.append(f"Restored deterministic candidate omitted by narration: {candidate.get('candidate_id')}")
-            event, event_warnings = _safe_narration(candidate, supplied)
-            events.append(event)
-            warnings.extend(event_warnings)
+            events.append(render(candidate))
         rows.append({
             "month_id": month_id,
             "focus_areas": [row["type"] for row in events[:5]],
@@ -3123,47 +3363,47 @@ def validate_v3_payload(
             "selection_summary": model_month.get("selection_summary") or {},
             # Compatibility union retained for older clients and frozen forecasts.
             "background_candidates": [
-                _safe_narration(candidate, None)[0]
+                render(candidate)
                 for candidate in model_month.get("background_candidates") or []
             ],
             "also_possible_candidates": [
-                _safe_narration(candidate, None)[0]
+                render(candidate)
                 for candidate in model_month.get("also_possible_candidates") or []
             ],
             "ongoing_background_candidates": [
-                _safe_narration(candidate, None)[0]
+                render(candidate)
                 for candidate in model_month.get("ongoing_background_candidates") or []
             ],
             "weak_signal_candidates": [
-                _safe_narration(candidate, None)[0]
+                render(candidate)
                 for candidate in model_month.get("weak_signal_candidates") or []
             ],
             "annual_context_candidates": [
-                _safe_narration(candidate, None)[0]
+                render(candidate)
                 for candidate in model_month.get("annual_context_candidates") or []
             ],
             "people_candidates": [
-                _safe_narration(candidate, None)[0]
+                render(candidate)
                 for candidate in model_month.get("people_candidates") or []
             ],
             "people_background_candidates": [
-                _safe_narration(candidate, None)[0]
+                render(candidate)
                 for candidate in model_month.get("people_background_candidates") or []
             ],
             "people_also_possible_candidates": [
-                _safe_narration(candidate, None)[0]
+                render(candidate)
                 for candidate in model_month.get("people_also_possible_candidates") or []
             ],
             "people_ongoing_background_candidates": [
-                _safe_narration(candidate, None)[0]
+                render(candidate)
                 for candidate in model_month.get("people_ongoing_background_candidates") or []
             ],
             "people_weak_signal_candidates": [
-                _safe_narration(candidate, None)[0]
+                render(candidate)
                 for candidate in model_month.get("people_weak_signal_candidates") or []
             ],
             "people_annual_context_candidates": [
-                _safe_narration(candidate, None)[0]
+                render(candidate)
                 for candidate in model_month.get("people_annual_context_candidates") or []
             ],
             "people_selection_summary": model_month.get("people_selection_summary") or {},
@@ -3184,7 +3424,13 @@ def validate_v3_payload(
         "publication_mode": prediction_model.get("publication_mode"),
         "language": prediction_model.get("language") or "en",
         "validation_warnings": warnings,
+        "narration_status": (
+            "deterministic"
+            if not narration_expected
+            else "complete" if not warnings else "partial_fallback"
+        ),
         "desh_kaal_patra": prediction_model.get("desh_kaal_patra") or {},
+        "manifestation_kg": prediction_model.get("manifestation_kg") or {},
         "user_fact_fingerprint": prediction_model.get("user_fact_fingerprint"),
     }
     return out, warnings

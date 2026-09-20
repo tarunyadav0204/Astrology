@@ -69,6 +69,8 @@ DEFAULT_GEMINI_PREMIUM_MODEL = "models/gemini-3.1-pro-preview"
 DEFAULT_GEMINI_ANALYSIS_MODEL = "models/gemini-3.1-flash-lite"
 DEFAULT_GEMINI_REPORT_MODEL = DEFAULT_GEMINI_ANALYSIS_MODEL
 DEFAULT_GEMINI_INSTANT_MODEL = "models/gemini-2.5-flash-lite"
+DEFAULT_EVENT_TIMELINE_NARRATION_MODEL = "models/gemini-3-flash-preview"
+DEFAULT_EVENT_TIMELINE_NARRATION_THINKING_LEVEL = "low"
 DEFAULT_PARALLEL_BRANCH_PLANNER_MODEL = DEFAULT_GEMINI_INSTANT_MODEL
 PARALLEL_BRANCH_GEMINI_MODEL_KEYS = {
     "parashari": "parallel_branch_gemini_model_parashari",
@@ -563,6 +565,30 @@ def get_event_timeline_model() -> str:
     if value and value.strip():
         return value.strip()
     return get_gemini_premium_model()
+
+
+def get_event_timeline_narration_model() -> str:
+    """Gemini model dedicated to V3 Event Timeline wording."""
+    value = (
+        os.getenv("EVENT_TIMELINE_V3_NARRATION_MODEL")
+        or get_setting("event_timeline_narration_model")
+    )
+    if value and value.strip():
+        return value.strip()
+    return DEFAULT_EVENT_TIMELINE_NARRATION_MODEL
+
+
+def get_event_timeline_narration_thinking_level() -> str:
+    """Gemini 3 thinking level for V3 Event Timeline wording."""
+    value = (
+        os.getenv("EVENT_TIMELINE_V3_NARRATION_THINKING_LEVEL")
+        or get_setting("event_timeline_narration_thinking_level")
+        or DEFAULT_EVENT_TIMELINE_NARRATION_THINKING_LEVEL
+    )
+    normalized = str(value).strip().lower()
+    if normalized in {"minimal", "low", "medium", "high"}:
+        return normalized
+    return DEFAULT_EVENT_TIMELINE_NARRATION_THINKING_LEVEL
 
 
 def get_parallel_branch_gemini_model(branch_label: str, fallback_model: Optional[str] = None) -> str:

@@ -1,0 +1,343 @@
+{
+  "sample": true,
+  "year": 2026,
+  "status": "success",
+  "narration_status": "complete",
+  "monthly_predictions": [
+    {
+      "month_id": 4,
+      "focus_areas": [
+        "Work or responsibility change",
+        "Income / gains",
+        "Agreement, contract or shared commitment",
+        "Children, care, or creative work"
+      ],
+      "people_evaluations": [],
+      "events": [
+        {
+          "candidate_id": "ET3-a1ae8024809e",
+          "type": "Work or responsibility change",
+          "prediction": "You might see a restructuring of your team or a change in your daily schedule as your working arrangement moves forward.",
+          "intensity": "Medium",
+          "support_label": "Moderate indication",
+          "support_grade": "B",
+          "manifestation_phase": "result_window",
+          "display_explanation": "This is one of the clearest supported possibilities for the month. It is still a possibility, not a certainty.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H10 by natal lordship, H3 by natal placement, and H11 by natal aspect. Rahu Antardasha activates H3 by transit aspect. Saturn Pratyantardasha activates H8 by natal lordship, H8 by natal placement, H2 and H10 by natal aspect, H10 by transit placement, and H12 by transit aspect. Mars Sookshma dasha activates H6 and H11 by natal lordship, H3 and H12 by natal aspect, and H10 by transit placement. Moon Sookshma dasha activates H2 by natal lordship, H11 by natal aspect, H6 by transit placement, and H10, H11, and H12 by transit aspect. Rahu Sookshma dasha activates H3 by transit aspect. For job change, H10 opens the career anchor, while H3, H8, and H12 supply the transition signal. H2 and H11 add outcome support, strengthening a visible result. KP independently supports the combination through H6, H8, H11, and H12; D10 repeats the event because Mars links D1 H3, H6, H11, and H12 with D10 H6 and Saturn links D1 H2, H8, and H10 with D10 H6; Jupiter and Moon do not repeat the required houses in both charts. Natal promise is strong (score 27); active-planet delivery is supportive (18 support versus 2 pressure); event-specific obstruction is moderate. Initiation is strong, ease is mixed, the result is strong, and permanence is supported. BAV/Kakshya is supportive; independent supporting groups are solar_return_subset; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 24 relevant contact windows were retained. Bhava disambiguation: H6 and H10 can signify health and treatment, service and work routines, debt, conflict and competition, and career and profession. The selected channel is work/service transition because the configured companion houses H2, H3, H8, H11, and H12 also activate; active natural karakas are Saturn, and D10 confirms it. Specificity is channel distinguished.",
+          "trigger_logic": "pratyantardasha>mahadasha carriers Jupiter, Mars, Moon, Saturn; transit carriers Mars, Moon, Rahu, Saturn.",
+          "possible_manifestations": [
+            {
+              "scenario": "A change in duties, team, schedule, or working arrangement rather than a complete exit."
+            },
+            {
+              "scenario": "Applications, a transfer, restructuring, or release from the present role may move forward."
+            }
+          ],
+          "start_date": "2026-04-04",
+          "end_date": "2026-04-10",
+          "subject_key": "self"
+        },
+        {
+          "candidate_id": "ET3-cd4430070968",
+          "type": "Income / gains",
+          "prediction": "A profitable opportunity or a return from your prior efforts could lead to an improvement in your savings or family resources.",
+          "intensity": "Medium",
+          "support_label": "Moderate indication",
+          "support_grade": "B",
+          "manifestation_phase": "result_window",
+          "display_explanation": "This is one of the clearest supported possibilities for the month. It is still a possibility, not a certainty.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H9 and H11 by natal aspect and H5 and H9 by transit aspect. Rahu Antardasha activates H9 by transit placement. Saturn Pratyantardasha activates H9 by natal lordship and H2 and H5 by natal aspect. Mars Sookshma dasha activates H11 by natal lordship, H9 by natal placement, and H5 by transit aspect. Moon Sookshma dasha activates H2 by natal lordship, H5 by natal placement, H11 by natal aspect, H5 by transit placement, and H11 by transit aspect. Rahu Sookshma dasha activates H9 by transit placement. For income / gains, H2 opens the savings anchor, while H11 supplies the gains signal. H5 and H9 add fortune or speculation support, strengthening a visible result. KP data is present but does not independently connect the required event houses; D2 repeats the event because Jupiter links D1 H9 and H11 with D2 H2, Moon links D1 H2, H5, and H11 with D2 H2, and Saturn links D1 H2, H5, and H9 with D2 H2 and H11; Mars does not repeat the required houses in both charts. Natal promise is strong (score 12); active-planet delivery is supportive (15 support versus 3 pressure); event-specific obstruction is moderate. Initiation is strong, ease is mixed, the result is strong, and permanence is possible. BAV/Kakshya is mixed; independent supporting groups are none; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 17 relevant contact windows were retained. Bhava disambiguation: H2 can signify savings and family resources, speech and food, and family continuity. The selected channel is income/accumulated resources because the configured companion houses H5, H9, and H11 also activate; active natural karakas are Jupiter, and D2 confirms it. Specificity is channel distinguished.",
+          "trigger_logic": "pratyantardasha>mahadasha carriers Jupiter, Mars, Moon, Saturn; transit carriers Jupiter, Mars, Moon, Rahu.",
+          "possible_manifestations": [
+            {
+              "scenario": "Income, receivables, savings, or family resources may improve or be reorganized."
+            },
+            {
+              "scenario": "A bonus, profitable opportunity, support from a network, or return from prior effort may emerge."
+            }
+          ],
+          "start_date": "2026-04-04",
+          "end_date": "2026-04-10",
+          "subject_key": "self"
+        },
+        {
+          "candidate_id": "ET3-28548bab60e0",
+          "type": "Agreement, contract or shared commitment",
+          "prediction": "A negotiation you are involved in might move toward a formal signing or a clear shared commitment during this window.",
+          "intensity": "Medium",
+          "support_label": "Moderate indication",
+          "support_grade": "B",
+          "manifestation_phase": "result_window",
+          "display_explanation": "This is one of the clearest supported possibilities for the month. It is still a possibility, not a certainty.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H7 by natal lordship, H3 by natal placement, H7 and H11 by natal aspect, and H7 by transit aspect. Rahu Antardasha activates H7 by natal placement and H3 by transit aspect. Saturn Pratyantardasha activates H7 by transit aspect. Mars Sookshma dasha activates H11 by natal lordship and H3 by natal aspect. Moon Sookshma dasha activates H11 by natal aspect, H7 by transit placement, and H11 by transit aspect. Rahu Sookshma dasha activates H7 by natal placement and H3 by transit aspect. For agreement, contract or shared commitment, H7 opens the subject anchor, while H3 supplies the manifestation pathway. H11 adds visible-result support, strengthening a visible result. KP data is present but does not independently connect the required event houses; D9 repeats the event because Jupiter links D1 H3, H7, and H11 with D9 H11; Mars, Moon, and Rahu do not repeat the required houses in both charts. Natal promise is strong (score 12); active-planet delivery is supportive (12 support versus 2 pressure); event-specific obstruction is moderate. Initiation is strong, ease is mixed, the result is strong, and permanence is possible. BAV/Kakshya is mixed; independent supporting groups are nakshatra_pada_dasha, solar_return_subset; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 17 relevant contact windows were retained. Bhava disambiguation: H7 can signify spouse and partnership, contracts and business, and clients and public dealings. The selected channel is contract or negotiated agreement because the configured companion houses H3 and H11 also activate; active natural karakas are Jupiter, and D9 confirms it. Specificity is channel distinguished.",
+          "trigger_logic": "antardasha>mahadasha carriers Jupiter, Mars, Moon, Rahu; transit carriers Jupiter, Moon, Rahu, Saturn.",
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-05",
+          "subject_key": "self"
+        },
+        {
+          "candidate_id": "ET3-65102d1c801f",
+          "type": "Children, care, or creative work",
+          "prediction": "A creative project or a mentoring role could become important, though you might face a change of plan or some friction.",
+          "intensity": "Medium",
+          "support_label": "Moderate indication",
+          "support_grade": "B",
+          "manifestation_phase": "obstructed",
+          "display_explanation": "This is one of the clearest supported possibilities for the month. It is still a possibility, not a certainty.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H9 and H11 by natal aspect and H5 and H9 by transit aspect. Rahu Antardasha activates H9 by transit placement. Saturn Pratyantardasha activates H9 by natal lordship and H2 and H5 by natal aspect. Mars Sookshma dasha activates H11 by natal lordship, H9 by natal placement, and H5 by transit aspect. Moon Sookshma dasha activates H2 by natal lordship, H5 by natal placement, H11 by natal aspect, H5 by transit placement, and H11 by transit aspect. Rahu Sookshma dasha activates H9 by transit placement. For children, H5 opens the children anchor, while H9 and H11 supply the expansion or fulfilment. H2 adds family-resource support, strengthening a visible result. KP cusp and significator chains emphasize obstruction without sufficient event-house permission; D7 repeats the event because Mars links D1 H9 and H11 with D7 H5 and Saturn links D1 H2, H5, and H9 with D7 H5; Jupiter and Moon do not repeat the required houses in both charts. Natal promise is strong (score 13); active-planet delivery is supportive (15 support versus 3 pressure); event-specific obstruction is moderate. Initiation is strong, ease is obstructed, the result is developing, and permanence is possible. BAV/Kakshya is mixed; independent supporting groups are none; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 18 relevant contact windows were retained. Bhava disambiguation: H5 can signify children, education and intelligence, creativity, romance, and speculation. The selected channel is children/creative progeny because the configured companion houses H2, H9, and H11 also activate; active natural karakas are Jupiter, and D7 does not independently confirm it. Specificity is channel supported but ranked.",
+          "trigger_logic": "pratyantardasha>mahadasha carriers Jupiter, Mars, Moon, Saturn; transit carriers Jupiter, Mars, Moon, Rahu.",
+          "possible_manifestations": [
+            {
+              "scenario": "A child-related milestone, education decision, or added caregiving responsibility may arise."
+            },
+            {
+              "scenario": "A creative project, mentoring role, or family-expansion discussion may become important."
+            }
+          ],
+          "start_date": "2026-04-04",
+          "end_date": "2026-04-10",
+          "subject_key": "self"
+        }
+      ],
+      "background_candidates": [
+        {
+          "candidate_id": "ET3-47e1c072785c",
+          "type": "Health",
+          "prediction": "A persistent energy concern might prompt you to adopt a stricter routine or a specific treatment plan to support your recovery.",
+          "intensity": "Medium",
+          "support_label": "Background indication",
+          "support_grade": "B",
+          "manifestation_phase": "result_window",
+          "display_explanation": "This theme continues from a nearby peak month, but it is not counted as a new event this month.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H11 by natal aspect, H1 by transit placement, and H5 by transit aspect. Rahu Antardasha activates H1 by natal aspect. Saturn Pratyantardasha activates H8 by natal lordship, H8 by natal placement, H5 by natal aspect, and H12 by transit aspect. Mars Sookshma dasha activates H6 and H11 by natal lordship, H12 by natal aspect, and H1 and H5 by transit aspect. Moon Sookshma dasha activates H5 by natal placement, H11 by natal aspect, H5 and H6 by transit placement, and H1, H11, and H12 by transit aspect. Rahu Sookshma dasha activates H1 by natal aspect. For health, H1 opens the health anchor, while H8 and H12 supply the health pressure or intervention. H5 and H11 add recovery support, strengthening a visible result. KP independently supports the combination through H1, H5, H6, and H12; D30 repeats the event because Jupiter links D1 H11 with D30 H1, Mars links D1 H6, H11, and H12 with D30 H1 and H12, Moon links D1 H5 and H11 with D30 H8, Rahu links D1 H1 with D30 H1, and Saturn links D1 H5 and H8 with D30 H8. Natal promise is available (score 11); active-planet delivery is supportive (17 support versus 2 pressure); event-specific obstruction is moderate. Initiation is strong, ease is mixed, the result is strong, and permanence is supported. BAV/Kakshya is supportive; independent supporting groups are nakshatra_dasha, nakshatra_pada_dasha; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 19 relevant contact windows were retained. Bhava disambiguation: H1 and H6 can signify body and vitality, identity and appearance, personal initiative, health and treatment, and service and work routines. The selected channel is health/treatment because the configured companion houses H5, H8, H11, and H12 also activate; active natural karakas are Mars and Moon, and D30 confirms it. Specificity is channel distinguished.",
+          "trigger_logic": "pratyantardasha>antardasha>mahadasha carriers Jupiter, Mars, Moon, Rahu, Saturn; transit carriers Jupiter, Mars, Moon, Saturn.",
+          "possible_manifestations": [
+            {
+              "scenario": "A persistent health or energy concern may prompt a check-up, treatment plan, or stricter routine."
+            },
+            {
+              "scenario": "Rest, reduced workload, therapy, or recovery time may become necessary."
+            }
+          ],
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-30",
+          "subject_key": "self"
+        },
+        {
+          "candidate_id": "ET3-7cc3aca04f14",
+          "type": "More responsibility or recognition",
+          "prediction": "You could be formally assigned greater authority or visibility, which might eventually translate into a useful opportunity for your resources.",
+          "intensity": "Medium",
+          "support_label": "Moderate indication",
+          "support_grade": "B",
+          "manifestation_phase": "developing",
+          "display_explanation": "This is also supported, but another possibility in the same area of life is clearer this month.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H10 by natal lordship, H11 by natal aspect, and H5 by transit aspect. Saturn Pratyantardasha activates H2, H5, and H10 by natal aspect and H10 by transit placement. Mars Sookshma dasha activates H11 by natal lordship, H10 by transit placement, and H5 by transit aspect. Moon Sookshma dasha activates H2 by natal lordship, H5 by natal placement, H11 by natal aspect, H5 by transit placement, and H10 and H11 by transit aspect. For promotion / status, H10 opens the career status anchor, while H5 and H11 supply the status or recognition signal. H2 adds salary or resource support, strengthening a visible result. KP data is present but does not independently connect the required event houses; D10 repeats the event because Mars links D1 H11 with D10 H11; Jupiter, Moon, and Saturn do not repeat the required houses in both charts. Natal promise is strong (score 14); active-planet delivery is supportive (16 support versus 3 pressure); event-specific obstruction is moderate. Initiation is strong, ease is mixed, the result is developing, and permanence is possible. BAV/Kakshya is supportive; independent supporting groups are none; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 18 relevant contact windows were retained. Bhava disambiguation: H10 can signify career and profession, status and authority, public responsibility, and major action. The selected channel is status/recognition because the configured companion houses H2, H5, and H11 also activate; active natural karakas are Jupiter and Saturn, and D10 does not independently confirm it. Specificity is channel supported but ranked.",
+          "trigger_logic": "pratyantardasha>mahadasha carriers Jupiter, Mars, Moon, Saturn; transit carriers Jupiter, Mars, Moon, Saturn.",
+          "possible_manifestations": [
+            {
+              "scenario": "Greater authority, visibility, or responsibility may be formally assigned."
+            },
+            {
+              "scenario": "Recognition may translate into a useful opportunity or improved resources."
+            }
+          ],
+          "start_date": "2026-04-04",
+          "end_date": "2026-04-10",
+          "subject_key": "self"
+        },
+        {
+          "candidate_id": "ET3-6c3227473bbd",
+          "type": "Relationship or marriage",
+          "prediction": "A meaningful development in your relationship might occur, though the path toward a clearer commitment could face some temporary friction.",
+          "intensity": "Medium",
+          "support_label": "Background indication",
+          "support_grade": "B",
+          "manifestation_phase": "obstructed",
+          "display_explanation": "This possibility is open during the year, but this month lacks a distinctive timing signal for treating it as an event.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H7 by natal lordship, H7, H9, and H11 by natal aspect, and H5, H7, and H9 by transit aspect. Rahu Antardasha activates H7 by natal placement and H9 by transit placement. Saturn Pratyantardasha activates H9 by natal lordship, H2 and H5 by natal aspect, and H7 by transit aspect. Mars Sookshma dasha activates H11 by natal lordship, H9 by natal placement, and H5 by transit aspect. Moon Sookshma dasha activates H2 by natal lordship, H5 by natal placement, H11 by natal aspect, H5 and H7 by transit placement, and H11 by transit aspect. Rahu Sookshma dasha activates H7 by natal placement and H9 by transit placement. For marriage / partnership, H7 opens the partnership anchor, while H2, H5, and H11 supply the joining, romance or fulfilment. H9 adds dharma or ceremony support, strengthening a visible result. KP cusp and significator chains emphasize obstruction without sufficient event-house permission; D9 repeats the event because Saturn links D1 H2, H5, and H9 with D9 H7; Jupiter, Mars, Moon, and Rahu do not repeat the required houses in both charts. Natal promise is strong (score 14); active-planet delivery is supportive (21 support versus 5 pressure); event-specific obstruction is moderate. Initiation is strong, ease is obstructed, the result is developing, and permanence is possible. BAV/Kakshya is mixed; independent supporting groups are nakshatra_dasha, nakshatra_pada_dasha; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 13 relevant contact windows were retained. Bhava disambiguation: H7 can signify spouse and partnership, contracts and business, and clients and public dealings. The selected channel is spouse/partnership because the configured companion houses H2, H5, H9, and H11 also activate; active natural karakas are Jupiter, and D9 does not independently confirm it. Specificity is channel supported but ranked.",
+          "trigger_logic": "pratyantardasha>antardasha>mahadasha carriers Jupiter, Mars, Moon, Rahu, Saturn; transit carriers Jupiter, Mars, Moon, Rahu, Saturn.",
+          "possible_manifestations": [
+            {
+              "scenario": "A partnership may move toward a clearer commitment, agreement, or shared family decision."
+            },
+            {
+              "scenario": "Romance, reconciliation, or a meaningful development in an existing relationship may occur."
+            }
+          ],
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-30",
+          "subject_key": "self"
+        },
+        {
+          "candidate_id": "ET3-c7036105c3b4",
+          "type": "Visa, travel documentation or permission",
+          "prediction": "Your application for a visa or other journey paperwork might move forward, although you could encounter some delays or friction.",
+          "intensity": "Medium",
+          "support_label": "Background indication",
+          "support_grade": "B",
+          "manifestation_phase": "obstructed",
+          "display_explanation": "This theme continues from a nearby peak month, but it is not counted as a new event this month.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H3 by natal placement, H9 and H11 by natal aspect, and H9 by transit aspect. Rahu Antardasha activates H9 by transit placement and H3 by transit aspect. Saturn Pratyantardasha activates H9 by natal lordship. Mars Sookshma dasha activates H11 by natal lordship, H9 by natal placement, and H3 by natal aspect. Moon Sookshma dasha activates H11 by natal aspect and H11 by transit aspect. Rahu Sookshma dasha activates H9 by transit placement and H3 by transit aspect. For visa, travel documentation or permission, H9 opens the subject anchor, while H3 supplies the manifestation pathway. H11 adds visible-result support, strengthening a visible result. KP cusp and significator chains emphasize obstruction without sufficient event-house permission; D9 repeats the event because Jupiter links D1 H3, H9, and H11 with D9 H11, Mars links D1 H3, H9, and H11 with D9 H3 and H9, and Saturn links D1 H9 with D9 H9; Moon does not repeat the required houses in both charts. Natal promise is available (score 11); active-planet delivery is supportive (13 support versus 2 pressure); event-specific obstruction is moderate. Initiation is strong, ease is obstructed, the result is developing, and permanence is possible. BAV/Kakshya is pressured; independent supporting groups are solar_return_subset; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 15 relevant contact windows were retained. Bhava disambiguation: H9 can signify father and mentors, higher education, religion and pilgrimage, law, and long-distance travel. The selected channel is visa/travel documentation or permission because the configured companion houses H3 and H11 also activate; active natural karakas are Jupiter and Rahu, and D9 confirms it. Specificity is channel distinguished.",
+          "trigger_logic": "pratyantardasha>mahadasha carriers Jupiter, Mars, Moon, Saturn; transit carriers Jupiter, Moon, Rahu.",
+          "possible_manifestations": [
+            {
+              "scenario": "A visa, travel permission, application, booking, or other journey paperwork may move forward."
+            }
+          ],
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-30",
+          "subject_key": "self"
+        },
+        {
+          "candidate_id": "ET3-e5f7a32dde1d",
+          "type": "Study, training, or qualification",
+          "prediction": "A course or qualification process could advance, but you might need to navigate some obstacles or a change in the learning plan.",
+          "intensity": "Medium",
+          "support_label": "Background indication",
+          "support_grade": "B",
+          "manifestation_phase": "obstructed",
+          "display_explanation": "This theme continues from a nearby peak month, but it is not counted as a new event this month.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H9 and H11 by natal aspect and H5 and H9 by transit aspect. Rahu Antardasha activates H9 by transit placement. Saturn Pratyantardasha activates H9 by natal lordship, H5 by natal aspect, and H4 by transit aspect. Mars Sookshma dasha activates H11 by natal lordship, H9 by natal placement, H4 by natal aspect, and H4 and H5 by transit aspect. Moon Sookshma dasha activates H5 by natal placement, H11 by natal aspect, H4 and H5 by transit placement, and H11 by transit aspect. Rahu Sookshma dasha activates H9 by transit placement. For education / exams, H5 opens the learning anchor, while H4 and H9 supply the study path. H11 adds result support, strengthening a visible result. KP cusp and significator chains emphasize obstruction without sufficient event-house permission; D24 repeats the event because Jupiter links D1 H9 and H11 with D24 H5 and H9 and Mars links D1 H4, H9, and H11 with D24 H9; Moon and Saturn do not repeat the required houses in both charts. Natal promise is strong (score 12); active-planet delivery is supportive (16 support versus 3 pressure); event-specific obstruction is moderate. Initiation is strong, ease is obstructed, the result is developing, and permanence is possible. BAV/Kakshya is pressured; independent supporting groups are none; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 13 relevant contact windows were retained. Bhava disambiguation: H5 can signify children, education and intelligence, creativity, romance, and speculation. The selected channel is education/qualification because the configured companion houses H4, H9, and H11 also activate; active natural karakas are Jupiter, and D24 confirms it. Specificity is channel distinguished.",
+          "trigger_logic": "pratyantardasha>mahadasha carriers Jupiter, Mars, Moon, Saturn; transit carriers Jupiter, Mars, Moon, Rahu, Saturn.",
+          "possible_manifestations": [
+            {
+              "scenario": "A course, examination, application, or qualification process may advance."
+            },
+            {
+              "scenario": "Higher study, specialist training, teaching, or guided learning may become active."
+            }
+          ],
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-30",
+          "subject_key": "self"
+        }
+      ],
+      "also_possible_candidates": [
+        {
+          "candidate_id": "ET3-7cc3aca04f14",
+          "type": "More responsibility or recognition",
+          "prediction": "You could be formally assigned greater authority or visibility, which might eventually translate into a useful opportunity for your resources.",
+          "intensity": "Medium",
+          "support_label": "Moderate indication",
+          "support_grade": "B",
+          "manifestation_phase": "developing",
+          "display_explanation": "This is also supported, but another possibility in the same area of life is clearer this month.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H10 by natal lordship, H11 by natal aspect, and H5 by transit aspect. Saturn Pratyantardasha activates H2, H5, and H10 by natal aspect and H10 by transit placement. Mars Sookshma dasha activates H11 by natal lordship, H10 by transit placement, and H5 by transit aspect. Moon Sookshma dasha activates H2 by natal lordship, H5 by natal placement, H11 by natal aspect, H5 by transit placement, and H10 and H11 by transit aspect. For promotion / status, H10 opens the career status anchor, while H5 and H11 supply the status or recognition signal. H2 adds salary or resource support, strengthening a visible result. KP data is present but does not independently connect the required event houses; D10 repeats the event because Mars links D1 H11 with D10 H11; Jupiter, Moon, and Saturn do not repeat the required houses in both charts. Natal promise is strong (score 14); active-planet delivery is supportive (16 support versus 3 pressure); event-specific obstruction is moderate. Initiation is strong, ease is mixed, the result is developing, and permanence is possible. BAV/Kakshya is supportive; independent supporting groups are none; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 18 relevant contact windows were retained. Bhava disambiguation: H10 can signify career and profession, status and authority, public responsibility, and major action. The selected channel is status/recognition because the configured companion houses H2, H5, and H11 also activate; active natural karakas are Jupiter and Saturn, and D10 does not independently confirm it. Specificity is channel supported but ranked.",
+          "trigger_logic": "pratyantardasha>mahadasha carriers Jupiter, Mars, Moon, Saturn; transit carriers Jupiter, Mars, Moon, Saturn.",
+          "possible_manifestations": [
+            {
+              "scenario": "Greater authority, visibility, or responsibility may be formally assigned."
+            },
+            {
+              "scenario": "Recognition may translate into a useful opportunity or improved resources."
+            }
+          ],
+          "start_date": "2026-04-04",
+          "end_date": "2026-04-10",
+          "subject_key": "self"
+        }
+      ],
+      "ongoing_background_candidates": [
+        {
+          "candidate_id": "ET3-47e1c072785c",
+          "type": "Health",
+          "prediction": "A persistent energy concern might prompt you to adopt a stricter routine or a specific treatment plan to support your recovery.",
+          "intensity": "Medium",
+          "support_label": "Background indication",
+          "support_grade": "B",
+          "manifestation_phase": "result_window",
+          "display_explanation": "This theme continues from a nearby peak month, but it is not counted as a new event this month.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H11 by natal aspect, H1 by transit placement, and H5 by transit aspect. Rahu Antardasha activates H1 by natal aspect. Saturn Pratyantardasha activates H8 by natal lordship, H8 by natal placement, H5 by natal aspect, and H12 by transit aspect. Mars Sookshma dasha activates H6 and H11 by natal lordship, H12 by natal aspect, and H1 and H5 by transit aspect. Moon Sookshma dasha activates H5 by natal placement, H11 by natal aspect, H5 and H6 by transit placement, and H1, H11, and H12 by transit aspect. Rahu Sookshma dasha activates H1 by natal aspect. For health, H1 opens the health anchor, while H8 and H12 supply the health pressure or intervention. H5 and H11 add recovery support, strengthening a visible result. KP independently supports the combination through H1, H5, H6, and H12; D30 repeats the event because Jupiter links D1 H11 with D30 H1, Mars links D1 H6, H11, and H12 with D30 H1 and H12, Moon links D1 H5 and H11 with D30 H8, Rahu links D1 H1 with D30 H1, and Saturn links D1 H5 and H8 with D30 H8. Natal promise is available (score 11); active-planet delivery is supportive (17 support versus 2 pressure); event-specific obstruction is moderate. Initiation is strong, ease is mixed, the result is strong, and permanence is supported. BAV/Kakshya is supportive; independent supporting groups are nakshatra_dasha, nakshatra_pada_dasha; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 19 relevant contact windows were retained. Bhava disambiguation: H1 and H6 can signify body and vitality, identity and appearance, personal initiative, health and treatment, and service and work routines. The selected channel is health/treatment because the configured companion houses H5, H8, H11, and H12 also activate; active natural karakas are Mars and Moon, and D30 confirms it. Specificity is channel distinguished.",
+          "trigger_logic": "pratyantardasha>antardasha>mahadasha carriers Jupiter, Mars, Moon, Rahu, Saturn; transit carriers Jupiter, Mars, Moon, Saturn.",
+          "possible_manifestations": [
+            {
+              "scenario": "A persistent health or energy concern may prompt a check-up, treatment plan, or stricter routine."
+            },
+            {
+              "scenario": "Rest, reduced workload, therapy, or recovery time may become necessary."
+            }
+          ],
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-30",
+          "subject_key": "self"
+        },
+        {
+          "candidate_id": "ET3-c7036105c3b4",
+          "type": "Visa, travel documentation or permission",
+          "prediction": "Your application for a visa or other journey paperwork might move forward, although you could encounter some delays or friction.",
+          "intensity": "Medium",
+          "support_label": "Background indication",
+          "support_grade": "B",
+          "manifestation_phase": "obstructed",
+          "display_explanation": "This theme continues from a nearby peak month, but it is not counted as a new event this month.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H3 by natal placement, H9 and H11 by natal aspect, and H9 by transit aspect. Rahu Antardasha activates H9 by transit placement and H3 by transit aspect. Saturn Pratyantardasha activates H9 by natal lordship. Mars Sookshma dasha activates H11 by natal lordship, H9 by natal placement, and H3 by natal aspect. Moon Sookshma dasha activates H11 by natal aspect and H11 by transit aspect. Rahu Sookshma dasha activates H9 by transit placement and H3 by transit aspect. For visa, travel documentation or permission, H9 opens the subject anchor, while H3 supplies the manifestation pathway. H11 adds visible-result support, strengthening a visible result. KP cusp and significator chains emphasize obstruction without sufficient event-house permission; D9 repeats the event because Jupiter links D1 H3, H9, and H11 with D9 H11, Mars links D1 H3, H9, and H11 with D9 H3 and H9, and Saturn links D1 H9 with D9 H9; Moon does not repeat the required houses in both charts. Natal promise is available (score 11); active-planet delivery is supportive (13 support versus 2 pressure); event-specific obstruction is moderate. Initiation is strong, ease is obstructed, the result is developing, and permanence is possible. BAV/Kakshya is pressured; independent supporting groups are solar_return_subset; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 15 relevant contact windows were retained. Bhava disambiguation: H9 can signify father and mentors, higher education, religion and pilgrimage, law, and long-distance travel. The selected channel is visa/travel documentation or permission because the configured companion houses H3 and H11 also activate; active natural karakas are Jupiter and Rahu, and D9 confirms it. Specificity is channel distinguished.",
+          "trigger_logic": "pratyantardasha>mahadasha carriers Jupiter, Mars, Moon, Saturn; transit carriers Jupiter, Moon, Rahu.",
+          "possible_manifestations": [
+            {
+              "scenario": "A visa, travel permission, application, booking, or other journey paperwork may move forward."
+            }
+          ],
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-30",
+          "subject_key": "self"
+        },
+        {
+          "candidate_id": "ET3-e5f7a32dde1d",
+          "type": "Study, training, or qualification",
+          "prediction": "A course or qualification process could advance, but you might need to navigate some obstacles or a change in the learning plan.",
+          "intensity": "Medium",
+          "support_label": "Background indication",
+          "support_grade": "B",
+          "manifestation_phase": "obstructed",
+          "display_explanation": "This theme continues from a nearby peak month, but it is not counted as a new event this month.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H9 and H11 by natal aspect and H5 and H9 by transit aspect. Rahu Antardasha activates H9 by transit placement. Saturn Pratyantardasha activates H9 by natal lordship, H5 by natal aspect, and H4 by transit aspect. Mars Sookshma dasha activates H11 by natal lordship, H9 by natal placement, H4 by natal aspect, and H4 and H5 by transit aspect. Moon Sookshma dasha activates H5 by natal placement, H11 by natal aspect, H4 and H5 by transit placement, and H11 by transit aspect. Rahu Sookshma dasha activates H9 by transit placement. For education / exams, H5 opens the learning anchor, while H4 and H9 supply the study path. H11 adds result support, strengthening a visible result. KP cusp and significator chains emphasize obstruction without sufficient event-house permission; D24 repeats the event because Jupiter links D1 H9 and H11 with D24 H5 and H9 and Mars links D1 H4, H9, and H11 with D24 H9; Moon and Saturn do not repeat the required houses in both charts. Natal promise is strong (score 12); active-planet delivery is supportive (16 support versus 3 pressure); event-specific obstruction is moderate. Initiation is strong, ease is obstructed, the result is developing, and permanence is possible. BAV/Kakshya is pressured; independent supporting groups are none; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 13 relevant contact windows were retained. Bhava disambiguation: H5 can signify children, education and intelligence, creativity, romance, and speculation. The selected channel is education/qualification because the configured companion houses H4, H9, and H11 also activate; active natural karakas are Jupiter, and D24 confirms it. Specificity is channel distinguished.",
+          "trigger_logic": "pratyantardasha>mahadasha carriers Jupiter, Mars, Moon, Saturn; transit carriers Jupiter, Mars, Moon, Rahu, Saturn.",
+          "possible_manifestations": [
+            {
+              "scenario": "A course, examination, application, or qualification process may advance."
+            },
+            {
+              "scenario": "Higher study, specialist training, teaching, or guided learning may become active."
+            }
+          ],
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-30",
+          "subject_key": "self"
+        }
+      ],
+      "annual_context_candidates": [
+        {
+          "candidate_id": "ET3-6c3227473bbd",
+          "type": "Relationship or marriage",
+          "prediction": "A meaningful development in your relationship might occur, though the path toward a clearer commitment could face some temporary friction.",
+          "intensity": "Medium",
+          "support_label": "Background indication",
+          "support_grade": "B",
+          "manifestation_phase": "obstructed",
+          "display_explanation": "This possibility is open during the year, but this month lacks a distinctive timing signal for treating it as an event.",
+          "activation_reasoning": "The active period stack is Jupiter Mahadasha, Rahu Antardasha, Saturn Pratyantardasha, and Mars, Moon, and Rahu Sookshma dasha. Jupiter Mahadasha activates H7 by natal lordship, H7, H9, and H11 by natal aspect, and H5, H7, and H9 by transit aspect. Rahu Antardasha activates H7 by natal placement and H9 by transit placement. Saturn Pratyantardasha activates H9 by natal lordship, H2 and H5 by natal aspect, and H7 by transit aspect. Mars Sookshma dasha activates H11 by natal lordship, H9 by natal placement, and H5 by transit aspect. Moon Sookshma dasha activates H2 by natal lordship, H5 by natal placement, H11 by natal aspect, H5 and H7 by transit placement, and H11 by transit aspect. Rahu Sookshma dasha activates H7 by natal placement and H9 by transit placement. For marriage / partnership, H7 opens the partnership anchor, while H2, H5, and H11 supply the joining, romance or fulfilment. H9 adds dharma or ceremony support, strengthening a visible result. KP cusp and significator chains emphasize obstruction without sufficient event-house permission; D9 repeats the event because Saturn links D1 H2, H5, and H9 with D9 H7; Jupiter, Mars, Moon, and Rahu do not repeat the required houses in both charts. Natal promise is strong (score 14); active-planet delivery is supportive (21 support versus 5 pressure); event-specific obstruction is moderate. Initiation is strong, ease is obstructed, the result is developing, and permanence is possible. BAV/Kakshya is mixed; independent supporting groups are nakshatra_dasha, nakshatra_pada_dasha; birth-time reliability is stable. The closest degree contact is Jupiter to natal Mars around 2026-04-05 (exact, orb 0.0368°); 13 relevant contact windows were retained. Bhava disambiguation: H7 can signify spouse and partnership, contracts and business, and clients and public dealings. The selected channel is spouse/partnership because the configured companion houses H2, H5, H9, and H11 also activate; active natural karakas are Jupiter, and D9 does not independently confirm it. Specificity is channel supported but ranked.",
+          "trigger_logic": "pratyantardasha>antardasha>mahadasha carriers Jupiter, Mars, Moon, Rahu, Saturn; transit carriers Jupiter, Mars, Moon, Rahu, Saturn.",
+          "possible_manifestations": [
+            {
+              "scenario": "A partnership may move toward a clearer commitment, agreement, or shared family decision."
+            },
+            {
+              "scenario": "Romance, reconciliation, or a meaningful development in an existing relationship may occur."
+            }
+          ],
+          "start_date": "2026-04-01",
+          "end_date": "2026-04-30",
+          "subject_key": "self"
+        }
+      ],
+      "weak_signal_candidates": [],
+      "people_candidates": [],
+      "people_background_candidates": [],
+      "people_also_possible_candidates": [],
+      "people_ongoing_background_candidates": [],
+      "people_annual_context_candidates": [],
+      "people_weak_signal_candidates": []
+    }
+  ]
+}

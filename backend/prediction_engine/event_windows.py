@@ -65,6 +65,15 @@ class EventDefinition:
     reference_house: int = 1
     source_event_key: str = ""
     subject_anchor: Optional[SignalGroup] = None
+    knowledge_pattern_id: str = ""
+    knowledge_manifestation_id: str = ""
+    knowledge_review_status: str = ""
+    knowledge_claim_basis: str = ""
+    knowledge_source_ids: Tuple[str, ...] = ()
+    knowledge_ontology_version: str = ""
+    knowledge_domain: str = ""
+    required_direct_transit_houses: Tuple[int, ...] = ()
+    direct_transit_excludes_slow_planets: bool = False
 
 
 def rotate_relative_house(reference_house: int, relative_house: int) -> int:
@@ -121,6 +130,7 @@ def build_relative_event_definition(
         transition=relative_transition,
         outcome=replace(definition.outcome, houses=rotate(definition.outcome.houses)),
         classifications=classifications,
+        required_direct_transit_houses=rotate(definition.required_direct_transit_houses),
         version=f"relative.{subject_key}.{definition.version}",
         event_kind="relative",
         subject_key=subject_key,
@@ -565,7 +575,8 @@ FOREIGN_TRAVEL = EventDefinition(
     label="Foreign travel / stay",
     description=(
         "Long-distance travel or a stay away from the native land. The ninth house must be "
-        "dasha-opened together with a movement or foreign-stay signal. This is not a home-move "
+        "dasha-opened together with a foreign-stay signal and a current departure trigger. "
+        "Applications, visas and bookings are evaluated separately as travel documentation. This is not a home-move "
         "search: relocation still requires the fourth house."
     ),
     varga="D9",
@@ -583,12 +594,11 @@ FOREIGN_TRAVEL = EventDefinition(
         ),
     ),
     transition=SignalGroup(
-        key="travel_or_stay", label="Travel or foreign-stay signal", houses=(3, 12), weight=20,
+        key="foreign_stay", label="Foreign-stay signal", houses=(12,), weight=20,
         required=True,
         description=(
-            "A travel reading needs movement as well as H9: H3 can show papers, planning or "
-            "the short-distance start of a journey; H12 can show foreign stay, expense of travel "
-            "or residence away from the native land."
+            "A physical-travel reading needs H12 as well as H9. H12 shows departure from the "
+            "present base, travel expense, foreign stay or residence away from the native land."
         ),
     ),
     outcome=SignalGroup(
@@ -602,17 +612,12 @@ FOREIGN_TRAVEL = EventDefinition(
         ClassificationRule(
             "travel_with_opportunity", "Travel with opportunity support", outcome="present"
         ),
-        ClassificationRule(
-            "foreign_stay", "Foreign-stay pattern",
-            transition_any=(12,), outcome="absent",
-        ),
-        ClassificationRule(
-            "journey_or_travel_plans", "Journey or travel-plans pattern",
-            transition_any=(3,), outcome="absent",
-        ),
+        ClassificationRule("foreign_stay", "Foreign-stay pattern", transition_any=(12,), outcome="absent"),
         ClassificationRule("long_distance_movement", "Long-distance movement window"),
     ),
-    version="foreign_travel.v1",
+    version="foreign_travel.v2",
+    required_direct_transit_houses=(9, 12),
+    direct_transit_excludes_slow_planets=True,
 )
 
 

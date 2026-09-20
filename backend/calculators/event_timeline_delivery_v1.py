@@ -39,9 +39,19 @@ EVENT_KARAKAS: Dict[str, Tuple[str, ...]] = {
     "relocation": ("Moon", "Mars", "Rahu"),
     "marriage": ("Venus", "Jupiter"),
     "foreign_travel": ("Jupiter", "Rahu", "Saturn"),
+    "travel_documentation": ("Mercury", "Jupiter", "Rahu"),
     "children": ("Jupiter", "Sun"),
     "education": ("Mercury", "Jupiter"),
     "income_gain": ("Jupiter", "Venus", "Mercury"),
+    "family_member": ("Moon", "Jupiter"),
+    "legal": ("Saturn", "Mars", "Jupiter"),
+    "agreement": ("Mercury", "Venus", "Jupiter"),
+    "competition": ("Mars", "Saturn", "Jupiter"),
+    "occult_study": ("Jupiter", "Mercury", "Ketu"),
+    "staff": ("Saturn", "Mercury"),
+    "remarriage": ("Venus", "Jupiter"),
+    "numbered_child": ("Jupiter", "Sun"),
+    "intimacy": ("Venus", "Moon"),
 }
 
 
@@ -59,7 +69,13 @@ EVENT_OBSTRUCTION_HOUSES: Dict[str, Set[int]] = {
     "vehicle_purchase": {6, 8, 12},
     "relocation": {6, 8}, "marriage": {1, 6, 10, 12},
     "foreign_travel": {6, 8}, "children": {1, 6, 10},
+    "travel_documentation": {6, 8},
     "education": {6, 8, 12}, "income_gain": {6, 8, 12},
+    "family_member": {6, 8, 12}, "legal": {8, 12},
+    "agreement": {6, 8, 12}, "competition": {8, 12},
+    "occult_study": {6, 12}, "staff": {8, 12},
+    "remarriage": {1, 6, 8, 10, 12}, "numbered_child": {1, 6, 8, 10, 12},
+    "intimacy": {6, 8},
 }
 
 

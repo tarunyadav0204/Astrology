@@ -1255,7 +1255,9 @@ async def get_monthly_events(request: ClearChatRequest, background_tasks: Backgr
             raise HTTPException(status_code=400, detail="birth_chart_id is required. Please ensure birth chart is saved to database.")
 
         engine_version = _timeline_engine_version_for_user(current_user.userid)
-        configured_narrator = str(os.getenv("EVENT_TIMELINE_V3_NARRATOR") or "deterministic").strip().lower()
+        configured_narrator = str(os.getenv("EVENT_TIMELINE_V3_NARRATOR") or "llm").strip().lower()
+        if configured_narrator not in {"llm", "deterministic"}:
+            configured_narrator = "llm"
         generation_mode = (
             "deterministic"
             if engine_version == ACCURACY_V3_ENGINE_VERSION and configured_narrator != "llm"

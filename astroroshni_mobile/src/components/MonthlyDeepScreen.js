@@ -20,6 +20,7 @@ import { storage } from '../services/storage';
 import { useCredits } from '../credits/CreditContext';
 import { useAuthGate } from '../auth/AuthGateContext';
 import MonthlyAccordion from './MonthlyAccordion';
+import EventTimelineSamplePreview from './EventTimelineSamplePreview';
 import ConfirmCreditsModal from './ConfirmCreditsModal';
 import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule, userFacingPdfExportError } from '../utils/pdfGenerator';
 import { useTheme } from '../context/ThemeContext';
@@ -869,6 +870,17 @@ export default function MonthlyDeepScreen() {
             contentContainerStyle={[styles.scrollContent, { backgroundColor: 'transparent' }]}
             showsVerticalScrollIndicator={false}
           >
+            {monthlyData?.narration_status === 'partial_fallback' ? (
+              <View style={[styles.narrationNotice, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
+                <Text style={[styles.narrationNoticeText, { color: colors.textSecondary }]}>
+                  {t(
+                    'eventScreen.narrationPartialFallback',
+                    'Some descriptions are shown in standard wording because the writing service did not finish. The calculated events and timing are unchanged.'
+                  )}
+                </Text>
+              </View>
+            ) : null}
             <MonthlyAccordion
               data={{ ...singleMonth, month: getMonthName(singleMonth.month_id) }}
               onChatPress={() => navigateToChatWithMonth({ ...singleMonth, month: getMonthName(singleMonth.month_id) })}
@@ -878,12 +890,19 @@ export default function MonthlyDeepScreen() {
             />
           </ScrollView>
         ) : (
-          <View style={[styles.emptyContainer, { backgroundColor: 'transparent' }]}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[styles.emptyContainer, { backgroundColor: 'transparent' }]}
+            showsVerticalScrollIndicator={false}
+          >
             <Ionicons name="calendar-outline" size={64} color={colors.textTertiary} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('monthlyDeepScreen.emptyTitle', { monthYear: monthLabel })}</Text>
             <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
               {t('monthlyDeepScreen.emptyDesc', { cost: creditCost })}
             </Text>
+            <View style={styles.samplePreviewContainer}>
+              <EventTimelineSamplePreview mode="monthly" />
+            </View>
             {showGenerateButton && !showMonthlyCreditsModal && (
               <TouchableOpacity
                 style={[
@@ -912,7 +931,7 @@ export default function MonthlyDeepScreen() {
                 )}
               </TouchableOpacity>
             )}
-          </View>
+          </ScrollView>
         )}
         <ConfirmCreditsModal
           visible={showMonthlyCreditsModal}
@@ -983,7 +1002,17 @@ const styles = StyleSheet.create({
   takingLongerText: { marginTop: 12, fontSize: 13, textAlign: 'center' },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 32 },
-  emptyContainer: { flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center' },
+  narrationNotice: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  narrationNoticeText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  emptyContainer: { flexGrow: 1, padding: 24, justifyContent: 'center', alignItems: 'center' },
   emptyTitle: { fontSize: 20, fontWeight: '700', marginTop: 16, textAlign: 'center' },
   emptyDesc: { fontSize: 14, textAlign: 'center', marginTop: 8, paddingHorizontal: 16 },
   generateButton: {
@@ -998,4 +1027,5 @@ const styles = StyleSheet.create({
   },
   generateButtonDisabled: { opacity: 0.85 },
   generateButtonText: { fontSize: 16, fontWeight: '700' },
+  samplePreviewContainer: { width: '100%', marginTop: 22 },
 });

@@ -2,7 +2,21 @@ import json
 import unittest
 from unittest.mock import patch
 
-from ai.gemini_chat_analyzer import generate_content_rest_v1beta_stream_result
+from ai.gemini_chat_analyzer import (
+    generate_content_rest_v1beta_result,
+    generate_content_rest_v1beta_stream_result,
+)
+
+
+class _FakeResponse:
+    ok = True
+    status_code = 200
+
+    def json(self):
+        return {
+            "candidates": [{"content": {"parts": [{"text": '{"monthly_predictions": []}'}]}}],
+            "usageMetadata": {"promptTokenCount": 4, "candidatesTokenCount": 3},
+        }
 
 
 class _FakeStreamResponse:
@@ -38,6 +52,25 @@ class _FakeStreamResponse:
 
 
 class GeminiRestStreamTests(unittest.TestCase):
+    @patch("requests.post")
+    def test_non_stream_supports_low_thinking_and_json_output(self, post):
+        post.return_value = _FakeResponse()
+
+        result = generate_content_rest_v1beta_result(
+            "models/gemini-3-flash-preview",
+            "write timeline copy",
+            "test-key",
+            thinking_level="low",
+            response_mime_type="application/json",
+            timeout_s=45,
+        )
+
+        config = post.call_args.kwargs["json"]["generationConfig"]
+        self.assertEqual(config["thinkingConfig"], {"thinkingLevel": "low"})
+        self.assertEqual(config["responseMimeType"], "application/json")
+        self.assertEqual(post.call_args.kwargs["timeout"], 45.0)
+        self.assertEqual(result["usage"]["total_tokens"], 0)
+
     @patch("requests.post")
     def test_stream_emits_only_visible_text_and_returns_usage(self, post):
         post.return_value = _FakeStreamResponse()

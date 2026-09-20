@@ -23,6 +23,7 @@ import { chatAPI, pricingAPI } from '../services/api';
 import { storage } from '../services/storage';
 import { useCredits } from '../credits/CreditContext';
 import MonthlyAccordion from './MonthlyAccordion';
+import EventTimelineSamplePreview from './EventTimelineSamplePreview';
 import RelativeProfilesPanel from './RelativeProfilesPanel';
 import NativeSelectorChip from './Common/NativeSelectorChip';
 import { API_BASE_URL } from '../utils/constants';
@@ -1785,6 +1786,8 @@ export default function EventScreen({ route }) {
             </View>
           </View>
 
+          <EventTimelineSamplePreview mode={readingMode} />
+
           {/* Continue Button */}
           <View
             style={[
@@ -1829,6 +1832,17 @@ export default function EventScreen({ route }) {
         contentContainerStyle={[styles.scrollContent, { backgroundColor: 'transparent' }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
+        {monthlyData?.narration_status === 'partial_fallback' ? (
+          <View style={[styles.narrationNotice, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+            <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
+            <Text style={[styles.narrationNoticeText, { color: colors.textSecondary }]}>
+              {t(
+                'eventScreen.narrationPartialFallback',
+                'Some descriptions are shown in standard wording because the writing service did not finish. The calculated events and timing are unchanged.'
+              )}
+            </Text>
+          </View>
+        ) : null}
         {/* Macro Trends (The "Vibe") */}
         {displayMacroTrends.length > 0 && (
           <View
@@ -1995,6 +2009,17 @@ const styles = StyleSheet.create({
   },
   
   scrollContent: { paddingBottom: 40 },
+  narrationNotice: {
+    marginHorizontal: 20,
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  narrationNoticeText: { flex: 1, fontSize: 13, lineHeight: 18 },
   
   section: { marginTop: 24, marginBottom: 24 },
   sectionHeader: { paddingHorizontal: 20, marginBottom: 16 },
