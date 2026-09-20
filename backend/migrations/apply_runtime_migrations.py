@@ -18,6 +18,7 @@ RUNTIME_MIGRATIONS = (
     "add_homepage_prompt_exposures.sql",
     "add_parashari_fomo_generation_claims.sql",
     "add_manifestation_syntheses.sql",
+    "add_engagement_suggestions.sql",
     "add_pandit_desk.sql",
     "add_pandit_verified_jobs.sql",
     "add_instant_billing_sessions.sql",

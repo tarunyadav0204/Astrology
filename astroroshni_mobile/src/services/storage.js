@@ -9,14 +9,6 @@ const DISPOSABLE_CACHE_PREFIXES = [
   'karma_analysis_',
 ];
 
-const CHAT_CACHE_PREFIXES = [
-  'chatMessages_',
-  'chatSessions_',
-  'pendingChatMessages_',
-  'pendingFeedback_',
-  'chat-entry:',
-];
-
 const isQuotaExceeded = (error) => {
   const name = error?.name || '';
   const message = String(error?.message || error || '');
@@ -80,14 +72,10 @@ const persistJson = async (key, value) => {
   } catch (error) {
     if (!isQuotaExceeded(error)) throw error;
   }
+  // Older PWA builds persisted full chart responses. Reclaim that snapshot
+  // before retrying essential profile writes; never evict unsent chat data.
+  await AsyncStorage.removeItem('chartData');
   await removeKeysWithPrefixes(DISPOSABLE_CACHE_PREFIXES);
-  try {
-    await AsyncStorage.setItem(key, payload);
-    return;
-  } catch (error) {
-    if (!isQuotaExceeded(error)) throw error;
-  }
-  await removeKeysWithPrefixes(CHAT_CACHE_PREFIXES);
   await AsyncStorage.setItem(key, payload);
 };
 
@@ -124,7 +112,7 @@ export const storage = {
   // Birth details
   setBirthDetails: async (details) => {
     // console.log('💾 [CRITICAL] setBirthDetails called with:', details.name, 'ID:', details.id);
-    const result = await AsyncStorage.setItem('birthDetails', JSON.stringify(details));
+    const result = await persistJson('birthDetails', details);
     return result;
   },
   getBirthDetails: async () => {
@@ -183,7 +171,12 @@ export const storage = {
     try {
       await persistJson('chartData', toPersistedChartCache(chartData));
     } catch (_) {
-      /* optional cache */
+      // Do not leave the previous native's chart behind after a failed write.
+      try {
+        await AsyncStorage.removeItem('chartData');
+      } catch (_) {
+        /* optional cache */
+      }
     }
   },
   getChartData: async () => {
@@ -199,7 +192,7 @@ export const storage = {
   setBirthProfiles: (profiles) => {
     // console.log('💾 [DEBUG] Storage: setBirthProfiles called with count:', profiles.length);
     // console.log('💾 [DEBUG] Storage: setBirthProfiles profiles:', profiles.map(p => ({ name: p.name, id: p.id })));
-    return AsyncStorage.setItem('birthProfiles', JSON.stringify(profiles));
+    return persistJson('birthProfiles', profiles);
   },
   getBirthProfiles: async () => {
     const data = await AsyncStorage.getItem('birthProfiles');

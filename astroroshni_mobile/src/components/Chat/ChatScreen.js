@@ -116,6 +116,26 @@ const COMPOSER_LINE_HEIGHT = 22;
 const COMPOSER_MIN_HEIGHT = 44;
 const COMPOSER_MAX_LINES = 3;
 const COMPOSER_MAX_HEIGHT = COMPOSER_MIN_HEIGHT + COMPOSER_LINE_HEIGHT * (COMPOSER_MAX_LINES - 1);
+const engagementEventId = (eventType) => (
+  `chat_${String(eventType || 'event')}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+);
+
+const timelessSuggestedQuestion = (value) => {
+  const original = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!original) return '';
+  const legacyKpMatch = original.match(/^How could (.+?) become relevant today\?$/i);
+  if (legacyKpMatch) return `How could ${legacyKpMatch[1]} develop in this period?`;
+  const withoutToday = original
+    .replace(/\bfor\s+today\b/gi, '')
+    .replace(/\btoday(?:['’]s)?\b/gi, '')
+    .replace(/\s+([,?.!])/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  if (!withoutToday) return '';
+  return /\?$/.test(withoutToday)
+    ? withoutToday
+    : `${withoutToday.replace(/\.$/, '')}?`;
+};
 
 function clampComposerHeight(contentHeight) {
   const raw = Math.ceil(Number(contentHeight) || 0);
@@ -792,7 +812,14 @@ export default function ChatScreen({ navigation, route }) {
   const instantRevealActiveRef = useRef(new Set());
   /** Instant assistant message_id → live WebSocket. Polling remains the recovery/final-authority path. */
   const instantStreamSocketsRef = useRef(new Map());
-  const [suggestions, setSuggestions] = useState(DEFAULT_CHAT_SUGGESTIONS);
+  const [staticSuggestions, setStaticSuggestions] = useState(DEFAULT_CHAT_SUGGESTIONS);
+  const [engagementSuggestions, setEngagementSuggestions] = useState([]);
+  const [engagementSuggestionScope, setEngagementSuggestionScope] = useState('');
+  const shownEngagementSuggestionsRef = useRef(new Set());
+  const selectedEngagementSuggestionRef = useRef(null);
+  const queuedEngagementRefreshesRef = useRef(new Set());
+  const engagementLoadGenerationRef = useRef(0);
+  const engagementRetryTimerRef = useRef(null);
   /** Keeps suggestion chips off-screen until the user asks for them — saves vertical space for messages. */
   const [showTopicIdeas, setShowTopicIdeas] = useState(false);
   const [showCreditChoice, setShowCreditChoice] = useState(false);
@@ -1068,6 +1095,28 @@ export default function ChatScreen({ navigation, route }) {
   const [sessionId, setSessionId] = useState(null);
   const [renderedMessageCount, setRenderedMessageCount] = useState(CHAT_RENDER_WINDOW_DEFAULT);
   const [currentPersonId, setCurrentPersonId] = useState(null);
+  const suggestionBirthChartId = birthData?.id ?? birthData?.birth_chart_id ?? null;
+  const suggestionScope = suggestionBirthChartId != null
+    ? `${String(suggestionBirthChartId)}:${String(language || 'en').toLowerCase()}`
+    : '';
+  const hasDynamicSuggestionScope = Boolean(suggestionScope && !isGuest);
+  const suggestions = hasDynamicSuggestionScope
+    ? (
+        engagementSuggestionScope === suggestionScope
+          ? engagementSuggestions.map((item) => item.question)
+          : []
+      )
+    : staticSuggestions;
+  const engagementSuggestionByQuestion = useMemo(
+    () => new Map(engagementSuggestions.map((item) => [item.question, item])),
+    [engagementSuggestions],
+  );
+  const latestCompletedAssistantMessageId = useMemo(() => {
+    const message = [...messages]
+      .reverse()
+      .find((item) => item?.role === 'assistant' && !item?.isTyping && !item?.isWelcome);
+    return message?.id || message?.message_id || null;
+  }, [messages]);
   const [pendingMessages, setPendingMessages] = useState(new Set());
   const scrollViewRef = useRef(null);
   const lastMessageRef = useRef(null);
@@ -1590,6 +1639,159 @@ export default function ChatScreen({ navigation, route }) {
 
   // Partnership mode state (declared before effects that read partnershipMode)
   const [partnershipMode, setPartnershipMode] = useState(false);
+
+  const recordEngagementSuggestionInteraction = useCallback(async (
+    suggestion,
+    eventType,
+    metadata = {},
+  ) => {
+    if (!suggestion?.opportunity_id || !eventType) return false;
+    try {
+      await chatAPI.recordEngagementSuggestionInteraction({
+        event_id: engagementEventId(eventType),
+        opportunity_id: String(suggestion.opportunity_id),
+        presentation_id: suggestion.presentation_id ?? null,
+        event_type: eventType,
+        surface: 'chat_question_suggestions',
+        birth_chart_id: suggestion.birth_chart_id ?? suggestionBirthChartId ?? null,
+        session_id: sessionId || null,
+        metadata,
+      });
+      return true;
+    } catch (error) {
+      console.warn('[ChatSuggestions] interaction recording failed', {
+        eventType,
+        opportunityId: suggestion.opportunity_id,
+        error: error?.message || String(error),
+      });
+      return false;
+    }
+  }, [sessionId, suggestionBirthChartId]);
+
+  const loadEngagementSuggestions = useCallback(async ({
+    enqueueIfEmpty = true,
+    retryAttemptsLeft = 0,
+  } = {}) => {
+    clearTimeout(engagementRetryTimerRef.current);
+    engagementRetryTimerRef.current = null;
+    if (!suggestionBirthChartId || isGuest) {
+      setEngagementSuggestions([]);
+      setEngagementSuggestionScope('');
+      return [];
+    }
+    const requestScope = suggestionScope;
+    const generation = engagementLoadGenerationRef.current + 1;
+    engagementLoadGenerationRef.current = generation;
+    setEngagementSuggestionScope(requestScope);
+    setEngagementSuggestions([]);
+    try {
+      const response = await chatAPI.getEngagementSuggestions(
+        suggestionBirthChartId,
+        language,
+        6,
+      );
+      if (generation !== engagementLoadGenerationRef.current) return [];
+      const rows = (Array.isArray(response?.data?.suggestions) ? response.data.suggestions : [])
+        .map((item) => ({
+          ...item,
+          question: timelessSuggestedQuestion(item?.question),
+          prefilled_question: timelessSuggestedQuestion(item?.question),
+        }))
+        .filter((item) => item.opportunity_id && item.question);
+      setEngagementSuggestionScope(requestScope);
+      setEngagementSuggestions(rows);
+      if (
+        rows.length === 0 &&
+        enqueueIfEmpty &&
+        !queuedEngagementRefreshesRef.current.has(requestScope)
+      ) {
+        queuedEngagementRefreshesRef.current.add(requestScope);
+        try {
+          await chatAPI.refreshEngagementSuggestions(suggestionBirthChartId);
+          if (generation === engagementLoadGenerationRef.current) {
+            clearTimeout(engagementRetryTimerRef.current);
+            engagementRetryTimerRef.current = setTimeout(() => {
+              loadEngagementSuggestions({ enqueueIfEmpty: false, retryAttemptsLeft: 4 });
+            }, 2500);
+          }
+        } catch (error) {
+          queuedEngagementRefreshesRef.current.delete(requestScope);
+          console.warn('[ChatSuggestions] refresh enqueue failed', error?.message || error);
+        }
+      } else if (rows.length === 0 && retryAttemptsLeft > 0) {
+        const retryDelay = Math.min(12000, 3000 * (5 - retryAttemptsLeft));
+        clearTimeout(engagementRetryTimerRef.current);
+        engagementRetryTimerRef.current = setTimeout(() => {
+          loadEngagementSuggestions({
+            enqueueIfEmpty: false,
+            retryAttemptsLeft: retryAttemptsLeft - 1,
+          });
+        }, retryDelay);
+      }
+      return rows;
+    } catch (error) {
+      if (generation === engagementLoadGenerationRef.current) {
+        setEngagementSuggestionScope(requestScope);
+        setEngagementSuggestions([]);
+      }
+      console.warn('[ChatSuggestions] load failed', error?.message || error);
+      return [];
+    }
+  }, [isGuest, language, suggestionBirthChartId, suggestionScope]);
+
+  useEffect(() => {
+    selectedEngagementSuggestionRef.current = null;
+    shownEngagementSuggestionsRef.current.clear();
+    if (!hasDynamicSuggestionScope || !chatSurfaceFocused) return undefined;
+    loadEngagementSuggestions();
+    return () => {
+      clearTimeout(engagementRetryTimerRef.current);
+      engagementRetryTimerRef.current = null;
+      engagementLoadGenerationRef.current += 1;
+    };
+  }, [chatSurfaceFocused, hasDynamicSuggestionScope, loadEngagementSuggestions, suggestionScope]);
+
+  useEffect(() => {
+    if (!hasDynamicSuggestionScope || !latestCompletedAssistantMessageId) return undefined;
+    const timer = setTimeout(() => {
+      loadEngagementSuggestions({ enqueueIfEmpty: false });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [
+    hasDynamicSuggestionScope,
+    latestCompletedAssistantMessageId,
+    loadEngagementSuggestions,
+  ]);
+
+  useEffect(() => {
+    const suggestionsAreVisible =
+      !isInstantAnalysis &&
+      !loading &&
+      !showGreeting &&
+      !partnershipMode &&
+      !isMundane &&
+      (showWelcomeSuggestionCards || showTopicIdeas);
+    if (!suggestionsAreVisible || !engagementSuggestions.length) return;
+    engagementSuggestions.forEach((suggestion) => {
+      const shownKey = `${suggestion.opportunity_id}:${suggestion.presentation_id || ''}`;
+      if (shownEngagementSuggestionsRef.current.has(shownKey)) return;
+      shownEngagementSuggestionsRef.current.add(shownKey);
+      recordEngagementSuggestionInteraction(suggestion, 'shown', {
+        source: suggestion.source || null,
+        manifestation_id: suggestion.manifestation_id || null,
+      });
+    });
+  }, [
+    engagementSuggestions,
+    isInstantAnalysis,
+    isMundane,
+    loading,
+    partnershipMode,
+    recordEngagementSuggestionInteraction,
+    showGreeting,
+    showTopicIdeas,
+    showWelcomeSuggestionCards,
+  ]);
 
   useEffect(() => {
     if (partnershipMode || isMundane || !birthData || freeQuestionAvailable || !chatModeHydratedRef.current) return;
@@ -2391,7 +2593,7 @@ export default function ChatScreen({ navigation, route }) {
       'What timing themes should I study right now?',
       'Which chart factors matter most for my next step?'
     ];
-    setSuggestions(
+    setStaticSuggestions(
       Platform.OS === 'ios'
         ? iosSuggestions
         : (adminSuggestions.length ? adminSuggestions : DEFAULT_CHAT_SUGGESTIONS)
@@ -2939,6 +3141,14 @@ export default function ChatScreen({ navigation, route }) {
 
   /** Suggestion cards: keep the question, then convert if the selected mode is unaffordable. */
   const handleSuggestionPress = (question) => {
+    const engagementSuggestion = engagementSuggestionByQuestion.get(question) || null;
+    selectedEngagementSuggestionRef.current = engagementSuggestion;
+    if (engagementSuggestion) {
+      recordEngagementSuggestionInteraction(engagementSuggestion, 'clicked', {
+        source: engagementSuggestion.source || null,
+        manifestation_id: engagementSuggestion.manifestation_id || null,
+      });
+    }
     setInputText(question);
     if (composerBlockedByCredits) {
       openCreditChoice(currentChatModeKey, question);
@@ -5788,6 +5998,30 @@ export default function ChatScreen({ navigation, route }) {
       if (!startedSession?.session_id) return;
       startedInstantBillingSessionId = startedSession.session_id;
     }
+    const selectedSuggestion = selectedEngagementSuggestionRef.current;
+    if (selectedSuggestion) {
+      const submittedQuestion = String(messageText || '').trim();
+      const originalQuestion = String(selectedSuggestion.question || '').trim();
+      const edited = submittedQuestion !== originalQuestion;
+      selectedEngagementSuggestionRef.current = null;
+      setEngagementSuggestions((current) => current.filter(
+        (item) => item.opportunity_id !== selectedSuggestion.opportunity_id,
+      ));
+      if (edited) {
+        recordEngagementSuggestionInteraction(selectedSuggestion, 'edited', {
+          original_question: originalQuestion,
+          submitted_question: submittedQuestion,
+        });
+      }
+      recordEngagementSuggestionInteraction(selectedSuggestion, 'asked', {
+        original_question: originalQuestion,
+        submitted_question: submittedQuestion,
+        edited,
+        chat_mode: usingInstant ? 'instant' : (usingPremium ? 'premium' : 'standard'),
+      }).finally(() => {
+        loadEngagementSuggestions({ enqueueIfEmpty: false });
+      });
+    }
     // Gate rating prompt to the next completed answer only.
     setRatingEligibleMessageId(null);
     setRatingPromptPending(false);
@@ -7175,7 +7409,10 @@ export default function ChatScreen({ navigation, route }) {
                       <MessageBubble
                       message={item}
                       language={language}
-                      onFollowUpClick={setInputText}
+                      onFollowUpClick={(question) => {
+                        selectedEngagementSuggestionRef.current = null;
+                        setInputText(question);
+                      }}
                       onRemedyFollowUpClick={handleRemedyFollowUpSend}
                       partnership={partnershipMode}
                       onDelete={handleDeleteMessage}
@@ -7310,7 +7547,7 @@ export default function ChatScreen({ navigation, route }) {
                     {t('chat.inputScopeSelectChart', 'Change chart')}
                   </Text>
                 </TouchableOpacity>
-                {!loading && messages.length > 0 && (
+                {!loading && messages.length > 0 && suggestions.length > 0 && (
                   <TouchableOpacity
                     onPress={() => setShowTopicIdeas((v) => !v)}
                     style={[
@@ -7483,6 +7720,7 @@ export default function ChatScreen({ navigation, route }) {
                 onChangeText={(text) => {
                   inputTextRef.current = text;
                   setInputText(text);
+                  if (!text) selectedEngagementSuggestionRef.current = null;
                   markInstantActivity();
                   if (!text) setComposerHeight(COMPOSER_MIN_HEIGHT);
                 }}

@@ -1597,15 +1597,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       return;
     }
     try {
-      // The welcome itself is free. Start metered time only when the live
-      // microphone conversation is about to begin.
-      if (!billingSessionRef.current?.session_id) {
-        const billingOk = await startSpeechBillingSession();
-        if (!billingOk || !mountedRef.current) {
-          setStatus('idle');
-          return;
-        }
-      }
+      // Greeting and recording are free until a question is submitted.
       await wait(POST_TTS_LISTEN_DELAY_MS);
       await startListening({ source: 'handsFreeAfterGreeting', stopCurrentSpeech: false });
     } catch (error) {
@@ -2630,9 +2622,14 @@ export default function SpeechChatScreen({ navigation, route }) {
   const runQuestionTurn = async (question) => {
     const spokenQuestion = String(question || '').trim();
     if (!spokenQuestion) return;
+    // This is the only billing entry point: both transcript submission and
+    // follow-up questions arrive here, after the user sends a question.
     if (!billingSessionRef.current?.session_id) {
       const billingStarted = await startSpeechBillingSession();
-      if (!billingStarted) return;
+      if (!billingStarted) {
+        if (mountedRef.current) setStatus('idle');
+        return;
+      }
     }
 
     const turnSerial = activeTurnSerialRef.current + 1;
@@ -2819,15 +2816,6 @@ export default function SpeechChatScreen({ navigation, route }) {
     }).catch(() => {});
     stopSpeechUiImmediately();
     await releaseSpeechRecognizer();
-    if (!billingSessionRef.current?.session_id) {
-      const billingOk = await startSpeechBillingSession();
-      if (!billingOk) {
-        const primedIOSRecording = iosWebPrimedRecordingRef.current;
-        iosWebPrimedRecordingRef.current = null;
-        await discardWebRecording(primedIOSRecording);
-        return;
-      }
-    }
     setErrorText('');
     setCurrentTranscript('');
     setFollowUps([]);

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -132,9 +133,12 @@ def test_store_fails_closed_for_unknown_schema(tmp_path: Path) -> None:
         raise AssertionError("Unknown schemas must not load")
 
 
-def test_only_event_timeline_imports_the_new_runtime() -> None:
+def test_only_approved_shared_clients_import_the_new_runtime() -> None:
     tracked = subprocess.run(
-        ["git", "ls-files", "backend", "astroroshni_mobile", "frontend", "frontend-next"],
+        [
+            "git", "ls-files", "--cached", "--others", "--exclude-standard",
+            "backend", "astroroshni_mobile", "frontend", "frontend-next",
+        ],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -151,6 +155,9 @@ def test_only_event_timeline_imports_the_new_runtime() -> None:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        if "manifestation_kg" in text:
+        if re.search(r"^\s*(?:from|import)\s+manifestation_kg\b", text, re.MULTILINE):
             offenders.append(relative)
-    assert offenders == ["backend/calculators/event_timeline_accuracy_v3.py"]
+    assert sorted(offenders) == [
+        "backend/calculators/event_timeline_accuracy_v3.py",
+        "backend/engagement_suggestions/manifestation_adapter.py",
+    ]

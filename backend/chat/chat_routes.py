@@ -1915,6 +1915,25 @@ async def process_event_timeline(
                     predictions=predictions,
                 )
                 conn.commit()
+            # Reuse only the deterministic Manifestation KG identity and
+            # evidence gates from Event Timeline. Suggestion wording is built
+            # locally; this does not make another LLM request.
+            try:
+                from engagement_suggestions.service import EngagementSuggestionService
+
+                EngagementSuggestionService().store_event_timeline(
+                    userid=int(user_id),
+                    birth_chart_id=int(birth_chart_id),
+                    chart_name=str(birth_data_dict.get("name") or ""),
+                    job_id=str(job_id),
+                    locale=str(language or "en"),
+                    payload=predictions,
+                )
+            except Exception:
+                logger.exception(
+                    "event_timeline_engagement_persist_failed job_id=%s",
+                    job_id,
+                )
             print(f"✅ Result saved, task completed")
         else:
             raise Exception(predictions.get('error', 'Prediction failed'))

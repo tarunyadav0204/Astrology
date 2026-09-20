@@ -73,6 +73,21 @@ def test_prashna_credit_setting_is_seeded_idempotently_during_deploy():
     assert "ON CONFLICT (setting_key)" not in sql
 
 
+def test_engagement_suggestion_schema_runs_during_deploy():
+    filename = "add_engagement_suggestions.sql"
+    assert filename in RUNTIME_MIGRATIONS
+    sql = (MIGRATIONS / filename).read_text(encoding="utf-8")
+    for table in (
+        "engagement_opportunities",
+        "engagement_presentations",
+        "engagement_interactions",
+        "user_engagement_preferences",
+        "engagement_refresh_queue",
+        "engagement_delivery_attempts",
+    ):
+        assert f"CREATE TABLE IF NOT EXISTS {table}" in sql
+
+
 def test_talk_to_tara_rate_correction_runs_only_once_and_preserves_future_admin_changes():
     sql = (MIGRATIONS / "set_talk_to_tara_rate_five.sql").read_text(encoding="utf-8")
     assert "runtime_data_migrations" in sql

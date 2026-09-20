@@ -382,6 +382,30 @@ export const userSettingsAPI = {
 };
 
 export const chatAPI = {
+  getEngagementSuggestions: (birthChartId, language = 'en', limit = 6) =>
+    api.get(getEndpoint('/engagement-suggestions'), {
+      params: {
+        birth_chart_id: Number(birthChartId),
+        language,
+        limit,
+      },
+      ...BACKGROUND_REQUEST_CONFIG,
+    }),
+  refreshEngagementSuggestions: (birthChartId) =>
+    api.post(
+      getEndpoint('/engagement-suggestions/refresh'),
+      {
+        birth_chart_id: Number(birthChartId),
+        sources: ['monthly_manifestation', 'kp_daily'],
+      },
+      BACKGROUND_REQUEST_CONFIG,
+    ),
+  recordEngagementSuggestionInteraction: (payload) =>
+    api.post(
+      getEndpoint('/engagement-suggestions/interactions'),
+      payload,
+      BACKGROUND_REQUEST_CONFIG,
+    ),
   getAnswerStylePreference: () =>
     api.get(getEndpoint('/user-settings/chat-answer-style'), BACKGROUND_REQUEST_CONFIG),
   updateAnswerStylePreference: (answerStyle) =>

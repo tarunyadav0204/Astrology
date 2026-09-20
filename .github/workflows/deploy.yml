@@ -700,6 +700,29 @@ jobs:
             --http-method POST \
             --update-headers "X-Cron-Secret=${CRON_SECRET}"
 
+          upsert_engagement_job() {
+            local job_name="$1"
+            local schedule="$2"
+            local uri="$3"
+            if gcloud scheduler jobs describe "${job_name}" --project "${GCP_PROJECT_ID}" --location asia-south1 >/dev/null 2>&1; then
+              gcloud scheduler jobs update http "${job_name}" \
+                --project "${GCP_PROJECT_ID}" --location asia-south1 \
+                --schedule "${schedule}" --time-zone UTC --uri "${uri}" \
+                --http-method POST --update-headers "X-Cron-Secret=${CRON_SECRET}"
+            else
+              gcloud scheduler jobs create http "${job_name}" \
+                --project "${GCP_PROJECT_ID}" --location asia-south1 \
+                --schedule "${schedule}" --time-zone UTC --uri "${uri}" \
+                --http-method POST --headers "X-Cron-Secret=${CRON_SECRET}"
+            fi
+          }
+          upsert_engagement_job astroroshni-engagement-repair "*/15 * * * *" \
+            "${DISPATCH_URL}/api/engagement-suggestions/cron/repair?lookback_hours=48&limit=1000"
+          upsert_engagement_job astroroshni-engagement-refresh-queue "7 * * * *" \
+            "${DISPATCH_URL}/api/engagement-suggestions/cron/schedule-notification-refreshes?limit=500"
+          upsert_engagement_job astroroshni-engagement-process-due "*/5 * * * *" \
+            "${DISPATCH_URL}/api/engagement-suggestions/cron/process-due?limit=2"
+
   frontend:
     if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.frontend_required == 'true' }}
     needs: [detect_changes]

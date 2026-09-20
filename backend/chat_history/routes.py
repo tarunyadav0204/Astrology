@@ -5171,6 +5171,48 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         )
 
         if result.get('success'):
+            # Persist the follow-ups the answer already produced as reusable
+            # engagement opportunities. This performs no additional LLM call
+            # and must never make an otherwise successful chat fail.
+            try:
+                raw_suggestions = result.get("follow_up_questions") or []
+                suggestion_texts = []
+                if isinstance(raw_suggestions, list):
+                    for suggestion in raw_suggestions:
+                        if isinstance(suggestion, str):
+                            suggestion_texts.append(suggestion)
+                        elif isinstance(suggestion, dict):
+                            value = suggestion.get("question") or suggestion.get("text")
+                            if value:
+                                suggestion_texts.append(str(value))
+                if suggestion_texts and message_id is not None:
+                    from engagement_suggestions.service import EngagementSuggestionService
+
+                    chart_id_value = (
+                        (birth_details or {}).get("id")
+                        or (birth_details or {}).get("birth_chart_id")
+                    )
+                    EngagementSuggestionService().store_chat_followups(
+                        userid=int(user_id),
+                        birth_chart_id=int(chart_id_value) if chart_id_value else None,
+                        chart_name=str((birth_details or {}).get("name") or ""),
+                        session_id=str(session_id),
+                        message_id=int(message_id),
+                        questions=suggestion_texts,
+                        locale=str(language or "en"),
+                        domain=str((intent or {}).get("category") or "other"),
+                        model_name=str(
+                            result.get("chat_llm_model")
+                            or (result.get("timing") or {}).get("chat_llm_model")
+                            or ""
+                        ) or None,
+                    )
+            except Exception:
+                logger.exception(
+                    "engagement_chat_followup_persist_failed session_id=%s message_id=%s",
+                    session_id,
+                    message_id,
+                )
             await _close_wait_side_conversation(message_id)
             try:
                 from credits.remedy_funnel import record_funnel_event as record_remedy_funnel_event

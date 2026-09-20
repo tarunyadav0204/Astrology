@@ -20,6 +20,7 @@ class KPChartRequest(BaseModel):
     timezone: Optional[str] = ""
 
 class KPFructificationRequest(BaseModel):
+    birth_chart_id: Optional[int] = None
     birth_date: str
     birth_time: str
     latitude: float
@@ -163,6 +164,36 @@ async def get_fructification(request: KPFructificationRequest, current_user: dic
             language=request.language or "en",
             synthesize=bool(request.synthesize) if request.synthesize is not None else True,
         )
+        # Store deterministic daily questions only when this request identifies
+        # an owned saved chart. Legacy clients can continue omitting the id.
+        if request.birth_chart_id:
+            try:
+                from db import execute, get_conn
+                from engagement_suggestions.service import EngagementSuggestionService
+
+                userid = int(
+                    getattr(current_user, "userid", 0)
+                    or (current_user.get("userid", 0) if isinstance(current_user, dict) else 0)
+                )
+                with get_conn() as conn:
+                    row = execute(
+                        conn,
+                        "SELECT name FROM birth_charts WHERE id = %s AND userid = %s",
+                        (int(request.birth_chart_id), userid),
+                    ).fetchone()
+                if row:
+                    EngagementSuggestionService().store_kp_daily(
+                        userid=userid,
+                        birth_chart_id=int(request.birth_chart_id),
+                        chart_name=str(row[0] or ""),
+                        locale=request.language or "en",
+                        payload=data,
+                    )
+            except Exception:
+                # Suggestion persistence is a side effect; the KP result remains
+                # valid and must still be returned.
+                import logging
+                logging.getLogger(__name__).exception("Could not persist KP engagement suggestions")
         return {"success": True, "data": data}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

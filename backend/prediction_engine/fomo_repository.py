@@ -601,6 +601,28 @@ class FomoSnapshotRepository:
                 finally:
                     cursor.close()
             conn.commit()
+        # The engagement system consumes the deterministic result directly.
+        # It does not invoke manifestation synthesis or any other LLM. Keep
+        # this best-effort so an optional suggestion sink cannot break FOMO.
+        try:
+            from engagement_suggestions.service import EngagementSuggestionService
+
+            EngagementSuggestionService().store_monthly_manifestations(
+                userid=userid,
+                birth_chart_id=birth_chart_id,
+                chart_name=chart_name,
+                snapshot_id=persisted_snapshot_id,
+                locale=locale,
+                result_payload=result.to_dict(include_evidence=True),
+                expires_at=expires_at,
+            )
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Could not persist monthly engagement suggestions snapshot_id=%s",
+                persisted_snapshot_id,
+            )
         stored = self.load_cached(
             userid=userid,
             cache_key=cache_key,
