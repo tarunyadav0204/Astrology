@@ -1942,6 +1942,8 @@ def _sync_subscription_from_play(
     )
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update subscription")
+    from credits.subscription_ledger import record_play_state
+    record_play_state(userid, product_id, purchase_token, purchase)
     plan = credit_service.get_plan_by_internal_id(plan_id) or {}
     tier_name = plan.get("tier_name") or credit_service.get_subscription_tier_name(userid)
 

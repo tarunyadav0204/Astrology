@@ -1,0 +1,19 @@
+.subscription-dashboard { padding: 20px; color: #25283b; }
+.subscription-dashboard h2 { margin: 0 0 8px; }
+.subscription-dashboard p { line-height: 1.5; }
+.subscription-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; margin: 20px 0; }
+.subscription-dashboard button, .subscription-dashboard input, .subscription-dashboard select { padding: 10px 14px; border: 1px solid #ccd1df; border-radius: 8px; background: white; color: inherit; font: inherit; }
+.subscription-dashboard button { cursor: pointer; }
+.subscription-dashboard button:disabled { opacity: .5; cursor: default; }
+.subscription-metrics button { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.subscription-metrics strong { font-size: 27px; }
+.subscription-views, .subscription-filters, .subscription-pagination { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; align-items: center; }
+.subscription-views button[aria-pressed="true"] { background: #39234f; color: white; }
+.subscription-filters input { flex: 1; min-width: 230px; }
+.subscription-table-wrap { overflow-x: auto; border: 1px solid #e0e3eb; border-radius: 10px; }
+.subscription-dashboard table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.subscription-dashboard th, .subscription-dashboard td { padding: 14px; text-align: left; border-bottom: 1px solid #e0e3eb; vertical-align: top; min-width: 130px; }
+.subscription-dashboard th { background: #f4f3f8; }
+.subscription-dashboard small { display: block; margin-top: 6px; overflow-wrap: anywhere; }
+.subscription-dashboard .subscription-error { color: #a02020; }
+.subscription-pagination { justify-content: flex-end; }

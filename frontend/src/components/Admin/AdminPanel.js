@@ -17,8 +17,7 @@ import AdminFreeAnswerFunnel from './AdminFreeAnswerFunnel';
 import AdminFirstPurchaseOfferFunnel from './AdminFirstPurchaseOfferFunnel';
 import AdminRemedyFunnel from './AdminRemedyFunnel';
 import AdminGooglePlayRefund from './AdminGooglePlayRefund';
-import AdminSubscriptionPurchases from './AdminSubscriptionPurchases';
-import AdminSubscriptionEvents from './AdminSubscriptionEvents';
+import AdminSubscriptionDashboard from './AdminSubscriptionDashboard';
 import AdminRazorpayRefund from './AdminRazorpayRefund';
 import ChatFeedback from './ChatFeedback';
 import ChatErrors from './ChatErrors';
@@ -3811,7 +3810,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 activeSubTab !== 'subscriptionPurchases' &&
                 activeSubTab !== 'subscriptionEvents'
               ) {
-                setActiveSubTab('subscriptionPlans');
+                setActiveSubTab('subscriptionPurchases');
               }
             }}
           >
@@ -3855,7 +3854,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             className={`subtab ${activeSubTab === 'subscriptionPlans' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('subscriptionPlans')}
           >
-            Subscription Plans
+            Plan settings
           </button>
           <button
             type="button"
@@ -3869,14 +3868,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             className={`subtab ${activeSubTab === 'subscriptionPurchases' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('subscriptionPurchases')}
           >
-            Subscription purchases
+            Subscriptions
           </button>
           <button
             type="button"
             className={`subtab ${activeSubTab === 'subscriptionEvents' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('subscriptionEvents')}
           >
-            Subscription events
+            Activity
           </button>
         </div>
       )}
@@ -5520,11 +5519,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
 
         {activeTab === 'credits' && activeSubTab === 'subscriptionPurchases' && (
-          <AdminSubscriptionPurchases />
+          <AdminSubscriptionDashboard />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'subscriptionEvents' && (
-          <AdminSubscriptionEvents />
+          <AdminSubscriptionDashboard initialView="activity" />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'playRefund' && (

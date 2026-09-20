@@ -903,7 +903,7 @@ async def razorpay_webhook(request: Request):
     if event.startswith("subscription."):
         from credits.razorpay_subscription_routes import process_razorpay_subscription_webhook_event
 
-        return process_razorpay_subscription_webhook_event(payload)
+        return process_razorpay_subscription_webhook_event(payload, event_id=request.headers.get("X-Razorpay-Event-Id"))
 
     if event != "payment.captured":
         return {"status": "ignored", "event": event or "unknown"}

@@ -121,6 +121,7 @@ from credits.web_continue_routes import (
 from whatsapp.routes import router as whatsapp_router
 from whatsapp.admin_routes import router as whatsapp_admin_router
 from credits.razorpay_subscription_routes import router as razorpay_subscription_router
+from credits.subscription_admin import router as subscription_admin_router
 from tts.routes import router as tts_router
 from speech.routes import router as speech_router
 from speech.ws_routes import router as speech_ws_router
@@ -806,8 +807,18 @@ async def lifespan(app: FastAPI):
                 step="start_local_chat_worker",
                 error=str(e),
             )
+        subscription_reconciliation_task = None
+        if os.getenv('SUBSCRIPTION_RECONCILIATION_ENABLED', 'true').lower() in ('true', '1', 'yes'):
+            from credits.subscription_admin import reconciliation_loop
+            subscription_reconciliation_task = asyncio.create_task(reconciliation_loop())
         yield
     finally:
+        if locals().get('subscription_reconciliation_task') is not None:
+            subscription_reconciliation_task.cancel()
+            try:
+                await subscription_reconciliation_task
+            except asyncio.CancelledError:
+                pass
         logger.debug("shutdown_lifespan_begin")
         if admin_settings_poll_task is not None:
             admin_settings_poll_task.cancel()
@@ -1061,6 +1072,7 @@ app.include_router(web_continue_auth_router, prefix="/api/auth")
 app.include_router(whatsapp_router, prefix="/api")
 app.include_router(whatsapp_admin_router, prefix="/api")
 app.include_router(razorpay_subscription_router, prefix="/api/credits")
+app.include_router(subscription_admin_router, prefix="/api/credits")
 app.include_router(tts_router, prefix="/api")
 app.include_router(speech_router, prefix="/api")
 app.include_router(speech_ws_router, prefix="/api")

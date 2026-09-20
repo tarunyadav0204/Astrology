@@ -358,6 +358,8 @@ def test_rtdn_push_one_time_credit_purchase_path_is_unchanged(monkeypatch):
 
 
 def test_sync_accepts_active_v2_purchase_and_persists_mapping_before_entitlement(monkeypatch):
+    from credits import subscription_ledger
+    monkeypatch.setattr(subscription_ledger, "record_play_state", lambda *args: None)
     service = _SyncCreditService()
     monkeypatch.setattr(routes, "credit_service", service)
     monkeypatch.setattr(db, "get_conn", _connection)

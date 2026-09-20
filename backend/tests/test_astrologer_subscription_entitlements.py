@@ -160,6 +160,13 @@ def test_razorpay_cancel_targets_astrologer_family(monkeypatch):
     )
     monkeypatch.setattr(razorpay_subscription_routes, "_auth", lambda: ("key", "secret"))
 
+    from credits import subscription_ledger as ledger
+    monkeypatch.setattr(razorpay_subscription_routes, "_fetch_razorpay_subscription", lambda _: {"id": "sub_test"})
+    def receive(entity, kind, **kwargs):
+        calls["actor"] = (kwargs["actor"], kwargs["actor_userid"])
+        return {"id": 1, "snapshot": entity}
+    monkeypatch.setattr(ledger, "receive_event", receive)
+    monkeypatch.setattr(ledger, "apply_billing_event", lambda event: calls.update(marked=event["snapshot"]))
     result = asyncio.run(
         razorpay_subscription_routes.razorpay_subscription_cancel(
             family="astrologer",
@@ -168,6 +175,7 @@ def test_razorpay_cancel_targets_astrologer_family(monkeypatch):
     )
 
     assert calls["details"] == (42, "astrologer")
-    assert calls["marked"] == (42, "sub_test")
+    assert calls["marked"] == {"id": "sub_test", "cancel_requested": True}
+    assert calls["actor"] == ("user", 42)
     assert result["success"] is True
     assert result["end_date"] == "2026-08-24"

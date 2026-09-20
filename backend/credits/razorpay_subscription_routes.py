@@ -10,7 +10,7 @@ import hmac
 import json
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import requests
@@ -189,7 +189,39 @@ def _notes_from_subscription(sub: Dict[str, Any]) -> Dict[str, str]:
     return {str(k): str(v) for k, v in notes.items()} if isinstance(notes, dict) else {}
 
 
-def process_razorpay_subscription_webhook_event(payload: Dict[str, Any]) -> Dict[str, Any]:
+def process_razorpay_subscription_webhook_event(payload: Dict[str, Any], event_id=None) -> Dict[str, Any]:
+    from credits import subscription_ledger as ledger
+    entity = ((payload.get("payload") or {}).get("subscription") or {}).get("entity")
+    if not isinstance(entity, dict) or not entity.get("id"):
+        raise HTTPException(400, "Subscription entity is missing")
+    event = ledger.receive_event(entity, payload.get("event") or "unknown",
+                                 event_id=event_id, event_time=payload.get("created_at"))
+    if event['done']:
+        return {"status": "duplicate"}
+    try:
+        with ledger.processing_lock(entity['id']):
+            if ledger.event_is_done(event['id']):
+                return {'status': 'duplicate'}
+            if ledger.is_stale(event):
+                ledger.finish_event(event['id'], 'stale')
+                return {"status": "stale"}
+            result = _process_razorpay_subscription_webhook_event(payload)
+            if result.get('status') == 'error':
+                raise RuntimeError('Subscription entitlement processing failed')
+            billing = ledger.apply_billing_event(event)
+            if billing['issue']:
+                # Event remains durable and visible in admin; returning 503 requests provider retry.
+                raise HTTPException(503, billing['issue'])
+            return {"status": "ok", "event": payload.get('event')}
+    except HTTPException:
+        raise
+    except Exception as error:
+        ledger.finish_event(event['id'], 'failed', type(error).__name__)
+        logger.exception('Subscription event processing failed for %s', entity['id'])
+        raise HTTPException(503, 'Subscription event saved; processing needs retry')
+
+
+def _process_razorpay_subscription_webhook_event(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Handle subscription.* webhook events (called from credits webhook router)."""
     event = (payload.get("event") or "").strip()
     ent = payload.get("payload") or {}
@@ -537,6 +569,11 @@ async def razorpay_subscription_cancel(
     if not sub_id:
         raise HTTPException(status_code=400, detail="Subscription id not found")
 
+    from credits import subscription_ledger as ledger
+    entity = _fetch_razorpay_subscription(sub_id)
+    intent = ledger.receive_event(entity, 'cancellation_requested', source='app',
+                                  event_time=datetime.now(timezone.utc).timestamp(),
+                                  actor='user', actor_userid=current_user.userid)
     try:
         r = requests.post(
             f"{RAZORPAY_API_BASE}/subscriptions/{sub_id}/cancel",
@@ -545,14 +582,21 @@ async def razorpay_subscription_cancel(
             timeout=30,
         )
     except requests.RequestException as e:
+        ledger.finish_event(intent['id'], 'failed', 'Provider request failed; reconcile to confirm outcome')
         logger.exception("Razorpay cancel subscription failed: %s", e)
         raise HTTPException(status_code=502, detail="Could not reach payment provider")
 
     if r.status_code not in (200, 202):
+        ledger.finish_event(intent['id'], 'failed', f'Provider HTTP {r.status_code}')
         logger.warning("Razorpay cancel subscription: %s %s", r.status_code, r.text[:500])
         raise HTTPException(status_code=502, detail="Could not cancel subscription. Try again or contact support.")
 
-    credit_service.mark_razorpay_subscription_cancel_pending(current_user.userid, sub_id)
+    intent['snapshot']['cancel_requested'] = True
+    try:
+        ledger.apply_billing_event(intent)
+    except Exception:
+        ledger.finish_event(intent['id'], 'failed', 'Provider accepted cancellation; local update needs reconciliation')
+        raise HTTPException(503, 'Cancellation accepted by provider; local status needs reconciliation')
     return {
         "success": True,
         "message": "Subscription will cancel at the end of the current billing period.",
