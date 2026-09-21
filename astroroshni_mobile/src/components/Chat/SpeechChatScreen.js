@@ -3822,7 +3822,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   subtitle: {
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 2,
   },
   sessionToolbar: {
@@ -3851,7 +3851,7 @@ const styles = StyleSheet.create({
   sessionBilling: {
     flex: 1,
     minWidth: 0,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
   sessionControlChip: {
@@ -3870,7 +3870,7 @@ const styles = StyleSheet.create({
   },
   sessionControlChipText: {
     flexShrink: 1,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
   },
   selectorBackdrop: {
@@ -3945,7 +3945,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   headerMenuItemBody: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     marginTop: 2,
   },
@@ -4050,7 +4050,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   bubbleLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     marginBottom: 5,
@@ -4230,7 +4230,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   stageEyebrow: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
@@ -4421,13 +4421,13 @@ const styles = StyleSheet.create({
   },
   statusTextStageCompact: {
     fontSize: 12,
-    lineHeight: 15,
+    lineHeight: 16,
     paddingHorizontal: 8,
     marginBottom: 6,
   },
   statusTextStageTiny: {
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
     marginBottom: 5,
   },
   chamberFooter: {
@@ -4465,14 +4465,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   chamberCreditText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 0,
     maxWidth: 70,
   },
   chamberCreditTextCompact: {
-    fontSize: 10,
+    fontSize: 12,
     marginBottom: 0,
   },
   chamberMicOuter: {

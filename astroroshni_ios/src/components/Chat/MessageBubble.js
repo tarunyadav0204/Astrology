@@ -41,7 +41,17 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageZoomScale, setImageZoomScale] = useState(1);
   const [isImageLoading, setIsImageLoading] = useState(true);
+  const [selectedClarificationChoice, setSelectedClarificationChoice] = useState(null);
   const skeletonAnim = useRef(new Animated.Value(0)).current;
+  const nextAction = message.next_action || message.nextAction || null;
+  const isClarificationChoice = String(nextAction?.type || '').toLowerCase() === 'clarification_choice';
+  const clarificationChoices = isClarificationChoice && Array.isArray(nextAction?.options)
+    ? nextAction.options.filter((option) => option?.id && option?.label && (option?.submit_text || option?.label))
+    : [];
+
+  useEffect(() => {
+    setSelectedClarificationChoice(null);
+  }, [message.messageId, message.id, nextAction?.type]);
 
   useEffect(() => {
     if (message.summary_image && isImageLoading) {
@@ -1246,6 +1256,58 @@ export default function MessageBubble({ message, language, onFollowUpClick, part
           {renderedElements}
         </View>
 
+        {message.role === 'assistant' && clarificationChoices.length > 0 && (
+          <View style={styles.clarificationChoiceCard}>
+            <Text style={styles.clarificationChoiceEyebrow}>
+              {t('chat.chooseTheme', 'Choose a theme')}
+            </Text>
+            {clarificationChoices.map((option, index) => {
+              const optionId = String(option.id);
+              const selected = selectedClarificationChoice === optionId;
+              const disabled = Boolean(selectedClarificationChoice);
+              return (
+                <TouchableOpacity
+                  key={optionId}
+                  activeOpacity={0.8}
+                  disabled={disabled}
+                  style={[
+                    styles.clarificationChoiceOption,
+                    disabled && !selected && styles.clarificationChoiceOptionDisabled,
+                    selected && styles.clarificationChoiceOptionSelected,
+                  ]}
+                  onPress={() => {
+                    if (selectedClarificationChoice || !onFollowUpClick) return;
+                    setSelectedClarificationChoice(optionId);
+                    onFollowUpClick(String(option.submit_text || option.label).trim(), {
+                      directSend: true,
+                      query_context: {
+                        follow_up_type: 'clarification_choice',
+                        clarification_choice_id: optionId,
+                        source_message_id: message.messageId ? String(message.messageId) : undefined,
+                        original_question: String(nextAction?.original_question || '').trim() || undefined,
+                      },
+                    });
+                  }}
+                >
+                  <View style={styles.clarificationChoiceIndex}>
+                    <Text style={styles.clarificationChoiceIndexText}>
+                      {selected ? '✓' : index + 1}
+                    </Text>
+                  </View>
+                  <View style={styles.clarificationChoiceCopy}>
+                    <Text style={styles.clarificationChoiceLabel}>{option.label}</Text>
+                    <Text style={styles.clarificationChoiceQuestion}>{option.submit_text}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#b45309" />
+                </TouchableOpacity>
+              );
+            })}
+            <Text style={styles.clarificationChoiceHint}>
+              {t('chat.themeChoiceHint', 'Answering several questions together thins each reading. Pick one theme and I’ll go deep.')}
+            </Text>
+          </View>
+        )}
+
         {/* NEW: Render Follow-up Questions from the dedicated prop */}
         {message.follow_up_questions && message.follow_up_questions.length > 0 && (
           <View style={styles.followUpContainer}>
@@ -1987,6 +2049,80 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 6,
     fontWeight: '500',
+  },
+  clarificationChoiceCard: {
+    alignSelf: 'stretch',
+    width: '100%',
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 247, 237, 0.96)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+  },
+  clarificationChoiceEyebrow: {
+    color: '#b45309',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  clarificationChoiceOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    padding: 11,
+    marginBottom: 8,
+    borderRadius: 13,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.28)',
+  },
+  clarificationChoiceOptionDisabled: {
+    opacity: 0.45,
+  },
+  clarificationChoiceOptionSelected: {
+    opacity: 1,
+    borderColor: '#16a34a',
+    backgroundColor: 'rgba(240, 253, 244, 0.98)',
+  },
+  clarificationChoiceIndex: {
+    width: 28,
+    height: 28,
+    marginRight: 10,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.14)',
+  },
+  clarificationChoiceIndexText: {
+    color: '#b45309',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  clarificationChoiceCopy: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
+  },
+  clarificationChoiceLabel: {
+    color: '#7c2d12',
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  clarificationChoiceQuestion: {
+    color: '#78716c',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  clarificationChoiceHint: {
+    color: '#92400e',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
   },
   followUpContainer: {
     flexDirection: 'column',

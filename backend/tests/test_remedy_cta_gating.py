@@ -109,8 +109,58 @@ def test_complete_remedy_fomo_preserves_llm_copy():
         category="health",
         question="मेरी सेहत?",
         remedy_followup_active=False,
+        answer_text="आपकी सेहत इस दशा में दबाव में है और रिकवरी संभव है।",
     )
     assert out["title"] == "Saturn-Rahu दबाव अभी चरम पर"
+    assert out["follow_up_questions"][0] == "उपाय देखें"
+
+
+def test_complete_remedy_fomo_rewrites_hindi_card_under_english_answer():
+    from utils.query_context import ensure_remedy_cta_next_action
+
+    out = ensure_remedy_cta_next_action(
+        {
+            "type": "remedy",
+            "title": "विवाह बाधा निवारण और पारिवारिक सहमति उपाय",
+            "reason": "शनि की महादशा में २२ बिंदु (SAV) की कमजोरी को दूर कर विवाह का मार्ग सुगम बनाने हेतु",
+            "follow_up_questions": ["उपाय देखें"],
+            "source": "merge",
+        },
+        answer_mode="topic_reading",
+        category="marriage",
+        question="Tell me about our marriage timing",
+        language="hindi",
+        answer_text=(
+            "Parashari: Double 7th-lord Saturn Mahadashas for both partners. "
+            "Nadi: Jaisai’s Age 46 trigger (running now) is the specific cutting period. "
+            "Jaimini: Chara Dasha of Aries confirms physical/social union is the current priority."
+        ),
+        remedy_followup_active=False,
+    )
+    assert out["type"] == "remedy"
+    assert "विवाह" not in out["title"]
+    assert "Personal remedies" in out["title"]
+    assert out["follow_up_questions"][0] == "Show my remedies"
+
+
+def test_complete_remedy_fomo_rewrites_english_card_under_hindi_answer():
+    from utils.query_context import ensure_remedy_cta_next_action
+
+    out = ensure_remedy_cta_next_action(
+        {
+            "type": "remedy",
+            "title": "Clear this marriage delay now",
+            "reason": "Saturn dasha pressure needs targeted remedies.",
+            "follow_up_questions": ["Show my remedies"],
+            "source": "merge",
+        },
+        answer_mode="topic_reading",
+        category="marriage",
+        question="हमारी शादी कब होगी?",
+        answer_text="आप दोनों की शादी इस दशा में दबाव में है, पर मार्ग पूरी तरह बंद नहीं है।",
+        remedy_followup_active=False,
+    )
+    assert "विवाह" in out["title"]
     assert out["follow_up_questions"][0] == "उपाय देखें"
 
     from utils.query_context import ensure_remedy_cta_next_action

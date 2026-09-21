@@ -74,7 +74,7 @@ function Metric({ label, value, onPress, colors, icon, calculating }) {
         <Ionicons name={icon} size={16} color={colors.onAccent} />
       </View>
       <View style={styles.metricCopy}>
-        <Text style={[styles.metricLabel, { color: colors.textTertiary }]}>{label}</Text>
+        <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>{label}</Text>
         <Text style={[styles.metricValue, { color: colors.text }]} numberOfLines={1}>{value || calculating}</Text>
       </View>
       {onPress ? <Ionicons name="chevron-forward" size={15} color={colors.textTertiary} /> : null}
@@ -228,17 +228,14 @@ export default function PremiumTodayOverview({
         </TouchableOpacity>
       </View>
 
-      <View style={[styles.hero, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
+      <View style={[styles.hero, hasChart && styles.heroReturning, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
         <View style={[styles.heroCopy, hasChart && styles.heroCopyWithChart]}>
           <Text style={[styles.heroEyebrow, typography.eyebrow, { color: colors.accent }]}>{t('premiumUi.home.taraGuide')}</Text>
           <Text style={[styles.heroTitle, typography.title, hasChart && styles.heroTitleWithChart, { color: colors.textInverse }]}>
             {hasChart
-              ? t('premiumUi.home.heroQuestionTitle', 'Your chart has something to say.')
-              : t('premiumUi.home.meetTara')}
-            {`\n`}
-            {hasChart
               ? t('premiumUi.home.heroQuestionSubtitle', 'Ask Tara what it means.')
-              : t('premiumUi.home.readLife')}
+              : t('premiumUi.home.meetTara')}
+            {!hasChart ? `\n${t('premiumUi.home.readLife')}` : null}
           </Text>
           <Text style={[styles.heroBody, hasChart && styles.heroBodyWithChart, { color: colors.textInverseMuted }]}>
             {hasChart
@@ -342,7 +339,7 @@ export default function PremiumTodayOverview({
                         ? t('premiumUi.home.askTaraActive', "Ask Tara what's active now")
                         : t('premiumUi.home.createFreeChartCta', 'Create my free chart')}
                     </Text>
-                    <Text style={[styles.primaryActionSubtext, { color: colors.onAccent }]} numberOfLines={1}>
+                    <Text style={[styles.primaryActionSubtext, { color: colors.onAccent }]}>
                       {hasChart
                         ? t('premiumUi.home.askTaraPromise', 'Personal guidance from your complete birth chart')
                         : t('premiumUi.home.askTaraNoChartPromise', 'Then ask Tara your first question')}
@@ -408,7 +405,7 @@ export default function PremiumTodayOverview({
             <View style={styles.talkToTaraFooter}>
               <View style={styles.talkToTaraRate}>
                 <Ionicons name="time-outline" size={15} color={colors.textInverseMuted} />
-                <Text style={[styles.talkToTaraRateText, { color: colors.textInverseMuted }]}>
+                <Text style={[styles.talkToTaraRateText, { color: colors.textInverse }]}>
                   {t('chat.modeIntro.speech.perStartedMinute', {
                     cost: speechPerMinuteCost,
                     defaultValue: '{{cost}} credits / started min',
@@ -477,6 +474,7 @@ export default function PremiumTodayOverview({
         </View>
       ) : null}
 
+      {hasChart && <>
       <View style={styles.sectionHeader}>
         <View>
           <Text style={[styles.sectionEyebrow, typography.eyebrow, { color: colors.primary }]}>{t('premiumUi.homeRecommendations.eyebrow')}</Text>
@@ -515,6 +513,7 @@ export default function PremiumTodayOverview({
         )}
       </View>
 
+      </>}
       <View style={styles.sectionHeader}>
         <View>
           <Text style={[styles.sectionEyebrow, typography.eyebrow, { color: colors.primary }]}>{t('premiumUi.home.rightNow')}</Text>
@@ -522,8 +521,8 @@ export default function PremiumTodayOverview({
         </View>
       </View>
       <View style={styles.metrics}>
-        <Metric label={t('premiumUi.home.activePeriod')} value={mahadasha ? t('premiumUi.home.mahadasha', { name: mahadasha }) : null} onPress={hasChart ? onOpenDasha : onCreateChart} colors={colors} icon="time-outline" calculating={t('premiumUi.home.calculating')} />
-        <Metric label={t('premiumUi.home.todaysNakshatra')} value={nakshatra} onPress={onOpenNakshatra} colors={colors} icon="star-outline" calculating={t('premiumUi.home.calculating')} />
+        <Metric label={t('premiumUi.home.activePeriod')} value={mahadasha ? t('premiumUi.home.mahadasha', { name: mahadasha }) : null} onPress={hasChart ? onOpenDasha : onCreateChart} colors={colors} icon="time-outline" calculating={hasChart ? t('premiumUi.home.calculating') : t('premiumUi.home.addChart')} />
+        <Metric label={t('premiumUi.home.todaysNakshatra')} value={nakshatra || t('premiumUi.home.openPanchang')} onPress={onOpenNakshatra} colors={colors} icon="star-outline" calculating={t('premiumUi.home.calculating')} />
         <Metric label={t('premiumUi.home.dayWindow')} value={panchangWindow || t('premiumUi.home.openPanchang')} onPress={onOpenPanchang} colors={colors} icon="sunny-outline" calculating={t('premiumUi.home.calculating')} />
         <Metric label={t('prashna.homeLabel', 'Ask a Question')} value={t('prashna.methodLabel', 'Classical Prashna')} onPress={onOpenPrashna} colors={colors} icon="help-circle-outline" calculating={t('premiumUi.home.calculating')} />
       </View>
@@ -562,7 +561,7 @@ function CatalogueGroup({ eyebrow, title, items, onSelect, colors, typography, t
               </View>
               <View style={styles.catalogueCopy}>
                 <Text style={[styles.catalogueRowTitle, { color: colors.text }]}>{item.title}</Text>
-                <Text style={[styles.catalogueRowBody, { color: colors.textSecondary }]} numberOfLines={1}>{item.description}</Text>
+                <Text style={[styles.catalogueRowBody, { color: colors.textSecondary }]}>{item.description}</Text>
               </View>
               {Number(item.cost) > 0 ? (
                 <Text style={[styles.catalogueCost, { color: colors.textTertiary }]}>{t('premiumUi.home.creditsShort', { count: item.cost })}</Text>
@@ -660,7 +659,7 @@ export function PremiumExploreIntro({
             <Text style={[styles.timingChoiceTitle, { color: colors.textInverse }]}>
               {t('premiumUi.home.yearlyTimeline', 'Yearly timeline')}
             </Text>
-            <Text style={[styles.timingChoiceBody, { color: colors.textInverseMuted }]} numberOfLines={2}>
+            <Text style={[styles.timingChoiceBody, { color: colors.textInverseMuted }]}>
               {t('premiumUi.home.yearlyTimelineBody', '12 monthly chapters and major turning points')}
             </Text>
             <View style={styles.timingChoiceCta}>
@@ -681,7 +680,7 @@ export function PremiumExploreIntro({
             <Text style={[styles.timingChoiceTitle, { color: colors.textInverse }]}>
               {t('premiumUi.home.monthlyDeepDive', 'Monthly deep dive')}
             </Text>
-            <Text style={[styles.timingChoiceBody, { color: colors.textInverseMuted }]} numberOfLines={2}>
+            <Text style={[styles.timingChoiceBody, { color: colors.textInverseMuted }]}>
               {t('premiumUi.home.monthlyDeepDiveBody', 'Detailed triggers and scenarios for one month')}
             </Text>
             <View style={styles.timingChoiceCta}>
@@ -723,18 +722,19 @@ const styles = StyleSheet.create({
   container: { gap: 18 },
   identityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   identityCopy: { flex: 1, minWidth: 0 },
-  eyebrow: { fontSize: 9, marginBottom: 6 },
+  eyebrow: { fontSize: 12, marginBottom: 6 },
   identity: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 23, lineHeight: 28 },
   profileButton: { width: 148, flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 7, padding: 6, paddingRight: 10, borderWidth: 1, borderRadius: 999 },
   avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 15, fontWeight: '700' },
-  profileButtonText: { maxWidth: 78, fontSize: 11, fontWeight: '800' },
+  profileButtonText: { maxWidth: 78, fontSize: 12, fontWeight: '800' },
   hero: { minHeight: 410, borderWidth: 1, borderRadius: 30, padding: 24, overflow: 'hidden' },
+  heroReturning: { minHeight: 0, padding: 20 },
   heroCopy: { maxWidth: '69%', zIndex: 2 },
   heroCopyWithChart: { maxWidth: '100%' },
   heroEyebrow: { marginBottom: 14 },
   heroTitle: { fontSize: 40, lineHeight: 42, marginBottom: 14 },
-  heroTitleWithChart: { maxWidth: '88%', fontSize: 37, lineHeight: 40 },
+  heroTitleWithChart: { maxWidth: '100%', fontSize: 28, lineHeight: 33 },
   heroBody: { fontSize: 13, lineHeight: 20, fontWeight: '500' },
   heroBodyWithChart: { maxWidth: '100%', paddingRight: 2 },
   orbitMotif: { position: 'absolute', right: -18, top: 44, opacity: 0.58 },
@@ -742,19 +742,19 @@ const styles = StyleSheet.create({
   heroActions: { marginTop: 24, alignItems: 'center', zIndex: 2 },
   primaryActionShell: { alignSelf: 'stretch', borderRadius: 999, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.34, shadowRadius: 18, elevation: 8 },
   firstQuestionBadge: { position: 'absolute', alignSelf: 'center', top: -13, zIndex: 3, minHeight: 25, borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  firstQuestionBadgeText: { fontSize: 9, lineHeight: 11, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase' },
+  firstQuestionBadgeText: { fontSize: 12, lineHeight: 16, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase' },
   primaryActionBorder: { minHeight: 64, borderRadius: 999, padding: 1.5, overflow: 'hidden' },
-  primaryAction: { flex: 1, minHeight: 61, paddingHorizontal: 8, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 9, overflow: 'hidden' },
+  primaryAction: { flex: 1, minHeight: 61, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 9, overflow: 'hidden' },
   primaryActionGradientShift: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   primaryActionGradientLayer: { flex: 1 },
   primaryActionMark: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.72, shadowRadius: 8, elevation: 6 },
   primaryActionMarkGlow: { position: 'absolute', width: 42, height: 42, borderRadius: 21 },
   primaryActionCopy: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
   primaryActionText: { width: '100%', fontSize: 15, lineHeight: 19, fontWeight: '900', letterSpacing: 0.1 },
-  primaryActionSubtext: { width: '100%', marginTop: 2, fontSize: 9, lineHeight: 12, fontWeight: '700', opacity: 0.66 },
+  primaryActionSubtext: { width: '100%', marginTop: 2, fontSize: 12, lineHeight: 16, fontWeight: '700', opacity: 0.9 },
   primaryActionArrow: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   secondaryAction: { minHeight: 38, marginTop: 4, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  secondaryActionText: { fontSize: 11, fontWeight: '800' },
+  secondaryActionText: { fontSize: 12, fontWeight: '800' },
   talkToTaraCard: { borderRadius: 24 },
   talkToTaraGradient: { minHeight: 168, borderWidth: 1, borderRadius: 24, padding: 18, overflow: 'hidden' },
   talkToTaraGlow: { position: 'absolute', width: 176, height: 176, borderRadius: 88, right: -54, top: -84 },
@@ -764,22 +764,22 @@ const styles = StyleSheet.create({
   voiceMarkWave: { position: 'absolute', right: 6, bottom: 7, height: 20, flexDirection: 'row', alignItems: 'center', gap: 2 },
   voiceMarkBar: { width: 2, borderRadius: 1 },
   talkToTaraCopy: { flex: 1, minWidth: 0 },
-  talkToTaraBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
-  talkToTaraEyebrow: { fontSize: 9 },
+  talkToTaraBadgeRow: { flexWrap: 'wrap', flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
+  talkToTaraEyebrow: { fontSize: 12 },
   talkToTaraNewBadge: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 },
-  talkToTaraNewBadgeText: { fontSize: 8, lineHeight: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
+  talkToTaraNewBadgeText: { fontSize: 12, lineHeight: 16, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
   talkToTaraTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 25, lineHeight: 29 },
   talkToTaraBody: { marginTop: 13, maxWidth: '84%', fontSize: 12, lineHeight: 17, fontWeight: '500', zIndex: 1 },
   talkToTaraFooter: { marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, zIndex: 1 },
   talkToTaraRate: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  talkToTaraRateText: { flexShrink: 1, fontSize: 9, lineHeight: 12, fontWeight: '700' },
+  talkToTaraRateText: { flexShrink: 1, fontSize: 12, lineHeight: 16, fontWeight: '700' },
   talkToTaraCta: { minHeight: 36, maxWidth: '48%', borderRadius: 999, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  talkToTaraCtaText: { flexShrink: 1, fontSize: 10, fontWeight: '900' },
+  talkToTaraCtaText: { flexShrink: 1, fontSize: 12, fontWeight: '900' },
   bigThree: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 18, paddingVertical: 14 },
   bigThreeItem: { flex: 1, alignItems: 'center', paddingHorizontal: 5 },
   bigThreeDivider: { width: 1, height: 29 },
   bigThreeLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 4 },
-  bigThreeLabel: { fontSize: 8, fontWeight: '800', letterSpacing: 0.8 },
+  bigThreeLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
   bigThreeValue: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 15 },
   predictionSection: { gap: 12 },
   sectionHeader: { marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
@@ -789,18 +789,18 @@ const styles = StyleSheet.create({
   metric: { minHeight: 70, borderRadius: 18, borderWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center' },
   metricIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   metricCopy: { flex: 1 },
-  metricLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 4 },
+  metricLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 4 },
   metricValue: { fontSize: 14, fontWeight: '800' },
   recommendations: { gap: 8 },
   recommendation: { minHeight: 96, borderWidth: 1, borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center' },
-  recommendationNumber: { width: 30, alignSelf: 'flex-start', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  recommendationNumber: { width: 30, alignSelf: 'flex-start', fontSize: 12, fontWeight: '900', letterSpacing: 0.8 },
   recommendationCopy: { flex: 1, paddingRight: 10 },
   recommendationTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 19, marginBottom: 5 },
   recommendationBody: { fontSize: 12, lineHeight: 17, fontWeight: '500' },
   arrow: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   exploreButton: { minHeight: 76, borderWidth: 1, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   exploreTitle: { fontSize: 14, fontWeight: '900', marginBottom: 4 },
-  exploreSub: { fontSize: 11, lineHeight: 15, fontWeight: '500', maxWidth: 280 },
+  exploreSub: { fontSize: 12, lineHeight: 16, fontWeight: '500', maxWidth: 280 },
   exploreIntroWrap: { gap: 22 },
   exploreHero: { minHeight: 260, marginHorizontal: -20, marginTop: -10, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, borderWidth: 0, paddingHorizontal: 36, paddingVertical: 34, justifyContent: 'center', overflow: 'hidden' },
   exploreHeroLinework: { ...StyleSheet.absoluteFillObject, opacity: 0.26 },
@@ -819,24 +819,24 @@ const styles = StyleSheet.create({
   timingSpotlightHeading: { flex: 1, minWidth: 0 },
   timingSpotlightTitle: { fontSize: 28, lineHeight: 32, marginTop: 5 },
   timingCostPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6 },
-  timingCostText: { fontSize: 10, fontWeight: '900' },
+  timingCostText: { fontSize: 12, fontWeight: '900' },
   timingSpotlightBody: { fontSize: 12, lineHeight: 18, marginTop: 8, marginBottom: 16, maxWidth: 320 },
   timingChoices: { flexDirection: 'row', gap: 10 },
   timingChoice: { flex: 1, minWidth: 0, minHeight: 176, borderWidth: 1, borderRadius: 18, padding: 13, overflow: 'hidden' },
   timingChoiceIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   timingChoiceTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 18, lineHeight: 21, marginBottom: 6 },
-  timingChoiceBody: { fontSize: 10, lineHeight: 15, fontWeight: '500', flexGrow: 1 },
+  timingChoiceBody: { fontSize: 12, lineHeight: 16, fontWeight: '500', flexGrow: 1 },
   timingChoiceCta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 12 },
-  timingChoiceCtaText: { fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.4 },
+  timingChoiceCtaText: { fontSize: 12, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.4 },
   studioDirectory: { borderWidth: 1, borderRadius: 22, overflow: 'hidden' },
   shortcut: { minHeight: 72, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
   shortcutIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   shortcutCopy: { flex: 1 },
   shortcutCostWrap: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  shortcutOriginalCost: { fontSize: 10, textDecorationLine: 'line-through' },
+  shortcutOriginalCost: { fontSize: 12, textDecorationLine: 'line-through' },
   shortcutCost: { fontSize: 12, fontWeight: '900' },
   shortcutTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 17, marginBottom: 3 },
-  shortcutBody: { fontSize: 11, lineHeight: 15, fontWeight: '500' },
+  shortcutBody: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
   catalogueSection: { gap: 0 },
   catalogueTitle: { fontSize: 25, lineHeight: 30, marginBottom: 12 },
   catalogueSurface: { borderWidth: 1, borderRadius: 22, overflow: 'hidden' },
@@ -845,6 +845,6 @@ const styles = StyleSheet.create({
   catalogueIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   catalogueCopy: { flex: 1, minWidth: 0, paddingRight: 8 },
   catalogueRowTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 17, marginBottom: 3 },
-  catalogueRowBody: { fontSize: 11, lineHeight: 15, fontWeight: '500' },
-  catalogueCost: { fontSize: 10, fontWeight: '800', marginRight: 7, textTransform: 'uppercase' },
+  catalogueRowBody: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  catalogueCost: { fontSize: 12, fontWeight: '800', marginRight: 7, textTransform: 'uppercase' },
 });

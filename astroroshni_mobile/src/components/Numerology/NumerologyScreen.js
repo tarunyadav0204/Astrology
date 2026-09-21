@@ -8,18 +8,20 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
+import { API_BASE_URL } from '../../utils/constants';
 import { formatBirthDateForDisplay } from '../../utils/birthDateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../../context/ThemeContext';
 import SoulBlueprint from './SoulBlueprint';
 import CosmicWeather from './CosmicWeather';
 import NameAlchemist from './NameAlchemist';
 
 export default function NumerologyScreen({ navigation, route }) {
+  const { colors } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('soul');
   const [numerologyData, setNumerologyData] = useState(null);
@@ -105,39 +107,44 @@ export default function NumerologyScreen({ navigation, route }) {
       id: 'soul',
       title: 'Soul Blueprint',
       subtitle: 'Core Numbers & Life Path',
-      icon: '🧮',
-      gradient: ['#667eea', '#764ba2'],
+      icon: 'calculator-outline',
     },
     {
       id: 'cosmic',
       title: 'Cosmic Weather',
       subtitle: 'Daily Cycles & Timeline',
-      icon: '📅',
-      gradient: ['#f093fb', '#f5576c'],
+      icon: 'calendar-outline',
     },
     {
       id: 'name',
       title: 'Name Alchemist',
       subtitle: 'Discover your name\'s power & find lucky variations',
-      icon: '✍️',
-      gradient: ['#4facfe', '#00f2fe'],
+      icon: 'create-outline',
     }
   ];
 
+  const renderHeader = (title, onBack, backIcon = 'arrow-back') => (
+    <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine || colors.cardBorder }]}>
+      <TouchableOpacity
+        onPress={onBack}
+        style={[styles.backButton, { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine || colors.cardBorder }]}
+        accessibilityRole="button"
+      >
+        <Ionicons name={backIcon} size={22} color={colors.textInverse} />
+      </TouchableOpacity>
+      <Text style={[styles.headerTitle, { color: colors.textInverse }]} numberOfLines={1}>{title}</Text>
+      <View style={styles.placeholder} />
+    </View>
+  );
+
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#1a0033', '#2d1b4e', '#4a2c6d', '#ff6b35']} style={styles.gradient}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={COLORS.white} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Numerology</Text>
-            <View style={styles.placeholder} />
-          </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} />
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {renderHeader('Numerology', () => navigation.goBack())}
 
           <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-            <Text style={styles.welcomeText}>
+            <Text style={[styles.welcomeText, { color: colors.textSecondary }]}>
               Unlock the secrets hidden in your numbers
             </Text>
             
@@ -145,15 +152,23 @@ export default function NumerologyScreen({ navigation, route }) {
               {cards.map((card) => (
                 <TouchableOpacity
                   key={card.id}
-                  style={styles.cardContainer}
+                  style={[
+                    styles.card,
+                    {
+                      backgroundColor: colors.cardBackground,
+                      borderColor: colors.cardBorder,
+                    },
+                  ]}
                   onPress={() => openModal(card.id)}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={card.title}
                 >
-                  <LinearGradient colors={card.gradient} style={styles.card}>
-                    <Text style={styles.cardIcon}>{card.icon}</Text>
-                    <Text style={styles.cardTitle}>{card.title}</Text>
-                    <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
-                  </LinearGradient>
+                  <View style={[styles.cardIconWrap, { backgroundColor: colors.selectionSurface }]}>
+                    <Ionicons name={card.icon} size={22} color={colors.selectionText} />
+                  </View>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{card.title}</Text>
+                  <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>{card.subtitle}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -165,48 +180,69 @@ export default function NumerologyScreen({ navigation, route }) {
             presentationStyle="pageSheet"
             onRequestClose={() => setModalVisible(false)}
           >
-            <View style={styles.modalContainer}>
-              <LinearGradient colors={['#1a0033', '#2d1b4e']} style={styles.modalGradient}>
-                <SafeAreaView style={styles.modalSafeArea}>
-                  <View style={styles.modalHeader}>
-                    <TouchableOpacity onPress={() => setModalVisible(false)}>
-                      <Ionicons name="close" size={24} color={COLORS.white} />
+            <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+              <SafeAreaView style={styles.modalSafeArea} edges={['top']}>
+                <View style={[styles.modalHeader, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine || colors.cardBorder }]}>
+                    <TouchableOpacity
+                      onPress={() => setModalVisible(false)}
+                      style={[styles.backButton, { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine || colors.cardBorder }]}
+                      accessibilityRole="button"
+                    >
+                      <Ionicons name="close" size={22} color={colors.textInverse} />
                     </TouchableOpacity>
                     <View style={styles.modalHeaderCenter}>
-                      <Text style={styles.modalTitle}>
+                      <Text style={[styles.modalTitle, { color: colors.textInverse }]}>
                         {birthData?.name || 'Numerology'}
                       </Text>
-                      <Text style={styles.modalSubtitle}>
+                      <Text style={[styles.modalSubtitle, { color: colors.textInverseMuted }]}>
                         {birthData?.date ? formatBirthDateForDisplay(birthData.date) : ''}
                       </Text>
                     </View>
                     <View style={styles.placeholder} />
                   </View>
 
-                  <View style={styles.tabContainer}>
+                  <View style={[styles.tabContainer, { backgroundColor: colors.background, borderBottomColor: colors.cardBorder }]}>
                     {[
-                      { id: 'soul', title: 'Soul Blueprint', icon: '🧮' },
-                      { id: 'cosmic', title: 'Cosmic Weather', icon: '📅' },
-                      { id: 'name', title: 'Name Alchemist', icon: '✍️' }
-                    ].map((tab) => (
+                      { id: 'soul', title: 'Soul Blueprint', icon: 'calculator-outline' },
+                      { id: 'cosmic', title: 'Cosmic Weather', icon: 'calendar-outline' },
+                      { id: 'name', title: 'Name Alchemist', icon: 'create-outline' }
+                    ].map((tab) => {
+                      const selected = activeTab === tab.id;
+                      return (
                       <TouchableOpacity
                         key={tab.id}
-                        style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+                        style={[
+                          styles.tab,
+                          {
+                            backgroundColor: selected ? colors.selectionSurface : colors.surfaceMuted,
+                            borderColor: selected ? colors.selectionBorder : colors.cardBorder,
+                          },
+                        ]}
                         onPress={() => setActiveTab(tab.id)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
                       >
-                        <Text style={styles.tabIcon}>{tab.icon}</Text>
-                        <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
+                        <Ionicons
+                          name={tab.icon}
+                          size={16}
+                          color={selected ? colors.selectionText : colors.textSecondary}
+                        />
+                        <Text style={[
+                          styles.tabText,
+                          { color: selected ? colors.selectionText : colors.textSecondary },
+                        ]}>
                           {tab.title}
                         </Text>
                       </TouchableOpacity>
-                    ))}
+                      );
+                    })}
                   </View>
 
-                  <ScrollView style={styles.modalContent}>
+                  <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentInner}>
                     {loading ? (
                       <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color="#ff6b35" />
-                        <Text style={styles.loadingText}>Loading numerology data...</Text>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading numerology data...</Text>
                       </View>
                     ) : (
                       <>
@@ -218,121 +254,120 @@ export default function NumerologyScreen({ navigation, route }) {
                     )}
                   </ScrollView>
                 </SafeAreaView>
-              </LinearGradient>
             </View>
           </Modal>
-        </SafeAreaView>
-      </LinearGradient>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  gradient: { flex: 1 },
   safeArea: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: StyleSheet.hairlineWidth,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
+    flex: 1,
+    textAlign: 'center',
   },
   placeholder: { width: 40 },
   scrollView: { flex: 1 },
   content: { padding: 20 },
   welcomeText: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
     textAlign: 'center',
-    marginBottom: 30,
-    fontStyle: 'italic',
+    marginBottom: 24,
+    lineHeight: 22,
   },
   cardsGrid: {
     gap: 16,
   },
-  cardContainer: {
-    width: '100%',
-    marginBottom: 16,
-  },
   card: {
+    width: '100%',
     padding: 20,
     borderRadius: 16,
+    borderWidth: 1,
     alignItems: 'center',
-    minHeight: 140,
+    minHeight: 132,
     justifyContent: 'center',
   },
-  cardIcon: { fontSize: 32, marginBottom: 12 },
+  cardIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.white,
     textAlign: 'center',
     marginBottom: 4,
   },
   cardSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 13,
     textAlign: 'center',
+    lineHeight: 18,
   },
   modalContainer: { flex: 1 },
-  modalGradient: { flex: 1 },
   modalSafeArea: { flex: 1 },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  modalHeaderCenter: { alignItems: 'center' },
+  modalHeaderCenter: { flex: 1, alignItems: 'center' },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.white,
   },
   modalSubtitle: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 2,
   },
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     borderRadius: 12,
     marginHorizontal: 4,
+    borderWidth: 1,
+    gap: 4,
   },
-  activeTab: {
-    backgroundColor: 'rgba(255, 107, 53, 0.2)',
-  },
-  tabIcon: { fontSize: 20, marginBottom: 4 },
   tabText: {
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '600',
     textAlign: 'center',
   },
-  activeTabText: { color: COLORS.white },
-  modalContent: { flex: 1, paddingHorizontal: 20 },
+  modalContent: { flex: 1 },
+  modalContentInner: { paddingHorizontal: 20, paddingBottom: 32 },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -340,7 +375,6 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   loadingText: {
-    color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 16,
     fontSize: 16,
   },

@@ -119,6 +119,9 @@ export default function BirthFormScreen({ navigation, route }) {
     is_family_member: editProfile?.is_family_member ?? prefillData?.is_family_member ?? false,
   });
   const [successAlert, setSuccessAlert] = useState(null);
+  const [fieldError, setFieldError] = useState('');
+  const [dateConfirmed, setDateConfirmed] = useState(Boolean(editProfile?.date));
+  const [timeConfirmed, setTimeConfirmed] = useState(Boolean(editProfile?.time));
 
   // Log edit mode for debugging
   useEffect(() => {
@@ -129,6 +132,8 @@ export default function BirthFormScreen({ navigation, route }) {
 
   useEffect(() => {
     if (!chartGatePrefill || editProfile || updateGender) return;
+    if (chartGatePrefill.date && parseCalendarDateInput(String(chartGatePrefill.date))) setDateConfirmed(true);
+    if (chartGatePrefill.time && /^\d{1,2}:\d{2}/.test(String(chartGatePrefill.time))) setTimeConfirmed(true);
     setFormData((prev) => {
       const next = { ...prev };
       if (chartGatePrefill.name) next.name = String(chartGatePrefill.name);
@@ -201,6 +206,8 @@ export default function BirthFormScreen({ navigation, route }) {
       // console.log('📂 [DEBUG] BirthForm: Existing data loaded:', JSON.stringify(existingData, null, 2));
 
       if (existingData) {
+        setDateConfirmed(Boolean(existingData.date));
+        setTimeConfirmed(Boolean(existingData.time));
         // Only load data if user hasn't made a selection yet
         setFormData(prev => ({
           name: existingData.name || prev.name,
@@ -308,6 +315,9 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const handleInputChange = (field, value) => {
+    setFieldError('');
+    if (Platform.OS === 'android' && field === 'date') setDateConfirmed(true);
+    if (Platform.OS === 'android' && field === 'time') setTimeConfirmed(true);
     if (field === 'time') {
       console.log('⏰ Time change:', value, 'Hours:', value.getHours(), 'Minutes:', value.getMinutes());
     }
@@ -512,26 +522,16 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const validateStep = () => {
-    if (step === 1 && !formData.name.trim()) {
-      shakeAnimation();
-      return false;
-    }
-    if (step === 2 && !formData.gender) {
-      shakeAnimation();
-      return false;
-    }
-    if (step === 5) {
-      if (!formData.place.trim()) {
-        shakeAnimation();
-        return false;
-      }
-      if (!formData.latitude || !formData.longitude) {
-        Alert.alert(t('birthForm.alerts.invalidLocation.title', 'Invalid Location'), t('birthForm.alerts.invalidLocation.suggestions', 'Please select a location from the suggestions to ensure accurate calculations.'));
-        shakeAnimation();
-        return false;
-      }
-    }
-    return true;
+    let message = '';
+    if (step === 1 && !formData.name.trim()) message = t('birthForm.validation.name', 'Enter your name to continue.');
+    if (step === 2 && !formData.gender) message = t('birthForm.validation.gender', 'Select a gender to continue.');
+    if (step === 3 && !dateConfirmed) message = t('birthForm.validation.date', 'Select and confirm your birth date.');
+    if (step === 4 && !timeConfirmed) message = t('birthForm.validation.time', 'Select and confirm your birth time.');
+    if (step === 5 && !formData.place.trim()) message = t('birthForm.validation.place', 'Enter your birthplace.');
+    else if (step === 5 && (formData.latitude == null || formData.longitude == null)) message = t('birthForm.validation.location', 'Select your birthplace from the suggestions.');
+    setFieldError(message);
+    if (message) shakeAnimation();
+    return !message;
   };
 
   const nextStep = () => {
@@ -544,6 +544,7 @@ export default function BirthFormScreen({ navigation, route }) {
   };
 
   const prevStep = () => {
+    setFieldError('');
     if (step > 1) setStep(step - 1);
   };
 
@@ -553,7 +554,7 @@ export default function BirthFormScreen({ navigation, route }) {
     submittingRef.current = true;
 
     // Final validation before submission
-    if (!formData.latitude || !formData.longitude) {
+    if (formData.latitude == null || formData.longitude == null) {
       Alert.alert(t('birthForm.alerts.invalidLocation.title', 'Invalid Location'), t('birthForm.alerts.invalidLocation.noSelection', 'Please select a location from the suggestions.'));
       setLoading(false);
       submittingRef.current = false;
@@ -774,7 +775,7 @@ export default function BirthFormScreen({ navigation, route }) {
               <View style={styles.headerTitleContainer}>
                 <Text style={[styles.headerTitle, { color: colors.textInverse }]}>{updateGender ? t('birthForm.headerTitle.updateGender', 'Update Gender') : editProfile ? t('birthForm.headerTitle.editProfile', 'Edit Profile') : t('birthForm.headerTitle.birthDetails', 'Birth Details')}</Text>
               </View>
-              <Text style={[styles.headerStep, { color: colors.textInverseMuted }]}>{String(step).padStart(2, '0')} / 05</Text>
+              <Text style={[styles.headerStep, { color: colors.textInverse }]}>{t('birthForm.progressText', 'Step {{step}} of 5', { step })}</Text>
             </View>
 
             {/* Progress Bar */}
@@ -782,7 +783,6 @@ export default function BirthFormScreen({ navigation, route }) {
               <View style={[styles.progressBar, { backgroundColor: colors.cosmicLine }]}>
                 <Animated.View style={[styles.progressFill, { width: progressWidth, backgroundColor: colors.accent }]} />
               </View>
-              <Text style={[styles.progressText, { color: colors.textInverseMuted }]}>{t('birthForm.progressText', 'Step {{step}} of 5', { step })}</Text>
             </View>
           </View>
         </SafeAreaView>
@@ -803,7 +803,7 @@ export default function BirthFormScreen({ navigation, route }) {
                 </View>
 
                 {/* Step Title */}
-                <Text style={[styles.stepEyebrow, { color: colors.primary }]}>CREATE A BIRTH CHART</Text>
+                <Text style={[styles.stepEyebrow, { color: colors.primary }]}>{updateGender ? t('birthForm.headerTitle.updateGender', 'Update Gender') : editProfile ? t('birthForm.headerTitle.editProfile', 'Edit Profile') : t('birthForm.headerTitle.birthDetails', 'Birth Details')}</Text>
                 <Text
                 style={[
                   styles.stepTitle,
@@ -813,6 +813,7 @@ export default function BirthFormScreen({ navigation, route }) {
                 {getStepTitle()}
               </Text>
 
+                {!!fieldError && <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: colors.error, fontSize: 14, lineHeight: 20, marginBottom: 16 }}>{fieldError}</Text>}
                 {/* Step Content */}
                 {step === 1 && (
                   <View style={styles.inputContainer}>
@@ -945,7 +946,7 @@ export default function BirthFormScreen({ navigation, route }) {
                           <Ionicons name="calendar-outline" size={28} color={colors.primary} />
                         </View>
                         <Text style={[styles.dateTimeValue, { color: colors.text }]}>
-                          {formData.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          {dateConfirmed ? formData.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : t('birthForm.selectDate', 'Select birth date')}
                         </Text>
                       </LinearGradient>
                     </TouchableOpacity>
@@ -971,7 +972,7 @@ export default function BirthFormScreen({ navigation, route }) {
                           <Ionicons name="time-outline" size={28} color={colors.primary} />
                         </View>
                         <Text style={[styles.dateTimeValue, { color: colors.text }]}>
-                          {formData.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                          {timeConfirmed ? formData.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : t('birthForm.selectTime', 'Select birth time')}
                         </Text>
                       </LinearGradient>
                     </TouchableOpacity>
@@ -1065,7 +1066,7 @@ export default function BirthFormScreen({ navigation, route }) {
                         <TouchableOpacity onPress={() => setShowDatePicker(false)}>
                           <Text style={[styles.pickerButton, { color: colors.textSecondary }]}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                        <TouchableOpacity onPress={() => { setDateConfirmed(true); setFieldError(''); setShowDatePicker(false); }}>
                           <Text style={[styles.pickerButton, styles.pickerButtonDone, { color: colors.primary }]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
@@ -1104,7 +1105,7 @@ export default function BirthFormScreen({ navigation, route }) {
                         <TouchableOpacity onPress={() => setShowDatePicker(false)}>
                           <Text style={[styles.pickerButton, { color: colors.textSecondary }]}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                        <TouchableOpacity onPress={() => { setDateConfirmed(true); setFieldError(''); setShowDatePicker(false); }}>
                           <Text style={[styles.pickerButton, styles.pickerButtonDone, { color: colors.primary }]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
@@ -1198,7 +1199,7 @@ export default function BirthFormScreen({ navigation, route }) {
                         <TouchableOpacity onPress={() => setShowTimePicker(false)}>
                           <Text style={[styles.pickerButton, { color: colors.textSecondary }]}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                        <TouchableOpacity onPress={() => { setTimeConfirmed(true); setFieldError(''); setShowTimePicker(false); }}>
                           <Text style={[styles.pickerButton, styles.pickerButtonDone, { color: colors.primary }]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
@@ -1263,7 +1264,7 @@ export default function BirthFormScreen({ navigation, route }) {
                         <TouchableOpacity onPress={() => setShowTimePicker(false)}>
                           <Text style={[styles.pickerButton, { color: colors.textSecondary }]}>{t('birthForm.picker.cancel', 'Cancel')}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                        <TouchableOpacity onPress={() => { setTimeConfirmed(true); setFieldError(''); setShowTimePicker(false); }}>
                           <Text style={[styles.pickerButton, styles.pickerButtonDone, { color: colors.primary }]}>{t('birthForm.picker.done', 'Done')}</Text>
                         </TouchableOpacity>
                       </View>
@@ -1322,7 +1323,7 @@ export default function BirthFormScreen({ navigation, route }) {
                   display="default"
                   onChange={(event, selectedTime) => {
                     setShowTimePicker(false);
-                    if (selectedTime) handleInputChange('time', selectedTime);
+                    if (event?.type === 'set' && selectedTime) handleInputChange('time', selectedTime);
                   }}
                 />
               )

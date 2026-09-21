@@ -824,6 +824,7 @@ CREATE TABLE "chat_messages" (
     "intent_router_ms" DOUBLE PRECISION,
     "client_request_id" TEXT,
     "gate_metadata" TEXT,
+    "next_action" TEXT,
     "chat_tier" TEXT NOT NULL DEFAULT 'standard',
     "response_style" TEXT,
     PRIMARY KEY ("message_id"),

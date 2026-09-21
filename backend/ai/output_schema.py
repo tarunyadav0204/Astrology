@@ -95,6 +95,27 @@ If CURRENT QUESTION is genuinely **one** integrated question (even if long), **d
 """
 
 
+def is_compound_choice_answer(intent_or_context: dict | None) -> bool:
+    payload = intent_or_context if isinstance(intent_or_context, dict) else {}
+    intent = payload.get("intent") if isinstance(payload.get("intent"), dict) else payload
+    qc = intent.get("query_context") if isinstance(intent.get("query_context"), dict) else {}
+    follow_up = str(qc.get("follow_up_type") or qc.get("followUpType") or "").strip().lower()
+    return follow_up == "clarification_choice"
+
+
+def build_compound_choice_focus_instruction() -> str:
+    """Force the answerer to cover only the topic the user just picked."""
+    return """
+📌 CHOSEN TOPIC ONLY (MANDATORY):
+The user already picked ONE topic from a previous multi-topic message.
+Answer ONLY CURRENT QUESTION. Conversation history may still list other life areas (spouse, children, health, career, and so on); those asks are abandoned for this turn.
+Do not analyze, summarize, or "also address" any abandoned topic.
+Do not add a scope notice that this reading also covers remaining questions.
+A brief invitation to ask remaining topics later is allowed only at the end, with no analysis of them now.
+
+"""
+
+
 # --------------------------------------------------------------------------------------
 # I. CENTRALIZED SYSTEM INSTRUCTIONS
 # --------------------------------------------------------------------------------------
@@ -206,10 +227,11 @@ At the very end of your response, before FAQ_META, output exactly one line in th
 NEXT_ACTION_META: {"type":"<remedy|diagnosis|timing|clarification|comparison|chart_explanation|none>","title":"<short label>","reason":"<short reason>","confidence":"<high|medium|low>","follow_up_questions":["<up to 3 short user-facing options>"],"source":"merge"}
 - If no follow-up is needed, set type to "none" and follow_up_questions to an empty array.
 - If the best immediate next step is a practical remedy reading, you MUST use type="remedy". This is required even when the main answer must NOT contain inline remedies—the card opens remedy mode.
-- For type="remedy", write ALL card copy in the SAME language/script as the user's current question:
+- For type="remedy", write ALL card copy in the SAME language/script as the answer body you just wrote (not app language, not a previous message):
   * title = FOMO headline (4–10 words, specific to this chart pressure, gentle urgency)
   * reason = one FOMO subline (why opening remedies now helps in this dasha/window)
-  * follow_up_questions[0] = short button label only (e.g. "Show my remedies" / "उपाय देखें")
+  * follow_up_questions[0] = short button label only (English answer → "Show my remedies"; Hindi answer → "उपाय देखें")
+  English answer ⇒ English card. Devanagari answer ⇒ Devanagari card. Never mix.
   The UI shows ONLY title, reason, and follow_up_questions[0] on the remedy card — no generic English boilerplate.
 - For non-remedy types, follow_up_questions can be normal follow-up prompts.
 - If REMEDY FOLLOW-UP MODE is active (user already opened the Remedies CTA), set type to "none" — remedies belong in the answer body, not another card.
@@ -1106,7 +1128,11 @@ You MUST NOT:
         # formatting has final precedence over their technical report layouts.
         prompt_parts.append(simple_presentation_instruction)
     
-    prompt_parts.append(build_multi_question_focus_instruction(_lang))
+    prompt_parts.append(
+        build_compound_choice_focus_instruction()
+        if is_compound_choice_answer(intent_block)
+        else build_multi_question_focus_instruction(_lang)
+    )
     try:
         from ai.prediction_anchor import (
             PREDICTION_ANCHOR_META_INSTRUCTION,

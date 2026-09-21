@@ -533,6 +533,8 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
                                 terms: msg.terms || [],
                                 glossary: msg.glossary || {},
                                 message_type: msg.message_type || 'answer',
+                                follow_up_questions: Array.isArray(msg.follow_up_questions) ? msg.follow_up_questions : [],
+                                next_action: msg.next_action || null,
                                 intent_gate: msg.intent_gate || (msg.gate_metadata && msg.gate_metadata.intent_gate),
                                 gate_metadata: msg.gate_metadata || null,
                                 summary_image: msg.summary_image
@@ -1056,7 +1058,18 @@ const ChatModal = ({ isOpen, onClose, initialBirthData = null, onChartRefClick: 
         const text = String(question || '').trim();
         if (!text) return;
         if (followUpOptions?.directSend) {
-            handleSendMessage(text, followUpOptions || {});
+            const isClarificationChoice = String(
+                followUpOptions?.query_context?.follow_up_type || ''
+            ).toLowerCase() === 'clarification_choice';
+            const previous = String(
+                followUpOptions?.query_context?.original_question
+                || followUpOptions?.originalQuestion
+                || ''
+            ).trim();
+            const composed = (!isClarificationChoice && previous && previous !== text)
+                ? `${text}\n\n${previous}`
+                : text;
+            handleSendMessage(composed, followUpOptions || {});
             return;
         }
         setFollowUpQuestion(text);

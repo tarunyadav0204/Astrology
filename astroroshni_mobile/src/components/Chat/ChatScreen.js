@@ -30,7 +30,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { subscribeWebKeyboardOverlap } from '../../platform/webSafeArea';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 
 import MessageBubble from './MessageBubble';
 import PremiumConsultationContext from './PremiumConsultationContext';
@@ -76,8 +76,6 @@ import { shouldPostChatErrorToAdminLogs } from '../../utils/chatAdminErrorGating
 import { typographyTokens } from '../../theme/tokens';
 import useInstantBillingSession from '../../hooks/useInstantBillingSession';
 import { getKpTodayCacheKey, rankKpHomeAreas } from '../../utils/kpHomeRecommendations';
-import { wasNotificationReminderShownThisSession } from '../../services/notificationReminder';
-import { wasTrackingPermissionPromptShownThisSession } from '../../services/facebookAnalytics';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
@@ -526,10 +524,11 @@ function chatPersonStorageKey(birth) {
 }
 
 export default function ChatScreen({ navigation, route }) {
+  const screenIsFocused = useIsFocused();
   const { t, i18n } = useTranslation();
   const { width: viewportWidth, fontScale: viewportFontScale = 1 } = useWindowDimensions();
   const effectiveHeaderWidth = viewportWidth / Math.max(1, viewportFontScale);
-  const compactHeaderChrome = viewportWidth < 390 || effectiveHeaderWidth < 350;
+  const compactHeaderChrome = viewportWidth < 430 || effectiveHeaderWidth < 390;
   const iconOnlyHeaderBrand = viewportWidth < 340 || effectiveHeaderWidth < 285;
   useAnalytics('ChatScreen');
   const {
@@ -857,41 +856,14 @@ export default function ChatScreen({ navigation, route }) {
   const stickMessagesToBottomRef = useRef(true);
   const lastAutoScrollAtRef = useRef(0);
   const pendingScrollToLastAnswerRef = useRef(false);
-  const showGreetingRef = useRef(true);
-  const prevShowGreetingRef = useRef(true);
+  const showGreetingRef = useRef(false);
+  const prevShowGreetingRef = useRef(false);
 
   useEffect(() => {
     showMenuRef.current = showMenu;
   }, [showMenu]);
 
-  useEffect(() => {
-    let active = true;
-    let timer;
-    const loadThemeDiscovery = async () => {
-      try {
-        const seen = await AsyncStorage.getItem(THEME_DISCOVERY_SEEN_KEY);
-        if (!active || seen) return;
-        timer = setTimeout(() => {
-          if (!active) return;
-          // Do not follow a notification ask with a second first-run modal.
-          // Leave theme discovery unseen so it can appear on a later visit.
-          if (
-            wasNotificationReminderShownThisSession() ||
-            wasTrackingPermissionPromptShownThisSession()
-          ) return;
-          setThemePickerDiscovery(true);
-          setShowQuickThemePicker(true);
-        }, 2400);
-      } catch (_) {
-        // Discovery is optional; never block the app if storage is unavailable.
-      }
-    };
-    loadThemeDiscovery();
-    return () => {
-      active = false;
-      if (timer) clearTimeout(timer);
-    };
-  }, []);
+  // Appearance is available from the menu; never interrupt first-run setup.
 
   const closeQuickThemePicker = useCallback(async () => {
     setShowQuickThemePicker(false);
@@ -2714,7 +2686,7 @@ export default function ChatScreen({ navigation, route }) {
           if (storedMessages.length > 0) {
             await hydrateSelectedChatMode(storedMessages, personId);
             setMessages(storedMessages);
-            // Keep Home as the default view; history is restored only after the user opens chat.
+            // Ask Tara is the default landing surface; restore the last thread immediately.
 
             // Align to the last answer once chat is visible; don't jump to the thread bottom.
             if (storedMessages.length > 0) {
@@ -3040,7 +3012,7 @@ export default function ChatScreen({ navigation, route }) {
             // Only update messages if we don't have any current messages to avoid overwriting
             const prevLength = messages.length;
             setMessages(prev => prev.length === 0 ? storedMessages : prev);
-            // Keep Home as the default view; history is restored only after the user opens chat.
+            // Ask Tara is the default landing surface; restore the last thread immediately.
 
             if (prevLength === 0 && storedMessages.length > 0 && !showGreeting) {
               requestScrollToLastAnswerTop();
@@ -6320,6 +6292,18 @@ export default function ChatScreen({ navigation, route }) {
     });
   };
 
+  const handleClarificationChoiceSend = async (questionText, options = {}) => {
+    const chosen = String(questionText || '').trim();
+    if (!chosen) return;
+    const queryContext = options.query_context || options.queryContext || {};
+    await sendMessageRef.current?.(chosen, {
+      queryContext: {
+        follow_up_type: 'clarification_choice',
+        ...queryContext,
+      },
+    });
+  };
+
   const handleSendRetry = async (failedMessage) => {
     const { clientRequestId, userMessageId, failedQuestion } = failedMessage || {};
     if (!clientRequestId || !failedQuestion) {
@@ -6589,10 +6573,6 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const inputScopeNativeTrimmed = birthData?.name?.trim() ?? '';
-  const inputScopeNativeShown =
-    inputScopeNativeTrimmed.length > 7
-      ? `${inputScopeNativeTrimmed.slice(0, 7)}...`
-      : inputScopeNativeTrimmed;
   const activeMahadasha = dashaData?.maha_dashas?.find((period) => period?.current)?.planet || null;
   const instantRemainingSeconds = Number(instantBilling.state?.remaining_seconds || 0);
   const instantBalanceCritical = instantBilling.active && instantRemainingSeconds > 0 && instantRemainingSeconds <= 60;
@@ -7253,15 +7233,10 @@ export default function ChatScreen({ navigation, route }) {
                 )}
                 {birthData && !isMundane && !isInstantAnalysis && (
                   <PremiumConsultationContext
-                    name={birthData.name}
                     sun={loadingChart ? null : (chartData?.planets?.Sun ? getSignName(chartData.planets.Sun.sign) : null)}
                     moon={loadingChart ? null : (chartData?.planets?.Moon ? getSignName(chartData.planets.Moon.sign) : null)}
                     ascendant={loadingChart ? null : (chartData?.houses?.[0] ? getSignName(chartData.houses[0].sign) : null)}
                     activePeriod={activeMahadasha ? t(`home.planet_names.${activeMahadasha}`, activeMahadasha) : null}
-                    onChangeChart={() => {
-                      keepChatOpenAfterNativeSelectRef.current = true;
-                      navigation.navigate('SelectNative', { returnTo: 'Home', returnParams: { returnToChat: true } });
-                    }}
                     onOpenDasha={() => setShowDashaBrowser(true)}
                     onOpenHistory={() => navigation.navigate('ChatHistory')}
                   />
@@ -7418,9 +7393,15 @@ export default function ChatScreen({ navigation, route }) {
                       <MessageBubble
                       message={item}
                       language={language}
-                      onFollowUpClick={(question) => {
+                      onFollowUpClick={(question, options = {}) => {
                         selectedEngagementSuggestionRef.current = null;
-                        setInputText(question);
+                        const text = String(question || '').trim();
+                        if (!text) return;
+                        if (options?.directSend) {
+                          handleClarificationChoiceSend(text, options);
+                          return;
+                        }
+                        setInputText(text);
                       }}
                       onRemedyFollowUpClick={handleRemedyFollowUpSend}
                       partnership={partnershipMode}
@@ -7518,44 +7499,11 @@ export default function ChatScreen({ navigation, route }) {
                       }
                     >
                       {inputScopeNativeTrimmed
-                        ? inputScopeNativeShown
+                        ? inputScopeNativeTrimmed
                         : t('chat.yourChart', 'your chart')}
                     </Text>
                   </Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => {
-                    keepChatOpenAfterNativeSelectRef.current = true;
-                    navigation.navigate('SelectNative', {
-                      returnTo: 'Home',
-                      returnParams: { returnToChat: true },
-                    });
-                  }}
-                  style={[
-                    styles.chatInputScopeChangeChip,
-                    {
-                      borderColor: colors.cardBorder,
-                      backgroundColor: colors.surface,
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('chat.selectNativeA11y', 'Select or create another birth chart')}
-                >
-                  <Ionicons
-                    name="swap-horizontal-outline"
-                    size={13}
-                    color={colors.textSecondary}
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text
-                    style={[
-                      styles.chatInputScopeChangeChipText,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    {t('chat.inputScopeSelectChart', 'Change chart')}
-                  </Text>
-                </TouchableOpacity>
                 {!loading && messages.length > 0 && suggestions.length > 0 && (
                   <TouchableOpacity
                     onPress={() => setShowTopicIdeas((v) => !v)}
@@ -8943,44 +8891,6 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
-                      closeMenuDrawer(async () => {
-                        const { openPanditMode } = require('../Pandit/openPanditMode');
-                        if (isPanditMode) {
-                          await exitPanditMode();
-                          return;
-                        }
-                        await openPanditMode({
-                          navigation,
-                          requireAuthForPaid,
-                          enterPanditMode,
-                        });
-                      });
-                    }}
-                  >
-                    <LinearGradient
-                      colors={menuRowGradient}
-                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
-                    >
-                      <View style={styles.menuIconContainer}>
-                        <LinearGradient
-                          colors={menuAccentIconGradient}
-                          style={styles.menuIconGradient}
-                        >
-                          <Ionicons name="infinite-outline" size={19} color={colors.selectionText} />
-                        </LinearGradient>
-                      </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>
-                        {isPanditMode
-                          ? t('menu.exitPanditMode', 'Exit Pandit mode')
-                          : t('menu.panditDesk', 'I am a Pandit')}
-                      </Text>
-                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-                    </LinearGradient>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={getMenuOptionStyle()}
-                    onPress={() => {
                       closeMenuDrawer(() => { navigation.navigate('Support'); });
                     }}
                   >
@@ -9391,9 +9301,8 @@ export default function ChatScreen({ navigation, route }) {
       </SafeAreaView>
 
       <NotificationEnableReminderModal
-        homeActive={showGreeting && !fomoHomeOpen && !homeInfoModalPayload}
+        homeActive={screenIsFocused && !!birthData && showGreeting && !fomoHomeOpen && !homeInfoModalPayload}
         fomoTriggerNonce={fomoNotificationPromptNonce}
-        allowGeneralPrompt
       />
 
       <AppAlertModal

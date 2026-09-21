@@ -933,12 +933,56 @@ def pending_compound_topic_choice(dialogue_state: Dict[str, Any] | None) -> bool
     return str(state.get("pending_choice_kind") or "").strip() == "compound_plan"
 
 
+def _normalize_compound_clarification_choices(result: Dict[str, Any]) -> list[Dict[str, str]]:
+    """Normalize model-authored theme cards without interpreting the user's prose."""
+    status = str(result.get("status") or "").strip().upper()
+    answer_mode = str(result.get("answer_mode") or "").strip().lower()
+    if status != "CLARIFY" or answer_mode != "compound_plan":
+        result["clarification_choices"] = []
+        return []
+
+    raw_choices = result.get("clarification_choices")
+    if not isinstance(raw_choices, list):
+        result["clarification_choices"] = []
+        return []
+
+    choices: list[Dict[str, str]] = []
+    seen_questions: set[str] = set()
+    for raw in raw_choices:
+        if not isinstance(raw, dict):
+            continue
+        label = str(raw.get("label") or raw.get("theme") or "").strip()[:80]
+        submit_text = str(
+            raw.get("submit_text") or raw.get("question") or raw.get("exact_question") or ""
+        ).strip()[:500]
+        dedupe_key = " ".join(submit_text.casefold().split())
+        if not label or not submit_text or dedupe_key in seen_questions:
+            continue
+        seen_questions.add(dedupe_key)
+        choices.append(
+            {
+                "id": str(raw.get("id") or f"q{len(choices) + 1}").strip()[:40]
+                or f"q{len(choices) + 1}",
+                "label": label,
+                "submit_text": submit_text,
+            }
+        )
+        if len(choices) >= 5:
+            break
+
+    if len(choices) < 2:
+        choices = []
+    result["clarification_choices"] = choices
+    return choices
+
+
 def _compound_choice_followup_instruction() -> str:
     return """
 COMPOUND CHOICE FOLLOW-UP (mandatory when dialogue_state.pending_choice_kind is compound_plan):
 The previous turn already asked the user to pick ONE topic from a multi-topic message.
 Classify ONLY LATEST USER MESSAGE. The original bundled list in history is abandoned.
 Do not return compound_plan unless LATEST USER MESSAGE itself still contains two or more unrelated life areas as separate asks.
+Do not keep extra life areas from the original bundled list in category, question_parts, or evidence needs.
 Related facets of the chosen domain are ONE question. Example: after a pick-one, "Abt my marriage, is there any possibility of marriage in my kundali?" is one marriage/promise question, not marriage timing + spouse qualities + foreign yoga.
 Return READY for the chosen topic unless a different material fact is still missing (for example whose chart).
 """
@@ -2369,6 +2413,7 @@ class IntentRouter:
                     for y in range(current_year, current_year + 3)
                 }
             }
+        _normalize_compound_clarification_choices(result)
         return result
 
     def _finalize_instant_dialogue_state(
@@ -2437,8 +2482,14 @@ class IntentRouter:
                 state["last_clarification_question"] = clarification_question
             if answer_mode == "compound_plan":
                 state["pending_choice_kind"] = "compound_plan"
+                choices = _normalize_compound_clarification_choices(result)
+                if choices:
+                    state["clarification_choices"] = choices
+                else:
+                    state.pop("clarification_choices", None)
             else:
                 state.pop("pending_choice_kind", None)
+                state.pop("clarification_choices", None)
         else:
             # READY is accepted only when the LLM's own state says there are no
             # unresolved facts.  We never decide which facts are required here.
@@ -2456,12 +2507,18 @@ class IntentRouter:
                         state["pending_choice_kind"] = "compound_plan"
                         state["answer_mode"] = "compound_plan"
                         result["answer_mode"] = "compound_plan"
+                        prior_choices = prior.get("clarification_choices")
+                        if isinstance(prior_choices, list) and prior_choices:
+                            result["clarification_choices"] = prior_choices
+                            state["clarification_choices"] = prior_choices
                     else:
                         state.pop("pending_choice_kind", None)
+                        state.pop("clarification_choices", None)
             else:
                 state["ready_to_calculate"] = True
                 state.pop("last_clarification_question", None)
                 state.pop("pending_choice_kind", None)
+                state.pop("clarification_choices", None)
 
         extracted_context = result.get("extracted_context")
         if not isinstance(extracted_context, dict):
@@ -2525,6 +2582,7 @@ class IntentRouter:
             result.get("evidence_plan"),
             question="",
         )
+        _normalize_compound_clarification_choices(result)
         if result["needs_transits"] and not isinstance(result.get("transit_request"), dict):
             result["transit_request"] = {
                 "startYear": current_year,
@@ -2669,7 +2727,7 @@ Task:
    - `follow_up` when it asks about, challenges, or continues the immediately previous answer.
    - `new_request` when it is a self-contained request with a different subject, goal, life area, or requested action. A new request abandons the unresolved clarification; do not merge its old topic, subject, question parts, known_facts, or unresolved_facts into this turn.
 2. Decide READY vs CLARIFY. Clarify whenever a missing fact would materially change which chart factors, relationship role, event definition, or timing calculation should be used. Resolve ambiguous people and pronouns through conversation; never guess who "he", "she", "they", "that person", or a similar reference means. Clarify when the core topic/event is genuinely unclear, the user asks multiple unrelated life areas, a reference cannot be resolved from recent history/state, OR the mode is RECOMMEND_LOCATION and india-vs-abroad scope is unknown. Do not clarify for one clear domain with multiple facets, follow-up challenges, natural messy phrasing, or one identical question/predicate applied to two or more clearly named people.
-   If the message contains two or more independently answerable questions from different life domains or incompatible calculation families, set CLARIFY, answer_mode=compound_plan, route_action=clarify, and ask the user in their own language/script to choose just one question first. Promise/outlook plus timing for the same event is one compatible composite request: keep it READY, emit each facet as a question_part, and use the event-timing route because it already checks natal promise before timing. Likewise, one shared behavior/event question applied to several explicitly identified relatives is compatible: keep READY, place every person in target_subject_keys, emit one question_part per person, and never ask the user to repeat the same question one person at a time.
+   If the message contains two or more independently answerable questions from different life domains or incompatible calculation families, set CLARIFY, answer_mode=compound_plan, route_action=clarify, and write a short `clarification_question` explaining that answering several questions together makes each reading weaker, then asking the user to choose one card. Also return `clarification_choices` with one card per independently answerable question actually present in LATEST USER MESSAGE (2-5 cards). Each card must contain a concise same-language `label` naming its theme and `submit_text` containing that complete standalone question in the user's language/script. Preserve the user's exact intent and details; do not replace it with a broad generic topic, invent options, combine unrelated asks, or include letter-choice instructions. Promise/outlook plus timing for the same event is one compatible composite request: keep it READY, emit each facet as a question_part, and use the event-timing route because it already checks natal promise before timing. Likewise, one shared behavior/event question applied to several explicitly identified relatives is compatible: keep READY, place every person in target_subject_keys, emit one question_part per person, and never ask the user to repeat the same question one person at a time.
    If the user asks for compatibility between two charts, set answer_mode=dedicated_partnership_flow and route_action=handoff. Instant Chat does not calculate compatibility.
    After a pick-one clarification, classify only LATEST USER MESSAGE. Do not keep compound_plan just because the abandoned original list is still in history.
 3. Maintain `dialogue_state` as a complete corrected snapshot, not a delta. If `turn_relation=clarification_answer`, semantically apply LATEST USER MESSAGE to known_facts, remove the fact it resolves from unresolved_facts, and do not repeat the same question. If `turn_relation=new_request`, create a fresh dialogue_state from LATEST USER MESSAGE only. Ask the next necessary question only if a different material fact remains unresolved. Ask exactly one natural question at a time in the user's current language/script. Continue clarifying until you have enough information to choose the correct astrological calculation; only then set READY and ready_to_calculate=true.
@@ -2797,7 +2855,8 @@ Return exactly this JSON shape:
   "resolved_question": "complete standalone question recovered from the accepted invitation, otherwise null",
   "explicit_remedy_request": true only for an unambiguous direct request for astrological remedies, otherwise false,
   "status": "CLARIFY" or "READY",
-  "clarification_question": "same language/script as user, only when CLARIFY",
+  "clarification_question": "same language/script as user, only when CLARIFY; for compound_plan explain that answering several questions together makes each reading weaker, then ask them to choose one card, without listing options in prose",
+  "clarification_choices": [{{"id":"q1","label":"short theme in user's language","submit_text":"complete standalone question preserving the user's exact intent"}}] only for CLARIFY + compound_plan, otherwise [],
   "route_action": "answer" or "clarify" or "handoff" or "ack",
   "user_message": "LLM-authored same-language clarification or handoff message, otherwise empty",
   "dialogue_state": {{
@@ -3113,7 +3172,7 @@ Rules:
 - Set `explicit_timeframe=true` only when the latest question supplies the requested date, range, named period or duration. A date saying when a process began or was scheduled is context, not automatically the forecast horizon.
 - `context_type` is usually `birth`; use `annual` only for whole-year forecast style questions.
 - Keep `divisional_charts` small but sensible. D1 and D9 are enough for most instant routing. Add D10 for career/work, D7 for relationships/children, D30 for health/disease, D24 for education, D4 for property/home.
-- When you do return `CLARIFY`, ask only one short narrowing question and give 2-4 quick options when helpful.
+- When you return CLARIFY for a normal missing detail, ask one short narrowing question. For compound_plan, write 1-2 sentences that answering several questions together makes each reading weaker, then ask them to pick one card. Do not embed quick replies in prose: return 2-5 `clarification_choices` cards, one per independently answerable question, with a short theme label and the complete standalone submit_text in the user's language/script.
 
 UNIVERSAL ANSWER MODE:
 - `explanation_mechanism`: user asks how/why a previous chart claim was made
@@ -3162,7 +3221,8 @@ Return ONLY this JSON shape:
   "resolved_question": "complete standalone question recovered from the accepted invitation, otherwise null",
   "explicit_remedy_request": true only for an unambiguous direct request for astrological remedies, otherwise false,
   "status": "CLARIFY" or "READY",
-  "clarification_question": "short question only when status=CLARIFY",
+  "clarification_question": "short question only when status=CLARIFY; for compound_plan explain that answering several questions together makes each reading weaker, then ask them to choose one card, without listing options in prose",
+  "clarification_choices": [{{"id":"q1","label":"short theme in user's language","submit_text":"complete standalone question preserving the user's exact intent"}}] only for CLARIFY + compound_plan, otherwise [],
   "route_action": "answer" or "clarify" or "handoff" or "ack",
   "user_message": "same-language clarification or handoff message, otherwise empty",
   "dialogue_state": {{
@@ -3559,7 +3619,12 @@ Invalid previous JSON:
         # Add clarification limit enforcement
         clarification_limit_text = ""
         multi_question_instruction = ""
-        if clarification_count < 1:
+        compound_choice_followup = str(
+            (normalized_query_context or {}).get("follow_up_type")
+            or (normalized_query_context or {}).get("followUpType")
+            or ""
+        ).strip().lower() == "clarification_choice"
+        if clarification_count < 1 and not compound_choice_followup:
             multi_question_instruction = r"""
 MULTI-QUESTION IN ONE MESSAGE (WHEN status WOULD BE "CLARIFY"):
 Clarify only when the user's current message explicitly packs SEVERAL distinct, unrelated questions into one. Strong signals include two or more question marks, numbered asks like "1. ... 2. ...", phrases like "another question" / "few questions" / "I have two questions", or clearly separate unrelated topics joined with ";" / "also".
@@ -3572,13 +3637,26 @@ Clarify only when the user's current message explicitly packs SEVERAL distinct, 
 - If the user asks one coherent question with related facets, return READY and classify the dominant domain.
 
 If the message truly has several unrelated asks, then:
-- Your "clarification_question" MUST still do your normal narrowing (which area, timeframe, etc.).
-- In the SAME language as the clarification (Hindi Devanagari for Hindi/Hinglish users per rules above), add ONE short polite sentence asking them to ask **one question at a time** so the reading can stay focused and detailed. Keep tone warm—not scolding.
-- If you already included that idea, do not repeat it.
+- Set `status="CLARIFY"` and `answer_mode="compound_plan"`.
+- Keep `clarification_question` to 1-2 short sentences in the user's language: answering several questions in one go makes each reading weaker/thinner, so they should pick one card. Do not list lettered/text options in that sentence.
+- Return `clarification_choices` with one card for each independently answerable question actually present in the current message (normally 2-5). Each card has `id`, a concise same-language theme `label`, and `submit_text` containing the complete standalone question that preserves the user's exact intent and details.
+- Do not invent options, broaden the question into a generic topic, or combine unrelated asks. If you already included the choose-one idea, do not repeat it.
 
 """
 
-        if clarification_count >= 1:
+        if compound_choice_followup:
+            clarification_limit_text = """
+
+COMPOUND TOPIC CHOICE (mandatory):
+The previous turn asked the user to pick ONE topic from a multi-topic message. They have now chosen.
+Classify ONLY CURRENT QUESTION. The original bundled list in conversation history is abandoned.
+Do not keep extra life areas from that list in category, question_parts, or evidence needs.
+Return status "READY" for the chosen topic unless a different material fact is still missing.
+You are FORBIDDEN from asking another pick-one clarification for the abandoned list.
+
+PROCEED WITH ANALYSIS NOW.
+"""
+        elif clarification_count >= 1:
             clarification_limit_text = f"""
 
 🚨🚨🚨 CRITICAL: CLARIFICATION LIMIT REACHED 🚨🚨🚨
@@ -3670,15 +3748,13 @@ The clarification_question MUST follow the language rule and use the inferred CU
 """
 
         clarification_format_instruction = """
-CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
-- When status is "CLARIFY" and you are presenting multiple choices, format the clarification so users can reply with a single letter.
-- Use wording like: "Type A for ..., Type B for ..., Type C for ...".
-- IMPORTANT: Do NOT hardcode exactly 3 options. Use only the number naturally needed (usually 2-5).
-- Use Type A / Type B options only after you have decided CLARIFY is genuinely needed. Never create Type A / Type B choices by splitting a single coherent question into imaginary sub-questions.
-- The options MUST be based on topics the user actually mentioned. Never offer unrelated defaults such as career, relationships, or health for an unusual single-topic question.
-- If only 2 choices are needed, provide only A-B. If 4 are needed, provide A-D, etc.
-- End with a short fallback like: "or type your topic in your own words."
-- Keep the full clarification in the inferred CURRENT QUESTION language/script.
+CLARIFICATION FORMAT RULE:
+- For a normal missing-detail clarification, ask one concise natural question as before.
+- For several unrelated asks, set answer_mode="compound_plan", write clarification_question as 1-2 sentences that answering several questions together makes each reading weaker so they should pick one card, and return 2-5 structured clarification_choices.
+- Each clarification choice must be {"id":"q1", "label":"short theme", "submit_text":"complete standalone question"}.
+- Labels and submit_text must match the inferred CURRENT QUESTION language/script. Preserve the user's exact meaning and details.
+- Never put Type A / Type B instructions or a free-text fallback into clarification_question for compound_plan; the UI renders the choices as cards.
+- Never split one coherent question into imaginary choices or offer topics the user did not ask about.
 """
 
         prompt = f"""
@@ -3842,7 +3918,11 @@ CLARIFICATION FORMAT RULE (FOR USER-FRIENDLY QUICK REPLIES):
         Return ONLY a JSON object:
         {{
             "status": "CLARIFY" or "READY",
-            "clarification_question": "Your clarifying question here (only if status=CLARIFY; when giving options, use lettered quick replies like Type A/Type B with variable count, not fixed 3; keep same language + script as CURRENT QUESTION)",
+            "clarification_question": "When status=CLARIFY for compound_plan: 1-2 sentences that answering several questions together makes each reading weaker, then ask them to pick a card; do not list lettered options",
+            "answer_mode": "compound_plan only for several unrelated asks, otherwise the best supported answer mode",
+            "clarification_choices": [
+                {{"id": "q1", "label": "short theme in the user's language", "submit_text": "complete standalone question preserving the user's exact intent"}}
+            ],
             "chart_insights": [],
             "mode": "PREDICT_DAILY" or "PREDICT_PERIOD_OUTLOOK" or "LIFESPAN_EVENT_TIMING" or "LIFE_TERMINATION_RESEARCH" or "PREDICT_EVENT_TIMING" or "PREDICT_EVENTS_FOR_PERIOD" or "ANALYZE_TOPIC_POTENTIAL" or "ANALYZE_PERSONALITY" or "ANALYZE_ROOT_CAUSE" or "RECOMMEND_LOCATION" or "RECOMMEND_REMEDY_FOR_PROBLEM",
             "chart_focus": {{

@@ -541,7 +541,20 @@ const ChatPage = ({ onLogin }) => {
             queryContextExtras,
         });
         if (followUpOptions?.directSend) {
-            handleSendMessage(text, {
+            const isClarificationChoice = String(
+                queryContextExtras?.follow_up_type
+                || followUpOptions?.query_context?.follow_up_type
+                || ''
+            ).toLowerCase() === 'clarification_choice';
+            const previous = String(
+                queryContextExtras?.original_question
+                || followUpOptions?.originalQuestion
+                || ''
+            ).trim();
+            const composed = (!isClarificationChoice && previous && previous !== text)
+                ? `${text}\n\n${previous}`
+                : text;
+            handleSendMessage(composed, {
                 ...(followUpOptions || {}),
                 query_context: queryContextExtras || undefined,
             });

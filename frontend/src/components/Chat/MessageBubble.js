@@ -576,10 +576,12 @@ const MessageBubble = ({
     const hasNextAction = Boolean(nextAction && nextActionType && nextActionType !== 'none');
     const isRemedyNextAction = nextActionType === 'remedy';
     const isTimelineSelection = nextActionType === 'timeline_selection';
-    const timelineOptions = isTimelineSelection && Array.isArray(nextAction?.options)
-        ? nextAction.options.filter((option) => option && option.id && option.label)
+    const isClarificationChoice = nextActionType === 'clarification_choice';
+    const isStructuredChoice = isTimelineSelection || isClarificationChoice;
+    const structuredOptions = isStructuredChoice && Array.isArray(nextAction?.options)
+        ? nextAction.options.filter((option) => option && option.id && option.label && (option.submit_text || option.label))
         : [];
-    const [selectedTimelineOption, setSelectedTimelineOption] = useState(null);
+    const [selectedStructuredOption, setSelectedStructuredOption] = useState(null);
     const nextActionTitle = String(nextAction?.title || '').trim();
     const nextActionReason = String(nextAction?.reason || '').trim();
     const nextActionFollowUps = Array.isArray(nextAction?.follow_up_questions)
@@ -601,34 +603,51 @@ const MessageBubble = ({
         : '';
 
     useEffect(() => {
-        setSelectedTimelineOption(null);
-    }, [message?.messageId, message?.id, nextAction?.selection_stage]);
+        setSelectedStructuredOption(null);
+    }, [message?.messageId, message?.id, nextAction?.selection_stage, nextActionType]);
 
-    const renderTimelineSelectionCard = () => {
+    const renderStructuredChoiceCard = () => {
         if (
             message.role !== 'assistant'
             || message.isTyping
             || message.isProcessing
-            || !isTimelineSelection
-            || timelineOptions.length === 0
+            || !isStructuredChoice
+            || structuredOptions.length === 0
         ) return null;
 
+        const eyebrow = isClarificationChoice
+            ? 'Choose a theme'
+            : `Marriage date finder · ${String(nextAction?.selection_stage || 'period')}`;
+        const fallbackTitle = isClarificationChoice
+            ? ''
+            : 'Choose the closest period';
+        const cardTitle = isClarificationChoice
+            ? ''
+            : (nextActionTitle || fallbackTitle);
+        const messageBody = String(message?.content || '').replace(/\s+/g, ' ').trim();
+        const titleLooksLikeBody = Boolean(
+            cardTitle && messageBody && cardTitle.replace(/\s+/g, ' ').trim() === messageBody
+        );
+
         return (
-            <div className="marriage-timeline-card" aria-label={nextActionTitle || 'Marriage period selection'}>
-                <div className="marriage-timeline-card__eyebrow">
-                    Marriage date finder · {String(nextAction?.selection_stage || 'period')}
-                </div>
-                <div className="marriage-timeline-card__title">
-                    {nextActionTitle || 'Choose the closest period'}
-                </div>
+            <div
+                className={`marriage-timeline-card${isClarificationChoice ? ' clarification-choice-card' : ''}`}
+                aria-label={cardTitle || eyebrow}
+            >
+                <div className="marriage-timeline-card__eyebrow">{eyebrow}</div>
+                {cardTitle && !titleLooksLikeBody ? (
+                    <div className="marriage-timeline-card__title">
+                        {cardTitle}
+                    </div>
+                ) : null}
                 {nextActionReason && (
                     <div className="marriage-timeline-card__reason">{nextActionReason}</div>
                 )}
                 <div className="marriage-timeline-card__options">
-                    {timelineOptions.map((option, index) => {
+                    {structuredOptions.map((option, index) => {
                         const optionId = String(option.id);
-                        const isSelected = selectedTimelineOption === optionId;
-                        const isDisabled = Boolean(selectedTimelineOption);
+                        const isSelected = selectedStructuredOption === optionId;
+                        const isDisabled = Boolean(selectedStructuredOption);
                         return (
                             <button
                                 key={optionId}
@@ -636,21 +655,30 @@ const MessageBubble = ({
                                 className={`marriage-timeline-option${isSelected ? ' marriage-timeline-option--selected' : ''}`}
                                 disabled={isDisabled}
                                 onClick={() => {
-                                    if (selectedTimelineOption || !onFollowUpClick) return;
-                                    setSelectedTimelineOption(optionId);
+                                    if (selectedStructuredOption || !onFollowUpClick) return;
+                                    setSelectedStructuredOption(optionId);
                                     const sourceMessageId = message.messageId || message.id;
+                                    const queryContext = isTimelineSelection
+                                        ? {
+                                            ...(option.query_context || {}),
+                                            source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
+                                            marriage_timeline_source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
+                                        }
+                                        : {
+                                            follow_up_type: 'clarification_choice',
+                                            clarification_choice_id: optionId,
+                                            source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
+                                            original_question: String(nextAction?.original_question || '').trim() || undefined,
+                                        };
                                     onFollowUpClick(
                                         String(option.submit_text || option.label).trim(),
                                         {
                                             directSend: true,
-                                            instant_chat: true,
-                                            chat_tier: 'instant',
-                                            instant_timeline_selection: true,
-                                            query_context: {
-                                                ...(option.query_context || {}),
-                                                source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
-                                                marriage_timeline_source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
-                                            },
+                                            ...(messageChatTier === 'instant'
+                                                ? { instant_chat: true, chat_tier: 'instant' }
+                                                : {}),
+                                            ...(isTimelineSelection ? { instant_timeline_selection: true } : {}),
+                                            query_context: queryContext,
                                         }
                                     );
                                 }}
@@ -660,11 +688,17 @@ const MessageBubble = ({
                                 </span>
                                 <span className="marriage-timeline-option__copy">
                                     <strong>{option.primary_label || option.label}</strong>
-                                    {(option.technical_label || option.evidence_hint || option.detail) && (
+                                    {(isClarificationChoice || option.technical_label || option.evidence_hint || option.detail) && (
                                         <small>
-                                            {option.technical_label ? `Astrology: ${option.technical_label}` : ''}
-                                            {option.technical_label && option.evidence_hint ? ' · ' : ''}
-                                            {option.evidence_hint || (!option.technical_label ? option.detail : '')}
+                                            {isClarificationChoice
+                                                ? String(option.submit_text || '').trim()
+                                                : (
+                                                    <>
+                                                        {option.technical_label ? `Astrology: ${option.technical_label}` : ''}
+                                                        {option.technical_label && option.evidence_hint ? ' · ' : ''}
+                                                        {option.evidence_hint || (!option.technical_label ? option.detail : '')}
+                                                    </>
+                                                )}
                                         </small>
                                     )}
                                 </span>
@@ -676,7 +710,9 @@ const MessageBubble = ({
                     })}
                 </div>
                 <div className="marriage-timeline-card__trust-note">
-                    Your choice narrows the calculation; it is not treated as a date predicted independently.
+                    {isClarificationChoice
+                        ? 'Answering several questions together thins each reading. Pick one theme and I’ll go deep.'
+                        : 'Your choice narrows the calculation; it is not treated as a date predicted independently.'}
                 </div>
             </div>
         );
@@ -1663,7 +1699,7 @@ const MessageBubble = ({
             : '';
 
         return (
-            <div className={`message-bubble message-bubble--instant${isTimelineSelection ? ' message-bubble--timeline' : ''} ${message.role} ${message.isTyping || message.isProcessing ? 'typing' : ''}`}>
+            <div className={`message-bubble message-bubble--instant${isStructuredChoice ? ' message-bubble--timeline' : ''} ${message.role} ${message.isTyping || message.isProcessing ? 'typing' : ''}`}>
                 <div className="message-content message-content--instant">
                     <div className="instant-chat-copy">
                         {(message.isTyping || message.isProcessing) && instantTypingState ? (
@@ -1742,7 +1778,7 @@ const MessageBubble = ({
                         </div>
                     ) : null}
                 </div>
-                {renderTimelineSelectionCard()}
+                {renderStructuredChoiceCard()}
                 {showInstantEvidence && instantEvidence ? (
                     <InstantEvidenceModal evidence={instantEvidence} onClose={() => setShowInstantEvidence(false)} />
                 ) : null}
@@ -2161,7 +2197,7 @@ const MessageBubble = ({
                     )}
                 </div>
 
-                {renderTimelineSelectionCard()}
+                {renderStructuredChoiceCard()}
 
                 {message.role === 'assistant'
                     && !message.isTyping
@@ -2226,7 +2262,7 @@ const MessageBubble = ({
                     && !message.isTyping
                     && !message.isProcessing
                     && messageChatTier !== 'instant'
-                    && !isTimelineSelection
+                    && !isStructuredChoice
                     && showNextActionCard && (
                     <div
                         className="remedy-next-action-card"

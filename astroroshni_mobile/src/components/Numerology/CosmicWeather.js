@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 
 // Helper functions for actionable advice
 const getActionableAdvice = (dayNumber) => {
@@ -45,14 +45,14 @@ const getPinnacleExplanation = (number, ageRange) => {
   return explanations[number] || `Pinnacle ${number} energy for ages ${ageRange} - Focus on personal growth and development`;
 };
 
-const renderFormattedText = (text) => {
+const renderFormattedText = (text, accentColor) => {
   if (!text || typeof text !== 'string') return text;
   
   const parts = text.split(/\*\*(.*?)\*\*/g);
   return parts.map((part, index) => {
     if (index % 2 === 1) {
       return (
-        <Text key={index} style={{ fontWeight: '700', color: '#fbbf24' }}>
+        <Text key={index} style={{ fontWeight: '700', color: accentColor }}>
           {part}
         </Text>
       );
@@ -75,12 +75,13 @@ const safeString = (value) => {
 };
 
 export default function CosmicWeather({ data }) {
+  const { colors } = useTheme();
   const [expandedPhase, setExpandedPhase] = useState(null);
   
   if (!data) {
     return (
       <View style={styles.container}>
-        <Text style={styles.noDataText}>No forecast data available</Text>
+        <Text style={[styles.noDataText, { color: colors.textSecondary }]}>No forecast data available</Text>
       </View>
     );
   }
@@ -91,50 +92,50 @@ export default function CosmicWeather({ data }) {
     <View style={styles.container}>
       {current_energy && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📅 Today's Energy Focus</Text>
-          <View style={styles.weatherCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>📅 Today's Energy Focus</Text>
+          <View style={[styles.weatherCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
             <View style={styles.weatherContent}>
               <View style={styles.currentCycle}>
-                <View style={styles.cycleBadge}>
-                  <Text style={styles.cycleNumber}>{safeString(current_energy.personal_day?.number)}</Text>
+                <View style={[styles.cycleBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.cycleNumber, { color: colors.onPrimary }]}>{safeString(current_energy.personal_day?.number)}</Text>
                 </View>
-                <Text style={styles.cycleLabel}>Personal Day {safeString(current_energy.personal_day?.number)}</Text>
-                <Text style={styles.cycleSubtext}>
+                <Text style={[styles.cycleLabel, { color: colors.text }]}>Personal Day {safeString(current_energy.personal_day?.number)}</Text>
+                <Text style={[styles.cycleSubtext, { color: colors.textSecondary }]}>
                   Month {safeString(current_energy.personal_month?.number)} • Year {safeString(current_energy.personal_year?.number)}
                 </Text>
               </View>
               
-              <View style={styles.actionSection}>
-                <Text style={styles.actionTitle}>Best Actions Today:</Text>
-                <Text style={styles.actionText}>
+              <View style={[styles.actionSection, { backgroundColor: colors.surfaceMuted }]}>
+                <Text style={[styles.actionTitle, { color: colors.primary }]}>Best Actions Today:</Text>
+                <Text style={[styles.actionText, { color: colors.text }]}>
                   {getActionableAdvice(current_energy.personal_day?.number)}
                 </Text>
               </View>
               
               <View style={styles.contextSection}>
-                <View style={styles.contextItem}>
-                  <Text style={styles.contextLabel}>This Month:</Text>
-                  <Text style={styles.contextValue}>{getMonthFocus(current_energy.personal_month?.number)}</Text>
+                <View style={[styles.contextItem, { backgroundColor: colors.surfaceMuted }]}>
+                  <Text style={[styles.contextLabel, { color: colors.textTertiary }]}>This Month:</Text>
+                  <Text style={[styles.contextValue, { color: colors.text }]}>{getMonthFocus(current_energy.personal_month?.number)}</Text>
                 </View>
-                <View style={styles.contextItem}>
-                  <Text style={styles.contextLabel}>This Year:</Text>
-                  <Text style={styles.contextValue}>{getYearTheme(current_energy.personal_year?.number)}</Text>
+                <View style={[styles.contextItem, { backgroundColor: colors.surfaceMuted }]}>
+                  <Text style={[styles.contextLabel, { color: colors.textTertiary }]}>This Year:</Text>
+                  <Text style={[styles.contextValue, { color: colors.text }]}>{getYearTheme(current_energy.personal_year?.number)}</Text>
                 </View>
               </View>
               
               {current_energy.daily_guidance && (
-                <View style={styles.guidanceSection}>
-                  <Text style={styles.guidanceTitle}>Today's Guidance</Text>
-                  <Text style={styles.guidanceText}>
-                    {renderFormattedText(safeString(current_energy.daily_guidance))}
+                <View style={[styles.guidanceSection, { backgroundColor: colors.surfaceMuted, borderLeftColor: colors.primary }]}>
+                  <Text style={[styles.guidanceTitle, { color: colors.primary }]}>Today's Guidance</Text>
+                  <Text style={[styles.guidanceText, { color: colors.text }]}>
+                    {renderFormattedText(safeString(current_energy.daily_guidance), colors.accent)}
                   </Text>
                 </View>
               )}
 
               {current_energy.calculation_logic && (
-                <View style={styles.calculationSection}>
-                  <Text style={styles.calculationTitle}>How it's calculated</Text>
-                  <Text style={styles.calculationText}>
+                <View style={[styles.calculationSection, { backgroundColor: colors.backgroundTertiary || colors.surfaceMuted }]}>
+                  <Text style={[styles.calculationTitle, { color: colors.textSecondary }]}>How it's calculated</Text>
+                  <Text style={[styles.calculationText, { color: colors.textTertiary }]}>
                     {safeString(current_energy.calculation_logic)}
                   </Text>
                 </View>
@@ -146,8 +147,8 @@ export default function CosmicWeather({ data }) {
 
       {life_timeline?.pinnacles && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎯 Your Life Strategy Phases</Text>
-          <Text style={styles.sectionDescription}>Your life has 4 strategic phases. Each phase has specific goals and opportunities:</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>🎯 Your Life Strategy Phases</Text>
+          <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>Your life has 4 strategic phases. Each phase has specific goals and opportunities:</Text>
           
           {Object.entries(life_timeline.pinnacles).map(([key, phase], index) => {
             const phaseNames = {
@@ -165,35 +166,35 @@ export default function CosmicWeather({ data }) {
             };
             
             return (
-              <View key={index} style={styles.phaseCard}>
+              <View key={index} style={[styles.phaseCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
                 <TouchableOpacity 
                   style={styles.phaseContent}
                   onPress={() => setExpandedPhase(expandedPhase === key ? null : key)}
                 >
                   <View style={styles.phaseHeader}>
-                    <View style={styles.phaseNumber}>
-                      <Text style={styles.phaseNumberText}>{safeString(phase.number)}</Text>
+                    <View style={[styles.phaseNumber, { backgroundColor: colors.accent }]}>
+                      <Text style={[styles.phaseNumberText, { color: colors.onAccent }]}>{safeString(phase.number)}</Text>
                     </View>
                     <View style={styles.phaseInfo}>
-                      <Text style={styles.phaseName}>{phaseNames[key]}</Text>
-                      <Text style={styles.phaseAge}>Age {safeString(phase.age_range)}</Text>
+                      <Text style={[styles.phaseName, { color: colors.text }]}>{phaseNames[key]}</Text>
+                      <Text style={[styles.phaseAge, { color: colors.textSecondary }]}>Age {safeString(phase.age_range)}</Text>
                     </View>
                   </View>
                   
-                  <Text style={styles.phaseGoals}>
-                    <Text style={styles.bold}>Goals:</Text> {phaseGoals[key]}
+                  <Text style={[styles.phaseGoals, { color: colors.textSecondary }]}>
+                    <Text style={[styles.bold, { color: colors.text }]}>Goals:</Text> {phaseGoals[key]}
                   </Text>
                   
-                  <Text style={styles.phaseMeaning}>
-                    <Text style={styles.bold}>Pinnacle #{safeString(phase.number)}:</Text> {safeString(phase.description || phase.meaning)}
+                  <Text style={[styles.phaseMeaning, { color: colors.textSecondary }]}>
+                    <Text style={[styles.bold, { color: colors.text }]}>Pinnacle #{safeString(phase.number)}:</Text> {safeString(phase.description || phase.meaning)}
                   </Text>
                   
-                  <Text style={styles.expandHint}>💡 Tap for detailed explanation</Text>
+                  <Text style={[styles.expandHint, { color: colors.primary }]}>💡 Tap for detailed explanation</Text>
                 </TouchableOpacity>
                 
                 {expandedPhase === key && (
-                  <View style={styles.explanationBox}>
-                    <Text style={styles.explanationText}>
+                  <View style={[styles.explanationBox, { backgroundColor: colors.surfaceMuted, borderLeftColor: colors.primary }]}>
+                    <Text style={[styles.explanationText, { color: colors.text }]}>
                       {getPinnacleExplanation(phase.number, phase.age_range)}
                     </Text>
                   </View>
@@ -213,7 +214,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   noDataText: {
-    color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
     fontSize: 16,
     marginTop: 40,
@@ -224,15 +224,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: COLORS.white,
     marginBottom: 16,
     paddingHorizontal: 4,
   },
   weatherCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   weatherContent: {
     padding: 20,
@@ -245,78 +242,54 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#6366f1',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   cycleNumber: {
     fontSize: 28,
     fontWeight: '700',
-    color: COLORS.white,
   },
   cycleLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.white,
     marginBottom: 4,
   },
   cycleSubtext: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  meaning: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 22,
   },
   guidanceSection: {
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
     padding: 16,
     borderRadius: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#6366f1',
     marginBottom: 16,
   },
   guidanceTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#a5b4fc',
     marginBottom: 8,
   },
   guidanceText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
     lineHeight: 20,
   },
   calculationSection: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     padding: 12,
     borderRadius: 8,
   },
   calculationTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 6,
   },
   calculationText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
     lineHeight: 16,
     ...(Platform.OS === 'ios' ? { fontFamily: 'Courier' } : {}),
   },
   phaseCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
     marginBottom: 12,
   },
   phaseContent: {
@@ -331,7 +304,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#10b981',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -339,7 +311,6 @@ const styles = StyleSheet.create({
   phaseNumberText: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
   },
   phaseInfo: {
     flex: 1,
@@ -347,21 +318,17 @@ const styles = StyleSheet.create({
   phaseName: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.white,
     marginBottom: 2,
   },
   phaseAge: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.7)',
   },
   phaseMeaning: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
     lineHeight: 20,
     marginBottom: 8,
   },
   actionSection: {
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
     padding: 16,
     borderRadius: 12,
     marginBottom: 16,
@@ -369,12 +336,10 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#a5b4fc',
     marginBottom: 8,
   },
   actionText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
     lineHeight: 20,
   },
   contextSection: {
@@ -384,7 +349,6 @@ const styles = StyleSheet.create({
   },
   contextItem: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     padding: 12,
     borderRadius: 8,
     marginHorizontal: 4,
@@ -392,48 +356,39 @@ const styles = StyleSheet.create({
   },
   contextLabel: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.6)',
     marginBottom: 4,
   },
   contextValue: {
     fontSize: 12,
     fontWeight: '600',
-    color: COLORS.white,
     textAlign: 'center',
   },
   sectionDescription: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 16,
     paddingHorizontal: 4,
   },
   phaseGoals: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
     lineHeight: 18,
     marginBottom: 8,
   },
   bold: {
     fontWeight: '600',
-    color: COLORS.white,
   },
   expandHint: {
     fontSize: 11,
-    color: 'rgba(99, 102, 241, 0.8)',
     textAlign: 'center',
     marginTop: 8,
   },
   explanationBox: {
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
     padding: 12,
     borderRadius: 8,
     marginTop: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#6366f1',
   },
   explanationText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
     lineHeight: 16,
   },
 });

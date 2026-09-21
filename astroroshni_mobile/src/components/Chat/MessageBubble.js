@@ -296,6 +296,12 @@ function MessageBubble({
       && message.next_action?.reason
       && message.next_action?.follow_up_questions?.[0]
   );
+  const nextAction = message.next_action || message.nextAction || null;
+  const isClarificationChoice = String(nextAction?.type || '').toLowerCase() === 'clarification_choice';
+  const clarificationChoices = isClarificationChoice && Array.isArray(nextAction?.options)
+    ? nextAction.options.filter((option) => option?.id && option?.label && (option?.submit_text || option?.label))
+    : [];
+  const [selectedClarificationChoice, setSelectedClarificationChoice] = useState(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [tooltipModal, setTooltipModal] = useState({ show: false, term: '', definition: '' });
   const [isLoadingPodcast, setIsLoadingPodcast] = useState(false);
@@ -335,6 +341,9 @@ function MessageBubble({
   useEffect(() => {
     showPodcastPlayerModalRef.current = showPodcastPlayerModal;
   }, [showPodcastPlayerModal]);
+  useEffect(() => {
+    setSelectedClarificationChoice(null);
+  }, [message.messageId, message.id, nextAction?.type]);
   /** After seek, ignore progress updates briefly so we don't overwrite with stale position. */
   const lastSeekedAtRef = useRef(0);
   /** Set when user closes the modal while "Generating..." so we don't reopen or auto-play when the request completes. */
@@ -2678,6 +2687,80 @@ function MessageBubble({
         )}
 
         {/* NEW: Render Follow-up Questions from the dedicated prop */}
+        {message.role === 'assistant' && !message.isTyping && clarificationChoices.length > 0 && (
+          <View
+            style={[
+              styles.clarificationChoiceCard,
+              {
+                backgroundColor: colors.cardBackground,
+                borderColor: colors.cardBorder,
+              },
+            ]}
+          >
+            <Text style={[styles.clarificationChoiceEyebrow, { color: colors.primary }]}>
+              {t('chat.chooseTheme', 'Choose a theme')}
+            </Text>
+            {clarificationChoices.map((option, index) => {
+              const optionId = String(option.id);
+              const selected = selectedClarificationChoice === optionId;
+              const disabled = Boolean(selectedClarificationChoice);
+              return (
+                <TouchableOpacity
+                  key={optionId}
+                  activeOpacity={0.84}
+                  disabled={disabled}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected, disabled }}
+                  style={[
+                    styles.clarificationChoiceOption,
+                    {
+                      backgroundColor: selected ? colors.selectionSurface : colors.surfaceMuted,
+                      borderColor: selected ? colors.selectionBorder : colors.cardBorder,
+                      opacity: disabled && !selected ? 0.5 : 1,
+                    },
+                  ]}
+                  onPress={() => {
+                    if (selectedClarificationChoice || !onFollowUpClick) return;
+                    setSelectedClarificationChoice(optionId);
+                    const sourceMessageId = message.messageId || message.id;
+                    const submitText = String(option.submit_text || option.label).trim();
+                    onFollowUpClick(submitText, {
+                      directSend: true,
+                      originalQuestion: String(nextAction?.original_question || '').trim() || undefined,
+                      query_context: {
+                        follow_up_type: 'clarification_choice',
+                        clarification_choice_id: optionId,
+                        source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
+                        original_question: String(nextAction?.original_question || '').trim() || undefined,
+                      },
+                    });
+                  }}
+                >
+                  <View style={[styles.clarificationChoiceIndex, { backgroundColor: colors.selectionSurface }]}>
+                    <Text style={[styles.clarificationChoiceIndexText, { color: colors.selectionText }]}>
+                      {selected ? '✓' : index + 1}
+                    </Text>
+                  </View>
+                  <View style={styles.clarificationChoiceCopy}>
+                    <Text style={[styles.clarificationChoiceLabel, { color: selected ? colors.selectionText : colors.text }]}>
+                      {option.label}
+                    </Text>
+                    {String(option.submit_text || '').trim() ? (
+                      <Text style={[styles.clarificationChoiceQuestion, { color: colors.textSecondary }]}>
+                        {option.submit_text}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+                </TouchableOpacity>
+              );
+            })}
+            <Text style={[styles.clarificationChoiceHint, { color: colors.textTertiary }]}>
+              {t('chat.themeChoiceHint', 'Answering several questions together thins each reading. Pick one theme and I’ll go deep.')}
+            </Text>
+          </View>
+        )}
+
         {message.follow_up_questions && message.follow_up_questions.length > 0 && (
           <View style={styles.followUpContainer}>
             <Text style={[styles.followUpEyebrow, { color: colors.primary }]}>{t('premiumUi.chat.continueReading')}</Text>
@@ -3886,6 +3969,66 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     fontWeight: '800',
     letterSpacing: 1.7,
     marginBottom: 2,
+  },
+  clarificationChoiceCard: {
+    alignSelf: 'stretch',
+    width: '100%',
+    marginTop: 14,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    gap: 8,
+  },
+  clarificationChoiceEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  clarificationChoiceTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  clarificationChoiceOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  clarificationChoiceIndex: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clarificationChoiceIndexText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  clarificationChoiceCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  clarificationChoiceLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  clarificationChoiceQuestion: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  clarificationChoiceHint: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
   },
   remedyCard: {
     borderRadius: 24,

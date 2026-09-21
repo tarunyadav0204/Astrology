@@ -671,12 +671,12 @@ export default function SelectNativeScreen({ navigation, route }) {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <View style={[styles.heroCard, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
+            <View style={[styles.heroCard, (totalCharts > 0 || profiles.length > 0) && styles.heroCardCompact, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
               <View style={[styles.heroOrbitLarge, { borderColor: colors.cosmicLine }]} />
               <View style={[styles.heroOrbitSmall, { borderColor: colors.cosmicLine }]} />
               <Text style={[styles.heroEyebrow, { color: colors.accent }]}>CHART LIBRARY</Text>
-              <Text style={[styles.heroTitle, { color: colors.textInverse }]}>Whose sky are we reading?</Text>
-              <Text style={[styles.heroSubtitle, { color: colors.textInverseMuted }]}>{selectionPrompt}</Text>
+              <Text style={[styles.heroTitle, (totalCharts > 0 || profiles.length > 0) && styles.heroTitleCompact, { color: colors.textInverse }]}>Whose sky are we reading?</Text>
+              {!(totalCharts > 0 || profiles.length > 0) && <Text style={[styles.heroSubtitle, { color: colors.textInverseMuted }]}>{selectionPrompt}</Text>}
               <View style={styles.heroFooter}>
                 <View style={[styles.chartCountPill, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}>
                   <Ionicons name="albums-outline" size={14} color={colors.accent} />
@@ -694,7 +694,7 @@ export default function SelectNativeScreen({ navigation, route }) {
                 <TextInput
                   style={[styles.localSearchInput, { color: colors.text }]}
                   placeholder="Search by name..."
-                  placeholderTextColor={colors.textSecondary + '80'}
+                  placeholderTextColor={colors.textSecondary}
                   value={localSearchQuery}
                   onChangeText={handleLocalSearchChange}
                   autoCorrect={false}
@@ -1016,6 +1016,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     overflow: 'hidden',
   },
+  heroCardCompact: { minHeight: 0, paddingVertical: 16 },
+  heroTitleCompact: { maxWidth: '100%', fontSize: 25, lineHeight: 30, marginTop: 6 },
   heroOrbitLarge: {
     position: 'absolute',
     width: 220,
@@ -1037,8 +1039,8 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   heroEyebrow: {
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '900',
     letterSpacing: 2,
   },
@@ -1073,12 +1075,12 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   chartCountText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
   heroHint: {
     flex: 1,
-    fontSize: 10,
+    fontSize: 12,
     textAlign: 'right',
   },
   localSearchContainer: {
@@ -1135,7 +1137,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   profileGroupTitle: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 1.5,
@@ -1178,8 +1180,8 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   sheetEyebrow: {
-    fontSize: 9,
-    lineHeight: 13,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '900',
     letterSpacing: 1.7,
     marginBottom: 5,
@@ -1340,8 +1342,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   relationKicker: {
-    fontSize: 9,
-    lineHeight: 12,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '900',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
@@ -1366,7 +1368,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   selfBadgeText: {
-    fontSize: 8,
+    fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0.7,
   },
@@ -1378,13 +1380,13 @@ const styles = StyleSheet.create({
   },
   profileDate: {
     flexShrink: 1,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 16,
   },
   profilePlace: {
     flexShrink: 1,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 16,
   },
   menuButton: {
     position: 'absolute',

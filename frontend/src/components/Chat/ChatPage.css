@@ -4417,3 +4417,20 @@ button.chat-header-credits.credits-display:focus-visible {
 }
 .marriage-timeline-option__copy small { color: var(--color-text-muted); font-size: 11px; line-height: 1.35; }
 .marriage-timeline-option__control { color: var(--color-accent); font-size: 20px; font-weight: 800; }
+
+.clarification-choice-card {
+    border-color: color-mix(in srgb, #f59e0b 42%, var(--color-border));
+    background: linear-gradient(145deg, color-mix(in srgb, var(--color-surface-raised) 94%, #fef3c7), var(--color-surface));
+}
+
+.clarification-choice-card .marriage-timeline-card__eyebrow,
+.clarification-choice-card .marriage-timeline-option__rank,
+.clarification-choice-card .marriage-timeline-option__control {
+    color: #b45309;
+}
+
+.clarification-choice-card .marriage-timeline-option:hover:not(:disabled),
+.clarification-choice-card .marriage-timeline-option:focus-visible:not(:disabled) {
+    border-color: #f59e0b;
+    background: color-mix(in srgb, #fef3c7 24%, var(--color-surface-raised));
+}

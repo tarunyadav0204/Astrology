@@ -175,14 +175,28 @@ def reconcile(body: ReconcileBody, user=Depends(admin)):
         raise HTTPException(502, 'Provider reconciliation failed; try again later')
 
 
+def _select_subscription_rows(sql):
+    """Read one subscription source on its own connection.
+
+    Play/Razorpay map tables may be missing SELECT for this role. A privilege
+    error on the shared advisory-lock transaction would abort the whole batch.
+    """
+    try:
+        with get_conn() as conn:
+            return execute(conn, sql).fetchall() or []
+    except Exception:
+        logger.warning('Skipping subscription source query: %s', sql, exc_info=True)
+        return []
+
+
 def reconcile_batch(limit=20):
     ledger.ensure_schema()
     with get_conn() as conn:
         # One worker across all production instances; transaction lock released on crash.
         if not execute(conn, 'SELECT pg_try_advisory_xact_lock(73106)').fetchone()[0]:
             return
-        refs = [('razorpay', r[0]) for r in execute(conn, 'SELECT razorpay_subscription_id FROM razorpay_subscription_map').fetchall()]
-        refs += [('google_play', ledger.play_reference(r[0])) for r in execute(conn, 'SELECT purchase_token FROM play_subscription_token_map').fetchall()]
+        refs = [('razorpay', r[0]) for r in _select_subscription_rows('SELECT razorpay_subscription_id FROM razorpay_subscription_map')]
+        refs += [('google_play', ledger.play_reference(r[0])) for r in _select_subscription_rows('SELECT purchase_token FROM play_subscription_token_map')]
         checked = {(r[0],r[1]):r[2] for r in execute(conn, 'SELECT provider,external_id,checked_at FROM subscription_billing_state').fetchall()}
         cutoff = datetime.now(timezone.utc)-timedelta(hours=6)
         refs = sorted((r for r in refs if r not in checked or checked[r]<cutoff), key=lambda r: checked.get(r,datetime.min.replace(tzinfo=timezone.utc)))[:limit]

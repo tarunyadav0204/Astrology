@@ -159,7 +159,18 @@ async def run_parallel_relational_chat_pipeline(
     parallel_ms = round((time.time() - t_parallel) * 1000, 1)
 
     hist_text = _format_history(conversation_history)
-    mq_focus = build_multi_question_focus_instruction(str(language or "english"))
+    try:
+        from ai.output_schema import (
+            build_compound_choice_focus_instruction,
+            is_compound_choice_answer,
+        )
+        mq_focus = (
+            build_compound_choice_focus_instruction()
+            if is_compound_choice_answer(ctx)
+            else build_multi_question_focus_instruction(str(language or "english"))
+        )
+    except ImportError:
+        mq_focus = build_multi_question_focus_instruction(str(language or "english"))
     compact_branches = {branch: _compact_branch_output(branch, branch_outputs[branch]) for branch in enabled_branches}
     merge_bundle = {
         "relationship": relation_profile,

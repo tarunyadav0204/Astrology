@@ -383,7 +383,7 @@ export default function HomeScreen({
       : ['rgba(255, 255, 255, 0.98)', 'rgba(255, 247, 237, 0.95)', 'rgba(255, 237, 213, 0.92)'];
   const isIOS = Platform.OS === 'ios';
   const { freeQuestionAvailable, pricing, pricingOriginal, fetchPricing } = useCredits();
-  const { requireAuthForPaid } = useAuthGate();
+  const { requireAuthForPaid, isGuest } = useAuthGate();
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
   const [showMultiChartTipModal, setShowMultiChartTipModal] = useState(false);
@@ -2265,7 +2265,7 @@ const loadHomeData = async (nativeData = null) => {
           onNextPeakAsk={() => askNextPeakQuestion(nextPeakData)}
           onNextPeakTimeline={openNextPeakTimeline}
           onNextPeakOpenDetail={() => setShowNextPeakSheet(true)}
-          todayPredictions={(currentNativeData || birthData)?.date ? (
+          todayPredictions={!isGuest && (currentNativeData || birthData)?.date ? (
             <KpTodayCarousel
               embedded
               birthDetails={currentNativeData || birthData}
@@ -2471,7 +2471,7 @@ const loadHomeData = async (nativeData = null) => {
           </AppScrollView>
         </View>
 
-        {(currentNativeData || birthData)?.date ? (
+        {!isGuest && (currentNativeData || birthData)?.date ? (
           <KpTodayCarousel
             birthDetails={currentNativeData || birthData}
             onOpenKp={(scope = 'today') => {

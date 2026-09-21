@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 
 const getCoreNumberExplanation = (type, number) => {
   const explanations = {
@@ -18,46 +18,48 @@ const getCoreNumberExplanation = (type, number) => {
 };
 
 export default function SoulBlueprint({ data }) {
+  const { colors } = useTheme();
   const [expandedNumber, setExpandedNumber] = useState(null);
   
   if (!data) {
     return (
       <View style={styles.container}>
-        <Text style={styles.noDataText}>No numerology data available</Text>
+        <Text style={[styles.noDataText, { color: colors.textSecondary }]}>No numerology data available</Text>
       </View>
     );
   }
 
   const { core_numbers, lo_shu_grid } = data;
+  const numberTones = {
+    life_path: colors.primary,
+    expression: colors.success,
+    soul_urge: colors.warning,
+    personality: colors.error,
+  };
 
   return (
     <View style={styles.container}>
       {/* Core Numbers */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Core Numbers</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Core Numbers</Text>
         <View style={styles.numbersGrid}>
           {core_numbers && Object.entries(core_numbers).map(([key, numberObj]) => {
             const displayValue = typeof numberObj === 'object' ? 
               (numberObj?.number || numberObj?.life_path_number) : numberObj;
-            const colors = {
-              life_path: '#6366f1',
-              expression: '#10b981', 
-              soul_urge: '#f59e0b',
-              personality: '#ef4444'
-            };
+            const tone = numberTones[key] || colors.secondary;
             return (
               <View key={key} style={styles.numberCard}>
                 <TouchableOpacity 
-                  style={[styles.numberContent, { backgroundColor: colors[key] || '#6b7280' }]}
+                  style={[styles.numberContent, { backgroundColor: tone }]}
                   onPress={() => setExpandedNumber(expandedNumber === key ? null : key)}
                 >
-                  <Text style={styles.numberValue}>{displayValue}</Text>
-                  <Text style={styles.numberLabel}>{key.replace(/_/g, ' ')}</Text>
-                  <Text style={styles.expandHint}>💡 Tap for details</Text>
+                  <Text style={[styles.numberValue, { color: colors.onPrimary }]}>{displayValue}</Text>
+                  <Text style={[styles.numberLabel, { color: colors.onPrimary }]}>{key.replace(/_/g, ' ')}</Text>
+                  <Text style={[styles.expandHint, { color: colors.onPrimary, opacity: 0.78 }]}>💡 Tap for details</Text>
                 </TouchableOpacity>
                 {expandedNumber === key && (
-                  <View style={styles.explanationBox}>
-                    <Text style={styles.explanationText}>
+                  <View style={[styles.explanationBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+                    <Text style={[styles.explanationText, { color: colors.text }]}>
                       {getCoreNumberExplanation(key, displayValue)}
                     </Text>
                   </View>
@@ -71,13 +73,26 @@ export default function SoulBlueprint({ data }) {
       {/* Lo Shu Grid */}
       {lo_shu_grid && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Lo Shu Grid</Text>
-          <View style={styles.grid}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Lo Shu Grid</Text>
+          <View style={[styles.grid, { backgroundColor: colors.surfaceMuted }]}>
               {[4, 9, 2, 3, 5, 7, 8, 1, 6].map((num, index) => {
                 const count = lo_shu_grid.grid_counts?.[num] || 0;
+                const filled = count > 0;
                 return (
-                  <View key={index} style={[styles.gridCell, count > 0 && styles.filledCell]}>
-                    <Text style={[styles.gridNumber, count > 0 && styles.activeGridNumber]}>{num}</Text>
+                  <View
+                    key={index}
+                    style={[
+                      styles.gridCell,
+                      {
+                        backgroundColor: filled ? colors.success : colors.cardBackground,
+                        borderColor: colors.cardBorder,
+                      },
+                    ]}
+                  >
+                    <Text style={[
+                      styles.gridNumber,
+                      { color: filled ? colors.onPrimary : colors.textTertiary },
+                    ]}>{num}</Text>
                   </View>
                 );
               })}
@@ -86,20 +101,38 @@ export default function SoulBlueprint({ data }) {
           {/* Patterns */}
           {(lo_shu_grid.arrows_of_strength?.length > 0 || lo_shu_grid.missing_numbers?.length > 0) && (
             <View style={styles.patternsSection}>
-              {lo_shu_grid.arrows_of_strength?.map((arrow, index) => (
-                <View key={index} style={[styles.patternItem, arrow.type === 'Strength' ? styles.strengthPattern : styles.weaknessPattern]}>
-                  <Text style={styles.patternName}>{typeof arrow === 'string' ? arrow : arrow?.name || 'Pattern'}</Text>
-                  {arrow?.description && <Text style={styles.patternDescription}>{arrow.description}</Text>}
+              {lo_shu_grid.arrows_of_strength?.map((arrow, index) => {
+                const isStrength = arrow.type === 'Strength';
+                return (
+                <View
+                  key={index}
+                  style={[
+                    styles.patternItem,
+                    {
+                      backgroundColor: colors.surfaceMuted,
+                      borderLeftColor: isStrength ? colors.success : colors.error,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.patternName, { color: colors.text }]}>{typeof arrow === 'string' ? arrow : arrow?.name || 'Pattern'}</Text>
+                  {arrow?.description && <Text style={[styles.patternDescription, { color: colors.textSecondary }]}>{arrow.description}</Text>}
                 </View>
-              ))}
+                );
+              })}
               
               {lo_shu_grid.missing_numbers?.map((missing, index) => (
-                <View key={index} style={styles.missingItem}>
+                <View
+                  key={index}
+                  style={[
+                    styles.missingItem,
+                    { backgroundColor: colors.surfaceMuted, borderLeftColor: colors.warning },
+                  ]}
+                >
                   <View style={styles.missingHeader}>
-                    <Text style={styles.missingNumber}>{missing.number}</Text>
-                    <Text style={styles.missingEnergy}>{missing.missing_energy}</Text>
+                    <Text style={[styles.missingNumber, { color: colors.warning }]}>{missing.number}</Text>
+                    <Text style={[styles.missingEnergy, { color: colors.text }]}>{missing.missing_energy}</Text>
                   </View>
-                  <Text style={styles.missingLesson}>{missing.lesson}</Text>
+                  <Text style={[styles.missingLesson, { color: colors.textSecondary }]}>{missing.lesson}</Text>
                 </View>
               ))}
             </View>
@@ -116,7 +149,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   noDataText: {
-    color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
     fontSize: 16,
     marginTop: 40,
@@ -127,7 +159,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: COLORS.white,
     marginBottom: 16,
     paddingHorizontal: 4,
   },
@@ -149,38 +180,33 @@ const styles = StyleSheet.create({
   numberValue: {
     fontSize: 28,
     fontWeight: '700',
-    color: COLORS.white,
     marginBottom: 6,
   },
   numberLabel: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     textTransform: 'capitalize',
     fontWeight: '500',
   },
   expandHint: {
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
     marginTop: 4,
   },
   explanationBox: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     padding: 12,
     borderRadius: 8,
     marginTop: 8,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   explanationText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
     lineHeight: 16,
   },
 
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingTop: 18,
@@ -193,25 +219,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
-    backgroundColor: 'rgba(253, 255, 255, 0.28)',
     marginBottom: 14,
-  },
-  filledCell: {
-    backgroundColor: 'rgba(91, 180, 121, 0.75)',
+    borderWidth: StyleSheet.hairlineWidth,
   },
   gridNumber: {
     fontSize: 18,
     fontWeight: '600',
-    color: 'rgba(243, 238, 238, 0.6)',
-  },
-  activeGridNumber: {
-    color: '#ffffff',
-  },
-  gridCount: {
-    fontSize: 10,
-    color: '#e0e7ff',
-    fontWeight: '700',
-    marginTop: 2,
   },
   patternsSection: {
     marginTop: 16,
@@ -222,32 +235,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderLeftWidth: 3,
   },
-  strengthPattern: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderLeftColor: '#10b981',
-  },
-  weaknessPattern: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderLeftColor: '#ef4444',
-  },
   patternName: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.white,
     marginBottom: 4,
   },
   patternDescription: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
     lineHeight: 18,
   },
   missingItem: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
     padding: 14,
     borderRadius: 10,
     marginBottom: 10,
     borderLeftWidth: 3,
-    borderLeftColor: '#f59e0b',
   },
   missingHeader: {
     flexDirection: 'row',
@@ -257,18 +258,15 @@ const styles = StyleSheet.create({
   missingNumber: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#fbbf24',
     marginRight: 8,
     width: 24,
   },
   missingEnergy: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.white,
   },
   missingLesson: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
     lineHeight: 18,
   },
 });

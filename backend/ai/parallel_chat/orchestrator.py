@@ -186,6 +186,17 @@ from ai.output_schema import (
     get_response_schema_for_mode,
     NEXT_ACTION_META_INSTRUCTION,
 )
+try:
+    from ai.output_schema import (
+        build_compound_choice_focus_instruction,
+        is_compound_choice_answer,
+    )
+except ImportError:
+    def is_compound_choice_answer(_intent_or_context=None):
+        return False
+
+    def build_compound_choice_focus_instruction():
+        return ""
 from ai.parallel_chat.agent_context_factory import (
     merged_context_to_agent_context,
     parallel_agent_context_enabled,
@@ -1131,12 +1142,18 @@ async def run_parallel_chat_pipeline(
             if remedy_followup_requested
             else NEXT_ACTION_META_INSTRUCTION.strip()
         )
+        mq_focus = (
+            build_compound_choice_focus_instruction()
+            if is_compound_choice_answer(intent)
+            else ""
+        )
         final_user = (
             f"{time_context}\n\n"
             f"{hist_text}"
             f"{lifespan_evidence_block}"
             f"{slow_transits_block}"
             f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n{_json_compact(parashari_branch_bundle)}\n"
+            f"{mq_focus}"
             f"CURRENT QUESTION: {user_question}\n"
             f"{final_check}\n{FAQ_META_INSTRUCTION.strip()}"
             f"\n{next_action_block}"
@@ -1408,7 +1425,11 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         },
     }
     _merge_lang = str(language or "english").strip() or "english"
-    mq_focus = build_multi_question_focus_instruction(_merge_lang)
+    mq_focus = (
+        build_compound_choice_focus_instruction()
+        if is_compound_choice_answer(intent)
+        else build_multi_question_focus_instruction(_merge_lang)
+    )
     merge_cached_note = (
         _cached_shared_context_note(shared_context_keys)
         if _runtime_for("merge")["cached_model"]

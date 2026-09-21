@@ -72,7 +72,8 @@ export default function NotificationEnableReminderModal({
 
   useEffect(() => {
     if (
-      !fomoTriggerNonce
+      !homeActive
+      || !fomoTriggerNonce
       || handledFomoTriggerRef.current === fomoTriggerNonce
       || Platform.OS === 'ios'
       || Platform.OS === 'web'
@@ -101,7 +102,7 @@ export default function NotificationEnableReminderModal({
     return () => {
       cancelled = true;
     };
-  }, [fomoTriggerNonce]);
+  }, [fomoTriggerNonce, homeActive]);
 
   const close = () => setVisible(false);
 

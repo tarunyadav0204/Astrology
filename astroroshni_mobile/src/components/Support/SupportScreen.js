@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -41,6 +41,7 @@ export default function SupportScreen({ navigation }) {
   const source = Platform.OS === 'web' ? 'web' : Platform.OS === 'ios' ? 'ios' : 'android';
 
   const [view, setView] = useState('list');
+  const [isGuest, setIsGuest] = useState(true);
   const [tickets, setTickets] = useState([]);
   const [listLoading, setListLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -62,6 +63,9 @@ export default function SupportScreen({ navigation }) {
   const loadTickets = useCallback(async () => {
     setError('');
     try {
+      const token = await AsyncStorage.getItem('authToken');
+      setIsGuest(!token);
+      if (!token) { setTickets([]); return; }
       const { data } = await supportAPI.listTickets();
       setTickets(data.tickets || []);
     } catch (e) {
@@ -73,9 +77,9 @@ export default function SupportScreen({ navigation }) {
     }
   }, [t]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     loadTickets();
-  }, [loadTickets]);
+  }, [loadTickets]));
 
   const openThread = useCallback(async (id) => {
     setActiveId(id);
@@ -85,6 +89,7 @@ export default function SupportScreen({ navigation }) {
     setReplyText('');
     setReplyImage(null);
     try {
+      if (!(await AsyncStorage.getItem('authToken'))) { setIsGuest(true); setView('list'); return; }
       const { data } = await supportAPI.getTicket(id);
       setTicketMeta(data.ticket);
       setMessages(data.messages || []);
@@ -303,7 +308,15 @@ export default function SupportScreen({ navigation }) {
   const cardBg = colors.surfaceRaised;
   const borderCol = colors.cardBorder;
 
-  const renderList = () => (
+  const renderList = () => isGuest && !listLoading ? (
+    <View style={styles.scrollContent}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('support.guestTitle', 'Your private support conversations')}</Text>
+      <Text style={{ color: colors.textSecondary, fontSize: 15, lineHeight: 22, marginVertical: 16 }}>{t('support.guestBody', 'Sign in to contact support and keep track of replies to your tickets.')}</Text>
+      <TouchableOpacity accessibilityRole="button" style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={() => navigation.navigate('Login')}>
+        <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>{t('support.guestSignIn', 'Sign in / Register')}</Text>
+      </TouchableOpacity>
+    </View>
+  ) : (
     <ScrollView
       contentContainerStyle={styles.scrollContent}
       refreshControl={

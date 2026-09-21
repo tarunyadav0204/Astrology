@@ -11,11 +11,12 @@ except Exception:  # pragma: no cover
 
 
 REMEDY_CARD_FOMO_COPY_RULES = """
-When type="remedy", the UI remedy card shows ONLY these three fields — write them in the SAME language/script as the user's CURRENT QUESTION (not English unless the question is English):
+When type="remedy", the UI remedy card shows ONLY these three fields — write them in the SAME language/script as the answer you just wrote (the visible reply), not the app language:
 - title: 4–10 word FOMO headline tied to the chart pressure just discussed (urgency + opportunity, no fear-mongering).
 - reason: One short FOMO subline (why acting in this dasha/window matters; what they gain by opening remedies now).
-- follow_up_questions[0]: Short button label (e.g. "Show my remedies" / "उपाय देखें") — this is the only CTA text on the card.
-Do NOT use generic labels like "Practical remedy plan" or "Generate remedies". Make copy specific to this reading and question language.
+- follow_up_questions[0]: Short button label (English answer → "Show my remedies"; Hindi answer → "उपाय देखें").
+English answer ⇒ English card. Hindi/Devanagari answer ⇒ Devanagari card. Never put Devanagari title/reason under an English reading.
+Do NOT use generic labels like "Practical remedy plan" or "Generate remedies". Make copy specific to this reading.
 """.strip()
 
 
@@ -181,6 +182,7 @@ def apply_normal_answer_remedy_guards(
         question=question,
         remedy_followup_active=False,
         language=language,
+        answer_text=cleaned,
     )
     return cleaned, action, list(follow_up_questions or [])
 
@@ -219,25 +221,154 @@ def should_offer_remedy_cta(
     return False
 
 
+_DEVANAGARI_RE = re.compile(r"[\u0900-\u097F]")
+_LATIN_RE = re.compile(r"[A-Za-z]")
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+_REMEDY_CARD_ALIGNED_COPY = {
+    "latin": {
+        "marriage": (
+            "Personal remedies to ease this marriage delay",
+            "This dasha pressure needs specific correction so the path can open.",
+        ),
+        "love": (
+            "Personal remedies to unblock this relationship",
+            "The current period is when targeted remedies help most.",
+        ),
+        "relationship": (
+            "Personal remedies to unblock this relationship",
+            "The current period is when targeted remedies help most.",
+        ),
+        "health": (
+            "Personal remedies for this health pressure",
+            "This dasha window is when targeted correction helps most.",
+        ),
+        "career": (
+            "Personal remedies for this career block",
+            "This dasha pressure needs specific correction so progress can open.",
+        ),
+        "job": (
+            "Personal remedies for this career block",
+            "This dasha pressure needs specific correction so progress can open.",
+        ),
+        "wealth": (
+            "Personal remedies for money leakage",
+            "This dasha window is when targeted correction helps most.",
+        ),
+        "money": (
+            "Personal remedies for money leakage",
+            "This dasha window is when targeted correction helps most.",
+        ),
+        "finance": (
+            "Personal remedies for money leakage",
+            "This dasha window is when targeted correction helps most.",
+        ),
+        "default": (
+            "Personal remedies for this chart pressure",
+            "This dasha window is when targeted correction helps most.",
+        ),
+        "button": "Show my remedies",
+    },
+    "devanagari": {
+        "marriage": (
+            "विवाह बाधा के लिए व्यक्तिगत उपाय",
+            "इस दशा के दबाव में लक्षित उपाय रास्ता खोलने में मदद करते हैं।",
+        ),
+        "love": (
+            "रिश्ते की रुकावट खोलने के उपाय",
+            "इस समय लक्षित उपाय सबसे अधिक सहायक रहते हैं।",
+        ),
+        "relationship": (
+            "रिश्ते की रुकावट खोलने के उपाय",
+            "इस समय लक्षित उपाय सबसे अधिक सहायक रहते हैं।",
+        ),
+        "health": (
+            "स्वास्थ्य दबाव के लिए व्यक्तिगत उपाय",
+            "इस दशा में लक्षित उपाय सबसे अधिक सहायक रहते हैं।",
+        ),
+        "career": (
+            "करियर रुकावट के लिए व्यक्तिगत उपाय",
+            "इस दशा के दबाव में लक्षित उपाय प्रगति खोलने में मदद करते हैं।",
+        ),
+        "job": (
+            "करियर रुकावट के लिए व्यक्तिगत उपाय",
+            "इस दशा के दबाव में लक्षित उपाय प्रगति खोलने में मदद करते हैं।",
+        ),
+        "wealth": (
+            "धन रिसाव के लिए व्यक्तिगत उपाय",
+            "इस दशा में लक्षित उपाय सबसे अधिक सहायक रहते हैं।",
+        ),
+        "money": (
+            "धन रिसाव के लिए व्यक्तिगत उपाय",
+            "इस दशा में लक्षित उपाय सबसे अधिक सहायक रहते हैं।",
+        ),
+        "finance": (
+            "धन रिसाव के लिए व्यक्तिगत उपाय",
+            "इस दशा में लक्षित उपाय सबसे अधिक सहायक रहते हैं।",
+        ),
+        "default": (
+            "इस चार्ट दबाव के लिए व्यक्तिगत उपाय",
+            "इस दशा में लक्षित उपाय सबसे अधिक सहायक रहते हैं।",
+        ),
+        "button": "उपाय देखें",
+    },
+}
+
+
+def _visible_text_script(text: str) -> str:
+    """Return 'latin', 'devanagari', or '' when the script is mixed/unclear."""
+    cleaned = _HTML_TAG_RE.sub(" ", str(text or ""))
+    dev = len(_DEVANAGARI_RE.findall(cleaned))
+    lat = len(_LATIN_RE.findall(cleaned))
+    if dev >= 8 and dev * 2 >= lat:
+        return "devanagari"
+    if lat >= 24 and lat >= dev * 4:
+        return "latin"
+    if dev > 0 and lat == 0:
+        return "devanagari"
+    if lat > 0 and dev == 0:
+        return "latin"
+    return ""
+
+
+def _aligned_remedy_card_copy(category: str, script: str) -> tuple[str, str, str] | None:
+    pack = _REMEDY_CARD_ALIGNED_COPY.get(script)
+    if not pack:
+        return None
+    cat = str(category or "").strip().lower()
+    title, reason = pack.get(cat) or pack["default"]
+    return title, reason, str(pack["button"])
+
+
 def _complete_remedy_fomo_copy(
     next_action: Dict[str, Any],
     *,
     category: str,
     question: str,
     language: str = "",
+    answer_text: str = "",
 ) -> Dict[str, Any]:
-    """Keep complete model-authored remedy-card copy in any language."""
-    _ = (category, question, language)
+    """Keep complete model-authored remedy-card copy, aligned to the answer script."""
+    _ = (question, language)
     follow = [
         str(q).strip()
         for q in (next_action.get("follow_up_questions") or [])
         if str(q).strip()
     ]
+    title = str(next_action.get("title") or "").strip()
+    reason = str(next_action.get("reason") or "").strip()
+    answer_script = _visible_text_script(answer_text)
+    card_script = _visible_text_script(f"{title} {reason}")
+    if answer_script and card_script and answer_script != card_script:
+        aligned = _aligned_remedy_card_copy(category, answer_script)
+        if aligned:
+            title, reason, button = aligned
+            follow = [button]
     return {
         **next_action,
         "type": "remedy",
-        "title": str(next_action.get("title") or "").strip(),
-        "reason": str(next_action.get("reason") or "").strip(),
+        "title": title,
+        "reason": reason,
         "confidence": str(next_action.get("confidence") or "medium").strip().lower() or "medium",
         "follow_up_questions": follow[:3],
         "source": str(next_action.get("source") or "merge").strip() or "merge",
@@ -252,6 +383,7 @@ def ensure_remedy_cta_next_action(
     question: str = "",
     remedy_followup_active: bool = False,
     language: str = "",
+    answer_text: str = "",
 ) -> Optional[Dict[str, Any]]:
     """
     If the model omitted NEXT_ACTION_META or set type=none, still show the Remedies card
@@ -269,7 +401,13 @@ def ensure_remedy_cta_next_action(
     if mode == "remedy_action":
         mode = "problem_diagnosis"
     if action_type == "remedy":
-        return _complete_remedy_fomo_copy(next_action or {}, category=category, question=question, language=language)
+        return _complete_remedy_fomo_copy(
+            next_action or {},
+            category=category,
+            question=question,
+            language=language,
+            answer_text=answer_text,
+        )
     if action_type and action_type != "none":
         return next_action
     if not should_offer_remedy_cta(

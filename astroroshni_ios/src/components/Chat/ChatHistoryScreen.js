@@ -218,6 +218,8 @@ export default function ChatHistoryScreen({ navigation }) {
             glossary: msg.glossary,
             images: msg.images,
             message_type: msg.message_type,
+            follow_up_questions: Array.isArray(msg.follow_up_questions) ? msg.follow_up_questions : [],
+            next_action: msg.next_action || null,
             intent_gate: msg.intent_gate,
             gate_metadata: msg.gate_metadata,
           }))

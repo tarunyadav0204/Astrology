@@ -18,6 +18,10 @@ from auth import ALGORITHM, SECRET_KEY, User, get_current_user
 from db import get_conn, execute
 from charts.house_insight_service import build_chart_preview_insights
 from chat.answer_style import normalize_chat_answer_style
+from chat_history.clarification_cards import (
+    build_clarification_next_action as _build_clarification_next_action,
+    is_compound_choice_followup,
+)
 from credits.instant_billing import InstantBillingError, require_active_session
 
 logger = logging.getLogger(__name__)
@@ -1635,6 +1639,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
 
         _ensure_chat_messages_gate_metadata(conn)
         _ensure_chat_messages_chat_tier(conn)
+        _ensure_chat_messages_next_action_col(conn)
         conn.commit()
 
         cur = execute(
@@ -3812,9 +3817,24 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 else _infer_location_scope_from_text(question)
             )
 
-            # Check if this is a clarification response and combine with original question
+            # Check if this is a clarification response and combine with original question.
+            # Compound pick-one replies must NOT be merged with the abandoned topic list.
             combined_question = question
-            if clarification_count > 0 and not fomo_chat_active:
+            compound_choice_followup = is_compound_choice_followup(
+                query_context,
+                extracted_context if int(clarification_count or 0) > 0 else None,
+            )
+            if compound_choice_followup:
+                query_context = dict(query_context or {})
+                if str(query_context.get("follow_up_type") or "").strip().lower() != "clarification_choice":
+                    query_context["follow_up_type"] = "clarification_choice"
+                _chat_log_event(
+                    "compound_choice_followup_isolated",
+                    session_id=session_id,
+                    message_id=message_id,
+                    clarification_count=int(clarification_count or 0),
+                )
+            if clarification_count > 0 and not fomo_chat_active and not compound_choice_followup:
                 with get_conn() as conn:
                     chain_parts = get_user_question_chain_for_clarification(session_id, message_id, conn)
                     original_question = get_original_question_for_clarification(session_id, message_id, conn)
@@ -4094,9 +4114,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 intent['mode'] = 'RECOMMEND_REMEDY_FOR_PROBLEM'
             
             # FAIL-SAFE: Force LIFESPAN_EVENT_TIMING for "When/Year" questions to avoid clarification trap.
+            # Do not apply this to compound_plan: the user packed unrelated asks and must pick a card.
             timing_keywords = ['when', 'year', 'which year', 'what year', 'kab', 'saal', 'samay']
             if (
                 not is_instant_chat
+                and str(intent.get("answer_mode") or "").strip().lower() != "compound_plan"
                 and
                 any(kw in question.lower() for kw in timing_keywords)
                 and intent.get('status') == 'CLARIFY'
@@ -4167,14 +4189,29 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     max_clarifications=MAX_CLARIFICATIONS,
                     location_scope_clarify=location_scope_clarify,
                 )
-                # Return clarification question
+                # Return clarification question and structured theme cards when this
+                # is a compound request. Text remains for clients that do not yet
+                # understand next_action.
+                clarification_next_action = _build_clarification_next_action(
+                    intent,
+                    original_question=question,
+                )
+                clarification_next_action_json = (
+                    json.dumps(clarification_next_action, ensure_ascii=False)
+                    if clarification_next_action
+                    else None
+                )
+                clarification_extracted = dict(intent.get("extracted_context") or {})
+                if str(intent.get("answer_mode") or "").strip().lower() == "compound_plan":
+                    clarification_extracted["answer_mode"] = "compound_plan"
                 with get_conn() as conn:
+                    _ensure_chat_messages_next_action_col(conn)
                     execute(
                         conn,
                         """
                             UPDATE chat_messages
                             SET content = %s, status = %s, message_type = %s, completed_at = %s,
-                                language = %s, intent_router_ms = %s
+                                language = %s, intent_router_ms = %s, next_action = %s
                             WHERE message_id = %s
                         """,
                         (
@@ -4184,6 +4221,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             datetime.now(),
                             language,
                             intent_router_ms,
+                            clarification_next_action_json,
                             message_id,
                         ),
                     )
@@ -4197,7 +4235,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                                 extracted_context = EXCLUDED.extracted_context,
                                 last_updated = CURRENT_TIMESTAMP
                         """,
-                        (session_id, 1, json.dumps(intent.get('extracted_context', {}))),
+                        (session_id, 1, json.dumps(clarification_extracted)),
                     )
                     conn.commit()
                 _release_free_question_if_reserved(using_free_question, user_id, birth_details)
@@ -4215,6 +4253,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         if prior_anchors and "prediction_anchors" not in ready_ctx:
                             merged_ready["prediction_anchors"] = prior_anchors
                         ready_ctx = merged_ready
+                    if str(intent.get("answer_mode") or "").strip().lower() != "compound_plan":
+                        ready_ctx.pop("answer_mode", None)
                     execute(
                         conn,
                         """
@@ -4564,8 +4604,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
         if isinstance(intent, dict) and isinstance(cached_intent, dict):
             qc_merge = cached_intent.get("query_context")
-            if isinstance(qc_merge, dict):
-                intent = {**intent, "query_context": qc_merge}
+            existing_qc = intent.get("query_context") if isinstance(intent.get("query_context"), dict) else {}
+            cached_qc = qc_merge if isinstance(qc_merge, dict) else {}
+            if cached_qc or existing_qc:
+                intent = {**intent, "query_context": {**cached_qc, **existing_qc}}
                 if isinstance(context, dict):
                     context = {**context, "intent": intent}
 

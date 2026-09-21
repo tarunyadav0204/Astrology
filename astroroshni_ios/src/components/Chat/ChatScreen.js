@@ -694,6 +694,11 @@ export default function ChatScreen({ navigation, route }) {
                 terms: m.terms,
                 glossary: m.glossary,
                 images: m.images,
+                message_type: m.message_type || 'answer',
+                follow_up_questions: Array.isArray(m.follow_up_questions) ? m.follow_up_questions : [],
+                next_action: m.next_action || null,
+                intent_gate: m.intent_gate || m.gate_metadata?.intent_gate,
+                gate_metadata: m.gate_metadata || null,
                 summary_image:
                   m.summary_image
                   || (Array.isArray(m.images) && m.images[0])
@@ -1697,6 +1702,11 @@ export default function ChatScreen({ navigation, route }) {
         terms: m.terms,
         glossary: m.glossary,
         images: m.images,
+        message_type: m.message_type || 'answer',
+        follow_up_questions: Array.isArray(m.follow_up_questions) ? m.follow_up_questions : [],
+        next_action: m.next_action || null,
+        intent_gate: m.intent_gate || m.gate_metadata?.intent_gate,
+        gate_metadata: m.gate_metadata || null,
         summary_image:
           m.summary_image
           || (Array.isArray(m.images) && m.images[0])
@@ -1865,6 +1875,9 @@ export default function ChatScreen({ navigation, route }) {
                       message_type: status.message_type || 'answer',
                       summary_image: status.summary_image || null,
                       follow_up_questions: status.follow_up_questions || [],
+                      next_action: status.next_action || null,
+                      intent_gate: status.intent_gate || status.gate_metadata?.intent_gate,
+                      gate_metadata: status.gate_metadata || null,
                       native_name: chartName,
                     }
                   : msg
@@ -3017,7 +3030,26 @@ export default function ChatScreen({ navigation, route }) {
                     <MessageBubble
                       message={item}
                       language={language}
-                      onFollowUpClick={setInputText}
+                      onFollowUpClick={(question, options = {}) => {
+                        const text = String(question || '').trim();
+                        if (!text) return;
+                        const isClarificationChoice = String(
+                          options?.query_context?.follow_up_type || ''
+                        ).toLowerCase() === 'clarification_choice';
+                        const previous = String(
+                          options?.query_context?.original_question
+                          || options?.originalQuestion
+                          || ''
+                        ).trim();
+                        const composed = (!isClarificationChoice && previous && previous !== text)
+                          ? `${text}\n\n${previous}`
+                          : text;
+                        if (options?.directSend) {
+                          sendMessage(composed);
+                        } else {
+                          setInputText(composed);
+                        }
+                      }}
                       partnership={partnershipMode}
                       onDelete={handleDeleteMessage}
                       onRestart={restartPolling}

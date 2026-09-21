@@ -169,7 +169,10 @@
     "statusClosed": "Closed",
     "statusPending": "Pending",
     "sourceIos": "iOS",
-    "sourceAndroid": "Android"
+    "sourceAndroid": "Android",
+    "guestTitle": "Your private support conversations",
+    "guestBody": "Sign in to contact support and keep track of replies to your tickets.",
+    "guestSignIn": "Sign in / Register"
   },
   "blog": {
     "screenTitle": "Blog & Knowledge",
@@ -838,6 +841,9 @@
     "instantWelcomeMessage": "🌟 Hi {{name}}, I'm Tara.\n\nTell me what's on your mind in your own words. I may ask one short follow-up so I can read your chart accurately.",
     "nativeGateTapInstruction": "Please choose one of the options below instead of typing a reply.",
     "welcomeSuggestionsTitle": "Try asking",
+    "chooseTheme": "Choose a theme",
+    "chooseOneQuestion": "Which question should I answer first?",
+    "themeChoiceHint": "Answering several questions together thins each reading. Pick one theme and I’ll go deep.",
     "insufficientCreditsTitle": "Not enough credits",
     "insufficientCreditsMessage": "This question needs {{cost}} credits — you have {{balance}}. Add credits to continue the study.",
     "insufficientCreditsCta": "Get credits",
@@ -1908,7 +1914,17 @@
     "coords": {
       "lat": "Lat:",
       "long": "Long:"
-    }
+    },
+    "validation": {
+      "name": "Enter your name to continue.",
+      "gender": "Select a gender to continue.",
+      "date": "Select and confirm your birth date.",
+      "time": "Select and confirm your birth time.",
+      "place": "Enter your birthplace.",
+      "location": "Select your birthplace from the suggestions."
+    },
+    "selectDate": "Select birth date",
+    "selectTime": "Select birth time"
   },
   "common": {
     "notNow": "Not now",
