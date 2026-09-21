@@ -11,6 +11,12 @@ class WealthCalculator(BaseCalculator):
     """Comprehensive wealth analysis using existing calculators"""
     
     def __init__(self, chart_data, birth_data):
+        chart_data = dict(chart_data or {})
+        if not chart_data.get("divisions"):
+            from .divisional_chart_calculator import DivisionalChartCalculator
+            chart_data["divisions"] = DivisionalChartCalculator(
+                chart_data
+            ).calculate_all_divisional_charts()
         super().__init__(chart_data)
         self.birth_data = birth_data
         

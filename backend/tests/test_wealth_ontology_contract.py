@@ -37,6 +37,7 @@ EXPECTED_KEYS = {
     "income", "income_timing", "multiple_income",
     "debt", "debt_diagnosis", "debt_repayment", "loan_support", "loan_decision",
     "investment", "investing_vs_trading", "investment_timing", "investment_risk",
+    "intraday_trading",
     "loss_vulnerability", "inheritance", "inheritance_timing", "windfall", "wealth_remedies",
 }
 
@@ -52,6 +53,7 @@ def _foundation_context(*, timing: bool = False):
                 "lord_nakshatra_chain": True, "dignity_strength": True,
                 "dhana_yogas": True, "indu_lagna": True, "hora_lagna": True,
                 "arudha_gains": True, "kp_fructification": True,
+                "trading_session_climate": True, "intraday_market_windows": True,
                 "remedy_blueprint": True,
             },
             "d2_synthesis": {
@@ -76,10 +78,12 @@ def test_wealth_ontology_compiles_and_validates() -> None:
         cwd=ROOT, capture_output=True, text=True, check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert "Wealth and Finance ontology PoC valid: 21 competency questions" in result.stdout
+    assert "Wealth and Finance ontology PoC valid: 22 competency questions" in result.stdout
+    from instant_chat_v2.wealth_graph_policy import default_wealth_graph_policy_store
+    default_wealth_graph_policy_store.cache_clear()
 
 
-def test_compiled_bundle_covers_all_twenty_one_routes() -> None:
+def test_compiled_bundle_covers_all_twenty_two_routes() -> None:
     assert set(WealthGraphPolicyStore().runtime_keys()) == EXPECTED_KEYS
 
 
@@ -96,10 +100,10 @@ def test_every_route_has_expandable_decision_stages_and_factor_children() -> Non
 
 def test_static_routes_exclude_timing_and_timed_routes_require_both_layers() -> None:
     store = WealthGraphPolicyStore()
-    for key in EXPECTED_KEYS - {"wealth_timing", "income_timing", "debt_repayment", "investment_timing", "inheritance_timing", "loan_support", "loan_decision"}:
+    for key in EXPECTED_KEYS - {"wealth_timing", "income_timing", "debt_repayment", "investment_timing", "inheritance_timing", "loan_support", "loan_decision", "intraday_trading"}:
         policy = store.require(key)
         assert {"wealth:DashaActivation", "wealth:TransitConfirmation"}.issubset(policy.default_exclusions)
-    for key in {"wealth_timing", "income_timing", "debt_repayment", "investment_timing", "inheritance_timing", "loan_support", "loan_decision"}:
+    for key in {"wealth_timing", "income_timing", "debt_repayment", "investment_timing", "inheritance_timing", "loan_support", "loan_decision", "intraday_trading"}:
         policy = store.require(key)
         assert {"wealth:DashaActivation", "wealth:TransitConfirmation"}.issubset(policy.required_factors)
         assert "wealth:StrictHorizon" in policy.guardrails
@@ -117,7 +121,7 @@ def test_every_investment_route_requires_full_carrier_condition_and_supporting_d
     store = WealthGraphPolicyStore()
     for key in (
         "investment", "investing_vs_trading", "investment_timing",
-        "investment_risk", "loss_vulnerability", "windfall",
+        "investment_risk", "loss_vulnerability", "windfall", "intraday_trading",
     ):
         policy = store.require(key)
         assert {"wealth:D5", "wealth:D9"}.issubset(policy.required_factors), key
@@ -132,7 +136,9 @@ def test_financial_safety_guardrails_are_compiled() -> None:
     assert "wealth:NoDeathPrediction" in store.require("inheritance").guardrails
     assert "wealth:NoWindfallCertainty" in store.require("windfall").guardrails
     assert "wealth:NoGenericRemedy" in store.require("wealth_remedies").guardrails
-    for key in ("wealth_timing", "income_timing", "debt_repayment", "loan_support", "loan_decision", "investment_timing", "inheritance_timing"):
+    assert "wealth:NoMarketDirectionPrediction" in store.require("intraday_trading").guardrails
+    assert "wealth:NoSecurityRecommendation" in store.require("intraday_trading").guardrails
+    for key in ("wealth_timing", "income_timing", "debt_repayment", "loan_support", "loan_decision", "investment_timing", "inheritance_timing", "intraday_trading"):
         assert "wealth:NoNodeFifthNinth" in store.require(key).guardrails
 
 
@@ -149,6 +155,7 @@ def test_semantic_subtypes_and_modes_resolve_to_specific_routes() -> None:
         ("debt", "event_prediction", "loan_decision", "loan_decision"),
         ("investment", "comparison_choice", "investing_vs_trading", "investing_vs_trading"),
         ("investment", "problem_diagnosis", "investment_risk", "investment_risk"),
+        ("investment", "timing_window", "intraday_trading", "intraday_trading"),
         ("wealth", "potential_capacity", "windfall", "windfall"),
         ("wealth", "remedy_action", "general", "wealth_remedies"),
         ("wealth", "potential_capacity", "general", "wealth"),
@@ -594,11 +601,31 @@ def test_reference_chart_overall_wealth_is_qualified_and_d2_is_mixed() -> None:
         row for row in foundation["route_adjudication"]["carrier_cautions"]
         if row["house"] == 5 and row["lord"] == "Mars"
     )
-    assert {"gandanta", "avayogi_lord", "dagdha_lord", "mixed_or_malefic_conjunctions"}.issubset(
+    assert {"gandanta", "dagdha_lord", "mixed_or_malefic_conjunctions"}.issubset(
         mars_caution["flags"]
     )
+    assert "avayogi_lord" in mars_caution["flags"] or "avayogi_tithi_shunya_override" in mars_caution["flags"]
     assert "wealth_score" not in foundation["natal_wealth"]
     assert "wealth_constitution" not in foundation["natal_wealth"]
+    assert foundation["availability"]["dignity_strength"] is True
+    assert foundation["natal_wealth"]["houses"]["5"]["lord"]["conditions"]["strength"]
+
+
+def test_wealth_foundation_survives_failed_natal_calculation() -> None:
+    foundation = _compact_wealth_foundation(
+        {},
+        {
+            "name": "Radha", "date": "1981-03-22", "time": "12:26",
+            "latitude": 29.1491875, "longitude": 75.7216527, "timezone": "UTC+5:30",
+        },
+        {},
+        category="investment",
+        answer_mode="timing_window",
+        wealth_subtype="intraday_trading",
+    )
+    assert foundation["investment_synthesis"]["verdict"]
+    assert foundation["investment_synthesis"]["eleventh_lord"]["shadbala_grade"] is None
+    assert foundation["availability"]["dignity_strength"] is False
 
 
 def test_reference_chart_wealth_source_ranks_concrete_channels_not_savings_advice() -> None:
@@ -804,8 +831,12 @@ def test_reference_chart_investment_synthesis_is_specific_and_generic_answer_fai
     synthesis = foundation["investment_synthesis"]
     assert synthesis["verdict"] == "disciplined_investing_favored_over_high_risk_speculation"
     assert synthesis["fifth_lord"]["planet"] == "Mars"
-    assert {"gandanta", "avayogi_lord", "dagdha_lord", "mixed_or_malefic_conjunctions"}.issubset(
+    assert {"gandanta", "dagdha_lord", "mixed_or_malefic_conjunctions"}.issubset(
         synthesis["fifth_lord"]["caution_flags"]
+    )
+    assert (
+        "avayogi_lord" in synthesis["fifth_lord"]["caution_flags"]
+        or "avayogi_tithi_shunya_override" in synthesis["fifth_lord"]["caution_flags"]
     )
     assert any(row["planet"] == "Jupiter" and row["house"] == 11 for row in synthesis["d5"]["supporting_placements"])
     assert any(row["planet"] == "Moon" and "debilitated" in row["reasons"] for row in synthesis["d5"]["caution_placements"])
@@ -1205,6 +1236,7 @@ def test_all_static_wealth_routes_exclude_timing_at_runtime() -> None:
     timed = {
         "wealth_timing", "income_timing", "debt_repayment",
         "loan_support", "loan_decision", "investment_timing", "inheritance_timing",
+        "intraday_trading",
     }
     context = _foundation_context(timing=True)
     for runtime_key in EXPECTED_KEYS - timed:
@@ -1254,6 +1286,7 @@ def test_every_timed_wealth_route_requires_dasha_and_transit_confirmation() -> N
         ("debt", "timing_window", "loan_support", "loan_support"),
         ("debt", "event_prediction", "loan_decision", "loan_decision"),
         ("investment", "timing_window", "general", "investment_timing"),
+        ("investment", "timing_window", "intraday_trading", "intraday_trading"),
         ("inheritance", "timing_window", "general", "inheritance_timing"),
     ]
     for category, mode, subtype, runtime_key in cases:
@@ -1317,3 +1350,115 @@ def test_wealth_blueprint_uses_foundation_for_every_route_shape() -> None:
             ("manifestation support" in row["slot"]) if static else ("timing window" in row["slot"])
             for row in blueprint["slots"]
         )
+
+
+def test_existing_investment_routes_are_not_stolen_by_intraday_trading() -> None:
+    assert wealth_graph_runtime_key("investment", {
+        "answer_mode": "potential_capacity", "wealth_subtype": "general",
+    }) == "investment"
+    assert wealth_graph_runtime_key("investment", {
+        "answer_mode": "comparison_choice", "wealth_subtype": "investing_vs_trading",
+    }) == "investing_vs_trading"
+    assert wealth_graph_runtime_key("investment", {
+        "answer_mode": "timing_window", "wealth_subtype": "general",
+        "time_scope": {"requested": "this year"},
+    }) == "investment_timing"
+    assert wealth_graph_runtime_key("investment", {
+        "answer_mode": "problem_diagnosis", "wealth_subtype": "investment_risk",
+    }) == "investment_risk"
+    assert wealth_graph_runtime_key("wealth", {
+        "answer_mode": "timing_window", "wealth_subtype": "intraday_trading",
+        "time_scope": {"is_exact_day": True},
+    }) == "intraday_trading"
+
+
+def test_intraday_trading_exact_day_attaches_live_graph_and_session_slots() -> None:
+    context = _foundation_context(timing=True)
+    packet = apply_live_graph_policy(
+        {
+            "query_plan": {
+                "category": "investment",
+                "answer_mode": "timing_window",
+                "wealth_subtype": "intraday_trading",
+                "time_scope": {"is_exact_day": True, "target_date": "2026-09-22"},
+            },
+            "answer_spec": {}, "verification": {}, "user_derivation": {},
+        },
+        intent={
+            "category": "investment",
+            "wealth_subtype": "intraday_trading",
+            "mode": "PREDICT_DAILY",
+        },
+        context=context,
+    )
+    policy = packet["answer_spec"]["knowledge_graph_policy"]
+    assert policy["runtime_key"] == "intraday_trading"
+    assert policy.get("missing_required_factors") == []
+    assert policy["wealth_answer_rules"]["static_route"] is False
+    session_rules = policy["wealth_answer_rules"]
+    assert "sit-out" in " ".join(session_rules["required_answer_order"])
+    blueprint = _build_instant_answer_blueprint(
+        query_plan={"category": "investment", "answer_mode": "timing_window"},
+        verdict=packet.get("verdict") or {},
+        evidence={
+            "wealth_foundation": context["normalized_evidence"]["wealth_foundation"],
+            "_wealth_rules": session_rules,
+        },
+    )
+    assert "intraday trading session" in blueprint["purpose"]
+    assert any("sit-out" in row["slot"] for row in blueprint["slots"])
+
+
+def test_intraday_trading_session_evidence_is_calculated_for_a_weekday() -> None:
+    from instant_chat_v2.intraday_trading_evidence import build_intraday_trading_session
+
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    session = build_intraday_trading_session(
+        natal_chart=chart,
+        birth_data=birth,
+        target_date="2026-09-22",
+        natal_qualified=True,
+    )
+    assert session["available"] is True
+    assert session["market_open"] is True
+    assert session["participation"] in {"sit_out", "reduce_size", "participate", "cautious"}
+    assert isinstance(session.get("windows"), list)
+    context = _foundation_context(timing=True)
+    context["normalized_evidence"]["wealth_foundation"]["intraday_trading_session"] = session
+    packet = apply_live_graph_policy(
+        {
+            "query_plan": {
+                "category": "investment", "answer_mode": "timing_window",
+                "wealth_subtype": "intraday_trading",
+                "time_scope": {"is_exact_day": True, "target_date": "2026-09-22"},
+            },
+            "answer_spec": {}, "verification": {}, "user_derivation": {},
+        },
+        intent={"category": "investment", "wealth_subtype": "intraday_trading", "mode": "PREDICT_DAILY"},
+        context=context,
+    )
+    policy = packet["answer_spec"]["knowledge_graph_policy"]
+    assert policy["runtime_key"] == "intraday_trading"
+    assert policy.get("missing_required_factors") == []
+    assert packet["verdict"]["direction"] == session["participation"]
+
+
+def test_wealth_routing_guard_only_rewrites_intraday_trading_subtype() -> None:
+    from ai.intent_router import apply_wealth_routing_guards
+
+    untouched = {"category": "investment", "wealth_subtype": "investing_vs_trading", "mode": "ANALYZE_TOPIC_POTENTIAL"}
+    apply_wealth_routing_guards(untouched)
+    assert untouched["mode"] == "ANALYZE_TOPIC_POTENTIAL"
+    assert untouched["wealth_subtype"] == "investing_vs_trading"
+
+    daily = {"category": "wealth", "wealth_subtype": "intraday_trading", "mode": "ANALYZE_TOPIC_POTENTIAL"}
+    apply_wealth_routing_guards(daily)
+    assert daily["category"] == "investment"
+    assert daily["mode"] == "PREDICT_DAILY"
+    assert daily["answer_mode"] == "timing_window"
+    assert "speculative_trading" in daily["daily_event_facets"]

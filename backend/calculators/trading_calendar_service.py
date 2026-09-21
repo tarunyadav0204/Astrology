@@ -70,6 +70,51 @@ class TradingCalendarService:
             
         return results
 
+    def get_session_forecast(self, target_date: datetime) -> Dict:
+        """One-day trader climate at 09:15 plus Choghadiya clipped to market hours.
+
+        Existing monthly/daily trading endpoints keep using get_monthly_forecast
+        and get_intraday_timings unchanged. Instant Chat uses this combined
+        packet so natal evidence and session windows share one clock.
+        """
+        date_obj = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        if date_obj.weekday() in [5, 6]:
+            return {
+                "luck": {
+                    "date": date_obj.strftime("%Y-%m-%d"),
+                    "luck_score": None,
+                    "signal": "CLOSED",
+                    "action": "Market Closed",
+                    "headline": "Weekend - No Trading",
+                    "market_mood": {"nature": "Closed", "strategy": "Rest"},
+                    "risk_factors": [],
+                    "details": {},
+                },
+                "timings": {
+                    "date": date_obj.strftime("%Y-%m-%d"),
+                    "timings": [],
+                    "note": "Cash-market session is closed on the weekend.",
+                },
+            }
+
+        chart_calc = ChartCalculator({})
+        transit_input = SimpleNamespace(
+            date=date_obj.strftime("%Y-%m-%d"),
+            time="09:15",
+            latitude=self.birth_data.get("latitude", 28.61),
+            longitude=self.birth_data.get("longitude", 77.20),
+            timezone=self.birth_data.get("timezone", "UTC+0"),
+        )
+        transit_chart = chart_calc.calculate_chart(transit_input)
+        t_calc = TradingLuckCalculator(
+            self.natal_chart, transit_chart, self.birth_data,
+            date_obj, self.natal_chart.get("ashtakavarga"),
+        )
+        return {
+            "luck": t_calc.calculate_trading_forecast(),
+            "timings": self.get_intraday_timings(date_obj),
+        }
+
     def get_intraday_timings(self, target_date: datetime) -> Dict:
         """Calculates Trading Windows using Choghadiya and Hora"""
         panchang_calc = PanchangCalculator()

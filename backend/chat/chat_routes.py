@@ -1329,7 +1329,7 @@ async def get_event_timeline_status(job_id: str, current_user: User = Depends(ge
         cur = execute(
             conn,
             """
-                SELECT status, result_data, error_message, started_at, completed_at
+                SELECT status, result_data, error_message, started_at, completed_at, engine_version
                 FROM event_timeline_jobs
                 WHERE job_id = %s AND user_id = %s
             """,
@@ -1340,9 +1340,10 @@ async def get_event_timeline_status(job_id: str, current_user: User = Depends(ge
     if not result:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    status, result_data, error_message, started_at, completed_at = result
+    status, result_data, error_message, started_at, completed_at, stored_engine_version = result
+    job_engine_version = stored_engine_version or LEGACY_ENGINE_VERSION
     
-    response = {"status": status}
+    response = {"status": status, "engine_version": job_engine_version}
     
     if status == "completed" and result_data:
         completed_data = json.loads(result_data)
@@ -1385,7 +1386,7 @@ async def stream_event_timeline_status(job_id: str, current_user: User = Depends
                 cur = execute(
                     conn,
                     """
-                        SELECT status, result_data, error_message, started_at, completed_at
+                        SELECT status, result_data, error_message, started_at, completed_at, engine_version
                         FROM event_timeline_jobs
                         WHERE job_id = %s AND user_id = %s
                     """,
@@ -1397,8 +1398,11 @@ async def stream_event_timeline_status(job_id: str, current_user: User = Depends
                 yield "event: error\ndata: " + json.dumps({"error": "Job not found"}) + "\n\n"
                 break
 
-            status, result_data, error_message, started_at, completed_at = result
-            payload = {"status": status}
+            status, result_data, error_message, started_at, completed_at, stored_engine_version = result
+            payload = {
+                "status": status,
+                "engine_version": stored_engine_version or LEGACY_ENGINE_VERSION,
+            }
             if status == "completed" and result_data:
                 payload["data"] = json.loads(result_data)
                 payload["completed_at"] = str(completed_at) if completed_at else None
@@ -1450,9 +1454,11 @@ async def stream_event_timeline_status(job_id: str, current_user: User = Depends
 @router.post("/monthly-events/cached")
 async def get_cached_timeline(request: ClearChatRequest, current_user: User = Depends(get_current_user)):
     """Get cached event timeline if exists for user and year"""
+    engine_version = LEGACY_ENGINE_VERSION
     try:
         init_event_timeline_table()
         target_year = request.selectedYear or datetime.now().year
+        engine_version = _timeline_engine_version_for_user(current_user.userid)
         # Handle both birth_chart_id and id fields, convert float to int
         birth_chart_id = request.birth_chart_id or request.id
         if birth_chart_id is not None:
@@ -1467,9 +1473,7 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
 
         if not birth_chart_id:
             logger.warning("monthly-events cache: no birth_chart_id")
-            return {"cached": False}
-
-        engine_version = _timeline_engine_version_for_user(current_user.userid)
+            return {"cached": False, "engine_version": engine_version}
         timeline_language = request.language or "english"
         current_facts = _timeline_user_facts(birth_chart_id, current_user.userid, engine_version)
         relative_profiles = _timeline_relative_profiles(birth_chart_id, current_user.userid, engine_version)
@@ -1490,7 +1494,7 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
                     birth_chart_id,
                     current_user.userid,
                 )
-                return {"cached": False}
+                return {"cached": False, "engine_version": engine_version}
 
             # Find most recent completed job for this user/birth_chart/year (and month if monthly deep)
             target_month = request.selectedMonth
@@ -1552,11 +1556,14 @@ async def get_cached_timeline(request: ClearChatRequest, current_user: User = De
             birth_chart_id,
             target_year,
         )
-        return {"cached": False}
+        return {"cached": False, "engine_version": engine_version}
 
     except Exception as e:
         logger.exception("monthly-events cache lookup failed: %s", e)
-        return {"cached": False}
+        return {
+            "cached": False,
+            "engine_version": engine_version,
+        }
 
 
 @router.get("/monthly-events/cached-years")

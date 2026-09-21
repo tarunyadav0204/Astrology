@@ -20,6 +20,7 @@ import { storage } from '../services/storage';
 import { useCredits } from '../credits/CreditContext';
 import { useAuthGate } from '../auth/AuthGateContext';
 import MonthlyAccordion from './MonthlyAccordion';
+import LegacyMonthlyAccordion from './LegacyMonthlyAccordion';
 import EventTimelineSamplePreview from './EventTimelineSamplePreview';
 import ConfirmCreditsModal from './ConfirmCreditsModal';
 import { generateEventTimelinePDF, sharePDFOnWhatsApp, getLogoDataUriForModule, userFacingPdfExportError } from '../utils/pdfGenerator';
@@ -59,6 +60,7 @@ export default function MonthlyDeepScreen() {
 
   const [birthData, setBirthData] = useState(null);
   const [monthlyData, setMonthlyData] = useState(null);
+  const [timelineEngineVersion, setTimelineEngineVersion] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [creditCost, setCreditCost] = useState(100);
@@ -213,8 +215,12 @@ export default function MonthlyDeepScreen() {
         selectedMonth: month,
         birth_chart_id: birthChartId,
       });
+      if (res.data?.engine_version && isMountedRef.current) {
+        setTimelineEngineVersion(res.data.engine_version);
+      }
       if (res.data?.cached && res.data?.data) {
         if (isMountedRef.current) {
+          setTimelineEngineVersion(res.data.data?.engine_version || res.data?.engine_version || null);
           setMonthlyData(res.data.data);
           setShowMonthlyCreditsModal(false);
           setShowGenerateButton(false);
@@ -247,6 +253,7 @@ export default function MonthlyDeepScreen() {
     const finishSuccess = async (data, mode = 'poll_completed') => {
       if (!takeOutcome()) return;
       stopDeepMonthJob();
+      setTimelineEngineVersion(data?.engine_version || null);
       setMonthlyData(data);
       await clearPendingDeepMonthJob();
       trackEvent('monthly_timeline_delivered', {
@@ -316,6 +323,9 @@ export default function MonthlyDeepScreen() {
       try {
         const statusResponse = await chatAPI.getMonthlyEventsStatus(jobId);
         const status = statusResponse.data.status;
+        if (statusResponse.data?.engine_version) {
+          setTimelineEngineVersion(statusResponse.data.engine_version);
+        }
         const serverProgressValue = statusResponse.data?.progress_percent;
         const serverPercent = serverProgressValue == null ? Number.NaN : Number(serverProgressValue);
         if (statusResponse.data?.generation_mode) {
@@ -432,6 +442,7 @@ export default function MonthlyDeepScreen() {
   const resumePendingDeepMonthJob = useCallback(async (pending, birthDataOverride = null) => {
     const activeBirthData = birthDataOverride || birthData;
     const activeBirthChartId = resolveBirthChartId(activeBirthData);
+    let pendingEngineVersion = pending?.engineVersion || null;
     if (
       !pending ||
       !pending.jobId ||
@@ -442,9 +453,38 @@ export default function MonthlyDeepScreen() {
     ) {
       return false;
     }
+    try {
+      const [activeResponse, pendingResponse] = await Promise.all([
+        chatAPI.getCachedMonthlyEvents({
+          ...activeBirthData,
+          selectedYear: year,
+          selectedMonth: month,
+          birth_chart_id: activeBirthChartId,
+        }),
+        chatAPI.getMonthlyEventsStatus(pending.jobId),
+      ]);
+      const activeEngineVersion = activeResponse.data?.engine_version || null;
+      pendingEngineVersion = pending.engineVersion
+        || pendingResponse.data?.engine_version
+        || null;
+      if (activeEngineVersion) setTimelineEngineVersion(activeEngineVersion);
+      if (
+        activeEngineVersion
+        && pendingEngineVersion
+        && activeEngineVersion !== pendingEngineVersion
+      ) {
+        await clearPendingDeepMonthJob();
+        return false;
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[MonthlyDeepScreen] pending engine check', error?.message || error);
+      }
+    }
     stopDeepMonthJob();
     setShowMonthlyCreditsModal(false);
     setShowGenerateButton(false);
+    setTimelineEngineVersion(pendingEngineVersion);
     startMonthlyLoadingUi(pending.startedAt);
     if (pending.generationMode === 'deterministic') {
       generationModeRef.current = 'deterministic';
@@ -460,6 +500,7 @@ export default function MonthlyDeepScreen() {
   }, [
     attachDeepMonthPolling,
     birthData,
+    clearPendingDeepMonthJob,
     month,
     startMonthlyLoadingUi,
     stopDeepMonthJob,
@@ -563,6 +604,7 @@ export default function MonthlyDeepScreen() {
         birth_chart_id: birthChartId,
       });
       if (startResponse.data?.data && !startResponse.data?.job_id) {
+        setTimelineEngineVersion(startResponse.data.data?.engine_version || startResponse.data?.engine_version || null);
         setMonthlyData(startResponse.data.data);
         await clearPendingDeepMonthJob();
         trackEvent('monthly_timeline_delivered', {
@@ -579,6 +621,8 @@ export default function MonthlyDeepScreen() {
       const jobId = startResponse.data?.job_id;
       if (!jobId) throw new Error('No job_id received.');
       const generationMode = startResponse.data?.generation_mode || null;
+      const engineVersion = startResponse.data?.engine_version || null;
+      setTimelineEngineVersion(engineVersion);
       generationModeRef.current = generationMode;
       if (generationMode === 'deterministic') {
         serverProgressRef.current = true;
@@ -598,6 +642,7 @@ export default function MonthlyDeepScreen() {
         month: Number(month),
         startedAt,
         generationMode,
+        engineVersion,
       });
       attachDeepMonthPolling(jobId, startedAt);
     } catch (e) {
@@ -733,6 +778,8 @@ export default function MonthlyDeepScreen() {
   };
 
   const singleMonth = monthlyData?.monthly_predictions?.[0];
+  const isLegacyTimeline = (monthlyData?.engine_version || timelineEngineVersion) === 'legacy_v1';
+  const TimelineMonthlyAccordion = isLegacyTimeline ? LegacyMonthlyAccordion : MonthlyAccordion;
   const monthLabel = year != null && month != null ? `${getMonthName(month)} ${year}` : '';
 
   const navigateToChatWithMonth = (context) => {
@@ -870,7 +917,7 @@ export default function MonthlyDeepScreen() {
             contentContainerStyle={[styles.scrollContent, { backgroundColor: 'transparent' }]}
             showsVerticalScrollIndicator={false}
           >
-            {monthlyData?.narration_status === 'partial_fallback' ? (
+            {!isLegacyTimeline && monthlyData?.narration_status === 'partial_fallback' ? (
               <View style={[styles.narrationNotice, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
                 <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
                 <Text style={[styles.narrationNoticeText, { color: colors.textSecondary }]}>
@@ -881,7 +928,7 @@ export default function MonthlyDeepScreen() {
                 </Text>
               </View>
             ) : null}
-            <MonthlyAccordion
+            <TimelineMonthlyAccordion
               data={{ ...singleMonth, month: getMonthName(singleMonth.month_id) }}
               onChatPress={() => navigateToChatWithMonth({ ...singleMonth, month: getMonthName(singleMonth.month_id) })}
               defaultExpanded
@@ -901,7 +948,10 @@ export default function MonthlyDeepScreen() {
               {t('monthlyDeepScreen.emptyDesc', { cost: creditCost })}
             </Text>
             <View style={styles.samplePreviewContainer}>
-              <EventTimelineSamplePreview mode="monthly" />
+              <EventTimelineSamplePreview
+                mode="monthly"
+                engineVersion={timelineEngineVersion}
+              />
             </View>
             {showGenerateButton && !showMonthlyCreditsModal && (
               <TouchableOpacity

@@ -126,3 +126,23 @@ def test_webhook_failure_is_durable_and_retry_succeeds(database,monkeypatch):
     assert routes.process_razorpay_subscription_webhook_event(payload,event_id='retry')['status'] == 'ok'
     assert routes.process_razorpay_subscription_webhook_event(payload,event_id='retry')['status'] == 'duplicate'
     assert admin.activity(view='unresolved',page=1,limit=50)['events'] == []
+
+
+def test_select_subscription_rows_skips_play_privilege_errors(monkeypatch):
+    from contextlib import contextmanager
+    from psycopg2.errors import InsufficientPrivilege
+
+    @contextmanager
+    def boom_conn():
+        yield object()
+
+    def boom_execute(_conn, _sql):
+        raise InsufficientPrivilege('permission denied for table play_subscription_token_map')
+
+    monkeypatch.setattr(admin, 'get_conn', boom_conn)
+    monkeypatch.setattr(admin, 'execute', boom_execute)
+    admin._skipped_subscription_sources.clear()
+    sql = 'SELECT purchase_token FROM play_subscription_token_map'
+    assert admin._select_subscription_rows(sql) == []
+    assert admin._select_subscription_rows(sql) == []
+    assert sql in admin._skipped_subscription_sources

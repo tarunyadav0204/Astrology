@@ -25,6 +25,7 @@ WEALTH_SUBTYPE_CATEGORIES = {
     "loan_decision": "debt",
     "investing_vs_trading": "investment",
     "investment_risk": "investment",
+    "intraday_trading": "investment",
     "loss_vulnerability": "investment",
     "windfall": "investment",
 }
@@ -48,6 +49,8 @@ _FACTOR_LABELS = {
     "wealth:InduLagna": "Indu Lagna wealth potential", "wealth:HoraLagna": "Hora Lagna material manifestation",
     "wealth:ArudhaGains": "Second and eleventh from Arudha Lagna", "wealth:KPFructification": "KP financial fructification",
     "wealth:DashaActivation": "Dasha activation", "wealth:TransitConfirmation": "Transit confirmation",
+    "wealth:TradingSessionClimate": "Trader day climate at market open",
+    "wealth:IntradayMarketWindows": "Market-hour Choghadiya windows",
     "wealth:RemedyBlueprint": "Calculated remedy blueprint",
 }
 
@@ -92,6 +95,8 @@ def wealth_graph_runtime_key(category: Any, query_plan: Mapping[str, Any] | None
         return None
     if mode == "remedy_action":
         return "wealth_remedies"
+    if subtype == "intraday_trading":
+        return "intraday_trading"
     if category_key == "wealth":
         # The primary intent router can occasionally retain the broad Wealth
         # category while correctly resolving the semantic subtype.  Preserve
@@ -167,6 +172,10 @@ def observed_wealth_factors(context: Mapping[str, Any], query_plan: Mapping[str,
     }
     for key, factor in flag_map.items():
         if availability.get(key): factors.add(factor)
+    if availability.get("trading_session_climate"):
+        factors.add("wealth:TradingSessionClimate")
+    if availability.get("intraday_market_windows"):
+        factors.add("wealth:IntradayMarketWindows")
     plan = query_plan if isinstance(query_plan, Mapping) else {}
     if _timing_requested(plan):
         dashas = context.get("current_dashas") if isinstance(context.get("current_dashas"), Mapping) else {}

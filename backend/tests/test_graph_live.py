@@ -225,6 +225,33 @@ def test_exact_day_contract_cannot_be_overwritten_by_static_domain_graph() -> No
     ) == packet
 
 
+def test_exact_day_intraday_trading_is_allowed_to_use_wealth_graph() -> None:
+    packet = _packet(
+        "investment", "timing_window",
+        time_scope={"is_exact_day": True, "target_date": "2026-09-22"},
+        forecast_shape="daily_forecast",
+    )
+    packet["query_plan"]["wealth_subtype"] = "intraday_trading"
+    result = apply_live_graph_policy(
+        packet,
+        intent={"category": "investment", "wealth_subtype": "intraday_trading", "mode": "PREDICT_DAILY"},
+        context={
+            "intent_summary": {"category": "investment", "answer_mode": "timing_window", "wealth_subtype": "intraday_trading"},
+            "normalized_evidence": {"wealth_foundation": {
+                "d1_available": True,
+                "houses_available": [2, 5, 8, 11, 12],
+                "availability": {
+                    "d2": True, "d5": True, "d9": True, "kp_fructification": True,
+                    "trading_session_climate": True, "intraday_market_windows": True,
+                },
+            }},
+            "current_dashas": {"levels": {"MD": {"planet": "Saturn"}}},
+            "current_transits": {"planets": {"Moon": {"house": 3}}},
+        },
+    )
+    assert result["knowledge_graph_policy"]["runtime_key"] == "intraday_trading"
+
+
 def test_career_comparison_routes_to_combined_promotion_and_job_change_graph() -> None:
     packet = _packet(
         "career", "comparison_choice", career_subtype="promotion",

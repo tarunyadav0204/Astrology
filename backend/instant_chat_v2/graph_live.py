@@ -283,7 +283,7 @@ def resolve_live_graph_policy(
     prefer_wealth_graph = wealth_subtype in {
         "source", "savings_instability", "multiple_income", "debt_repayment",
         "loan_support", "loan_decision", "investing_vs_trading", "investment_risk",
-        "loss_vulnerability", "windfall",
+        "loss_vulnerability", "windfall", "intraday_trading",
     }
     # ``income`` is shared vocabulary with the Career salary route. A typed
     # Wealth subtype is the more specific domain signal and must win before
@@ -366,7 +366,15 @@ def apply_live_graph_policy(
         # Exact-day materialisation has its own calculator contract (five-level
         # dasha, Moon/Tara and KP). A static domain route must never overwrite
         # that temporal lens with vocation, promise or profile evidence.
-        return result
+        # The sole exception is the authored Wealth intraday-trading route,
+        # which is itself an exact-day session contract.
+        wealth_subtype = str(
+            query_plan.get("wealth_subtype")
+            or (intent or {}).get("wealth_subtype")
+            or ""
+        ).strip().lower()
+        if wealth_subtype != "intraday_trading":
+            return result
     graph_context = dict(context or {})
     # The fused verdict owns option-specific comparison rows.  Make that
     # adjudicated evidence visible to the graph comparator without copying it
@@ -504,6 +512,7 @@ def apply_live_graph_policy(
         and policy.get("runtime_key") in {
             "wealth_timing", "income_timing", "debt_repayment",
             "loan_support", "loan_decision", "investment_timing", "inheritance_timing",
+            "intraday_trading",
         }
     ) or bool(
         policy.get("domain") == "education"
@@ -1153,6 +1162,7 @@ def apply_live_graph_policy(
             "investing_vs_trading": "long-term investing versus active trading suitability",
             "investment": "investment and speculation suitability",
             "investment_timing": "investment-support timing",
+            "intraday_trading": "exact-day intraday trading session climate and market-hour windows",
             "investment_risk": "investment volatility and risk mechanism",
             "loss_vulnerability": "financial-loss vulnerability",
             "inheritance": "inheritance and settlement potential",
@@ -1163,6 +1173,7 @@ def apply_live_graph_policy(
         is_static_wealth = runtime_key not in {
             "wealth_timing", "income_timing", "debt_repayment",
             "loan_support", "loan_decision", "investment_timing", "inheritance_timing",
+            "intraday_trading",
         }
         investment_family = runtime_key in {
             "investment", "investing_vs_trading", "investment_timing",
@@ -1273,6 +1284,7 @@ def apply_live_graph_policy(
             "forbidden_moves": [
                 "Do not guarantee wealth, returns, profit, inheritance, loan approval, or freedom from loss.",
                 "Do not recommend a named security, asset, leverage level, trade, lender, or transaction.",
+                "Do not predict index, sector or ticker direction on an intraday trading route.",
                 "Do not infer timing from natal promise or Indu Lagna alone.",
                 "Do not use dasha or transit language on a static route.",
                 "Do not treat Indu Lagna as an exact-degree point or as overriding D1 and D2.",
@@ -1290,6 +1302,57 @@ def apply_live_graph_policy(
         compact_policy["wealth_adjudication"] = wealth_adjudication
         answer_spec["financial_safety_rules"] = compact_policy["financial_safety_rules"]
         answer_spec["wealth_answer_rules"] = wealth_answer_rules
+        if runtime_key == "intraday_trading":
+            session = (
+                dict(wealth_foundation.get("intraday_trading_session"))
+                if isinstance(wealth_foundation.get("intraday_trading_session"), Mapping)
+                else {}
+            )
+            wealth_answer_rules["intraday_trading_session"] = session
+            wealth_answer_rules["required_answer_order"] = [
+                "sit-out, reduce-size or participate verdict for the requested session day",
+                "brief natal speculation permission from D1, D2 and D5; do not write a lifetime investment essay",
+                "day climate from Tara, Chandra, SAV and supplied lunar risk flags",
+                "usable versus caution windows inside 09:15-15:30 only",
+                "one practical risk (overtrading, stops, calculation error) and the non-market-forecast disclaimer",
+            ]
+            wealth_answer_rules["forbidden_moves"].extend([
+                "Do not predict whether Nifty, a sector, option or named security will rise or fall.",
+                "Do not recommend a ticker, strike, leverage level or guaranteed P&L.",
+                "Do not treat a Labha/Shubha/Amrita hora as a buy signal; it is only a lower-friction entry window.",
+                "Do not answer a lifetime investing-versus-trading suitability question on this route.",
+                "Do not use windows outside 09:15-15:30 or invent times when windows are empty.",
+                "If participation is sit_out or the market is closed, do not still advise new entries.",
+            ])
+            compact_policy["instruction"] = (
+                "Answer only the requested trading session. Lead with sit-out versus participate from "
+                "intraday_trading_session.participation, then natal permission, then day climate, then "
+                "market-hour windows. This is the native's judgment climate, not a market call."
+            )
+            session_windows = [
+                {
+                    "start": row.get("start"),
+                    "end": row.get("end"),
+                    "label": row.get("name"),
+                    "quality": row.get("quality"),
+                }
+                for row in list(session.get("entry_windows") or [])
+                if isinstance(row, Mapping)
+            ]
+            verdict = dict(result.get("verdict") or {})
+            verdict["direction"] = str(session.get("participation") or "cautious")
+            verdict["ranked_windows"] = session_windows
+            verdict["rationale"] = {
+                "source": "wealth_foundation.intraday_trading_session",
+                "signal": session.get("signal"),
+                "headline": session.get("headline"),
+                "claim_rule": session.get("claim_rule"),
+            }
+            result["verdict"] = verdict
+            event_rules = dict(answer_spec.get("event_rules") or {})
+            event_rules["allowed_timing_windows"] = session_windows
+            event_rules["window_answer_rule"] = session.get("claim_rule")
+            answer_spec["event_rules"] = event_rules
         if runtime_key == "wealth_timing":
             growth_synthesis = (
                 dict(wealth_foundation.get("wealth_growth_timing_synthesis"))

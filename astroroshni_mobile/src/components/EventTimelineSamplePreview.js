@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '../context/ThemeContext';
 import MonthlyAccordion from './MonthlyAccordion';
+import LegacyMonthlyAccordion from './LegacyMonthlyAccordion';
 import yearlySample from '../data/eventTimelineYearlySample.json';
 import monthlySample from '../data/eventTimelineMonthlySample.json';
 
@@ -13,13 +14,16 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-export default function EventTimelineSamplePreview({ mode = 'yearly' }) {
+export default function EventTimelineSamplePreview({ mode = 'yearly', engineVersion = null }) {
   const [expanded, setExpanded] = useState(false);
   const { t } = useTranslation();
   const { colors } = useTheme();
   const sample = mode === 'monthly' ? monthlySample : yearlySample;
   const months = useMemo(() => sample.monthly_predictions || [], [sample]);
   const isYearly = mode !== 'monthly';
+  const SampleMonthlyAccordion = engineVersion === 'legacy_v1'
+    ? LegacyMonthlyAccordion
+    : MonthlyAccordion;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -68,7 +72,7 @@ export default function EventTimelineSamplePreview({ mode = 'yearly' }) {
         <View style={styles.report}>
           {months.map((month) => (
             <View key={`sample-${mode}-${month.month_id}`} style={styles.sampleMonth}>
-              <MonthlyAccordion
+              <SampleMonthlyAccordion
                 data={{
                   ...month,
                   month: MONTH_NAMES[Number(month.month_id) - 1] || `Month ${month.month_id}`,

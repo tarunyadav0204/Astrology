@@ -1,7 +1,7 @@
 # Wealth and Finance ontology validation report
 
-- Ontology version: `0.2.5`
-- Competency questions: **21**
+- Ontology version: `0.2.6`
+- Competency questions: **22**
 - Result: **PASS**
 
 | Test | Human question | Runtime key | Answer mode | Factors | Calculators | Result |
@@ -22,6 +22,7 @@
 | `investing_vs_trading` | Is long-term investing or active trading better for me? | `investing_vs_trading` | `ModeComparison` | 12 | 6 | PASS |
 | `investment_timing` | Is this a supportive period for investing? | `investment_timing` | `ModeTiming` | 12 | 6 | PASS |
 | `investment_risk` | Why do my investments fluctuate so much? | `investment_risk` | `ModeDiagnosis` | 12 | 6 | PASS |
+| `intraday_trading` | Should I do intraday tomorrow, and which session windows are usable? | `intraday_trading` | `ModeTiming` | 14 | 8 | PASS |
 | `loss_vulnerability` | Where is my chart most vulnerable to financial loss? | `loss_vulnerability` | `ModeTopic` | 12 | 5 | PASS |
 | `inheritance` | Does my chart support inheritance or settlement? | `inheritance` | `ModeTopic` | 10 | 6 | PASS |
 | `inheritance_timing` | When may an inheritance or settlement move forward? | `inheritance_timing` | `ModeTiming` | 10 | 6 | PASS |

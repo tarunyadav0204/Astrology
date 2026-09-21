@@ -79,6 +79,17 @@ def test_reduce_daily_context_includes_micro_intent():
     assert reduced["intent"]["daily_micro_intent"]["name"] == "interview_meeting"
 
 
+def test_speculative_trading_facet_uses_investment_houses() -> None:
+    result = build_daily_micro_intent_from_facets(
+        ["speculative_trading"],
+        activity_label="intraday trading session",
+        category="investment",
+    )
+    assert result["name"] == "semantic_activity"
+    assert set((2, 5, 8, 11, 12)).issubset(result["houses"])
+    assert "Mars" in result["fast_planets"]
+
+
 if __name__ == "__main__":
     test_classify_interview_meeting()
     test_classify_relationship_outreach()

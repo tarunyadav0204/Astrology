@@ -6066,6 +6066,8 @@ def _mode_selection_from_intent(
         # decision. It requires the event/timing evidence path even if the
         # provider left the generic answer mode on topic_reading.
         mode = "event_prediction"
+    if str(intent.get("wealth_subtype") or "").strip().lower() == "intraday_trading":
+        mode = "timing_window"
     requested_object = str(intent.get("requested_object") or "").strip().lower()
     # Validate the primary LLM's semantic fields against one another. This is
     # intentionally not a keyword parser: the LLM identifies the requested
@@ -11328,6 +11330,7 @@ def _compact_wealth_foundation(
     category: str,
     answer_mode: str,
     wealth_subtype: str = "",
+    period_window: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Calculate the bounded evidence ledger required by the Wealth graph."""
     from calculators.indu_lagna_calculator import InduLagnaCalculator
@@ -11339,6 +11342,7 @@ def _compact_wealth_foundation(
         "lord_nakshatra_chain": False, "dignity_strength": False,
         "dhana_yogas": False, "indu_lagna": False, "hora_lagna": False,
         "arudha_gains": False, "kp_fructification": False,
+        "trading_session_climate": False, "intraday_market_windows": False,
         "remedy_blueprint": bool(
             isinstance(normalized_evidence.get("remedy_blueprint"), dict)
             and normalized_evidence["remedy_blueprint"].get("top_recommendation")
@@ -12053,18 +12057,34 @@ def _compact_wealth_foundation(
 
         fifth_house = natal_houses.get("5") if isinstance(natal_houses, dict) else {}
         fifth_lord = fifth_house.get("lord") if isinstance(fifth_house, dict) else {}
+        if not isinstance(fifth_lord, dict):
+            fifth_lord = {}
         fifth_placement = fifth_lord.get("placement") if isinstance(fifth_lord, dict) else {}
+        if not isinstance(fifth_placement, dict):
+            fifth_placement = {}
         fifth_conditions = fifth_lord.get("conditions") if isinstance(fifth_lord, dict) else {}
+        if not isinstance(fifth_conditions, dict):
+            fifth_conditions = {}
         fifth_strength = fifth_conditions.get("strength") if isinstance(fifth_conditions, dict) else {}
+        if not isinstance(fifth_strength, dict):
+            fifth_strength = {}
         fifth_caution = next(
             (row for row in carrier_cautions if row.get("house") == 5),
             {},
         )
         eleventh_house = natal_houses.get("11") if isinstance(natal_houses, dict) else {}
         eleventh_lord = eleventh_house.get("lord") if isinstance(eleventh_house, dict) else {}
+        if not isinstance(eleventh_lord, dict):
+            eleventh_lord = {}
         eleventh_placement = eleventh_lord.get("placement") if isinstance(eleventh_lord, dict) else {}
+        if not isinstance(eleventh_placement, dict):
+            eleventh_placement = {}
         eleventh_conditions = eleventh_lord.get("conditions") if isinstance(eleventh_lord, dict) else {}
+        if not isinstance(eleventh_conditions, dict):
+            eleventh_conditions = {}
         eleventh_strength = eleventh_conditions.get("strength") if isinstance(eleventh_conditions, dict) else {}
+        if not isinstance(eleventh_strength, dict):
+            eleventh_strength = {}
         eleventh_dignity = eleventh_conditions.get("dignity") or eleventh_lord.get("dignity")
 
         gains_supported = str(eleventh_dignity or "").lower() in {
@@ -12945,6 +12965,38 @@ def _compact_wealth_foundation(
         "Rahu and Ketu contribute through occupation, conjunction and seventh aspect only, never fifth or ninth aspects.",
         "Never guarantee returns, inheritance, loan approval, windfalls or freedom from loss.",
     ]
+    if subtype == "intraday_trading":
+        try:
+            from instant_chat_v2.intraday_trading_evidence import build_intraday_trading_session
+            target_date = str((period_window or {}).get("start") or (period_window or {}).get("date") or "")[:10]
+            natal_qualified = (
+                str((result.get("route_adjudication") or {}).get("strength_claim_permission") or "")
+                == "qualified_only"
+            )
+            session = build_intraday_trading_session(
+                natal_chart=chart_data,
+                birth_data=birth_data,
+                target_date=target_date,
+                natal_qualified=natal_qualified,
+            )
+            result["intraday_trading_session"] = session
+            session_ok = bool(session.get("available"))
+            availability["trading_session_climate"] = session_ok
+            availability["intraday_market_windows"] = session_ok
+            adjudication = result.get("route_adjudication")
+            if isinstance(adjudication, dict):
+                adjudication["intraday_trading_session"] = {
+                    "participation": session.get("participation"),
+                    "signal": session.get("signal"),
+                    "market_open": session.get("market_open"),
+                }
+            result["interpretation_rules"] = list(result.get("interpretation_rules") or []) + [
+                "Natal D1/D2/D5 permission gates the session; a supportive hora cannot override a sit-out climate.",
+                "Answer sit-out versus participate, then day climate, then 09:15-15:30 windows only.",
+                "Never predict index or ticker direction or guarantee P&L.",
+            ]
+        except Exception:
+            logger.exception("Instant Wealth intraday trading session calculation failed")
     return result
 
 
@@ -12987,6 +13039,8 @@ def _build_instant_context(
     wealth_subtype = str((intent or {}).get("wealth_subtype") or "").strip().lower()
     if wealth_subtype == "loan_decision":
         focus = {**focus, "houses": [2, 6, 7, 8, 10, 11, 12]}
+    if wealth_subtype == "intraday_trading":
+        focus = {**focus, "houses": [2, 5, 8, 11, 12]}
     if is_education_category(category):
         education_route = education_profile(category, (intent or {}).get("education_subtype"))
         focus = {**focus, "houses": education_route["houses"], "planets": education_route["planets"]}
@@ -13854,6 +13908,7 @@ def _build_instant_context(
             category=category,
             answer_mode=answer_mode,
             wealth_subtype=str((intent or {}).get("wealth_subtype") or ""),
+            period_window=period_window,
         )
     if is_education_category(category):
         normalized_evidence["education_foundation"] = _compact_education_foundation(
@@ -16482,6 +16537,34 @@ def _build_instant_answer_blueprint(
             "user_goal": query_plan.get("user_goal"),
         }
     if wealth_rules and wealth_foundation:
+        if str(wealth_rules.get("runtime_key") or "") == "intraday_trading":
+            return {
+                "purpose": "semantic slots for the exact-day intraday trading session; not a market forecast and not lifetime trading suitability",
+                "slots": [
+                    {
+                        "slot": "sit-out, reduce-size or participate verdict for the requested day",
+                        "source": "evidence.wealth_foundation.intraday_trading_session.participation and signal",
+                    },
+                    {
+                        "slot": "brief natal speculation permission",
+                        "source": "evidence.wealth_foundation.route_adjudication and D1/D2/D5; do not write a lifetime investment essay",
+                    },
+                    {
+                        "slot": "day climate at market open",
+                        "source": "evidence.wealth_foundation.intraday_trading_session tara_bala, chandra_bala, ashtakavarga and risk_factors",
+                    },
+                    {
+                        "slot": "usable versus caution windows inside 09:15-15:30",
+                        "source": "evidence.wealth_foundation.intraday_trading_session.entry_windows and caution_windows",
+                    },
+                    {
+                        "slot": "one practical risk and the non-market-forecast disclaimer",
+                        "source": "intraday_trading_session.claim_rule",
+                    },
+                ],
+                "forbidden_content": list(wealth_rules.get("forbidden_moves") or []),
+                "user_goal": query_plan.get("user_goal"),
+            }
         static_route = bool(wealth_rules.get("static_route"))
         investment_family = str(wealth_rules.get("runtime_key") or "") in {
             "investment", "investing_vs_trading", "investment_timing",
@@ -20047,6 +20130,14 @@ async def generate_instant_chat_response(
         )
         if required_category and str(intent.get("category") or "").strip().lower() != required_category:
             intent = {**intent, "category": required_category}
+        if str(intent.get("wealth_subtype") or "").strip().lower() == "intraday_trading":
+            intent = {
+                **intent,
+                "category": required_category or "investment",
+                "mode": "PREDICT_DAILY",
+                "needs_transits": True,
+                "daily_intent_confirmed": True,
+            }
     requested_app_language = str(language or "english").strip().lower() or "english"
     language = _instant_response_language(
         latest_user_question or question,

@@ -452,7 +452,7 @@ class EventPredictor:
 
             use_parallel_yearly = (
                 self.engine_version not in {ACCURACY_ENGINE_VERSION, ACCURACY_V3_ENGINE_VERSION}
-                and self._env_bool("EVENT_TIMELINE_PARALLEL_YEARLY", default=False)
+                and self._env_bool("EVENT_TIMELINE_PARALLEL_YEARLY", default=True)
             )
             from utils.admin_settings import CHAT_LLM_DEEPSEEK
 
@@ -599,7 +599,7 @@ class EventPredictor:
                 "error": "Timeline model not initialized.",
             }
 
-        require_cache = self._env_bool("EVENT_TIMELINE_REQUIRE_CONTEXT_CACHE", default=True)
+        require_cache = self._env_bool("EVENT_TIMELINE_REQUIRE_CONTEXT_CACHE", default=False)
         cache_ttl_s = max(300, self._safe_int_env("EVENT_TIMELINE_CACHE_TTL_S", 3600))
         cache_resource = None
         cache_setup_input_tokens = max(1, int(round(len(raw_data or "") / 4.0)))
@@ -624,9 +624,7 @@ class EventPredictor:
                     "_timeline_invalid": True,
                     "error": _user_timeline_error(e),
                 }
-            print("⚠️ EVENT_TIMELINE_REQUIRE_CONTEXT_CACHE is disabled; falling back to single-call yearly.")
-            prompt = self._create_prediction_prompt(raw_data, year, age)
-            return await self._get_ai_prediction_async(prompt)
+            print("⚠️ Context cache unavailable; running the four quarter requests directly in parallel.")
 
         try:
             quarter_tasks: List[asyncio.Task] = []
@@ -637,8 +635,13 @@ class EventPredictor:
                     age=age,
                     quarter_idx=q,
                     month_ids=month_ids,
+                    raw_data=raw_data if cache_resource is None else None,
                 )
-                cached_model = genai.GenerativeModel.from_cached_content(cache_resource)
+                quarter_model = (
+                    genai.GenerativeModel.from_cached_content(cache_resource)
+                    if cache_resource is not None
+                    else self.model
+                )
                 async def _run_quarter(quarter_index: int, prompt: str, model_obj: Any):
                     result = await self._get_ai_prediction_async(
                         prompt,
@@ -647,7 +650,7 @@ class EventPredictor:
                     )
                     return quarter_index, result
 
-                quarter_tasks.append(asyncio.create_task(_run_quarter(q, quarter_prompt, cached_model)))
+                quarter_tasks.append(asyncio.create_task(_run_quarter(q, quarter_prompt, quarter_model)))
 
             quarter_results_by_index: Dict[int, Dict[str, Any]] = {}
             usage_totals = {
@@ -858,15 +861,6 @@ class EventPredictor:
                         f"Month {m.get('month_id')} has no events in merged quarterly output."
                     ),
                 }
-            if len(events) < 6:
-                return {
-                    "macro_trends": [],
-                    "monthly_predictions": [],
-                    "_timeline_invalid": True,
-                    "error": _user_timeline_error(
-                        f"Month {m.get('month_id')} has {len(events)} events; minimum 6 required."
-                    ),
-                }
             for ev_idx, ev in enumerate(events, start=1):
                 if not isinstance(ev, dict):
                     return {
@@ -996,7 +990,7 @@ class EventPredictor:
                 dasha_facts = self._get_dasha_facts_for_month(birth_data, year, month)
             use_parallel_monthly = (
                 self.engine_version not in {ACCURACY_ENGINE_VERSION, ACCURACY_V3_ENGINE_VERSION}
-                and self._env_bool("EVENT_TIMELINE_PARALLEL_MONTHLY", default=False)
+                and self._env_bool("EVENT_TIMELINE_PARALLEL_MONTHLY", default=True)
             )
             from utils.admin_settings import CHAT_LLM_DEEPSEEK
 
@@ -1138,7 +1132,7 @@ class EventPredictor:
                 "_timeline_invalid": True,
                 "error": "Timeline model not initialized.",
             }
-        require_cache = self._env_bool("EVENT_TIMELINE_REQUIRE_CONTEXT_CACHE", default=True)
+        require_cache = self._env_bool("EVENT_TIMELINE_REQUIRE_CONTEXT_CACHE", default=False)
         cache_ttl_s = max(300, self._safe_int_env("EVENT_TIMELINE_CACHE_TTL_S", 3600))
         cache_resource = None
         cache_setup_input_tokens = max(1, int(round(len(raw_data or "") / 4.0)))
@@ -1163,8 +1157,7 @@ class EventPredictor:
                     "_timeline_invalid": True,
                     "error": _user_timeline_error(e),
                 }
-            prompt = self._create_monthly_deep_prompt(raw_data, year, month, age, transit_facts, dasha_facts)
-            return await self._get_ai_prediction_async(prompt)
+            print("⚠️ Monthly context cache unavailable; running the domain shards directly in parallel.")
 
         try:
             shards = self._monthly_domain_shards()
@@ -1177,8 +1170,13 @@ class EventPredictor:
                     transit_facts=transit_facts,
                     dasha_facts=dasha_facts,
                     shard=shard,
+                    raw_data=raw_data if cache_resource is None else None,
                 )
-                cached_model = genai.GenerativeModel.from_cached_content(cache_resource)
+                shard_model = (
+                    genai.GenerativeModel.from_cached_content(cache_resource)
+                    if cache_resource is not None
+                    else self.model
+                )
 
                 async def _run_shard(shard_id: str, shard_prompt: str, model_obj: Any):
                     result = await self._get_ai_prediction_async(
@@ -1188,7 +1186,7 @@ class EventPredictor:
                     )
                     return shard_id, result
 
-                tasks.append(asyncio.create_task(_run_shard(shard["id"], prompt, cached_model)))
+                tasks.append(asyncio.create_task(_run_shard(shard["id"], prompt, shard_model)))
 
             results_by_shard: Dict[str, Dict[str, Any]] = {}
             usage_totals = {
@@ -1252,6 +1250,7 @@ class EventPredictor:
         transit_facts: Dict[str, Any],
         dasha_facts: Dict[str, Any],
         shard: Dict[str, Any],
+        raw_data: Optional[str] = None,
     ) -> str:
         month_names = [
             "",
@@ -1271,7 +1270,20 @@ class EventPredictor:
         month_name = month_names[month] if 1 <= month <= 12 else f"Month {month}"
         domains = shard.get("domains") or []
         domains_line = ", ".join(str(d).strip() for d in domains if str(d).strip())
+        direct_context = "" if raw_data is None else f"""
+AUTHORITATIVE ASTROLOGICAL CONTEXT:
+<chart_context>
+{raw_data}
+</chart_context>
+"""
+        context_instruction = (
+            "Use cached context as ground truth for all chart computations"
+            if raw_data is None
+            else "Use the chart_context above as ground truth for all chart computations"
+        )
         return f"""You are an expert Vedic astrologer. Generate ONE SHARD for monthly deep-dive for {month_name} {year}.
+
+{direct_context}
 
 You are shard `{shard.get("id")}` focused on domain group: {shard.get("label")}.
 You MUST cover only these domains: [{domains_line}].
@@ -1286,7 +1298,7 @@ TRANSIT FACTS (copy exactly, do not change):
 {json.dumps(transit_facts, indent=2)}
 ```
 
-Use cached context as ground truth for all chart computations, and apply Desha-Kala-Patra for age {age}.
+{context_instruction}, and apply Desha-Kala-Patra for age {age}.
 
 OUTPUT JSON ONLY with keys:
 {{
@@ -1412,15 +1424,6 @@ Constraints:
                 "_timeline_invalid": True,
                 "error": _user_timeline_error(
                     f"Monthly shards returned no usable events: {', '.join(empty_shards)}"
-                ),
-            }
-        if len(events) < 20:
-            return {
-                "macro_trends": [],
-                "monthly_predictions": [],
-                "_timeline_invalid": True,
-                "error": _user_timeline_error(
-                    f"Merged monthly deep has {len(events)} events; minimum 20 required."
                 ),
             }
 
@@ -3001,13 +3004,33 @@ Each item in possible_manifestations MUST be an object with TWO fields:
 {test_month_suffix}
 """
 
-    def _create_quarter_prompt(self, year: int, age: int, quarter_idx: int, month_ids: List[int]) -> str:
+    def _create_quarter_prompt(
+        self,
+        year: int,
+        age: int,
+        quarter_idx: int,
+        month_ids: List[int],
+        raw_data: Optional[str] = None,
+    ) -> str:
         life_stage_context = self._extract_life_stage_context(age)
+        direct_context = "" if raw_data is None else f"""
+AUTHORITATIVE ASTROLOGICAL CONTEXT:
+<chart_context>
+{raw_data}
+</chart_context>
+"""
+        context_instruction = (
+            "Full astrological context is already provided via cached content."
+            if raw_data is None
+            else "Full astrological context is provided in chart_context above."
+        )
         return f"""
 You are an expert Vedic Astrologer predicting life events for Quarter {quarter_idx} of {year}.
 
+{direct_context}
+
 IMPORTANT:
-- Full astrological context is already provided via cached content.
+- {context_instruction}
 - Do not ask for or expect missing context.
 
 {life_stage_context}

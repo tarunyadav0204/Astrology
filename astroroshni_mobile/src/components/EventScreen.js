@@ -23,6 +23,7 @@ import { chatAPI, pricingAPI } from '../services/api';
 import { storage } from '../services/storage';
 import { useCredits } from '../credits/CreditContext';
 import MonthlyAccordion from './MonthlyAccordion';
+import LegacyMonthlyAccordion from './LegacyMonthlyAccordion';
 import EventTimelineSamplePreview from './EventTimelineSamplePreview';
 import RelativeProfilesPanel from './RelativeProfilesPanel';
 import NativeSelectorChip from './Common/NativeSelectorChip';
@@ -129,6 +130,7 @@ export default function EventScreen({ route }) {
   ); // 'yearly' | 'monthly'
   const [selectedMonth, setSelectedMonth] = useState(recommendedMonth);
   const [monthlyData, setMonthlyData] = useState(null);
+  const [timelineEngineVersion, setTimelineEngineVersion] = useState(null);
   
   // Loading states
   const [loadingMonthly, setLoadingMonthly] = useState(false);
@@ -157,6 +159,7 @@ export default function EventScreen({ route }) {
     if (previousTimelineLanguageRef.current === timelineLanguageCode) return;
     previousTimelineLanguageRef.current = timelineLanguageCode;
     setMonthlyData(null);
+    setTimelineEngineVersion(null);
     setAnalysisStarted(false);
     setCachedYears([]);
     setCachedMonths([]);
@@ -250,12 +253,13 @@ export default function EventScreen({ route }) {
     { icon: '✅', text: isIOS ? 'Finalizing your chart study...' : 'Finalizing the timing study...' }
   ];
 
-  const getYearlyPendingPayload = useCallback((jobId, year, birthChartId, startedAt = new Date().toISOString(), generationMode = null) => ({
+  const getYearlyPendingPayload = useCallback((jobId, year, birthChartId, startedAt = new Date().toISOString(), generationMode = null, engineVersion = null) => ({
     jobId,
     year: Number(year),
     birthChartId: Number(birthChartId),
     startedAt,
     generationMode,
+    engineVersion,
   }), []);
 
   const saveYearlyPendingJob = useCallback(async (payload) => {
@@ -408,7 +412,11 @@ export default function EventScreen({ route }) {
           selectedYear: y,
           birth_chart_id: bd.id,
         });
+        if (res.data?.engine_version) {
+          setTimelineEngineVersion(res.data.engine_version);
+        }
         if (res.data?.cached && res.data?.data) {
+          setTimelineEngineVersion(res.data.data?.engine_version || res.data?.engine_version || null);
           setMonthlyData(res.data.data);
           markYearCached(y);
           await clearYearlyPendingJob();
@@ -440,6 +448,7 @@ export default function EventScreen({ route }) {
     const finishSuccess = async (data, mode = 'poll_completed') => {
       if (!takeOutcome()) return;
       stopEventTimelineJob();
+      setTimelineEngineVersion(data?.engine_version || null);
       setMonthlyData(data);
       markYearCached(year);
       await clearYearlyPendingJob();
@@ -503,6 +512,9 @@ export default function EventScreen({ route }) {
       try {
         const statusResponse = await chatAPI.getMonthlyEventsStatus(jobId);
         const status = statusResponse.data.status;
+        if (statusResponse.data?.engine_version) {
+          setTimelineEngineVersion(statusResponse.data.engine_version);
+        }
         const partialData = statusResponse.data?.partial_data;
         const serverProgressValue = statusResponse.data?.progress_percent;
         const serverPercent = serverProgressValue == null ? Number.NaN : Number(serverProgressValue);
@@ -629,6 +641,7 @@ export default function EventScreen({ route }) {
   const resumePendingYearlyJob = useCallback(async (pending, options = {}) => {
     const { preservePartialData = true } = options;
     const birthChartId = resolveBirthChartId(birthData);
+    let pendingEngineVersion = pending?.engineVersion || null;
     if (
       !pending ||
       !pending.jobId ||
@@ -637,12 +650,40 @@ export default function EventScreen({ route }) {
     ) {
       return false;
     }
+    try {
+      const [activeResponse, pendingResponse] = await Promise.all([
+        chatAPI.getCachedMonthlyEvents({
+          ...birthData,
+          selectedYear: Number(pending.year) || selectedYear,
+          birth_chart_id: birthChartId,
+        }),
+        chatAPI.getMonthlyEventsStatus(pending.jobId),
+      ]);
+      const activeEngineVersion = activeResponse.data?.engine_version || null;
+      pendingEngineVersion = pending.engineVersion
+        || pendingResponse.data?.engine_version
+        || null;
+      if (activeEngineVersion) setTimelineEngineVersion(activeEngineVersion);
+      if (
+        activeEngineVersion
+        && pendingEngineVersion
+        && activeEngineVersion !== pendingEngineVersion
+      ) {
+        await clearYearlyPendingJob();
+        return false;
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[EventScreen] pending engine check', error?.message || error);
+      }
+    }
     stopEventTimelineJob();
     if (!preservePartialData) {
       setMonthlyData(null);
       setTimelineProgress({ monthsReady: 0, totalMonths: 12, completedQuarters: 0 });
     }
     setSelectedYear(Number(pending.year) || selectedYear);
+    setTimelineEngineVersion(pendingEngineVersion);
     startYearlyLoadingUi(pending.startedAt);
     if (pending.generationMode === 'deterministic') {
       timelineGenerationModeRef.current = 'deterministic';
@@ -662,6 +703,7 @@ export default function EventScreen({ route }) {
   }, [
     attachYearlyTimelinePolling,
     birthData,
+    clearYearlyPendingJob,
     selectedYear,
     startYearlyLoadingUi,
     stopEventTimelineJob,
@@ -704,6 +746,7 @@ export default function EventScreen({ route }) {
       });
 
       if (startResponse.data?.data && !startResponse.data?.job_id) {
+        setTimelineEngineVersion(startResponse.data.data?.engine_version || startResponse.data?.engine_version || null);
         setMonthlyData(startResponse.data.data);
         await clearYearlyPendingJob();
         trackEvent('yearly_timeline_delivered', {
@@ -722,6 +765,8 @@ export default function EventScreen({ route }) {
         throw new Error('No job_id received from server.');
       }
       const generationMode = startResponse.data?.generation_mode || null;
+      const engineVersion = startResponse.data?.engine_version || null;
+      setTimelineEngineVersion(engineVersion);
       timelineGenerationModeRef.current = generationMode;
       if (generationMode === 'deterministic') {
         serverProgressRef.current = true;
@@ -734,7 +779,7 @@ export default function EventScreen({ route }) {
           Number(startResponse.data?.progress_percent || 5)
         ));
       }
-      await saveYearlyPendingJob(getYearlyPendingPayload(jobId, year, birthData.id, startedAt, generationMode));
+      await saveYearlyPendingJob(getYearlyPendingPayload(jobId, year, birthData.id, startedAt, generationMode, engineVersion));
       attachYearlyTimelinePolling(jobId, year, startedAt);
     } catch (error) {
       console.error('❌ EventScreen Error Details:', {
@@ -1039,6 +1084,8 @@ export default function EventScreen({ route }) {
             ? res.years
             : [];
         const hasAuthoritativeYearList = Array.isArray(res?.data?.years) || Array.isArray(res?.years);
+        const activeEngineVersion = res?.data?.engine_version || res?.engine_version || null;
+        if (activeEngineVersion) setTimelineEngineVersion(activeEngineVersion);
         apiYears = mergeCachedYearList(yearsFromApi);
         if (hasAuthoritativeYearList) {
           setCachedYears(apiYears);
@@ -1452,6 +1499,8 @@ export default function EventScreen({ route }) {
     return true;
   };
   const displayMacroTrends = (monthlyData?.macro_trends || []).filter(isDescriptiveTrend);
+  const isLegacyTimeline = (monthlyData?.engine_version || timelineEngineVersion) === 'legacy_v1';
+  const TimelineMonthlyAccordion = isLegacyTimeline ? LegacyMonthlyAccordion : MonthlyAccordion;
 
   const renderCachedYearsLegend = () => (
     <View style={styles.cachedYearsHintRow}>
@@ -1752,11 +1801,13 @@ export default function EventScreen({ route }) {
             </>
           )}
 
-          <RelativeProfilesPanel
-            birthChartId={resolveBirthChartId(birthData)}
-            compact
-            onSaved={handleRelativeProfileSaved}
-          />
+          {!isLegacyTimeline ? (
+            <RelativeProfilesPanel
+              birthChartId={resolveBirthChartId(birthData)}
+              compact
+              onSaved={handleRelativeProfileSaved}
+            />
+          ) : null}
 
           {/* What's Included */}
           <View style={[styles.featuresContainer, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
@@ -1788,7 +1839,10 @@ export default function EventScreen({ route }) {
             </View>
           </View>
 
-          <EventTimelineSamplePreview mode={readingMode} />
+          <EventTimelineSamplePreview
+            mode={readingMode}
+            engineVersion={timelineEngineVersion}
+          />
 
           {/* Continue Button */}
           <View
@@ -1834,7 +1888,7 @@ export default function EventScreen({ route }) {
         contentContainerStyle={[styles.scrollContent, { backgroundColor: 'transparent' }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        {monthlyData?.narration_status === 'partial_fallback' ? (
+        {!isLegacyTimeline && monthlyData?.narration_status === 'partial_fallback' ? (
           <View style={[styles.narrationNotice, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
             <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
             <Text style={[styles.narrationNoticeText, { color: colors.textSecondary }]}>
@@ -1869,10 +1923,12 @@ export default function EventScreen({ route }) {
           </View>
         )}
 
-        <RelativeProfilesPanel
-          birthChartId={resolveBirthChartId(birthData)}
-          onSaved={handleRelativeProfileSaved}
-        />
+        {!isLegacyTimeline ? (
+          <RelativeProfilesPanel
+            birthChartId={resolveBirthChartId(birthData)}
+            onSaved={handleRelativeProfileSaved}
+          />
+        ) : null}
 
         {/* SECTION 3: Monthly Guide (The "Details") */}
         {loadingMonthly ? (
@@ -1904,7 +1960,7 @@ export default function EventScreen({ route }) {
             {monthlyData?.monthly_predictions && monthlyData.monthly_predictions.length > 0 ? (
               <View style={styles.accordionContainer}>
                 {monthlyData.monthly_predictions.map((month, index) => (
-                  <MonthlyAccordion
+                  <TimelineMonthlyAccordion
                     key={`stream-${index}`}
                     data={{ ...month, month: getMonthName(month.month_id) }}
                     hideDiveDeep
@@ -1924,7 +1980,7 @@ export default function EventScreen({ route }) {
             </View>
             <View style={styles.accordionContainer}>
               {monthlyData?.monthly_predictions?.map((month, index) => (
-                <MonthlyAccordion
+                <TimelineMonthlyAccordion
                   key={index}
                   data={{ ...month, month: getMonthName(month.month_id) }}
                   onChatPress={() => navigateToChat({ ...month, month: getMonthName(month.month_id) }, 'monthly')}

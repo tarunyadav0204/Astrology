@@ -150,6 +150,7 @@ _SEMANTIC_EVENT_FACETS: Dict[str, Dict[str, Any]] = {
     "audience_response": {"houses": [3, 7, 10, 11], "fast_planets": ["Moon", "Mercury", "Venus"]},
     "authority_interaction": {"houses": [3, 6, 9, 10, 11], "fast_planets": ["Sun", "Mercury", "Moon"]},
     "commercial_transaction": {"houses": [2, 7, 10, 11], "fast_planets": ["Mercury", "Venus", "Moon"]},
+    "speculative_trading": {"houses": [2, 5, 8, 11, 12], "fast_planets": ["Moon", "Mercury", "Mars"]},
     "relationship_exchange": {"houses": [5, 7, 11], "fast_planets": ["Venus", "Moon", "Mercury"]},
     "travel_movement": {"houses": [3, 9, 12], "fast_planets": ["Moon", "Mars", "Mercury"]},
     "health_treatment": {"houses": [1, 6, 8, 12], "fast_planets": ["Moon", "Mars", "Sun"]},

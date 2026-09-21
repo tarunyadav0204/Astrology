@@ -4,6 +4,7 @@ import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from psycopg2.errors import InsufficientPrivilege
 from pydantic import BaseModel
 from auth import User, get_current_user
 from db import execute, get_conn
@@ -175,6 +176,9 @@ def reconcile(body: ReconcileBody, user=Depends(admin)):
         raise HTTPException(502, 'Provider reconciliation failed; try again later')
 
 
+_skipped_subscription_sources = set()
+
+
 def _select_subscription_rows(sql):
     """Read one subscription source on its own connection.
 
@@ -184,6 +188,14 @@ def _select_subscription_rows(sql):
     try:
         with get_conn() as conn:
             return execute(conn, sql).fetchall() or []
+    except InsufficientPrivilege:
+        if sql not in _skipped_subscription_sources:
+            _skipped_subscription_sources.add(sql)
+            logger.warning(
+                "Skipping subscription source query; database role cannot read this table: %s",
+                sql,
+            )
+        return []
     except Exception:
         logger.warning('Skipping subscription source query: %s', sql, exc_info=True)
         return []
