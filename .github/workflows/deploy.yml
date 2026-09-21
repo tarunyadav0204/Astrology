@@ -299,7 +299,7 @@ jobs:
                   --zone "${mig_zone}" \
                   --tunnel-through-iap \
                   --quiet \
-                  --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SERVE_FRONTEND_LOCALLY='${serve_frontend_locally}' SYNC_GCP_SECRETS='true' && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"; then
+                  --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SERVE_FRONTEND_LOCALLY='${serve_frontend_locally}' SYNC_GCP_SECRETS='true' && export DEPLOY_PREV_HEAD=\$(git rev-parse HEAD) && git fetch origin main && git reset --hard origin/main && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"; then
                 if ! instance_is_running "${INSTANCE}"; then
                   echo "⚠️ Skipping ${mig_label} instance ${INSTANCE}: it disappeared during deploy"
                   continue
@@ -947,7 +947,7 @@ jobs:
                 --zone "${mig_zone}" \
                 --tunnel-through-iap \
                 --quiet \
-                --command "for i in \$(seq 1 60); do if [ -d /home/tarun_yadav/AstrologyApp/.git ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then break; fi; sleep 5; done; cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' && git fetch origin main && git reset --hard origin/main && DEPLOY_BRANCH=main SERVE_FRONTEND_LOCALLY=false SYNC_GCP_SECRETS=true bash deploy.sh"
+                --command "for i in \$(seq 1 60); do if [ -d /home/tarun_yadav/AstrologyApp/.git ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then break; fi; sleep 5; done; cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' && export DEPLOY_PREV_HEAD=\$(git rev-parse HEAD) && git fetch origin main && git reset --hard origin/main && DEPLOY_BRANCH=main SERVE_FRONTEND_LOCALLY=false SYNC_GCP_SECRETS=true bash deploy.sh"
             done
           }
 

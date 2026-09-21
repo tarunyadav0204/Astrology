@@ -66,7 +66,7 @@ fi
 
 # Pull latest changes
 echo "📥 Pulling latest changes from Git..."
-PREV_HEAD="$(git rev-parse --short HEAD 2>/dev/null || echo '')"
+PREV_HEAD="${DEPLOY_PREV_HEAD:-$(git rev-parse --short HEAD 2>/dev/null || echo '')}"
 git fetch origin "${DEPLOY_BRANCH}"
 git reset --hard "origin/${DEPLOY_BRANCH}"
 NEW_HEAD="$(git rev-parse --short HEAD)"
