@@ -350,6 +350,12 @@ fi
 echo "✅ Backend Python syntax valid"
 deploy_timing "backend syntax validation finished"
 
+# Runtime JSON is compiled from tracked ontology sources. It is intentionally
+# ignored by Git, so every normal deploy must create it before the backend starts.
+APP_ROOT="${APP_ROOT}" PYTHON_BIN="${VENV_PYTHON}" \
+  bash "${APP_ROOT}/scripts/compile_knowledge_graph_runtime.sh"
+deploy_timing "knowledge graph runtime compilation finished"
+
 # Apply schema changes before restarting either API or chat workers. Every listed
 # runtime migration is idempotent because each MIG instance executes this deploy.
 echo "🗃️ Applying runtime database migrations..."

@@ -169,6 +169,12 @@ PY
   prep_timing "backend pip finished"
 fi
 
+# Bake generated runtime bundles from the authored ontology sources into every
+# release image. The generated JSON files are intentionally not stored in Git.
+APP_ROOT="${APP_ROOT}" PYTHON_BIN="${BACKEND_DIR}/venv/bin/python" \
+  bash "${APP_ROOT}/scripts/compile_knowledge_graph_runtime.sh"
+prep_timing "knowledge graph runtime compilation finished"
+
 echo "🔐 Setting up encryption..."
 python3 setup_encryption.py || true
 prep_timing "encryption setup finished"

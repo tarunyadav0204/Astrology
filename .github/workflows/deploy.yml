@@ -124,7 +124,7 @@ jobs:
             # Prefix patterns must not use a trailing `$` after `backend/` / `play_payment_service/`
             # or only the exact directory path would match (never files under it).
             if printf '%s\n' "${changed_files}" | grep -E -q \
-              '^backend/|^deploy\.sh$|^scripts/check_backend_syntax\.py$|^scripts/(deploy-release|build-gce-release-image|prepare-image-release|bootstrap-runtime|gce-startup-bootstrap|install_runtime_watchdog)\.sh$|^\.github/workflows/deploy\.yml$'; then
+              '^backend/|^deploy\.sh$|^scripts/check_backend_syntax\.py$|^scripts/(deploy-release|build-gce-release-image|prepare-image-release|bootstrap-runtime|gce-startup-bootstrap|install_runtime_watchdog|compile_knowledge_graph_runtime)\.sh$|^\.github/workflows/deploy\.yml$'; then
               backend_required=true
             fi
 
@@ -923,6 +923,34 @@ jobs:
           set -euo pipefail
           echo "========== GitHub Actions: MIG replacement start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
           gcloud config set project "${GCP_PROJECT_ID}"
+
+          deploy_current_main_to_replacements() {
+            local mig_name="$1"
+            local mig_zone="$2"
+            local instance
+            mapfile -t replacement_instances < <(
+              gcloud compute instance-groups managed list-instances "${mig_name}" \
+                --project "${GCP_PROJECT_ID}" \
+                --zone "${mig_zone}" \
+                --filter="instanceStatus=RUNNING" \
+                --format="value(instance.basename())" \
+              | sort
+            )
+            if [ "${#replacement_instances[@]}" -eq 0 ]; then
+              echo "❌ No running replacement instances found for ${mig_name}"
+              exit 1
+            fi
+            for instance in "${replacement_instances[@]}"; do
+              echo "📦 Updating replacement ${instance} to current main"
+              gcloud compute ssh "tarun_yadav@${instance}" \
+                --project "${GCP_PROJECT_ID}" \
+                --zone "${mig_zone}" \
+                --tunnel-through-iap \
+                --quiet \
+                --command "for i in \$(seq 1 60); do if [ -d /home/tarun_yadav/AstrologyApp/.git ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then break; fi; sleep 5; done; cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' && git fetch origin main && git reset --hard origin/main && DEPLOY_BRANCH=main SERVE_FRONTEND_LOCALLY=false SYNC_GCP_SECRETS=true bash deploy.sh"
+            done
+          }
+
           gcloud compute instance-groups managed rolling-action replace "${GCP_API_MIG_NAME}" \
             --project "${GCP_PROJECT_ID}" \
             --zone "${GCP_API_MIG_ZONE}" \
@@ -936,6 +964,7 @@ jobs:
           gcloud compute instance-groups managed list-instances "${GCP_API_MIG_NAME}" \
             --project "${GCP_PROJECT_ID}" \
             --zone "${GCP_API_MIG_ZONE}"
+          deploy_current_main_to_replacements "${GCP_API_MIG_NAME}" "${GCP_API_MIG_ZONE}"
           gcloud compute instance-groups managed rolling-action replace "${GCP_CHAT_WORKER_MIG_NAME}" \
             --project "${GCP_PROJECT_ID}" \
             --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
@@ -949,4 +978,5 @@ jobs:
           gcloud compute instance-groups managed list-instances "${GCP_CHAT_WORKER_MIG_NAME}" \
             --project "${GCP_PROJECT_ID}" \
             --zone "${GCP_CHAT_WORKER_MIG_ZONE}"
+          deploy_current_main_to_replacements "${GCP_CHAT_WORKER_MIG_NAME}" "${GCP_CHAT_WORKER_MIG_ZONE}"
           echo "========== GitHub Actions: MIG replacement end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="

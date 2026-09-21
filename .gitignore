@@ -133,6 +133,7 @@ backend/gcp_key.json
 !knowledge_graph/nakshatra_poc/nakshatra-runtime-preview.json
 !knowledge_graph/health_poc/competency-questions.json
 !knowledge_graph/health_poc/health-runtime-preview.json
+!knowledge_graph/manifestation/competency-cases.json
 !astroroshni_mobile/src/locales/*.json
 !astroroshni_mobile/src/data/eventTimelineYearlySample.json
 !astroroshni_mobile/src/data/eventTimelineMonthlySample.json

@@ -100,6 +100,7 @@ tar \
   backend \
   frontend \
   frontend-next \
+  knowledge_graph \
   scripts \
   systemd \
   ops-agent \

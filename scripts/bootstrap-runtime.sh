@@ -178,6 +178,12 @@ fi
 cd "${BACKEND_DIR}"
 source venv/bin/activate
 
+# Self-heal replacement VMs and fail before opening the API port when a baked
+# image is missing an ontology runtime artifact.
+APP_ROOT="${APP_ROOT}" PYTHON_BIN="${BACKEND_DIR}/venv/bin/python" \
+  bash "${APP_ROOT}/scripts/compile_knowledge_graph_runtime.sh"
+bootstrap_timing "knowledge graph runtime compilation finished"
+
 if [ ! -f "${BACKEND_DIR}/.env" ]; then
   echo "❌ backend/.env missing after bootstrap"
   exit 1

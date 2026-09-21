@@ -1,0 +1,245 @@
+{
+  "ontology_version": "0.3.2",
+  "cases": [
+    {
+      "id": "career_recognition_without_compensation",
+      "active_houses": [6, 10, 11],
+      "domain": "career",
+      "phase": "developing",
+      "must_include": ["career.professional_recognition", "career.employment_joining"],
+      "must_exclude": ["career.compensation_progress"]
+    },
+    {
+      "id": "career_compensation_full_chain",
+      "active_houses": [2, 6, 10, 11],
+      "domain": "career",
+      "phase": "result_window",
+      "must_include": ["career.compensation_progress", "career.employment_joining", "career.professional_recognition"],
+      "must_exclude": ["career.job_separation"]
+    },
+    {
+      "id": "job_change_preparation_is_not_separation",
+      "active_houses": [3, 6, 10, 11],
+      "domain": "career",
+      "phase": "preparatory",
+      "must_include": ["career.job_change_preparation"],
+      "must_exclude": ["career.job_separation"]
+    },
+    {
+      "id": "job_change_separation_requires_twelve",
+      "active_houses": [3, 6, 10, 11, 12],
+      "domain": "career",
+      "phase": "result_window",
+      "must_include": ["career.job_separation"],
+      "must_exclude": []
+    },
+    {
+      "id": "relationship_contact_is_not_reconciliation",
+      "active_houses": [3, 5, 7],
+      "domain": "relationships",
+      "phase": "developing",
+      "must_include": ["relationship.communication"],
+      "must_exclude": ["relationship.reconciliation", "relationship.commitment"]
+    },
+    {
+      "id": "relationship_reconciliation_requires_result_support",
+      "active_houses": [3, 5, 7, 11],
+      "domain": "relationships",
+      "phase": "result_window",
+      "must_include": ["relationship.communication", "relationship.reconciliation"],
+      "must_exclude": ["relationship.commitment"]
+    },
+    {
+      "id": "marriage_commitment_chain",
+      "active_houses": [2, 5, 7, 11],
+      "domain": "relationships",
+      "phase": "result_window",
+      "must_include": ["relationship.commitment"],
+      "must_exclude": ["relationship.distance_pressure"]
+    },
+    {
+      "id": "earned_income_is_more_specific_than_gain",
+      "active_houses": [2, 6, 10, 11],
+      "domain": "wealth",
+      "phase": "result_window",
+      "must_include": ["wealth.earned_income", "wealth.income_gain"],
+      "must_exclude": ["wealth.expense_outflow"]
+    },
+    {
+      "id": "property_purchase_without_loan",
+      "active_houses": [2, 4, 9, 11],
+      "domain": "home_property",
+      "phase": "result_window",
+      "must_include": ["property.acquisition", "property.vehicle_acquisition"],
+      "must_exclude": ["property.financing", "property.home_relocation"]
+    },
+    {
+      "id": "property_financing_requires_six_and_eight_or_twelve",
+      "active_houses": [2, 4, 6, 8, 11],
+      "domain": "home_property",
+      "phase": "developing",
+      "must_include": ["property.financing", "property.acquisition"],
+      "must_exclude": ["property.home_relocation"]
+    },
+    {
+      "id": "education_admission_full_chain",
+      "active_houses": [4, 5, 9, 11],
+      "domain": "education",
+      "phase": "result_window",
+      "must_include": ["education.admission", "education.higher_education"],
+      "must_exclude": ["education.exam_selection"]
+    },
+    {
+      "id": "travel_paperwork_not_yet_journey",
+      "active_houses": [3, 9, 11],
+      "domain": "foreign_life",
+      "phase": "preparatory",
+      "must_include": ["travel.documentation"],
+      "must_exclude": ["travel.long_distance_journey", "travel.foreign_settlement"]
+    },
+    {
+      "id": "unbounded_nine_three_eleven_preserves_multiple_meanings",
+      "active_houses": [3, 9, 11],
+      "domain": null,
+      "phase": "preparatory",
+      "must_include": [
+        "travel.documentation",
+        "family.father_communication_support",
+        "guidance.mentor_guru_support",
+        "education.higher_learning_application",
+        "creativity.publishing_reach",
+        "general.supportive_opportunity",
+        "spirituality.pilgrimage_preparation"
+      ],
+      "must_exclude": ["travel.long_distance_journey", "travel.foreign_settlement"]
+    },
+    {
+      "id": "father_context_selects_father_branch",
+      "active_houses": [3, 9, 11],
+      "domain": "family",
+      "phase": "preparatory",
+      "must_include": ["family.father_communication_support"],
+      "must_exclude": ["travel.documentation", "guidance.mentor_guru_support"]
+    },
+    {
+      "id": "foreign_settlement_is_more_specific",
+      "active_houses": [3, 4, 9, 11, 12],
+      "domain": "foreign_life",
+      "phase": "result_window",
+      "must_include": ["travel.foreign_settlement", "travel.long_distance_journey", "travel.foreign_opportunity"],
+      "must_exclude": ["travel.documentation"]
+    },
+    {
+      "id": "health_attention_does_not_imply_recovery",
+      "active_houses": [1, 6, 8],
+      "domain": "health",
+      "phase": "developing",
+      "must_include": ["health.attention"],
+      "must_exclude": ["health.recovery_support", "health.rest_and_withdrawal"]
+    },
+    {
+      "id": "health_recovery_needs_eleven",
+      "active_houses": [1, 5, 6, 11],
+      "domain": "health",
+      "phase": "result_window",
+      "must_include": ["health.recovery_support", "health.attention"],
+      "must_exclude": ["health.rest_and_withdrawal"]
+    },
+    {
+      "id": "mother_development_requires_mother_anchor",
+      "active_houses": [3, 4, 11],
+      "domain": "family",
+      "phase": "developing",
+      "must_include": ["family.mother_development"],
+      "must_exclude": ["family.in_law_development"]
+    },
+    {
+      "id": "sibling_development_chain",
+      "active_houses": [3, 11],
+      "domain": "family",
+      "phase": "result_window",
+      "must_include": ["family.sibling_development"],
+      "must_exclude": ["family.in_law_development"]
+    },
+    {
+      "id": "in_law_development_chain",
+      "active_houses": [3, 7, 8, 11],
+      "domain": "family",
+      "phase": "developing",
+      "must_include": ["family.in_law_development"],
+      "must_exclude": ["family.mother_development"]
+    },
+    {
+      "id": "legal_dispute_without_result",
+      "active_houses": [3, 6, 7],
+      "domain": "legal_competition",
+      "phase": "developing",
+      "must_include": ["legal.dispute_activity"],
+      "must_exclude": ["legal.resolution", "legal.contract_agreement"]
+    },
+    {
+      "id": "legal_resolution_with_outcome",
+      "active_houses": [3, 6, 7, 11],
+      "domain": "legal_competition",
+      "phase": "result_window",
+      "must_include": ["legal.dispute_activity", "legal.resolution", "legal.contract_agreement"],
+      "must_exclude": []
+    },
+    {
+      "id": "competition_result_chain",
+      "active_houses": [6, 10, 11],
+      "domain": "legal_competition",
+      "phase": "result_window",
+      "must_include": ["legal.competition_result"],
+      "must_exclude": ["legal.contract_agreement"]
+    },
+    {
+      "id": "occult_study_is_not_generic_travel",
+      "active_houses": [5, 8, 9],
+      "domain": "spirituality",
+      "phase": "developing",
+      "must_include": ["spirituality.occult_study"],
+      "must_exclude": ["spirituality.pilgrimage_preparation"]
+    },
+    {
+      "id": "staff_hiring_result",
+      "active_houses": [6, 7, 11],
+      "domain": "career",
+      "phase": "result_window",
+      "must_include": ["career.staff_hiring"],
+      "must_exclude": ["career.staff_change"]
+    },
+    {
+      "id": "staff_change_without_hiring",
+      "active_houses": [3, 6, 10],
+      "domain": "career",
+      "phase": "developing",
+      "must_include": ["career.staff_change"],
+      "must_exclude": ["career.staff_hiring"]
+    },
+    {
+      "id": "remarriage_requires_complete_chain",
+      "active_houses": [2, 7, 9, 11],
+      "domain": "relationships",
+      "phase": "result_window",
+      "must_include": ["relationship.remarriage_development"],
+      "must_exclude": ["relationship.private_intimacy"]
+    },
+    {
+      "id": "numbered_children_remain_distinct",
+      "active_houses": [2, 5, 7, 9, 11],
+      "domain": "children",
+      "phase": "result_window",
+      "must_include": ["children.first_child_development", "children.second_child_development", "children.third_child_development"],
+      "must_exclude": []
+    },
+    {
+      "id": "private_intimacy_requires_relationship_and_private_house",
+      "active_houses": [5, 7, 12],
+      "domain": "relationships",
+      "phase": "developing",
+      "must_include": ["relationship.private_intimacy"],
+      "must_exclude": ["relationship.remarriage_development"]
+    }
+  ]
+}
