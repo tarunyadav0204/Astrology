@@ -1619,7 +1619,8 @@ export default function EventScreen({ route }) {
                 style={[
                   styles.modeToggleSubtext,
                   {
-                    color: readingMode === 'yearly' ? 'rgba(255,255,255,0.88)' : colors.textSecondary,
+                    color: readingMode === 'yearly' ? onPrimaryText : colors.textSecondary,
+                    opacity: readingMode === 'yearly' ? 0.78 : 1,
                   },
                 ]}
               >
@@ -1641,7 +1642,8 @@ export default function EventScreen({ route }) {
                 style={[
                   styles.modeToggleSubtext,
                   {
-                    color: readingMode === 'monthly' ? 'rgba(255,255,255,0.88)' : colors.textSecondary,
+                    color: readingMode === 'monthly' ? onPrimaryText : colors.textSecondary,
+                    opacity: readingMode === 'monthly' ? 0.78 : 1,
                   },
                 ]}
               >

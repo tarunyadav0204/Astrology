@@ -41,18 +41,26 @@ const EMPTY = {
 function ChoiceRow({ options, value, onChange, colors, t, namespace }) {
   return (
     <View style={styles.choiceRow}>
-      {options.map(([key, label]) => (
-        <TouchableOpacity
-          key={key}
-          onPress={() => onChange(key)}
-          style={[
-            styles.choice,
-            { borderColor: value === key ? colors.primary : colors.cardBorder, backgroundColor: value === key ? colors.selectionSurface : colors.surface },
-          ]}
-        >
-          <Text style={[styles.choiceText, { color: value === key ? colors.primary : colors.textSecondary }]}>{t(`${namespace}.${key}`, label)}</Text>
-        </TouchableOpacity>
-      ))}
+      {options.map(([key, label]) => {
+        const selected = value === key;
+        return (
+          <TouchableOpacity
+            key={key}
+            onPress={() => onChange(key)}
+            style={[
+              styles.choice,
+              {
+                borderColor: selected ? (colors.selectionBorder || colors.primary) : colors.cardBorder,
+                backgroundColor: selected ? colors.selectionSurface : colors.surface,
+              },
+            ]}
+          >
+            <Text style={[styles.choiceText, { color: selected ? (colors.selectionText || colors.onPrimary || colors.text) : colors.textSecondary }]}>
+              {t(`${namespace}.${key}`, label)}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
@@ -127,9 +135,9 @@ export default function RelativeProfilesPanel({ birthChartId, compact = false, o
           const profile = byKey[key];
           const active = profile?.enabled && profile?.life_status !== 'deceased';
           return (
-            <TouchableOpacity key={key} onPress={() => openProfile(key)} style={[styles.tab, { borderColor: active ? colors.primary : colors.cardBorder, backgroundColor: active ? colors.selectionSurface : colors.surface }]}>
-              <Ionicons name={active ? 'checkmark-circle' : 'add-circle-outline'} size={16} color={active ? colors.primary : colors.textTertiary} />
-              <Text style={[styles.tabText, { color: active ? colors.primary : colors.textSecondary }]}>{t(`relativeProfiles.subjects.${key}`, fallback)}</Text>
+            <TouchableOpacity key={key} onPress={() => openProfile(key)} style={[styles.tab, { borderColor: active ? (colors.selectionBorder || colors.primary) : colors.cardBorder, backgroundColor: active ? colors.selectionSurface : colors.surface }]}>
+              <Ionicons name={active ? 'checkmark-circle' : 'add-circle-outline'} size={16} color={active ? (colors.selectionText || colors.primary) : colors.textTertiary} />
+              <Text style={[styles.tabText, { color: active ? (colors.selectionText || colors.onPrimary || colors.text) : colors.textSecondary }]}>{t(`relativeProfiles.subjects.${key}`, fallback)}</Text>
             </TouchableOpacity>
           );
         })}
