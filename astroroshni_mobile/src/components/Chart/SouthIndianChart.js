@@ -221,6 +221,7 @@ const SouthIndianChart = ({
         viewBox="0 0 340 340"
         width={size || '100%'}
         height={size || '100%'}
+        overflow="visible"
         preserveAspectRatio="xMidYMid meet"
         style={[styles.svg, size ? { width: size, height: size } : null]}
       >
@@ -234,19 +235,18 @@ const SouthIndianChart = ({
           </ClipPath>
         </Defs>
 
-        {/* The premium stage supplies the single outer perimeter. */}
-        {!cosmicTheme ? (
-          <Rect
-            x="1.5" y="1.5" width="337" height="337"
-            fill="none"
-            stroke={theme === 'dark'
+        <Rect
+          x="1.5" y="1.5" width="337" height="337"
+          fill="none"
+          stroke={cosmicTheme
+            ? (colors.chartLineStrong || colors.chartLine || '#334155')
+            : theme === 'dark'
               ? (colors.cardBorder || 'rgba(148, 163, 184, 0.8)')
-              : "#ff6f00"}
-            strokeWidth="3"
-            rx="0"
-            ry="0"
-          />
-        ) : null}
+              : '#ff6f00'}
+          strokeWidth={cosmicTheme ? 2.5 : 3}
+          rx="0"
+          ry="0"
+        />
 
         <G clipPath="url(#southChartClip)" pointerEvents="none">
           {/* Grid lines */}

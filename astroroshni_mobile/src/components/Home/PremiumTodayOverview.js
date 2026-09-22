@@ -1,5 +1,5 @@
 import React from 'react';
-import { AccessibilityInfo, Animated, Easing, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Line } from 'react-native-svg';
@@ -140,6 +140,8 @@ export default function PremiumTodayOverview({
 }) {
   const { colors, typography } = useTheme();
   const { t, i18n } = useTranslation();
+  const { width: windowWidth } = useWindowDimensions();
+  const wideHeader = windowWidth >= 768;
   const displayName = name || t('premiumUi.home.explorer');
   const taraCtaEntrance = React.useRef(new Animated.Value(0)).current;
   const taraCtaShimmer = React.useRef(new Animated.Value(0)).current;
@@ -205,26 +207,26 @@ export default function PremiumTodayOverview({
     <View style={styles.container}>
       <View style={styles.identityRow}>
         <View style={styles.identityCopy}>
-          <Text style={[styles.eyebrow, typography.eyebrow, { color: colors.textTertiary }]}>{t('premiumUi.home.yourSky')} · {formatToday(i18n.resolvedLanguage || i18n.language)}</Text>
-          <Text style={[styles.identity, { color: colors.text }]} numberOfLines={1}>{t('premiumUi.home.hello', { name: displayName })}</Text>
+          <Text style={[styles.eyebrow, wideHeader && styles.eyebrowWide, typography.eyebrow, { color: colors.textTertiary }]}>{t('premiumUi.home.yourSky')} · {formatToday(i18n.resolvedLanguage || i18n.language)}</Text>
+          <Text style={[styles.identity, wideHeader && styles.identityWide, { color: colors.text }]} numberOfLines={1}>{t('premiumUi.home.hello', { name: displayName })}</Text>
         </View>
         <TouchableOpacity
           onPress={hasChart ? onSelectNative : onCreateChart}
           activeOpacity={0.8}
-          style={[styles.profileButton, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
+          style={[styles.profileButton, wideHeader && styles.profileButtonWide, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
         >
-          <View style={[styles.avatar, { backgroundColor: colors.accentSoft }]}>
-            <Text style={[styles.avatarText, { color: colors.onAccent }]}>{displayName.slice(0, 1).toUpperCase()}</Text>
+          <View style={[styles.avatar, wideHeader && styles.avatarWide, { backgroundColor: colors.accentSoft }]}>
+            <Text style={[styles.avatarText, wideHeader && styles.avatarTextWide, { color: colors.onAccent }]}>{displayName.slice(0, 1).toUpperCase()}</Text>
           </View>
           <Text
-            style={[styles.profileButtonText, { color: colors.text }]}
+            style={[styles.profileButtonText, wideHeader && styles.profileButtonTextWide, { color: colors.text }]}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.8}
           >
             {hasChart ? t('premiumUi.home.changeChart') : t('premiumUi.home.addChart')}
           </Text>
-          <Ionicons name="chevron-down" size={14} color={colors.textTertiary} />
+          <Ionicons name="chevron-down" size={wideHeader ? 22 : 14} color={colors.textTertiary} />
         </TouchableOpacity>
       </View>
 
@@ -424,14 +426,14 @@ export default function PremiumTodayOverview({
       ) : null}
 
       {hasChart ? (
-        <View style={[styles.bigThree, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+        <View style={[styles.bigThree, wideHeader && styles.bigThreeWide, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           {[
             [t('premiumUi.home.ascendant'), ascendant, onOpenAscendant],
             [t('premiumUi.home.moon'), moon, onOpenMoon],
             [t('premiumUi.home.sun'), sun, onOpenSun],
           ].map(([label, value, onPress], index) => (
             <React.Fragment key={label}>
-              {index ? <View style={[styles.bigThreeDivider, { backgroundColor: colors.cardBorder }]} /> : null}
+              {index ? <View style={[styles.bigThreeDivider, wideHeader && styles.bigThreeDividerWide, { backgroundColor: colors.cardBorder }]} /> : null}
               <TouchableOpacity
                 style={styles.bigThreeItem}
                 onPress={onPress}
@@ -440,10 +442,10 @@ export default function PremiumTodayOverview({
                 accessibilityLabel={t('premiumUi.home.learnAbout', { label })}
               >
                 <View style={styles.bigThreeLabelRow}>
-                  <Text style={[styles.bigThreeLabel, { color: colors.textTertiary }]}>{label}</Text>
-                  <Ionicons name="information-circle-outline" size={11} color={colors.textTertiary} />
+                  <Text style={[styles.bigThreeLabel, wideHeader && styles.bigThreeLabelWide, { color: colors.textTertiary }]}>{label}</Text>
+                  <Ionicons name="information-circle-outline" size={wideHeader ? 18 : 11} color={colors.textTertiary} />
                 </View>
-                <Text style={[styles.bigThreeValue, { color: colors.text }]} numberOfLines={1}>{value || '—'}</Text>
+                <Text style={[styles.bigThreeValue, wideHeader && styles.bigThreeValueWide, { color: colors.text }]} numberOfLines={1}>{value || '—'}</Text>
               </TouchableOpacity>
             </React.Fragment>
           ))}
@@ -723,11 +725,17 @@ const styles = StyleSheet.create({
   identityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   identityCopy: { flex: 1, minWidth: 0 },
   eyebrow: { fontSize: 12, marginBottom: 6 },
+  eyebrowWide: { fontSize: 16, marginBottom: 8 },
   identity: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 23, lineHeight: 28 },
+  identityWide: { fontSize: 32, lineHeight: 38 },
   profileButton: { width: 148, flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 7, padding: 6, paddingRight: 10, borderWidth: 1, borderRadius: 999 },
+  profileButtonWide: { width: 210, gap: 10, padding: 8, paddingRight: 14 },
   avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  avatarWide: { width: 42, height: 42, borderRadius: 21 },
   avatarText: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 15, fontWeight: '700' },
+  avatarTextWide: { fontSize: 20 },
   profileButtonText: { maxWidth: 78, fontSize: 12, fontWeight: '800' },
+  profileButtonTextWide: { maxWidth: 120, fontSize: 16 },
   hero: { minHeight: 410, borderWidth: 1, borderRadius: 30, padding: 24, overflow: 'hidden' },
   heroReturning: { minHeight: 0, padding: 20 },
   heroCopy: { maxWidth: '69%', zIndex: 2 },
@@ -776,11 +784,15 @@ const styles = StyleSheet.create({
   talkToTaraCta: { minHeight: 36, maxWidth: '48%', borderRadius: 999, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   talkToTaraCtaText: { flexShrink: 1, fontSize: 12, fontWeight: '900' },
   bigThree: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 18, paddingVertical: 14 },
+  bigThreeWide: { paddingVertical: 20, borderRadius: 22 },
   bigThreeItem: { flex: 1, alignItems: 'center', paddingHorizontal: 5 },
   bigThreeDivider: { width: 1, height: 29 },
+  bigThreeDividerWide: { height: 40 },
   bigThreeLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 4 },
   bigThreeLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
+  bigThreeLabelWide: { fontSize: 16, letterSpacing: 0.6 },
   bigThreeValue: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 15 },
+  bigThreeValueWide: { fontSize: 22 },
   predictionSection: { gap: 12 },
   sectionHeader: { marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   sectionEyebrow: { marginBottom: 6 },

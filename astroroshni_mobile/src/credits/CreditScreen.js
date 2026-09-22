@@ -2954,7 +2954,7 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     alignItems: 'flex-start',
-    maxWidth: 420,
+    width: '100%',
   },
   headerEyebrow: {
     ...typographyTokens.eyebrow,
@@ -3101,8 +3101,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 150,
     width: '100%',
-    maxWidth: 620,
-    alignSelf: 'center',
   },
 
   sectionEyebrow: {

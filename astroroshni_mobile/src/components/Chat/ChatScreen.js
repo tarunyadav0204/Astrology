@@ -530,6 +530,7 @@ export default function ChatScreen({ navigation, route }) {
   const { width: viewportWidth, fontScale: viewportFontScale = 1 } = useWindowDimensions();
   const effectiveHeaderWidth = viewportWidth / Math.max(1, viewportFontScale);
   const compactHeaderChrome = viewportWidth < 430 || effectiveHeaderWidth < 390;
+  const wideHeader = viewportWidth >= 768;
   const iconOnlyHeaderBrand = viewportWidth < 340 || effectiveHeaderWidth < 285;
   useAnalytics('ChatScreen');
   const {
@@ -6623,6 +6624,7 @@ export default function ChatScreen({ navigation, route }) {
             style={[
               styles.header,
               compactHeaderChrome && styles.headerCompact,
+              wideHeader && styles.headerWide,
               {
                 borderColor: colors.cosmicLine,
                 elevation: getCardElevation(3),
@@ -6631,7 +6633,7 @@ export default function ChatScreen({ navigation, route }) {
           >
             {(!showGreeting && (partnershipMode || isMundane)) && (
               <TouchableOpacity
-                style={[styles.backButton, {
+                style={[styles.backButton, wideHeader && styles.backButtonWide, {
                   backgroundColor: theme === 'dark'
                     ? 'rgba(255, 255, 255, 0.15)'
                     : isPanditMode
@@ -6640,7 +6642,7 @@ export default function ChatScreen({ navigation, route }) {
                 }]}
                 onPress={exitSpecialChatModes}
               >
-                <Ionicons name="arrow-back" size={20} color={colors.textInverse} />
+                <Ionicons name="arrow-back" size={wideHeader ? 28 : 20} color={colors.textInverse} />
               </TouchableOpacity>
             )}
 
@@ -6648,10 +6650,10 @@ export default function ChatScreen({ navigation, route }) {
               {showGreeting ? (
                 <View style={styles.headerBrandRow}>
                   {(!compactHeaderChrome || iconOnlyHeaderBrand) ? (
-                    <View style={[styles.headerLogoContainer, compactHeaderChrome && styles.headerLogoContainerCompact]}>
+                    <View style={[styles.headerLogoContainer, compactHeaderChrome && styles.headerLogoContainerCompact, wideHeader && styles.headerLogoContainerWide]}>
                       <Image
                         source={require('../../../assets/logo.png')}
-                        style={[styles.headerLogo, compactHeaderChrome && styles.headerLogoCompact]}
+                        style={[styles.headerLogo, compactHeaderChrome && styles.headerLogoCompact, wideHeader && styles.headerLogoWide]}
                         resizeMode="contain"
                       />
                     </View>
@@ -6662,6 +6664,7 @@ export default function ChatScreen({ navigation, route }) {
                         style={[
                           styles.headerTitle,
                           compactHeaderChrome && styles.headerTitleCompact,
+                          wideHeader && styles.headerTitleWide,
                           { color: colors.textInverse },
                         ]}
                         numberOfLines={1}
@@ -6678,8 +6681,8 @@ export default function ChatScreen({ navigation, route }) {
                 <View style={styles.activeChatTitleWrap}>
                   <View style={[styles.activeChatDot, { backgroundColor: colors.accent }]} />
                   <View style={styles.activeChatTitleCopy}>
-                    <Text style={[styles.activeChatTitle, { color: colors.textInverse }]}>{t('premiumUi.chatScreen.globalMarkets')}</Text>
-                    <Text style={[styles.activeChatSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>
+                    <Text style={[styles.activeChatTitle, wideHeader && styles.activeChatTitleWide, { color: colors.textInverse }]}>{t('premiumUi.chatScreen.globalMarkets')}</Text>
+                    <Text style={[styles.activeChatSubtitle, wideHeader && styles.activeChatSubtitleWide, { color: colors.textInverseMuted }]} numberOfLines={1}>
                       {mundaneContext?.event_name || selectedCountry.name}
                     </Text>
                   </View>
@@ -6699,16 +6702,16 @@ export default function ChatScreen({ navigation, route }) {
                   <View style={styles.activeChatTitleCopy}>
                     {isInstantAnalysis && instantBilling.active ? (
                       <View style={styles.liveHeaderTitleRow}>
-                        <Text style={[styles.liveHeaderTitle, { color: colors.textInverse }]}>
+                        <Text style={[styles.liveHeaderTitle, wideHeader && styles.liveHeaderTitleWide, { color: colors.textInverse }]}>
                           {t('instantBilling.liveShort', 'LIVE')}
                         </Text>
-                        <Ionicons name="time-outline" size={13} color={colors.textInverseMuted} />
-                        <Text style={[styles.liveHeaderTimer, { color: colors.textInverse }]}>
+                        <Ionicons name="time-outline" size={wideHeader ? 20 : 13} color={colors.textInverseMuted} />
+                        <Text style={[styles.liveHeaderTimer, wideHeader && styles.liveHeaderTimerWide, { color: colors.textInverse }]}>
                           {formatMeterTime(instantBilling.state?.elapsed_seconds)}
                         </Text>
                       </View>
                     ) : (
-                      <Text style={[styles.activeChatTitle, { color: colors.textInverse }]}>
+                      <Text style={[styles.activeChatTitle, wideHeader && styles.activeChatTitleWide, { color: colors.textInverse }]}>
                         {t('premiumUi.home.askTara')}
                       </Text>
                     )}
@@ -6720,13 +6723,14 @@ export default function ChatScreen({ navigation, route }) {
                         showIcon={false}
                         style={[
                           styles.instantNativeSelectorChip,
+                          wideHeader && styles.instantNativeSelectorChipWide,
                           { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine },
                         ]}
-                        textStyle={[styles.instantNativeSelectorText, { color: colors.textInverseMuted }]}
+                        textStyle={[styles.instantNativeSelectorText, wideHeader && styles.instantNativeSelectorTextWide, { color: colors.textInverseMuted }]}
                         iconColor={colors.accentSoft}
                       />
                     ) : (
-                      <Text style={[styles.activeChatSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>
+                      <Text style={[styles.activeChatSubtitle, wideHeader && styles.activeChatSubtitleWide, { color: colors.textInverseMuted }]} numberOfLines={1}>
                         {birthData?.name || 'Private consultation'}
                       </Text>
                     )}
@@ -6736,8 +6740,8 @@ export default function ChatScreen({ navigation, route }) {
                 <View style={styles.activeChatTitleWrap}>
                   <View style={[styles.activeChatDot, { backgroundColor: colors.accent }]} />
                   <View style={styles.activeChatTitleCopy}>
-                    <Text style={[styles.activeChatTitle, { color: colors.textInverse }]}>{t('premiumUi.chatScreen.partnershipAnalysis')}</Text>
-                    <Text style={[styles.activeChatSubtitle, { color: colors.textInverseMuted }]} numberOfLines={1}>
+                    <Text style={[styles.activeChatTitle, wideHeader && styles.activeChatTitleWide, { color: colors.textInverse }]}>{t('premiumUi.chatScreen.partnershipAnalysis')}</Text>
+                    <Text style={[styles.activeChatSubtitle, wideHeader && styles.activeChatSubtitleWide, { color: colors.textInverseMuted }]} numberOfLines={1}>
                       {nativeChart?.name || t('premiumUi.chatScreen.native')} × {partnerChart?.name || t('premiumUi.chatScreen.partner')}
                     </Text>
                   </View>
@@ -6753,8 +6757,8 @@ export default function ChatScreen({ navigation, route }) {
               {showGreeting ? (
                 <>
                   {isGuruMember ? (
-                    <View style={[styles.guruMemberBadge, { backgroundColor: theme === 'dark' ? 'rgba(255,107,53,0.2)' : 'rgba(255,107,53,0.12)', borderColor: colors.primary }]}>
-                      <Text style={[styles.guruMemberBadgeText, { color: colors.primary }]}>
+                    <View style={[styles.guruMemberBadge, wideHeader && styles.guruMemberBadgeWide, { backgroundColor: theme === 'dark' ? 'rgba(255,107,53,0.2)' : 'rgba(255,107,53,0.12)', borderColor: colors.primary }]}>
+                      <Text style={[styles.guruMemberBadgeText, wideHeader && styles.guruMemberBadgeTextWide, { color: colors.primary }]}>
                         {t('credits.page.guruMemberBadge', 'Guru Member')}
                       </Text>
                     </View>
@@ -6763,6 +6767,7 @@ export default function ChatScreen({ navigation, route }) {
                     style={[
                       styles.creditButton,
                       compactHeaderChrome && styles.creditButtonCompact,
+                      wideHeader && styles.creditButtonWide,
                       { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine },
                     ]}
                     onPress={() => navigation.navigate('Credits')}
@@ -6770,7 +6775,7 @@ export default function ChatScreen({ navigation, route }) {
                     accessibilityLabel={t('credits.label', 'Credits') + `: ${credits}`}
                   >
                     <Text
-                      style={[styles.creditText, compactHeaderChrome && styles.creditTextCompact, { color: colors.textInverse }]}
+                      style={[styles.creditText, compactHeaderChrome && styles.creditTextCompact, wideHeader && styles.creditTextWide, { color: colors.textInverse }]}
                       numberOfLines={1}
                       maxFontSizeMultiplier={1.15}
                     >
@@ -6779,7 +6784,7 @@ export default function ChatScreen({ navigation, route }) {
                     {freeQuestionAvailable && !partnershipMode && !isMundane && (
                       <View style={[styles.creditFreeBadge, { backgroundColor: colors.accent }]}>
                         <Text
-                          style={[styles.creditFreeBadgeText, { color: colors.onAccent }]}
+                          style={[styles.creditFreeBadgeText, wideHeader && styles.creditFreeBadgeTextWide, { color: colors.onAccent }]}
                           numberOfLines={1}
                           maxFontSizeMultiplier={1.15}
                         >
@@ -6789,13 +6794,13 @@ export default function ChatScreen({ navigation, route }) {
                     )}
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.headerBellButton}
+                    style={[styles.headerBellButton, wideHeader && styles.headerBellButtonWide]}
                     onPress={() => navigation.navigate('NudgeInbox')}
                     accessibilityRole="button"
                     accessibilityLabel={t('premiumUi.chatScreen.notificationHistory')}
                   >
-                    <View style={styles.headerBellHitBox} pointerEvents="none">
-                      <Ionicons name="notifications-outline" size={22} color={colors.textInverse} />
+                    <View style={[styles.headerBellHitBox, wideHeader && styles.headerBellHitBoxWide]} pointerEvents="none">
+                      <Ionicons name="notifications-outline" size={wideHeader ? 28 : 22} color={colors.textInverse} />
                       {nudgeUnreadCount > 0 && (
                         <View style={styles.headerBellBadge}>
                           <Text
@@ -6818,6 +6823,7 @@ export default function ChatScreen({ navigation, route }) {
                       style={[
                         styles.headerModeChip,
                         compactHeaderChrome && styles.headerModeChipCompact,
+                        wideHeader && styles.headerModeChipWide,
                         { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine },
                       ]}
                       onPress={() => {
@@ -6836,23 +6842,23 @@ export default function ChatScreen({ navigation, route }) {
                         adjustsFontSizeToFit
                         minimumFontScale={0.78}
                         maxFontSizeMultiplier={1.15}
-                        style={[styles.headerModeChipText, { color: colors.textInverse }]}
+                        style={[styles.headerModeChipText, wideHeader && styles.headerModeChipTextWide, { color: colors.textInverse }]}
                       >
                         {`${getChatModeName()} · ${getAnswerStyleName(getAnswerStyleForMode())}`}
                       </Text>
-                      <Ionicons name="chevron-down" size={14} color={colors.textInverseMuted || colors.textInverse} />
+                      <Ionicons name="chevron-down" size={wideHeader ? 20 : 14} color={colors.textInverseMuted || colors.textInverse} />
                     </TouchableOpacity>
                   ) : null}
                   {isInstantAnalysis && instantBilling.active ? (
                     <TouchableOpacity
                       onPress={() => setShowInstantEndConfirm(true)}
-                      style={[styles.liveHeaderEndButton, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicGlow }]}
+                      style={[styles.liveHeaderEndButton, wideHeader && styles.liveHeaderEndButtonWide, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicGlow }]}
                       accessibilityRole="button"
                       accessibilityLabel={t('instantBilling.endLive', 'End Live consultation')}
                     >
-                      <Ionicons name="stop-circle-outline" size={18} color={colors.textInverse} />
+                      <Ionicons name="stop-circle-outline" size={wideHeader ? 26 : 18} color={colors.textInverse} />
                       {!compactHeaderChrome ? (
-                        <Text style={[styles.liveHeaderEndText, { color: colors.textInverse }]}>
+                        <Text style={[styles.liveHeaderEndText, wideHeader && styles.liveHeaderEndTextWide, { color: colors.textInverse }]}>
                           {t('instantBilling.end', 'End')}
                         </Text>
                       ) : null}
@@ -6863,12 +6869,12 @@ export default function ChatScreen({ navigation, route }) {
 
               {!(isInstantAnalysis && instantBilling.active) ? (
                 <TouchableOpacity
-                  style={styles.menuButton}
+                  style={[styles.menuButton, wideHeader && styles.menuButtonWide]}
                   onPress={openMenuDrawer}
                   accessibilityRole="button"
                   accessibilityLabel={t('premiumUi.chatScreen.more', 'More')}
                 >
-                  <Ionicons name="menu" size={20} color={colors.textInverse} />
+                  <Ionicons name="menu" size={wideHeader ? 28 : 20} color={colors.textInverse} />
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -7462,7 +7468,7 @@ export default function ChatScreen({ navigation, route }) {
             keyboardBottomInset > 0
               // Web overlap already equals covered pixels; native needs a little extra.
               ? (Platform.OS === 'web' ? keyboardBottomInset : keyboardBottomInset + 20)
-              : homeBottomTabHeight,
+              : homeBottomTabHeight + 16,
         }}
         >
         {/* Topic idea chips — opt-in so the message list keeps most of the screen */}
@@ -9580,6 +9586,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
+  headerWide: {
+    paddingHorizontal: 28,
+    paddingVertical: 20,
+  },
   backButton: {
     width: 36,
     height: 36,
@@ -9588,6 +9598,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  backButtonWide: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 16,
   },
   headerCenter: {
     flex: 1,
@@ -9630,11 +9646,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 21,
   },
+  activeChatTitleWide: {
+    fontSize: 26,
+    lineHeight: 32,
+  },
   activeChatSubtitle: {
     fontSize: 9,
     lineHeight: 12,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  activeChatSubtitleWide: {
+    fontSize: 14,
+    lineHeight: 18,
   },
   instantNativeSelectorChip: {
     alignSelf: 'flex-start',
@@ -9648,12 +9672,22 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
     elevation: 0,
   },
+  instantNativeSelectorChipWide: {
+    maxWidth: 240,
+    minHeight: 34,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
   instantNativeSelectorText: {
     flexShrink: 1,
     fontSize: 9,
     lineHeight: 12,
     fontWeight: '700',
     letterSpacing: 0.35,
+  },
+  instantNativeSelectorTextWide: {
+    fontSize: 14,
+    lineHeight: 18,
   },
   liveHeaderTitleRow: {
     flexDirection: 'row',
@@ -9667,11 +9701,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginRight: 2,
   },
+  liveHeaderTitleWide: {
+    fontSize: 22,
+    lineHeight: 26,
+  },
   liveHeaderTimer: {
     fontSize: 13,
     lineHeight: 17,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
+  },
+  liveHeaderTimerWide: {
+    fontSize: 18,
+    lineHeight: 22,
   },
   liveHeaderEndButton: {
     minWidth: 40,
@@ -9690,6 +9732,15 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '800',
   },
+  liveHeaderEndTextWide: {
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  liveHeaderEndButtonWide: {
+    minWidth: 52,
+    minHeight: 48,
+    paddingHorizontal: 14,
+  },
   headerTitle: {
     fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif', default: 'serif' }),
     fontSize: 23,
@@ -9700,6 +9751,10 @@ const styles = StyleSheet.create({
   headerTitleCompact: {
     fontSize: 20,
     lineHeight: 25,
+  },
+  headerTitleWide: {
+    fontSize: 30,
+    lineHeight: 36,
   },
   headerLogoContainer: {
     width: 50,
@@ -9731,6 +9786,17 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 12,
+  },
+  headerLogoWide: {
+    width: 58,
+    height: 58,
+    borderRadius: 16,
+  },
+  headerLogoContainerWide: {
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    marginRight: 16,
   },
   nameChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -9821,6 +9887,18 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '700',
   },
+  headerModeChipWide: {
+    maxWidth: 320,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 22,
+    gap: 6,
+  },
+  headerModeChipTextWide: {
+    fontSize: 16,
+    lineHeight: 20,
+  },
   guruMemberBadge: {
     borderWidth: 1,
     borderRadius: 12,
@@ -9833,6 +9911,15 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.3,
+  },
+  guruMemberBadgeWide: {
+    maxWidth: 140,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  guruMemberBadgeTextWide: {
+    fontSize: 13,
+    letterSpacing: 0.4,
   },
   creditButton: {
     backgroundColor: 'rgba(255, 107, 53, 0.2)',
@@ -9860,6 +9947,18 @@ const styles = StyleSheet.create({
   creditTextCompact: {
     fontSize: 12,
   },
+  creditButtonWide: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  creditTextWide: {
+    fontSize: 17,
+  },
+  creditFreeBadgeTextWide: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
   creditFreeBadge: {
     minHeight: 20,
     paddingHorizontal: 7,
@@ -9881,6 +9980,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  menuButtonWide: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
   headerBellButton: {
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -9889,12 +9993,21 @@ const styles = StyleSheet.create({
     minWidth: 40,
     minHeight: 40,
   },
+  headerBellButtonWide: {
+    borderRadius: 24,
+    minWidth: 48,
+    minHeight: 48,
+  },
   headerBellHitBox: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+  },
+  headerBellHitBoxWide: {
+    width: 48,
+    height: 48,
   },
   headerBellBadge: {
     position: 'absolute',

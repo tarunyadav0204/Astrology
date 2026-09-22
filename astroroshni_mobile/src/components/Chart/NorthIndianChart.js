@@ -315,9 +315,6 @@ const NorthIndianChart = ({
   const diamondDashProps = useStaticGrid
     ? {}
     : { strokeDasharray: '1200', strokeDashoffset: gridStrokeDash };
-  const borderDashProps = useStaticGrid
-    ? {}
-    : { strokeDasharray: '1600', strokeDashoffset: gridStrokeDash };
 
   return (
     <View
@@ -330,6 +327,7 @@ const NorthIndianChart = ({
         viewBox="0 0 400 400"
         width={size || '100%'}
         height={size || '100%'}
+        overflow="visible"
         preserveAspectRatio="xMidYMid meet"
         style={[styles.svg, size ? { width: size, height: size } : null]}
       >
@@ -353,20 +351,17 @@ const NorthIndianChart = ({
           </LinearGradient>
         </Defs>
 
-        {/* In the premium chart stage, the surrounding card owns the perimeter.
-            Keeping an SVG perimeter as well creates a visibly doubled outline. */}
-        {!cosmicTheme ? (
-          <AnimatedRect
-            x="0" y="0" width={CHART_SIZE} height={CHART_SIZE}
-            fill="transparent"
-            stroke="#e91e63"
-            strokeWidth="3"
-            rx="0"
-            ry="0"
-            {...borderDashProps}
-            pointerEvents="none"
-          />
-        ) : null}
+        {/* Outer square. Inset so the stroke stays inside the SVG and is not clipped. */}
+        <Rect
+          x="1.5"
+          y="1.5"
+          width={CHART_SIZE - 3}
+          height={CHART_SIZE - 3}
+          fill="none"
+          stroke={cosmicTheme ? (colors.chartLineStrong || resolvedGridLine) : '#e91e63'}
+          strokeWidth={cosmicTheme ? 2.5 : 3}
+          pointerEvents="none"
+        />
 
         {/* Inner diamond border */}
         <GridPolygon

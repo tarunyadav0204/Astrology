@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  useWindowDimensions,
   PanResponder,
   Platform,
   Modal,
@@ -40,16 +41,18 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   // PWA/web: measure parent width before locking SVG pixels (window width can be
   // wider than the chart column and clipped the diamond + toolbar).
   const [webChartSize, setWebChartSize] = useState(null);
+  const { width: windowWidth } = useWindowDimensions();
+  const fitTablet = windowWidth >= 768;
 
   const onWebChartLayout = useCallback((event) => {
-    if (!isWeb) return;
+    if (!isWeb && !fitTablet) return;
     const nextWidth = Math.floor(event?.nativeEvent?.layout?.width || 0);
     if (nextWidth < 80) return;
     setWebChartSize((prev) => (prev === nextWidth ? prev : nextWidth));
-  }, []);
+  }, [fitTablet]);
 
   useEffect(() => {
-    if (!isWeb) return undefined;
+    if (!isWeb || fitTablet) return undefined;
     const syncSize = ({ window: nextWindow } = {}) => {
       const nextWidth = Math.floor((nextWindow || Dimensions.get('window')).width);
       if (nextWidth < 80) return;
@@ -62,7 +65,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     syncSize();
     const subscription = Dimensions.addEventListener('change', syncSize);
     return () => subscription?.remove?.();
-  }, []);
+  }, [fitTablet]);
 
   useEffect(() => {
     if (chartType && chartType !== currentChartType) {
@@ -489,7 +492,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
 
   const renderChart = useCallback((type, data) => {
     if (!type || !data) return <View style={styles.loadingContainer}><Text style={styles.loadingText}>{t('premiumUi.common.loading')}</Text></View>;
-    const sizeProp = isWeb && webChartSize ? { size: webChartSize } : {};
+    const sizeProp = (isWeb || fitTablet) && webChartSize ? { size: webChartSize } : {};
     return chartStyle === 'north' ? (
       <NorthIndianChart
         chartData={data}
@@ -519,7 +522,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         {...sizeProp}
       />
     );
-  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize]);
+  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet]);
 
   const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
     const iconColor = primary ? colors.onPrimary : (active ? colors.onAccent : colors.text);
@@ -578,7 +581,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
 
       <View
         style={cosmicTheme
-          ? [styles.chartStage, { backgroundColor: colors.chartSurface, borderColor: colors.chartLine }]
+          ? [styles.chartStage, { backgroundColor: colors.chartSurface, borderColor: colors.chartLine, overflow: 'visible' }]
           : null}
       >
       {cosmicTheme ? (
@@ -802,10 +805,10 @@ const styles = StyleSheet.create({
   container: { backgroundColor: COLORS.surface, borderRadius: 16, paddingVertical: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 5 },
   cosmicContainer: { backgroundColor: 'transparent', borderRadius: 0, paddingVertical: 0, shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
   chartStage: {
-    marginHorizontal: 10,
-    borderRadius: 24,
-    borderWidth: 1,
-    overflow: 'hidden',
+    marginHorizontal: 0,
+    borderRadius: 0,
+    borderWidth: 0,
+    overflow: 'visible',
   },
   header: { alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 20, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 12 },

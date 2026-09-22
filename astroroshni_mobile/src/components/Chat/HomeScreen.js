@@ -355,6 +355,7 @@ export default function HomeScreen({
   // Web: keep tab bar size normal. Home-indicator orange is applied via
   // setWebBottomSafeColor (CSS body::after below the safe edge) — not tab padding.
   const { width: windowWidth } = useWindowDimensions();
+  const wideHeader = windowWidth >= 768;
   const { totalHeight: tabTotalHeight } = getHomeBottomTabMetrics(insets.bottom, windowWidth);
   const [showTaraDock, setShowTaraDock] = useState(false);
   const taraDockAnim = useRef(new Animated.Value(0)).current;
@@ -2046,6 +2047,7 @@ const loadHomeData = async (nativeData = null) => {
             colors={homeHeaderGradient}
             style={[
               styles.headerDashboard,
+              wideHeader && styles.headerDashboardWide,
               androidLightCardFixStyle,
               (theme === 'light' || isPanditMode) ? { borderColor: colors.cardBorder } : {},
             ]}
@@ -2055,6 +2057,7 @@ const loadHomeData = async (nativeData = null) => {
                 <Text
                   style={[
                     hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.headerGreeting),
+                    wideHeader && styles.headerGreetingWide,
                     { color: colors.textSecondary },
                   ]}
                 >
@@ -2066,6 +2069,7 @@ const loadHomeData = async (nativeData = null) => {
                 <Text
                   style={[
                     hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.headerName),
+                    wideHeader && styles.headerNameWide,
                     { color: colors.text },
                   ]}
                   numberOfLines={1}
@@ -2090,7 +2094,7 @@ const loadHomeData = async (nativeData = null) => {
               />
             </View>
 
-            <View style={[styles.headerBigThree, (theme === 'light' || isPanditMode) && { backgroundColor: colors.surface }]}>
+            <View style={[styles.headerBigThree, wideHeader && styles.headerBigThreeWide, (theme === 'light' || isPanditMode) && { backgroundColor: colors.surface }]}>
               <TouchableOpacity
                 style={styles.headerSignItem}
                 onPress={() => {
@@ -2098,20 +2102,20 @@ const loadHomeData = async (nativeData = null) => {
                   setActiveInsight(insight);
                 }}
               >
-                <View style={[styles.headerSignIcon, { backgroundColor: theme === 'dark' ? '#3B82F620' : 'rgba(59, 130, 246, 0.12)' }]}>
-                  <Text style={styles.headerSignEmoji}>
+                <View style={[styles.headerSignIcon, wideHeader && styles.headerSignIconWide, { backgroundColor: theme === 'dark' ? '#3B82F620' : 'rgba(59, 130, 246, 0.12)' }]}>
+                  <Text style={[styles.headerSignEmoji, wideHeader && styles.headerSignEmojiWide]}>
                     {chartData ? getSignIcon(chartData?.houses?.[0]?.sign) : '⏳'}
                   </Text>
                 </View>
                 <View>
-                  <Text style={[styles.headerSignLabel, { color: colors.textTertiary }]}>{t('home.signs.ascendant', 'Asc')}</Text>
-                  <Text style={[styles.headerSignName, { color: colors.text }]}>
+                  <Text style={[styles.headerSignLabel, wideHeader && styles.headerSignLabelWide, { color: colors.textTertiary }]}>{t('home.signs.ascendant', 'Asc')}</Text>
+                  <Text style={[styles.headerSignName, wideHeader && styles.headerSignNameWide, { color: colors.text }]}>
                     {chartData ? getSignName(chartData?.houses?.[0]?.sign) : '...'}
                   </Text>
                 </View>
               </TouchableOpacity>
 
-              <View style={[styles.headerDivider, (theme === 'light' || isPanditMode) && { backgroundColor: colors.cardBorder }]} />
+              <View style={[styles.headerDivider, wideHeader && styles.headerDividerWide, (theme === 'light' || isPanditMode) && { backgroundColor: colors.cardBorder }]} />
 
               <TouchableOpacity
                 style={styles.headerSignItem}
@@ -2120,20 +2124,20 @@ const loadHomeData = async (nativeData = null) => {
                   setActiveInsight(insight);
                 }}
               >
-                <View style={[styles.headerSignIcon, { backgroundColor: theme === 'dark' ? '#DC262620' : 'rgba(220, 38, 38, 0.12)' }]}>
-                  <Text style={styles.headerSignEmoji}>
+                <View style={[styles.headerSignIcon, wideHeader && styles.headerSignIconWide, { backgroundColor: theme === 'dark' ? '#DC262620' : 'rgba(220, 38, 38, 0.12)' }]}>
+                  <Text style={[styles.headerSignEmoji, wideHeader && styles.headerSignEmojiWide]}>
                     {chartData ? getSignIcon(chartData?.planets?.Moon?.sign) : '⏳'}
                   </Text>
                 </View>
                 <View>
-                  <Text style={[styles.headerSignLabel, { color: colors.textTertiary }]}>{t('home.signs.moon', 'Moon')}</Text>
-                  <Text style={[styles.headerSignName, { color: colors.text }]}>
+                  <Text style={[styles.headerSignLabel, wideHeader && styles.headerSignLabelWide, { color: colors.textTertiary }]}>{t('home.signs.moon', 'Moon')}</Text>
+                  <Text style={[styles.headerSignName, wideHeader && styles.headerSignNameWide, { color: colors.text }]}>
                     {chartData ? getSignName(chartData?.planets?.Moon?.sign) : '...'}
                   </Text>
                 </View>
               </TouchableOpacity>
 
-              <View style={[styles.headerDivider, (theme === 'light' || isPanditMode) && { backgroundColor: colors.cardBorder }]} />
+              <View style={[styles.headerDivider, wideHeader && styles.headerDividerWide, (theme === 'light' || isPanditMode) && { backgroundColor: colors.cardBorder }]} />
 
               <TouchableOpacity
                 style={styles.headerSignItem}
@@ -2142,14 +2146,14 @@ const loadHomeData = async (nativeData = null) => {
                   setActiveInsight(insight);
                 }}
               >
-                <View style={[styles.headerSignIcon, { backgroundColor: theme === 'dark' ? '#F59E0B20' : 'rgba(245, 158, 11, 0.2)' }]}>
-                  <Text style={styles.headerSignEmoji}>
+                <View style={[styles.headerSignIcon, wideHeader && styles.headerSignIconWide, { backgroundColor: theme === 'dark' ? '#F59E0B20' : 'rgba(245, 158, 11, 0.2)' }]}>
+                  <Text style={[styles.headerSignEmoji, wideHeader && styles.headerSignEmojiWide]}>
                     {chartData ? getSignIcon(chartData?.planets?.Sun?.sign) : '⏳'}
                   </Text>
                 </View>
                 <View>
-                  <Text style={[styles.headerSignLabel, { color: colors.textTertiary }]}>{t('home.signs.sun', 'Sun')}</Text>
-                  <Text style={[styles.headerSignName, { color: colors.text }]}>
+                  <Text style={[styles.headerSignLabel, wideHeader && styles.headerSignLabelWide, { color: colors.textTertiary }]}>{t('home.signs.sun', 'Sun')}</Text>
+                  <Text style={[styles.headerSignName, wideHeader && styles.headerSignNameWide, { color: colors.text }]}>
                     {chartData ? getSignName(chartData?.planets?.Sun?.sign) : '...'}
                   </Text>
                 </View>
@@ -3931,6 +3935,10 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 5,
   },
+  headerDashboardWide: {
+    padding: 24,
+    borderRadius: 28,
+  },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -3947,9 +3955,18 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 2,
   },
+  headerGreetingWide: {
+    fontSize: 16,
+    letterSpacing: 1.2,
+    marginBottom: 4,
+  },
   headerName: {
     fontSize: 20,
     fontWeight: '800',
+  },
+  headerNameWide: {
+    fontSize: 28,
+    lineHeight: 34,
   },
   headerNativeChip: {
     backgroundColor: 'rgba(255, 107, 53, 0.15)',
@@ -3965,6 +3982,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
   },
+  headerBigThreeWide: {
+    padding: 18,
+    borderRadius: 20,
+  },
   headerSignItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3977,8 +3998,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  headerSignIconWide: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
   headerSignEmoji: {
     fontSize: 16,
+  },
+  headerSignEmojiWide: {
+    fontSize: 26,
   },
   headerSignLabel: {
     fontSize: 9,
@@ -3986,14 +4015,24 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  headerSignLabelWide: {
+    fontSize: 14,
+    letterSpacing: 0.6,
+  },
   headerSignName: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  headerSignNameWide: {
+    fontSize: 18,
   },
   headerDivider: {
     width: 1,
     height: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  headerDividerWide: {
+    height: 36,
   },
   adminHomeBannerRibbon: {
     flexDirection: 'row',
