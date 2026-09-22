@@ -1,0 +1,44 @@
+diff --git a/node_modules/expo-print/android/src/main/java/expo/modules/print/PrintModule.kt b/node_modules/expo-print/android/src/main/java/expo/modules/print/PrintModule.kt
+--- a/node_modules/expo-print/android/src/main/java/expo/modules/print/PrintModule.kt
++++ b/node_modules/expo-print/android/src/main/java/expo/modules/print/PrintModule.kt
+@@ -4,6 +4,7 @@ import android.os.ParcelFileDescriptor
+ import android.print.PrintAttributes
+ import android.print.PrintManager
++import com.facebook.react.bridge.ReadableMap
+ import expo.modules.kotlin.modules.Module
+ import expo.modules.kotlin.modules.ModuleDefinition
+ import android.print.PrintDocumentAdapter
+@@ -35,14 +36,30 @@ class PrintModule : Module() {
+       )
+     }
+ 
+-    AsyncFunction("print") Coroutine { options: PrintOptions ->
+-      return@Coroutine print(options)
++    AsyncFunction("print") Coroutine { options: ReadableMap ->
++      return@Coroutine print(options.toPrintOptions())
+     }
+ 
+-    AsyncFunction("printToFileAsync") Coroutine { options: PrintOptions ->
+-      return@Coroutine printToFile(options)
++    AsyncFunction("printToFileAsync") Coroutine { options: ReadableMap ->
++      return@Coroutine printToFile(options.toPrintOptions())
+     }
+   }
+ 
++  /**
++   * Avoid reflection-based Record conversion here. In minified React Native
++   * release builds it can fail before Expo Print receives otherwise valid
++   * options, leaving every Android PDF export unusable.
++   */
++  private fun ReadableMap.toPrintOptions() = PrintOptions(
++    html = if (hasKey("html") && !isNull("html")) getString("html") else null,
++    uri = if (hasKey("uri") && !isNull("uri")) getString("uri") else null,
++    width = if (hasKey("width") && !isNull("width")) getDouble("width").toInt() else null,
++    height = if (hasKey("height") && !isNull("height")) getDouble("height").toInt() else null,
++    orientation = if (hasKey("orientation") && !isNull("orientation")) getString("orientation") else null,
++    textZoom = if (hasKey("textZoom") && !isNull("textZoom")) getDouble("textZoom").toInt() else null,
++    base64 = hasKey("base64") && !isNull("base64") && getBoolean("base64")
++  )
++
+   val context: Context
+     get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()

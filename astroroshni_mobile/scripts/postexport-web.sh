@@ -121,7 +121,7 @@ cat > "$DIST/expo-manifest.webmanifest" <<'EOF'
   "start_url": "/mobile/",
   "scope": "/mobile/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#2d0c1c",
   "theme_color": "#2d0c1c",
   "icons": [

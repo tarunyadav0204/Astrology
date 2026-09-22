@@ -3,7 +3,7 @@
     "name": "AstroRoshni",
     "slug": "astroroshni-mobile",
     "version": "1.2.5",
-    "orientation": "portrait",
+    "orientation": "default",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
     "splash": {
@@ -42,7 +42,7 @@
       },
       "package": "com.astroroshni.mobile",
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.astroroshni.mobile",
-      "versionCode": 250,
+      "versionCode": 251,
       "newArchEnabled": false,
       "googleServicesFile": "./google-services.json",
       "permissions": [
@@ -143,7 +143,7 @@
       "themeColor": "#210b17",
       "backgroundColor": "#2d0c1c",
       "display": "standalone",
-      "orientation": "portrait",
+      "orientation": "any",
       "description": "AstroRoshni — Vedic astrology chat, charts, and timing tools"
     },
     "extra": {

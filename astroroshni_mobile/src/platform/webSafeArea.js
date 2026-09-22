@@ -182,14 +182,10 @@ export function refreshWebShellHeight() {
     appRoot.style.height = '';
     appRoot.style.minHeight = '';
     appRoot.style.maxHeight = '';
-    // Do not defeat the centred desktop shell with inline left/right values.
-    if (window.innerWidth >= 768) {
-      appRoot.style.left = '50%';
-      appRoot.style.right = 'auto';
-    } else {
-      appRoot.style.left = '0';
-      appRoot.style.right = '0';
-    }
+    appRoot.style.left = '0';
+    appRoot.style.right = '0';
+    appRoot.style.maxWidth = 'none';
+    appRoot.style.transform = 'none';
   }
 
   // Re-measure / refresh orange cover if Home has it active.

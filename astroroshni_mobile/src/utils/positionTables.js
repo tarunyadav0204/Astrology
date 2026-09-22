@@ -290,10 +290,12 @@ export function buildHouseRows(chartData) {
     const h = typeof data.house === 'number' ? data.house : houseOf(data.sign, lagnaSign);
     if (!h) return;
     if (!tenantsByHouse[h]) tenantsByHouse[h] = [];
-    const mark = data.retrograde && name !== 'Rahu' && name !== 'Ketu'
-      ? `${planetAbbr(name)}(R)`
-      : planetAbbr(name);
-    tenantsByHouse[h].push(mark);
+    const retro = !!(data.retrograde && name !== 'Rahu' && name !== 'Ketu');
+    tenantsByHouse[h].push({
+      name,
+      retro,
+      mark: retro ? `${planetAbbr(name)}(R)` : planetAbbr(name),
+    });
   });
 
   return Array.from({ length: 12 }, (_, i) => {
@@ -319,7 +321,8 @@ export function buildHouseRows(chartData) {
       lordAbbr: lordAbbr(lord),
       lordHouse: lordHouse || '—',
       dignity,
-      occupants: (tenantsByHouse[house] || []).join(' '),
+      occupants: (tenantsByHouse[house] || []).map((person) => person.mark).join(' '),
+      occupantList: tenantsByHouse[house] || [],
     };
   });
 }
@@ -337,10 +340,16 @@ export function buildNakshatraRows(planetRows) {
         lord: NAKSHATRA_LORDS[key],
         lordAbbr: lordAbbr(NAKSHATRA_LORDS[key]),
         occupants: [],
+        people: [],
       });
     }
     const mark = `${row.abbr}·${row.pada}${row.retro ? 'R' : ''}`;
     grouped.get(key).occupants.push(mark);
+    grouped.get(key).people.push({
+      name: row.name,
+      pada: row.pada,
+      retro: row.retro,
+    });
   });
   return Array.from(grouped.values()).sort((a, b) => a.index - b.index);
 }

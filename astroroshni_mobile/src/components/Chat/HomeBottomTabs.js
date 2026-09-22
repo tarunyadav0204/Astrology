@@ -83,9 +83,6 @@ export default function HomeBottomTabs({
                 left: 0,
                 right: 0,
                 width: '100%',
-                maxWidth: 520,
-                marginLeft: 'auto',
-                marginRight: 'auto',
                 zIndex: 10000,
                 backgroundColor: tabSafeColor,
               }

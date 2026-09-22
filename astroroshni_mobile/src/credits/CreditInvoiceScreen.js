@@ -119,6 +119,7 @@ export default function CreditInvoiceScreen({ navigation, route }) {
   const shareInvoice = async () => {
     if (!invoice || sharing) return;
     setSharing(true);
+    let shareStage = 'prepare';
     try {
       const rows = [
         [t('credits.page.transactionDetail.invoiceNumber'), invoice.invoice_number],
@@ -162,7 +163,9 @@ export default function CreditInvoiceScreen({ navigation, route }) {
           ${rowHtml}
           ${money?.tax_amount != null ? `<div class="footer">${escapeHtml(t('credits.page.transactionDetail.gstNote'))}</div>` : ''}
         </body></html>`;
+      shareStage = 'generate';
       const pdfUri = await exportHtmlAsPdf(html, { timeoutMs: 45000 });
+      shareStage = 'share';
       await sharePDFOnWhatsApp(pdfUri, {
         dialogTitle: t('credits.page.transactionDetail.shareInvoice'),
         reportType: 'credit_invoice',
@@ -171,7 +174,7 @@ export default function CreditInvoiceScreen({ navigation, route }) {
     } catch (error) {
       Alert.alert(
         t('credits.page.transactionDetail.shareInvoice'),
-        userFacingPdfExportError(error),
+        `${userFacingPdfExportError(error)}\n\nDiagnostic: ${shareStage}: ${error?.message || String(error)}`,
       );
     } finally {
       setSharing(false);

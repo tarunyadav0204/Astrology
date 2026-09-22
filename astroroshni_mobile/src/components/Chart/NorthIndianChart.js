@@ -33,7 +33,7 @@ const NorthIndianChart = ({
   chartData,
   chartType,
   birthData,
-  showDegreeNakshatra = false,
+  showDegreeNakshatra = true,
   cosmicTheme = false,
   rotatedAscendant = null,
   onRotate,

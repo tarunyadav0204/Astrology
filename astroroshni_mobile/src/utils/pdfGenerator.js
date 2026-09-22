@@ -150,8 +150,18 @@ async function printHtmlToPdfFile({ html, base64 = false, timeoutMs = 45000 }) {
     return null;
   }
 
+  const printOptions = Platform.OS === 'android'
+    ? {
+        html,
+        base64: Boolean(base64),
+        width: 612,
+        height: 792,
+        textZoom: 100,
+      }
+    : { html, base64 };
+
   const result = await Promise.race([
-    Print.printToFileAsync({ html, base64 }),
+    Print.printToFileAsync(printOptions),
     new Promise((_, reject) =>
       setTimeout(() => reject(new Error('PDF generation timeout')), timeoutMs)
     ),

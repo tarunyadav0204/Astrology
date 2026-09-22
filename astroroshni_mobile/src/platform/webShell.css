@@ -77,29 +77,14 @@ body {
   position: relative;
 }
 
-/* Phone column on wide desktop (not device-mode). */
-@media (min-width: 768px) {
-  #root {
-    left: 50%;
-    right: auto;
-    width: 100%;
-    max-width: 520px;
-    transform: translateX(-50%);
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 0 80px rgba(0, 0, 0, 0.34);
-  }
-
-  /* Home tabs are rendered through a document.body portal. Constrain that
-     fixed layer to the same desktop phone shell instead of the whole browser. */
-  body [data-ar-home-bottom-nav='1'] {
-    left: 50% !important;
-    right: auto !important;
-    width: min(520px, 100vw) !important;
-    max-width: 520px !important;
-    margin: 0 !important;
-    transform: translateX(-50%) !important;
-  }
+/* Wide Chrome / PWA uses the full window. Home tabs are portaled to body. */
+body [data-ar-home-bottom-nav='1'] {
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  transform: none !important;
 }
 
 input,
