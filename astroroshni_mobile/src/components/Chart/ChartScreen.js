@@ -9,6 +9,7 @@ import {
   StatusBar,
   Animated,
   Dimensions,
+  useWindowDimensions,
   Platform,
   Image,
   Alert,
@@ -88,6 +89,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const accentSurface = { backgroundColor: colors.accentSoft, borderColor: colors.cardBorder };
   const { requireAuthForPaid } = useAuthGate();
   const { isAstrologerLicensed } = useCredits();
+  const { width: windowWidth } = useWindowDimensions();
+  const wideSheet = windowWidth >= 768;
   const embedded = !!route?.params?.embedded;
   const [birthData, setBirthData] = useState(null);
   const [chartData, setChartData] = useState(null);
@@ -1396,7 +1399,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     {houseInsight && (
                       <View style={[styles.drawerSection, accentSurface]}>
                         <View style={styles.insightHeaderRow}>
-                          <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>
+                          <Text style={[styles.sectionTitle, { color: colors.onAccent, marginBottom: 0 }]}>
                             {t('chartScreen.houseDrawer.chartReading', 'Chart reading')}
                           </Text>
                           <View
@@ -1416,11 +1419,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                               style={[
                                 styles.verdictBadgeText,
                                 {
-                                  color:
-                                    houseInsight.verdict.key === 'strong' ? colors.success
-                                    : houseInsight.verdict.key === 'mixed' ? colors.warning
-                                    : houseInsight.verdict.key === 'active' ? colors.info
-                                    : colors.textSecondary,
+                                  color: colors.onAccent,
                                 },
                               ]}
                             >
@@ -1429,12 +1428,12 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                           </View>
                         </View>
 
-                        <Text style={[styles.sectionDesc, { color: colors.text, marginTop: 12 }]}>
+                        <Text style={[styles.sectionDesc, { color: colors.onAccent, marginTop: 12 }]}>
                           {translateHouseInterpretation(t, houseInsight, selectedHouse.houseNum)}
                         </Text>
 
                         {houseInsightLoading && (
-                          <Text style={[styles.insightLoadingText, { color: colors.textSecondary }]}>
+                          <Text style={[styles.insightLoadingText, { color: colors.onAccent }]}>
                             {t('chartScreen.houseDrawer.insightLoading', 'Checking chart support, pressure, and timing...')}
                           </Text>
                         )}
@@ -1669,35 +1668,77 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       )}
                     </View>
 
+                    <View style={wideSheet ? styles.sheetGrid : null}>
                     {/* House Lord */}
-                    <View style={[styles.drawerSection, sectionSurface]}>
+                    <View style={[styles.drawerSection, sectionSurface, wideSheet && styles.sheetGridCard]}>
                       <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                         {t('chartScreen.houseDrawer.houseLord', 'House Lord')}
                       </Text>
                       {houseInsight?.lord_worksheet ? (
-                        <>
-                          <Text style={[styles.lordText, { color: colors.text }]}>
-                            {t(`home.planet_names.${houseInsight.lord_worksheet.planet}`, houseInsight.lord_worksheet.planet)}
-                            {houseInsight.lord_worksheet.sign_name ? ` · ${t(`signs.${houseInsight.lord_worksheet.sign_name}`, houseInsight.lord_worksheet.sign_name)}` : ''}
-                            {houseInsight.lord_worksheet.house != null ? ` · H${houseInsight.lord_worksheet.house}` : ''}
-                            {houseInsight.lord_worksheet.dignity ? ` · ${String(houseInsight.lord_worksheet.dignity).replace(/_/g, ' ')}` : ''}
-                          </Text>
-                          <Text style={[styles.sectionDesc, { color: colors.textSecondary, marginTop: 8 }]}>
-                            {houseInsight.lord_worksheet.shadbala_rupas != null
-                              ? `${houseInsight.lord_worksheet.shadbala_rupas} / ${houseInsight.lord_worksheet.required_rupas ?? '—'} rupas`
-                              : ''}
-                            {houseInsight.lord_worksheet.meets_minimum === false ? ' · below requirement' : houseInsight.lord_worksheet.meets_minimum ? ' · meets requirement' : ''}
-                          </Text>
-                          <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
-                            {[
-                              houseInsight.lord_worksheet.retrograde ? t('chartScreen.houseDrawer.retrograde', 'Retrograde') : null,
-                              houseInsight.lord_worksheet.combust ? 'Combust' : null,
-                              (houseInsight.lord_worksheet.other_lordships || []).length
-                                ? `Also H${houseInsight.lord_worksheet.other_lordships.join(', H')}`
-                                : null,
-                            ].filter(Boolean).join(' · ') || t('chartScreen.houseDrawer.direct', 'Direct')}
-                          </Text>
-                        </>
+                        <View style={styles.sheetLead}>
+                          <View style={[styles.planetIconContainer, { backgroundColor: withAlpha(colors.primary, '15'), marginRight: 0 }]}>
+                            <Ionicons name="key-outline" size={18} color={colors.primary} />
+                          </View>
+                          <View style={styles.sheetLeadCopy}>
+                            <Text style={[styles.planetName, { color: colors.text }]}>
+                              {t(`home.planet_names.${houseInsight.lord_worksheet.planet}`, houseInsight.lord_worksheet.planet)}
+                            </Text>
+                            <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>
+                              {[
+                                houseInsight.lord_worksheet.sign_name
+                                  ? t(`signs.${houseInsight.lord_worksheet.sign_name}`, houseInsight.lord_worksheet.sign_name)
+                                  : null,
+                                houseInsight.lord_worksheet.house != null
+                                  ? `H${houseInsight.lord_worksheet.house}`
+                                  : null,
+                              ].filter(Boolean).join(' · ')}
+                            </Text>
+                            <View style={styles.sheetChipRow}>
+                              {houseInsight.lord_worksheet.dignity ? (
+                                <View style={[styles.sheetChip, { backgroundColor: withAlpha(colors.primary, '18') }]}>
+                                  <Text style={[styles.sheetChipText, { color: colors.text }]}>
+                                    {String(houseInsight.lord_worksheet.dignity).replace(/_/g, ' ')}
+                                  </Text>
+                                </View>
+                              ) : null}
+                              <View style={[styles.sheetChip, { backgroundColor: withAlpha(houseInsight.lord_worksheet.retrograde || houseInsight.lord_worksheet.combust ? colors.warning : colors.success, '22') }]}>
+                                <Text style={[styles.sheetChipText, { color: colors.text }]}>
+                                  {houseInsight.lord_worksheet.retrograde
+                                    ? t('chartScreen.houseDrawer.retrograde', 'Retrograde')
+                                    : t('chartScreen.houseDrawer.direct', 'Direct')}
+                                </Text>
+                              </View>
+                              {houseInsight.lord_worksheet.combust ? (
+                                <View style={[styles.sheetChip, { backgroundColor: withAlpha(colors.warning, '22') }]}>
+                                  <Text style={[styles.sheetChipText, { color: colors.text }]}>Combust</Text>
+                                </View>
+                              ) : null}
+                              {houseInsight.lord_worksheet.meets_minimum != null ? (
+                                <View style={[styles.sheetChip, { backgroundColor: withAlpha(houseInsight.lord_worksheet.meets_minimum ? colors.success : colors.error, '22') }]}>
+                                  <Text style={[styles.sheetChipText, { color: colors.text }]}>
+                                    {houseInsight.lord_worksheet.meets_minimum ? 'Meets requirement' : 'Below requirement'}
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+                            {houseInsight.lord_worksheet.shadbala_rupas != null ? (
+                              <View style={[styles.sheetStat, nestedCard]}>
+                                <Text style={[styles.sheetStatLabel, { color: colors.textSecondary }]}>Shadbala</Text>
+                                <Text style={[styles.sheetStatValue, { color: colors.text }]}>
+                                  {houseInsight.lord_worksheet.shadbala_rupas}
+                                  <Text style={[styles.sheetStatUnit, { color: colors.textSecondary }]}>
+                                    {` / ${houseInsight.lord_worksheet.required_rupas ?? '—'} rupas`}
+                                  </Text>
+                                </Text>
+                              </View>
+                            ) : null}
+                            {(houseInsight.lord_worksheet.other_lordships || []).length ? (
+                              <Text style={[styles.sheetFoot, { color: colors.textSecondary }]}>
+                                {`Also H${houseInsight.lord_worksheet.other_lordships.join(', H')}`}
+                              </Text>
+                            ) : null}
+                          </View>
+                        </View>
                       ) : (
                         <View style={styles.lordContainer}>
                           <Ionicons name="key-outline" size={20} color={colors.primary} />
@@ -1716,110 +1757,178 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     </View>
 
                     {(houseInsight?.argala?.support?.length || houseInsight?.argala?.obstruction?.length) ? (
-                      <View style={[styles.drawerSection, sectionSurface]}>
-                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-                          {t('chartScreen.houseDrawer.argala', 'Argala')}
-                        </Text>
-                        <Text style={[styles.sectionDesc, { color: colors.text, marginBottom: 8 }]}>
-                          {houseInsight.argala.grade}
-                        </Text>
+                      <View style={[styles.drawerSection, sectionSurface, wideSheet && styles.sheetGridCard]}>
+                        <View style={styles.insightHeaderRow}>
+                          <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>
+                            {t('chartScreen.houseDrawer.argala', 'Argala')}
+                          </Text>
+                          {houseInsight.argala.grade ? (
+                            <View style={[styles.sheetChip, { backgroundColor: withAlpha(houseInsight.argala.grade === 'Obstruction' ? colors.error : houseInsight.argala.grade === 'Support' ? colors.success : colors.primary, '22') }]}>
+                              <Text style={[styles.sheetChipText, { color: colors.text }]}>{houseInsight.argala.grade}</Text>
+                            </View>
+                          ) : null}
+                        </View>
                         {(houseInsight.argala.support || []).map((row) => (
-                          <View key={`a-${row.planet}-${row.from_house}`} style={styles.reasonRow}>
-                            <View style={[styles.reasonDot, { backgroundColor: colors.success }]} />
-                            <Text style={[styles.reasonText, { color: colors.text }]}>
-                              {t('chartScreen.houseDrawer.argalaFromHouse', {
-                                planet: row.planet,
-                                house: row.from_house,
-                                label: row.label,
-                              })}
-                            </Text>
+                          <View key={`a-${row.planet}-${row.from_house}`} style={[styles.sheetNested, nestedCard]}>
+                            <View style={[styles.reasonDot, { backgroundColor: colors.success, marginTop: 6 }]} />
+                            <View style={styles.sheetLeadCopy}>
+                              <Text style={[styles.planetName, { color: colors.text }]}>
+                                {t(`home.planet_names.${row.planet}`, row.planet)}
+                              </Text>
+                              <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>
+                                {`H${row.from_house}${row.label ? ` · ${row.label}` : ''}`}
+                              </Text>
+                            </View>
                           </View>
                         ))}
                         {(houseInsight.argala.obstruction || []).map((row) => (
-                          <View key={`v-${row.planet}-${row.from_house}`} style={styles.reasonRow}>
-                            <View style={[styles.reasonDot, { backgroundColor: colors.error }]} />
-                            <Text style={[styles.reasonText, { color: colors.text }]}>
-                              {t('chartScreen.houseDrawer.argalaVirodhaFromHouse', {
-                                planet: row.planet,
-                                house: row.from_house,
-                                label: row.label,
-                              })}
-                            </Text>
+                          <View key={`v-${row.planet}-${row.from_house}`} style={[styles.sheetNested, nestedCard]}>
+                            <View style={[styles.reasonDot, { backgroundColor: colors.error, marginTop: 6 }]} />
+                            <View style={styles.sheetLeadCopy}>
+                              <Text style={[styles.planetName, { color: colors.text }]}>
+                                {t(`home.planet_names.${row.planet}`, row.planet)}
+                              </Text>
+                              <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>
+                                {`Virodha · H${row.from_house}${row.label ? ` · ${row.label}` : ''}`}
+                              </Text>
+                            </View>
                           </View>
                         ))}
                       </View>
                     ) : null}
 
                     {(houseInsight?.points_in_house?.length || houseInsight?.chara_karakas_here?.length) ? (
-                      <View style={[styles.drawerSection, sectionSurface]}>
+                      <View style={[styles.drawerSection, sectionSurface, wideSheet && styles.sheetGridCard]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                           {t('chartScreen.houseDrawer.pointsHere', 'Points in this house')}
                         </Text>
                         {(houseInsight.points_in_house || []).map((point) => (
-                          <Text key={point.key} style={[styles.reasonText, { color: colors.text, marginBottom: 6 }]}>
-                            {point.label}: {point.sign_name}{point.detail ? ` · ${point.detail}` : ''}
-                          </Text>
+                          <View key={point.key} style={[styles.sheetNested, nestedCard]}>
+                            <View style={[styles.sheetMark, { backgroundColor: withAlpha(colors.primary, '18') }]}>
+                              <Text style={[styles.sheetMarkText, { color: colors.primary }]}>
+                                {String(point.label || '').slice(0, 1)}
+                              </Text>
+                            </View>
+                            <View style={styles.sheetLeadCopy}>
+                              <Text style={[styles.planetName, { color: colors.text }]}>{point.label}</Text>
+                              <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>
+                                {point.sign_name ? t(`signs.${point.sign_name}`, point.sign_name) : ''}
+                                {point.detail ? ` · ${point.detail}` : ''}
+                              </Text>
+                            </View>
+                          </View>
                         ))}
                         {(houseInsight.chara_karakas_here || []).map((row) => (
-                          <Text key={row.karaka} style={[styles.reasonText, { color: colors.text, marginBottom: 6 }]}>
-                            {row.abbr} · {row.planet} · {row.title}
-                          </Text>
+                          <View key={row.karaka} style={[styles.sheetNested, nestedCard]}>
+                            <View style={[styles.sheetMark, { backgroundColor: withAlpha(colors.accent, '28') }]}>
+                              <Text style={[styles.sheetMarkText, { color: colors.text }]}>{row.abbr}</Text>
+                            </View>
+                            <View style={styles.sheetLeadCopy}>
+                              <Text style={[styles.planetName, { color: colors.text }]}>
+                                {t(`home.planet_names.${row.planet}`, row.planet)}
+                              </Text>
+                              <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>{row.title}</Text>
+                            </View>
+                          </View>
                         ))}
                       </View>
                     ) : null}
 
                     {(houseInsight?.timing?.windows?.length || houseInsight?.timing?.current_transits?.length || houseInsight?.natural_karakas?.length || houseInsight?.related_varga) ? (
-                      <View style={[styles.drawerSection, sectionSurface]}>
+                      <View style={[styles.drawerSection, sectionSurface, wideSheet && styles.sheetGridCard]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                           {t('chartScreen.houseDrawer.timingKaraka', 'Timing, karaka, related varga')}
                         </Text>
                         {houseInsight.timing?.current_transits?.length ? (
-                          <Text style={[styles.sectionDesc, { color: colors.text, marginBottom: 8 }]}>
-                            {t('chartScreen.houseDrawer.transitingHereNow', {
-                              planets: houseInsight.timing.current_transits.join(', '),
-                            })}
-                          </Text>
+                          <View style={[styles.sheetNested, nestedCard]}>
+                            <Ionicons name="planet-outline" size={18} color={colors.primary} style={styles.aspectIcon} />
+                            <View style={styles.sheetLeadCopy}>
+                              <Text style={[styles.sheetStatLabel, { color: colors.textSecondary }]}>
+                                {t('chartScreen.houseDrawer.timingNow', 'Now')}
+                              </Text>
+                              <Text style={[styles.planetName, { color: colors.text }]}>
+                                {houseInsight.timing.current_transits.map((planet) => t(`home.planet_names.${planet}`, planet)).join(', ')}
+                              </Text>
+                            </View>
+                          </View>
                         ) : null}
                         {(houseInsight.timing?.windows || []).map((row) => (
-                          <Text key={`${row.mahadasha}-${row.antardasha}-${row.start}`} style={[styles.reasonText, { color: colors.text, marginBottom: 6 }]}>
-                            {row.current
-                              ? t('chartScreen.houseDrawer.timingNow', 'Now')
-                              : t('chartScreen.houseDrawer.timingNext', 'Next')}
-                            {' · '}{row.mahadasha}/{row.antardasha}
-                            {row.start ? ` · ${row.start}` : ''}{row.end ? `–${row.end}` : ''}
-                            {row.why ? ` · ${row.why}` : ''}
-                          </Text>
+                          <View key={`${row.mahadasha}-${row.antardasha}-${row.start}`} style={[styles.sheetNested, nestedCard]}>
+                            <View style={[styles.sheetChip, { backgroundColor: withAlpha(row.current ? colors.success : colors.primary, '22'), alignSelf: 'flex-start' }]}>
+                              <Text style={[styles.sheetChipText, { color: colors.text }]}>
+                                {row.current
+                                  ? t('chartScreen.houseDrawer.timingNow', 'Now')
+                                  : t('chartScreen.houseDrawer.timingNext', 'Next')}
+                              </Text>
+                            </View>
+                            <View style={styles.sheetLeadCopy}>
+                              <Text style={[styles.planetName, { color: colors.text }]}>
+                                {t(`home.planet_names.${row.mahadasha}`, row.mahadasha)}
+                                {row.antardasha ? ` / ${t(`home.planet_names.${row.antardasha}`, row.antardasha)}` : ''}
+                              </Text>
+                              {(row.start || row.end) ? (
+                                <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>
+                                  {row.start || ''}{row.end ? ` – ${row.end}` : ''}
+                                </Text>
+                              ) : null}
+                              {row.why ? (
+                                <Text style={[styles.sheetFoot, { color: colors.textSecondary }]}>{row.why}</Text>
+                              ) : null}
+                            </View>
+                          </View>
                         ))}
                         {(houseInsight.natural_karakas || []).map((row) => (
-                          <Text key={row.planet} style={[styles.reasonText, { color: colors.text, marginBottom: 6 }]}>
-                            {t('chartScreen.houseDrawer.karakaLine', {
-                              planet: row.planet,
-                              sign: row.sign_name || '—',
-                              house: row.house != null
-                                ? t('chartScreen.houseDrawer.houseMark', { house: row.house })
-                                : '',
-                            })}
-                          </Text>
+                          <View key={row.planet} style={[styles.sheetNested, nestedCard]}>
+                            <View style={[styles.sheetMark, { backgroundColor: withAlpha(colors.primary, '18') }]}>
+                              <Ionicons name="star-outline" size={14} color={colors.primary} />
+                            </View>
+                            <View style={styles.sheetLeadCopy}>
+                              <Text style={[styles.planetName, { color: colors.text }]}>
+                                {t(`home.planet_names.${row.planet}`, row.planet)}
+                              </Text>
+                              <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>
+                                {[
+                                  row.sign_name ? t(`signs.${row.sign_name}`, row.sign_name) : null,
+                                  row.house != null ? `H${row.house}` : null,
+                                ].filter(Boolean).join(' · ')}
+                              </Text>
+                            </View>
+                          </View>
                         ))}
                         {houseInsight.related_varga ? (
-                          <Text style={[styles.sectionDesc, { color: colors.text }]}>
-                            {t('chartScreen.houseDrawer.relatedVargaLine', {
-                              name: houseInsight.related_varga.name,
-                              sign: houseInsight.related_varga.sign_name || '—',
-                              lord: houseInsight.related_varga.lord || '—',
-                              lordHouse: houseInsight.related_varga.lord_house != null
-                                ? t('chartScreen.houseDrawer.inHouseShort', {
-                                    house: houseInsight.related_varga.lord_house,
-                                  })
-                                : '',
-                              occupants: houseInsight.related_varga.occupants?.length
-                                ? ` · ${houseInsight.related_varga.occupants.join(', ')}`
-                                : t('chartScreen.houseDrawer.vargaEmpty'),
-                            })}
-                          </Text>
+                          <View style={[styles.sheetNested, styles.sheetNestedStack, nestedCard]}>
+                            <Text style={[styles.sheetStatLabel, { color: colors.textSecondary }]}>
+                              {houseInsight.related_varga.name}
+                            </Text>
+                            <Text style={[styles.planetName, { color: colors.text }]}>
+                              {houseInsight.related_varga.sign_name
+                                ? t(`signs.${houseInsight.related_varga.sign_name}`, houseInsight.related_varga.sign_name)
+                                : '—'}
+                            </Text>
+                            <Text style={[styles.planetDetails, { color: colors.textSecondary }]}>
+                              {t('chartScreen.houseDrawer.lordOf', {
+                                sign: houseInsight.related_varga.sign_name
+                                  ? t(`signs.${houseInsight.related_varga.sign_name}`, houseInsight.related_varga.sign_name)
+                                  : '—',
+                                lord: houseInsight.related_varga.lord
+                                  ? t(`home.planet_names.${houseInsight.related_varga.lord}`, houseInsight.related_varga.lord)
+                                  : '—',
+                                defaultValue: 'Lord of {{sign}} is {{lord}}',
+                              })}
+                              {houseInsight.related_varga.lord_house != null
+                                ? ` · ${t('chartScreen.houseDrawer.inHouseShort', { house: houseInsight.related_varga.lord_house, defaultValue: 'in H{{house}}' })}`
+                                : ''}
+                            </Text>
+                            <Text style={[styles.sheetFoot, { color: colors.textSecondary }]}>
+                              {houseInsight.related_varga.occupants?.length
+                                ? houseInsight.related_varga.occupants.map((planet) => t(`home.planet_names.${planet}`, planet)).join(', ')
+                                : t('chartScreen.houseDrawer.vargaEmpty', ' · empty').replace(/^[\s·]+/, '')}
+                            </Text>
+                          </View>
                         ) : null}
                       </View>
                     ) : null}
+                    </View>
 
                     {/* Extra padding for scroll */}
                     <View style={{ height: 40 }} />
@@ -2514,6 +2623,96 @@ const styles = StyleSheet.create({
   },
   lordText: {
     fontSize: 15,
+  },
+  sheetGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    alignItems: 'stretch',
+  },
+  sheetGridCard: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: '48%',
+    minWidth: '47%',
+    marginBottom: 0,
+  },
+  sheetLead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginTop: 4,
+  },
+  sheetLeadCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  sheetChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  sheetChip: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  sheetChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  sheetStat: {
+    marginTop: 12,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  sheetStatLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  sheetStatValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  sheetStatUnit: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sheetFoot: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 6,
+  },
+  sheetNested: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginTop: 10,
+  },
+  sheetNestedStack: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  sheetMark: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetMarkText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   drawerActions: {
     flexDirection: 'row',
