@@ -18,7 +18,7 @@ import { chartAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 
 import { COLORS } from '../../utils/constants';
-import NorthIndianChart from './NorthIndianChart';
+import NorthIndianChart, { dashaPaint } from './NorthIndianChart';
 import SouthIndianChart from './SouthIndianChart';
 import DateNavigator from '../Common/DateNavigator';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +39,7 @@ const toLocalYmd = (value) => {
 const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, onRequestBirthChart, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
+  const dashaColor = dashaPaint(colors).fill;
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(true);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
@@ -763,11 +764,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
 
       {showDashaHighlight && currentChartType !== 'transit' && dashaLords ? (
         <Text style={[styles.dashaLegend, fitTablet && styles.dashaLegendTablet, { color: colors.chartText || colors.text }]} numberOfLines={2}>
-          <Text style={{ color: colors.primary }}>{t('chartScreen.dashaMd', 'MD')}</Text>
+          <Text style={{ color: dashaColor }}>{t('chartScreen.dashaMd', 'MD')}</Text>
           {` ${t(`home.planet_names.${dashaLords.mahadasha}`, dashaLords.mahadasha || '')} · `}
-          <Text style={{ color: colors.primary }}>{t('chartScreen.dashaAd', 'AD')}</Text>
+          <Text style={{ color: dashaColor }}>{t('chartScreen.dashaAd', 'AD')}</Text>
           {` ${t(`home.planet_names.${dashaLords.antardasha}`, dashaLords.antardasha || '')} · `}
-          <Text style={{ color: colors.primary }}>{t('chartScreen.dashaPd', 'PD')}</Text>
+          <Text style={{ color: dashaColor }}>{t('chartScreen.dashaPd', 'PD')}</Text>
           {` ${t(`home.planet_names.${dashaLords.pratyantardasha}`, dashaLords.pratyantardasha || '')}`}
         </Text>
       ) : null}

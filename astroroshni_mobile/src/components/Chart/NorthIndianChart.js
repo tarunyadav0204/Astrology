@@ -78,7 +78,7 @@ const boxGap = (a, b) => {
   return Math.hypot(dx, dy);
 };
 
-export const textHalfWidth = (text, fontSize) => Math.max(8, String(text || '').length * fontSize * 0.33);
+export const textHalfWidth = (text, fontSize) => Math.max(4, String(text || '').length * fontSize * 0.34);
 
 const colorLuminance = (hex) => {
   const raw = String(hex || '').replace('#', '');
@@ -96,15 +96,40 @@ const colorContrast = (a, b) => {
   return (lighter + 0.05) / (darker + 0.05);
 };
 
+const readableHex = (value) => (
+  /^#[0-9A-Fa-f]{6}$/.test(String(value || '').trim()) ? String(value).trim() : null
+);
+
+// Letter color for the period planets. Theme color when it stays readable on the
+// chart surface and apart from the other planets; otherwise a strong mark color.
 export const dashaPaint = (colors) => {
-  const primary = colors.primary || '#701d3f';
-  const ink = colors.chartText || '#210b17';
-  const surface = colors.chartSurface || '#fffaf2';
-  const accent = colors.accent || primary;
-  const edge = colorContrast(primary, ink) >= 1.35 && colorContrast(primary, surface) >= 1.8
-    ? primary
-    : accent;
-  return { fill: ink, glow: edge };
+  const primary = readableHex(colors?.primary) || '#701d3f';
+  const accent = readableHex(colors?.accent) || primary;
+  const ink = readableHex(colors?.chartText) || '#210b17';
+  const surface = readableHex(colors?.chartSurface) || '#fffaf2';
+  const marks = colorLuminance(surface) >= 0.4
+    ? ['#9f1239', '#1d4ed8', '#b45309', '#0f766e']
+    : ['#fb7185', '#38bdf8', '#fbbf24', '#4ade80'];
+  const pool = [];
+  [primary, accent, ...marks].forEach((hex) => {
+    if (!pool.includes(hex)) pool.push(hex);
+  });
+  const scored = pool.map((hex) => ({
+    hex,
+    theme: hex === primary || hex === accent,
+    surface: colorContrast(hex, surface),
+    ink: colorContrast(hex, ink),
+  }));
+  const themeOk = scored.find((item) => item.theme && item.surface >= 4.5 && item.ink >= 1.7);
+  const distinct = scored
+    .filter((item) => item.surface >= 4.5 && item.ink >= 2)
+    .sort((a, b) => (b.surface + Math.min(b.ink, 4)) - (a.surface + Math.min(a.ink, 4)));
+  const readable = scored
+    .filter((item) => item.surface >= 4.5)
+    .sort((a, b) => b.surface - a.surface);
+  const brightest = scored.slice().sort((a, b) => b.surface - a.surface)[0];
+  const chosen = themeOk || distinct[0] || readable[0] || brightest;
+  return { fill: chosen.hex, glow: chosen.hex };
 };
 
 export const dashaLevelSuffix = (planetName, highlight) => {
@@ -264,7 +289,8 @@ const polygonCentroid = (polygon) => {
 };
 
 // Pick baselines whose glyphs stay inside the house and clear of occupied boxes.
-export const placeClearLabels = (polygon, occupied, specs, minGap = 4) => {
+// Clearance wins over sitting near the house center, which is where natal labels are.
+export const placeClearLabels = (polygon, occupied, specs, minGap = 3) => {
   const xs = polygon.map((point) => point[0]);
   const ys = polygon.map((point) => point[1]);
   const minX = Math.min(...xs);
@@ -273,34 +299,89 @@ export const placeClearLabels = (polygon, occupied, specs, minGap = 4) => {
   const maxY = Math.max(...ys);
   const centroid = polygonCentroid(polygon);
   const candidates = [];
-  for (let x = minX + 4; x <= maxX - 4; x += 4) {
-    for (let y = minY + 8; y <= maxY - 4; y += 4) {
+  for (let x = minX + 2; x <= maxX - 2; x += 3) {
+    for (let y = minY + 2; y <= maxY - 2; y += 3) {
       candidates.push({ x, y });
     }
   }
 
   const blocked = occupied.slice();
   const placed = [];
-  specs.forEach((spec) => {
+  for (const spec of specs) {
     let best = null;
     candidates.forEach((candidate) => {
       const box = labelBox(candidate.x, candidate.y, spec.halfW, spec.above, spec.below);
-      const inset = labelBox(candidate.x, candidate.y, spec.halfW + 3, spec.above + 3, spec.below + 2);
+      const inset = labelBox(
+        candidate.x,
+        candidate.y,
+        spec.halfW + 1,
+        spec.above + 1,
+        spec.below + 1,
+      );
       if (!boxInsidePolygon(inset, polygon)) return;
       const gap = blocked.reduce((min, rect) => Math.min(min, boxGap(box, rect)), Infinity);
       if (gap < minGap) return;
       const dist = Math.hypot(candidate.x - centroid.x, candidate.y - centroid.y);
-      const score = Math.min(gap, 36) - dist * 0.25;
+      const score = gap - dist * 0.02;
       if (!best || score > best.score) best = { ...candidate, score, box };
     });
     if (!best) {
       placed.push(null);
-      return;
+      return placed;
     }
     placed.push(best);
     blocked.push(best.box);
-  });
+  }
   return placed;
+};
+
+const TRANSIT_MARK = '\u1D40';
+
+// Try roomy labels first, then shorter ones. Never overlap a natal box.
+export const placeTransitLabels = (polygon, occupied, labels, showDegree) => {
+  if (!labels.length) return null;
+  const fullText = (label) => `${label.symbol}${label.retrograde ? '(R)' : ''}${TRANSIT_MARK}`;
+  const shortText = (label) => `${label.symbol}${TRANSIT_MARK}`;
+  const detailText = (label) => `${label.degree || ''} ${label.nakshatra || ''}`.trim();
+  const sized = (fontSize, textOf, above, below = 2) => labels.map((label) => {
+    const text = textOf(label);
+    return { halfW: textHalfWidth(text, fontSize), above, below, text, fontSize };
+  });
+
+  const attempts = [];
+  if (showDegree && labels.length <= 2) {
+    attempts.push(labels.map((label) => ({
+      halfW: Math.max(textHalfWidth(fullText(label), 10), textHalfWidth(detailText(label), 8)),
+      above: 11,
+      below: 18,
+      text: fullText(label),
+      detail: detailText(label),
+      fontSize: 10,
+      detailSize: 8,
+    })));
+  }
+  attempts.push(sized(9, fullText, 9));
+  attempts.push(sized(8, shortText, 8));
+  attempts.push(sized(7, shortText, 7));
+  if (labels.length > 1) {
+    [8, 7].forEach((fontSize) => {
+      const text = labels.map(shortText).join(' ');
+      attempts.push([{
+        halfW: textHalfWidth(text, fontSize),
+        above: fontSize,
+        below: 2,
+        text,
+        fontSize,
+        joined: true,
+      }]);
+    });
+  }
+
+  for (const specs of attempts) {
+    const placed = placeClearLabels(polygon, occupied, specs, 3);
+    if (placed.length === specs.length && placed.every(Boolean)) return { placed, specs };
+  }
+  return null;
 };
 // House polygons and grid lines must share the same 400×400 frame so
 // active-house fills align with the diagonal/diamond dividers.
@@ -606,73 +687,42 @@ const NorthIndianChart = ({
     const list = getTransitPlanetsInHouse(houseNumber - 1);
     const polygon = HOUSE_POLYGONS[houseNumber];
     if (!list.length || !polygon) return null;
-    const labelFor = (planet) => `${planet.symbol}${planet.retrograde ? '(R)' : ''}\u1D40`;
     const occupied = planetsInHouse.map((planet, pIndex) => {
       const anchor = natalPlanetAnchor(houseNumber, houseData.center, planetsInHouse.length, pIndex);
       const dashaTag = dashaLevelSuffix(planet.name, dashaHighlight);
       const symbolFont = (planetsInHouse.length > 4 ? 10 : planetsInHouse.length > 2 ? 12 : 14) + (dashaTag ? 4 : 0);
       const degreeFont = planetsInHouse.length > 4 ? 7 : planetsInHouse.length > 2 ? 9 : 10;
-      const half = Math.max(
-        textHalfWidth(getPlanetSymbolWithStatus(planet), symbolFont)
-          + (dashaTag ? textHalfWidth(dashaTag, Math.max(6, symbolFont * 0.46)) + 2 : 0),
-        showDegreeNakshatra ? textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, degreeFont) : 0,
-      ) + 3;
-      return labelBox(anchor.x, anchor.y - 2, half, dashaTag ? 26 : 18, showDegreeNakshatra ? 16 : 6);
+      const symbol = getPlanetSymbolWithStatus(planet);
+      const symbolY = anchor.y - 8;
+      const tagFont = Math.max(6, Math.round(symbolFont * 0.42));
+      const symbolHalf = textHalfWidth(symbol, symbolFont);
+      const tagExtra = dashaTag ? textHalfWidth(dashaTag, tagFont) + 2 : 0;
+      const degreeHalf = showDegreeNakshatra
+        ? textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, degreeFont)
+        : 0;
+      const half = Math.max(symbolHalf + tagExtra, degreeHalf) + 5;
+      const above = Math.ceil(symbolFont * 0.95) + (dashaTag ? tagFont + 1 : 2);
+      const below = showDegreeNakshatra ? 16 + Math.ceil(degreeFont * 0.5) + 2 : 4;
+      return labelBox(anchor.x, symbolY, half, above, below);
     });
     const sign = signAnchor(houseNumber, houseData.center);
     const signLabel = String(getRashiForHouse(houseNumber - 1) + 1);
-    occupied.push(labelBox(sign.x + textHalfWidth(signLabel, 18), sign.y - 2, textHalfWidth(signLabel, 18) + 2, 16, 4));
+    const signHalf = textHalfWidth(signLabel, 18) + 4;
+    occupied.push(labelBox(sign.x + signHalf - 4, sign.y, signHalf, 18, 5));
     if (houseNumber === 1) {
       const ascX = houseData.center.x + 25;
       const ascY = houseData.center.y + 35;
-      occupied.push(labelBox(ascX, ascY + 6, 22, 16, showDegreeNakshatra ? 22 : 8));
+      occupied.push(labelBox(ascX, ascY, 26, 14, showDegreeNakshatra ? 24 : 6));
     }
 
-    const detailSpecs = list.map((planet) => ({
-      halfW: Math.max(
-        textHalfWidth(labelFor(planet), 10),
-        textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, 8),
-      ) + 2,
-      above: 11,
-      below: 18,
-      detail: true,
-    }));
-    const compactSpecs = list.map((planet) => ({
-      halfW: textHalfWidth(labelFor(planet), 9) + 2,
-      above: 10,
-      below: 3,
-      detail: false,
-    }));
-    const joined = list.map(labelFor).join(' ');
-    const joinedSpec = [{
-      halfW: textHalfWidth(joined, 9) + 2,
-      above: 10,
-      below: 3,
-      detail: false,
-      joined: true,
-    }];
-
-    let placed = null;
-    let specs = compactSpecs;
-    if (showDegreeNakshatra && list.length <= 2) {
-      placed = placeClearLabels(polygon, occupied, detailSpecs);
-      if (placed.every(Boolean)) specs = detailSpecs;
-      else placed = null;
-    }
-    if (!placed) {
-      placed = placeClearLabels(polygon, occupied, compactSpecs);
-      specs = compactSpecs;
-      if (!placed.every(Boolean)) {
-        placed = placeClearLabels(polygon, occupied, joinedSpec);
-        specs = joinedSpec;
-      }
-    }
-    if (!placed?.some(Boolean)) {
-      const tight = joinedSpec.map((spec) => ({ ...spec, halfW: Math.min(spec.halfW, 16) }));
-      placed = placeClearLabels(polygon, occupied, tight, -30);
-      specs = tight;
-    }
-    if (!placed || !placed.some(Boolean)) return null;
+    const layout = placeTransitLabels(polygon, occupied, list.map((planet) => ({
+      symbol: planet.symbol,
+      retrograde: planet.retrograde,
+      degree: planet.formattedDegree,
+      nakshatra: planet.shortNakshatra,
+      name: planet.name,
+    })), showDegreeNakshatra);
+    if (!layout) return null;
 
     const transitColor = colors.accent || colors.primary;
     return (
@@ -681,31 +731,31 @@ const NorthIndianChart = ({
           <Path d={houseData.path} />
         </ClipPath>
         <G pointerEvents="none" clipPath={`url(#transit-house-${houseNumber})`}>
-          {specs[0]?.joined ? (
-            placed[0] ? (
-              <SvgText
-                x={placed[0].x}
-                y={placed[0].y}
-                fontSize="9"
-                fill={transitColor}
-                fontWeight="800"
-                textAnchor="middle"
-              >
-                {joined}
-              </SvgText>
-            ) : null
-          ) : list.map((planet, index) => {
-            const slot = placed[index];
+          {layout.specs.map((spec, index) => {
+            const slot = layout.placed[index];
             if (!slot) return null;
-            const spec = specs[index];
             return (
-              <G key={`transit-${planet.name}`}>
-                <SvgText x={slot.x} y={slot.y} fontSize={spec.detail ? '10' : '9'} fill={transitColor} fontWeight="800" textAnchor="middle">
-                  {labelFor(planet)}
+              <G key={`transit-${spec.text}-${index}`}>
+                <SvgText
+                  x={slot.x}
+                  y={slot.y}
+                  fontSize={spec.fontSize}
+                  fill={transitColor}
+                  fontWeight="800"
+                  textAnchor="middle"
+                >
+                  {spec.text}
                 </SvgText>
                 {spec.detail ? (
-                  <SvgText x={slot.x} y={slot.y + 10} fontSize="8" fill={transitColor} fontWeight="600" textAnchor="middle">
-                    {`${planet.formattedDegree} ${planet.shortNakshatra}`}
+                  <SvgText
+                    x={slot.x}
+                    y={slot.y + 10}
+                    fontSize={spec.detailSize || 8}
+                    fill={transitColor}
+                    fontWeight="600"
+                    textAnchor="middle"
+                  >
+                    {spec.detail}
                   </SvgText>
                 ) : null}
               </G>
@@ -889,22 +939,6 @@ const NorthIndianChart = ({
                 const paint = dashaTag ? dashaPaint(colors) : null;
                 return (
                   <G key={pIndex}>
-                    {paint ? (
-                      <SvgText
-                        x={planetX}
-                        y={planetY - 8}
-                        fontSize={planetFont}
-                        fill="none"
-                        stroke={paint.glow}
-                        strokeWidth={1.75}
-                        strokeLinejoin="round"
-                        fontWeight="900"
-                        textAnchor="middle"
-                        pointerEvents="none"
-                      >
-                        {symbol}
-                      </SvgText>
-                    ) : null}
                     <SvgText
                       x={planetX}
                       y={planetY - 8}

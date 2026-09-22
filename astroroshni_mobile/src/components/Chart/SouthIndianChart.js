@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, Easing, Platform } from 'react-native';
 import Svg, { Rect, Text as SvgText, G, Line, ClipPath, Defs } from 'react-native-svg';
-import { dashaLevelSuffix, dashaPaint, labelBox, placeClearLabels, textHalfWidth } from './NorthIndianChart';
+import { dashaLevelSuffix, dashaPaint, labelBox, placeTransitLabels, textHalfWidth } from './NorthIndianChart';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -411,22 +411,6 @@ const SouthIndianChart = ({
                 const paint = dashaTag ? dashaPaint(colors) : null;
                 return (
                 <G key={pIndex}>
-                  {paint ? (
-                    <SvgText
-                      x={symbolX}
-                      y={symbolY}
-                      fontSize={planetFont}
-                      fill="none"
-                      stroke={paint.glow}
-                      strokeWidth={1.5}
-                      strokeLinejoin="round"
-                      fontWeight="bold"
-                      textAnchor="middle"
-                      pointerEvents="none"
-                    >
-                      {planet.symbol}
-                    </SvgText>
-                  ) : null}
                   <SvgText
                     x={symbolX}
                     y={symbolY}
@@ -466,7 +450,6 @@ const SouthIndianChart = ({
               {(() => {
                 const transits = getTransitPlanetsInSign(pos.sign);
                 if (!transits.length) return null;
-                const labelFor = (planet) => `${planet.symbol}${planet.retrograde ? '(R)' : ''}\u1D40`;
                 const polygon = [
                   [pos.x + 2, pos.y + 2],
                   [pos.x + pos.width - 2, pos.y + 2],
@@ -477,28 +460,25 @@ const SouthIndianChart = ({
                   const symbolY = pos.y + 20 + (pIndex * 20);
                   const dashaTag = dashaLevelSuffix(planet.name, dashaHighlight);
                   const symbolFont = (showKarakas ? 10 : 12) + (dashaTag ? 4 : 0);
-                  const half = Math.max(
-                    textHalfWidth(planet.symbol, symbolFont)
-                      + (dashaTag ? textHalfWidth(dashaTag, Math.max(6, symbolFont * 0.46)) + 2 : 0),
-                    showDegreeNakshatra
-                      ? textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, 8)
-                      : 0,
-                  ) + 3;
-                  return labelBox(
-                    pos.x + pos.width / 2,
-                    symbolY + (showDegreeNakshatra ? 4 : 0),
-                    half,
-                    14,
-                    showDegreeNakshatra ? 16 : 4,
-                  );
+                  const tagFont = Math.max(6, Math.round(symbolFont * 0.42));
+                  const symbolHalf = textHalfWidth(planet.symbol, symbolFont);
+                  const tagExtra = dashaTag ? textHalfWidth(dashaTag, tagFont) + 2 : 0;
+                  const degreeHalf = showDegreeNakshatra
+                    ? textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, 8)
+                    : 0;
+                  const half = Math.max(symbolHalf + tagExtra, degreeHalf) + 4;
+                  const above = Math.ceil(symbolFont * 0.95) + (dashaTag ? tagFont : 1);
+                  const below = showDegreeNakshatra ? 16 : 3;
+                  return labelBox(pos.x + pos.width / 2, symbolY, half, above, below);
                 });
                 const houseLabel = String(houseNumber || '');
                 if (houseLabel) {
+                  const houseHalf = textHalfWidth(houseLabel, 12) + 2;
                   occupied.push(labelBox(
-                    pos.x + 8 + textHalfWidth(houseLabel, 12),
+                    pos.x + 8 + houseHalf - 2,
                     pos.y + 16,
-                    textHalfWidth(houseLabel, 12) + 2,
-                    12,
+                    houseHalf,
+                    14,
                     4,
                   ));
                 }
@@ -506,55 +486,19 @@ const SouthIndianChart = ({
                   occupied.push(labelBox(
                     pos.x + pos.width - 20,
                     pos.y + pos.height - 16,
-                    18,
+                    20,
                     12,
-                    showDegreeNakshatra ? 14 : 6,
+                    showDegreeNakshatra ? 16 : 6,
                   ));
                 }
-                const detailSpecs = transits.map((planet) => ({
-                  halfW: Math.max(
-                    textHalfWidth(labelFor(planet), 9),
-                    textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, 7),
-                  ) + 1,
-                  above: 10,
-                  below: 16,
-                  detail: true,
-                }));
-                const compactSpecs = transits.map((planet) => ({
-                  halfW: textHalfWidth(labelFor(planet), 8) + 1,
-                  above: 9,
-                  below: 3,
-                  detail: false,
-                }));
-                const joined = transits.map(labelFor).join(' ');
-                const joinedSpec = [{
-                  halfW: textHalfWidth(joined, 8) + 1,
-                  above: 9,
-                  below: 3,
-                  detail: false,
-                  joined: true,
-                }];
-                let placed = null;
-                let specs = compactSpecs;
-                if (showDegreeNakshatra && transits.length <= 2) {
-                  placed = placeClearLabels(polygon, occupied, detailSpecs);
-                  if (placed.every(Boolean)) specs = detailSpecs;
-                  else placed = null;
-                }
-                if (!placed) {
-                  placed = placeClearLabels(polygon, occupied, compactSpecs);
-                  specs = compactSpecs;
-                  if (!placed.every(Boolean)) {
-                    placed = placeClearLabels(polygon, occupied, joinedSpec);
-                    specs = joinedSpec;
-                  }
-                }
-                if (!placed?.some(Boolean)) {
-                  const tight = joinedSpec.map((spec) => ({ ...spec, halfW: Math.min(spec.halfW, 14) }));
-                  placed = placeClearLabels(polygon, occupied, tight, -24);
-                  specs = tight;
-                }
-                if (!placed || !placed.some(Boolean)) return null;
+                const layout = placeTransitLabels(polygon, occupied, transits.map((planet) => ({
+                  symbol: planet.symbol,
+                  retrograde: planet.retrograde,
+                  degree: planet.formattedDegree,
+                  nakshatra: planet.shortNakshatra,
+                  name: planet.name,
+                })), showDegreeNakshatra);
+                if (!layout) return null;
                 const transitColor = colors.accent || colors.primary;
                 return (
                   <>
@@ -562,31 +506,31 @@ const SouthIndianChart = ({
                       <Rect x={pos.x + 2} y={pos.y + 2} width={pos.width - 4} height={pos.height - 4} />
                     </ClipPath>
                     <G pointerEvents="none" clipPath={`url(#transit-cell-${index})`}>
-                      {specs[0]?.joined ? (
-                        placed[0] ? (
-                          <SvgText
-                            x={placed[0].x}
-                            y={placed[0].y}
-                            fontSize="8"
-                            fill={transitColor}
-                            fontWeight="800"
-                            textAnchor="middle"
-                          >
-                            {joined}
-                          </SvgText>
-                        ) : null
-                      ) : transits.map((planet, transitIndex) => {
-                        const slot = placed[transitIndex];
+                      {layout.specs.map((spec, transitIndex) => {
+                        const slot = layout.placed[transitIndex];
                         if (!slot) return null;
-                        const spec = specs[transitIndex];
                         return (
-                          <G key={`transit-${planet.name}`}>
-                            <SvgText x={slot.x} y={slot.y} fontSize={spec.detail ? '9' : '8'} fill={transitColor} fontWeight="800" textAnchor="middle">
-                              {labelFor(planet)}
+                          <G key={`transit-${spec.text}-${transitIndex}`}>
+                            <SvgText
+                              x={slot.x}
+                              y={slot.y}
+                              fontSize={spec.fontSize}
+                              fill={transitColor}
+                              fontWeight="800"
+                              textAnchor="middle"
+                            >
+                              {spec.text}
                             </SvgText>
                             {spec.detail ? (
-                              <SvgText x={slot.x} y={slot.y + 9} fontSize="7" fill={transitColor} fontWeight="600" textAnchor="middle">
-                                {`${planet.formattedDegree} ${planet.shortNakshatra}`}
+                              <SvgText
+                                x={slot.x}
+                                y={slot.y + 9}
+                                fontSize={spec.detailSize || 7}
+                                fill={transitColor}
+                                fontWeight="600"
+                                textAnchor="middle"
+                              >
+                                {spec.detail}
                               </SvgText>
                             ) : null}
                           </G>
