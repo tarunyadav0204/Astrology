@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  useWindowDimensions,
   Alert,
   FlatList,
   AppState,
@@ -353,7 +354,8 @@ export default function HomeScreen({
   const insets = useSafeAreaInsets();
   // Web: keep tab bar size normal. Home-indicator orange is applied via
   // setWebBottomSafeColor (CSS body::after below the safe edge) — not tab padding.
-  const { totalHeight: tabTotalHeight } = getHomeBottomTabMetrics(insets.bottom);
+  const { width: windowWidth } = useWindowDimensions();
+  const { totalHeight: tabTotalHeight } = getHomeBottomTabMetrics(insets.bottom, windowWidth);
   const [showTaraDock, setShowTaraDock] = useState(false);
   const taraDockAnim = useRef(new Animated.Value(0)).current;
   // The tab bar overlays the page. Reserve its full height plus a comfortable
@@ -3454,12 +3456,12 @@ const loadHomeData = async (nativeData = null) => {
                 ...(Platform.OS === 'web'
                   ? {
                       position: 'fixed',
-                      left: 0,
-                      right: 0,
-                      width: 'calc(100% - 32px)',
+                      left: 16,
+                      right: 'auto',
+                      width: 'min(488px, calc(100% - 32px))',
                       maxWidth: 488,
-                      marginLeft: 'auto',
-                      marginRight: 'auto',
+                      marginLeft: 0,
+                      marginRight: 0,
                     }
                   : null),
               },
@@ -6346,7 +6348,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: 7,
   },
   taraActionDockAskText: { flexShrink: 1, fontSize: 13, fontWeight: '900' },

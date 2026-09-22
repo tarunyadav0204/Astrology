@@ -13,6 +13,7 @@ import {
   StyleSheet,
   TextInput,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
@@ -62,7 +63,9 @@ const ASHTAKVARGA_TABS = [
   { key: 'transit', labelKey: 'transit', icon: 'navigate-circle-outline' },
   { key: 'ai', labelKey: 'analysis', icon: 'analytics-outline' },
 ];
+const SIGN_NAMES = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
 const SIGN_SHORT_NAMES = ['Ari', 'Tau', 'Gem', 'Can', 'Leo', 'Vir', 'Lib', 'Sco', 'Sag', 'Cap', 'Aqu', 'Pis'];
+const TABLET_MIN_WIDTH = 768;
 const ASHTAKVARGA_PROFILES = [
   { id: 'pvr_narasimha_rao', label: 'P.V.R. Narasimha Rao', detail: 'Replacement rule · seven grahas' },
   { id: 'parasharas_light_7', label: 'Parashara’s Light 7', detail: 'Published-table profile · Lagna occupancy' },
@@ -176,6 +179,16 @@ const HOUSE_SIGNIFICATIONS = {
 
 export default function AshtakvargaOracle({ navigation, route, onHeaderStateChange }) {
   const { t } = useTranslation();
+  const { width: windowWidth } = useWindowDimensions();
+  const wideTable = windowWidth >= TABLET_MIN_WIDTH;
+  const wideCell = (style, flex = 1) => (
+    wideTable ? [style, styles.wideTableCell, { flex }] : style
+  );
+  const fitTable = (table) => (
+    wideTable
+      ? <View style={styles.wideTable}>{table}</View>
+      : <ScrollView horizontal showsHorizontalScrollIndicator={false}>{table}</ScrollView>
+  );
   const { theme, colors } = useTheme();
   const { credits, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
@@ -1172,11 +1185,13 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
           : Number.isFinite(Number(houseData?.sign))
             ? Number(houseData.sign)
             : index;
-      const signLabel = SIGN_SHORT_NAMES[signIndex] || SIGN_SHORT_NAMES[index];
+      const signLabel = wideTable
+        ? `${SIGN_NAMES[signIndex] || SIGN_NAMES[index]}\nHouse ${houseNum}`
+        : `${SIGN_SHORT_NAMES[signIndex] || SIGN_SHORT_NAMES[index]} (H${houseNum})`;
 
       return {
         houseNum,
-        sign: `${signLabel} (H${houseNum})`,
+        sign: signLabel,
         values: planets.map((planet) => individualCharts?.[planet]?.bindus?.[signIndex] ?? 0),
         sav: houseData?.bindus ?? 0,
       };
@@ -1191,19 +1206,21 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
         </View>
 
         <View style={[styles.matrixCard, themedSurface]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {fitTable(
             <View>
               <View style={[styles.matrixRow, styles.matrixHeaderRow, { borderBottomColor: colors.borderStrong, backgroundColor: colors.surfaceMuted }]}>
-                <Text style={[styles.matrixHeaderCell, styles.matrixSignCell, { color: colors.text }]}>House</Text>
+                <Text style={[styles.matrixHeaderCell, wideCell(styles.matrixSignCell, 2.4), { color: colors.text }]}>{wideTable ? 'Sign' : 'House'}</Text>
                 {planets.map((planet) => (
-                  <Text key={planet} style={[styles.matrixHeaderCell, { color: colors.text }]}>{planet.slice(0, 2)}</Text>
+                  <Text key={planet} style={[styles.matrixHeaderCell, wideCell(null, 1), { color: colors.text }]} numberOfLines={2}>
+                    {wideTable ? planet : planet.slice(0, 2)}
+                  </Text>
                 ))}
-                <Text style={[styles.matrixHeaderCell, styles.matrixSavCell, { color: colors.primary }]}>SAV</Text>
+                <Text style={[styles.matrixHeaderCell, wideCell(styles.matrixSavCell, 1.2), { color: colors.primary }]}>{wideTable ? 'Total' : 'SAV'}</Text>
               </View>
 
               {rows.map((row, rowIndex) => (
                 <View
-                  key={row.sign}
+                  key={row.houseNum}
                   style={[
                     styles.matrixRow,
                     rowIndex % 2 === 0
@@ -1212,19 +1229,19 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
                     { borderBottomColor: colors.cardBorder },
                   ]}
                 >
-                  <Text style={[styles.matrixCell, styles.matrixSignCell, { color: colors.text }]}>{row.sign}</Text>
+                  <Text style={[styles.matrixCell, wideCell(styles.matrixSignCell, 2.4), { color: colors.text }]}>{row.sign}</Text>
                   {row.values.map((value, idx) => (
-                    <Text key={`${row.sign}-${planets[idx]}`} style={[styles.matrixCell, { color: colors.textSecondary }]}>
+                    <Text key={`${row.houseNum}-${planets[idx]}`} style={[styles.matrixCell, wideCell(null, 1), { color: colors.textSecondary }]}>
                       {value}
                     </Text>
                   ))}
-                  <Text style={[styles.matrixCell, styles.matrixSavCell, { color: colors.primary }]}>
+                  <Text style={[styles.matrixCell, wideCell(styles.matrixSavCell, 1.2), { color: colors.primary }]}>
                     {row.sav}
                   </Text>
                 </View>
               ))}
             </View>
-          </ScrollView>
+          )}
         </View>
 
         <Text style={[styles.matrixHint, { color: colors.textSecondary }]}>
@@ -1286,19 +1303,19 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
               <Text style={[styles.advancedEyebrow, { color: colors.primary }]}>{t('ashtakavargaUi.advanced.tableTitle').toUpperCase()}</Text>
               <Text style={[styles.advancedCardTitle, { color: colors.text }]}>{t('ashtakavargaUi.advanced.tableTitle')}</Text>
               <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.advanced.tableBody')}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.advancedTableScroll}>
-                <View>
+              {fitTable(
+                <View style={wideTable ? styles.wideTable : null}>
                   <View style={[styles.advancedTableRow, styles.advancedTableHeader, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.cardBorder }]}>
-                    {[t('ashtakavargaUi.labels.graha'), t('ashtakavargaUi.labels.raw'), t('ashtakavargaUi.labels.reduced'), t('ashtakavargaUi.labels.rashi'), t('ashtakavargaUi.labels.graha'), t('ashtakavargaUi.labels.shodhya')].map((label, index) => <Text key={`${label}-${index}`} style={[styles.advancedTableCell, index === 0 && styles.advancedTableFirstCell, { color: colors.text }]}>{label}</Text>)}
+                    {[t('ashtakavargaUi.labels.graha'), t('ashtakavargaUi.labels.raw'), t('ashtakavargaUi.labels.reduced'), t('ashtakavargaUi.labels.rashi'), t('ashtakavargaUi.labels.graha'), t('ashtakavargaUi.labels.shodhya')].map((label, index) => <Text key={`${label}-${index}`} style={[styles.advancedTableCell, wideCell(index === 0 ? styles.advancedTableFirstCell : null, index === 0 ? 1.4 : 1), { color: colors.text }]}>{label}</Text>)}
                   </View>
                   {ADVANCED_PLANETS.map((planet) => {
                     const row = advanced.shodhya_pinda?.[planet];
                     const active = selectedAdvancedPlanet === planet;
                     const values = [planet, Object.values(row?.raw_bav || {}).reduce((sum, value) => sum + Number(value), 0), Object.values(row?.after_ekadhipatya || {}).reduce((sum, value) => sum + Number(value), 0), row?.rashi_pinda, row?.graha_pinda, row?.shodhya_pinda];
-                    return <TouchableOpacity key={planet} onPress={() => setSelectedAdvancedPlanet(planet)} style={[styles.advancedTableRow, { backgroundColor: active ? colors.surfaceMuted : 'transparent', borderBottomColor: colors.borderStrong }]}>{values.map((value, index) => <Text key={`${planet}-${index}`} style={[styles.advancedTableCell, index === 0 && styles.advancedTableFirstCell, index === 5 && styles.advancedTableStrong, { color: index === 5 || active ? colors.primary : colors.textSecondary }]}>{value ?? '—'}</Text>)}</TouchableOpacity>;
+                    return <TouchableOpacity key={planet} onPress={() => setSelectedAdvancedPlanet(planet)} style={[styles.advancedTableRow, { backgroundColor: active ? colors.surfaceMuted : 'transparent', borderBottomColor: colors.borderStrong }]}>{values.map((value, index) => <Text key={`${planet}-${index}`} style={[styles.advancedTableCell, wideCell(index === 0 ? styles.advancedTableFirstCell : null, index === 0 ? 1.4 : 1), index === 5 && styles.advancedTableStrong, { color: index === 5 || active ? colors.primary : colors.textSecondary }]}>{value ?? '—'}</Text>)}</TouchableOpacity>;
                   })}
                 </View>
-              </ScrollView>
+              )}
             </View>
 
             <View style={[styles.advancedCard, themedSurface]}>
@@ -1307,24 +1324,24 @@ export default function AshtakvargaOracle({ navigation, route, onHeaderStateChan
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.advancedPlanetChips}>
                 {ADVANCED_PLANETS.map((planet) => <TouchableOpacity key={planet} onPress={() => setSelectedAdvancedPlanet(planet)} style={[styles.advancedPlanetChip, { backgroundColor: selectedAdvancedPlanet === planet ? colors.primary : colors.surfaceMuted, borderColor: selectedAdvancedPlanet === planet ? colors.primary : colors.borderStrong }]}><Text style={{ color: selectedAdvancedPlanet === planet ? colors.onPrimary : colors.textSecondary, fontWeight: '800', fontSize: 11 }}>{planet}</Text></TouchableOpacity>)}
               </ScrollView>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.advancedTableScroll}>
-                <View>
-                  <View style={[styles.reductionRow, styles.advancedTableHeader, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, { color: colors.text }]}>{t('ashtakavargaUi.labels.stage')}</Text>{SIGN_SHORT_NAMES.map((sign) => <Text key={sign} style={[styles.reductionCell, { color: colors.text }]}>{sign.slice(0, 2)}</Text>)}</View>
-                  {reductionRows.map(([label, values]) => <View key={label} style={[styles.reductionRow, { borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, { color: colors.text }]}>{label}</Text>{Array.from({ length: 12 }, (_, sign) => <Text key={sign} style={[styles.reductionCell, { color: colors.textSecondary }]}>{values?.[String(sign)] ?? 0}</Text>)}</View>)}
+              {fitTable(
+                <View style={wideTable ? styles.wideTable : null}>
+                  <View style={[styles.reductionRow, styles.advancedTableHeader, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, wideCell(null, 1.8), { color: colors.text }]}>{t('ashtakavargaUi.labels.stage')}</Text>{SIGN_NAMES.map((sign, index) => <Text key={sign} numberOfLines={2} style={[styles.reductionCell, wideCell(null, 1), { color: colors.text }]}>{wideTable ? sign : SIGN_SHORT_NAMES[index].slice(0, 2)}</Text>)}</View>
+                  {reductionRows.map(([label, values]) => <View key={label} style={[styles.reductionRow, { borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, wideCell(null, 1.8), { color: colors.text }]}>{label}</Text>{Array.from({ length: 12 }, (_, sign) => <Text key={sign} style={[styles.reductionCell, wideCell(null, 1), { color: colors.textSecondary }]}>{values?.[String(sign)] ?? 0}</Text>)}</View>)}
                 </View>
-              </ScrollView>
+              )}
               <View style={[styles.traceBlock, { backgroundColor: colors.surfaceMuted }]}><Text style={[styles.traceTitle, { color: colors.text }]}>Trikona Shodhana</Text>{selected?.trikona_trace?.map((row) => <Text key={row.signs.join('-')} style={[styles.traceText, { color: colors.textSecondary }]}>{row.signs.join(' · ')}: {row.before.join('/')} → {row.after.join('/')}</Text>)}</View>
               <View style={[styles.traceBlock, { backgroundColor: colors.surfaceMuted }]}><Text style={[styles.traceTitle, { color: colors.text }]}>Ekadhipatya Shodhana</Text>{selected?.ekadhipatya_trace?.map((row) => <Text key={row.lord} style={[styles.traceText, { color: colors.textSecondary }]}>{row.signs.join(' · ')}: {row.before.join('/')} → {row.after.join('/')}</Text>)}</View>
 
               <Text style={[styles.advancedSubheading, { color: colors.text }]}>{t('ashtakavargaUi.advanced.prastara', { planet: selectedAdvancedPlanet })}</Text>
               <Text style={[styles.advancedBody, { color: colors.textSecondary }]}>{t('ashtakavargaUi.advanced.prastaraBody')}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.advancedTableScroll}>
-                <View>
-                  <View style={[styles.reductionRow, styles.advancedTableHeader, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, { color: colors.text }]}>{t('ashtakavargaUi.labels.contributor')}</Text>{SIGN_SHORT_NAMES.map((sign) => <Text key={sign} style={[styles.reductionCell, { color: colors.text }]}>{sign.slice(0, 2)}</Text>)}</View>
-                  {selectedPrastara?.contributors?.map((contributor) => <View key={contributor} style={[styles.reductionRow, { borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, { color: colors.text }]}>{contributor}</Text>{Array.from({ length: 12 }, (_, sign) => { const bindu = selectedPrastara.matrix?.[contributor]?.[String(sign)] ?? 0; return <Text key={sign} style={[styles.reductionCell, bindu ? { backgroundColor: colors.primary, color: colors.onPrimary } : { color: colors.textSecondary }]}>{bindu}</Text>; })}</View>)}
-                  <View style={[styles.reductionRow, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, { color: colors.text, fontWeight: '900' }]}>{t('ashtakavargaUi.labels.bavTotal')}</Text>{Array.from({ length: 12 }, (_, sign) => <Text key={sign} style={[styles.reductionCell, { color: colors.primary, fontWeight: '900' }]}>{selectedPrastara?.sign_totals?.[String(sign)] ?? 0}</Text>)}</View>
+              {fitTable(
+                <View style={wideTable ? styles.wideTable : null}>
+                  <View style={[styles.reductionRow, styles.advancedTableHeader, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, wideCell(null, 1.8), { color: colors.text }]}>{t('ashtakavargaUi.labels.contributor')}</Text>{SIGN_NAMES.map((sign, index) => <Text key={sign} numberOfLines={2} style={[styles.reductionCell, wideCell(null, 1), { color: colors.text }]}>{wideTable ? sign : SIGN_SHORT_NAMES[index].slice(0, 2)}</Text>)}</View>
+                  {selectedPrastara?.contributors?.map((contributor) => <View key={contributor} style={[styles.reductionRow, { borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, wideCell(null, 1.8), { color: colors.text }]}>{contributor}</Text>{Array.from({ length: 12 }, (_, sign) => { const bindu = selectedPrastara.matrix?.[contributor]?.[String(sign)] ?? 0; return <Text key={sign} style={[styles.reductionCell, wideCell(null, 1), bindu ? { backgroundColor: colors.primary, color: colors.onPrimary } : { color: colors.textSecondary }]}>{bindu}</Text>; })}</View>)}
+                  <View style={[styles.reductionRow, { backgroundColor: colors.surfaceMuted, borderBottomColor: colors.borderStrong }]}><Text style={[styles.reductionLabel, wideCell(null, 1.8), { color: colors.text, fontWeight: '900' }]}>{wideTable ? 'Bhinnashtakvarga total' : t('ashtakavargaUi.labels.bavTotal')}</Text>{Array.from({ length: 12 }, (_, sign) => <Text key={sign} style={[styles.reductionCell, wideCell(null, 1), { color: colors.primary, fontWeight: '900' }]}>{selectedPrastara?.sign_totals?.[String(sign)] ?? 0}</Text>)}</View>
                 </View>
-              </ScrollView>
+              )}
             </View>
 
             <View style={[styles.advancedCard, themedSurface]}>
@@ -2849,6 +2866,13 @@ const styles = {
     fontSize: 13,
     lineHeight: 19,
     marginHorizontal: 2,
+  },
+  wideTable: {
+    width: '100%',
+  },
+  wideTableCell: {
+    width: undefined,
+    minWidth: 0,
   },
   aiInsightSection: {
     marginTop: 12,

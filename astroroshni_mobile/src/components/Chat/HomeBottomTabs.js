@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from '@expo/vector-icons/Ionicons';
@@ -20,8 +20,14 @@ if (Platform.OS === 'web') {
   }
 }
 
-export function getHomeBottomTabMetrics(bottomInset = 0) {
-  const contentHeight = Platform.OS === 'ios' ? 80 : Platform.OS === 'web' ? 56 : 70;
+const TABLET_MIN_WIDTH = 768;
+
+export function getHomeBottomTabMetrics(bottomInset = 0, windowWidth) {
+  const width = windowWidth ?? Dimensions.get('window').width;
+  const wide = width >= TABLET_MIN_WIDTH;
+  const contentHeight = wide
+    ? 92
+    : Platform.OS === 'ios' ? 80 : Platform.OS === 'web' ? 56 : 70;
   const safeBottom = Platform.OS === 'ios'
     ? 10
     : Platform.OS === 'web'
@@ -46,11 +52,13 @@ export default function HomeBottomTabs({
 }) {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const wideTabs = windowWidth >= TABLET_MIN_WIDTH;
   const { theme, colors, isPanditMode } = useTheme();
   const {
     contentHeight: tabContentHeight,
     safeBottom: tabSafeBottom,
-  } = getHomeBottomTabMetrics(insets.bottom);
+  } = getHomeBottomTabMetrics(insets.bottom, windowWidth);
   const isHindiUi = isPanditMode || isHindiLocale(i18n.language);
   const tabActiveWeight = isHindiUi ? '600' : '800';
   const tabIdleWeight = isHindiUi ? '500' : '600';
@@ -68,6 +76,8 @@ export default function HomeBottomTabs({
 
   const tabColor = (key) => (activeTab === key ? tabActiveColor : tabIdleColor);
   const tabWeight = (key) => (activeTab === key ? tabActiveWeight : tabIdleWeight);
+  const iconSize = wideTabs ? 28 : 22;
+  const labelStyle = wideTabs ? styles.tabLabelWide : null;
 
   const bottomTabs = (
     <View
@@ -113,12 +123,13 @@ export default function HomeBottomTabs({
         accessibilityState={{ selected: activeTab === 'today' }}
         accessibilityLabel={t('premiumUi.home.tabs.today')}
       >
-        <View style={styles.tabIconContainer}>
-          <Icon name="today-outline" size={22} color={tabColor('today')} />
+        <View style={[styles.tabIconContainer, wideTabs && styles.tabIconContainerWide]}>
+          <Icon name="today-outline" size={iconSize} color={tabColor('today')} />
         </View>
         <Text style={[
           styles.tabLabel,
-          hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.tabLabel),
+          labelStyle,
+          hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, wideTabs ? styles.tabLabelWide : styles.tabLabel),
           { color: tabColor('today'), fontWeight: tabWeight('today') },
         ]}>
           {t('premiumUi.home.tabs.today')}
@@ -133,10 +144,10 @@ export default function HomeBottomTabs({
         accessibilityState={{ selected: activeTab === 'ask' }}
         accessibilityLabel={t('premiumUi.home.tabs.askTara')}
       >
-        <View style={styles.tabIconContainer}>
-          <Icon name="sparkles-outline" size={22} color={tabColor('ask')} />
+        <View style={[styles.tabIconContainer, wideTabs && styles.tabIconContainerWide]}>
+          <Icon name="sparkles-outline" size={iconSize} color={tabColor('ask')} />
         </View>
-        <Text style={[styles.tabLabel, hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.tabLabel), { color: tabColor('ask'), fontWeight: tabWeight('ask') }]}>
+        <Text style={[styles.tabLabel, labelStyle, hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, wideTabs ? styles.tabLabelWide : styles.tabLabel), { color: tabColor('ask'), fontWeight: tabWeight('ask') }]}>
           {t('premiumUi.home.tabs.askTara')}
         </Text>
       </TouchableOpacity>
@@ -149,10 +160,10 @@ export default function HomeBottomTabs({
         accessibilityState={{ selected: activeTab === 'explore' }}
         accessibilityLabel={t('premiumUi.home.tabs.explore')}
       >
-        <View style={styles.tabIconContainer}>
-          <Icon name="compass-outline" size={22} color={tabColor('explore')} />
+        <View style={[styles.tabIconContainer, wideTabs && styles.tabIconContainerWide]}>
+          <Icon name="compass-outline" size={iconSize} color={tabColor('explore')} />
         </View>
-        <Text style={[styles.tabLabel, hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.tabLabel), { color: tabColor('explore'), fontWeight: tabWeight('explore') }]}>
+        <Text style={[styles.tabLabel, labelStyle, hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, wideTabs ? styles.tabLabelWide : styles.tabLabel), { color: tabColor('explore'), fontWeight: tabWeight('explore') }]}>
           {t('premiumUi.home.tabs.explore')}
         </Text>
       </TouchableOpacity>
@@ -165,15 +176,15 @@ export default function HomeBottomTabs({
         accessibilityState={{ selected: activeTab === 'charts' }}
         accessibilityLabel={t('premiumUi.home.tabs.charts')}
       >
-        <View style={styles.tabIconContainer}>
-          <Svg width="22" height="22" viewBox="0 0 48 48">
+        <View style={[styles.tabIconContainer, wideTabs && styles.tabIconContainerWide]}>
+          <Svg width={iconSize} height={iconSize} viewBox="0 0 48 48">
             <Rect x="2" y="2" width="44" height="44" fill="none" stroke={tabColor('charts')} strokeWidth="3" />
             <Polygon points="24,2 46,24 24,46 2,24" fill="none" stroke={activeTab === 'charts' ? (isPanditMode ? tabActiveColor : '#ffd700') : tabIdleColor} strokeWidth="2" />
             <Line x1="2" y1="2" x2="46" y2="46" stroke={tabColor('charts')} strokeWidth="1.5" />
             <Line x1="46" y1="2" x2="2" y2="46" stroke={tabColor('charts')} strokeWidth="1.5" />
           </Svg>
         </View>
-        <Text style={[styles.tabLabel, hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.tabLabel), { color: tabColor('charts'), fontWeight: tabWeight('charts') }]}>
+        <Text style={[styles.tabLabel, labelStyle, hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, wideTabs ? styles.tabLabelWide : styles.tabLabel), { color: tabColor('charts'), fontWeight: tabWeight('charts') }]}>
           {t('premiumUi.home.tabs.charts')}
         </Text>
       </TouchableOpacity>
@@ -186,10 +197,10 @@ export default function HomeBottomTabs({
         accessibilityState={{ selected: activeTab === 'you' }}
         accessibilityLabel={t('premiumUi.home.tabs.you')}
       >
-        <View style={styles.tabIconContainer}>
-          <Icon name="person-outline" size={22} color={tabColor('you')} />
+        <View style={[styles.tabIconContainer, wideTabs && styles.tabIconContainerWide]}>
+          <Icon name="person-outline" size={iconSize} color={tabColor('you')} />
         </View>
-        <Text style={[styles.tabLabel, hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, styles.tabLabel), { color: tabColor('you'), fontWeight: tabWeight('you') }]}>
+        <Text style={[styles.tabLabel, labelStyle, hindiReadableTextStyle(isHindiUi ? 'hi' : i18n.language, wideTabs ? styles.tabLabelWide : styles.tabLabel), { color: tabColor('you'), fontWeight: tabWeight('you') }]}>
           {t('premiumUi.home.tabs.you')}
         </Text>
       </TouchableOpacity>
@@ -244,9 +255,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
+  tabIconContainerWide: {
+    width: 52,
+    height: 36,
+    marginBottom: 6,
+  },
   tabLabel: {
     fontSize: 11,
     marginTop: 2,
     letterSpacing: 0.3,
+  },
+  tabLabelWide: {
+    fontSize: 16,
+    lineHeight: 20,
+    marginTop: 4,
+    letterSpacing: 0.2,
   },
 });

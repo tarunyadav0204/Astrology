@@ -557,7 +557,7 @@ export default function ChatScreen({ navigation, route }) {
   } = useCredits();
   const { requireAuthForPaid, isGuest, refreshAuthState } = useAuthGate();
   const insets = useSafeAreaInsets();
-  const homeBottomTabHeight = getHomeBottomTabMetrics(insets.bottom).totalHeight;
+  const homeBottomTabHeight = getHomeBottomTabMetrics(insets.bottom, viewportWidth).totalHeight;
 
   // Mundane mode state
   const [isMundane, setIsMundane] = useState(false);
@@ -9592,7 +9592,7 @@ const styles = StyleSheet.create({
   headerCenter: {
     flex: 1,
     minWidth: 0,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     overflow: 'hidden',
   },
   headerCenterCompact: {
@@ -9614,7 +9614,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     minWidth: 0,
-    maxWidth: 176,
   },
   activeChatDot: {
     width: 7,

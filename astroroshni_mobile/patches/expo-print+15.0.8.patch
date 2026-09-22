@@ -1,14 +1,14 @@
 diff --git a/node_modules/expo-print/android/src/main/java/expo/modules/print/PrintModule.kt b/node_modules/expo-print/android/src/main/java/expo/modules/print/PrintModule.kt
 --- a/node_modules/expo-print/android/src/main/java/expo/modules/print/PrintModule.kt
 +++ b/node_modules/expo-print/android/src/main/java/expo/modules/print/PrintModule.kt
-@@ -4,6 +4,7 @@ import android.os.ParcelFileDescriptor
+@@ -5,5 +5,6 @@ import android.os.ParcelFileDescriptor
  import android.print.PrintAttributes
  import android.print.PrintManager
 +import com.facebook.react.bridge.ReadableMap
  import expo.modules.kotlin.modules.Module
  import expo.modules.kotlin.modules.ModuleDefinition
  import android.print.PrintDocumentAdapter
-@@ -35,14 +36,30 @@ class PrintModule : Module() {
+@@ -35,14 +36,29 @@ class PrintModule : Module() {
        )
      }
  
