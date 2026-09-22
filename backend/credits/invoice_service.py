@@ -7,6 +7,7 @@ credit transaction metadata and are not copied onto the invoice.
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -40,6 +41,39 @@ def _seller() -> Dict[str, str]:
     return seller
 
 
+def _paid_amount(money: Any) -> Optional[float]:
+    if not isinstance(money, dict):
+        return None
+    try:
+        paid = float(money.get("amount_paid"))
+    except (TypeError, ValueError):
+        return None
+    return paid if paid > 0 else None
+
+
+def _catalog_inr_money(product_id: Any, credits: int) -> Optional[Dict[str, Any]]:
+    """List price for a credit pack when the gateway metadata has no amount."""
+    from credits.transaction_receipt import money_from_total
+
+    count = None
+    match = re.match(r"^credits_(\d+)$", str(product_id or "").strip())
+    if match:
+        count = int(match.group(1))
+    elif int(credits or 0) > 0:
+        count = int(credits)
+    if not count:
+        return None
+    try:
+        from credits.razorpay_routes import _expected_paise_for_pack
+
+        paise = int(_expected_paise_for_pack(count))
+    except Exception:
+        return None
+    if paise <= 0:
+        return None
+    return money_from_total("INR", paise / 100.0)
+
+
 def _text(value: Any) -> Optional[str]:
     text = str(value or "").strip()
     return text or None
@@ -62,6 +96,9 @@ def purchase_invoice_document(
     view = transaction_payment_view(src, metadata, amount_inr)
     if view.get("payment_method") not in PURCHASE_SOURCES:
         return None
+    money = view.get("money") if isinstance(view.get("money"), dict) else None
+    if not _paid_amount(money):
+        money = _catalog_inr_money(view.get("product_id"), credits) or money
     meta = {}
     if isinstance(metadata, dict):
         meta = metadata
@@ -86,7 +123,7 @@ def purchase_invoice_document(
         "payment_method": view["payment_method"],
         "order_id": order_id,
         "payment_reference": _text(reference_id),
-        "money": view.get("money"),
+        "money": money,
     }
     return document
 
@@ -152,6 +189,51 @@ def _load_saved(conn, userid: int, transaction_id: int):
     return cursor.fetchone()
 
 
+def _document_for_transaction(conn, userid: int, transaction_id: int) -> Optional[Dict[str, Any]]:
+    from db import execute
+
+    cursor = execute(
+        conn,
+        """
+        SELECT id, transaction_type, amount, source, reference_id, created_at, metadata
+        FROM credit_transactions
+        WHERE id = ? AND userid = ?
+        """,
+        (transaction_id, userid),
+    )
+    row = cursor.fetchone()
+    if not row or (row[1] or "") != "earned" or (row[3] or "") not in PURCHASE_SOURCES:
+        return None
+    issued = row[5]
+    if isinstance(issued, datetime):
+        if issued.tzinfo is None:
+            issued_at = issued.isoformat()
+        else:
+            issued_at = issued.astimezone(timezone.utc).isoformat()
+    else:
+        issued_at = str(issued or "")
+    buyer_cursor = execute(
+        conn,
+        "SELECT name, phone, email FROM users WHERE userid = ?",
+        (userid,),
+    )
+    buyer_row = buyer_cursor.fetchone()
+    buyer = {
+        "name": buyer_row[0] if buyer_row else None,
+        "phone": buyer_row[1] if buyer_row else None,
+        "email": buyer_row[2] if buyer_row else None,
+    }
+    return purchase_invoice_document(
+        credits=int(row[2] or 0),
+        source=row[3],
+        reference_id=row[4],
+        metadata=row[6],
+        amount_inr=None,
+        issued_at=issued_at,
+        buyer=buyer,
+    )
+
+
 def _public_row(row) -> Dict[str, Any]:
     payload = json.loads(row[2]) if row[2] else {}
     if not isinstance(payload, dict):
@@ -169,8 +251,28 @@ def ensure_purchase_invoice(userid: int, transaction_id: int) -> Dict[str, Any]:
         _ensure_tables(conn)
         existing = _load_saved(conn, userid, transaction_id)
         if existing:
+            current = _public_row(existing)
+            if _paid_amount(current.get("money")) and (
+                str((current.get("money") or {}).get("currency") or "").upper() != "INR"
+                or (current.get("money") or {}).get("tax_amount") is not None
+            ):
+                conn.commit()
+                return current
+            refreshed = _document_for_transaction(conn, userid, transaction_id)
+            if refreshed and _paid_amount(refreshed.get("money")):
+                current["money"] = refreshed["money"]
+                if not current.get("product_id"):
+                    current["product_id"] = refreshed.get("product_id")
+                stored = {key: value for key, value in current.items() if key != "id"}
+                execute(
+                    conn,
+                    "UPDATE credit_invoices SET payload = ? WHERE id = ? AND userid = ?",
+                    (json.dumps(stored), current["id"], userid),
+                )
+                conn.commit()
+                return current
             conn.commit()
-            return _public_row(existing)
+            return current
 
         cursor = execute(
             conn,

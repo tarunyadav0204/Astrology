@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,7 +17,7 @@ import { appLocaleForI18n } from '../utils/appLocale';
 import { typographyTokens } from '../theme/tokens';
 import FocusedStatusBar from '../components/Common/FocusedStatusBar';
 import { creditAPI } from '../services/api';
-import { exportHtmlAsPdf, sharePDFOnWhatsApp } from '../utils/pdfGenerator';
+import { exportHtmlAsPdf, PDF_PRINT_STYLES, sharePDFOnWhatsApp, userFacingPdfExportError } from '../utils/pdfGenerator';
 
 function formatWhen(value, locale) {
   const date = new Date(value);
@@ -56,7 +57,9 @@ function escapeHtml(value) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+    .replace(/\n/g, '<br>');
 }
 
 function DetailRow({ label, value, colors }) {
@@ -134,23 +137,42 @@ export default function CreditInvoiceScreen({ navigation, route }) {
           ? [t('credits.page.transactionDetail.beforeGst'), formatMoney(money.pretax_amount, money.currency, dateLocale)]
           : null,
       ].filter((row) => row && row[1]);
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-        body { font-family: -apple-system, sans-serif; color: #1a1a1a; padding: 32px; }
-        h1 { font-size: 28px; margin: 0 0 8px; }
-        .muted { color: #666; margin-bottom: 24px; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 10px 0; border-bottom: 1px solid #eee; vertical-align: top; }
-        td:first-child { color: #666; width: 42%; }
-      </style></head><body>
-        <h1>${escapeHtml(t('credits.page.transactionDetail.invoiceTitle'))}</h1>
-        <div class="muted">${escapeHtml(invoice.seller?.name || 'AstroRoshni')}</div>
-        <table>${rows.map(([label, value]) => `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`).join('')}</table>
-        ${money?.tax_amount != null ? `<p class="muted">${escapeHtml(t('credits.page.transactionDetail.gstNote'))}</p>` : ''}
-      </body></html>`;
-      const uri = await exportHtmlAsPdf(html);
-      await sharePDFOnWhatsApp(uri, { contentType: 'invoice', source: 'credit_invoice' });
-    } catch (_) {
-      /* The invoice stays on screen if sharing is cancelled or the PDF cannot be created. */
+      const rowHtml = rows.map(([label, value]) => (
+        `<div class="row"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div></div>`
+      )).join('');
+      const html = `<!doctype html>
+        <html><head><meta charset="utf-8"><style>
+          @page { margin: 18mm 15mm; }
+          body { margin: 0; color: #272033; background: #fff; font-family: Arial, "Noto Sans", sans-serif; font-size: 11pt; line-height: 1.58; }
+          .header { padding-bottom: 20px; margin-bottom: 24px; border-bottom: 3px solid #8b1d4a; }
+          .brand { color: #8b1d4a; font-size: 10pt; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
+          h1 { margin: 7px 0 5px; color: #241322; font-size: 25pt; }
+          .meta { color: #6f6671; font-size: 10pt; }
+          .row { padding: 10px 0; border-bottom: 1px solid #eee7e3; }
+          .label { color: #6f6671; font-size: 10pt; }
+          .value { color: #272033; font-size: 12pt; }
+          .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #ddd; color: #777; font-size: 8.5pt; }
+          ${PDF_PRINT_STYLES}
+        </style></head><body>
+          <header class="header">
+            <div class="brand">${escapeHtml(invoice.seller?.name || 'AstroRoshni')}</div>
+            <h1>${escapeHtml(t('credits.page.transactionDetail.invoiceTitle'))}</h1>
+            <div class="meta">${escapeHtml(invoice.invoice_number || '')}</div>
+          </header>
+          ${rowHtml}
+          ${money?.tax_amount != null ? `<div class="footer">${escapeHtml(t('credits.page.transactionDetail.gstNote'))}</div>` : ''}
+        </body></html>`;
+      const pdfUri = await exportHtmlAsPdf(html, { timeoutMs: 45000 });
+      await sharePDFOnWhatsApp(pdfUri, {
+        dialogTitle: t('credits.page.transactionDetail.shareInvoice'),
+        reportType: 'credit_invoice',
+        source: 'credit_invoice_screen',
+      });
+    } catch (error) {
+      Alert.alert(
+        t('credits.page.transactionDetail.shareInvoice'),
+        userFacingPdfExportError(error),
+      );
     } finally {
       setSharing(false);
     }

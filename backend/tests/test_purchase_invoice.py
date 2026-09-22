@@ -39,6 +39,23 @@ def test_inr_purchase_invoice_includes_gst_and_hides_the_payment_token():
     assert "purchase_token" not in dumped
 
 
+def test_pack_without_a_stored_price_still_invoices_the_list_price_and_gst():
+    document = purchase_invoice_document(
+        credits=50,
+        source="google_play",
+        reference_id="GPA.50",
+        metadata={"product_id": "credits_50", "order_id": "GPA.50"},
+        amount_inr=None,
+        issued_at="2026-09-22T06:00:00+00:00",
+        buyer={"name": "Asha"},
+    )
+    assert document["money"]["currency"] == "INR"
+    assert document["money"]["amount_paid"] == 99
+    assert document["money"]["tax_included"] is True
+    assert document["money"]["tax_amount"] > 0
+    assert round(document["money"]["pretax_amount"] + document["money"]["tax_amount"], 2) == 99
+
+
 def test_non_inr_invoice_has_no_gst_and_bonus_rows_are_not_invoices():
     document = purchase_invoice_document(
         credits=50,
