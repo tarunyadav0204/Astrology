@@ -4443,6 +4443,7 @@ async def get_ashtakavarga_oracle_insight(request: dict, current_user: User = De
             ensure_oracle_history_table,
             fetch_cached_oracle_payload,
             oracle_cache_key,
+            oracle_history_id_for_key,
             store_oracle_payload,
         )
         from credits.credit_service import CreditService
@@ -4511,17 +4512,7 @@ async def get_ashtakavarga_oracle_insight(request: dict, current_user: User = De
         
         oracle = get_oracle_instance()
         complete_oracle = oracle.generate_complete_oracle(birth_data, ashtakvarga_data, date, query_type)
-
-        spent = credit_service.spend_credits(
-            current_user.userid,
-            analysis_cost,
-            "ashtakavarga_oracle_insight",
-            f"Ashtakavarga analysis for {(birth_data or {}).get('name') or 'user'}",
-        )
-        if not spent:
-            raise HTTPException(status_code=500, detail="Credit deduction failed after analysis generation.")
         complete_oracle["credits_charged"] = analysis_cost
-        complete_oracle["credits_remaining"] = credit_service.get_user_credits(current_user.userid)
         complete_oracle["credit_cost_next"] = analysis_cost
         complete_oracle["cached"] = False
 
@@ -4538,8 +4529,29 @@ async def get_ashtakavarga_oracle_insight(request: dict, current_user: User = De
                 question_text=question_text,
                 payload=complete_oracle,
             )
+            analysis_id = oracle_history_id_for_key(conn, current_user.userid, cache_key)
             conn.commit()
-        
+
+        from credits.transaction_receipt import ashtakavarga_oracle_usage_metadata
+
+        spent = credit_service.spend_credits(
+            current_user.userid,
+            analysis_cost,
+            "ashtakavarga_oracle_insight",
+            f"Ashtakavarga analysis for {(birth_data or {}).get('name') or 'user'}",
+            metadata=ashtakavarga_oracle_usage_metadata(analysis_id),
+        )
+        if not spent:
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    "DELETE FROM ai_ashtakavarga_oracle_history WHERE userid = ? AND oracle_key = ?",
+                    (current_user.userid, cache_key),
+                )
+                conn.commit()
+            raise HTTPException(status_code=500, detail="Credit deduction failed after analysis generation.")
+        complete_oracle["credits_remaining"] = credit_service.get_user_credits(current_user.userid)
+
         return complete_oracle
         
     except HTTPException:
@@ -7244,11 +7256,19 @@ async def process_ashtakavarga_life_prediction_job(
                 conn.commit()
             return
 
+        from credits.transaction_receipt import ashtakavarga_life_usage_metadata
+
         spent = credit_service.spend_credits(
             userid,
             prediction_cost,
             "ashtakavarga_life_predictions",
             f"Ashtakavarga life predictions for {birth_data.name or 'user'}",
+            metadata=ashtakavarga_life_usage_metadata(
+                date=birth_data.date,
+                time=birth_data.time,
+                latitude=birth_data.latitude,
+                longitude=birth_data.longitude,
+            ),
         )
         if not spent:
             with get_conn() as conn:

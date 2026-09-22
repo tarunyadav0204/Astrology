@@ -154,6 +154,8 @@ export default function EventScreen({ route }) {
   const cachedYearsLanguageRef = useRef(null);
   const cachedYearsLoadPromiseRef = useRef(null);
   const previousTimelineLanguageRef = useRef(timelineLanguageCode);
+  const savedViewOnlyRef = useRef(false);
+  const openedFromCreditRef = useRef(false);
 
   useEffect(() => {
     if (previousTimelineLanguageRef.current === timelineLanguageCode) return;
@@ -403,14 +405,15 @@ export default function EventScreen({ route }) {
   }, []);
 
   const tryLoadCachedYearlyTimeline = useCallback(
-    async (y) => {
+    async (y, chartId) => {
       try {
         const bd = await getBirthDetails();
-        if (!bd?.id) return false;
+        const resolvedChartId = Number(chartId) > 0 ? Number(chartId) : bd?.id;
+        if (!resolvedChartId) return false;
         const res = await chatAPI.getCachedMonthlyEvents({
           ...bd,
           selectedYear: y,
-          birth_chart_id: bd.id,
+          birth_chart_id: resolvedChartId,
         });
         if (res.data?.engine_version) {
           setTimelineEngineVersion(res.data.engine_version);
@@ -836,6 +839,18 @@ export default function EventScreen({ route }) {
     saveYearlyPendingJob,
   ]);
 
+  useEffect(() => {
+    if (openedFromCreditRef.current || !route?.params?.openSaved) return;
+    const year = Number(route.params.year);
+    if (!Number.isInteger(year) || year < 1900 || year > 2200) return;
+    openedFromCreditRef.current = true;
+    savedViewOnlyRef.current = true;
+    setReadingMode('yearly');
+    setSelectedYear(year);
+    setMonthlyData(null);
+    setAnalysisStarted(true);
+  }, [route?.params?.openSaved, route?.params?.year]);
+
   // Check for cached data when analysis starts or year changes
   useEffect(() => {
     const loadCachedData = async () => {
@@ -843,15 +858,23 @@ export default function EventScreen({ route }) {
       if (loadingMonthly) return;
       
       if (monthlyData) return;
+
+      const viewSavedOnly = savedViewOnlyRef.current;
+      const savedChartId = viewSavedOnly ? Number(route?.params?.birthChartId) : null;
+      savedViewOnlyRef.current = false;
       
       try {
         const birthData = await getBirthDetails();
         if (!birthData) return;
 
-        const pending = await loadYearlyPendingJob();
-        const resumedPending = await resumePendingYearlyJob(pending, { preservePartialData: true });
-        if (resumedPending) {
-          return;
+        const birthChartId = Number.isFinite(savedChartId) && savedChartId > 0 ? savedChartId : birthData.id;
+
+        if (!viewSavedOnly) {
+          const pending = await loadYearlyPendingJob();
+          const resumedPending = await resumePendingYearlyJob(pending, { preservePartialData: true });
+          if (resumedPending) {
+            return;
+          }
         }
         
         // console.log('🔍 Checking cache with:', { 
@@ -863,7 +886,7 @@ export default function EventScreen({ route }) {
         const cacheResponse = await chatAPI.getCachedMonthlyEvents({
           ...birthData,
           selectedYear: selectedYear,
-          birth_chart_id: birthData.id
+          birth_chart_id: birthChartId
         });
         
         // console.log('📦 Cache response:', cacheResponse.data);
@@ -871,6 +894,8 @@ export default function EventScreen({ route }) {
         if (cacheResponse.data?.cached && cacheResponse.data?.data) {
           setMonthlyData(cacheResponse.data.data);
           markYearCached(selectedYear);
+        } else if (viewSavedOnly) {
+          setAnalysisStarted(false);
         } else {
           // No cached data - check credits before generating
           const refreshedCredits = await fetchBalance();
@@ -888,7 +913,14 @@ export default function EventScreen({ route }) {
         }
       } catch (error) {
         // Do not auto-start paid generation on cache failure — user may have 0 credits but a saved result.
-        const recovered = await tryLoadCachedYearlyTimeline(selectedYear);
+        const recovered = await tryLoadCachedYearlyTimeline(
+          selectedYear,
+          Number.isFinite(savedChartId) && savedChartId > 0 ? savedChartId : undefined,
+        );
+        if (viewSavedOnly && !recovered) {
+          setAnalysisStarted(false);
+          return;
+        }
         if (!recovered) {
           console.warn('[EventScreen] loadCachedData failed', error?.message || error);
           const startPaidGenerationIfAllowed = async () => {

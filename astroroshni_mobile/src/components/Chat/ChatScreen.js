@@ -52,6 +52,7 @@ import { chatAPI, creditAPI, mundaneAPI, predictionAPI } from '../../services/ap
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { buildQueryContext } from '../../utils/queryContext';
+import { detectQuestionPlace, loadSavedQuestionPlace, saveQuestionPlace } from '../../utils/questionPlace';
 import { COUNTRIES, YEARS } from '../../utils/mundaneConstants';
 import { trackAstrologyEvent, trackEvent } from '../../utils/analytics';
 import { ThemeColorsScope, useTheme } from '../../context/ThemeContext';
@@ -5300,6 +5301,21 @@ export default function ChatScreen({ navigation, route }) {
           ...buildQueryContext(),
           ...(queryContextOverride && typeof queryContextOverride === 'object' ? queryContextOverride : {}),
         };
+        // Intraday Muhurta depends on the trader's present place, not the
+        // birthplace. Resolve it only for trading-session questions and cache
+        // it for later asks; failure remains explicit in the backend response.
+        if (/\b(?:intraday|day[ -]?trad(?:e|ing)|trad(?:e|ing).*(?:today|session)|today.*trad(?:e|ing))\b/i.test(messageText)) {
+          const tradingPlace = await detectQuestionPlace() || await loadSavedQuestionPlace();
+          if (tradingPlace) {
+            await saveQuestionPlace(tradingPlace);
+            requestQueryContext.current_location = {
+              ...tradingPlace,
+              timezone_name: requestQueryContext.timezone_name,
+              timezone: requestQueryContext.timezone_name,
+            };
+            requestQueryContext.exchange = 'NSE';
+          }
+        }
 
         const requestBody = {
           session_id: activeSessionId,

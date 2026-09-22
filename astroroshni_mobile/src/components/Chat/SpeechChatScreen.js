@@ -28,6 +28,7 @@ import { useTranslation } from 'react-i18next';
 import { chatAPI, creditAPI, pricingAPI, speechAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { buildQueryContext } from '../../utils/queryContext';
+import { detectQuestionPlace, loadSavedQuestionPlace, saveQuestionPlace } from '../../utils/questionPlace';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { useTheme } from '../../context/ThemeContext';
 import { speechRecognition } from '../../native/speechRecognition';
@@ -372,6 +373,7 @@ export default function SpeechChatScreen({ navigation, route }) {
   // Reuse the text-chat thread when Speech was opened as a consultation mode.
   // Speech remains an Instant interaction, while both modalities share history.
   const [sessionId, setSessionId] = useState(route.params?.sessionId || null);
+  const chatSessionIdRef = useRef(route.params?.sessionId || null);
   const [language, setLanguage] = useState(initialSpeechLanguage);
   const [answerStyle, setAnswerStyle] = useState(
     route.params?.responseStyle === 'technical' ? 'technical' : 'simple'
@@ -581,7 +583,11 @@ export default function SpeechChatScreen({ navigation, route }) {
       billingTimerRef.current = null;
     }
     try {
-      const res = await creditAPI.endSpeechSession(current.session_id, reason);
+      const res = await creditAPI.endSpeechSession(
+        current.session_id,
+        reason,
+        chatSessionIdRef.current,
+      );
       const result = res?.data || null;
       logSpeechDebug('billing.end', result || {});
       if (result && mountedRef.current) {
@@ -657,7 +663,7 @@ export default function SpeechChatScreen({ navigation, route }) {
         ) {
           lastBillingHeartbeatSecondRef.current = elapsed;
           billingHeartbeatInFlightRef.current = true;
-          creditAPI.heartbeatSpeechSession(currentSession.session_id)
+          creditAPI.heartbeatSpeechSession(currentSession.session_id, chatSessionIdRef.current)
             .then((heartbeat) => {
               const heartbeatData = heartbeat?.data || {};
               if (heartbeatData.status && heartbeatData.status !== 'active') {
@@ -887,7 +893,11 @@ export default function SpeechChatScreen({ navigation, route }) {
         transcriptSendTimerRef.current = null;
       }
       if (billingSessionRef.current?.session_id) {
-        creditAPI.endSpeechSession(billingSessionRef.current.session_id, 'screen_unmount').catch(() => {});
+        creditAPI.endSpeechSession(
+          billingSessionRef.current.session_id,
+          'screen_unmount',
+          chatSessionIdRef.current,
+        ).catch(() => {});
         billingSessionRef.current = null;
       }
       setAvatarSpeech({ active: false, text: '', timeline: [], positionMs: 0, durationMs: 0, audioStarted: false });
@@ -1130,6 +1140,7 @@ export default function SpeechChatScreen({ navigation, route }) {
     const response = await chatAPI.createV2Session(birthData.id);
     const nextSessionId = response?.data?.session_id;
     if (nextSessionId) {
+      chatSessionIdRef.current = nextSessionId;
       setSessionId(nextSessionId);
       return nextSessionId;
     }
@@ -2361,6 +2372,18 @@ export default function SpeechChatScreen({ navigation, route }) {
         }
         : {}
     );
+    if (/\b(?:intraday|day[ -]?trad(?:e|ing)|trad(?:e|ing).*(?:today|session)|today.*trad(?:e|ing))\b/i.test(question)) {
+      const tradingPlace = await detectQuestionPlace() || await loadSavedQuestionPlace();
+      if (tradingPlace) {
+        await saveQuestionPlace(tradingPlace);
+        speechQueryContext.current_location = {
+          ...tradingPlace,
+          timezone_name: speechQueryContext.timezone_name,
+          timezone: speechQueryContext.timezone_name,
+        };
+        speechQueryContext.exchange = 'NSE';
+      }
+    }
     if (USE_SPEECH_WEBSOCKET) {
       try {
         return await askSpeechSocket(
@@ -2407,10 +2430,12 @@ export default function SpeechChatScreen({ navigation, route }) {
       const detailRaw = err?.response?.data?.detail;
       const detail = typeof detailRaw === 'string' ? detailRaw : JSON.stringify(detailRaw || '');
       if (status === 409 && /session_turn_limit/i.test(detail) && birthData?.id) {
+        chatSessionIdRef.current = null;
         setSessionId(null);
         const created = await chatAPI.createV2Session(birthData.id);
         const nextSid = created?.data?.session_id;
         if (!nextSid) throw err;
+        chatSessionIdRef.current = nextSid;
         setSessionId(nextSid);
         activeSessionId = nextSid;
         askResponse = await chatAPI.askV2(buildAskBody(activeSessionId));
@@ -2862,6 +2887,7 @@ export default function SpeechChatScreen({ navigation, route }) {
       activeTurnLanguageRef.current = returnedLanguage;
       setLanguage(returnedLanguage);
       setBirthData(selectedNative);
+      chatSessionIdRef.current = null;
       setSessionId(null);
       setTurns([]);
       setCurrentTranscript('');

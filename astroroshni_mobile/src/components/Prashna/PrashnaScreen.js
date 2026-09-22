@@ -35,7 +35,7 @@ const tone = (result, colors) => ({
 // Keep the customer-facing error stable and localized.
 const apiError = (_error, fallback) => fallback;
 
-export default function PrashnaScreen({ navigation }) {
+export default function PrashnaScreen({ navigation, route }) {
   const { t, i18n } = useTranslation();
   const { colors } = useTheme();
   const { credits, pricing, pricingOriginal, fetchBalance, fetchPricing } = useCredits();
@@ -84,6 +84,31 @@ export default function PrashnaScreen({ navigation }) {
     })();
     return () => { active = false; };
   }, [t]);
+
+  useEffect(() => {
+    const readingId = Number(route?.params?.readingId);
+    if (!Number.isInteger(readingId) || readingId < 1) return undefined;
+    let active = true;
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const response = await prashnaAPI.getReading(readingId);
+        const data = response?.data || response;
+        if (!active) return;
+        if (['favorable', 'unfavorable', 'mixed', 'cannot_judge'].includes(data?.verdict?.result)) {
+          setResult(data);
+        } else {
+          setError(t('prashna.screen.calculationError'));
+        }
+      } catch (err) {
+        if (active) setError(apiError(err, t('prashna.screen.calculationError')));
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [route?.params?.readingId, t]);
 
   const localizedTopics = useMemo(() => topics.map((item) => ({
     ...item,

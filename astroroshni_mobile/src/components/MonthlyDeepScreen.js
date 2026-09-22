@@ -207,7 +207,10 @@ export default function MonthlyDeepScreen() {
   const tryLoadCachedDeepMonth = useCallback(async () => {
     try {
       const bd = await getBirthDetails();
-      const birthChartId = resolveBirthChartId(bd);
+      const creditedChartId = Number(route.params?.birthChartId);
+      const birthChartId = Number.isFinite(creditedChartId) && creditedChartId > 0
+        ? creditedChartId
+        : resolveBirthChartId(bd);
       if (!birthChartId || year == null || month == null) return false;
       const res = await chatAPI.getCachedMonthlyEvents({
         ...bd,
@@ -240,7 +243,7 @@ export default function MonthlyDeepScreen() {
       console.warn('[MonthlyDeepScreen] cache recovery', e?.message || e);
     }
     return false;
-  }, [clearPendingDeepMonthJob, year, month, fetchBalance, getBirthDetails]);
+  }, [clearPendingDeepMonthJob, year, month, fetchBalance, getBirthDetails, route.params?.birthChartId]);
 
   const attachDeepMonthPolling = useCallback((jobId, startedAt = new Date().toISOString()) => {
     let outcomeHandled = false;

@@ -307,11 +307,17 @@ async def execute_career_analysis(
             "generated_at": datetime.now().isoformat(),
         }
 
+        from credits.transaction_receipt import analysis_usage_metadata
+
         if not credit_service.spend_credits(
             userid,
             career_cost,
             "career_analysis",
             f"Career analysis for {birth_data.get('name', 'user')}",
+            metadata=analysis_usage_metadata(
+                analysis="career",
+                birth_chart_id=getattr(request, "chart_id", None),
+            ),
         ):
             return {"ok": False, "error": "Credit deduction failed"}
 

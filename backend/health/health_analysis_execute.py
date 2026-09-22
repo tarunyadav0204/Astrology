@@ -334,11 +334,17 @@ async def execute_health_analysis(
             "generated_at": datetime.now().isoformat(),
         }
 
+        from credits.transaction_receipt import analysis_usage_metadata
+
         if not credit_service.spend_credits(
             userid,
             health_cost,
             "health_analysis",
             f"Health analysis for {birth_data.get('name', 'user')}",
+            metadata=analysis_usage_metadata(
+                analysis="health",
+                birth_chart_id=getattr(request, "chart_id", None),
+            ),
         ):
             return {"ok": False, "error": "Credit deduction failed"}
 

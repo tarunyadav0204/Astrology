@@ -114,6 +114,18 @@ export default function SupportScreen({ navigation }) {
     } catch (_) {}
   }, [route.params?.ticketId, navigation, openThread]);
 
+  useLayoutEffect(() => {
+    const draftSubject = route.params?.draftSubject;
+    const draftBody = route.params?.draftBody;
+    if (!draftSubject && !draftBody) return;
+    if (draftSubject) setSubject(String(draftSubject));
+    if (draftBody) setComposeBody(String(draftBody));
+    setView('compose');
+    try {
+      navigation.setParams({ draftSubject: undefined, draftBody: undefined });
+    } catch (_) {}
+  }, [route.params?.draftSubject, route.params?.draftBody, navigation]);
+
   const refreshThread = async () => {
     if (!activeId) return;
     try {

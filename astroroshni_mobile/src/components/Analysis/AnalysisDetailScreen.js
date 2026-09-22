@@ -29,6 +29,31 @@ import { useAuthGate } from '../../auth/AuthGateContext';
 import AnalysisCreditModal from './AnalysisCreditModal';
 import { useTranslation } from 'react-i18next';
 
+const SAVED_ANALYSIS_ENDPOINTS = {
+  career: '/career/check-cache',
+  wealth: '/wealth/check-cache',
+  health: '/health/get-analysis',
+  marriage: '/marriage/check-cache',
+  education: '/education/get-analysis',
+  progeny: '/progeny/check-cache',
+};
+
+function unwrapCachedAnalysis(json) {
+  if (!json || json.success === false || json.analysis === null) return null;
+  const payload = json.data && typeof json.data === 'object' ? json.data : json;
+  const candidate = payload.analysis && typeof payload.analysis === 'object' ? payload.analysis : payload;
+  const inner = candidate.analysis && (candidate.analysis.quick_answer || candidate.analysis.detailed_analysis)
+    ? candidate.analysis
+    : candidate;
+  if (!inner || typeof inner !== 'object') return null;
+  if (!inner.quick_answer && !inner.detailed_analysis && !inner.final_thoughts) return null;
+  return {
+    ...inner,
+    terms: payload.terms || candidate.terms || inner.terms || [],
+    glossary: payload.glossary || candidate.glossary || inner.glossary || {},
+  };
+}
+
 export default function AnalysisDetailScreen({ route, navigation }) {
   const { t, i18n } = useTranslation();
   const { analysisType, title, cost: costFromParams, originalCost: originalCostFromParams } = route.params;
@@ -59,6 +84,9 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const lastTrackedResultRef = useRef(null);
   const loadingLoopsRef = useRef([]);
   const mountedRef = useRef(true);
+  const savedFetchRef = useRef(false);
+  const openSaved = route.params?.openSaved === true;
+  const linkedChartId = Number(route.params?.birthChartId) > 0 ? Number(route.params.birthChartId) : null;
   const localizedAnalysisTitle = t(`home.analysis.${analysisType}.title`, title);
   const displayTitle = localizedAnalysisTitle;
   const uiText = {
@@ -150,6 +178,17 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     pulseLoop.start();
     glowLoop.start();
   };
+
+  useEffect(() => {
+    const focus = route.params?.analysisFocus;
+    if (focus === 'first_child' || focus === 'next_child' || focus === 'parenting') {
+      setAnalysisFocus(focus);
+    }
+    const count = Number(route.params?.childrenCount);
+    if (Number.isInteger(count) && count >= 0 && count <= 20) {
+      setChildrenCount(count);
+    }
+  }, []);
 
   useEffect(() => {
     checkBirthData();
@@ -911,20 +950,92 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     });
   };
 
+  const loadServerCachedAnalysis = async (chartId) => {
+    const endpoint = SAVED_ANALYSIS_ENDPOINTS[analysisType];
+    if (!endpoint || !birthData?.date || !birthData?.time || !birthData?.place) return;
+    const fixedBirthData = { ...birthData };
+    if (fixedBirthData.date && String(fixedBirthData.date).includes('T')) {
+      fixedBirthData.date = String(fixedBirthData.date).split('T')[0];
+    }
+    if (fixedBirthData.time && String(fixedBirthData.time).includes('T')) {
+      const timeDate = new Date(fixedBirthData.time);
+      fixedBirthData.time = timeDate.toTimeString().slice(0, 5);
+    }
+    const focus = route.params?.analysisFocus || analysisFocus;
+    const count = Number.isInteger(Number(route.params?.childrenCount))
+      ? Number(route.params.childrenCount)
+      : childrenCount;
+    const body = analysisType === 'wealth'
+      ? {
+          chart_id: chartId,
+          birth_date: fixedBirthData.date,
+          birth_time: fixedBirthData.time,
+          birth_place: fixedBirthData.place,
+          latitude: fixedBirthData.latitude,
+          longitude: fixedBirthData.longitude,
+          timezone: fixedBirthData.timezone,
+          language: i18n.resolvedLanguage || i18n.language || 'english',
+        }
+      : {
+          chart_id: chartId,
+          name: fixedBirthData.name,
+          date: fixedBirthData.date,
+          time: fixedBirthData.time,
+          place: fixedBirthData.place,
+          latitude: fixedBirthData.latitude,
+          longitude: fixedBirthData.longitude,
+          timezone: fixedBirthData.timezone,
+          gender: fixedBirthData.gender || 'unknown',
+          language: i18n.resolvedLanguage || i18n.language || 'english',
+          ...(analysisType === 'progeny' && {
+            analysis_focus: focus || 'first_child',
+            children_count: count,
+          }),
+        };
+    setLoading(true);
+    startLoadingAnimations();
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}${getEndpoint(endpoint)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok || !mountedRef.current) return;
+      const json = await response.json();
+      const normalized = unwrapCachedAnalysis(json);
+      if (!normalized || !mountedRef.current) return;
+      setAnalysisResult(normalized);
+      await AsyncStorage.setItem(`analysis_${analysisType}_id_${chartId}`, JSON.stringify(normalized));
+    } catch (error) {
+      console.error('Saved analysis lookup failed:', error);
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+        stopLoadingAnimations();
+      }
+    }
+  };
+
   const loadStoredAnalysis = async () => {
     try {
       if (!birthData?.name) {
         return;
       }
-      const idKey = birthData?.id != null ? `analysis_${analysisType}_id_${birthData.id}` : null;
-      const legacyKey = `analysis_${analysisType}_${birthData.name}`;
+      const chartId = linkedChartId || birthData?.id;
+      const idKey = chartId != null ? `analysis_${analysisType}_id_${chartId}` : null;
+      const sameChart = !linkedChartId || Number(birthData?.id) === linkedChartId;
+      const legacyKey = sameChart ? `analysis_${analysisType}_${birthData.name}` : null;
 
       // Prefer id-based key (stable per chart), but migrate legacy name-based key if found.
       let stored = null;
       if (idKey) {
         stored = await AsyncStorage.getItem(idKey);
       }
-      if (!stored) {
+      if (!stored && legacyKey) {
         stored = await AsyncStorage.getItem(legacyKey);
         if (stored && idKey) {
           // Migrate legacy cache to id-based key for future lookups.
@@ -935,7 +1046,11 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       if (stored) {
         const parsedData = JSON.parse(stored);
         setAnalysisResult(parsedData);
-      } else {
+        return;
+      }
+      if (openSaved && linkedChartId && !savedFetchRef.current) {
+        savedFetchRef.current = true;
+        await loadServerCachedAnalysis(linkedChartId);
       }
     } catch (error) {
 

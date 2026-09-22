@@ -428,11 +428,19 @@ async def execute_progeny_analysis(
             "generated_at": datetime.now().isoformat(),
         }
 
+        from credits.transaction_receipt import analysis_usage_metadata
+
         if not credit_service.spend_credits(
             userid,
             analysis_cost,
             "progeny_analysis",
             f"Progeny for {request.name or 'User'}",
+            metadata=analysis_usage_metadata(
+                analysis="progeny",
+                birth_chart_id=getattr(request, "chart_id", None),
+                analysis_focus=getattr(request, "analysis_focus", None),
+                children_count=getattr(request, "children_count", None),
+            ),
         ):
             return {"ok": False, "error": "Credit deduction failed"}
 

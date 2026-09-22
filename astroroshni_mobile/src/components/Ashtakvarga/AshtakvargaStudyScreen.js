@@ -85,14 +85,25 @@ function displayStudyDate(value, language, savedLabel) {
   return date.toLocaleDateString(DATE_LOCALES[language] || 'en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-async function requestStudy(birth, forceRegenerate = false, translate = null) {
+async function requestStudy(birth, forceRegenerate = false, translate = null, exactBirth = false) {
   const tr = (key, fallback) => translate ? translate(key, fallback) : fallback;
   const token = await AsyncStorage.getItem('authToken');
+  const birthData = exactBirth
+    ? {
+        name: birth?.name || 'User',
+        date: birth?.date,
+        time: birth?.time,
+        latitude: Number(birth?.latitude),
+        longitude: Number(birth?.longitude),
+        place: birth?.place || '',
+        gender: birth?.gender || '',
+      }
+    : birthPayload(birth);
   const response = await fetch(`${API_BASE_URL}${getEndpoint('/ashtakavarga/life-predictions')}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      birth_data: birthPayload(birth),
+      birth_data: birthData,
       cache_probe: !forceRegenerate,
       force_regenerate: forceRegenerate,
     }),
@@ -203,7 +214,12 @@ export default function AshtakvargaStudyScreen({ navigation, route }) {
       const selectedBirth = birth || await storage.getBirthDetails();
       if (!selectedBirth) throw new Error(t('ashtakavargaStudy.errors.selectNative'));
       setBirth(selectedBirth);
-      const result = await requestStudy(selectedBirth, false, (key, fallback) => t(key, { defaultValue: fallback }));
+      const result = await requestStudy(
+        selectedBirth,
+        false,
+        (key, fallback) => t(key, { defaultValue: fallback }),
+        route.params?.exactBirth === true,
+      );
       if (!result?.cached || !result?.predictions) {
         throw new Error(t('ashtakavargaStudy.errors.noSaved'));
       }

@@ -1990,8 +1990,17 @@ const CreditScreen = ({ navigation, route }) => {
   const promoInputBg = colors.surfaceMuted;
   const backButtonBg = colors.surfaceMuted;
 
+  const isCreditPurchase = (item) => (
+    item?.type === 'earned' && (item?.source === 'google_play' || item?.source === 'razorpay')
+  );
+
   const renderTransaction = ({ item }) => (
-    <View style={styles.transactionItem}>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => navigation.navigate('CreditTransactionDetail', { transaction: item })}
+      style={styles.transactionItem}
+      accessibilityRole="button"
+    >
       <View style={styles.transactionIcon}>
         <Ionicons
           name={item.type === 'earned' ? 'add-circle' : 'remove-circle'}
@@ -2026,7 +2035,19 @@ const CreditScreen = ({ navigation, route }) => {
           </Text>
         </View>
       </View>
-    </View>
+      {isCreditPurchase(item) ? (
+        <TouchableOpacity
+          onPress={() => navigation.navigate('CreditInvoice', { transactionId: item.id })}
+          accessibilityRole="button"
+          accessibilityLabel={t('credits.page.transactionDetail.viewInvoice')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={styles.transactionInvoice}
+        >
+          <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+        </TouchableOpacity>
+      ) : null}
+      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={styles.transactionChevron} />
+    </TouchableOpacity>
   );
 
   return (
@@ -3433,6 +3454,16 @@ const styles = StyleSheet.create({
   },
   transactionIcon: {
     marginRight: 16,
+  },
+  transactionChevron: {
+    marginLeft: 8,
+  },
+  transactionInvoice: {
+    marginLeft: 8,
+    minWidth: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   transactionDetails: {
     flex: 1,

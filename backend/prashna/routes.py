@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from auth import User, get_current_user
 from credits.credit_service import CreditService
+from credits.transaction_receipt import prashna_usage_metadata
+from db import execute, get_conn
 from prashna.question_interpreter import public_topics, resolve_guided_question
 from prashna.service import analyze_prashna
 
@@ -16,6 +18,70 @@ from prashna.service import analyze_prashna
 router = APIRouter(prefix="/prashna", tags=["prashna"])
 credit_service = CreditService()
 PRASHNA_COST_SETTING = "prashna_analysis_cost"
+_prashna_readings_ready = False
+
+
+def _ensure_prashna_readings() -> None:
+    global _prashna_readings_ready
+    if _prashna_readings_ready:
+        return
+    with get_conn() as conn:
+        execute(
+            conn,
+            """
+            CREATE TABLE IF NOT EXISTS prashna_readings (
+                id SERIAL PRIMARY KEY,
+                userid INTEGER NOT NULL,
+                question_id TEXT NOT NULL,
+                result_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        conn.commit()
+    _prashna_readings_ready = True
+
+
+def _save_prashna_reading(userid: int, question_id: str, result: dict) -> int:
+    _ensure_prashna_readings()
+    import json
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            INSERT INTO prashna_readings (userid, question_id, result_json)
+            VALUES (?, ?, ?)
+            RETURNING id
+            """,
+            (userid, question_id, json.dumps(result)),
+        )
+        row = cur.fetchone()
+        conn.commit()
+    if not row or row[0] is None:
+        raise RuntimeError("Prashna reading was not saved")
+    return int(row[0])
+
+
+def _load_prashna_reading(userid: int, reading_id: int):
+    _ensure_prashna_readings()
+    import json
+
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """
+            SELECT result_json
+            FROM prashna_readings
+            WHERE id = ? AND userid = ?
+            """,
+            (reading_id, userid),
+        )
+        row = cur.fetchone()
+    if not row or not row[0]:
+        return None
+    stored = row[0]
+    return json.loads(stored) if isinstance(stored, str) else stored
 
 
 class AnalyzeRequest(BaseModel):
@@ -39,6 +105,17 @@ class AnalyzeRequest(BaseModel):
 @router.get("/topics")
 def topics_route():
     return {"topics": public_topics()}
+
+
+@router.get("/readings/{reading_id}")
+def reading_route(reading_id: int, current_user: User = Depends(get_current_user)):
+    """Return one saved Prashna casting for this user. Does not charge credits."""
+    if reading_id < 1:
+        raise HTTPException(status_code=404, detail="Prashna reading not found")
+    stored = _load_prashna_reading(current_user.userid, reading_id)
+    if not stored:
+        raise HTTPException(status_code=404, detail="Prashna reading not found")
+    return stored
 
 
 @router.post("/analyze")
@@ -65,8 +142,14 @@ def analyze_route(request: AnalyzeRequest, current_user: User = Depends(get_curr
         result = analyze_prashna(question_id=request.question_id, date=request.date, time=request.time,
             latitude=request.latitude, longitude=request.longitude,
             timezone=request.timezone, place=request.place, name=request.name)
-        if not credit_service.spend_credits(current_user.userid, cost, "prashna_analysis",
-                                             f"Classical Prashna: {request.question_id}"):
+        reading_id = _save_prashna_reading(current_user.userid, request.question_id, result)
+        if not credit_service.spend_credits(
+            current_user.userid,
+            cost,
+            "prashna_analysis",
+            f"Classical Prashna: {request.question_id}",
+            metadata=prashna_usage_metadata(reading_id),
+        ):
             raise HTTPException(status_code=402,
                 detail="The Prashna chart was not charged because your available credits changed. Refresh your balance and try again.")
         result["billing"] = {"feature": "prashna", "credits_spent": cost,

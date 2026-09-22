@@ -4829,10 +4829,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         analysis_type = "Talk To Tara" if is_speech_chat else "Instant Chat"
                     else:
                         analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
+                    from credits.transaction_receipt import chat_usage_metadata
+
                     credit_service.record_zero_cost_feature_usage(
                         user_id,
                         "chat_question",
                         f"{analysis_type} (Free): {question[:50]}...",
+                        metadata=chat_usage_metadata(session_id, message_id),
                     )
                     try:
                         # Resolve the offer against the entry-level active
@@ -4873,11 +4876,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     else:
                         analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
                         spend_feature = "chat_question"
+                    from credits.transaction_receipt import chat_usage_metadata
+
                     success = credit_service.spend_credits(
                         user_id,
                         amount_to_deduct,
                         spend_feature,
-                        f"{analysis_type}: {question[:50]}..."
+                        f"{analysis_type}: {question[:50]}...",
+                        metadata=chat_usage_metadata(session_id, message_id),
                     )
                     if success:
                         logger.info("credits deducted amount=%s user_id=%s message_id=%s", amount_to_deduct, user_id, message_id)

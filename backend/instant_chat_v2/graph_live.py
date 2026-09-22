@@ -1311,30 +1311,31 @@ def apply_live_graph_policy(
             wealth_answer_rules["intraday_trading_session"] = session
             wealth_answer_rules["required_answer_order"] = [
                 "sit-out, reduce-size or participate verdict for the requested session day",
-                "brief natal speculation permission from D1, D2 and D5; do not write a lifetime investment essay",
-                "day climate from Tara, Chandra, SAV and supplied lunar risk flags",
-                "usable versus caution windows inside 09:15-15:30 only",
+                "Vimshottari MD/AD/PD period permission, then today's Tara, Chandra, gochara, Ashtakavarga and Panchanga climate",
+                "usable versus caution Muhurta segments inside the verified market session",
                 "one practical risk (overtrading, stops, calculation error) and the non-market-forecast disclaimer",
+                "at most one plain sentence about natal D1/D2 capacity; never use D5, Indu Lagna or KP on this route",
             ]
             wealth_answer_rules["forbidden_moves"].extend([
                 "Do not predict whether Nifty, a sector, option or named security will rise or fall.",
                 "Do not recommend a ticker, strike, leverage level or guaranteed P&L.",
-                "Do not treat a Labha/Shubha/Amrita hora as a buy signal; it is only a lower-friction entry window.",
+                "Do not treat Choghadiya alone as an entry signal; every window must also contain Hora, Muhurta ascendant, house-lord, active-dasha and Panchanga evidence.",
                 "Do not answer a lifetime investing-versus-trading suitability question on this route.",
                 "Do not use windows outside 09:15-15:30 or invent times when windows are empty.",
                 "If participation is sit_out or the market is closed, do not still advise new entries.",
             ])
             compact_policy["instruction"] = (
                 "Answer only the requested trading session. Lead with sit-out versus participate from "
-                "intraday_trading_session.participation, then natal permission, then day climate, then "
-                "market-hour windows. This is the native's judgment climate, not a market call."
+                "intraday_trading_session.participation, explain period permission and today's changing evidence, "
+                "then give the calculated market-hour Muhurta windows. Natal charts are background capacity only, "
+                "not today's trigger. This is the native's judgment climate, not a market call."
             )
             session_windows = [
                 {
                     "start": row.get("start"),
                     "end": row.get("end"),
-                    "label": row.get("name"),
-                    "quality": row.get("quality"),
+                    "label": f"{row.get('hora_lord') or ''} Hora / {row.get('choghadiya') or ''}".strip(" /"),
+                    "quality": row.get("verdict"),
                 }
                 for row in list(session.get("entry_windows") or [])
                 if isinstance(row, Mapping)
@@ -2079,6 +2080,169 @@ def enforce_live_graph_answer(
         return "A birth chart cannot guarantee that a trip will be safe or replace official travel, weather, health or security guidance. Use current advisories and practical precautions; I can discuss only non-safety travel themes."
     if foreign_boundary == "foreign_other_person_handoff":
         return "Your chart cannot reliably determine another adult's travel, residence or settlement outcome. That question needs their own birth chart and consent; this reading can only discuss how their move may affect your experience."
+    wealth_rules = (
+        policy.get("wealth_answer_rules")
+        if isinstance(policy.get("wealth_answer_rules"), Mapping)
+        else {}
+    )
+    if str(wealth_rules.get("runtime_key") or "") == "intraday_trading":
+        session = (
+            wealth_rules.get("intraday_trading_session")
+            if isinstance(wealth_rules.get("intraday_trading_session"), Mapping)
+            else {}
+        )
+        if session:
+            participation = str(session.get("participation") or "cautious")
+            market_open = bool(session.get("market_open"))
+            windows = [
+                row for row in list(session.get("windows") or [])
+                if isinstance(row, Mapping) and row.get("start") and row.get("end")
+            ]
+
+            # Session times are calculated facts. The composer may explain the
+            # verdict, but it must not omit, rename, or invent a Choghadiya
+            # period. Remove its timing prose and render the ledger verbatim.
+            timing_names = {
+                "amrita", "kala", "labha", "roga", "shubha", "udvega", "chara",
+            }
+            timing_name_pattern = re.compile(
+                r"\b(?:" + "|".join(sorted(timing_names)) + r")\b",
+                re.IGNORECASE,
+            )
+            clock_pattern = re.compile(
+                r"\b(?:[01]?\d|2[0-3]):[0-5]\d(?:\s*[AaPp]\.?[Mm]\.?)?\b"
+            )
+            retained_sentences = []
+            for sentence in re.split(r"(?<=[.!?])\s+|\n+", clean_answer):
+                sentence = sentence.strip()
+                if not sentence:
+                    continue
+                if timing_name_pattern.search(sentence) or clock_pattern.search(sentence):
+                    continue
+                if re.search(
+                    r"\b(?:D1|D2|D5|Hora|Panchamsha|Indu Lagna|natal chart|birth chart)\b",
+                    sentence,
+                    re.IGNORECASE,
+                ):
+                    continue
+                if re.search(
+                    r"\b(?:Sun|Mars|Mercury|Jupiter|Venus|Saturn|Rahu|Ketu)\b",
+                    sentence,
+                    re.IGNORECASE,
+                ):
+                    continue
+                if re.search(
+                    r"\b(?:this combination|these placements|this alignment)\b",
+                    sentence,
+                    re.IGNORECASE,
+                ):
+                    continue
+                if re.search(r"\bmateriali[sz]ation\b", sentence, re.IGNORECASE):
+                    continue
+                # KP availability is not a positive intraday materialization
+                # verdict. Do not let the writer turn it into one.
+                if re.search(r"\bKP\b", sentence, re.IGNORECASE) and re.search(
+                    r"\b(?:strong|support(?:ive|ed)?|materiali[sz]ation)\b",
+                    sentence,
+                    re.IGNORECASE,
+                ):
+                    continue
+                retained_sentences.append(sentence)
+            practical_sentences = [
+                sentence for sentence in retained_sentences
+                if sentence.endswith("?")
+                or re.search(
+                    r"\b(?:risk|disciplin|overtrad|stop(?:-loss)?|capital|profit|loss|plan|"
+                    r"impuls|restraint|precision|position size)\w*\b",
+                    sentence,
+                    re.IGNORECASE,
+                )
+            ]
+            question_sentence = next(
+                (sentence for sentence in reversed(practical_sentences) if sentence.endswith("?")),
+                "",
+            )
+            explanation_rows = [
+                sentence for sentence in practical_sentences if not sentence.endswith("?")
+            ][:2]
+            if question_sentence:
+                explanation_rows.append(question_sentence)
+            explanation = " ".join(explanation_rows).strip()
+
+            if not bool(session.get("available", True)):
+                error = session.get("calculation_error") if isinstance(session.get("calculation_error"), Mapping) else {}
+                reason = session.get("reason") or error.get("message") or "The required session evidence could not be calculated."
+                return (
+                    "**Today's session indication: Calculation unavailable**\n\n"
+                    f"{reason} No trading indication or time window has been inferred."
+                )
+            if not market_open:
+                return (
+                    "**Today's session indication: Market closed**\n\n"
+                    f"{((session.get('market') or {}).get('reason') if isinstance(session.get('market'), Mapping) else '') or 'The configured cash-market session is closed on this date.'} "
+                    "No intraday entry windows are provided."
+                )
+
+            decision = {
+                "sit_out": "Sit out",
+                "reduce_size": "Use reduced position size",
+                "participate": "Participation is permitted with normal risk controls",
+                "cautious": "Proceed cautiously",
+            }.get(participation, "Proceed cautiously")
+            lines = [
+                f"**Today's session indication: {decision}**",
+                "",
+                "**Why today's result**",
+            ]
+            period = session.get("period_permission") if isinstance(session.get("period_permission"), Mapping) else {}
+            daily = session.get("daily_climate") if isinstance(session.get("daily_climate"), Mapping) else {}
+            active = [row for row in list(period.get("active_periods") or []) if isinstance(row, Mapping)]
+            if active:
+                lines.append(
+                    f"- Period permission is **{period.get('status', 'mixed')}**: "
+                    + " / ".join(str(row.get("planet")) for row in active)
+                    + f" activate houses {', '.join(str(x) for x in period.get('activated_houses') or [])}."
+                )
+            tara = daily.get("tara_bala") if isinstance(daily.get("tara_bala"), Mapping) else {}
+            chandra = daily.get("chandra_bala") if isinstance(daily.get("chandra_bala"), Mapping) else {}
+            if not tara and isinstance(session.get("tara_bala"), Mapping):
+                tara = session.get("tara_bala")
+            if not chandra and isinstance(session.get("chandra_bala"), Mapping):
+                chandra = session.get("chandra_bala")
+            if tara:
+                if daily:
+                    lines.append(f"- Today's Tara is {tara.get('name')}; the Moon is {chandra.get('house_from_natal_moon')} from your natal Moon.")
+                else:
+                    tara_quality = str(tara.get("quality") or "mixed").lower()
+                    tara_plain = "supportive" if tara_quality in {"good", "excellent"} else "challenging" if tara_quality in {"danger", "obstacle", "critical"} else "mixed"
+                    lines.append(f"- Today's lunar-star relationship is {tara_plain} ({tara.get('name') or 'Tara Bala'} Tara).")
+            for row in list(daily.get("supports") or [])[:3]:
+                if isinstance(row, Mapping): lines.append(f"- Support: {row.get('reason')}")
+            for row in list(daily.get("obstructions") or [])[:4]:
+                if isinstance(row, Mapping): lines.append(f"- Caution: {row.get('reason')}")
+            lines.extend([
+                "- D1 and D2 set the background capacity; they do not decide today's signal.",
+                "",
+                "**Calculated market-hour Muhurta windows**",
+            ])
+            for row in windows:
+                window_verdict = row.get("verdict")
+                if not window_verdict:
+                    legacy_quality = str(row.get("quality") or "").lower()
+                    window_verdict = "supportive" if legacy_quality.startswith("good") else ("avoid" if legacy_quality.startswith("bad") else "neutral")
+                choghadiya_name = row.get("choghadiya") or row.get("name") or "Unknown"
+                lines.append(
+                    f"- {row.get('start')}–{row.get('end')} — **{window_verdict}** · "
+                    f"{row.get('hora_lord') or 'Unknown'} Hora · {choghadiya_name} Choghadiya · "
+                    f"Ascendant sign {int(row.get('ascendant_sign', 0)) + 1}"
+                )
+            lines.extend([
+                "",
+                "Each window combines planetary Hora, Choghadiya, the changing ascendant, 2nd/5th/11th house lords, active dasha lords and Panchanga. It describes your execution climate, not market direction.",
+            ])
+            if explanation:
+                lines.extend(["", explanation])
+            clean_answer = "\n".join(lines)
     nakshatra_rules = (
         policy.get("nakshatra_answer_rules")
         if isinstance(policy.get("nakshatra_answer_rules"), Mapping) else {}

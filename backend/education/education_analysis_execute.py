@@ -211,11 +211,17 @@ async def execute_education_analysis(
             "generated_at": datetime.now().isoformat(),
         }
 
+        from credits.transaction_receipt import analysis_usage_metadata
+
         if not credit_service.spend_credits(
             userid,
             education_cost,
             "education_analysis",
             f"Education analysis for {birth_data.get('name', 'user')}",
+            metadata=analysis_usage_metadata(
+                analysis="education",
+                birth_chart_id=getattr(request, "chart_id", None),
+            ),
         ):
             return {"ok": False, "error": "Credit deduction failed"}
 

@@ -1423,6 +1423,10 @@ def test_intraday_trading_session_evidence_is_calculated_for_a_weekday() -> None
         birth_data=birth,
         target_date="2026-09-22",
         natal_qualified=True,
+        current_location={
+            "latitude": 28.4595, "longitude": 77.0266,
+            "timezone": "Asia/Kolkata", "name": "Gurugram",
+        },
     )
     assert session["available"] is True
     assert session["market_open"] is True
@@ -1446,6 +1450,86 @@ def test_intraday_trading_session_evidence_is_calculated_for_a_weekday() -> None
     assert policy["runtime_key"] == "intraday_trading"
     assert policy.get("missing_required_factors") == []
     assert packet["verdict"]["direction"] == session["participation"]
+
+
+def test_intraday_daily_signal_is_not_downgraded_by_static_natal_qualification() -> None:
+    from instant_chat_v2.intraday_trading_evidence import _participation
+
+    assert _participation(signal="GREEN", natal_qualified=True, market_open=True) == "participate"
+    assert _participation(signal="YELLOW", natal_qualified=False, market_open=True) == "reduce_size"
+    assert _participation(signal="ORANGE", natal_qualified=False, market_open=True) == "sit_out"
+
+
+def test_intraday_answer_renders_calculated_times_and_removes_invented_periods() -> None:
+    session = {
+        "market_open": True,
+        "participation": "reduce_size",
+        "tara_bala": {"name": "Mitra", "quality": "Good", "score": 75},
+        "chandra_bala": {"quality": "Average", "transit_house_from_natal": 4, "score": 50},
+        "ashtakavarga": {"points": 28, "score": 50},
+        "risk_factors": [],
+        "windows": [
+            {"start": "09:15", "end": "09:17", "name": "Labha", "quality": "Good"},
+            {"start": "09:17", "end": "10:48", "name": "Shubha", "quality": "Good"},
+            {"start": "10:48", "end": "12:19", "name": "Chara", "quality": "Neutral (Good for momentum)"},
+            {"start": "12:19", "end": "13:50", "name": "Kala", "quality": "Bad"},
+            {"start": "13:50", "end": "15:21", "name": "Udvega", "quality": "Bad"},
+            {"start": "15:21", "end": "15:30", "name": "Amrita", "quality": "Good"},
+        ],
+    }
+    packet = {
+        "answer_spec": {
+            "knowledge_graph_policy": {
+                "wealth_answer_rules": {
+                    "runtime_key": "intraday_trading",
+                    "intraday_trading_session": session,
+                }
+            }
+        }
+    }
+    generated = (
+        "Use Labha, Shubha or Amrita and avoid Udvega or Roga. "
+        "There is strong KP materialization support today. "
+        "Your D2 Hora and Indu Lagna are the main reason for today's result. "
+        "Sun and Mars anchor today's energy. Protect profits and avoid overtrading."
+    )
+
+    answer = enforce_live_graph_answer(generated, packet)
+
+    assert "Use reduced position size" in answer
+    for value in ("09:15", "09:17", "10:48", "12:19", "13:50", "15:21", "15:30"):
+        assert value in answer
+    for value in ("Labha", "Shubha", "Chara", "Kala", "Udvega", "Amrita"):
+        assert value in answer
+    assert "Roga" not in answer
+    assert "strong KP materialization" not in answer
+    assert "D2 Hora" not in answer
+    assert "Sun and Mars" not in answer
+    assert "lunar-star relationship is supportive (Mitra Tara)" in answer
+    assert "do not decide today's signal" in answer
+    assert "Protect profits and avoid overtrading" in answer
+
+
+def test_intraday_answer_closes_session_without_inventing_windows() -> None:
+    packet = {
+        "answer_spec": {
+            "knowledge_graph_policy": {
+                "wealth_answer_rules": {
+                    "runtime_key": "intraday_trading",
+                    "intraday_trading_session": {
+                        "market_open": False,
+                        "participation": "sit_out",
+                        "windows": [],
+                    },
+                }
+            }
+        }
+    }
+
+    answer = enforce_live_graph_answer("Trade during Labha at 09:30.", packet)
+
+    assert "Market closed" in answer
+    assert "09:30" not in answer
 
 
 def test_wealth_routing_guard_only_rewrites_intraday_trading_subtype() -> None:

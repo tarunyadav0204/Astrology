@@ -1868,11 +1868,23 @@ async def process_event_timeline(
             llm_cache_setup_input_tokens = int(usage_totals.get("cache_setup_input_tokens") or 0)
             llm_total_tokens = int(usage_totals.get("total_tokens") or 0)
             # Deduct credits
+            from credits.transaction_receipt import event_timeline_usage_metadata
+
+            if target_month is not None:
+                timeline_description = f"Monthly deep dive for {target_year}-{int(target_month):02d}"
+            else:
+                timeline_description = f"Cosmic Timeline Analysis for {target_year}"
             success = credit_service.spend_credits(
-                user_id, 
-                cost, 
-                'event_timeline', 
-                f"Cosmic Timeline Analysis for {target_year}"
+                user_id,
+                cost,
+                'event_timeline',
+                timeline_description,
+                metadata=event_timeline_usage_metadata(
+                    job_id=job_id,
+                    year=target_year,
+                    month=target_month,
+                    birth_chart_id=birth_chart_id,
+                ),
             )
             
             if not success:

@@ -26,7 +26,7 @@ import { goBackOrHome } from '../../navigation/navHelpers';
 import FocusedStatusBar from '../Common/FocusedStatusBar';
 import { sharePodcastBlobOnWeb } from '../../utils/sharePodcastWeb';
 
-export default function PodcastHistoryScreen({ navigation }) {
+export default function PodcastHistoryScreen({ navigation, route }) {
   useAnalytics('PodcastHistoryScreen');
   const { t, i18n } = useTranslation();
   const { colors } = useTheme();
@@ -46,6 +46,7 @@ export default function PodcastHistoryScreen({ navigation }) {
   const [visualLoading, setVisualLoading] = useState(false);
   const [visualError, setVisualError] = useState('');
   const visualRequestKeyRef = useRef('');
+  const openedPodcastKeyRef = useRef('');
 
   const loadHistory = useCallback(async () => {
     try {
@@ -107,6 +108,27 @@ export default function PodcastHistoryScreen({ navigation }) {
       onError: () => { stopPlaying(); Alert.alert(t('historyUi.common.error'), t('historyUi.podcast.playError')); },
     });
   };
+
+  useEffect(() => {
+    if (loading) return;
+    const messageId = String(route?.params?.openMessageId || '').trim();
+    if (!messageId) return;
+    const lang = String(route?.params?.openLang || 'en').toLowerCase().startsWith('hi') ? 'hi' : 'en';
+    const key = `${messageId}:${lang}`;
+    if (openedPodcastKeyRef.current === key) return;
+    openedPodcastKeyRef.current = key;
+    const match = list.find((item) => {
+      const itemLang = String(item?.lang || 'en').toLowerCase().startsWith('hi') ? 'hi' : 'en';
+      return String(item?.message_id) === messageId && itemLang === lang;
+    });
+    playFromStream(match || {
+      message_id: messageId,
+      lang,
+      session_id: route?.params?.openSessionId || null,
+      birth_chart_id: route?.params?.openBirthChartId || null,
+      preview: null,
+    });
+  }, [loading, list, route?.params?.openMessageId, route?.params?.openLang, route?.params?.openSessionId, route?.params?.openBirthChartId]);
 
   const handleViewModeChange = async (nextMode) => {
     const mode = nextMode === 'watch' ? 'watch' : 'listen';

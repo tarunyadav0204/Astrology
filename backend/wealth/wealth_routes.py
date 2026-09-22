@@ -498,6 +498,7 @@ async def check_cached_insights(request: BirthDetailsRequest, current_user: User
         # Create birth data object
         from types import SimpleNamespace
         birth_data = SimpleNamespace(
+            chart_id=request.chart_id,
             date=request.birth_date,
             time=request.birth_time,
             place=request.birth_place,

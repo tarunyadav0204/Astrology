@@ -122,6 +122,18 @@ def _ensure_speech_billing_table(conn) -> None:
         "ALTER TABLE speech_billing_sessions ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
         (),
     )
+    execute(
+        conn,
+        "ALTER TABLE speech_billing_sessions ADD COLUMN IF NOT EXISTS chat_session_id TEXT",
+        (),
+    )
+
+
+def _speech_chat_session_id(value) -> str:
+    from credits.transaction_receipt import speech_session_link
+
+    link = speech_session_link(value)
+    return link["session_id"] if link else ""
 
 
 def _speech_minutes_from_seconds(seconds: int) -> int:
@@ -160,15 +172,22 @@ def _speech_billing_metadata(
     seconds: int,
     per_minute_cost: int,
     reason: str,
+    chat_session_id: str = None,
 ) -> str:
-    return json.dumps({
+    payload = {
         "billing_type": "speech",
         "speech_billing_session_id": str(session_id),
         "billed_started_minutes": int(minutes),
         "elapsed_seconds": int(seconds),
         "per_minute_cost": int(per_minute_cost),
         "ended_reason": str(reason),
-    })
+    }
+    from credits.transaction_receipt import speech_session_link
+
+    link = speech_session_link(chat_session_id)
+    if link:
+        payload["feature_link"] = link
+    return json.dumps(payload)
 
 
 def _iso_utc_now() -> str:
@@ -204,7 +223,14 @@ def _settle_stale_speech_session_locked(conn, row, *, reason: str = "connection_
                 -charge,
                 new_balance,
                 _speech_billing_description(minutes, elapsed_seconds, per_minute_cost, reason),
-                _speech_billing_metadata(session_id, minutes, elapsed_seconds, per_minute_cost, reason),
+                _speech_billing_metadata(
+                    session_id,
+                    minutes,
+                    elapsed_seconds,
+                    per_minute_cost,
+                    reason,
+                    chat_session_id=row[10] if len(row) > 10 else None,
+                ),
             ),
         )
     execute(
@@ -2447,6 +2473,16 @@ async def get_credit_history(current_user: User = Depends(get_current_user)):
     transactions = credit_service.get_transaction_history(current_user.userid)
     return {"transactions": transactions}
 
+@router.get("/invoices/{transaction_id}")
+async def get_purchase_invoice(transaction_id: int, current_user: User = Depends(get_current_user)):
+    """Saved invoice for a completed credit purchase. Creates one for an older purchase that has none."""
+    from credits.invoice_service import InvoiceUnavailable, ensure_purchase_invoice
+
+    try:
+        return ensure_purchase_invoice(current_user.userid, transaction_id)
+    except InvoiceUnavailable:
+        raise HTTPException(status_code=404, detail="Invoice is not available for this transaction")
+
 @router.post("/redeem")
 async def redeem_promo_code(request: PromoCodeRequest, current_user: User = Depends(get_current_user)):
     code = request.code.strip().upper()
@@ -2571,7 +2607,7 @@ async def start_speech_billing_session(current_user: User = Depends(get_current_
                    GREATEST(0, elapsed_seconds)::INTEGER AS confirmed_elapsed,
                    GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_heartbeat_at)))::INTEGER AS heartbeat_gap,
                    starting_balance, original_per_minute_cost, discount_percent,
-                   required_start_credits, started_at
+                   required_start_credits, started_at, chat_session_id
             FROM speech_billing_sessions
             WHERE userid = ? AND status = 'active'
             ORDER BY started_at DESC LIMIT 1 FOR UPDATE
@@ -2687,8 +2723,10 @@ async def start_speech_billing_session(current_user: User = Depends(get_current_
 @router.post("/speech-session/{session_id}/heartbeat")
 async def heartbeat_speech_billing_session(
     session_id: str,
+    request: dict = None,
     current_user: User = Depends(get_current_user),
 ):
+    chat_session_id = _speech_chat_session_id((request or {}).get("chat_session_id"))
     with get_conn() as conn:
         _ensure_speech_billing_table(conn)
         cur = execute(
@@ -2718,10 +2756,11 @@ async def heartbeat_speech_billing_session(
                 """
                 UPDATE speech_billing_sessions
                 SET elapsed_seconds = ?, last_heartbeat_at = CURRENT_TIMESTAMP,
+                    chat_session_id = COALESCE(NULLIF(?, ''), chat_session_id),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE session_id = ? AND userid = ? AND status = 'active'
                 """,
-                (elapsed_seconds, session_id, current_user.userid),
+                (elapsed_seconds, chat_session_id or None, session_id, current_user.userid),
             )
         conn.commit()
     return {
@@ -2774,6 +2813,7 @@ async def end_speech_billing_session(
     current_user: User = Depends(get_current_user),
 ):
     reason = str((request or {}).get("reason") or "ended").strip()[:80] or "ended"
+    requested_chat_session_id = _speech_chat_session_id((request or {}).get("chat_session_id"))
     with get_conn() as conn:
         _ensure_speech_billing_table(conn)
         cur = execute(
@@ -2781,7 +2821,8 @@ async def end_speech_billing_session(
             """
             SELECT session_id, userid, status, per_minute_cost,
                    GREATEST(0, elapsed_seconds)::INTEGER AS confirmed_elapsed_seconds,
-                   GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_heartbeat_at)))::INTEGER AS confirmation_gap
+                   GREATEST(0, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_heartbeat_at)))::INTEGER AS confirmation_gap,
+                   chat_session_id
             FROM speech_billing_sessions
             WHERE session_id = ? AND userid = ?
             FOR UPDATE
@@ -2837,7 +2878,14 @@ async def end_speech_billing_session(
                 -charge,
                 new_balance,
                 _speech_billing_description(minutes, elapsed_seconds, per_minute_cost, reason),
-                _speech_billing_metadata(session_id, minutes, elapsed_seconds, per_minute_cost, reason),
+                _speech_billing_metadata(
+                    session_id,
+                    minutes,
+                    elapsed_seconds,
+                    per_minute_cost,
+                    reason,
+                    chat_session_id=requested_chat_session_id or (row[6] if len(row) > 6 else None),
+                ),
             ),
         )
         execute(

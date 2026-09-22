@@ -1079,6 +1079,8 @@ export const creditAPI = {
     api.get(getEndpoint(`/credits/subscription?family=${encodeURIComponent(family)}`)),
   getEntitlements: () => api.get(getEndpoint('/credits/entitlements')),
   getHistory: () => api.get(getEndpoint('/credits/history')),
+  getInvoice: (transactionId) =>
+    api.get(getEndpoint(`/credits/invoices/${encodeURIComponent(transactionId)}`)),
   startInstantSession: (chatSessionId, clientInstanceId) =>
     api.post(
       getEndpoint('/credits/instant-session/start'),
@@ -1106,10 +1108,21 @@ export const creditAPI = {
       GLOBAL_ERROR_CONFIG,
     ),
   startSpeechSession: () => api.post(getEndpoint('/credits/speech-session/start'), {}, GLOBAL_ERROR_CONFIG),
-  endSpeechSession: (sessionId, reason = 'ended') =>
-    api.post(getEndpoint(`/credits/speech-session/${encodeURIComponent(sessionId)}/end`), { reason }, GLOBAL_ERROR_CONFIG),
-  heartbeatSpeechSession: (sessionId) =>
-    api.post(getEndpoint(`/credits/speech-session/${encodeURIComponent(sessionId)}/heartbeat`), {}, GLOBAL_ERROR_CONFIG),
+  endSpeechSession: (sessionId, reason = 'ended', chatSessionId = null) =>
+    api.post(
+      getEndpoint(`/credits/speech-session/${encodeURIComponent(sessionId)}/end`),
+      {
+        reason,
+        ...(chatSessionId ? { chat_session_id: chatSessionId } : {}),
+      },
+      GLOBAL_ERROR_CONFIG,
+    ),
+  heartbeatSpeechSession: (sessionId, chatSessionId = null) =>
+    api.post(
+      getEndpoint(`/credits/speech-session/${encodeURIComponent(sessionId)}/heartbeat`),
+      chatSessionId ? { chat_session_id: chatSessionId } : {},
+      GLOBAL_ERROR_CONFIG,
+    ),
   getSpeechSessionStatus: (sessionId) =>
     api.get(getEndpoint(`/credits/speech-session/${encodeURIComponent(sessionId)}/status`), GLOBAL_ERROR_CONFIG),
   redeemPromoCode: (code) => 
@@ -1527,6 +1540,7 @@ export const kpAPI = {
 export const prashnaAPI = {
   getTopics: () => api.get(getEndpoint('/prashna/topics')),
   analyze: (payload) => api.post(getEndpoint('/prashna/analyze'), payload),
+  getReading: (readingId) => api.get(getEndpoint(`/prashna/readings/${encodeURIComponent(readingId)}`)),
 };
 
 export const blogAPI = {

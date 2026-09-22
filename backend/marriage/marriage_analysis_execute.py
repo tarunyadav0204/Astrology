@@ -341,11 +341,17 @@ async def execute_marriage_analysis(
             "generated_at": datetime.now().isoformat(),
         }
 
+        from credits.transaction_receipt import analysis_usage_metadata
+
         if not credit_service.spend_credits(
             userid,
             marriage_cost,
             "marriage_analysis",
             f"Marriage analysis for {birth_data.get('name', 'user')}",
+            metadata=analysis_usage_metadata(
+                analysis="marriage",
+                birth_chart_id=getattr(request, "chart_id", None),
+            ),
         ):
             return {"ok": False, "error": "Credit deduction failed"}
 

@@ -2476,7 +2476,7 @@ class CreditService:
         except Exception:
             return
 
-    def record_zero_cost_feature_usage(self, userid: int, feature: str, description: str = None) -> bool:
+    def record_zero_cost_feature_usage(self, userid: int, feature: str, description: str = None, metadata: str = None) -> bool:
         """Record a feature usage transaction with 0 credit impact (for free/waived usages)."""
         from db import get_conn, execute
         try:
@@ -2486,10 +2486,10 @@ class CreditService:
                     conn,
                     """
                     INSERT INTO credit_transactions
-                    (userid, transaction_type, amount, balance_after, source, reference_id, description)
-                    VALUES (?, 'spent', 0, ?, 'feature_usage', ?, ?)
+                    (userid, transaction_type, amount, balance_after, source, reference_id, description, metadata)
+                    VALUES (?, 'spent', 0, ?, 'feature_usage', ?, ?, ?)
                     """,
-                    (userid, current_balance, feature, description),
+                    (userid, current_balance, feature, description, metadata),
                 )
                 conn.commit()
             return True
@@ -3643,6 +3643,9 @@ class CreditService:
                     (userid, amount, new_balance, source, reference_id, description, metadata),
                 )
                 conn.commit()
+            if source in ("google_play", "razorpay") and reference_id:
+                from credits.invoice_service import ensure_purchase_invoice_for_reference
+                ensure_purchase_invoice_for_reference(userid, source, reference_id)
             return True
         except Exception:
             log.exception(
@@ -3654,8 +3657,8 @@ class CreditService:
             )
             return False
     
-    def spend_credits(self, userid: int, amount: int, feature: str, description: str = None) -> bool:
-        """Spend credits for a feature"""
+    def spend_credits(self, userid: int, amount: int, feature: str, description: str = None, metadata: str = None) -> bool:
+        """Spend credits for a feature. metadata is optional JSON written only by server callers."""
         from db import get_conn, execute
         try:
             with get_conn() as conn:
@@ -3672,10 +3675,10 @@ class CreditService:
                     conn,
                     """
                     INSERT INTO credit_transactions
-                    (userid, transaction_type, amount, balance_after, source, reference_id, description)
-                    VALUES (?, 'spent', ?, ?, ?, ?, ?)
+                    (userid, transaction_type, amount, balance_after, source, reference_id, description, metadata)
+                    VALUES (?, 'spent', ?, ?, ?, ?, ?, ?)
                     """,
-                    (userid, -amount, new_balance, "feature_usage", feature, description),
+                    (userid, -amount, new_balance, "feature_usage", feature, description, metadata),
                 )
                 conn.commit()
             return True
@@ -4543,15 +4546,19 @@ class CreditService:
                                END
                            )
                            ELSE NULL
-                       END AS amount_inr
+                       END AS amount_inr,
+                       ct.metadata
                 FROM credit_transactions ct
                 WHERE ct.userid = ?{zero_filter}{type_filter}
                 ORDER BY ct.created_at DESC
                 LIMIT ?
             """, (userid, limit))
+            from credits.transaction_receipt import feature_link_from_usage, transaction_payment_view
+
             transactions = []
             for row in cursor.fetchall():
-                transactions.append({
+                payment = transaction_payment_view(row[4], row[9], row[8])
+                entry = {
                     "id": row[0],
                     "type": row[1],
                     "amount": row[2],
@@ -4561,8 +4568,67 @@ class CreditService:
                     "description": row[6],
                     "date": row[7],
                     "amount_inr": row[8],
-                })
+                    "payment_method": payment["payment_method"],
+                    "product_id": payment["product_id"],
+                    "money": payment["money"],
+                }
+                feature_link = feature_link_from_usage(row[5], row[9])
+                if feature_link:
+                    entry["feature_link"] = feature_link
+                transactions.append(entry)
+            self._attach_refund_receipts(conn, userid, transactions)
             return transactions
+
+    def _attach_refund_receipts(self, conn, userid: int, transactions: List[Dict]) -> None:
+        """Fill refund receipts from the original charge when the refund row has no price."""
+        from credits.transaction_receipt import refund_money_from_original
+        from db import execute
+
+        pending = [
+            tx for tx in transactions
+            if tx.get("source") in ("google_play_refund", "razorpay_refund")
+            and tx.get("reference_id")
+            and not ((tx.get("money") or {}).get("amount_paid"))
+        ]
+        if not pending:
+            return
+        reference_ids = list({tx["reference_id"] for tx in pending})
+        placeholders = ",".join("?" for _ in reference_ids)
+        cursor = execute(
+            conn,
+            f"""
+            SELECT source, reference_id, amount, metadata
+            FROM credit_transactions
+            WHERE userid = ?
+              AND source IN ('google_play', 'razorpay')
+              AND transaction_type IN ('earned', 'refund')
+              AND reference_id IN ({placeholders})
+            ORDER BY created_at ASC
+            """,
+            (userid, *reference_ids),
+        )
+        originals: Dict[tuple, tuple] = {}
+        for source, reference_id, amount, metadata in cursor.fetchall():
+            originals.setdefault((source, reference_id), (amount, metadata))
+        source_map = {
+            "google_play_refund": "google_play",
+            "razorpay_refund": "razorpay",
+        }
+        for tx in pending:
+            original = originals.get((source_map[tx["source"]], tx["reference_id"]))
+            if not original:
+                continue
+            filled = refund_money_from_original(
+                tx.get("amount"),
+                original[0],
+                source_map[tx["source"]],
+                original[1],
+            )
+            if not (filled.get("money") or {}).get("amount_paid"):
+                continue
+            tx["payment_method"] = filled.get("payment_method") or tx.get("payment_method")
+            tx["product_id"] = filled.get("product_id") or tx.get("product_id")
+            tx["money"] = filled["money"]
 
     def get_daily_activity(self, target_date: str) -> List[Dict]:
         """

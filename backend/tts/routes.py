@@ -2457,11 +2457,19 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
 
     # Deduct (we already checked balance above)
     if effective_cost > 0:
+      from credits.transaction_receipt import podcast_usage_metadata
+
       success = credit_service.spend_credits(
         current_user.userid,
         effective_cost,
         "podcast",
         f"Podcast for message {message_id or 'chat'}",
+        metadata=podcast_usage_metadata(
+          message_id=message_id,
+          lang=cache_lang,
+          session_id=request.session_id,
+          birth_chart_id=request.birth_chart_id,
+        ),
       )
       if not success:
         logger.warning("Podcast: credit deduction failed (insufficient balance?) for user %s", current_user.userid)

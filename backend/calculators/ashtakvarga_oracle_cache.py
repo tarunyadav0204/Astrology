@@ -125,7 +125,26 @@ def store_oracle_payload(
             question_text or "",
             json.dumps(payload, default=str),
         ),
+        )
+
+
+def oracle_history_id_for_key(conn, userid: int, oracle_key: str) -> Optional[int]:
+    cur = execute(
+        conn,
+        """
+        SELECT id
+        FROM ai_ashtakavarga_oracle_history
+        WHERE userid = ? AND oracle_key = ?
+        """,
+        (userid, oracle_key),
     )
+    row = cur.fetchone()
+    if not row or row[0] is None:
+        return None
+    try:
+        return int(row[0])
+    except (TypeError, ValueError):
+        return None
 
 
 def list_oracle_history(conn, userid: int, birth_hash: str, limit: int = 25) -> List[Dict[str, Any]]:

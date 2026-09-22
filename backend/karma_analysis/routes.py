@@ -213,11 +213,14 @@ def process_karma_analysis_background(job_id: str, chart_id: str, user_id: int, 
         )
 
         if analysis.get("success"):
+            from credits.transaction_receipt import karma_usage_metadata
+
             credits_spent = credit_service.spend_credits(
                 user_id,
                 karma_cost,
                 "karma_analysis",
                 f"Karma analysis for chart {chart_id}",
+                metadata=karma_usage_metadata(chart_id),
             )
             if not credits_spent:
                 raise RuntimeError("Unable to spend credits for karma analysis. Please check your balance and try again.")

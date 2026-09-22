@@ -269,8 +269,17 @@ async def execute_wealth_enhanced(
                     "glossary": ai_result.get("glossary", {}),
                 }
 
+            from credits.transaction_receipt import analysis_usage_metadata
+
             if not credit_service.spend_credits(
-                userid, wealth_cost, "wealth_analysis", f"Wealth analysis for {birth_request.birth_date}"
+                userid,
+                wealth_cost,
+                "wealth_analysis",
+                f"Wealth analysis for {birth_request.birth_date}",
+                metadata=analysis_usage_metadata(
+                    analysis="wealth",
+                    birth_chart_id=getattr(birth_request, "chart_id", None),
+                ),
             ):
                 return {"ok": False, "error": "Credit deduction failed"}
 

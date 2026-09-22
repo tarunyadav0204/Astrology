@@ -44,6 +44,7 @@ from instant_chat_v2.career import (
 from instant_chat_v2.health import HEALTH_ALIASES, HEALTH_PROFILES
 from instant_chat_v2.graph_live import (
     apply_live_graph_policy,
+    enforce_live_graph_answer,
     required_divisional_codes_for_live_route,
 )
 from instant_chat_v2.translated_astrology import (
@@ -12978,6 +12979,16 @@ def _compact_wealth_foundation(
                 birth_data=birth_data,
                 target_date=target_date,
                 natal_qualified=natal_qualified,
+                current_location=(
+                    ((intent.get("query_context") or {}).get("current_location"))
+                    if isinstance(intent.get("query_context"), Mapping)
+                    else None
+                ),
+                exchange=str(
+                    ((intent.get("query_context") or {}).get("exchange") or "NSE")
+                    if isinstance(intent.get("query_context"), Mapping)
+                    else "NSE"
+                ),
             )
             result["intraday_trading_session"] = session
             session_ok = bool(session.get("available"))
@@ -12991,7 +13002,8 @@ def _compact_wealth_foundation(
                     "market_open": session.get("market_open"),
                 }
             result["interpretation_rules"] = list(result.get("interpretation_rules") or []) + [
-                "Natal D1/D2/D5 permission gates the session; a supportive hora cannot override a sit-out climate.",
+                "Natal D1/D2 provides background capacity; Vimshottari MD/AD/PD and today's changing evidence decide permission.",
+                "A supportive Muhurta segment cannot override a sit-out period or daily verdict.",
                 "Answer sit-out versus participate, then day climate, then 09:15-15:30 windows only.",
                 "Never predict index or ticker direction or guarantee P&L.",
             ]
@@ -16546,12 +16558,8 @@ def _build_instant_answer_blueprint(
                         "source": "evidence.wealth_foundation.intraday_trading_session.participation and signal",
                     },
                     {
-                        "slot": "brief natal speculation permission",
-                        "source": "evidence.wealth_foundation.route_adjudication and D1/D2/D5; do not write a lifetime investment essay",
-                    },
-                    {
                         "slot": "day climate at market open",
-                        "source": "evidence.wealth_foundation.intraday_trading_session tara_bala, chandra_bala, ashtakavarga and risk_factors",
+                        "source": "evidence.wealth_foundation.intraday_trading_session tara_bala, chandra_bala, ashtakavarga and risk_factors; this changing daily evidence is the primary reason for the verdict",
                     },
                     {
                         "slot": "usable versus caution windows inside 09:15-15:30",
@@ -16560,6 +16568,10 @@ def _build_instant_answer_blueprint(
                     {
                         "slot": "one practical risk and the non-market-forecast disclaimer",
                         "source": "intraday_trading_session.claim_rule",
+                    },
+                    {
+                        "slot": "optional one-sentence natal risk background",
+                        "source": "evidence.wealth_foundation.route_adjudication; never make D1, D2, D5 or Indu Lagna the reason for today's verdict",
                     },
                 ],
                 "forbidden_content": list(wealth_rules.get("forbidden_moves") or []),
@@ -20573,7 +20585,7 @@ async def generate_instant_chat_response(
         response_validation_enabled
         and pre_generation_graph_policy.get("live")
         and str(pre_generation_graph_policy.get("runtime_key") or "").lower() in {
-            "debt_repayment", "wealth_timing", "loan_decision",
+            "debt_repayment", "wealth_timing", "loan_decision", "intraday_trading",
         }
     )
     # Constitutional health claims are buffered until their immutable chart
@@ -21559,10 +21571,16 @@ REJECTED ANSWER:
     graph_fallback_error: Dict[str, Any] | None = None
     if instant_v2_packet:
         pre_enforcement_content = response_content
-        # The graph contract is applied before generation. Do not scan or
-        # rewrite the rendered answer with language-specific word lists here;
-        # Live supports arbitrary languages and scripts.
         graph_policy = ((instant_v2_packet.get("answer_spec") or {}).get("knowledge_graph_policy") or {})
+        # Exact intraday windows are an immutable calculation ledger. The LLM
+        # explains the day, while this renderer guarantees that clients receive
+        # the calculated verdict and every market-hour interval verbatim.
+        if str(graph_policy.get("runtime_key") or "").lower() == "intraday_trading":
+            response_content = enforce_live_graph_answer(
+                str(response_content or ""),
+                instant_v2_packet,
+                language=language,
+            )
         if graph_policy.get("live") and graph_policy.get("fallback_to_deeper_mode"):
             graph_fallback_error = {
                 "error_type": "InstantGraphEvidenceIncomplete",

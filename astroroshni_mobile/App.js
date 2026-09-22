@@ -27,6 +27,8 @@ import BirthFormScreen from './src/components/BirthForm/BirthFormScreen';
 import BirthProfileIntroScreen from './src/components/BirthProfileIntro/BirthProfileIntroScreen';
 import SelectNativeScreen from './src/components/Native/SelectNativeScreen';
 import CreditScreen from './src/credits/CreditScreen';
+import CreditTransactionDetailScreen from './src/credits/CreditTransactionDetailScreen';
+import CreditInvoiceScreen from './src/credits/CreditInvoiceScreen';
 import ProfileScreen from './src/components/Profile/ProfileScreen';
 import AccountSecurityScreen from './src/components/Profile/AccountSecurityScreen';
 import AnalysisHubScreen from './src/components/Analysis/AnalysisHubScreen';
@@ -988,6 +990,16 @@ export default function App() {
           <Stack.Screen 
             name="Credits" 
             component={CreditScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="CreditTransactionDetail"
+            component={CreditTransactionDetailScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="CreditInvoice"
+            component={CreditInvoiceScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen
