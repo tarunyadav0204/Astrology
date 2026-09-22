@@ -6,6 +6,7 @@ import {
   StyleSheet,
   StatusBar,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +28,8 @@ export default function ChartsHubScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
+  const { width: windowWidth } = useWindowDimensions();
+  const wide = windowWidth >= 768;
 
   const initialTab = TAB_KEYS.includes(route.params?.tab) ? route.params.tab : 'chart';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -119,17 +122,17 @@ export default function ChartsHubScreen({ navigation, route }) {
         <View style={[styles.header, { borderBottomColor: colors.cosmicLine }]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={[styles.backButton, { backgroundColor: actionBtnBg }]}
+            style={[styles.backButton, wide && styles.backButtonTablet, { backgroundColor: actionBtnBg }]}
             accessibilityRole="button"
             accessibilityLabel={t('common.back', 'Back')}
           >
-            <Ionicons name="arrow-back" size={20} color={colors.textInverse} />
+            <Ionicons name="arrow-back" size={wide ? 28 : 20} color={colors.textInverse} />
           </TouchableOpacity>
 
           {showChartHeader ? (
             <>
               <View style={styles.headerCenter}>
-                <Text style={[styles.chartTitle, { color: colors.textInverse }]} numberOfLines={1}>
+                <Text style={[styles.chartTitle, wide && styles.chartTitleTablet, { color: colors.textInverse }]} numberOfLines={1}>
                   {chartHeader.chartName}
                 </Text>
                 {(chartHeader.birthData || birthData) ? (
@@ -138,7 +141,7 @@ export default function ChartsHubScreen({ navigation, route }) {
                     onPress={() => navigation.navigate('SelectNative', { returnTo: 'ChartsHub' })}
                     maxLength={14}
                     style={[styles.nativeChip, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
-                    textStyle={[styles.nativeChipText, { color: colors.textInverseMuted }]}
+                    textStyle={[styles.nativeChipText, wide && styles.nativeChipTextTablet, { color: colors.textInverseMuted }]}
                     iconColor={colors.textInverseMuted}
                     showIcon={false}
                   />
@@ -146,18 +149,18 @@ export default function ChartsHubScreen({ navigation, route }) {
               </View>
               <TouchableOpacity
                 onPress={chartHeader.onShare}
-                style={[styles.headerAction, { backgroundColor: actionBtnBg }]}
+                style={[styles.headerAction, wide && styles.headerActionTablet, { backgroundColor: actionBtnBg }]}
                 disabled={!!chartHeader.isSharing}
                 accessibilityRole="button"
                 accessibilityLabel={t('common.share', 'Share')}
               >
-                <Ionicons name="share-outline" size={18} color={colors.textInverse} />
+                <Ionicons name="share-outline" size={wide ? 26 : 18} color={colors.textInverse} />
               </TouchableOpacity>
             </>
           ) : showDashaHeader ? (
             <>
               <View style={styles.headerCenter}>
-                <Text style={[styles.chartTitle, { color: colors.textInverse }]} numberOfLines={1}>
+                <Text style={[styles.chartTitle, wide && styles.chartTitleTablet, { color: colors.textInverse }]} numberOfLines={1}>
                   {dashaTitle}
                 </Text>
                 {dashaBirth?.name ? (
@@ -182,7 +185,7 @@ export default function ChartsHubScreen({ navigation, route }) {
           ) : showAshtakHeader ? (
             <>
               <View style={styles.headerCenter}>
-                <Text style={[styles.chartTitle, { color: colors.textInverse }]} numberOfLines={1}>
+                <Text style={[styles.chartTitle, wide && styles.chartTitleTablet, { color: colors.textInverse }]} numberOfLines={1}>
                   {ashtakTitle}
                 </Text>
                 {ashtakBirth?.name ? (
@@ -204,11 +207,11 @@ export default function ChartsHubScreen({ navigation, route }) {
               </View>
               <TouchableOpacity
                 onPress={() => ashtakHeader?.onOpenInfo?.()}
-                style={[styles.headerAction, { backgroundColor: actionBtnBg }]}
+                style={[styles.headerAction, wide && styles.headerActionTablet, { backgroundColor: actionBtnBg }]}
                 accessibilityRole="button"
                 accessibilityLabel={t('common.info', 'Info')}
               >
-                <Ionicons name="information-circle-outline" size={20} color={colors.textInverse} />
+                <Ionicons name="information-circle-outline" size={wide ? 26 : 20} color={colors.textInverse} />
               </TouchableOpacity>
             </>
           ) : (
@@ -229,6 +232,7 @@ export default function ChartsHubScreen({ navigation, route }) {
                 key={tab.key}
                 style={[
                   styles.tabChip,
+                  wide && styles.tabChipTablet,
                   selected && {
                     backgroundColor: colors.accentSoft,
                     shadowColor: colors.cosmicSurface,
@@ -244,6 +248,7 @@ export default function ChartsHubScreen({ navigation, route }) {
                 <Text
                   style={[
                     styles.tabLabel,
+                    wide && styles.tabLabelTablet,
                     {
                       color: selected ? colors.onAccent : colors.textInverseMuted,
                       fontWeight: selected ? '800' : '600',
@@ -318,6 +323,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  backButtonTablet: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
   headerCenter: {
     flex: 1,
     minWidth: 0,
@@ -330,6 +340,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  chartTitleTablet: {
+    fontSize: 28,
+  },
   nativeChip: {
     marginTop: 2,
     paddingHorizontal: 8,
@@ -339,12 +352,20 @@ const styles = StyleSheet.create({
   nativeChipText: {
     fontSize: 10,
   },
+  nativeChipTextTablet: {
+    fontSize: 16,
+  },
   headerAction: {
     width: 32,
     height: 32,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerActionTablet: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   positionBadge: {
     paddingHorizontal: 8,
@@ -384,8 +405,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  tabChipTablet: {
+    paddingVertical: 14,
+    borderRadius: 16,
+  },
   tabLabel: {
     fontSize: 13,
+  },
+  tabLabelTablet: {
+    fontSize: 18,
   },
   content: {
     flex: 1,

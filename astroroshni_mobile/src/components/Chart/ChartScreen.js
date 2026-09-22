@@ -880,6 +880,10 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 const transitIndex = chartTypes.findIndex((chart) => chart.id === 'transit');
                 if (transitIndex !== -1) changeChart(transitIndex);
               }}
+              onRequestBirthChart={() => {
+                const lagnaIndex = chartTypes.findIndex((chart) => chart.id === 'lagna');
+                if (lagnaIndex !== -1 && currentChartIndex !== lagnaIndex) changeChart(lagnaIndex);
+              }}
               navigation={navigation}
               onHousePress={openHouseDrawer}
               division={
@@ -1002,8 +1006,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 >
                   <View style={styles.chartCollection}>
                     <View style={styles.collectionHeadingRow}>
-                      <Text style={[styles.collectionLabel, { color: colors.textSecondary }]}>{t('premiumUi.common.chart')}</Text>
-                      <Text style={[styles.collectionContext, { color: colors.textTertiary }]} numberOfLines={1}>
+                      <Text style={[styles.collectionLabel, wideSheet && styles.collectionLabelTablet, { color: colors.textSecondary }]}>{t('premiumUi.common.chart')}</Text>
+                      <Text style={[styles.collectionContext, wideSheet && styles.collectionContextTablet, { color: colors.textTertiary }]} numberOfLines={1}>
                         {chartTypes[currentChartIndex]?.description}
                       </Text>
                     </View>
@@ -1022,13 +1026,14 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                             activeOpacity={0.8}
                             style={[
                               styles.collectionCard,
+                              wideSheet && styles.collectionCardTablet,
                               {
                                 borderBottomColor: selected ? colors.primary : 'transparent',
                               },
                             ]}
                           >
-                            <Text style={[styles.collectionCode, { color: selected ? colors.primary : colors.textTertiary }]}>{CHART_CODES[chart.id] || `D${index + 1}`}</Text>
-                            <Text style={[styles.collectionName, { color: selected ? colors.text : colors.textSecondary }]} numberOfLines={1}>{chart.name.replace(/\s*\([^)]*\)\s*$/, '')}</Text>
+                            <Text style={[styles.collectionCode, wideSheet && styles.collectionCodeTablet, { color: selected ? colors.primary : colors.textTertiary }]}>{CHART_CODES[chart.id] || `D${index + 1}`}</Text>
+                            <Text style={[styles.collectionName, wideSheet && styles.collectionNameTablet, { color: selected ? colors.text : colors.textSecondary }]} numberOfLines={1}>{chart.name.replace(/\s*\([^)]*\)\s*$/, '')}</Text>
                           </TouchableOpacity>
                         );
                       })}
@@ -1087,21 +1092,22 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                           <View
                             style={[
                               styles.activationExplorerCtaGradient,
+                              wideSheet && styles.activationExplorerCtaGradientTablet,
                               { backgroundColor: colors.accent },
                             ]}
                           >
-                            <View style={styles.activationExplorerCtaIcon}>
-                              <Ionicons name="book-outline" size={20} color={colors.onAccent || colors.textInverse} />
+                            <View style={[styles.activationExplorerCtaIcon, wideSheet && styles.activationExplorerCtaIconTablet]}>
+                              <Ionicons name="book-outline" size={wideSheet ? 28 : 20} color={colors.onAccent || colors.textInverse} />
                             </View>
                             <View style={styles.activationExplorerCtaCopy}>
-                              <Text style={[styles.activationExplorerCtaTitle, { color: colors.onAccent || colors.textInverse }]}>
+                              <Text style={[styles.activationExplorerCtaTitle, wideSheet && styles.activationExplorerCtaTitleTablet, { color: colors.onAccent || colors.textInverse }]}>
                                 {t('premiumUi.common.chartOverviewTitle', 'Read this chart')}
                               </Text>
-                              <Text style={[styles.activationExplorerCtaSubtitle, { color: colors.onAccent || colors.textInverseMuted }]}>
+                              <Text style={[styles.activationExplorerCtaSubtitle, wideSheet && styles.activationExplorerCtaSubtitleTablet, { color: colors.onAccent || colors.textInverseMuted }]}>
                                 {t('premiumUi.common.chartOverviewBody', 'Houses, pillars, gandanta, special points')}
                               </Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={22} color={colors.onAccent || colors.textInverse} />
+                            <Ionicons name="chevron-forward" size={wideSheet ? 28 : 22} color={colors.onAccent || colors.textInverse} />
                           </View>
                         </TouchableOpacity>
                       <TouchableOpacity
@@ -1114,21 +1120,22 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       <View
                         style={[
                           styles.activationExplorerCtaGradient,
+                          wideSheet && styles.activationExplorerCtaGradientTablet,
                           {
                             backgroundColor: colors.cosmicSurface,
                           },
                         ]}
                       >
-                        <View style={styles.activationExplorerCtaIcon}>
-                          <Ionicons name="pulse" size={20} color={colors.accent} />
+                        <View style={[styles.activationExplorerCtaIcon, wideSheet && styles.activationExplorerCtaIconTablet]}>
+                          <Ionicons name="pulse" size={wideSheet ? 28 : 20} color={colors.accent} />
                         </View>
                         <View style={styles.activationExplorerCtaCopy}>
-                          <Text style={[styles.activationExplorerCtaTitle, { color: colors.textInverse }]}>{t('premiumUi.common.activatedTitle')}</Text>
-                          <Text style={[styles.activationExplorerCtaSubtitle, { color: colors.textInverseMuted }]}>{t('premiumUi.common.activatedBody')}</Text>
+                          <Text style={[styles.activationExplorerCtaTitle, wideSheet && styles.activationExplorerCtaTitleTablet, { color: colors.textInverse }]}>{t('premiumUi.common.activatedTitle')}</Text>
+                          <Text style={[styles.activationExplorerCtaSubtitle, wideSheet && styles.activationExplorerCtaSubtitleTablet, { color: colors.textInverseMuted }]}>{t('premiumUi.common.activatedBody')}</Text>
                         </View>
                         {checkingAstrologerLicense
                           ? <ActivityIndicator size="small" color={colors.accent} />
-                          : <Ionicons name="chevron-forward" size={22} color={colors.accent} />}
+                          : <Ionicons name="chevron-forward" size={wideSheet ? 28 : 22} color={colors.accent} />}
                       </View>
                     </TouchableOpacity>
                     </View>
@@ -2108,6 +2115,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  collectionLabelTablet: {
+    fontSize: 13,
+  },
+  collectionContextTablet: {
+    fontSize: 15,
+  },
+  collectionCardTablet: {
+    width: 118,
+    minHeight: 68,
+    paddingVertical: 10,
+  },
+  collectionCodeTablet: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  collectionNameTablet: {
+    fontSize: 15,
+  },
   chartAndNavContainer: {
     flex: 1,
     ...(Platform.OS === 'web'
@@ -2231,6 +2256,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  activationExplorerCtaGradientTablet: {
+    minHeight: 96,
+    paddingHorizontal: 22,
+    paddingVertical: 8,
+  },
   activationExplorerCtaIcon: {
     width: 38,
     height: 38,
@@ -2252,6 +2282,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     marginTop: 3,
+  },
+  activationExplorerCtaTitleTablet: {
+    fontSize: 24,
+  },
+  activationExplorerCtaSubtitleTablet: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  activationExplorerCtaIconTablet: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    marginRight: 14,
   },
   navContent: {
     paddingHorizontal: 16,

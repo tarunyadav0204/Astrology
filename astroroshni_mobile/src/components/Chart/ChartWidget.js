@@ -28,7 +28,15 @@ import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
 
 const isWeb = Platform.OS === 'web';
 
-const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, division, navigation, onHousePress }, ref) => {
+const toLocalYmd = (value) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+};
+
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, onRequestBirthChart, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const [chartStyle, setChartStyle] = useState(defaultStyle);
@@ -38,6 +46,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [showKarakas, setShowKarakas] = useState(false);
   const [karakas, setKarakas] = useState(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showTransitOverlay, setShowTransitOverlay] = useState(false);
+  const [showDashaHighlight, setShowDashaHighlight] = useState(false);
+  const [dashaLords, setDashaLords] = useState(null);
   // PWA/web: measure parent width before locking SVG pixels (window width can be
   // wider than the chart column and clipped the diamond + toolbar).
   const [webChartSize, setWebChartSize] = useState(null);
@@ -79,6 +90,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [showSwipeHint, setShowSwipeHint] = useState(true);
   const [chartDataCache, setChartDataCache] = useState({ lagna: chartData });
   const [transitDate, setTransitDate] = useState(new Date());
+  const [transitOverlayChart, setTransitOverlayChart] = useState(null);
 
   const activeChartTypeRef = useRef(currentChartType);
   const chartDataCacheRef = useRef(chartDataCache);
@@ -145,6 +157,89 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const toggleStyle = useCallback(() => {
     setChartStyle(prev => prev === 'north' ? 'south' : 'north');
   }, []);
+
+  const transitOverlayRequestRef = useRef(0);
+  const ensureTransitOverlay = useCallback(async (dateKey) => {
+    if (!birthData || !dateKey) return;
+    const requestId = ++transitOverlayRequestRef.current;
+    try {
+      const formattedData = {
+        ...birthData,
+        date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
+        time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
+        latitude: parseFloat(birthData.latitude),
+        longitude: parseFloat(birthData.longitude),
+      };
+      const response = await chartAPI.calculateTransits(formattedData, dateKey);
+      if (requestId !== transitOverlayRequestRef.current) return;
+      if (response?.data?.planets) setTransitOverlayChart(response.data);
+    } catch (error) {
+      console.error('Failed to load transit overlay:', error);
+    }
+  }, [birthData]);
+
+  const toggleTransitOverlay = useCallback(() => {
+    setShowTransitOverlay((prev) => {
+      const next = !prev;
+      if (next && currentChartType !== 'lagna') onRequestBirthChart?.();
+      return next;
+    });
+  }, [currentChartType, onRequestBirthChart]);
+
+  const dashaRequestRef = useRef(0);
+  const ensureDashaHighlight = useCallback(async (dateKey) => {
+    if (!birthData) return;
+    const requestId = ++dashaRequestRef.current;
+    try {
+      const dateValue = birthData.date;
+      const timeValue = birthData.time;
+      const formattedBirthData = {
+        name: birthData.name,
+        date: typeof dateValue === 'string' && dateValue.includes('T') ? dateValue.split('T')[0] : dateValue,
+        time: typeof timeValue === 'string' && timeValue.includes('T')
+          ? (timeValue.split('T')[1] || '').slice(0, 5)
+          : timeValue,
+        latitude: parseFloat(birthData.latitude),
+        longitude: parseFloat(birthData.longitude),
+        place: birthData.place || 'Unknown',
+        ...(birthData.timezone != null && birthData.timezone !== ''
+          ? { timezone: birthData.timezone }
+          : {}),
+      };
+      const targetDate = dateKey || toLocalYmd(transitDate);
+      const response = await chartAPI.calculateCascadingDashas(formattedBirthData, targetDate);
+      if (requestId !== dashaRequestRef.current) return;
+      const current = response?.data?.current_dashas || {};
+      const planetOf = (value) => (typeof value === 'string' ? value : value?.planet) || null;
+      const lords = {
+        mahadasha: planetOf(current.mahadasha),
+        antardasha: planetOf(current.antardasha),
+        pratyantardasha: planetOf(current.pratyantardasha),
+      };
+      if (lords.mahadasha || lords.antardasha || lords.pratyantardasha) {
+        setDashaLords(lords);
+      }
+    } catch (error) {
+      console.error('Failed to load dasha highlight:', error);
+    }
+  }, [birthData, transitDate]);
+
+  const toggleDashaHighlight = useCallback(() => {
+    setShowDashaHighlight((prev) => !prev);
+  }, []);
+
+  const dashaBirthKey = `${birthData?.id || ''}|${birthData?.date || ''}|${birthData?.time || ''}`;
+  const dashaBirthKeyRef = useRef(dashaBirthKey);
+  useEffect(() => {
+    if (dashaBirthKeyRef.current === dashaBirthKey) return;
+    dashaBirthKeyRef.current = dashaBirthKey;
+    dashaRequestRef.current += 1;
+    transitOverlayRequestRef.current += 1;
+    setDashaLords(null);
+    setTransitOverlayChart(null);
+    setShowDashaHighlight(false);
+    setShowTransitOverlay(false);
+  }, [dashaBirthKey]);
 
   const handleRotate = useCallback((rashiIndex) => {
     setRotatedAscendant(rashiIndex);
@@ -483,6 +578,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
 
   const handleTransitDateChange = (newDate) => setTransitDate(newDate);
 
+  useEffect(() => {
+    const dateKey = toLocalYmd(transitDate);
+    if (showTransitOverlay) ensureTransitOverlay(dateKey);
+    if (showDashaHighlight) ensureDashaHighlight(dateKey);
+  }, [showTransitOverlay, showDashaHighlight, transitDate, ensureTransitOverlay, ensureDashaHighlight]);
+
   useImperativeHandle(ref, () => ({ navigateToTransit, handleRotate }), [navigateToTransit, handleRotate]);
 
   useEffect(() => {
@@ -493,6 +594,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const renderChart = useCallback((type, data) => {
     if (!type || !data) return <View style={styles.loadingContainer}><Text style={styles.loadingText}>{t('premiumUi.common.loading')}</Text></View>;
     const sizeProp = (isWeb || fitTablet) && webChartSize ? { size: webChartSize } : {};
+    const transitOverlay = showTransitOverlay && currentChartType === 'lagna'
+      ? (transitOverlayChart || null)
+      : null;
+    const dashaHighlight = showDashaHighlight && currentChartType !== 'transit' && dashaLords
+      ? dashaLords
+      : null;
     return chartStyle === 'north' ? (
       <NorthIndianChart
         chartData={data}
@@ -506,6 +613,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         karakas={karakas}
         onHousePress={onHousePress}
         hideInstructions={cosmicTheme}
+        transitOverlay={transitOverlay}
+        dashaHighlight={dashaHighlight}
         {...sizeProp}
       />
     ) : (
@@ -519,10 +628,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         onRotate={handleRotate}
         showKarakas={showKarakas}
         karakas={karakas}
+        transitOverlay={transitOverlay}
+        dashaHighlight={dashaHighlight}
         {...sizeProp}
       />
     );
-  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet]);
+  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType]);
 
   const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
     const iconColor = primary ? colors.onPrimary : (active ? colors.onAccent : colors.text);
@@ -535,12 +646,13 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         onPress={onPress}
         activeOpacity={0.8}
       >
-        <View style={[styles.quickActionIcon, { backgroundColor: primary ? colors.primary : active ? colors.accentSoft : colors.surfaceMuted }]}>
-          <Ionicons name={icon} size={18} color={iconColor} />
+        <View style={[styles.quickActionIcon, fitTablet && styles.quickActionIconTablet, { backgroundColor: primary ? colors.primary : active ? colors.accentSoft : colors.surfaceMuted }]}>
+          <Ionicons name={icon} size={fitTablet ? 26 : 18} color={iconColor} />
         </View>
         <Text
           style={[
             styles.quickActionText,
+            fitTablet && styles.quickActionTextTablet,
             { color: textColor },
           ]}
           numberOfLines={2}
@@ -564,11 +676,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         </View>
       )}
 
-      {currentChartType === 'transit' && (
+      {(currentChartType === 'transit' || showTransitOverlay || showDashaHighlight) && (
         <DateNavigator
           date={transitDate}
           onDateChange={handleTransitDateChange}
           cosmicTheme={cosmicTheme}
+          resetDate={new Date()}
         />
       )}
 
@@ -586,27 +699,56 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       >
       {cosmicTheme ? (
         <View style={[styles.webToolbar, { backgroundColor: colors.chartRaised, borderBottomColor: colors.chartLine }]}>
-          <Text style={[styles.viewToolbarLabel, { color: colors.chartTextMuted }]}>{t('premiumUi.common.view')}</Text>
+          <Text style={[styles.viewToolbarLabel, fitTablet && styles.viewToolbarLabelTablet, { color: colors.chartTextMuted }]}>{t('premiumUi.common.view')}</Text>
           <View style={styles.webToolbarLeft}>
             <TouchableOpacity
               onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
               style={[
                 styles.viewControl,
+                fitTablet && styles.viewControlTablet,
                 {
                   backgroundColor: 'transparent',
                 },
               ]}
             >
-              <Ionicons name={showDegreeNakshatra ? "eye" : "eye-off"} size={15} color={showDegreeNakshatra ? colors.primary : colors.chartTextMuted} />
-              <Text style={[styles.viewControlText, { color: showDegreeNakshatra ? colors.primary : colors.chartTextMuted }]}>{t('premiumUi.common.degrees')}</Text>
+              <Ionicons name={showDegreeNakshatra ? "eye" : "eye-off"} size={fitTablet ? 22 : 15} color={showDegreeNakshatra ? colors.primary : colors.chartTextMuted} />
+              <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: showDegreeNakshatra ? colors.primary : colors.chartTextMuted }]}>{t('premiumUi.common.degrees')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={toggleStyle}
-              style={[styles.viewControl, { backgroundColor: 'transparent' }]}
+              style={[styles.viewControl, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
             >
-              <Ionicons name="grid-outline" size={15} color={colors.chartTextMuted} />
-              <Text style={[styles.viewControlText, { color: colors.chartTextMuted }]}>{chartStyle === 'north' ? 'South' : 'North'}</Text>
+              <Ionicons name="grid-outline" size={fitTablet ? 22 : 15} color={colors.chartTextMuted} />
+              <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: colors.chartTextMuted }]}>{chartStyle === 'north' ? 'South' : 'North'}</Text>
             </TouchableOpacity>
+            {currentChartType !== 'transit' ? (
+              <TouchableOpacity
+                onPress={toggleTransitOverlay}
+                style={[styles.viewControl, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: showTransitOverlay }}
+                accessibilityLabel={t('chartScreen.transit', 'Transit')}
+              >
+                <Ionicons name="planet-outline" size={fitTablet ? 22 : 15} color={showTransitOverlay ? colors.primary : colors.chartTextMuted} />
+                <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: showTransitOverlay ? colors.primary : colors.chartTextMuted }]}>
+                  {t('chartScreen.transit', 'Transit')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {currentChartType !== 'transit' ? (
+              <TouchableOpacity
+                onPress={toggleDashaHighlight}
+                style={[styles.viewControl, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: showDashaHighlight }}
+                accessibilityLabel={t('chartScreen.dasha', 'Dasha')}
+              >
+                <Ionicons name="time-outline" size={fitTablet ? 22 : 15} color={showDashaHighlight ? colors.primary : colors.chartTextMuted} />
+                <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: showDashaHighlight ? colors.primary : colors.chartTextMuted }]}>
+                  {t('chartScreen.dasha', 'Dasha')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
           <TouchableOpacity
             onPress={() => setShowInfoModal(true)}
@@ -614,9 +756,20 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             accessibilityRole="button"
             accessibilityLabel={t('premiumUi.common.aboutChart')}
           >
-            <Ionicons name="information-circle-outline" size={18} color={colors.chartTextMuted} />
+            <Ionicons name="information-circle-outline" size={fitTablet ? 26 : 18} color={colors.chartTextMuted} />
           </TouchableOpacity>
         </View>
+      ) : null}
+
+      {showDashaHighlight && currentChartType !== 'transit' && dashaLords ? (
+        <Text style={[styles.dashaLegend, fitTablet && styles.dashaLegendTablet, { color: colors.chartText || colors.text }]} numberOfLines={2}>
+          <Text style={{ color: colors.primary }}>MD</Text>
+          {` ${t(`home.planet_names.${dashaLords.mahadasha}`, dashaLords.mahadasha || '')} · `}
+          <Text style={{ color: colors.primary }}>AD</Text>
+          {` ${t(`home.planet_names.${dashaLords.antardasha}`, dashaLords.antardasha || '')} · `}
+          <Text style={{ color: colors.primary }}>PD</Text>
+          {` ${t(`home.planet_names.${dashaLords.pratyantardasha}`, dashaLords.pratyantardasha || '')}`}
+        </Text>
       ) : null}
 
       <View
@@ -654,7 +807,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
 
       {cosmicTheme && (
         <View style={styles.advancedToolsSection}>
-          <Text style={[styles.advancedToolsLabel, { color: colors.textSecondary }]}>{t('premiumUi.common.professionalTools')}</Text>
+          <Text style={[styles.advancedToolsLabel, fitTablet && styles.advancedToolsLabelTablet, { color: colors.textSecondary }]}>{t('premiumUi.common.professionalTools')}</Text>
           <View style={styles.advancedToolsRow}>
             {[
               ['compass-outline', 'KP system', () => navigation?.navigate('KPSystem', { birthDetails: birthData })],
@@ -667,9 +820,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 style={styles.advancedTool}
                 activeOpacity={0.8}
               >
-                <Ionicons name={icon} size={16} color={colors.primary} />
+                <Ionicons name={icon} size={fitTablet ? 24 : 16} color={colors.primary} />
                 <Text
-                  style={[styles.advancedToolText, { color: colors.text }]}
+                  style={[styles.advancedToolText, fitTablet && styles.advancedToolTextTablet, { color: colors.text }]}
                   numberOfLines={2}
                 >
                   {label}
@@ -682,7 +835,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
 
       {cosmicTheme && (
         <View style={styles.quickActionsGrid}>
-          <Text style={[styles.advancedToolsLabel, { color: colors.textSecondary }]}>{t('premiumUi.common.readChart')}</Text>
+          <Text style={[styles.advancedToolsLabel, fitTablet && styles.advancedToolsLabelTablet, { color: colors.textSecondary }]}>{t('premiumUi.common.readChart')}</Text>
           <View style={styles.quickActionsRow}>
             {currentChartType !== 'transit' && (
               <QuickActionButton
@@ -874,6 +1027,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     marginRight: 12,
   },
+  viewToolbarLabelTablet: {
+    fontSize: 13,
+    letterSpacing: 1.6,
+  },
   webToolbarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -887,9 +1044,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  viewControlTablet: {
+    minHeight: 44,
+    gap: 8,
+  },
   viewControlText: {
     fontSize: 10,
     fontWeight: '600',
+  },
+  viewControlTextTablet: {
+    fontSize: 16,
+  },
+  dashaLegend: {
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  dashaLegendTablet: {
+    fontSize: 17,
+    paddingTop: 12,
+    paddingBottom: 6,
   },
   viewInfoButton: {
     width: 30,
@@ -920,7 +1097,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 7,
   },
+  quickActionIconTablet: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginBottom: 10,
+  },
   quickActionText: { fontSize: 10, lineHeight: 13, fontWeight: '700', textAlign: 'center' },
+  quickActionTextTablet: { fontSize: 16, lineHeight: 20 },
   advancedToolsSection: {
     marginTop: 20,
     width: '100%',
@@ -931,6 +1115,10 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 1.4,
+  },
+  advancedToolsLabelTablet: {
+    fontSize: 13,
+    marginBottom: 12,
   },
   advancedToolsRow: {
     flexDirection: 'row',
@@ -955,6 +1143,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     flexShrink: 1,
+  },
+  advancedToolTextTablet: {
+    fontSize: 16,
+    lineHeight: 20,
   },
   rotationBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.accent, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginVertical: 12, alignSelf: 'center', gap: 12 },
   rotationBadgeCosmic: { backgroundColor: 'rgba(255, 107, 53, 0.8)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.3)' },

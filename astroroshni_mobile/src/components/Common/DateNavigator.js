@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Modal, ActivityIndicator, useWindowDimensions } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import WebDatePickerModal from './WebDatePickerModal';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -36,6 +36,8 @@ const DateNavigator = ({
 }) => {
   const { colors } = useTheme();
   const { t, i18n } = useTranslation();
+  const { width: windowWidth } = useWindowDimensions();
+  const wide = windowWidth >= 768;
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [tempDate, setTempDate] = useState(date);
@@ -194,12 +196,12 @@ const DateNavigator = ({
     <View style={styles.dateNav}>
       <View style={[styles.navShell, shellStyle]}>
         <View style={styles.compactNavRow}>
-          <TouchableOpacity style={[styles.dayStepButton, ghostBtn]} onPress={() => adjustDate(-1)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }} accessibilityLabel={t('premiumUi.common.previousDay')}>
-            <Ionicons name="chevron-back" size={18} color={colors.text} />
+          <TouchableOpacity style={[styles.dayStepButton, wide && styles.dayStepButtonTablet, ghostBtn]} onPress={() => adjustDate(-1)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }} accessibilityLabel={t('premiumUi.common.previousDay')}>
+            <Ionicons name="chevron-back" size={wide ? 26 : 18} color={colors.text} />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.compactDateButton, { backgroundColor: colors.surfaceRaised || colors.surface, borderColor: colors.cardBorder }]}
+            style={[styles.compactDateButton, wide && styles.compactDateButtonTablet, { backgroundColor: colors.surfaceRaised || colors.surface, borderColor: colors.cardBorder }]}
             onPress={openDatePicker}
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             accessibilityState={{ busy: loading }}
@@ -207,22 +209,22 @@ const DateNavigator = ({
             {loading ? (
               <ActivityIndicator size="small" color={colors.primary} />
             ) : (
-              <Ionicons name="calendar-clear-outline" size={15} color={colors.primary} />
+              <Ionicons name="calendar-clear-outline" size={wide ? 22 : 15} color={colors.primary} />
             )}
-            <Text style={[styles.compactDateText, { color: colors.text }]}>{dateOnlyLabel}</Text>
+            <Text style={[styles.compactDateText, wide && styles.compactDateTextTablet, { color: colors.text }]}>{dateOnlyLabel}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.dayStepButton, ghostBtn]} onPress={() => adjustDate(1)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }} accessibilityLabel={t('premiumUi.common.nextDay')}>
-            <Ionicons name="chevron-forward" size={18} color={colors.text} />
+          <TouchableOpacity style={[styles.dayStepButton, wide && styles.dayStepButtonTablet, ghostBtn]} onPress={() => adjustDate(1)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }} accessibilityLabel={t('premiumUi.common.nextDay')}>
+            <Ionicons name="chevron-forward" size={wide ? 26 : 18} color={colors.text} />
           </TouchableOpacity>
         </View>
 
         <View style={[styles.rangeRow, { borderTopColor: colors.cardBorder }]}>
-          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(-30)}><Text style={[styles.rangeButtonText, ghostText]}>{t('premiumUi.common.minusMonth')}</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(-7)}><Text style={[styles.rangeButtonText, ghostText]}>{t('premiumUi.common.minusWeek')}</Text></TouchableOpacity>
-          <TouchableOpacity style={[styles.todayButton, { backgroundColor: colors.accentSoft }]} onPress={handleReset}><Text style={[styles.todayButtonText, { color: colors.onAccent }]}>{t('premiumUi.common.today')}</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(7)}><Text style={[styles.rangeButtonText, ghostText]}>{t('premiumUi.common.plusWeek')}</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(30)}><Text style={[styles.rangeButtonText, ghostText]}>{t('premiumUi.common.plusMonth')}</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(-30)}><Text style={[styles.rangeButtonText, wide && styles.rangeButtonTextTablet, ghostText]}>{t('premiumUi.common.minusMonth')}</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(-7)}><Text style={[styles.rangeButtonText, wide && styles.rangeButtonTextTablet, ghostText]}>{t('premiumUi.common.minusWeek')}</Text></TouchableOpacity>
+          <TouchableOpacity style={[styles.todayButton, wide && styles.todayButtonTablet, { backgroundColor: colors.accentSoft }]} onPress={handleReset}><Text style={[styles.todayButtonText, wide && styles.todayButtonTextTablet, { color: colors.onAccent }]}>{t('premiumUi.common.today')}</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(7)}><Text style={[styles.rangeButtonText, wide && styles.rangeButtonTextTablet, ghostText]}>{t('premiumUi.common.plusWeek')}</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.rangeButton} onPress={() => adjustDate(30)}><Text style={[styles.rangeButtonText, wide && styles.rangeButtonTextTablet, ghostText]}>{t('premiumUi.common.plusMonth')}</Text></TouchableOpacity>
         </View>
 
         {includeTime ? (
@@ -296,6 +298,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  dayStepButtonTablet: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+  },
   rangeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -312,14 +319,24 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
   },
+  rangeButtonTextTablet: {
+    fontSize: 15,
+  },
   todayButton: {
     paddingHorizontal: 11,
     paddingVertical: 6,
     borderRadius: 999,
   },
+  todayButtonTablet: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
   todayButtonText: {
     fontSize: 9,
     fontWeight: '800',
+  },
+  todayButtonTextTablet: {
+    fontSize: 16,
   },
   timeRow: {
     flexDirection: 'row',
@@ -354,6 +371,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 7,
   },
+  compactDateButtonTablet: {
+    height: 52,
+    borderRadius: 26,
+    gap: 10,
+  },
   timeChip: {
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -366,6 +388,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  compactDateTextTablet: {
+    fontSize: 18,
   },
   doneButton: {
     paddingHorizontal: 20,
