@@ -173,6 +173,9 @@
     "emptyText": "请添加出生详情以查看星盘",
     "transit": "流年",
     "dasha": "大运",
+    "dashaMd": "MD",
+    "dashaAd": "AD",
+    "dashaPd": "PD",
     "karakas": "指标星 (Karakas)",
     "positions": "位置",
     "overview": {

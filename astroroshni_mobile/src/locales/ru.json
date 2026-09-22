@@ -173,6 +173,9 @@
     "emptyText": "Добавьте данные рождения для просмотра карт",
     "transit": "Транзит",
     "dasha": "Даша",
+    "dashaMd": "MD",
+    "dashaAd": "AD",
+    "dashaPd": "PD",
     "karakas": "Караки",
     "positions": "Позиции",
     "overview": {

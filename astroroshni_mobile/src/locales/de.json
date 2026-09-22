@@ -173,6 +173,9 @@
     "emptyText": "Bitte Geburtsdaten hinzufügen, um Horoskope zu sehen",
     "transit": "Transit",
     "dasha": "Dasha",
+    "dashaMd": "MD",
+    "dashaAd": "AD",
+    "dashaPd": "PD",
     "karakas": "Karakas",
     "positions": "Positionen",
     "overview": {

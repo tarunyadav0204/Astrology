@@ -1717,7 +1717,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                               </View>
                               {houseInsight.lord_worksheet.combust ? (
                                 <View style={[styles.sheetChip, { backgroundColor: withAlpha(colors.warning, '22') }]}>
-                                  <Text style={[styles.sheetChipText, { color: colors.text }]}>Combust</Text>
+                                  <Text style={[styles.sheetChipText, { color: colors.text }]}>{t('chartScreen.houseDrawer.combust', 'Combust')}</Text>
                                 </View>
                               ) : null}
                               {houseInsight.lord_worksheet.meets_minimum != null ? (
@@ -1730,7 +1730,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                             </View>
                             {houseInsight.lord_worksheet.shadbala_rupas != null ? (
                               <View style={[styles.sheetStat, nestedCard]}>
-                                <Text style={[styles.sheetStatLabel, { color: colors.textSecondary }]}>Shadbala</Text>
+                                <Text style={[styles.sheetStatLabel, { color: colors.textSecondary }]}>{t('chartScreen.houseDrawer.shadbala', 'Shadbala')}</Text>
                                 <Text style={[styles.sheetStatValue, { color: colors.text }]}>
                                   {houseInsight.lord_worksheet.shadbala_rupas}
                                   <Text style={[styles.sheetStatUnit, { color: colors.textSecondary }]}>

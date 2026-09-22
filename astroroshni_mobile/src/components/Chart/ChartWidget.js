@@ -763,11 +763,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
 
       {showDashaHighlight && currentChartType !== 'transit' && dashaLords ? (
         <Text style={[styles.dashaLegend, fitTablet && styles.dashaLegendTablet, { color: colors.chartText || colors.text }]} numberOfLines={2}>
-          <Text style={{ color: colors.primary }}>MD</Text>
+          <Text style={{ color: colors.primary }}>{t('chartScreen.dashaMd', 'MD')}</Text>
           {` ${t(`home.planet_names.${dashaLords.mahadasha}`, dashaLords.mahadasha || '')} · `}
-          <Text style={{ color: colors.primary }}>AD</Text>
+          <Text style={{ color: colors.primary }}>{t('chartScreen.dashaAd', 'AD')}</Text>
           {` ${t(`home.planet_names.${dashaLords.antardasha}`, dashaLords.antardasha || '')} · `}
-          <Text style={{ color: colors.primary }}>PD</Text>
+          <Text style={{ color: colors.primary }}>{t('chartScreen.dashaPd', 'PD')}</Text>
           {` ${t(`home.planet_names.${dashaLords.pratyantardasha}`, dashaLords.pratyantardasha || '')}`}
         </Text>
       ) : null}

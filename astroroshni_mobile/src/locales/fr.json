@@ -173,6 +173,9 @@
     "emptyText": "Veuillez ajouter les détails de naissance pour voir les thèmes",
     "transit": "Transit",
     "dasha": "Dasha",
+    "dashaMd": "MD",
+    "dashaAd": "AD",
+    "dashaPd": "PD",
     "karakas": "Karakas",
     "positions": "Positions",
     "overview": {

@@ -173,6 +173,9 @@
     "emptyText": "कुंडली पाहण्यासाठी कृपया जन्मतपशील जोडा",
     "transit": "गोचर",
     "dasha": "दशा",
+    "dashaMd": "MD",
+    "dashaAd": "AD",
+    "dashaPd": "PD",
     "karakas": "कारक",
     "positions": "स्थिती",
     "overview": {

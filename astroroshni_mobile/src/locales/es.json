@@ -173,6 +173,9 @@
     "emptyText": "Por favor, agrega detalles de nacimiento para ver las cartas",
     "transit": "Tránsito",
     "dasha": "Dasha",
+    "dashaMd": "MD",
+    "dashaAd": "AD",
+    "dashaPd": "PD",
     "karakas": "Karakas",
     "positions": "Posiciones",
     "overview": {

@@ -122,6 +122,9 @@
     "emptyText": "चार्ट देखने के लिए कृपया जन्म विवरण जोड़ें",
     "transit": "गोचर",
     "dasha": "दशा",
+    "dashaMd": "MD",
+    "dashaAd": "AD",
+    "dashaPd": "PD",
     "karakas": "कारक",
     "positions": "स्थितियां",
     "overview": {
@@ -181,6 +184,8 @@
       "timingNext": "अगला",
       "houseMark": " · H{{house}}",
       "direct": "मार्गी",
+      "combust": "अस्त",
+      "shadbala": "षड्बल",
       "lordOf": "{{sign}} के स्वामी {{lord}} हैं",
       "relatedChart": "संबंधित चार्ट",
       "relatedChartDesc": "{{name}} इस भाव के विषय को और गहराई से समझने में सहायक होता है।",
