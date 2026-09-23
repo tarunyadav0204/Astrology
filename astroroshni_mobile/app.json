@@ -42,7 +42,7 @@
       },
       "package": "com.astroroshni.mobile",
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.astroroshni.mobile",
-      "versionCode": 253,
+      "versionCode": 255,
       "newArchEnabled": false,
       "googleServicesFile": "./google-services.json",
       "permissions": [

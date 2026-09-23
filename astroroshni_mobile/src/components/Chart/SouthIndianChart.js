@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, Easing, Platform } from 'react-native';
-import Svg, { Rect, Text as SvgText, G, Line, ClipPath, Defs } from 'react-native-svg';
-import { dashaLevelSuffix, dashaPaint, labelBox, placeTransitLabels, textHalfWidth } from './NorthIndianChart';
+import Svg, { Circle, Rect, Text as SvgText, G, Line, ClipPath, Defs } from 'react-native-svg';
+import { dashaLevelSuffix, dashaPaint, labelBox, placeCircleClear, placeTransitLabels, signPointAt, textHalfWidth, transitBav } from './NorthIndianChart';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -19,6 +19,10 @@ const SouthIndianChart = ({
   size = null, // PWA/web: explicit pixel square (avoids % SVG collapse)
   transitOverlay = null,
   dashaHighlight = null,
+  signPoints = null,
+  bavBySign = null,
+  onTransitPlanetPress = null,
+  onHousePress = null,
 }) => {
   const [contextMenu, setContextMenu] = useState({ show: false, rashiIndex: null, signName: null });
   const { t } = useTranslation();
@@ -209,6 +213,7 @@ const SouthIndianChart = ({
         symbol: t(`planets.${name}`, name.substring(0, 2)),
         name,
         retrograde,
+        bav: transitBav(bavBySign, name, data.sign),
         shortNakshatra: getShortNakshatra(data.longitude || 0),
         formattedDegree: formatDegree(data.degree ?? 0),
       }];
@@ -229,6 +234,35 @@ const SouthIndianChart = ({
       }
     }
     return '';
+  };
+
+  const southPlanetSlot = (pos, index, count, houseNum) => {
+    const top = pos.y + 19;
+    const bottom = pos.y + pos.height - (houseNum === 1 ? 24 : 4);
+    const slot = Math.max(9, (bottom - top) / Math.max(count, 1));
+    const degreesFit = showDegreeNakshatra && slot >= 17;
+    const symbolFont = Math.max(
+      7,
+      Math.min(showKarakas ? 10 : 12, Math.floor(degreesFit ? slot * 0.46 : slot * 0.7)),
+    );
+    const symbolY = top + index * slot + Math.min(symbolFont * 0.85, slot * (degreesFit ? 0.4 : 0.62));
+    const degreeY = top + (index + 1) * slot - 2;
+    return { symbolY, degreeY, symbolFont, degreeFont: 7, degreesFit };
+  };
+
+  const handleCellPress = (signIndex) => {
+    const houseNumber = getHouseNumber(signIndex);
+    if (onHousePress && typeof houseNumber === 'number') {
+      onHousePress({
+        houseNum: houseNumber,
+        rashiIndex: signIndex,
+        signName: rashiNames[signIndex],
+        planets: getPlanetsInSign(signIndex),
+        chartData,
+      });
+      return;
+    }
+    setContextMenu({ show: true, rashiIndex: signIndex, signName: rashiNames[signIndex] });
   };
 
   return (
@@ -358,7 +392,7 @@ const SouthIndianChart = ({
               <Rect
                 x={pos.x} y={pos.y} width={pos.width} height={pos.height}
                 fill="transparent"
-                onPress={() => setContextMenu({ show: true, rashiIndex: pos.sign, signName: rashiNames[pos.sign] })}
+                onPress={() => handleCellPress(pos.sign)}
               />
 
               {/* House number */}
@@ -375,6 +409,69 @@ const SouthIndianChart = ({
                 pointerEvents="none">
                 {houseNumber}
               </SvgText>
+
+              {(() => {
+                if (signPointAt(signPoints, pos.sign) == null) return null;
+                const cellPolygon = [
+                  [pos.x + 2, pos.y + 2],
+                  [pos.x + pos.width - 2, pos.y + 2],
+                  [pos.x + pos.width - 2, pos.y + pos.height - 2],
+                  [pos.x + 2, pos.y + pos.height - 2],
+                ];
+                const occupied = planetsInSign.map((planet, pIndex) => {
+                  const slot = southPlanetSlot(pos, pIndex, planetsInSign.length, houseNumber);
+                  const dashaTag = dashaLevelSuffix(planet.name, dashaHighlight);
+                  const symbolFont = slot.symbolFont;
+                  const tagFont = Math.max(6, Math.round(symbolFont * 0.42));
+                  const symbolHalf = textHalfWidth(planet.symbol, symbolFont);
+                  const tagExtra = dashaTag ? textHalfWidth(dashaTag, tagFont) + 2 : 0;
+                  const degreeHalf = slot.degreesFit
+                    ? textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, slot.degreeFont)
+                    : 0;
+                  const half = Math.max(symbolHalf + tagExtra, degreeHalf) + 4;
+                  const above = Math.ceil(symbolFont * 0.95) + (dashaTag ? tagFont : 1);
+                  const below = slot.degreesFit ? Math.max(4, slot.degreeY - slot.symbolY + 3) : 3;
+                  return labelBox(pos.x + pos.width / 2, slot.symbolY, half, above, below);
+                });
+                const houseLabel = String(houseNumber || '');
+                if (houseLabel) {
+                  const houseHalf = textHalfWidth(houseLabel, 12) + 2;
+                  occupied.push(labelBox(pos.x + 8 + houseHalf, pos.y + 14, houseHalf, 12, 5));
+                }
+                if (houseNumber === 1) {
+                  occupied.push(labelBox(
+                    pos.x + pos.width - 22,
+                    pos.y + pos.height - 18,
+                    22,
+                    14,
+                    showDegreeNakshatra ? 16 : 8,
+                  ));
+                }
+                const savSpot = placeCircleClear(cellPolygon, occupied, 11);
+                if (!savSpot) return null;
+                return (
+                  <G pointerEvents="none">
+                    <Circle
+                      cx={savSpot.x}
+                      cy={savSpot.y}
+                      r={savSpot.radius}
+                      fill={cosmicTheme ? colors.chartSurface : (theme === 'dark' ? '#111827' : '#ffffff')}
+                      stroke={cosmicTheme ? (colors.chartLineStrong || colors.chartLine) : (theme === 'dark' ? '#94a3b8' : '#e91e63')}
+                      strokeWidth="1.25"
+                    />
+                    <SvgText
+                      x={savSpot.x}
+                      y={savSpot.y + 4}
+                      fontSize="11"
+                      fill={cosmicTheme ? colors.chartText : (theme === 'dark' ? '#fff' : '#333')}
+                      fontWeight="700"
+                      textAnchor="middle"
+                    >
+                      {signPointAt(signPoints, pos.sign)}
+                    </SvgText>
+                  </G>
+                );
+              })()}
 
               {/* Ascendant marker for house 1 */}
               {houseNumber === 1 && (
@@ -404,10 +501,11 @@ const SouthIndianChart = ({
 
               {/* Planets */}
               {planetsInSign.map((planet, pIndex) => {
+                const slot = southPlanetSlot(pos, pIndex, planetsInSign.length, houseNumber);
                 const dashaTag = dashaLevelSuffix(planet.name, dashaHighlight);
-                const planetFont = (showKarakas ? 10 : 12) + (dashaTag ? 4 : 0);
+                const planetFont = slot.symbolFont + (dashaTag && planetsInSign.length < 3 ? 2 : 0);
                 const symbolX = pos.x + pos.width / 2;
-                const symbolY = pos.y + 20 + (pIndex * 20);
+                const symbolY = slot.symbolY;
                 const paint = dashaTag ? dashaPaint(colors) : null;
                 return (
                 <G key={pIndex}>
@@ -417,9 +515,26 @@ const SouthIndianChart = ({
                     fontSize={planetFont}
                     fill={paint ? paint.fill : getPlanetColor(planet.name, pos.sign)}
                     fontWeight="bold"
-                    textAnchor="middle">
+                    textAnchor="middle"
+                    onPress={chartType === 'transit' && onTransitPlanetPress && bavBySign?.[planet.name]
+                      ? () => onTransitPlanetPress(planet.name)
+                      : undefined}
+                  >
                     {planet.symbol}
                   </SvgText>
+                  {chartType === 'transit' && transitBav(bavBySign, planet.name, pos.sign) != null ? (
+                    <SvgText
+                      x={symbolX + textHalfWidth(planet.symbol, planetFont) + 2}
+                      y={symbolY}
+                      fontSize={Math.max(7, Math.round(planetFont * 0.62))}
+                      fill={cosmicTheme ? colors.chartTextMuted : (theme === 'dark' ? '#cbd5e1' : '#666')}
+                      fontWeight="700"
+                      textAnchor="start"
+                      pointerEvents="none"
+                    >
+                      {transitBav(bavBySign, planet.name, pos.sign)}
+                    </SvgText>
+                  ) : null}
                   {dashaTag ? (
                     <SvgText
                       x={symbolX + textHalfWidth(planet.symbol, planetFont)}
@@ -433,11 +548,11 @@ const SouthIndianChart = ({
                       {dashaTag}
                     </SvgText>
                   ) : null}
-                  {showDegreeNakshatra && (
+                  {slot.degreesFit && (
                     <SvgText
                       x={symbolX}
-                      y={pos.y + 31 + (pIndex * 20)}
-                      fontSize="8"
+                      y={slot.degreeY}
+                      fontSize={slot.degreeFont}
                       fill={paint ? paint.fill : (cosmicTheme ? colors.chartTextMuted : (theme === 'dark' ? (colors.textSecondary || 'rgba(148, 163, 184, 0.9)') : "#666"))}
                       fontWeight="500"
                       textAnchor="middle">
@@ -457,19 +572,19 @@ const SouthIndianChart = ({
                   [pos.x + 2, pos.y + pos.height - 2],
                 ];
                 const occupied = planetsInSign.map((planet, pIndex) => {
-                  const symbolY = pos.y + 20 + (pIndex * 20);
+                  const slot = southPlanetSlot(pos, pIndex, planetsInSign.length, houseNumber);
                   const dashaTag = dashaLevelSuffix(planet.name, dashaHighlight);
-                  const symbolFont = (showKarakas ? 10 : 12) + (dashaTag ? 4 : 0);
+                  const symbolFont = slot.symbolFont;
                   const tagFont = Math.max(6, Math.round(symbolFont * 0.42));
                   const symbolHalf = textHalfWidth(planet.symbol, symbolFont);
                   const tagExtra = dashaTag ? textHalfWidth(dashaTag, tagFont) + 2 : 0;
-                  const degreeHalf = showDegreeNakshatra
-                    ? textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, 8)
+                  const degreeHalf = slot.degreesFit
+                    ? textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, slot.degreeFont)
                     : 0;
                   const half = Math.max(symbolHalf + tagExtra, degreeHalf) + 4;
                   const above = Math.ceil(symbolFont * 0.95) + (dashaTag ? tagFont : 1);
-                  const below = showDegreeNakshatra ? 16 : 3;
-                  return labelBox(pos.x + pos.width / 2, symbolY, half, above, below);
+                  const below = slot.degreesFit ? Math.max(4, slot.degreeY - slot.symbolY + 3) : 3;
+                  return labelBox(pos.x + pos.width / 2, slot.symbolY, half, above, below);
                 });
                 const houseLabel = String(houseNumber || '');
                 if (houseLabel) {
@@ -491,12 +606,23 @@ const SouthIndianChart = ({
                     showDegreeNakshatra ? 16 : 6,
                   ));
                 }
+                if (signPointAt(signPoints, pos.sign) != null) {
+                  const cellPolygon = [
+                    [pos.x + 2, pos.y + 2],
+                    [pos.x + pos.width - 2, pos.y + 2],
+                    [pos.x + pos.width - 2, pos.y + pos.height - 2],
+                    [pos.x + 2, pos.y + pos.height - 2],
+                  ];
+                  const savSpot = placeCircleClear(cellPolygon, occupied, 11);
+                  if (savSpot?.box) occupied.push(savSpot.box);
+                }
                 const layout = placeTransitLabels(polygon, occupied, transits.map((planet) => ({
                   symbol: planet.symbol,
                   retrograde: planet.retrograde,
                   degree: planet.formattedDegree,
                   nakshatra: planet.shortNakshatra,
                   name: planet.name,
+                  bav: planet.bav,
                 })), showDegreeNakshatra);
                 if (!layout) return null;
                 const transitColor = colors.accent || colors.primary;
@@ -505,7 +631,7 @@ const SouthIndianChart = ({
                     <ClipPath id={`transit-cell-${index}`}>
                       <Rect x={pos.x + 2} y={pos.y + 2} width={pos.width - 4} height={pos.height - 4} />
                     </ClipPath>
-                    <G pointerEvents="none" clipPath={`url(#transit-cell-${index})`}>
+                    <G pointerEvents="box-none" clipPath={`url(#transit-cell-${index})`}>
                       {layout.specs.map((spec, transitIndex) => {
                         const slot = layout.placed[transitIndex];
                         if (!slot) return null;
@@ -518,13 +644,14 @@ const SouthIndianChart = ({
                               fill={transitColor}
                               fontWeight="800"
                               textAnchor="middle"
+                              onPress={spec.name && onTransitPlanetPress ? () => onTransitPlanetPress(spec.name) : undefined}
                             >
                               {spec.text}
                             </SvgText>
                             {spec.detail ? (
                               <SvgText
                                 x={slot.x}
-                                y={slot.y + 9}
+                                y={slot.y + (spec.detailOffset || 9)}
                                 fontSize={spec.detailSize || 7}
                                 fill={transitColor}
                                 fontWeight="600"
@@ -540,6 +667,14 @@ const SouthIndianChart = ({
                   </>
                 );
               })()}
+              <Rect
+                x={pos.x}
+                y={pos.y}
+                width={pos.width}
+                height={pos.height}
+                fill="transparent"
+                onPress={() => handleCellPress(pos.sign)}
+              />
             </G>
           );
         })}

@@ -17,6 +17,46 @@ const HOUSE_DOT_POINTS = {
   7: { x: 250, y: 345 }, 8: { x: 350, y: 380 }, 9: { x: 375, y: 330 },
   10: { x: 350, y: 190 }, 11: { x: 375, y: 70 }, 12: { x: 350, y: 20 },
 };
+const SAV_RADIUS = 12;
+
+const circleInsidePolygon = (x, y, radius, polygon) => {
+  if (!pointInPolygon(x, y, polygon)) return false;
+  for (let step = 0; step < 8; step += 1) {
+    const angle = (Math.PI * 2 * step) / 8;
+    if (!pointInPolygon(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius, polygon)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+export const placeCircleClear = (polygon, occupied, radius) => {
+  if (!polygon) return null;
+  const xs = polygon.map((point) => point[0]);
+  const ys = polygon.map((point) => point[1]);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const radii = [radius, Math.max(8, radius - 4)];
+  let fallback = null;
+  for (const nextRadius of radii) {
+    let best = null;
+    for (let x = minX + nextRadius; x <= maxX - nextRadius; x += 4) {
+      for (let y = minY + nextRadius; y <= maxY - nextRadius; y += 4) {
+        if (!circleInsidePolygon(x, y, nextRadius + 1, polygon)) continue;
+        const box = labelBox(x, y, nextRadius, nextRadius, nextRadius);
+        const gap = occupied.reduce((min, rect) => Math.min(min, boxGap(box, rect)), Infinity);
+        const spot = { x, y, gap, radius: nextRadius, box };
+        if (!best || gap > best.gap) best = spot;
+      }
+    }
+    if (best && best.gap >= 2) return best;
+    if (best && (!fallback || best.gap > fallback.gap)) fallback = best;
+  }
+  return fallback;
+};
+
 const HOUSE_DOT_POINTS_ALT = {
   1: { x: 180, y: 145 }, 2: { x: 75, y: 67 }, 3: { x: 50, y: 97 },
   4: { x: 125, y: 197 }, 5: { x: 50, y: 302 }, 6: { x: 75, y: 332 },
@@ -254,6 +294,30 @@ const natalPlanetAnchor = (houseNumber, center, totalPlanets, pIndex) => {
     }
   }
 
+  if ([6, 8].includes(houseNumber) && totalPlanets > 1) {
+    // Bottom triangles are short. A second row lands on the sign number and
+    // then on the frame, so keep every planet on one row in the wide base.
+    const y = 372;
+    const edgeLeft = houseNumber === 8 ? 600 - y : 400 - y;
+    const edgeRight = houseNumber === 8 ? y : y - 200;
+    const inset = 26;
+    const innerLeft = edgeLeft + inset;
+    const innerRight = edgeRight - inset;
+    const slot = (innerRight - innerLeft) / Math.max(totalPlanets - 1, 1);
+    planetX = innerLeft + pIndex * slot;
+    planetY = y;
+  } else if (houseNumber === 7 && totalPlanets > 1) {
+    const packed = totalPlanets > 4;
+    const rowSpacingUsed = packed ? 28 : 32;
+    const rowCount = packed ? totalPlanets : Math.ceil(totalPlanets / 2);
+    const rowIndex = packed ? pIndex : Math.floor(pIndex / 2);
+    const bottomLimit = 368;
+    let start = planetY - rowIndex * rowSpacingUsed;
+    const lastY = start + (rowCount - 1) * rowSpacingUsed;
+    if (lastY > bottomLimit) start -= lastY - bottomLimit;
+    planetY = start + rowIndex * rowSpacingUsed;
+  }
+
   return { x: planetX, y: planetY };
 };
 
@@ -299,8 +363,8 @@ export const placeClearLabels = (polygon, occupied, specs, minGap = 3) => {
   const maxY = Math.max(...ys);
   const centroid = polygonCentroid(polygon);
   const candidates = [];
-  for (let x = minX + 2; x <= maxX - 2; x += 3) {
-    for (let y = minY + 2; y <= maxY - 2; y += 3) {
+  for (let x = minX + 2; x <= maxX - 2; x += 2) {
+    for (let y = minY + 2; y <= maxY - 2; y += 2) {
       candidates.push({ x, y });
     }
   }
@@ -311,16 +375,24 @@ export const placeClearLabels = (polygon, occupied, specs, minGap = 3) => {
     let best = null;
     candidates.forEach((candidate) => {
       const box = labelBox(candidate.x, candidate.y, spec.halfW, spec.above, spec.below);
-      const inset = labelBox(
-        candidate.x,
-        candidate.y,
-        spec.halfW + 1,
-        spec.above + 1,
-        spec.below + 1,
-      );
-      if (!boxInsidePolygon(inset, polygon)) return;
+      let inside;
+      if (spec.lineOffsets) {
+        const samples = [candidate.x - spec.halfW, candidate.x, candidate.x + spec.halfW];
+        inside = spec.lineOffsets.every((offset) => (
+          samples.every((x) => pointInPolygon(x, candidate.y + offset, polygon))
+        )) && pointInPolygon(candidate.x, candidate.y - Math.max(3, spec.above - 1), polygon);
+      } else {
+        inside = boxInsidePolygon(labelBox(
+          candidate.x,
+          candidate.y,
+          spec.halfW + 1,
+          spec.above + 1,
+          spec.below + 1,
+        ), polygon);
+      }
+      if (!inside) return;
       const gap = blocked.reduce((min, rect) => Math.min(min, boxGap(box, rect)), Infinity);
-      if (gap < minGap) return;
+      if (gap < (spec.lineOffsets ? 1 : minGap)) return;
       const dist = Math.hypot(candidate.x - centroid.x, candidate.y - centroid.y);
       const score = gap - dist * 0.02;
       if (!best || score > best.score) best = { ...candidate, score, box };
@@ -337,49 +409,89 @@ export const placeClearLabels = (polygon, occupied, specs, minGap = 3) => {
 
 const TRANSIT_MARK = '\u1D40';
 
+const bavSuffix = (label) => (Number.isInteger(label.bav) ? ` ${label.bav}` : '');
+
+export const signPointAt = (signPoints, signIndex) => {
+  if (!Array.isArray(signPoints) || signIndex < 0 || signIndex > 11) return null;
+  const value = signPoints[signIndex];
+  return Number.isFinite(value) ? value : null;
+};
+
+export const transitBav = (bavBySign, planetName, signIndex) => {
+  if (!bavBySign || signIndex == null || signIndex < 0) return null;
+  const value = bavBySign[planetName]?.[signIndex];
+  return Number.isInteger(value) ? value : null;
+};
+
 // Try roomy labels first, then shorter ones. Never overlap a natal box.
 export const placeTransitLabels = (polygon, occupied, labels, showDegree) => {
   if (!labels.length) return null;
-  const fullText = (label) => `${label.symbol}${label.retrograde ? '(R)' : ''}${TRANSIT_MARK}`;
-  const shortText = (label) => `${label.symbol}${TRANSIT_MARK}`;
+  const fullText = (label) => `${label.symbol}${label.retrograde ? '(R)' : ''}${TRANSIT_MARK}${bavSuffix(label)}`;
+  const shortText = (label) => `${label.symbol}${TRANSIT_MARK}${bavSuffix(label)}`;
   const detailText = (label) => `${label.degree || ''} ${label.nakshatra || ''}`.trim();
-  const sized = (fontSize, textOf, above, below = 2) => labels.map((label) => {
+  const detailSpec = (label, fontSize, detailSize) => {
+    const text = fullText(label);
+    const detail = detailText(label);
+    const detailOffset = detailSize + 2;
+    return {
+      halfW: Math.max(textHalfWidth(text, fontSize), textHalfWidth(detail, detailSize)),
+      above: Math.ceil(fontSize * 0.8),
+      below: detailOffset + Math.ceil(detailSize * 0.4),
+      text,
+      detail,
+      fontSize,
+      detailSize,
+      detailOffset,
+      name: label.name,
+      lineOffsets: [0, detailOffset],
+    };
+  };
+  const nameSpec = (label, fontSize, textOf) => {
     const text = textOf(label);
-    return { halfW: textHalfWidth(text, fontSize), above, below, text, fontSize };
-  });
+    return {
+      halfW: textHalfWidth(text, fontSize),
+      above: fontSize,
+      below: 2,
+      text,
+      fontSize,
+      name: label.name,
+    };
+  };
 
-  const attempts = [];
-  if (showDegree && labels.length <= 2) {
-    attempts.push(labels.map((label) => ({
-      halfW: Math.max(textHalfWidth(fullText(label), 10), textHalfWidth(detailText(label), 8)),
-      above: 11,
-      below: 18,
-      text: fullText(label),
-      detail: detailText(label),
-      fontSize: 10,
-      detailSize: 8,
-    })));
-  }
-  attempts.push(sized(9, fullText, 9));
-  attempts.push(sized(8, shortText, 8));
-  attempts.push(sized(7, shortText, 7));
+  const blocked = occupied.slice();
+  const placed = [];
+  const specs = [];
+  labels.forEach((label) => {
+    const tries = [];
+    if (showDegree && detailText(label)) {
+      tries.push(detailSpec(label, 9, 7), detailSpec(label, 8, 6));
+    }
+    tries.push(nameSpec(label, 9, fullText), nameSpec(label, 8, shortText), nameSpec(label, 7, shortText));
+    for (const spec of tries) {
+      const slot = placeClearLabels(polygon, blocked, [spec], 2)[0];
+      if (!slot) continue;
+      placed.push(slot);
+      specs.push(spec);
+      blocked.push(slot.box);
+      return;
+    }
+  });
+  if (placed.length) return { placed, specs };
+
   if (labels.length > 1) {
-    [8, 7].forEach((fontSize) => {
+    for (const fontSize of [8, 7]) {
       const text = labels.map(shortText).join(' ');
-      attempts.push([{
+      const spec = {
         halfW: textHalfWidth(text, fontSize),
         above: fontSize,
         below: 2,
         text,
         fontSize,
         joined: true,
-      }]);
-    });
-  }
-
-  for (const specs of attempts) {
-    const placed = placeClearLabels(polygon, occupied, specs, 3);
-    if (placed.length === specs.length && placed.every(Boolean)) return { placed, specs };
+      };
+      const slot = placeClearLabels(polygon, occupied, [spec], 2)[0];
+      if (slot) return { placed: [slot], specs: [spec] };
+    }
   }
   return null;
 };
@@ -412,6 +524,9 @@ const NorthIndianChart = ({
   gridLineWidth = null,
   transitOverlay = null,
   dashaHighlight = null,
+  signPoints = null,
+  bavBySign = null,
+  onTransitPlanetPress = null,
 }) => {
   const { theme, colors } = useTheme();
   const { t } = useTranslation();
@@ -475,6 +590,10 @@ const NorthIndianChart = ({
   }, [chartData, chartType, rotatedAscendant, drawAnim]);
 
   const handlePlanetPress = (planet) => {
+    if (chartType === 'transit' && onTransitPlanetPress && bavBySign?.[planet.name]) {
+      onTransitPlanetPress(planet.name);
+      return;
+    }
     const tooltipText = `${planet.name}: ${planet.formattedDegree} in ${planet.nakshatra} · Pada ${planet.pada}`;
     setTooltip({ show: true, text: tooltipText });
     setTimeout(() => setTooltip({ show: false, text: '' }), 2000);
@@ -675,6 +794,8 @@ const NorthIndianChart = ({
         symbol: t(`planets.${name}`, name.substring(0, 2)),
         name,
         retrograde,
+        sign: data.sign,
+        bav: transitBav(bavBySign, name, data.sign),
         nakshatra: getNakshatra(data.longitude || 0),
         shortNakshatra: getShortNakshatra(data.longitude || 0),
         pada: getNakshatraPada(data.longitude || 0),
@@ -683,10 +804,7 @@ const NorthIndianChart = ({
     });
   };
 
-  const renderTransitOverlay = (houseNumber, houseData, planetsInHouse) => {
-    const list = getTransitPlanetsInHouse(houseNumber - 1);
-    const polygon = HOUSE_POLYGONS[houseNumber];
-    if (!list.length || !polygon) return null;
+  const collectNatalBoxes = (houseNumber, houseData, planetsInHouse) => {
     const occupied = planetsInHouse.map((planet, pIndex) => {
       const anchor = natalPlanetAnchor(houseNumber, houseData.center, planetsInHouse.length, pIndex);
       const dashaTag = dashaLevelSuffix(planet.name, dashaHighlight);
@@ -700,20 +818,39 @@ const NorthIndianChart = ({
       const degreeHalf = showDegreeNakshatra
         ? textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, degreeFont)
         : 0;
-      const half = Math.max(symbolHalf + tagExtra, degreeHalf) + 5;
-      const above = Math.ceil(symbolFont * 0.95) + (dashaTag ? tagFont + 1 : 2);
-      const below = showDegreeNakshatra ? 16 + Math.ceil(degreeFont * 0.5) + 2 : 4;
+      const half = Math.max(symbolHalf + tagExtra, degreeHalf) + 6;
+      const above = Math.ceil(symbolFont * 0.95) + (dashaTag ? tagFont + 1 : 2) + 2;
+      const below = (showDegreeNakshatra ? 16 + Math.ceil(degreeFont * 0.5) + 2 : 4) + 2;
       return labelBox(anchor.x, symbolY, half, above, below);
     });
     const sign = signAnchor(houseNumber, houseData.center);
     const signLabel = String(getRashiForHouse(houseNumber - 1) + 1);
     const signHalf = textHalfWidth(signLabel, 18) + 4;
-    occupied.push(labelBox(sign.x + signHalf - 4, sign.y, signHalf, 18, 5));
+    occupied.push(labelBox(sign.x + signHalf, sign.y - 2, signHalf, 16, 8));
     if (houseNumber === 1) {
       const ascX = houseData.center.x + 25;
       const ascY = houseData.center.y + 35;
-      occupied.push(labelBox(ascX, ascY, 26, 14, showDegreeNakshatra ? 24 : 6));
+      occupied.push(labelBox(ascX, ascY, 28, 16, showDegreeNakshatra ? 26 : 8));
     }
+    return occupied;
+  };
+
+  const savSpotFor = (houseNumber, houseData, planetsInHouse) => {
+    if (signPointAt(signPoints, getRashiForHouse(houseNumber - 1)) == null) return null;
+    return placeCircleClear(
+      HOUSE_POLYGONS[houseNumber],
+      collectNatalBoxes(houseNumber, houseData, planetsInHouse),
+      SAV_RADIUS,
+    );
+  };
+
+  const renderTransitOverlay = (houseNumber, houseData, planetsInHouse) => {
+    const list = getTransitPlanetsInHouse(houseNumber - 1);
+    const polygon = HOUSE_POLYGONS[houseNumber];
+    if (!list.length || !polygon) return null;
+    const occupied = collectNatalBoxes(houseNumber, houseData, planetsInHouse);
+    const savSpot = savSpotFor(houseNumber, houseData, planetsInHouse);
+    if (savSpot?.box) occupied.push(savSpot.box);
 
     const layout = placeTransitLabels(polygon, occupied, list.map((planet) => ({
       symbol: planet.symbol,
@@ -721,6 +858,7 @@ const NorthIndianChart = ({
       degree: planet.formattedDegree,
       nakshatra: planet.shortNakshatra,
       name: planet.name,
+      bav: planet.bav,
     })), showDegreeNakshatra);
     if (!layout) return null;
 
@@ -730,7 +868,7 @@ const NorthIndianChart = ({
         <ClipPath id={`transit-house-${houseNumber}`}>
           <Path d={houseData.path} />
         </ClipPath>
-        <G pointerEvents="none" clipPath={`url(#transit-house-${houseNumber})`}>
+        <G pointerEvents="box-none" clipPath={`url(#transit-house-${houseNumber})`}>
           {layout.specs.map((spec, index) => {
             const slot = layout.placed[index];
             if (!slot) return null;
@@ -743,13 +881,14 @@ const NorthIndianChart = ({
                   fill={transitColor}
                   fontWeight="800"
                   textAnchor="middle"
+                  onPress={spec.name && onTransitPlanetPress ? () => onTransitPlanetPress(spec.name) : undefined}
                 >
                   {spec.text}
                 </SvgText>
                 {spec.detail ? (
                   <SvgText
                     x={slot.x}
-                    y={slot.y + 10}
+                    y={slot.y + (spec.detailOffset || 10)}
                     fontSize={spec.detailSize || 8}
                     fill={transitColor}
                     fontWeight="600"
@@ -911,6 +1050,33 @@ const NorthIndianChart = ({
                 {rashiIndex + 1}
               </SvgText>
 
+              {(() => {
+                const savSpot = savSpotFor(houseNumber, houseData, planetsInHouse);
+                if (!savSpot) return null;
+                return (
+                  <G pointerEvents="none">
+                    <Circle
+                      cx={savSpot.x}
+                      cy={savSpot.y}
+                      r={savSpot.radius}
+                      fill={cosmicTheme ? colors.chartSurface : (theme === 'dark' ? '#111827' : '#ffffff')}
+                      stroke={cosmicTheme ? (colors.chartLineStrong || colors.chartLine) : (theme === 'dark' ? '#94a3b8' : '#e91e63')}
+                      strokeWidth="1.25"
+                    />
+                    <SvgText
+                      x={savSpot.x}
+                      y={savSpot.y + 4}
+                      fontSize="11"
+                      fill={themedChartText}
+                      fontWeight="700"
+                      textAnchor="middle"
+                    >
+                      {signPointAt(signPoints, rashiIndex)}
+                    </SvgText>
+                  </G>
+                );
+              })()}
+
               {houseNumber === 1 && (
                 <G>
                   <SvgText x={houseData.center.x + 25} y={houseData.center.y + 35} fontSize="12" fill={activatedHouseText || (cosmicTheme ? colors.primary : "#e91e63")} fontWeight="900" textAnchor="middle">ASC</SvgText>
@@ -960,6 +1126,19 @@ const NorthIndianChart = ({
                         pointerEvents="none"
                       >
                         {dashaTag}
+                      </SvgText>
+                    ) : null}
+                    {chartType === 'transit' && transitBav(bavBySign, planet.name, rashiIndex) != null ? (
+                      <SvgText
+                        x={planetX + textHalfWidth(symbol, planetFont) + 2}
+                        y={planetY - 8}
+                        fontSize={Math.max(7, Math.round(planetFont * 0.62))}
+                        fill={themedChartTextMuted}
+                        fontWeight="700"
+                        textAnchor="start"
+                        pointerEvents="none"
+                      >
+                        {transitBav(bavBySign, planet.name, rashiIndex)}
                       </SvgText>
                     ) : null}
                     {showDegreeNakshatra && (

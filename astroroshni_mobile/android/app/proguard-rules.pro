@@ -25,5 +25,7 @@
     @android.webkit.JavascriptInterface <methods>;
 }
 -keep class com.appsflyer.** { *; }
+-keep class com.google.android.play.core.** { *; }
+-dontwarn com.google.android.play.core.**
 -keep class com.margelo.nitro.** { *; }
 # @generated end expo-build-properties

@@ -27,6 +27,16 @@ import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
 
 const isWeb = Platform.OS === 'web';
+const BAV_PLANETS = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'];
+
+const normalizeBindus = (bindus) => {
+  const out = [];
+  for (let i = 0; i < 12; i += 1) {
+    const value = Number(bindus?.[i] ?? bindus?.[String(i)]);
+    out.push(Number.isFinite(value) ? value : null);
+  }
+  return out;
+};
 
 const toLocalYmd = (value) => {
   const date = value instanceof Date ? value : new Date(value);
@@ -48,6 +58,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [karakas, setKarakas] = useState(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showTransitOverlay, setShowTransitOverlay] = useState(false);
+  const [showSav, setShowSav] = useState(false);
+  const [bavPlanet, setBavPlanet] = useState(null);
+  const [ashtakavarga, setAshtakavarga] = useState(null);
   const [showDashaHighlight, setShowDashaHighlight] = useState(false);
   const [dashaLords, setDashaLords] = useState(null);
   // PWA/web: measure parent width before locking SVG pixels (window width can be
@@ -237,6 +250,78 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       console.error('Failed to load dasha highlight:', error);
     }
   }, [birthData, transitDate]);
+
+  const birthKey = `${birthData?.id || ''}|${birthData?.date || ''}|${birthData?.time || ''}|${birthData?.latitude || ''}|${birthData?.longitude || ''}`;
+  const loadedAvKeyRef = useRef('');
+  const avRequestRef = useRef(0);
+  const ensureAshtakavarga = useCallback(async () => {
+    if (!birthData || loadedAvKeyRef.current === birthKey) return;
+    const requestId = ++avRequestRef.current;
+    try {
+      const formattedData = {
+        ...birthData,
+        date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
+        time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
+        latitude: parseFloat(birthData.latitude),
+        longitude: parseFloat(birthData.longitude),
+      };
+      const response = await chartAPI.calculateAshtakavarga(formattedData, 'lagna');
+      if (requestId !== avRequestRef.current) return;
+      const payload = response?.data?.ashtakavarga;
+      if (!payload?.sarvashtakavarga) return;
+      loadedAvKeyRef.current = birthKey;
+      setAshtakavarga(payload);
+    } catch (error) {
+      console.error('Failed to load ashtakavarga overlay:', error);
+    }
+  }, [birthData, birthKey]);
+
+  const handleTransitPlanetPress = useCallback((planetName) => {
+    if (!BAV_PLANETS.includes(planetName)) return;
+    setBavPlanet((prev) => (prev === planetName ? null : planetName));
+  }, []);
+
+  useEffect(() => {
+    avRequestRef.current += 1;
+    loadedAvKeyRef.current = '';
+    setAshtakavarga(null);
+    setBavPlanet(null);
+  }, [birthKey]);
+
+  useEffect(() => {
+    if (currentChartType === 'lagna' && !showTransitOverlay) setBavPlanet(null);
+    if (currentChartType !== 'lagna' && currentChartType !== 'transit') setBavPlanet(null);
+  }, [currentChartType, showTransitOverlay]);
+
+  const savBySign = useMemo(() => (
+    ashtakavarga?.sarvashtakavarga ? normalizeBindus(ashtakavarga.sarvashtakavarga) : null
+  ), [ashtakavarga]);
+
+  const bavBySign = useMemo(() => {
+    const showBav = currentChartType === 'transit' || (currentChartType === 'lagna' && showTransitOverlay);
+    if (!showBav || !ashtakavarga?.individual_charts) return null;
+    const map = {};
+    BAV_PLANETS.forEach((planet) => {
+      const chart = ashtakavarga.individual_charts[planet];
+      if (chart?.bindus) map[planet] = normalizeBindus(chart.bindus);
+    });
+    return map;
+  }, [ashtakavarga, currentChartType, showTransitOverlay]);
+
+  const signPoints = useMemo(() => {
+    const onRashiChart = currentChartType === 'lagna' || currentChartType === 'transit';
+    if (!onRashiChart) return null;
+    if (bavPlanet && ashtakavarga?.individual_charts?.[bavPlanet]?.bindus) {
+      return normalizeBindus(ashtakavarga.individual_charts[bavPlanet].bindus);
+    }
+    if (showSav) return savBySign;
+    return null;
+  }, [ashtakavarga, bavPlanet, currentChartType, savBySign, showSav]);
+
+  useEffect(() => {
+    const wantsPoints = showSav || showTransitOverlay || currentChartType === 'transit' || Boolean(bavPlanet);
+    if (wantsPoints) ensureAshtakavarga();
+  }, [bavPlanet, currentChartType, ensureAshtakavarga, showSav, showTransitOverlay]);
 
   const toggleDashaHighlight = useCallback(() => {
     if (!showDashaHighlight && !timingLicensed) {
@@ -633,6 +718,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         hideInstructions={cosmicTheme}
         transitOverlay={transitOverlay}
         dashaHighlight={dashaHighlight}
+        signPoints={signPoints}
+        bavBySign={bavBySign}
+        onTransitPlanetPress={handleTransitPlanetPress}
         {...sizeProp}
       />
     ) : (
@@ -648,10 +736,14 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         karakas={karakas}
         transitOverlay={transitOverlay}
         dashaHighlight={dashaHighlight}
+        signPoints={signPoints}
+        bavBySign={bavBySign}
+        onTransitPlanetPress={handleTransitPlanetPress}
+        onHousePress={onHousePress}
         {...sizeProp}
       />
     );
-  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType]);
+  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType, signPoints, bavBySign, handleTransitPlanetPress]);
 
   const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
     const iconColor = primary ? colors.onPrimary : (active ? colors.onAccent : colors.text);
@@ -717,7 +809,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       >
       {cosmicTheme ? (
         <View style={[styles.webToolbar, { backgroundColor: colors.chartRaised, borderBottomColor: colors.chartLine }]}>
-          <Text style={[styles.viewToolbarLabel, fitTablet && styles.viewToolbarLabelTablet, { color: colors.chartTextMuted }]}>{t('premiumUi.common.view')}</Text>
+          {fitTablet ? (
+            <Text style={[styles.viewToolbarLabel, styles.viewToolbarLabelTablet, { color: colors.chartTextMuted }]}>{t('premiumUi.common.view')}</Text>
+          ) : null}
           <View style={styles.webToolbarLeft}>
             <TouchableOpacity
               onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
@@ -773,6 +867,20 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 </Text>
               </TouchableOpacity>
             ) : null}
+            {(currentChartType === 'lagna' || currentChartType === 'transit') ? (
+              <TouchableOpacity
+                onPress={() => setShowSav((prev) => !prev)}
+                style={[styles.viewControl, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: showSav }}
+                accessibilityLabel={t('chartScreen.sav', 'SAV')}
+              >
+                <Ionicons name="apps-outline" size={fitTablet ? 22 : 15} color={showSav ? colors.primary : colors.chartTextMuted} />
+                <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: showSav ? colors.primary : colors.chartTextMuted }]}>
+                  {t('chartScreen.sav', 'SAV')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
           <TouchableOpacity
             onPress={() => setShowInfoModal(true)}
@@ -785,14 +893,32 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         </View>
       ) : null}
 
-      {showDashaHighlight && currentChartType !== 'transit' && dashaLords ? (
-        <Text style={[styles.dashaLegend, fitTablet && styles.dashaLegendTablet, { color: colors.chartText || colors.text }]} numberOfLines={2}>
-          <Text style={{ color: dashaColor }}>{t('chartScreen.dashaMd', 'MD')}</Text>
-          {` ${t(`home.planet_names.${dashaLords.mahadasha}`, dashaLords.mahadasha || '')} · `}
-          <Text style={{ color: dashaColor }}>{t('chartScreen.dashaAd', 'AD')}</Text>
-          {` ${t(`home.planet_names.${dashaLords.antardasha}`, dashaLords.antardasha || '')} · `}
-          <Text style={{ color: dashaColor }}>{t('chartScreen.dashaPd', 'PD')}</Text>
-          {` ${t(`home.planet_names.${dashaLords.pratyantardasha}`, dashaLords.pratyantardasha || '')}`}
+      {((currentChartType === 'lagna' || currentChartType === 'transit') && (bavPlanet || showSav))
+        || (showDashaHighlight && currentChartType !== 'transit' && dashaLords) ? (
+        <Text
+          style={[styles.dashaLegend, fitTablet && styles.dashaLegendTablet, { color: colors.chartText || colors.text }]}
+          numberOfLines={(currentChartType === 'lagna' || currentChartType === 'transit') && (bavPlanet || showSav) && showDashaHighlight && dashaLords ? 1 : 2}
+        >
+          {(currentChartType === 'lagna' || currentChartType === 'transit') && (bavPlanet || showSav) ? (
+            bavPlanet
+              ? t('chartScreen.bavPlanet', {
+                  planet: t(`home.planet_names.${bavPlanet}`, bavPlanet),
+                  defaultValue: 'BAV · {{planet}}',
+                })
+              : t('chartScreen.sav', 'SAV')
+          ) : null}
+          {(currentChartType === 'lagna' || currentChartType === 'transit') && (bavPlanet || showSav)
+            && showDashaHighlight && currentChartType !== 'transit' && dashaLords ? '   ' : null}
+          {showDashaHighlight && currentChartType !== 'transit' && dashaLords ? (
+            <>
+              <Text style={{ color: dashaColor }}>{t('chartScreen.dashaMd', 'MD')}</Text>
+              {` ${t(`home.planet_names.${dashaLords.mahadasha}`, dashaLords.mahadasha || '')} · `}
+              <Text style={{ color: dashaColor }}>{t('chartScreen.dashaAd', 'AD')}</Text>
+              {` ${t(`home.planet_names.${dashaLords.antardasha}`, dashaLords.antardasha || '')} · `}
+              <Text style={{ color: dashaColor }}>{t('chartScreen.dashaPd', 'PD')}</Text>
+              {` ${t(`home.planet_names.${dashaLords.pratyantardasha}`, dashaLords.pratyantardasha || '')}`}
+            </>
+          ) : null}
         </Text>
       ) : null}
 
@@ -1058,6 +1184,7 @@ const styles = StyleSheet.create({
   webToolbarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 7,
     flex: 1,
   },

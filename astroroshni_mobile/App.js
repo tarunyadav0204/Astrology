@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 import { DefaultTheme, NavigationContainer, getPathFromState, getStateFromPath } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StatusBar, View, ActivityIndicator, Animated, Text, TouchableOpacity, Linking, ScrollView, StyleSheet } from 'react-native';
+import { StatusBar, View, ActivityIndicator, Animated, Text, TouchableOpacity, Linking, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -98,6 +98,13 @@ import { initFacebookAnalytics } from './src/services/facebookAnalytics';
 import { initAppsFlyerAnalytics } from './src/services/appsFlyerAnalytics';
 import { initFirebaseAnalytics } from './src/services/firebaseAnalytics';
 import { trackNavigationRoute } from './src/services/navigationAnalytics';
+import {
+  checkPlayUpdate,
+  completePlayUpdate,
+  isPlayInAppUpdateAvailable,
+  startPlayUpdate,
+  subscribePlayUpdate,
+} from './src/services/playInAppUpdate';
 import { trackGA4EventOnly } from './src/utils/analytics';
 import AddToHomeScreenPrompt from './src/platform/AddToHomeScreenPrompt';
 import WebAlertProvider from './src/platform/WebAlertProvider';
@@ -460,10 +467,80 @@ export default function App() {
   const [initialTheme, setInitialTheme] = useState(null);
   const [initialPanditMode, setInitialPanditMode] = useState(false);
   const [forceUpdateInfo, setForceUpdateInfo] = useState(null);
+  const [playUpdateBlocking, setPlayUpdateBlocking] = useState(false);
   const [fatalRuntimeError, setFatalRuntimeError] = useState(null);
   const [isRecoveringFromCrash, setIsRecoveringFromCrash] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const navigationRef = useRef(null);
+  const playRestartPromptedRef = useRef(false);
+  const promptPlayRestartRef = useRef(() => {});
+  const pendingAndroidForceRef = useRef(null);
+
+  promptPlayRestartRef.current = () => {
+    if (playRestartPromptedRef.current) return;
+    playRestartPromptedRef.current = true;
+    Alert.alert(
+      i18n.t('appUpdate.restartTitle', 'Update ready'),
+      i18n.t('appUpdate.restartBody', 'The update has downloaded. Restart to finish installing.'),
+      [{
+        text: i18n.t('appUpdate.restartNow', 'Restart'),
+        onPress: () => {
+          playRestartPromptedRef.current = false;
+          completePlayUpdate().catch(() => {});
+        },
+      }],
+      { cancelable: false },
+    );
+  };
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !isPlayInAppUpdateAvailable()) return undefined;
+    const unsubscribeStatus = subscribePlayUpdate((event) => {
+      if (event?.status === 'downloaded') promptPlayRestartRef.current();
+    });
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      checkPlayUpdate().then((info) => {
+        if (!info) return;
+        if (info.installStatus === 'downloaded') promptPlayRestartRef.current();
+        else if (info.updateInProgress) startPlayUpdate('immediate').catch(() => {});
+      }).catch(() => {});
+    });
+    return () => {
+      unsubscribeStatus();
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!playUpdateBlocking) return undefined;
+    let alive = true;
+    const retry = () => {
+      startPlayUpdate('immediate').then((result) => {
+        if (!alive) return;
+        if (result === 'downloaded') promptPlayRestartRef.current();
+        if (result === 'canceled') {
+          setTimeout(() => {
+            if (alive) retry();
+          }, 400);
+          return;
+        }
+        if (result === 'unavailable' || result === 'failed') {
+          setPlayUpdateBlocking(false);
+          if (pendingAndroidForceRef.current) setForceUpdateInfo(pendingAndroidForceRef.current);
+        }
+      }).catch(() => {
+        if (!alive) return;
+        setPlayUpdateBlocking(false);
+        if (pendingAndroidForceRef.current) setForceUpdateInfo(pendingAndroidForceRef.current);
+      });
+    };
+    const timer = setTimeout(retry, 400);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [playUpdateBlocking]);
 
   useEffect(() => {
     installRuntimeGuard();
@@ -510,6 +587,40 @@ export default function App() {
 
   const SPLASH_MIN_MS = Platform.OS === 'web' ? 800 : 1500;
 
+  const offerAndroidPlayUpdate = async (required) => {
+    if (!isPlayInAppUpdateAvailable()) return false;
+    try {
+      const info = await checkPlayUpdate();
+      if (!info) return false;
+      if (info.installStatus === 'downloaded') {
+        promptPlayRestartRef.current();
+        return true;
+      }
+      if (info.updateInProgress) {
+        const result = await startPlayUpdate('immediate');
+        if (result === 'canceled') setPlayUpdateBlocking(true);
+        return result !== 'unavailable' && result !== 'failed';
+      }
+      if (!info.updateAvailable) return false;
+      const immediate = required || Number(info.updatePriority) >= 4;
+      const mode = immediate ? 'immediate' : 'flexible';
+      const allowed = immediate ? info.immediateAllowed : info.flexibleAllowed;
+      if (!allowed) return false;
+      const result = await startPlayUpdate(mode);
+      if (result === 'downloaded') {
+        promptPlayRestartRef.current();
+        return true;
+      }
+      if (immediate && result === 'canceled') {
+        setPlayUpdateBlocking(true);
+        return true;
+      }
+      return result === 'accepted' || mode === 'flexible';
+    } catch (_) {
+      return false;
+    }
+  };
+
   const checkForceUpdate = async () => {
     let timeoutId = null;
     let controller = null;
@@ -534,7 +645,16 @@ export default function App() {
         const nativeBuild = Number(Application.nativeBuildVersion || 0);
         const fallbackBuild = Number(Constants.expoConfig?.android?.versionCode || 0);
         const current = nativeBuild || fallbackBuild;
-        if (minAndroid && current && current < minAndroid) {
+        const required = Boolean(minAndroid && current && current < minAndroid);
+        pendingAndroidForceRef.current = required ? {
+          platform: 'android',
+          currentVersion: current,
+          minVersion: minAndroid,
+          releaseNotes,
+        } : null;
+        const playHandled = await offerAndroidPlayUpdate(required);
+        // Play's own screen is the update. The in-app screen remains only when Play cannot deliver it.
+        if (required && !playHandled) {
           setForceUpdateInfo({
             platform: 'android',
             currentVersion: current,
@@ -743,9 +863,18 @@ export default function App() {
     };
   }, [isLoading, skipPushOnIos]);
 
-  const handleUpdatePress = () => {
+  const handleUpdatePress = async () => {
     try {
       if (Platform.OS === 'android') {
+        try {
+          const result = await startPlayUpdate('immediate');
+          if (result === 'accepted' || result === 'downloaded') {
+            if (result === 'downloaded') promptPlayRestartRef.current();
+            return;
+          }
+        } catch (_) {
+          /* Play could not start; open the listing. */
+        }
         const pkg = Constants.expoConfig?.android?.package || 'com.astroroshni.mobile';
         const playUrl = `https://play.google.com/store/apps/details?id=${pkg}`;
         Linking.openURL(playUrl);
@@ -838,6 +967,18 @@ export default function App() {
             </TouchableOpacity>
           </View>
         </View>
+      </SafeAreaProvider>
+    );
+  }
+
+  if (playUpdateBlocking) {
+    return (
+      <SafeAreaProvider>
+        <ThemeProvider initialTheme={initialTheme} initialPanditMode={initialPanditMode}>
+          <ThemedAppBackground>
+            <View style={{ flex: 1 }} />
+          </ThemedAppBackground>
+        </ThemeProvider>
       </SafeAreaProvider>
     );
   }
