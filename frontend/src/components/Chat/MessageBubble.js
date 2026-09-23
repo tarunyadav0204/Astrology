@@ -829,7 +829,8 @@ const MessageBubble = ({
         () => (isFreeQuestionAnswer ? splitFreeAnswerContent(message.content) : null),
         [isFreeQuestionAnswer, message.content],
     );
-    const canBlurFreeDetail = Boolean(freeSplit?.canBlur);
+    // The first free question includes the full answer. Do not hide the rest behind a credit reveal.
+    const canBlurFreeDetail = false;
     const shouldBlurDetail = canBlurFreeDetail && !detailUnlocked;
 
     useEffect(() => {
@@ -2186,10 +2187,10 @@ const MessageBubble = ({
                                         className="free-detail-reveal-btn"
                                         onClick={handleRevealDetailedAnswer}
                                     >
-                                        Reveal the detailed answer
+                                        Ask another question
                                     </button>
                                     <div className="free-detail-hint">
-                                        Standard mode · {standardChatCost} credits
+                                        Credits for another Detailed Question · {standardChatCost}
                                     </div>
                                 </div>
                             )}

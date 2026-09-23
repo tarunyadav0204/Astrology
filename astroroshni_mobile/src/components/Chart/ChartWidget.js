@@ -36,7 +36,7 @@ const toLocalYmd = (value) => {
   return `${date.getFullYear()}-${month}-${day}`;
 };
 
-const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, onRequestBirthChart, division, navigation, onHousePress }, ref) => {
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, onRequestBirthChart, onRequestTimingLicense, timingLicensed = false, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const dashaColor = dashaPaint(colors).fill;
@@ -179,13 +179,26 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     }
   }, [birthData]);
 
+  const enableTiming = useCallback((kind) => {
+    if (kind === 'transit') {
+      setShowTransitOverlay(true);
+      if (currentChartType !== 'lagna') onRequestBirthChart?.();
+      return;
+    }
+    if (kind === 'dasha') setShowDashaHighlight(true);
+  }, [currentChartType, onRequestBirthChart]);
+
   const toggleTransitOverlay = useCallback(() => {
+    if (!showTransitOverlay && !timingLicensed) {
+      onRequestTimingLicense?.('transit');
+      return;
+    }
     setShowTransitOverlay((prev) => {
       const next = !prev;
       if (next && currentChartType !== 'lagna') onRequestBirthChart?.();
       return next;
     });
-  }, [currentChartType, onRequestBirthChart]);
+  }, [currentChartType, onRequestBirthChart, onRequestTimingLicense, showTransitOverlay, timingLicensed]);
 
   const dashaRequestRef = useRef(0);
   const ensureDashaHighlight = useCallback(async (dateKey) => {
@@ -226,8 +239,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   }, [birthData, transitDate]);
 
   const toggleDashaHighlight = useCallback(() => {
+    if (!showDashaHighlight && !timingLicensed) {
+      onRequestTimingLicense?.('dasha');
+      return;
+    }
     setShowDashaHighlight((prev) => !prev);
-  }, []);
+  }, [onRequestTimingLicense, showDashaHighlight, timingLicensed]);
 
   const dashaBirthKey = `${birthData?.id || ''}|${birthData?.date || ''}|${birthData?.time || ''}`;
   const dashaBirthKeyRef = useRef(dashaBirthKey);
@@ -585,7 +602,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     if (showDashaHighlight) ensureDashaHighlight(dateKey);
   }, [showTransitOverlay, showDashaHighlight, transitDate, ensureTransitOverlay, ensureDashaHighlight]);
 
-  useImperativeHandle(ref, () => ({ navigateToTransit, handleRotate }), [navigateToTransit, handleRotate]);
+  useImperativeHandle(ref, () => ({ navigateToTransit, handleRotate, enableTiming }), [navigateToTransit, handleRotate, enableTiming]);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowSwipeHint(false), 3000);
@@ -728,9 +745,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 style={[styles.viewControl, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: showTransitOverlay }}
-                accessibilityLabel={t('chartScreen.transit', 'Transit')}
+                accessibilityLabel={timingLicensed ? t('chartScreen.transit', 'Transit') : t('premiumUi.chart.licenseRequired')}
               >
                 <Ionicons name="planet-outline" size={fitTablet ? 22 : 15} color={showTransitOverlay ? colors.primary : colors.chartTextMuted} />
+                {timingLicensed ? null : (
+                  <Ionicons name="lock-closed" size={fitTablet ? 14 : 11} color={colors.chartTextMuted} />
+                )}
                 <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: showTransitOverlay ? colors.primary : colors.chartTextMuted }]}>
                   {t('chartScreen.transit', 'Transit')}
                 </Text>
@@ -742,9 +762,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 style={[styles.viewControl, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: showDashaHighlight }}
-                accessibilityLabel={t('chartScreen.dasha', 'Dasha')}
+                accessibilityLabel={timingLicensed ? t('chartScreen.dasha', 'Dasha') : t('premiumUi.chart.licenseRequired')}
               >
                 <Ionicons name="time-outline" size={fitTablet ? 22 : 15} color={showDashaHighlight ? colors.primary : colors.chartTextMuted} />
+                {timingLicensed ? null : (
+                  <Ionicons name="lock-closed" size={fitTablet ? 14 : 11} color={colors.chartTextMuted} />
+                )}
                 <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: showDashaHighlight ? colors.primary : colors.chartTextMuted }]}>
                   {t('chartScreen.dasha', 'Dasha')}
                 </Text>

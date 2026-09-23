@@ -32,8 +32,9 @@ from utils.calendar_date import parse_calendar_date_y_m_d
 from public_sky import calculate_current_sky
 from utils.account_deletion_bigquery import (
     AccountDeletionBackupError,
-    backup_user_deletion_to_bigquery,
+    build_account_deletion_snapshot,
     list_deleted_account_backups,
+    upload_account_deletion_snapshot,
 )
 from db import get_conn, execute, SQL_SUBSCRIPTION_PLAN_ACTIVE
 import bcrypt
@@ -2094,13 +2095,7 @@ def _anonymize_user_account_tx(conn, userid: int) -> None:
     )
 
 
-def _hard_delete_user_tx(
-    conn,
-    userid: int,
-    *,
-    deleted_by_userid: Optional[int] = None,
-    deletion_source: str = "unknown",
-) -> None:
+def _hard_delete_user_tx(conn, userid: int) -> None:
     """
     Delete/scrub personal data tied to userid in an order that respects foreign keys.
     Payment/credit audit rows are intentionally retained:
@@ -2108,14 +2103,8 @@ def _hard_delete_user_tx(
     - users.phone is replaced with deleted_<userid>_<random>, so the original phone can register again.
     - user_credits and credit_transactions are preserved for support/refund/audit.
     Must run inside a single transaction (caller commits).
+    The BigQuery backup is uploaded before this transaction opens.
     """
-    backup_user_deletion_to_bigquery(
-        conn,
-        userid=userid,
-        deleted_by_userid=deleted_by_userid,
-        deletion_source=deletion_source,
-    )
-
     session_subquery = "SELECT session_id FROM chat_sessions WHERE user_id = %s"
 
     execute(conn, "DELETE FROM event_timeline_jobs WHERE user_id = %s", (userid,))
@@ -2234,21 +2223,21 @@ def delete_user_data(
     On any failure, fall back to anonymizing the user so they cannot sign in again.
     """
     with get_conn() as conn:
+        snapshot = build_account_deletion_snapshot(conn, userid)
+    try:
+        upload_account_deletion_snapshot(
+            snapshot,
+            userid=userid,
+            deleted_by_userid=deleted_by_userid,
+            deletion_source=deletion_source,
+        )
+    except AccountDeletionBackupError:
+        logger.exception("Account deletion backup failed for userid=%s; aborting delete", userid)
+        raise
+    with get_conn() as conn:
         try:
-            _hard_delete_user_tx(
-                conn,
-                userid,
-                deleted_by_userid=deleted_by_userid,
-                deletion_source=deletion_source,
-            )
+            _hard_delete_user_tx(conn, userid)
             conn.commit()
-        except AccountDeletionBackupError:
-            logger.exception("Account deletion backup failed for userid=%s; aborting delete", userid)
-            try:
-                conn.rollback()
-            except Exception:
-                pass
-            raise
         except Exception:
             logger.exception("Hard delete failed for userid=%s; rolling back and anonymizing", userid)
             try:

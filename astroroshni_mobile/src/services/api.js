@@ -366,7 +366,7 @@ export const authAPI = {
   updateOwnGender: (body) =>
     api.put(getEndpoint('/user/gender'), body, { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
   deleteAccount: () =>
-    api.delete(getEndpoint('/user/account'), { timeout: AUTH_API_TIMEOUT_MS, ...GLOBAL_ERROR_CONFIG }),
+    api.delete(getEndpoint('/user/account'), { timeout: API_TIMEOUT, ...GLOBAL_ERROR_CONFIG }),
 
 };
 

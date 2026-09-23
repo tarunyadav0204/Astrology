@@ -7,9 +7,12 @@ columns plus a JSON payload containing per-table row snapshots.
 
 from __future__ import annotations
 
+import base64
+import gzip
 import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -18,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 _bq_client = None
 _table_ensured = False
+
+# Streaming insertAll rejects a request over 10 MB. Stay under that after JSON
+# escaping, and use a load job only when one source row itself cannot.
+_STREAMING_INSERT_LIMIT_BYTES = 8_500_000
+_LOAD_JOB_LIMIT_BYTES = 95_000_000
+_GZIP_PREFIX = "gz1:"
 
 
 class AccountDeletionBackupError(RuntimeError):
@@ -215,8 +224,225 @@ def build_account_deletion_snapshot(conn, userid: int) -> Dict[str, Any]:
     }
 
 
-def backup_user_deletion_to_bigquery(
-    conn,
+def _utf8_json_size(value: Any) -> int:
+    return len(json.dumps(value, ensure_ascii=False).encode("utf-8"))
+
+
+def encode_backup_payload(payload: Dict[str, Any]) -> str:
+    """Store the snapshot compressed. Chat text shrinks enough to avoid multi-megabyte uploads."""
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    compressed = gzip.compress(raw, compresslevel=6)
+    encoded = base64.b64encode(compressed).decode("ascii")
+    if len(encoded) + len(_GZIP_PREFIX) < len(raw):
+        return _GZIP_PREFIX + encoded
+    return raw.decode("utf-8")
+
+
+def decode_backup_payload(text: str) -> Dict[str, Any]:
+    raw_text = text or ""
+    if raw_text.startswith(_GZIP_PREFIX):
+        decoded = gzip.decompress(base64.b64decode(raw_text[len(_GZIP_PREFIX):]))
+        parsed = json.loads(decoded.decode("utf-8"))
+    else:
+        parsed = json.loads(raw_text or "{}")
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _backup_insert_row(
+    *,
+    snapshot: Dict[str, Any],
+    deletion_id: str,
+    deleted_at: str,
+    deleted_by_userid: Optional[int],
+    deletion_source: str,
+    part_index: Optional[int] = None,
+    part_count: Optional[int] = None,
+) -> Dict[str, Any]:
+    payload = dict(snapshot)
+    if part_index is not None and part_count is not None:
+        payload["_part"] = {"index": int(part_index), "count": int(part_count)}
+    user_rows = (payload.get("tables") or {}).get("users") or []
+    user_row = user_rows[0] if user_rows else {}
+    return {
+        "deletion_id": deletion_id,
+        "deleted_at": deleted_at,
+        "userid": int(snapshot.get("userid") or 0),
+        "deleted_by_userid": int(deleted_by_userid) if deleted_by_userid is not None else None,
+        "deletion_source": str(deletion_source or "unknown"),
+        "user_phone": str(user_row.get("phone") or ""),
+        "user_name": str(user_row.get("name") or ""),
+        "user_email": str(user_row.get("email") or ""),
+        "signup_client": str(user_row.get("signup_client") or ""),
+        "row_counts_json": json.dumps(snapshot.get("row_counts") or {}, ensure_ascii=False),
+        "backup_payload": encode_backup_payload(payload),
+    }
+
+
+def split_account_deletion_backup_rows(
+    snapshot: Dict[str, Any],
+    *,
+    deletion_id: str,
+    deleted_at: str,
+    deleted_by_userid: Optional[int],
+    deletion_source: str,
+    max_bytes: int = _STREAMING_INSERT_LIMIT_BYTES,
+) -> List[Dict[str, Any]]:
+    """Split a snapshot into BigQuery rows that each fit a streaming insert.
+
+    A single source row that is still too large is marked with ``_use_load_job``
+    so the caller can append it with a load job (100 MB row limit) instead.
+    """
+    meta = dict(
+        deletion_id=deletion_id,
+        deleted_at=deleted_at,
+        deleted_by_userid=deleted_by_userid,
+        deletion_source=deletion_source,
+    )
+    whole = _backup_insert_row(snapshot=snapshot, **meta)
+    if _utf8_json_size(whole) <= max_bytes:
+        return [whole]
+
+    raw_json = json.dumps(snapshot, ensure_ascii=False).encode("utf-8")
+    stored = max(len(whole["backup_payload"]), 1)
+    ratio = stored / max(len(raw_json), 1)
+    raw_budget = max(1024, int(max_bytes / max(ratio, 0.05) * 0.7))
+    shell = {key: value for key, value in snapshot.items() if key != "tables"}
+    shell_size = _utf8_json_size({**shell, "tables": {}})
+    pieces: List[Dict[str, List[Dict[str, Any]]]] = []
+    current: Dict[str, List[Dict[str, Any]]] = {}
+    current_size = shell_size
+
+    def flush() -> None:
+        nonlocal current, current_size
+        if current:
+            pieces.append(current)
+        current = {}
+        current_size = shell_size
+
+    for table_name, rows in (snapshot.get("tables") or {}).items():
+        rows = list(rows or [])
+        key_overhead = _utf8_json_size(table_name) + 8
+        batch: List[Dict[str, Any]] = []
+        batch_size = 0
+        for item in rows:
+            item_size = _utf8_json_size(item) + 1
+            projected = current_size + key_overhead + batch_size + item_size
+            if batch and projected > raw_budget:
+                current[table_name] = batch
+                flush()
+                batch = []
+                batch_size = 0
+            if not batch and current and (current_size + key_overhead + item_size) > raw_budget:
+                flush()
+            batch.append(item)
+            batch_size += item_size
+        if batch:
+            if current and (current_size + key_overhead + batch_size) > raw_budget:
+                flush()
+            current[table_name] = batch
+            current_size += key_overhead + batch_size
+    flush()
+
+    if not pieces:
+        pieces = [{name: list(rows or []) for name, rows in (snapshot.get("tables") or {}).items()}]
+
+    identity_rows = (snapshot.get("tables") or {}).get("users") or []
+    identity = identity_rows[0] if identity_rows else {}
+    rows_out: List[Dict[str, Any]] = []
+    part_count = len(pieces)
+    for index, tables in enumerate(pieces):
+        part_snapshot = {**shell, "tables": tables}
+        row = _backup_insert_row(
+            snapshot=part_snapshot,
+            part_index=index,
+            part_count=part_count,
+            **meta,
+        )
+        # The users table may sit in a different part from this chunk.
+        if not row["user_phone"] and not row["user_name"] and not row["user_email"]:
+            row["user_phone"] = str(identity.get("phone") or "")
+            row["user_name"] = str(identity.get("name") or "")
+            row["user_email"] = str(identity.get("email") or "")
+            row["signup_client"] = str(identity.get("signup_client") or "")
+        encoded = _utf8_json_size(row)
+        if encoded > max_bytes:
+            if encoded > _LOAD_JOB_LIMIT_BYTES:
+                raise AccountDeletionBackupError(
+                    "Account deletion backup has a single record larger than BigQuery can store "
+                    f"({encoded} bytes)"
+                )
+            row["_use_load_job"] = True
+        rows_out.append(row)
+    return rows_out
+
+
+def merge_account_deletion_payloads(payloads: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Join part rows written by split_account_deletion_backup_rows back into one snapshot."""
+    parsed = [payload for payload in payloads if isinstance(payload, dict)]
+    if not parsed:
+        return {}
+
+    def _index(payload: Dict[str, Any]) -> int:
+        part = payload.get("_part")
+        if isinstance(part, dict):
+            try:
+                return int(part.get("index") or 0)
+            except (TypeError, ValueError):
+                return 0
+        return 0
+
+    ordered = sorted(parsed, key=_index)
+    if len(ordered) == 1 and "_part" not in ordered[0]:
+        return ordered[0]
+
+    merged = {key: value for key, value in ordered[0].items() if key not in ("tables", "_part")}
+    tables: Dict[str, Any] = {}
+    for payload in ordered:
+        for name, rows in (payload.get("tables") or {}).items():
+            if isinstance(rows, list):
+                tables.setdefault(name, []).extend(rows)
+            elif name not in tables:
+                tables[name] = rows
+    merged["tables"] = tables
+    if "row_counts" not in merged:
+        merged["row_counts"] = {name: len(rows) if isinstance(rows, list) else 0 for name, rows in tables.items()}
+    return merged
+
+
+def _insert_backup_rows(client, table: str, rows: List[Dict[str, Any]]) -> None:
+    if len(rows) <= 1:
+        for row in rows:
+            _insert_backup_row(client, table, row)
+        return
+    workers = min(4, len(rows))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_insert_backup_row, client, table, row) for row in rows]
+        for future in futures:
+            future.result()
+
+
+def _insert_backup_row(client, table: str, row: Dict[str, Any]) -> None:
+    use_load_job = bool(row.pop("_use_load_job", False))
+    if not use_load_job:
+        errors = client.insert_rows_json(table, [row])
+        if errors:
+            raise AccountDeletionBackupError(f"BigQuery insert failed: {errors}")
+        return
+
+    from google.cloud import bigquery
+
+    job = client.load_table_from_json(
+        [row],
+        table,
+        job_config=bigquery.LoadJobConfig(write_disposition=bigquery.WriteDisposition.WRITE_APPEND),
+    )
+    job.result(timeout=180)
+    if job.errors:
+        raise AccountDeletionBackupError(f"BigQuery load failed: {job.errors}")
+
+
+def upload_account_deletion_snapshot(
+    snapshot: Dict[str, Any],
     *,
     userid: int,
     deleted_by_userid: Optional[int],
@@ -228,32 +454,45 @@ def backup_user_deletion_to_bigquery(
         raise AccountDeletionBackupError("BigQuery account deletion backup table is not configured")
     _ensure_table(client, required=True)
 
-    snapshot = build_account_deletion_snapshot(conn, userid)
-    user_rows = snapshot["tables"].get("users") or []
-    user_row = user_rows[0] if user_rows else {}
     deletion_id = f"acctdel_{userid}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}"
-    row = {
-        "deletion_id": deletion_id,
-        "deleted_at": datetime.now(timezone.utc).isoformat(),
-        "userid": int(userid),
-        "deleted_by_userid": int(deleted_by_userid) if deleted_by_userid is not None else None,
-        "deletion_source": str(deletion_source or "unknown"),
-        "user_phone": str(user_row.get("phone") or ""),
-        "user_name": str(user_row.get("name") or ""),
-        "user_email": str(user_row.get("email") or ""),
-        "signup_client": str(user_row.get("signup_client") or ""),
-        "row_counts_json": json.dumps(snapshot.get("row_counts") or {}, ensure_ascii=False),
-        "backup_payload": json.dumps(snapshot, ensure_ascii=False),
-    }
+    deleted_at = datetime.now(timezone.utc).isoformat()
+    rows = split_account_deletion_backup_rows(
+        snapshot,
+        deletion_id=deletion_id,
+        deleted_at=deleted_at,
+        deleted_by_userid=deleted_by_userid,
+        deletion_source=deletion_source,
+    )
+    payload_bytes = sum(len(str(row.get("backup_payload") or "")) for row in rows)
+    logger.info(
+        "account_deletion_bigquery: userid=%s backup %s part(s), %s bytes",
+        userid,
+        len(rows),
+        payload_bytes,
+    )
     try:
-        errors = client.insert_rows_json(table, [row])
-        if errors:
-            raise AccountDeletionBackupError(f"BigQuery insert failed: {errors}")
+        _insert_backup_rows(client, table, rows)
         return deletion_id
     except AccountDeletionBackupError:
         raise
     except Exception as exc:
         raise AccountDeletionBackupError(f"BigQuery account deletion backup failed: {exc}") from exc
+
+
+def backup_user_deletion_to_bigquery(
+    conn,
+    *,
+    userid: int,
+    deleted_by_userid: Optional[int],
+    deletion_source: str,
+) -> str:
+    snapshot = build_account_deletion_snapshot(conn, userid)
+    return upload_account_deletion_snapshot(
+        snapshot,
+        userid=userid,
+        deleted_by_userid=deleted_by_userid,
+        deletion_source=deletion_source,
+    )
 
 
 def list_deleted_account_backups(
@@ -297,21 +536,52 @@ def list_deleted_account_backups(
     where_sql = " AND ".join(where)
     query = f"""
         SELECT
-          deletion_id, deleted_at, userid, deleted_by_userid, deletion_source,
-          user_phone, user_name, user_email, signup_client, row_counts_json,
-          backup_payload
+          deletion_id,
+          MIN(deleted_at) AS deleted_at,
+          ANY_VALUE(userid) AS userid,
+          ANY_VALUE(deleted_by_userid) AS deleted_by_userid,
+          ANY_VALUE(deletion_source) AS deletion_source,
+          ANY_VALUE(user_phone) AS user_phone,
+          ANY_VALUE(user_name) AS user_name,
+          ANY_VALUE(user_email) AS user_email,
+          ANY_VALUE(signup_client) AS signup_client,
+          ANY_VALUE(row_counts_json) AS row_counts_json
         FROM {table}
         WHERE {where_sql}
+        GROUP BY deletion_id
         ORDER BY deleted_at DESC
         LIMIT @limit_param OFFSET @offset_param
     """
-    count_query = f"SELECT COUNT(*) AS total FROM {table} WHERE {where_sql}"
+    count_query = f"SELECT COUNT(DISTINCT deletion_id) AS total FROM {table} WHERE {where_sql}"
     filter_params = [
         p for p in params
         if getattr(p, "name", "") not in ("limit_param", "offset_param")
     ]
     rows = list(client.query(query, job_config=bigquery.QueryJobConfig(query_parameters=params)))
     count_rows = list(client.query(count_query, job_config=bigquery.QueryJobConfig(query_parameters=filter_params)))
+    deletion_ids = [dict(row).get("deletion_id") for row in rows if dict(row).get("deletion_id")]
+    payloads_by_id: Dict[str, List[Dict[str, Any]]] = {deletion_id: [] for deletion_id in deletion_ids}
+    if deletion_ids:
+        payload_query = f"""
+            SELECT deletion_id, backup_payload
+            FROM {table}
+            WHERE deletion_id IN UNNEST(@deletion_ids)
+        """
+        payload_rows = client.query(
+            payload_query,
+            job_config=bigquery.QueryJobConfig(query_parameters=[
+                bigquery.ArrayQueryParameter("deletion_ids", "STRING", deletion_ids),
+            ]),
+        )
+        for payload_row in payload_rows:
+            item = dict(payload_row)
+            deletion_id = item.get("deletion_id")
+            try:
+                parsed = decode_backup_payload(item.get("backup_payload") or "")
+            except Exception:
+                parsed = {}
+            if deletion_id in payloads_by_id and isinstance(parsed, dict):
+                payloads_by_id[deletion_id].append(parsed)
 
     def _serialize(v: Any) -> Any:
         if isinstance(v, (datetime, date)):
@@ -322,15 +592,11 @@ def list_deleted_account_backups(
     for row in rows:
         d = dict(row)
         row_counts = {}
-        payload = {}
         try:
             row_counts = json.loads(d.get("row_counts_json") or "{}")
         except Exception:
             row_counts = {}
-        try:
-            payload = json.loads(d.get("backup_payload") or "{}")
-        except Exception:
-            payload = {}
+        payload = merge_account_deletion_payloads(payloads_by_id.get(d.get("deletion_id")) or [])
         out.append({
             "deletion_id": d.get("deletion_id"),
             "deleted_at": _serialize(d.get("deleted_at")),

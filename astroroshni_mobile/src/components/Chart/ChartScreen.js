@@ -117,7 +117,10 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const [showGuidePlayer, setShowGuidePlayer] = useState(false);
   const [guidePlayerStatus, setGuidePlayerStatus] = useState('idle');
   const [showAstrologerLicenseModal, setShowAstrologerLicenseModal] = useState(false);
+  const [licensePrompt, setLicensePrompt] = useState('activation');
+  const [astrologerLicenseAmount, setAstrologerLicenseAmount] = useState('₹100');
   const [astrologerLicensePrice, setAstrologerLicensePrice] = useState('₹100/month');
+  const pendingTimingRef = useRef(null);
   const [checkingAstrologerLicense, setCheckingAstrologerLicense] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [chartGuideVideoUrl, setChartGuideVideoUrl] = useState(route.params?.chartGuideVideoUrl || '');
@@ -235,7 +238,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     return () => clearTimeout(timer);
   }, [showGuidePlayer, guidePlayerStatus]);
 
-  const openActivationExplorer = useCallback(async () => {
+  const presentAstrologerLicense = useCallback(async (prompt) => {
     if (checkingAstrologerLicense) return;
     const authenticated = await requireAuthForPaid({
       feature: 'Astrologer tools',
@@ -251,7 +254,13 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     try {
       const { data } = await creditAPI.getEntitlements();
       if (data?.is_astrologer_licensed) {
-        navigation.navigate('ActivationExplorer', { birthData, chartData });
+        if (prompt === 'timing') {
+          const pending = pendingTimingRef.current;
+          pendingTimingRef.current = null;
+          if (pending) chartWidgetRef.current?.enableTiming(pending);
+        } else {
+          navigation.navigate('ActivationExplorer', { birthData, chartData });
+        }
         return;
       }
       try {
@@ -265,14 +274,20 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           || item.google_play_product_id === 'astrologer_license_monthly'
           || item.product_id === 'astrologer_license_monthly'
         );
-        const livePrice = plan?.formatted_price || plan?.amount_display;
-        setAstrologerLicensePrice(livePrice ? `${livePrice}/month` : '₹100/month');
+        const livePrice = String(plan?.formatted_price || plan?.amount_display || '₹100')
+          .replace(/\s*\/\s*month\s*$/i, '');
+        const amount = livePrice || '₹100';
+        setAstrologerLicenseAmount(amount);
+        setAstrologerLicensePrice(`${amount}/month`);
       } catch (_) {
+        setAstrologerLicenseAmount('₹100');
         setAstrologerLicensePrice('₹100/month');
       }
+      setLicensePrompt(prompt);
       setShowAstrologerLicenseModal(true);
     } catch (error) {
       if (error?.response?.status === 403) {
+        setLicensePrompt(prompt);
         setShowAstrologerLicenseModal(true);
       } else {
         Alert.alert('Could not check access', 'Please check your connection and try again.');
@@ -282,15 +297,30 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     }
   }, [
     birthData,
+    chartData,
     checkingAstrologerLicense,
     navigation,
     requireAuthForPaid,
     route?.params,
   ]);
 
+  const openActivationExplorer = useCallback(() => {
+    pendingTimingRef.current = null;
+    presentAstrologerLicense('activation');
+  }, [presentAstrologerLicense]);
+
+  const requestTimingLicense = useCallback((kind) => {
+    pendingTimingRef.current = kind;
+    presentAstrologerLicense('timing');
+  }, [presentAstrologerLicense]);
+
   useEffect(() => {
     if (!isAstrologerLicensed) return;
     setShowAstrologerLicenseModal(false);
+    const pending = pendingTimingRef.current;
+    if (!pending) return;
+    pendingTimingRef.current = null;
+    chartWidgetRef.current?.enableTiming(pending);
   }, [isAstrologerLicensed]);
 
   const handleSwipe = useCallback((event) => {
@@ -884,6 +914,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 const lagnaIndex = chartTypes.findIndex((chart) => chart.id === 'lagna');
                 if (lagnaIndex !== -1 && currentChartIndex !== lagnaIndex) changeChart(lagnaIndex);
               }}
+              timingLicensed={isAstrologerLicensed}
+              onRequestTimingLicense={requestTimingLicense}
               navigation={navigation}
               onHousePress={openHouseDrawer}
               division={
@@ -1148,16 +1180,20 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 visible={showAstrologerLicenseModal}
                 variant="info"
                 icon="school-outline"
+                stackButtons
+                largePrimary
                 title={t('premiumUi.chart.licenseRequired')}
-                message={t('premiumUi.chart.licenseMessage', { price: astrologerLicensePrice })}
+                message={licensePrompt === 'timing'
+                  ? t('premiumUi.chart.timingLicenseMessage', { price: astrologerLicenseAmount })
+                  : t('premiumUi.chart.licenseMessage', { price: astrologerLicensePrice })}
                 primaryText={t('premiumUi.chart.viewPlan')}
                 secondaryText={t('common.notNow')}
                 onPrimaryPress={() => {
                   setShowAstrologerLicenseModal(false);
                   navigation.navigate('Credits', {
                     focusSubscriptionFamily: 'astrologer',
-                    returnTo: 'ActivationExplorer',
-                    returnParams: { birthData },
+                    returnTo: licensePrompt === 'timing' ? 'Chart' : 'ActivationExplorer',
+                    returnParams: licensePrompt === 'timing' ? (route?.params || {}) : { birthData },
                   });
                 }}
                 onSecondaryPress={() => setShowAstrologerLicenseModal(false)}

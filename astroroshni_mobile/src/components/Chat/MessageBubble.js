@@ -1914,8 +1914,8 @@ function MessageBubble({
     !isNativeGate &&
     Boolean(gateMetadata.free_question_completed);
   const freeSplit = isFreeQuestionAnswer ? splitFreeAnswerContent(contentStr) : null;
-  const canBlurFreeDetail =
-    Boolean(freeSplit?.canBlur) && !isInstantChatMessage;
+  // The first free question includes the full answer. Do not hide the rest behind a credit reveal.
+  const canBlurFreeDetail = false;
   const lockedDetailHeadings = canBlurFreeDetail
     ? extractFreeAnswerDetailHeadings(freeSplit.detail, 3)
     : [];
@@ -2486,12 +2486,12 @@ function MessageBubble({
                 {t('chat.firstPurchaseOffer.continueEyebrow', 'CONTINUE THIS READING')}
               </Text>
               <Text style={[styles.freeDetailOfferTitle, { color: colors.text }]}>
-                {t('chat.firstPurchaseOffer.completeAnswerTitle', "Unlock Tara's complete answer")}
+                {t('chat.firstPurchaseOffer.completeAnswerTitle', 'Ask Tara another question')}
               </Text>
               <Text style={[styles.freeDetailOfferBody, { color: colors.textSecondary }]}>
                 {t(
                   'chat.firstPurchaseOffer.completeAnswerBody',
-                  'See everything Tara found beyond the central insight you just read.',
+                  'Your first answer is complete. Credits let you ask one more Detailed Question.',
                 )}
               </Text>
               {lockedDetailHeadings.length > 0 ? (
@@ -2518,7 +2518,7 @@ function MessageBubble({
               activeOpacity={0.9}
               onPress={() => setShowRevealCreditsModal(true)}
               accessibilityRole="button"
-              accessibilityLabel={t('chat.revealDetailedAnswerA11y', 'Reveal the detailed answer')}
+              accessibilityLabel={t('chat.revealDetailedAnswerA11y', 'Ask another question')}
             >
               <LinearGradient
                 colors={['#ea580c', '#f97316']}
@@ -2531,9 +2531,9 @@ function MessageBubble({
                   {firstPurchaseStarterEligible
                     ? t('chat.firstPurchaseOffer.completeAnswerCta', {
                         price: firstPurchaseStarterPrice,
-                        defaultValue: `Unlock complete answer + 1 more question · ${firstPurchaseStarterPrice}`,
+                        defaultValue: `Ask another question · ${firstPurchaseStarterPrice}`,
                       })
-                    : t('chat.firstPurchaseOffer.standardRevealCta', 'Unlock complete answer')}
+                    : t('chat.firstPurchaseOffer.standardRevealCta', 'Get credits for another question')}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -3189,15 +3189,15 @@ function MessageBubble({
       <ConfirmCreditsModal
         visible={showRevealCreditsModal}
         onClose={() => setShowRevealCreditsModal(false)}
-        title={t('chat.firstPurchaseOffer.completeAnswerTitle', "Unlock Tara's complete answer")}
+        title={t('chat.firstPurchaseOffer.completeAnswerTitle', 'Ask Tara another question')}
         description={firstPurchaseStarterEligible
           ? t(
               'chat.firstPurchaseOffer.starterCompleteDescription',
-              'Unlock everything Tara found for this question, plus enough credits to ask one more Detailed Question.',
+              'Your first answer is complete. This one-time offer includes enough credits to ask one more Detailed Question.',
             )
           : t(
               'chat.firstPurchaseOffer.completeAnswerDescription',
-              'Unlock everything Tara found beyond the central insight you just read.',
+              'Your first answer is complete. Get credits to ask another Detailed Question.',
             )}
         cost={standardChatCost}
         credits={credits}

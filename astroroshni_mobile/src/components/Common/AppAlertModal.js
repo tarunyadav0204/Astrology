@@ -47,6 +47,7 @@ export default function AppAlertModal({
   onSecondaryPress,
   onRequestClose,
   stackButtons = false,
+  largePrimary = false,
   showCloseButton = false,
 }) {
   const { colors } = useTheme();
@@ -92,7 +93,7 @@ export default function AppAlertModal({
               <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text>
             )}
 
-            <View style={[styles.buttonRow, stackButtons && styles.buttonRowStacked]}>
+            <View style={[styles.buttonRow, stackButtons && styles.buttonRowStacked, largePrimary && styles.buttonRowPrimaryFirst]}>
               {!!secondaryText && (
                 <TouchableOpacity
                   style={[
@@ -108,12 +109,28 @@ export default function AppAlertModal({
               )}
 
               <TouchableOpacity
-                style={[styles.primaryButton, stackButtons && styles.stackedButton, { backgroundColor: colors.primary }]}
+                style={[
+                  styles.primaryButton,
+                  stackButtons && styles.stackedButton,
+                  largePrimary && styles.stackedPrimaryButton,
+                  { backgroundColor: colors.primary },
+                ]}
                 activeOpacity={0.9}
                 onPress={onPrimaryPress || handleClose}
               >
-                <LinearGradient colors={[colors.primary, colors.primaryStrong]} style={styles.primaryGradient}>
-                <Text style={[styles.primaryText, { color: colors.onPrimary }]}>{resolvedPrimaryText}</Text>
+                <LinearGradient
+                  colors={[colors.primary, colors.primaryStrong]}
+                  style={[styles.primaryGradient, largePrimary && styles.stackedPrimaryGradient]}
+                >
+                <Text
+                  style={[
+                    styles.primaryText,
+                    largePrimary && styles.stackedPrimaryText,
+                    { color: colors.onPrimary },
+                  ]}
+                >
+                  {resolvedPrimaryText}
+                </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -226,9 +243,15 @@ const styles = StyleSheet.create({
   buttonRowStacked: {
     flexDirection: 'column',
   },
+  buttonRowPrimaryFirst: {
+    flexDirection: 'column-reverse',
+  },
   stackedButton: {
     flex: 0,
     width: '100%',
+  },
+  stackedPrimaryButton: {
+    minHeight: 64,
   },
   secondaryButton: {
     flex: 1,
@@ -256,8 +279,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 18,
   },
+  stackedPrimaryGradient: {
+    minHeight: 64,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+  },
   primaryText: {
     fontSize: 16,
     fontWeight: '800',
+    textAlign: 'center',
+  },
+  stackedPrimaryText: {
+    fontSize: 18,
+    lineHeight: 24,
   },
 });
