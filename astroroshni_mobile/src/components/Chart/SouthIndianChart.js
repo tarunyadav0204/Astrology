@@ -628,10 +628,7 @@ const SouthIndianChart = ({
                 const transitColor = colors.accent || colors.primary;
                 return (
                   <>
-                    <ClipPath id={`transit-cell-${index}`}>
-                      <Rect x={pos.x + 2} y={pos.y + 2} width={pos.width - 4} height={pos.height - 4} />
-                    </ClipPath>
-                    <G pointerEvents="box-none" clipPath={`url(#transit-cell-${index})`}>
+                    <G pointerEvents="box-none">
                       {layout.specs.map((spec, transitIndex) => {
                         const slot = layout.placed[transitIndex];
                         if (!slot) return null;

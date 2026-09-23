@@ -176,6 +176,17 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "drawing": {
+      "menu": "Opciones de la carta",
+      "mode": "Modo dibujo",
+      "clear": "Borrar",
+      "gold": "Dorado",
+      "red": "Rojo",
+      "green": "Verde",
+      "blue": "Azul",
+      "pen": "Lápiz",
+      "arrow": "Flecha"
+    },
     "karakas": "Karakas",
     "positions": "Posiciones",
     "overview": {

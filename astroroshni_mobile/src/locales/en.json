@@ -419,6 +419,17 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "drawing": {
+      "menu": "Chart options",
+      "mode": "Drawing mode",
+      "clear": "Clear",
+      "gold": "Gold",
+      "red": "Red",
+      "green": "Green",
+      "blue": "Blue",
+      "pen": "Pen",
+      "arrow": "Arrow"
+    },
     "karakas": "Karakas",
     "positions": "Positions",
     "askTara": "Ask Tara",

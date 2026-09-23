@@ -176,6 +176,17 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "drawing": {
+      "menu": "ચાર્ટ વિકલ્પો",
+      "mode": "ચિત્ર મોડ",
+      "clear": "ભૂંસો",
+      "gold": "સોનેરી",
+      "red": "લાલ",
+      "green": "લીલો",
+      "blue": "વાદળી",
+      "pen": "પેન",
+      "arrow": "તીર"
+    },
     "karakas": "કારકો",
     "positions": "સ્થિતિ",
     "overview": {

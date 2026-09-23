@@ -115,6 +115,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const [mudakkuAnalysis, setMudakkuAnalysis] = useState(null);
   const [gandantaAnalysis, setGandantaAnalysis] = useState(null);
   const [showGuidePlayer, setShowGuidePlayer] = useState(false);
+  const [chartDrawing, setChartDrawing] = useState(false);
   const [guidePlayerStatus, setGuidePlayerStatus] = useState('idle');
   const [showAstrologerLicenseModal, setShowAstrologerLicenseModal] = useState(false);
   const [licensePrompt, setLicensePrompt] = useState('activation');
@@ -918,6 +919,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
               onRequestTimingLicense={requestTimingLicense}
               navigation={navigation}
               onHousePress={openHouseDrawer}
+              onDrawingModeChange={setChartDrawing}
               division={
                 chartTypes[currentChartIndex].id === 'hora' ? 2 :
                 chartTypes[currentChartIndex].id === 'drekkana' ? 3 :
@@ -1028,6 +1030,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     : { flexGrow: 1, paddingBottom: 112 }
                 }
                 showsVerticalScrollIndicator={false}
+                scrollEnabled={!chartDrawing}
               >
                 <View
                   style={[
@@ -1079,12 +1082,13 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                   ]}>
                     {Platform.OS === 'web' ? (
                       <Animated.View
-                        {...(webSwipePanResponder?.panHandlers || {})}
+                        {...(chartDrawing ? {} : (webSwipePanResponder?.panHandlers || {}))}
                         style={{
                           transform: [{ translateX: chartTranslateX }],
                           // Preserve vertical document scrolling while claiming
                           // deliberate horizontal drags to change charts.
-                          touchAction: 'pan-y',
+                          // Drawing mode keeps the finger on the chart.
+                          touchAction: chartDrawing ? 'none' : 'pan-y',
                           userSelect: 'none',
                         }}
                       >
@@ -1092,6 +1096,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       </Animated.View>
                     ) : (
                       <PanGestureHandler
+                        enabled={!chartDrawing}
                         onGestureEvent={onGestureEvent}
                         onHandlerStateChange={handleSwipe}
                         activeOffsetX={[-8, 8]}

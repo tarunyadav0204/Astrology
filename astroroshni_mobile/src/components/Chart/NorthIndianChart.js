@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated, Easing, Platform } from 'react-native';
-import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle, Path, ClipPath } from 'react-native-svg';
+import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle, Path } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 
@@ -377,18 +377,18 @@ export const placeClearLabels = (polygon, occupied, specs, minGap = 3) => {
       const box = labelBox(candidate.x, candidate.y, spec.halfW, spec.above, spec.below);
       let inside;
       if (spec.lineOffsets) {
-        const samples = [candidate.x - spec.halfW, candidate.x, candidate.x + spec.halfW];
-        inside = spec.lineOffsets.every((offset) => (
-          samples.every((x) => pointInPolygon(x, candidate.y + offset, polygon))
-        )) && pointInPolygon(candidate.x, candidate.y - Math.max(3, spec.above - 1), polygon);
+        inside = transitLabelInside(candidate.x, candidate.y, spec, polygon);
       } else {
-        inside = boxInsidePolygon(labelBox(
-          candidate.x,
-          candidate.y,
-          spec.halfW + 1,
-          spec.above + 1,
-          spec.below + 1,
-        ), polygon);
+        const edge = 4;
+        inside = box.top >= minY + edge && box.bottom <= maxY - edge
+          && box.left >= minX + edge && box.right <= maxX - edge
+          && boxInsidePolygon(labelBox(
+            candidate.x,
+            candidate.y,
+            spec.halfW + 1,
+            spec.above + 1,
+            spec.below + 1,
+          ), polygon);
       }
       if (!inside) return;
       const gap = blocked.reduce((min, rect) => Math.min(min, boxGap(box, rect)), Infinity);
@@ -405,6 +405,39 @@ export const placeClearLabels = (polygon, occupied, specs, minGap = 3) => {
     blocked.push(best.box);
   }
   return placed;
+};
+
+// Both text lines have to stay in this house. Touching a grid line is fine;
+// crossing into the next sign or past the frame is not.
+const transitLabelInside = (x, y, spec, polygon) => {
+  const samples = [x - spec.halfW, x, x + spec.halfW];
+  const lines = [0, ...(spec.lineOffsets || [])];
+  const onLine = (offset) => samples.every((px) => pointInPolygon(px, y + offset, polygon));
+  return lines.every(onLine) && pointInPolygon(x, y - spec.above, polygon);
+};
+
+// Last resort so a transit planet is never dropped. Overlap inside the house
+// is allowed. The degree line still has to remain in that house.
+const placeForcedLabel = (polygon, occupied, spec) => {
+  const xs = polygon.map((point) => point[0]);
+  const ys = polygon.map((point) => point[1]);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const centroid = polygonCentroid(polygon);
+  let best = null;
+  for (let x = minX + 2; x <= maxX - 2; x += 2) {
+    for (let y = minY + 2; y <= maxY - 2; y += 2) {
+      if (!transitLabelInside(x, y, spec, polygon)) continue;
+      const box = labelBox(x, y, spec.halfW, spec.above, spec.below);
+      const gap = occupied.reduce((min, rect) => Math.min(min, boxGap(box, rect)), Infinity);
+      const dist = Math.hypot(x - centroid.x, y - centroid.y);
+      const score = gap - dist * 0.04;
+      if (!best || score > best.score) best = { x, y, score, box };
+    }
+  }
+  return best;
 };
 
 const TRANSIT_MARK = '\u1D40';
@@ -435,7 +468,7 @@ export const placeTransitLabels = (polygon, occupied, labels, showDegree) => {
     const detailOffset = detailSize + 2;
     return {
       halfW: Math.max(textHalfWidth(text, fontSize), textHalfWidth(detail, detailSize)),
-      above: Math.ceil(fontSize * 0.8),
+      above: fontSize,
       below: detailOffset + Math.ceil(detailSize * 0.4),
       text,
       detail,
@@ -462,11 +495,10 @@ export const placeTransitLabels = (polygon, occupied, labels, showDegree) => {
   const placed = [];
   const specs = [];
   labels.forEach((label) => {
-    const tries = [];
-    if (showDegree && detailText(label)) {
-      tries.push(detailSpec(label, 9, 7), detailSpec(label, 8, 6));
-    }
-    tries.push(nameSpec(label, 9, fullText), nameSpec(label, 8, shortText), nameSpec(label, 7, shortText));
+    const detail = showDegree ? detailText(label) : '';
+    const tries = detail
+      ? [detailSpec(label, 9, 7), detailSpec(label, 8, 6), detailSpec(label, 7, 5)]
+      : [nameSpec(label, 9, fullText), nameSpec(label, 8, shortText), nameSpec(label, 7, shortText)];
     for (const spec of tries) {
       const slot = placeClearLabels(polygon, blocked, [spec], 2)[0];
       if (!slot) continue;
@@ -475,6 +507,12 @@ export const placeTransitLabels = (polygon, occupied, labels, showDegree) => {
       blocked.push(slot.box);
       return;
     }
+    const fallback = detail ? detailSpec(label, 7, 5) : nameSpec(label, 7, shortText);
+    const slot = placeForcedLabel(polygon, blocked, fallback);
+    if (!slot) return;
+    placed.push(slot);
+    specs.push(fallback);
+    blocked.push(slot.box);
   });
   if (placed.length) return { placed, specs };
 
@@ -865,10 +903,7 @@ const NorthIndianChart = ({
     const transitColor = colors.accent || colors.primary;
     return (
       <>
-        <ClipPath id={`transit-house-${houseNumber}`}>
-          <Path d={houseData.path} />
-        </ClipPath>
-        <G pointerEvents="box-none" clipPath={`url(#transit-house-${houseNumber})`}>
+        <G pointerEvents="box-none">
           {layout.specs.map((spec, index) => {
             const slot = layout.placed[index];
             if (!slot) return null;

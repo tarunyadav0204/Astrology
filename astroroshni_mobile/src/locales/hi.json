@@ -125,6 +125,17 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "drawing": {
+      "menu": "चार्ट विकल्प",
+      "mode": "आरेख मोड",
+      "clear": "मिटाएँ",
+      "gold": "सुनहरा",
+      "red": "लाल",
+      "green": "हरा",
+      "blue": "नीला",
+      "pen": "कलम",
+      "arrow": "तीर"
+    },
     "karakas": "कारक",
     "positions": "स्थितियां",
     "overview": {

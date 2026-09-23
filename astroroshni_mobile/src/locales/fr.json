@@ -176,6 +176,17 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "drawing": {
+      "menu": "Options du thème",
+      "mode": "Mode dessin",
+      "clear": "Effacer",
+      "gold": "Or",
+      "red": "Rouge",
+      "green": "Vert",
+      "blue": "Bleu",
+      "pen": "Crayon",
+      "arrow": "Flèche"
+    },
     "karakas": "Karakas",
     "positions": "Positions",
     "overview": {

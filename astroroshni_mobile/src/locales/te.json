@@ -176,6 +176,17 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "drawing": {
+      "menu": "చార్ట్ ఎంపికలు",
+      "mode": "గీత మోడ్",
+      "clear": "తొలగించు",
+      "gold": "బంగారు",
+      "red": "ఎరుపు",
+      "green": "ఆకుపచ్చ",
+      "blue": "నీలం",
+      "pen": "పెన్",
+      "arrow": "బాణం"
+    },
     "karakas": "కారకాలు",
     "positions": "స్థానాలు",
     "overview": {

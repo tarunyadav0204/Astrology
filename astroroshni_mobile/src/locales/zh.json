@@ -176,6 +176,17 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "drawing": {
+      "menu": "星盘选项",
+      "mode": "绘图模式",
+      "clear": "清除",
+      "gold": "金色",
+      "red": "红",
+      "green": "绿",
+      "blue": "蓝",
+      "pen": "画笔",
+      "arrow": "箭头"
+    },
     "karakas": "指标星 (Karakas)",
     "positions": "位置",
     "overview": {

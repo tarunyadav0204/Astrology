@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   Animated,
   Dimensions,
   useWindowDimensions,
@@ -20,6 +21,7 @@ import { storage } from '../../services/storage';
 import { COLORS } from '../../utils/constants';
 import NorthIndianChart, { dashaPaint } from './NorthIndianChart';
 import SouthIndianChart from './SouthIndianChart';
+import ChartDrawingLayer from './ChartDrawingLayer';
 import DateNavigator from '../Common/DateNavigator';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -46,7 +48,7 @@ const toLocalYmd = (value) => {
   return `${date.getFullYear()}-${month}-${day}`;
 };
 
-const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, onRequestBirthChart, onRequestTimingLicense, timingLicensed = false, division, navigation, onHousePress }, ref) => {
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, onRequestBirthChart, onRequestTimingLicense, timingLicensed = false, division, navigation, onHousePress, onDrawingModeChange }, ref) => {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const dashaColor = dashaPaint(colors).fill;
@@ -63,11 +65,37 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [ashtakavarga, setAshtakavarga] = useState(null);
   const [showDashaHighlight, setShowDashaHighlight] = useState(false);
   const [dashaLords, setDashaLords] = useState(null);
+  const [showChartMenu, setShowChartMenu] = useState(false);
+  const [drawingMode, setDrawingMode] = useState(false);
+  const [drawColor, setDrawColor] = useState(null);
+  const [drawTool, setDrawTool] = useState('pen');
+  const [strokes, setStrokes] = useState([]);
+  const drawingsRef = useRef({});
+  const drawingKey = `${birthData?.id || birthData?.name || 'guest'}:${currentChartType}:${chartStyle}`;
+  const drawingKeyRef = useRef(drawingKey);
+  drawingKeyRef.current = drawingKey;
   // PWA/web: measure parent width before locking SVG pixels (window width can be
   // wider than the chart column and clipped the diamond + toolbar).
   const [webChartSize, setWebChartSize] = useState(null);
   const { width: windowWidth } = useWindowDimensions();
   const fitTablet = windowWidth >= 768;
+
+  useEffect(() => {
+    setStrokes(drawingsRef.current[drawingKey] || []);
+  }, [drawingKey]);
+
+  useEffect(() => {
+    onDrawingModeChange?.(drawingMode);
+    return () => onDrawingModeChange?.(false);
+  }, [drawingMode, onDrawingModeChange]);
+
+  const updateStrokes = useCallback((updater) => {
+    setStrokes((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      drawingsRef.current[drawingKeyRef.current] = next;
+      return next;
+    });
+  }, []);
 
   const onWebChartLayout = useCallback((event) => {
     if (!isWeb && !fitTablet) return;
@@ -714,7 +742,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         onRotate={handleRotate}
         showKarakas={showKarakas}
         karakas={karakas}
-        onHousePress={onHousePress}
+        onHousePress={drawingMode ? undefined : onHousePress}
         hideInstructions={cosmicTheme}
         transitOverlay={transitOverlay}
         dashaHighlight={dashaHighlight}
@@ -739,11 +767,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         signPoints={signPoints}
         bavBySign={bavBySign}
         onTransitPlanetPress={handleTransitPlanetPress}
-        onHousePress={onHousePress}
+        onHousePress={drawingMode ? undefined : onHousePress}
         {...sizeProp}
       />
     );
-  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType, signPoints, bavBySign, handleTransitPlanetPress]);
+  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType, signPoints, bavBySign, handleTransitPlanetPress, drawingMode]);
 
   const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
     const iconColor = primary ? colors.onPrimary : (active ? colors.onAccent : colors.text);
@@ -882,14 +910,99 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
               </TouchableOpacity>
             ) : null}
           </View>
-          <TouchableOpacity
-            onPress={() => setShowInfoModal(true)}
-            style={styles.viewInfoButton}
-            accessibilityRole="button"
-            accessibilityLabel={t('premiumUi.common.aboutChart')}
-          >
-            <Ionicons name="information-circle-outline" size={fitTablet ? 26 : 18} color={colors.chartTextMuted} />
-          </TouchableOpacity>
+          <View style={styles.viewToolbarActions}>
+            <TouchableOpacity
+              onPress={() => setShowInfoModal(true)}
+              style={styles.viewInfoButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('premiumUi.common.aboutChart')}
+            >
+              <Ionicons name="information-circle-outline" size={fitTablet ? 26 : 18} color={colors.chartTextMuted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowChartMenu((open) => !open)}
+              style={styles.viewInfoButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('chartScreen.drawing.menu', 'Chart options')}
+            >
+              <Ionicons name="ellipsis-vertical" size={fitTablet ? 22 : 16} color={drawingMode ? colors.primary : colors.chartTextMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      {cosmicTheme && showChartMenu ? (
+        <View style={styles.chartMenuWrap} pointerEvents="box-none">
+          {drawingMode ? null : (
+            <Pressable style={styles.chartMenuBackdrop} onPress={() => setShowChartMenu(false)} />
+          )}
+          <View style={[styles.chartMenu, { backgroundColor: colors.chartRaised || colors.surface, borderColor: colors.chartLine }]}>
+            <TouchableOpacity
+              style={styles.chartMenuRow}
+              onPress={() => setDrawingMode((on) => !on)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: drawingMode }}
+            >
+              <Ionicons name="pencil-outline" size={16} color={colors.chartText || colors.text} />
+              <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{t('chartScreen.drawing.mode', 'Drawing mode')}</Text>
+              {drawingMode ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null}
+            </TouchableOpacity>
+            {drawingMode ? (
+              <>
+                <View style={styles.drawTools}>
+                  {[
+                    { id: 'pen', icon: 'pencil-outline', label: t('chartScreen.drawing.pen', 'Pen') },
+                    { id: 'arrow', icon: 'arrow-forward-outline', label: t('chartScreen.drawing.arrow', 'Arrow') },
+                  ].map((item) => {
+                    const selected = drawTool === item.id;
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        onPress={() => setDrawTool(item.id)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        style={styles.drawTool}
+                      >
+                        <Ionicons name={item.icon} size={16} color={selected ? colors.primary : (colors.chartText || colors.text)} />
+                        <Text style={[styles.drawToolText, { color: selected ? colors.primary : (colors.chartText || colors.text) }]}>{item.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <View style={styles.drawColors}>
+                  {[
+                    { id: 'gold', value: colors.primary, label: t('chartScreen.drawing.gold', 'Gold') },
+                    { id: 'red', value: '#C0392B', label: t('chartScreen.drawing.red', 'Red') },
+                    { id: 'green', value: '#1E7A46', label: t('chartScreen.drawing.green', 'Green') },
+                    { id: 'blue', value: '#1D4E89', label: t('chartScreen.drawing.blue', 'Blue') },
+                  ].map((swatch) => {
+                    const selected = (drawColor || colors.primary) === swatch.value;
+                    return (
+                      <TouchableOpacity
+                        key={swatch.id}
+                        onPress={() => setDrawColor(swatch.value)}
+                        accessibilityRole="button"
+                        accessibilityLabel={swatch.label}
+                        style={[
+                          styles.drawSwatch,
+                          { backgroundColor: swatch.value },
+                          selected && { borderColor: colors.chartText || colors.text },
+                        ]}
+                      />
+                    );
+                  })}
+                </View>
+                <TouchableOpacity
+                  style={styles.chartMenuRow}
+                  onPress={() => updateStrokes([])}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="trash-outline" size={16} color={colors.chartText || colors.text} />
+                  <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{t('chartScreen.drawing.clear', 'Clear')}</Text>
+                </TouchableOpacity>
+              </>
+            ) : null}
+          </View>
         </View>
       ) : null}
 
@@ -940,7 +1053,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         ]}
       >
         <Animated.View
-          {...(disableSwipe ? {} : panResponder.panHandlers)}
+          {...(disableSwipe || drawingMode ? {} : panResponder.panHandlers)}
           style={[
             styles.swipeArea,
             isWeb && styles.swipeAreaWeb,
@@ -952,6 +1065,15 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         >
           {renderChart(currentChartType, getChartData())}
         </Animated.View>
+        {(drawingMode || strokes.length > 0) ? (
+          <ChartDrawingLayer
+            strokes={strokes}
+            color={drawColor || colors.primary}
+            tool={drawTool}
+            enabled={drawingMode}
+            onChange={updateStrokes}
+          />
+        ) : null}
       </View>
       </View>
 
@@ -1224,6 +1346,72 @@ const styles = StyleSheet.create({
     height: 30,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  viewToolbarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chartMenuWrap: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 6,
+  },
+  chartMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  chartMenu: {
+    position: 'absolute',
+    top: 40,
+    right: 8,
+    minWidth: 168,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  chartMenuRow: {
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 6,
+  },
+  chartMenuText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  drawColors: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  drawTools: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 4,
+    paddingTop: 4,
+  },
+  drawTool: {
+    flex: 1,
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  drawToolText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  drawSwatch: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   quickActionsGrid: { marginTop: 22, width: '100%' },
   quickActionsRow: {

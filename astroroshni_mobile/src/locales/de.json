@@ -176,6 +176,17 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "drawing": {
+      "menu": "Diagrammoptionen",
+      "mode": "Zeichenmodus",
+      "clear": "Löschen",
+      "gold": "Gold",
+      "red": "Rot",
+      "green": "Grün",
+      "blue": "Blau",
+      "pen": "Stift",
+      "arrow": "Pfeil"
+    },
     "karakas": "Karakas",
     "positions": "Positionen",
     "overview": {

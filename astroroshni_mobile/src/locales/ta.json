@@ -176,6 +176,17 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "drawing": {
+      "menu": "சார்ட் விருப்பங்கள்",
+      "mode": "வரைதல் முறை",
+      "clear": "அழி",
+      "gold": "தங்கம்",
+      "red": "சிவப்பு",
+      "green": "பச்சை",
+      "blue": "நீலம்",
+      "pen": "பேனா",
+      "arrow": "அம்பு"
+    },
     "karakas": "காரகங்கள்",
     "positions": "நிலைகள்",
     "overview": {

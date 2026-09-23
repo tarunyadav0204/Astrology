@@ -176,6 +176,17 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "drawing": {
+      "menu": "Параметры карты",
+      "mode": "Режим рисования",
+      "clear": "Очистить",
+      "gold": "Золотой",
+      "red": "Красный",
+      "green": "Зелёный",
+      "blue": "Синий",
+      "pen": "Карандаш",
+      "arrow": "Стрелка"
+    },
     "karakas": "Караки",
     "positions": "Позиции",
     "overview": {
