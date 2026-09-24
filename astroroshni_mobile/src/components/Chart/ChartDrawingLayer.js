@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { PanResponder, Platform, StyleSheet, View } from 'react-native';
+import { NativeViewGestureHandler } from 'react-native-gesture-handler';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 const clamp01 = (value) => Math.min(1, Math.max(0, value));
@@ -111,7 +112,7 @@ const ChartDrawingLayer = ({ strokes, color, tool = 'pen', enabled, onChange }) 
   const width = size.width || 1;
   const height = size.height || 1;
 
-  return (
+  const layer = (
     <View
       style={[styles.layer, enabled && styles.captureTouch]}
       pointerEvents={enabled ? 'box-only' : 'none'}
@@ -162,6 +163,13 @@ const ChartDrawingLayer = ({ strokes, color, tool = 'pen', enabled, onChange }) 
         })}
       </Svg>
     </View>
+  );
+
+  if (Platform.OS === 'web' || !enabled) return layer;
+  return (
+    <NativeViewGestureHandler shouldActivateOnStart disallowInterruption>
+      {layer}
+    </NativeViewGestureHandler>
   );
 };
 

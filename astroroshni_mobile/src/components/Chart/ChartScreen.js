@@ -89,7 +89,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const accentSurface = { backgroundColor: colors.accentSoft, borderColor: colors.cardBorder };
   const { requireAuthForPaid } = useAuthGate();
   const { isAstrologerLicensed } = useCredits();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const houseSheetHeight = Math.round(windowHeight * 0.75);
   const wideSheet = windowWidth >= 768;
   const embedded = !!route?.params?.embedded;
   const [birthData, setBirthData] = useState(null);
@@ -97,6 +98,9 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const [loading, setLoading] = useState(false);
   const [currentChartIndex, setCurrentChartIndex] = useState(0);
   const bottomNavScrollRef = useRef(null);
+  const pageScrollRef = useRef(null);
+  const chartBlockRef = useRef(null);
+  const pageScrollYRef = useRef(0);
   const lastSwipeTime = useRef(0);
   const chartWidgetRef = useRef(null);
   const captureViewRef = useRef(null);
@@ -116,6 +120,36 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const [gandantaAnalysis, setGandantaAnalysis] = useState(null);
   const [showGuidePlayer, setShowGuidePlayer] = useState(false);
   const [chartDrawing, setChartDrawing] = useState(false);
+
+  useEffect(() => {
+    if (!chartDrawing) return undefined;
+    const reveal = () => {
+      const chart = chartBlockRef.current;
+      const scroll = pageScrollRef.current;
+      if (!chart?.measureInWindow || !scroll?.measureInWindow || !scroll?.scrollTo) return;
+      chart.measureInWindow((chartX, chartY, chartWidth, chartHeight) => {
+        scroll.measureInWindow((scrollX, scrollY, scrollWidth, scrollHeight) => {
+          const offset = pageScrollYRef.current;
+          const top = offset + (chartY - scrollY);
+          const bottom = top + chartHeight;
+          let nextY = offset;
+          if (chartHeight <= scrollHeight) {
+            if (chartY < scrollY) nextY = top;
+            else if (chartY + chartHeight > scrollY + scrollHeight) nextY = bottom - scrollHeight;
+          } else {
+            nextY = top;
+          }
+          scroll.scrollTo({ y: Math.max(0, nextY), animated: true });
+        });
+      });
+    };
+    const first = setTimeout(reveal, 80);
+    const second = setTimeout(reveal, 460);
+    return () => {
+      clearTimeout(first);
+      clearTimeout(second);
+    };
+  }, [chartDrawing]);
   const [guidePlayerStatus, setGuidePlayerStatus] = useState('idle');
   const [showAstrologerLicenseModal, setShowAstrologerLicenseModal] = useState(false);
   const [licensePrompt, setLicensePrompt] = useState('activation');
@@ -881,6 +915,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
       >
         <View style={[styles.chartArea, webIntrinsic, chartFlowIntrinsic, embedded && Platform.OS === 'web' ? { paddingTop: 4 } : null]}>
           <View
+            ref={chartBlockRef}
+            collapsable={false}
             style={[
               styles.chartWrapper,
               webIntrinsic,
@@ -1017,7 +1053,12 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           ) : chartData && birthData ? (
             <View style={{ flex: 1, ...(Platform.OS === 'web' ? { minHeight: 0 } : null) }}>
               <VerticalPageScroll
+                ref={pageScrollRef}
                 style={{ flex: 1 }}
+                scrollEventThrottle={16}
+                onScroll={(event) => {
+                  pageScrollYRef.current = event?.nativeEvent?.contentOffset?.y || 0;
+                }}
                 contentContainerStyle={
                   Platform.OS === 'web'
                     ? {
@@ -1030,7 +1071,6 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                     : { flexGrow: 1, paddingBottom: 112 }
                 }
                 showsVerticalScrollIndicator={false}
-                scrollEnabled={!chartDrawing}
               >
                 <View
                   style={[
@@ -1085,10 +1125,9 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         {...(chartDrawing ? {} : (webSwipePanResponder?.panHandlers || {}))}
                         style={{
                           transform: [{ translateX: chartTranslateX }],
-                          // Preserve vertical document scrolling while claiming
-                          // deliberate horizontal drags to change charts.
-                          // Drawing mode keeps the finger on the chart.
-                          touchAction: chartDrawing ? 'none' : 'pan-y',
+                          // Vertical scrolling stays available. The drawing layer
+                          // sets touch-action none only on the chart itself.
+                          touchAction: 'pan-y',
                           userSelect: 'none',
                         }}
                       >
@@ -1291,11 +1330,22 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
               style={[
                 styles.drawerContent,
                 {
+                  height: houseSheetHeight,
+                  maxHeight: houseSheetHeight,
                   backgroundColor: colors.surfaceRaised || colors.surface,
                   borderColor: colors.cardBorder,
                 },
               ]}
             >
+              <TouchableOpacity
+                onPress={closeHouseDrawer}
+                style={[styles.drawerClose, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close', 'Close')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close" size={20} color={colors.text} />
+              </TouchableOpacity>
               <View style={[styles.drawerHandle, { backgroundColor: colors.borderStrong }]} />
 
               {selectedHouse && (
@@ -2438,13 +2488,12 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 30,
     borderWidth: 1,
     borderBottomWidth: 0,
-    maxHeight: height * 0.75,
     zIndex: 1,
     elevation: 24,
   },
   drawerInner: {
-    height: height * 0.7,
-    maxHeight: height * 0.75,
+    flex: 1,
+    minHeight: 0,
   },
   drawerScroll: {
     flex: 1,
@@ -2458,6 +2507,18 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 8,
   },
+  drawerClose: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    zIndex: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   drawerScrollContent: {
     padding: 24,
   },
@@ -2465,6 +2526,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 22,
+    paddingRight: 28,
   },
   houseNumberBadge: {
     width: 52,

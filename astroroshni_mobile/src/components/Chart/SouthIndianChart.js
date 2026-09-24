@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, Easing, Platform } from 'react-native';
 import Svg, { Circle, Rect, Text as SvgText, G, Line, ClipPath, Defs } from 'react-native-svg';
 import { dashaLevelSuffix, dashaPaint, labelBox, placeCircleClear, placeTransitLabels, signPointAt, textHalfWidth, transitBav } from './NorthIndianChart';
+import { aspectArrow, aspectHouse, ChartAspectArrows, jaiminiTargetSigns, planetAspectCounts } from './chartAspects';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -23,6 +24,9 @@ const SouthIndianChart = ({
   bavBySign = null,
   onTransitPlanetPress = null,
   onHousePress = null,
+  aspectMode = null,
+  aspectFocus = null,
+  planetRoles = null,
 }) => {
   const [contextMenu, setContextMenu] = useState({ show: false, rashiIndex: null, signName: null });
   const { t } = useTranslation();
@@ -265,6 +269,58 @@ const SouthIndianChart = ({
     setContextMenu({ show: true, rashiIndex: signIndex, signName: rashiNames[signIndex] });
   };
 
+  const southCellPolygon = (cell) => ([
+    [cell.x, cell.y],
+    [cell.x + cell.width, cell.y],
+    [cell.x + cell.width, cell.y + cell.height],
+    [cell.x, cell.y + cell.height],
+  ]);
+  const aspectArrows = [];
+  if (aspectMode === 'jaimini' && aspectFocus) {
+    const source = gridPositions.find((pos) => getHouseNumber(pos.sign) === aspectFocus);
+    if (source) {
+      const from = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
+      jaiminiTargetSigns(source.sign).forEach((targetSign) => {
+        const target = gridPositions.find((cell) => cell.sign === targetSign);
+        if (!target) return;
+        const arrow = aspectArrow(
+          from,
+          { x: target.x + target.width / 2, y: target.y + target.height / 2 },
+          southCellPolygon(target),
+          '',
+          `jaimini-${source.sign}-${targetSign}`,
+        );
+        if (arrow) aspectArrows.push(arrow);
+      });
+    }
+  } else if (aspectMode === 'parashari' || (aspectMode === 'nadi' && aspectFocus)) {
+    gridPositions.forEach((pos) => {
+      const houseNumber = getHouseNumber(pos.sign);
+      if (typeof houseNumber !== 'number') return;
+      const planetsInSign = getPlanetsInSign(pos.sign);
+      planetsInSign.forEach((planet, pIndex) => {
+        const counts = planetAspectCounts(aspectMode, planet.name);
+        if (!counts) return;
+        if (aspectMode === 'nadi' && planet.name !== aspectFocus) return;
+        const slot = southPlanetSlot(pos, pIndex, planetsInSign.length, houseNumber);
+        const from = { x: pos.x + pos.width / 2, y: slot.symbolY - 4 };
+        counts.forEach((count) => {
+          const targetHouse = aspectHouse(houseNumber, count);
+          const target = gridPositions.find((cell) => getHouseNumber(cell.sign) === targetHouse);
+          if (!target) return;
+          const arrow = aspectArrow(
+            from,
+            { x: target.x + target.width / 2, y: target.y + target.height / 2 },
+            southCellPolygon(target),
+            count,
+            `${aspectMode}-${planet.name}-${count}`,
+          );
+          if (arrow) aspectArrows.push(arrow);
+        });
+      });
+    });
+  }
+
   return (
     <View
       style={[
@@ -380,6 +436,8 @@ const SouthIndianChart = ({
             strokeWidth={cosmicTheme ? "1.5" : "3"}
           />
         </G>
+
+        <ChartAspectArrows arrows={aspectArrows} color={colors.primary} />
 
         {/* Grid cells */}
         {gridPositions.map((pos, index) => {
@@ -546,6 +604,19 @@ const SouthIndianChart = ({
                       pointerEvents="none"
                     >
                       {dashaTag}
+                    </SvgText>
+                  ) : null}
+                  {planetRoles?.[planet.name] ? (
+                    <SvgText
+                      x={symbolX + textHalfWidth(planet.symbol, planetFont) + 1}
+                      y={symbolY + (dashaTag ? Math.round(planetFont * 0.7) : 1)}
+                      fontSize={Math.max(7, Math.round(planetFont * 0.5))}
+                      fill={colors.primary}
+                      fontWeight="700"
+                      textAnchor="start"
+                      pointerEvents="none"
+                    >
+                      {planetRoles[planet.name]}
                     </SvgText>
                   ) : null}
                   {slot.degreesFit && (

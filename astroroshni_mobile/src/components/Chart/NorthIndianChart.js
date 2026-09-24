@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated, Easing, Plat
 import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Stop, Circle, Path } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { aspectArrow, aspectHouse, ChartAspectArrows, jaiminiTargetSigns, planetAspectCounts } from './chartAspects';
 
 // Create animated versions of SVG components
 const AnimatedLine = Animated.createAnimatedComponent(Line);
@@ -565,6 +566,9 @@ const NorthIndianChart = ({
   signPoints = null,
   bavBySign = null,
   onTransitPlanetPress = null,
+  aspectMode = null,
+  aspectFocus = null,
+  planetRoles = null,
 }) => {
   const { theme, colors } = useTheme();
   const { t } = useTranslation();
@@ -956,6 +960,51 @@ const NorthIndianChart = ({
     ? {}
     : { strokeDasharray: '1200', strokeDashoffset: gridStrokeDash };
 
+  const aspectArrows = [];
+  if (aspectMode === 'jaimini' && aspectFocus) {
+    const houseBySign = {};
+    for (let houseNumber = 1; houseNumber <= 12; houseNumber += 1) {
+      houseBySign[getRashiForHouse(houseNumber - 1)] = houseNumber;
+    }
+    const houseNumber = aspectFocus;
+    const sign = getRashiForHouse(houseNumber - 1);
+    const from = getHouseData(houseNumber).center;
+    jaiminiTargetSigns(sign).forEach((targetSign) => {
+      const target = houseBySign[targetSign];
+      if (!target) return;
+      const arrow = aspectArrow(
+        from,
+        getHouseData(target).center,
+        HOUSE_POLYGONS[target],
+        '',
+        `jaimini-${sign}-${targetSign}`,
+      );
+      if (arrow) aspectArrows.push(arrow);
+    });
+  } else if (aspectMode === 'parashari' || (aspectMode === 'nadi' && aspectFocus)) {
+    for (let houseNumber = 1; houseNumber <= 12; houseNumber += 1) {
+      const planetsInHouse = getPlanetsInHouse(houseNumber - 1);
+      const fromCenter = getHouseData(houseNumber).center;
+      planetsInHouse.forEach((planet, pIndex) => {
+        const counts = planetAspectCounts(aspectMode, planet.name);
+        if (!counts) return;
+        if (aspectMode === 'nadi' && planet.name !== aspectFocus) return;
+        const from = natalPlanetAnchor(houseNumber, fromCenter, planetsInHouse.length, pIndex);
+        counts.forEach((count) => {
+          const target = aspectHouse(houseNumber, count);
+          const arrow = aspectArrow(
+            from,
+            getHouseData(target).center,
+            HOUSE_POLYGONS[target],
+            count,
+            `${aspectMode}-${planet.name}-${count}`,
+          );
+          if (arrow) aspectArrows.push(arrow);
+        });
+      });
+    }
+  }
+
   return (
     <View
       style={[
@@ -1030,6 +1079,8 @@ const NorthIndianChart = ({
             pointerEvents="none"
           />
         </G>
+
+        <ChartAspectArrows arrows={aspectArrows} color={colors.primary} />
 
         {/* Houses */}
         {[1,2,3,4,5,6,7,8,9,10,11,12].map((houseNumber) => {
@@ -1161,6 +1212,19 @@ const NorthIndianChart = ({
                         pointerEvents="none"
                       >
                         {dashaTag}
+                      </SvgText>
+                    ) : null}
+                    {planetRoles?.[planet.name] ? (
+                      <SvgText
+                        x={planetX + textHalfWidth(symbol, planetFont) + 1}
+                        y={planetY + (dashaTag ? 2 : -2)}
+                        fontSize={Math.max(7, Math.round(planetFont * 0.45))}
+                        fill={colors.primary}
+                        fontWeight="700"
+                        textAnchor="start"
+                        pointerEvents="none"
+                      >
+                        {planetRoles[planet.name]}
                       </SvgText>
                     ) : null}
                     {chartType === 'transit' && transitBav(bavBySign, planet.name, rashiIndex) != null ? (

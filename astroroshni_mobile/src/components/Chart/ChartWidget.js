@@ -22,6 +22,8 @@ import { COLORS } from '../../utils/constants';
 import NorthIndianChart, { dashaPaint } from './NorthIndianChart';
 import SouthIndianChart from './SouthIndianChart';
 import ChartDrawingLayer from './ChartDrawingLayer';
+import { NADI_PLANETS, lagnaRoleLords } from './chartAspects';
+import { isMooltrikona, isVargottama } from '../../utils/positionTables';
 import DateNavigator from '../Common/DateNavigator';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -67,6 +69,12 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [dashaLords, setDashaLords] = useState(null);
   const [showChartMenu, setShowChartMenu] = useState(false);
   const [drawingMode, setDrawingMode] = useState(false);
+  const [aspectMode, setAspectMode] = useState(null);
+  const [aspectFocus, setAspectFocus] = useState(null);
+  const [showBadhaka, setShowBadhaka] = useState(false);
+  const [showMaraka, setShowMaraka] = useState(false);
+  const [showVargottama, setShowVargottama] = useState(false);
+  const [showMooltrikona, setShowMooltrikona] = useState(false);
   const [drawColor, setDrawColor] = useState(null);
   const [drawTool, setDrawTool] = useState('pen');
   const [strokes, setStrokes] = useState([]);
@@ -77,8 +85,13 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   // PWA/web: measure parent width before locking SVG pixels (window width can be
   // wider than the chart column and clipped the diamond + toolbar).
   const [webChartSize, setWebChartSize] = useState(null);
-  const { width: windowWidth } = useWindowDimensions();
+  const [drawFitSize, setDrawFitSize] = useState(null);
+  const drawFitSizeRef = useRef(null);
+  const fitWindowWidthRef = useRef(0);
+  const chartToolbarRef = useRef(null);
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const fitTablet = windowWidth >= 768;
+  const fitChartToScreen = windowWidth >= 744;
 
   useEffect(() => {
     setStrokes(drawingsRef.current[drawingKey] || []);
@@ -88,6 +101,41 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     onDrawingModeChange?.(drawingMode);
     return () => onDrawingModeChange?.(false);
   }, [drawingMode, onDrawingModeChange]);
+
+  const dateNavigatorVisible = currentChartType === 'transit' || showTransitOverlay || showDashaHighlight;
+
+  useEffect(() => {
+    if (!fitChartToScreen) {
+      drawFitSizeRef.current = null;
+      setDrawFitSize(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const measure = () => {
+      const node = chartToolbarRef.current;
+      if (!node?.measureInWindow) return;
+      node.measureInWindow((x, y, width, toolbarHeight) => {
+        if (cancelled) return;
+        const barHeight = 52;
+        const available = windowHeight - y - toolbarHeight - barHeight - 12;
+        const measured = Math.floor(Math.max(180, Math.min(width, available)));
+        const widthChanged = fitWindowWidthRef.current !== windowWidth;
+        const current = drawFitSizeRef.current;
+        const size = !widthChanged && current != null ? Math.max(current, measured) : measured;
+        fitWindowWidthRef.current = windowWidth;
+        if (size === current) return;
+        drawFitSizeRef.current = size;
+        setDrawFitSize(size);
+      });
+    };
+    const first = setTimeout(measure, 140);
+    const second = setTimeout(measure, 420);
+    return () => {
+      cancelled = true;
+      clearTimeout(first);
+      clearTimeout(second);
+    };
+  }, [dateNavigatorVisible, fitChartToScreen, windowHeight, windowWidth]);
 
   const updateStrokes = useCallback((updater) => {
     setStrokes((prev) => {
@@ -230,7 +278,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     if (kind === 'sav') setShowSav(true);
     if (kind === 'drawing') {
       setDrawingMode(true);
-      setShowChartMenu(true);
+      setShowChartMenu(false);
     }
   }, [currentChartType, onRequestBirthChart]);
 
@@ -378,7 +426,14 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       return;
     }
     setDrawingMode((on) => !on);
+    setShowChartMenu(false);
   }, [drawingMode, onRequestTimingLicense, timingLicensed]);
+
+  const toggleAspectMode = useCallback((mode) => {
+    setAspectMode((current) => (current === mode ? null : mode));
+    setAspectFocus(null);
+    setShowChartMenu(false);
+  }, []);
 
   useEffect(() => {
     if (timingLicensed) return;
@@ -758,6 +813,30 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     const dashaHighlight = showDashaHighlight && currentChartType !== 'transit' && dashaLords
       ? dashaLords
       : null;
+    const lagnaSign = rotatedAscendant != null ? rotatedAscendant : data?.houses?.[0]?.sign;
+    const roleLords = lagnaRoleLords(lagnaSign);
+    const planetRoles = {};
+    if (showBadhaka && roleLords.badhaka) planetRoles[roleLords.badhaka] = t('chartScreen.badhaka', 'Badhaka');
+    if (showMaraka) {
+      roleLords.maraka.forEach((name) => {
+        planetRoles[name] = planetRoles[name]
+          ? `${planetRoles[name]} · ${t('chartScreen.marka', 'Marka')}`
+          : t('chartScreen.marka', 'Marka');
+      });
+    }
+    if (showVargottama || showMooltrikona) {
+      const addRole = (name, label) => {
+        planetRoles[name] = planetRoles[name] ? `${planetRoles[name]} · ${label}` : label;
+      };
+      Object.entries(data?.planets || {}).forEach(([name, planet]) => {
+        if (!planet || typeof planet !== 'object') return;
+        const sign = planet.sign;
+        const degree = typeof planet.degree === 'number' ? planet.degree : (typeof planet.longitude === 'number' ? planet.longitude % 30 : null);
+        const longitude = typeof planet.longitude === 'number' ? planet.longitude : (typeof sign === 'number' && degree != null ? sign * 30 + degree : null);
+        if (showMooltrikona && isMooltrikona(name, sign, degree)) addRole(name, t('chartScreen.mooltrikona', 'Mooltrikona'));
+        if (showVargottama && name !== 'Gulika' && name !== 'Mandi' && isVargottama(sign, longitude)) addRole(name, t('chartScreen.vargottama', 'Vargottama'));
+      });
+    }
     return chartStyle === 'north' ? (
       <NorthIndianChart
         chartData={data}
@@ -776,6 +855,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         signPoints={signPoints}
         bavBySign={bavBySign}
         onTransitPlanetPress={handleTransitPlanetPress}
+        aspectMode={aspectMode}
+        aspectFocus={aspectFocus}
+        planetRoles={planetRoles}
         {...sizeProp}
       />
     ) : (
@@ -795,10 +877,13 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         bavBySign={bavBySign}
         onTransitPlanetPress={handleTransitPlanetPress}
         onHousePress={drawingMode ? undefined : onHousePress}
+        aspectMode={aspectMode}
+        aspectFocus={aspectFocus}
+        planetRoles={planetRoles}
         {...sizeProp}
       />
     );
-  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType, signPoints, bavBySign, handleTransitPlanetPress, drawingMode]);
+  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType, signPoints, bavBySign, handleTransitPlanetPress, drawingMode, aspectMode, aspectFocus, showBadhaka, showMaraka, showVargottama, showMooltrikona, t]);
 
   const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
     const iconColor = primary ? colors.onPrimary : (active ? colors.onAccent : colors.text);
@@ -863,7 +948,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           : null}
       >
       {cosmicTheme ? (
-        <View style={[styles.webToolbar, !fitTablet && styles.webToolbarPhone, { backgroundColor: colors.chartRaised, borderBottomColor: colors.chartLine }]}>
+        <View ref={chartToolbarRef} style={[styles.webToolbar, !fitTablet && styles.webToolbarPhone, { backgroundColor: colors.chartRaised, borderBottomColor: colors.chartLine }]}>
           {fitTablet ? (
             <Text style={[styles.viewToolbarLabel, styles.viewToolbarLabelTablet, { color: colors.chartTextMuted }]}>{t('premiumUi.common.view')}</Text>
           ) : null}
@@ -956,7 +1041,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
               accessibilityRole="button"
               accessibilityLabel={t('chartScreen.drawing.menu', 'Chart options')}
             >
-              <Ionicons name="ellipsis-vertical" size={fitTablet ? 22 : 16} color={drawingMode ? colors.primary : colors.chartTextMuted} />
+              <Ionicons name="ellipsis-vertical" size={fitTablet ? 22 : 16} color={(drawingMode || aspectMode || showBadhaka || showMaraka || showVargottama || showMooltrikona) ? colors.primary : colors.chartTextMuted} />
             </TouchableOpacity>
           </View>
         </View>
@@ -983,61 +1068,43 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 <Ionicons name="lock-closed" size={14} color={colors.chartTextMuted} />
               )}
             </TouchableOpacity>
-            {drawingMode ? (
-              <>
-                <View style={styles.drawTools}>
-                  {[
-                    { id: 'pen', icon: 'pencil-outline', label: t('chartScreen.drawing.pen', 'Pen') },
-                    { id: 'arrow', icon: 'arrow-forward-outline', label: t('chartScreen.drawing.arrow', 'Arrow') },
-                  ].map((item) => {
-                    const selected = drawTool === item.id;
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        onPress={() => setDrawTool(item.id)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        style={styles.drawTool}
-                      >
-                        <Ionicons name={item.icon} size={16} color={selected ? colors.primary : (colors.chartText || colors.text)} />
-                        <Text style={[styles.drawToolText, { color: selected ? colors.primary : (colors.chartText || colors.text) }]}>{item.label}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <View style={styles.drawColors}>
-                  {[
-                    { id: 'gold', value: colors.primary, label: t('chartScreen.drawing.gold', 'Gold') },
-                    { id: 'red', value: '#C0392B', label: t('chartScreen.drawing.red', 'Red') },
-                    { id: 'green', value: '#1E7A46', label: t('chartScreen.drawing.green', 'Green') },
-                    { id: 'blue', value: '#1D4E89', label: t('chartScreen.drawing.blue', 'Blue') },
-                  ].map((swatch) => {
-                    const selected = (drawColor || colors.primary) === swatch.value;
-                    return (
-                      <TouchableOpacity
-                        key={swatch.id}
-                        onPress={() => setDrawColor(swatch.value)}
-                        accessibilityRole="button"
-                        accessibilityLabel={swatch.label}
-                        style={[
-                          styles.drawSwatch,
-                          { backgroundColor: swatch.value },
-                          selected && { borderColor: colors.chartText || colors.text },
-                        ]}
-                      />
-                    );
-                  })}
-                </View>
-                <TouchableOpacity
-                  style={styles.chartMenuRow}
-                  onPress={() => updateStrokes([])}
-                  accessibilityRole="button"
-                >
-                  <Ionicons name="trash-outline" size={16} color={colors.chartText || colors.text} />
-                  <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{t('chartScreen.drawing.clear', 'Clear')}</Text>
-                </TouchableOpacity>
-              </>
-            ) : null}
+            {[
+              ['parashari', t('chartScreen.aspects', 'Aspects'), 'eye-outline'],
+              ['nadi', t('chartScreen.nadiAspects', 'Nadi aspects'), 'git-network-outline'],
+              ['jaimini', t('chartScreen.jaiminiAspects', 'Jaimini aspects'), 'diamond-outline'],
+            ].map(([mode, label, icon]) => (
+              <TouchableOpacity
+                key={mode}
+                style={styles.chartMenuRow}
+                onPress={() => toggleAspectMode(mode)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: aspectMode === mode }}
+                accessibilityLabel={label}
+              >
+                <Ionicons name={icon} size={16} color={colors.chartText || colors.text} />
+                <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{label}</Text>
+                {aspectMode === mode ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null}
+              </TouchableOpacity>
+            ))}
+            {[
+              ['badhaka', showBadhaka, () => setShowBadhaka((on) => !on), t('chartScreen.badhaka', 'Badhaka'), 'alert-circle-outline'],
+              ['marka', showMaraka, () => setShowMaraka((on) => !on), t('chartScreen.marka', 'Marka'), 'remove-circle-outline'],
+              ['vargottama', showVargottama, () => setShowVargottama((on) => !on), t('chartScreen.vargottama', 'Vargottama'), 'star-outline'],
+              ['mooltrikona', showMooltrikona, () => setShowMooltrikona((on) => !on), t('chartScreen.mooltrikona', 'Mooltrikona'), 'leaf-outline'],
+            ].map(([key, selected, onPress, label, icon]) => (
+              <TouchableOpacity
+                key={key}
+                style={styles.chartMenuRow}
+                onPress={() => { onPress(); setShowChartMenu(false); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={label}
+              >
+                <Ionicons name={icon} size={16} color={colors.chartText || colors.text} />
+                <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{label}</Text>
+                {selected ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null}
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       ) : null}
@@ -1086,6 +1153,15 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 overflow: 'visible',
               }
             : null,
+          fitChartToScreen && drawFitSize
+            ? {
+                width: drawFitSize,
+                height: drawFitSize,
+                aspectRatio: 1,
+                alignSelf: 'center',
+                maxWidth: '100%',
+              }
+            : null,
         ]}
       >
         <Animated.View
@@ -1111,6 +1187,156 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           />
         ) : null}
       </View>
+      {aspectMode === 'parashari' ? (
+        <TouchableOpacity
+          onPress={() => { setAspectMode(null); setAspectFocus(null); }}
+          accessibilityRole="button"
+          accessibilityLabel={t('chartScreen.aspects', 'Aspects')}
+          style={[styles.aspectsOff, { borderColor: colors.chartLine, backgroundColor: colors.chartRaised }]}
+        >
+          <Text style={[styles.aspectsOffText, { color: colors.chartText || colors.text }]}>{t('chartScreen.aspects', 'Aspects')}</Text>
+          <Ionicons name="close" size={14} color={colors.chartTextMuted} />
+        </TouchableOpacity>
+      ) : null}
+      {aspectMode === 'nadi' || aspectMode === 'jaimini' ? (
+        <View style={[styles.aspectPickRow, { borderColor: colors.chartLine, backgroundColor: colors.chartRaised }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.aspectPickScroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            {aspectMode === 'nadi' ? NADI_PLANETS.map((name) => {
+              const selected = aspectFocus === name;
+              const label = t(`planets.${name}`, name.substring(0, 2));
+              return (
+                <TouchableOpacity
+                  key={name}
+                  onPress={() => setAspectFocus(selected ? null : name)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={t(`home.planet_names.${name}`, name)}
+                  style={[styles.aspectPickChip, selected && { backgroundColor: colors.primary }]}
+                >
+                  <Text style={[styles.aspectPickText, { color: selected ? colors.onPrimary : (colors.chartText || colors.text) }]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            }) : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((house) => {
+              const selected = aspectFocus === house;
+              return (
+                <TouchableOpacity
+                  key={house}
+                  onPress={() => setAspectFocus(selected ? null : house)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${t('chartScreen.houseAbbr', 'H')}${house}`}
+                  style={[styles.aspectPickChip, selected && { backgroundColor: colors.primary }]}
+                >
+                  <Text style={[styles.aspectPickText, { color: selected ? colors.onPrimary : (colors.chartText || colors.text) }]}>{house}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <TouchableOpacity
+            onPress={() => { setAspectMode(null); setAspectFocus(null); }}
+            accessibilityRole="button"
+            accessibilityLabel={aspectMode === 'nadi' ? t('chartScreen.nadiAspects', 'Nadi aspects') : t('chartScreen.jaiminiAspects', 'Jaimini aspects')}
+            style={styles.aspectPickClose}
+          >
+            <Ionicons name="close" size={16} color={colors.chartTextMuted} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      {showBadhaka || showMaraka || showVargottama || showMooltrikona ? (
+        <View style={styles.roleOffRow}>
+          {[
+            [showBadhaka, () => setShowBadhaka(false), t('chartScreen.badhaka', 'Badhaka')],
+            [showMaraka, () => setShowMaraka(false), t('chartScreen.marka', 'Marka')],
+            [showVargottama, () => setShowVargottama(false), t('chartScreen.vargottama', 'Vargottama')],
+            [showMooltrikona, () => setShowMooltrikona(false), t('chartScreen.mooltrikona', 'Mooltrikona')],
+          ].filter(([on]) => on).map(([on, close, label]) => (
+            <TouchableOpacity
+              key={label}
+              onPress={close}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              style={[styles.aspectsOff, styles.roleOffChip, { borderColor: colors.chartLine, backgroundColor: colors.chartRaised }]}
+            >
+              <Text style={[styles.aspectsOffText, { color: colors.chartText || colors.text }]}>{label}</Text>
+              <Ionicons name="close" size={14} color={colors.chartTextMuted} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
+      {drawingMode ? (
+        <View style={[styles.drawBar, { borderColor: colors.chartLine, backgroundColor: colors.chartRaised }]}>
+          <ScrollView
+            horizontal
+            style={styles.drawBarScroll}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.drawBarTools}
+            keyboardShouldPersistTaps="handled"
+          >
+            {[
+              { id: 'pen', icon: 'pencil-outline', label: t('chartScreen.drawing.pen', 'Pen') },
+              { id: 'arrow', icon: 'arrow-forward-outline', label: t('chartScreen.drawing.arrow', 'Arrow') },
+            ].map((item) => {
+              const selected = drawTool === item.id;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  onPress={() => setDrawTool(item.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
+                  accessibilityState={{ selected }}
+                  style={styles.drawBarTool}
+                >
+                  <Ionicons name={item.icon} size={18} color={selected ? colors.primary : (colors.chartText || colors.text)} />
+                </TouchableOpacity>
+              );
+            })}
+            {[
+              { id: 'gold', value: colors.primary, label: t('chartScreen.drawing.gold', 'Gold') },
+              { id: 'red', value: '#C0392B', label: t('chartScreen.drawing.red', 'Red') },
+              { id: 'green', value: '#1E7A46', label: t('chartScreen.drawing.green', 'Green') },
+              { id: 'blue', value: '#1D4E89', label: t('chartScreen.drawing.blue', 'Blue') },
+            ].map((swatch) => {
+              const selected = (drawColor || colors.primary) === swatch.value;
+              return (
+                <TouchableOpacity
+                  key={swatch.id}
+                  onPress={() => setDrawColor(swatch.value)}
+                  accessibilityRole="button"
+                  accessibilityLabel={swatch.label}
+                  style={[
+                    styles.drawSwatch,
+                    { backgroundColor: swatch.value },
+                    selected && { borderColor: colors.chartText || colors.text },
+                  ]}
+                />
+              );
+            })}
+            <TouchableOpacity
+              onPress={() => updateStrokes([])}
+              accessibilityRole="button"
+              accessibilityLabel={t('chartScreen.drawing.clear', 'Clear')}
+              style={styles.drawBarTool}
+            >
+              <Ionicons name="trash-outline" size={18} color={colors.chartText || colors.text} />
+            </TouchableOpacity>
+          </ScrollView>
+          <TouchableOpacity
+            onPress={() => {
+              setDrawingMode(false);
+              setShowChartMenu(false);
+            }}
+            accessibilityRole="button"
+            style={[styles.drawBarDone, { backgroundColor: colors.primary }]}
+          >
+            <Text style={[styles.drawBarDoneText, { color: colors.onPrimary }]}>{t('premiumUi.common.done', 'Done')}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       </View>
 
       {cosmicTheme && (
@@ -1443,6 +1669,65 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  aspectsOff: {
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    marginRight: 4,
+    minHeight: 28,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  roleOffRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  roleOffChip: {
+    marginTop: 8,
+    marginRight: 0,
+  },
+  aspectsOffText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  aspectPickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    borderWidth: 1,
+    borderRadius: 16,
+    minHeight: 36,
+  },
+  aspectPickScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingLeft: 6,
+    paddingVertical: 4,
+  },
+  aspectPickChip: {
+    minWidth: 28,
+    minHeight: 28,
+    paddingHorizontal: 7,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aspectPickText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  aspectPickClose: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   drawColors: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1475,6 +1760,48 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     borderWidth: 2,
     borderColor: 'transparent',
+  },
+  drawBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingLeft: 4,
+    paddingRight: 8,
+    gap: 6,
+  },
+  drawBarScroll: {
+    flex: 1,
+    minWidth: 0,
+  },
+  drawBarTools: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingRight: 4,
+  },
+  drawBarTool: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+  },
+  drawBarToolText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  drawBarDone: {
+    minHeight: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drawBarDoneText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   quickActionsGrid: { marginTop: 22, width: '100%' },
   quickActionsRow: {

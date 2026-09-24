@@ -161,6 +161,18 @@ export function isVargottama(sign, longitude) {
   return sign === navamsaSign(longitude);
 }
 
+export function isMooltrikona(planet, sign, degree) {
+  const range = MOOLATRIKONA_RANGES[planet];
+  return Boolean(
+    range
+    && sign === range.sign
+    && degree != null
+    && Number.isFinite(Number(degree))
+    && Number(degree) >= range.start
+    && Number(degree) <= range.end
+  );
+}
+
 function angularDistance(a, b) {
   let distance = Math.abs(normLon(a) - normLon(b));
   if (distance > 180) distance = 360 - distance;
