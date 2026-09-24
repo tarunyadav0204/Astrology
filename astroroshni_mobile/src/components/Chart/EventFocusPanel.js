@@ -255,7 +255,7 @@ export default function EventFocusPanel({
               : runSearch}
             style={[styles.runButton, { backgroundColor: colors.primary, marginTop: 4 }]}
           >
-            <Text style={styles.runButtonText}>{licenseRequired ? 'View ₹100 monthly plan' : 'Try again'}</Text>
+            <Text style={styles.runButtonText}>{licenseRequired ? 'View ₹300 monthly plan' : 'Try again'}</Text>
           </TouchableOpacity>
         </View>
       ) : null}

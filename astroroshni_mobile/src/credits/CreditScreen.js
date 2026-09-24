@@ -2589,14 +2589,14 @@ const CreditScreen = ({ navigation, route }) => {
                         <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>Loading Astrologer plan…</Text>
                       ) : (Platform.OS === 'android' ? astrologerPlansFromPlay : razorpayAstrologerPlans).length === 0 ? (
                         <Text style={[styles.buyProductPlaceholder, { color: colors.textSecondary }]}>
-                          The ₹100/month Astrologer plan is not available from the billing provider yet.
+                          The ₹300/month Astrologer plan is not available from the billing provider yet.
                         </Text>
                       ) : (
                         (Platform.OS === 'android' ? astrologerPlansFromPlay : razorpayAstrologerPlans).map((plan) => {
                           const productId = plan.google_play_product_id || plan.product_id;
                           const displayPrice = Platform.OS === 'android'
                             ? getSubscriptionDisplayPrice(plan, iapSubscriptions)
-                            : plan.formatted_price || plan.amount_display || '₹100';
+                            : plan.formatted_price || plan.amount_display || '₹300';
                           const purchasing = Platform.OS === 'android'
                             ? purchasingSubscriptionId === productId
                             : purchasingRazorpaySubscriptionId === plan.plan_id;
@@ -2604,7 +2604,7 @@ const CreditScreen = ({ navigation, route }) => {
                             <View key={plan.plan_id || productId} style={[styles.vipPlanRow, { borderColor: colors.cardBorder }]}>
                               <View style={styles.vipPlanRowCopy}>
                                 <Text style={[styles.vipPlanRowTitle, { color: colors.text }]}>
-                                  {displayPrice || '₹100'} / month
+                                  {displayPrice || '₹300'} / month
                                 </Text>
                                 {(plan.benefits?.length ? plan.benefits : [
                                   'What is activated now?',

@@ -432,7 +432,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
             })}
             style={[styles.primaryButton, { backgroundColor: colors.primary }]}
           >
-            <Text style={styles.primaryButtonText}>View ₹100 monthly plan</Text>
+            <Text style={styles.primaryButtonText}>View ₹300 monthly plan</Text>
           </TouchableOpacity>
         </View> : null}
 

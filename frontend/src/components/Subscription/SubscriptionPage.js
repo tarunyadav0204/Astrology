@@ -236,7 +236,7 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
             <div>
               <h1>{isAstrologerPlan ? 'Astrologer License' : <>Deeper guidance,<br /><em>better value.</em></>}</h1>
               <p>{isAstrologerPlan
-                ? 'Unlock professional chart activation, timing and whole-chart manifestation tools for ₹100 per month.'
+                ? 'Unlock professional chart activation, timing and whole-chart manifestation tools for ₹300 per month.'
                 : 'VIP lowers the credit price of chats, analyses, muhurats, and other premium readings. Choose your saving level; buy credits only when you need them.'}
               </p>
             </div>
@@ -428,7 +428,7 @@ const SubscriptionPage = ({ user, onLogin, onLogout, onAdminClick }) => {
             <h2>Choose a plan</h2>
             <p className="subscription-hint">
               {isAstrologerPlan
-                ? '₹100 per month. This license can remain active alongside a VIP membership.'
+                ? '₹300 per month. This license can remain active alongside a VIP membership.'
                 : 'Monthly fee for your discount tier. Credit balances are bought separately—not included with membership.'}
             </p>
             <div className="subscription-plans-grid">

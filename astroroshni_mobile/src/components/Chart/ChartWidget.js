@@ -227,6 +227,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       return;
     }
     if (kind === 'dasha') setShowDashaHighlight(true);
+    if (kind === 'sav') setShowSav(true);
+    if (kind === 'drawing') {
+      setDrawingMode(true);
+      setShowChartMenu(true);
+    }
   }, [currentChartType, onRequestBirthChart]);
 
   const toggleTransitOverlay = useCallback(() => {
@@ -358,6 +363,28 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     }
     setShowDashaHighlight((prev) => !prev);
   }, [onRequestTimingLicense, showDashaHighlight, timingLicensed]);
+
+  const toggleSav = useCallback(() => {
+    if (!showSav && !timingLicensed) {
+      onRequestTimingLicense?.('sav');
+      return;
+    }
+    setShowSav((prev) => !prev);
+  }, [onRequestTimingLicense, showSav, timingLicensed]);
+
+  const toggleDrawingMode = useCallback(() => {
+    if (!drawingMode && !timingLicensed) {
+      onRequestTimingLicense?.('drawing');
+      return;
+    }
+    setDrawingMode((on) => !on);
+  }, [drawingMode, onRequestTimingLicense, timingLicensed]);
+
+  useEffect(() => {
+    if (timingLicensed) return;
+    setShowSav(false);
+    setDrawingMode(false);
+  }, [timingLicensed]);
 
   const dashaBirthKey = `${birthData?.id || ''}|${birthData?.date || ''}|${birthData?.time || ''}`;
   const dashaBirthKeyRef = useRef(dashaBirthKey);
@@ -898,13 +925,16 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             ) : null}
             {(currentChartType === 'lagna' || currentChartType === 'transit') ? (
               <TouchableOpacity
-                onPress={() => setShowSav((prev) => !prev)}
+                onPress={toggleSav}
                 style={[styles.viewControl, !fitTablet && styles.viewControlPhone, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: showSav }}
-                accessibilityLabel={t('chartScreen.sav', 'SAV')}
+                accessibilityLabel={timingLicensed ? t('chartScreen.sav', 'SAV') : t('premiumUi.chart.licenseRequired')}
               >
                 <Ionicons name="apps-outline" size={fitTablet ? 22 : 14} color={showSav ? colors.primary : colors.chartTextMuted} />
+                {timingLicensed ? null : (
+                  <Ionicons name="lock-closed" size={fitTablet ? 14 : 10} color={colors.chartTextMuted} />
+                )}
                 <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showSav ? colors.primary : colors.chartTextMuted }]}>
                   {t('chartScreen.sav', 'SAV')}
                 </Text>
@@ -940,13 +970,18 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           <View style={[styles.chartMenu, { backgroundColor: colors.chartRaised || colors.surface, borderColor: colors.chartLine }]}>
             <TouchableOpacity
               style={styles.chartMenuRow}
-              onPress={() => setDrawingMode((on) => !on)}
+              onPress={toggleDrawingMode}
               accessibilityRole="button"
               accessibilityState={{ selected: drawingMode }}
+              accessibilityLabel={timingLicensed ? t('chartScreen.drawing.mode', 'Drawing mode') : t('premiumUi.chart.licenseRequired')}
             >
               <Ionicons name="pencil-outline" size={16} color={colors.chartText || colors.text} />
               <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{t('chartScreen.drawing.mode', 'Drawing mode')}</Text>
-              {drawingMode ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null}
+              {timingLicensed ? (
+                drawingMode ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null
+              ) : (
+                <Ionicons name="lock-closed" size={14} color={colors.chartTextMuted} />
+              )}
             </TouchableOpacity>
             {drawingMode ? (
               <>

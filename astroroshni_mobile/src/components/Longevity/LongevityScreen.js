@@ -38,7 +38,7 @@ export default function LongevityScreen({ navigation }) {
   const [error, setError] = useState('');
   const [checkingLicense, setCheckingLicense] = useState(false);
   const [showLicenseModal, setShowLicenseModal] = useState(false);
-  const [licensePrice, setLicensePrice] = useState('₹100/month');
+  const [licensePrice, setLicensePrice] = useState('₹300/month');
   const checkingLicenseRef = useRef(false);
 
   const calculate = useCallback(async () => {
@@ -70,9 +70,9 @@ export default function LongevityScreen({ navigation }) {
             || item.product_id === 'astrologer_license_monthly'
           );
           const livePrice = plan?.formatted_price || plan?.amount_display;
-          setLicensePrice(livePrice ? `${livePrice}/month` : '₹100/month');
+          setLicensePrice(livePrice ? `${livePrice}/month` : '₹300/month');
         } catch (_) {
-          setLicensePrice('₹100/month');
+          setLicensePrice('₹300/month');
         }
         setShowLicenseModal(true);
         setLoading(false);

@@ -119,8 +119,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const [guidePlayerStatus, setGuidePlayerStatus] = useState('idle');
   const [showAstrologerLicenseModal, setShowAstrologerLicenseModal] = useState(false);
   const [licensePrompt, setLicensePrompt] = useState('activation');
-  const [astrologerLicenseAmount, setAstrologerLicenseAmount] = useState('₹100');
-  const [astrologerLicensePrice, setAstrologerLicensePrice] = useState('₹100/month');
+  const [astrologerLicenseAmount, setAstrologerLicenseAmount] = useState('₹300');
+  const [astrologerLicensePrice, setAstrologerLicensePrice] = useState('₹300/month');
   const pendingTimingRef = useRef(null);
   const [checkingAstrologerLicense, setCheckingAstrologerLicense] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
@@ -275,14 +275,14 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           || item.google_play_product_id === 'astrologer_license_monthly'
           || item.product_id === 'astrologer_license_monthly'
         );
-        const livePrice = String(plan?.formatted_price || plan?.amount_display || '₹100')
+        const livePrice = String(plan?.formatted_price || plan?.amount_display || '₹300')
           .replace(/\s*\/\s*month\s*$/i, '');
-        const amount = livePrice || '₹100';
+        const amount = livePrice || '₹300';
         setAstrologerLicenseAmount(amount);
         setAstrologerLicensePrice(`${amount}/month`);
       } catch (_) {
-        setAstrologerLicenseAmount('₹100');
-        setAstrologerLicensePrice('₹100/month');
+        setAstrologerLicenseAmount('₹300');
+        setAstrologerLicensePrice('₹300/month');
       }
       setLicensePrompt(prompt);
       setShowAstrologerLicenseModal(true);
