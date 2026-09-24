@@ -2514,7 +2514,6 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
           <div className="footer-content">
             <div className="footer-links">
               <div className="footer-links-row">
-                <a href="https://astrovishnu.com" target="_blank" rel="noopener noreferrer">World's best astrology software</a>
                 <Link to="/panchang">Panchang</Link>
                 <Link to="/muhurat-finder">Muhurat Finder</Link>
                 <Link to="/nakshatras">Nakshatras</Link>

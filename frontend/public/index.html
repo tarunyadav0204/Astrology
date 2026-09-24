@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#e91e63" />
   <script>
+    (function () {
+      var host = location.hostname;
+      if (host === 'astrovishnu.com' || host === 'www.astrovishnu.com') {
+        location.replace('https://astroroshni.com' + location.pathname + location.search + location.hash);
+      }
+    })();
+  </script>
+  <script>
     /* Apply the saved semantic theme before CSS/React to prevent a color flash. */
     (function () {
       try {

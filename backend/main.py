@@ -1817,29 +1817,15 @@ async def register(user_data: UserCreate):
         )
         user = cur.fetchone()
 
-        # Get free plans for both platforms
-        cur = execute(
-            conn,
-            "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astrovishnu'",
-        )
-        astrovishnu_free = cur.fetchone()
         cur = execute(
             conn,
             "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astroroshni'",
         )
         astroroshni_free = cur.fetchone()
 
-        # Give user free access to both platforms
         from datetime import date, timedelta
         start_date = date.today()
         end_date = start_date + timedelta(days=365)  # 1 year free
-
-        if astrovishnu_free:
-            execute(
-                conn,
-                "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
-                (user[0], astrovishnu_free[0], start_date, end_date),
-            )
 
         if astroroshni_free:
             execute(
@@ -1989,11 +1975,6 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
 
             cur = execute(
                 conn,
-                "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astrovishnu'",
-            )
-            astrovishnu_free = cur.fetchone()
-            cur = execute(
-                conn,
                 "SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astroroshni'",
             )
             astroroshni_free = cur.fetchone()
@@ -2001,13 +1982,6 @@ async def register_with_birth(user_data: UserRegistrationWithBirth):
             from datetime import date, timedelta
             start_date = date.today()
             end_date = start_date + timedelta(days=365)  # 1 year free
-
-            if astrovishnu_free:
-                execute(
-                    conn,
-                    "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
-                    (user[0], astrovishnu_free[0], start_date, end_date),
-                )
 
             if astroroshni_free:
                 execute(

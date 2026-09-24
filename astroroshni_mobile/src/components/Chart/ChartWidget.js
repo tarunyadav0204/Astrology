@@ -836,44 +836,45 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           : null}
       >
       {cosmicTheme ? (
-        <View style={[styles.webToolbar, { backgroundColor: colors.chartRaised, borderBottomColor: colors.chartLine }]}>
+        <View style={[styles.webToolbar, !fitTablet && styles.webToolbarPhone, { backgroundColor: colors.chartRaised, borderBottomColor: colors.chartLine }]}>
           {fitTablet ? (
             <Text style={[styles.viewToolbarLabel, styles.viewToolbarLabelTablet, { color: colors.chartTextMuted }]}>{t('premiumUi.common.view')}</Text>
           ) : null}
-          <View style={styles.webToolbarLeft}>
+          <View style={[styles.webToolbarLeft, !fitTablet && styles.webToolbarLeftPhone]}>
             <TouchableOpacity
               onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
               style={[
                 styles.viewControl,
+                !fitTablet && styles.viewControlPhone,
                 fitTablet && styles.viewControlTablet,
                 {
                   backgroundColor: 'transparent',
                 },
               ]}
             >
-              <Ionicons name={showDegreeNakshatra ? "eye" : "eye-off"} size={fitTablet ? 22 : 15} color={showDegreeNakshatra ? colors.primary : colors.chartTextMuted} />
-              <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: showDegreeNakshatra ? colors.primary : colors.chartTextMuted }]}>{t('premiumUi.common.degrees')}</Text>
+              <Ionicons name={showDegreeNakshatra ? "eye" : "eye-off"} size={fitTablet ? 22 : 14} color={showDegreeNakshatra ? colors.primary : colors.chartTextMuted} />
+              <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showDegreeNakshatra ? colors.primary : colors.chartTextMuted }]}>{t('premiumUi.common.degrees')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={toggleStyle}
-              style={[styles.viewControl, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
+              style={[styles.viewControl, !fitTablet && styles.viewControlPhone, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
             >
-              <Ionicons name="grid-outline" size={fitTablet ? 22 : 15} color={colors.chartTextMuted} />
-              <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: colors.chartTextMuted }]}>{chartStyle === 'north' ? 'South' : 'North'}</Text>
+              <Ionicons name="grid-outline" size={fitTablet ? 22 : 14} color={colors.chartTextMuted} />
+              <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: colors.chartTextMuted }]}>{chartStyle === 'north' ? 'South' : 'North'}</Text>
             </TouchableOpacity>
             {currentChartType !== 'transit' ? (
               <TouchableOpacity
                 onPress={toggleTransitOverlay}
-                style={[styles.viewControl, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
+                style={[styles.viewControl, !fitTablet && styles.viewControlPhone, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: showTransitOverlay }}
                 accessibilityLabel={timingLicensed ? t('chartScreen.transit', 'Transit') : t('premiumUi.chart.licenseRequired')}
               >
-                <Ionicons name="planet-outline" size={fitTablet ? 22 : 15} color={showTransitOverlay ? colors.primary : colors.chartTextMuted} />
+                <Ionicons name="planet-outline" size={fitTablet ? 22 : 14} color={showTransitOverlay ? colors.primary : colors.chartTextMuted} />
                 {timingLicensed ? null : (
-                  <Ionicons name="lock-closed" size={fitTablet ? 14 : 11} color={colors.chartTextMuted} />
+                  <Ionicons name="lock-closed" size={fitTablet ? 14 : 10} color={colors.chartTextMuted} />
                 )}
-                <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: showTransitOverlay ? colors.primary : colors.chartTextMuted }]}>
+                <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showTransitOverlay ? colors.primary : colors.chartTextMuted }]}>
                   {t('chartScreen.transit', 'Transit')}
                 </Text>
               </TouchableOpacity>
@@ -881,16 +882,16 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             {currentChartType !== 'transit' ? (
               <TouchableOpacity
                 onPress={toggleDashaHighlight}
-                style={[styles.viewControl, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
+                style={[styles.viewControl, !fitTablet && styles.viewControlPhone, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: showDashaHighlight }}
                 accessibilityLabel={timingLicensed ? t('chartScreen.dasha', 'Dasha') : t('premiumUi.chart.licenseRequired')}
               >
-                <Ionicons name="time-outline" size={fitTablet ? 22 : 15} color={showDashaHighlight ? colors.primary : colors.chartTextMuted} />
+                <Ionicons name="time-outline" size={fitTablet ? 22 : 14} color={showDashaHighlight ? colors.primary : colors.chartTextMuted} />
                 {timingLicensed ? null : (
-                  <Ionicons name="lock-closed" size={fitTablet ? 14 : 11} color={colors.chartTextMuted} />
+                  <Ionicons name="lock-closed" size={fitTablet ? 14 : 10} color={colors.chartTextMuted} />
                 )}
-                <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: showDashaHighlight ? colors.primary : colors.chartTextMuted }]}>
+                <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showDashaHighlight ? colors.primary : colors.chartTextMuted }]}>
                   {t('chartScreen.dasha', 'Dasha')}
                 </Text>
               </TouchableOpacity>
@@ -898,13 +899,13 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             {(currentChartType === 'lagna' || currentChartType === 'transit') ? (
               <TouchableOpacity
                 onPress={() => setShowSav((prev) => !prev)}
-                style={[styles.viewControl, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
+                style={[styles.viewControl, !fitTablet && styles.viewControlPhone, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: showSav }}
                 accessibilityLabel={t('chartScreen.sav', 'SAV')}
               >
-                <Ionicons name="apps-outline" size={fitTablet ? 22 : 15} color={showSav ? colors.primary : colors.chartTextMuted} />
-                <Text style={[styles.viewControlText, fitTablet && styles.viewControlTextTablet, { color: showSav ? colors.primary : colors.chartTextMuted }]}>
+                <Ionicons name="apps-outline" size={fitTablet ? 22 : 14} color={showSav ? colors.primary : colors.chartTextMuted} />
+                <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showSav ? colors.primary : colors.chartTextMuted }]}>
                   {t('chartScreen.sav', 'SAV')}
                 </Text>
               </TouchableOpacity>
@@ -913,7 +914,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           <View style={styles.viewToolbarActions}>
             <TouchableOpacity
               onPress={() => setShowInfoModal(true)}
-              style={styles.viewInfoButton}
+              style={[styles.viewInfoButton, !fitTablet && styles.viewInfoButtonPhone]}
               accessibilityRole="button"
               accessibilityLabel={t('premiumUi.common.aboutChart')}
             >
@@ -921,7 +922,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setShowChartMenu((open) => !open)}
-              style={styles.viewInfoButton}
+              style={[styles.viewInfoButton, !fitTablet && styles.viewInfoButtonPhone]}
               accessibilityRole="button"
               accessibilityLabel={t('chartScreen.drawing.menu', 'Chart options')}
             >
@@ -1286,12 +1287,18 @@ const styles = StyleSheet.create({
   webToolbar: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'nowrap',
     width: '100%',
     minHeight: 46,
     paddingHorizontal: 15,
     paddingVertical: 6,
     borderBottomWidth: 1,
     zIndex: 2,
+  },
+  webToolbarPhone: {
+    minHeight: 40,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
   },
   viewToolbarLabel: {
     fontSize: 8,
@@ -1306,9 +1313,13 @@ const styles = StyleSheet.create({
   webToolbarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     gap: 7,
     flex: 1,
+    minWidth: 0,
+  },
+  webToolbarLeftPhone: {
+    gap: 0,
   },
   viewControl: {
     minHeight: 30,
@@ -1316,6 +1327,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  viewControlPhone: {
+    minHeight: 28,
+    paddingHorizontal: 3,
+    gap: 2,
   },
   viewControlTablet: {
     minHeight: 44,
@@ -1324,6 +1342,10 @@ const styles = StyleSheet.create({
   viewControlText: {
     fontSize: 10,
     fontWeight: '600',
+    flexShrink: 1,
+  },
+  viewControlTextPhone: {
+    fontSize: 11,
   },
   viewControlTextTablet: {
     fontSize: 16,
@@ -1346,10 +1368,16 @@ const styles = StyleSheet.create({
     height: 30,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+  },
+  viewInfoButtonPhone: {
+    width: 26,
+    height: 26,
   },
   viewToolbarActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   chartMenuWrap: {
     ...StyleSheet.absoluteFillObject,

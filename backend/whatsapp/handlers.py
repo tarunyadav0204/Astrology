@@ -708,20 +708,9 @@ def _grant_free_subscriptions(conn, userid: int) -> None:
     end_date = start_date + timedelta(days=365)
     cur = execute(
         conn,
-        f"SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astrovishnu' AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}",
-    )
-    av = cur.fetchone()
-    cur = execute(
-        conn,
         f"SELECT plan_id FROM subscription_plans WHERE plan_name = 'Free' AND platform = 'astroroshni' AND {SQL_SUBSCRIPTION_PLAN_ACTIVE}",
     )
     ar = cur.fetchone()
-    if av:
-        execute(
-            conn,
-            "INSERT INTO user_subscriptions (userid, plan_id, start_date, end_date) VALUES (%s, %s, %s, %s)",
-            (userid, av[0], start_date, end_date),
-        )
     if ar:
         execute(
             conn,

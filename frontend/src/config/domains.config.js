@@ -72,34 +72,16 @@ function shouldBypassSubscriptionDomainRedirect() {
   return h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
 }
 
-// Get redirect URL based on user subscriptions and current domain
-export const getRedirectUrl = (user) => {
-  if (shouldBypassSubscriptionDomainRedirect()) {
+// AstroVishnu is retired. Anyone who still opens that host is sent to AstroRoshni.
+export const getRedirectUrl = () => {
+  if (typeof window === 'undefined' || shouldBypassSubscriptionDomainRedirect()) {
     return null;
   }
 
-  const currentDomain = getCurrentDomainConfig();
-
-  if (!user || !user.subscriptions) {
-    return null; // No redirect for unauthenticated users
+  const host = window.location.hostname;
+  if (host === 'astrovishnu.com' || host === 'www.astrovishnu.com') {
+    return `https://astroroshni.com${window.location.pathname}${window.location.search}${window.location.hash}`;
   }
-
-  const hasAstrovishnu = hasAccess(user, 'astrovishnu');
-  const hasAstroroshni = hasAccess(user, 'astroroshni');
-
-  // If user has both platforms, let them stay on current domain
-  if (hasAstrovishnu && hasAstroroshni) {
-    return null;
-  }
-
-  // AstroVishnu-only on the AstroRoshni / consumer domain → send them to the software site.
-  if (hasAstrovishnu && !hasAstroroshni && currentDomain.userType === 'general') {
-    return `https://${DOMAIN_CONFIG.ASTROVISHNU.domain}`;
-  }
-
-  // We intentionally do not redirect to astroroshni.com from AstroVishnu (or from localhost
-  // with ?domain=astrovishnu): users stay on the site they opened. If subscription data
-  // only lists Astroroshni, they remain here instead of being bounced away.
 
   return null;
 };
