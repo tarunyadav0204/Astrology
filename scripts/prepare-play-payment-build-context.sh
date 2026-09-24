@@ -47,17 +47,10 @@ copy_path "backend/utils/env_json.py"
 copy_path "backend/utils/llm_pricing.py"
 copy_path "backend/utils/smtp_mail.py"
 copy_path "backend/utils/payment_failure_alerts.py"
-copy_path "backend/credits/__init__.py"
-copy_path "backend/credits/routes.py"
-copy_path "backend/credits/credit_service.py"
-copy_path "backend/credits/credit_campaigns.py"
-copy_path "backend/credits/instant_billing.py"
-copy_path "backend/credits/razorpay_routes.py"
-copy_path "backend/credits/purchase_promos.py"
-copy_path "backend/credits/play_external_transactions.py"
-copy_path "backend/credits/play_order_id_util.py"
-copy_path "backend/credits/play_subscription_events.py"
-copy_path "backend/credits/subscription_pricing_util.py"
-copy_path "backend/credits/admin/promo_manager.py"
+# Keep the payment service's credit package complete. Several payment paths use
+# lazy imports after a provider verification or database commit; maintaining a
+# hand-written file allowlist let builds pass while runtime-only modules such as
+# invoice_service and subscription_ledger were absent from the image.
+copy_path "backend/credits"
 
 echo "Prepared play payment build context at ${OUT_DIR}"

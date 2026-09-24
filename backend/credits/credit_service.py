@@ -3643,10 +3643,6 @@ class CreditService:
                     (userid, amount, new_balance, source, reference_id, description, metadata),
                 )
                 conn.commit()
-            if source in ("google_play", "razorpay") and reference_id:
-                from credits.invoice_service import ensure_purchase_invoice_for_reference
-                ensure_purchase_invoice_for_reference(userid, source, reference_id)
-            return True
         except Exception:
             log.exception(
                 "add_credits failed userid=%s amount=%s source=%s reference_id=%s",
@@ -3656,6 +3652,24 @@ class CreditService:
                 reference_id,
             )
             return False
+
+        # The credit grant is complete once the transaction above commits. Invoice
+        # creation is a recoverable, post-purchase side effect and must never turn a
+        # successful grant into a payment failure response (or an alert to support).
+        if source in ("google_play", "razorpay") and reference_id:
+            try:
+                from credits.invoice_service import ensure_purchase_invoice_for_reference
+
+                ensure_purchase_invoice_for_reference(userid, source, reference_id)
+            except Exception:
+                log.exception(
+                    "purchase invoice creation failed after credit grant "
+                    "userid=%s source=%s reference_id=%s",
+                    userid,
+                    source,
+                    reference_id,
+                )
+        return True
     
     def spend_credits(self, userid: int, amount: int, feature: str, description: str = None, metadata: str = None) -> bool:
         """Spend credits for a feature. metadata is optional JSON written only by server callers."""

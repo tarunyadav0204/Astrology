@@ -25,7 +25,7 @@ RUN chmod +x /app/play_payment_service/start.sh
 # missing a transitive Python module. Without this check Cloud Build succeeds,
 # but Cloud Run only discovers the problem when Uvicorn starts the revision.
 RUN JWT_SECRET=payment-service-build-smoke-test \
-    python -c "import play_payment_service.main"
+    python -c "import play_payment_service.main; import credits.invoice_service; import credits.subscription_ledger"
 
 EXPOSE 8080
 
