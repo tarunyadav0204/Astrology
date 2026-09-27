@@ -5,6 +5,7 @@ Implements sophisticated Vedic astrology techniques for enhanced predictions
 
 from typing import Dict, List, Any, Tuple
 from utils.timezone_service import parse_timezone_offset
+from calculators.classical_functional_nature import calculate_functional_nature, ruled_houses_for_ascendant
 import math
 
 class AdvancedClassicalTechniques:
@@ -56,22 +57,17 @@ class AdvancedClassicalTechniques:
         ascendant = self._get_ascendant_sign()
         yogakaraka_planets = []
         
-        # Define Kendra (1,4,7,10) and Trikona (1,5,9) houses
-        kendra_houses = [1, 4, 7, 10]
-        trikona_houses = [1, 5, 9]
-        
         for planet in ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']:
             ruled_houses = self._get_planet_rulerships(planet, ascendant)
-            
-            kendra_ruler = any(house in kendra_houses for house in ruled_houses)
-            trikona_ruler = any(house in trikona_houses for house in ruled_houses)
-            
-            if kendra_ruler and trikona_ruler:
+            classical_role = calculate_functional_nature(ascendant, planet)
+
+            if classical_role['is_yogakaraka']:
                 yogakaraka_data = {
                     "planet": planet,
                     "ruled_houses": ruled_houses,
                     "strength": self._calculate_yogakaraka_strength(planet),
-                    "current_condition": self._analyze_planet_condition(planet)
+                    "current_condition": self._analyze_planet_condition(planet),
+                    "classical_functional_nature": classical_role,
                 }
                 yogakaraka_planets.append(yogakaraka_data)
                 
@@ -365,16 +361,19 @@ class AdvancedClassicalTechniques:
     
     def _get_ascendant_sign(self) -> int:
         """Get ascendant sign number"""
-        return 1  # Mock - would calculate from birth data
+        for source in (self.planet_positions, self.birth_data):
+            raw = source.get("ascendant") if isinstance(source, dict) else None
+            if isinstance(raw, dict):
+                raw = raw.get("sign", raw.get("longitude"))
+            if raw is None:
+                continue
+            number = float(raw)
+            return int(number) % 12 if number.is_integer() and 0 <= number < 12 else int(number / 30.0) % 12
+        return 0
     
     def _get_planet_rulerships(self, planet: str, ascendant: int) -> List[int]:
         """Get houses ruled by planet for given ascendant"""
-        # Simplified rulership calculation
-        base_rulerships = {
-            "Sun": [5], "Moon": [4], "Mars": [1, 8], "Mercury": [3, 6],
-            "Jupiter": [9, 12], "Venus": [2, 7], "Saturn": [10, 11]
-        }
-        return base_rulerships.get(planet, [])
+        return ruled_houses_for_ascendant(ascendant, planet)
     
     def _calculate_yogakaraka_strength(self, planet: str) -> float:
         """Calculate Yogakaraka strength"""

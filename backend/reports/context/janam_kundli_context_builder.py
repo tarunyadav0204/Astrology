@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from calculators.ashtakavarga import AshtakavargaCalculator
 from calculators.base_calculator import BaseCalculator
 from calculators.chart_calculator import ChartCalculator
+from calculators.classical_functional_nature import calculate_functional_nature
 from calculators.color_calculator import ColorCalculator
 from calculators.friendship_calculator import FriendshipCalculator
 from calculators.nakshatra_remedy_calculator import NakshatraRemedyCalculator
@@ -650,6 +651,7 @@ def _planet_matrix(
 
         avastha_raw = chart_calc.get_baladi_avastha(planet, degree_f, sign_i)
         functional = dignity_analysis.get("functional_nature") or _functional_nature_for_planet(asc_sign, planet)
+        functional_details = dignity_analysis.get("functional_nature_details") or calculate_functional_nature(asc_sign, planet)
 
         rows.append({
             "planet": planet,
@@ -665,6 +667,7 @@ def _planet_matrix(
             "is_combust": combust_status == "combust",
             "combustion_status": combust_status,
             "functional_nature": functional,
+            "functional_nature_details": functional_details,
             "dispositor": dispositor,
             "houses_ruled": lord_sign_of.get(planet) or [],
             "natural_friendship": natural,

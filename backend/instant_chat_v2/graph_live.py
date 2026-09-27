@@ -2570,7 +2570,16 @@ def enforce_live_graph_answer(
                         f"The strongest calculated window for {event_label} is {start_text} to {end_text}."
                         f"{peak_text}{qualification}{mechanism} What concrete opportunity, application, or deadline are you working toward?"
                     )
-    if policy.get("fallback_to_deeper_mode"):
+    # Domain-specific fail-closed responses below explain the exact missing
+    # calculation.  Do not replace them with the generic mode-upgrade message.
+    domain_specific_boundaries = {
+        "no_complete_wealth_verdict",
+        "no_health_area_specificity",
+    }
+    if (
+        policy.get("fallback_to_deeper_mode")
+        and policy.get("claim_permission") not in domain_specific_boundaries
+    ):
         return _deeper_mode_fallback(language)
     if policy.get("domain") == "education":
         education_rules = (
@@ -3159,15 +3168,31 @@ def enforce_live_graph_answer(
                 elif eleventh_dignity and eleventh_dignity != "neutral":
                     gains_sentence += f" with {eleventh_dignity} dignity"
 
+                def caution_priority(row: Mapping[str, Any]) -> tuple[int, int, str]:
+                    """Put concrete pressure placements ahead of generic nature flags."""
+                    reasons = {str(value) for value in row.get("reasons") or []}
+                    concrete = bool(
+                        reasons.intersection({"house_6", "house_8", "house_12", "debilitated"})
+                    )
+                    return (0 if concrete else 1, -len(reasons), str(row.get("planet") or ""))
+
                 d5_support = [placement_text(row) for row in list(d5.get("supporting_placements") or [])[:2] if isinstance(row, Mapping)]
-                d5_cautions = [placement_text(row) for row in list(d5.get("caution_placements") or [])[:2] if isinstance(row, Mapping)]
+                d5_caution_rows = sorted(
+                    [row for row in list(d5.get("caution_placements") or []) if isinstance(row, Mapping)],
+                    key=caution_priority,
+                )
+                d5_cautions = [placement_text(row) for row in d5_caution_rows[:2]]
                 node_notes = [
                     f"{row.get('node')} sharing the {ordinal(row.get('house'))} house with {', '.join(str(value) for value in row.get('companions') or [])}"
                     for row in list(d5.get("node_cooccupancies") or [])[:1]
                     if isinstance(row, Mapping)
                 ]
                 d9_support = [placement_text(row) for row in list(d9.get("supporting_placements") or [])[:2] if isinstance(row, Mapping)]
-                d9_cautions = [placement_text(row) for row in list(d9.get("caution_placements") or [])[:2] if isinstance(row, Mapping)]
+                d9_caution_rows = sorted(
+                    [row for row in list(d9.get("caution_placements") or []) if isinstance(row, Mapping)],
+                    key=caution_priority,
+                )
+                d9_cautions = [placement_text(row) for row in d9_caution_rows[:2]]
 
                 d5_sentence = "D5 is mixed"
                 if d5_support:

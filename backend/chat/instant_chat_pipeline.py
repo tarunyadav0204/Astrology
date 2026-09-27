@@ -18,6 +18,11 @@ from ai.response_parser import ResponseParser
 from calculators import RemedyEngine
 from calculators.avayogi_policy import AVAYOGI_CHAT_DOCTRINE
 from calculators.chart_calculator import ChartCalculator
+from calculators.classical_functional_nature import (
+    calculate_functional_nature as calculate_classical_functional_nature,
+    derive_lordship_nature,
+)
+from calculators.classical_natural_nature import calculate_natural_nature
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.gandanta_calculator import GandantaCalculator
 from calculators.planetary_dignities_calculator import PlanetaryDignitiesCalculator
@@ -598,9 +603,9 @@ def _semantic_event_horizon_days(intent: Any) -> int:
 
 _NATURAL_NATURE = {
     "Sun": "malefic",
-    "Moon": "benefic",
+    "Moon": "variable",
     "Mars": "malefic",
-    "Mercury": "benefic",
+    "Mercury": "variable",
     "Jupiter": "benefic",
     "Venus": "benefic",
     "Saturn": "malefic",
@@ -749,25 +754,38 @@ def _sign_index_from_row(row: Dict[str, Any]) -> Optional[int]:
     return None
 
 
-def _natural_nature(planet: str) -> str:
-    return _NATURAL_NATURE.get(str(planet or "").strip(), "neutral")
+def _natural_nature(planet: str, chart_data: Optional[Dict[str, Any]] = None) -> str:
+    planet = str(planet or "").strip()
+    if isinstance(chart_data, dict) and isinstance(chart_data.get("planets"), dict):
+        nature = calculate_natural_nature(chart_data, planet).get("nature")
+        if nature in {"benefic", "malefic", "neutral", "mixed", "variable"}:
+            return str(nature)
+    # Preserve a conservative legacy fallback when chart geometry is absent.
+    # Moon and Mercury must not be asserted as benefic without their context.
+    if planet in {"Moon", "Mercury"}:
+        return "variable"
+    return _NATURAL_NATURE.get(planet, "neutral")
 
 
-def _functional_nature(lordships: List[int]) -> str:
-    good = {1, 5, 9}
-    bad = {3, 6, 8, 11, 12}
-    neutral = {2, 4, 7, 10}
-    hs = {int(h) for h in (lordships or []) if _safe_int(h) is not None}
-    good_hits = len(hs & good)
-    bad_hits = len(hs & bad)
-    neutral_hits = len(hs & neutral)
-    if good_hits > bad_hits:
-        return "functional_benefic"
-    if bad_hits > good_hits:
-        return "functional_malefic"
-    if neutral_hits and not good_hits and not bad_hits:
-        return "functional_neutral"
-    return "mixed_functional"
+def _functional_nature(
+    lordships: List[int],
+    *,
+    planet: Optional[str] = None,
+    ascendant_sign: Optional[int] = None,
+) -> str:
+    """Stable chat label backed by the canonical BPHS functional result."""
+    if planet and isinstance(ascendant_sign, int):
+        nature = calculate_classical_functional_nature(ascendant_sign, planet)["functional_nature"]
+    else:
+        derived = derive_lordship_nature(lordships, str(planet or ""))
+        nature = derived["nature"]
+    return {
+        "benefic": "functional_benefic",
+        "malefic": "functional_malefic",
+        "neutral": "functional_neutral",
+        "conditional": "functional_neutral",
+        "mixed": "mixed_functional",
+    }.get(str(nature), "functional_neutral")
 
 
 def _planet_dignity_status(planet: str, sign_index: Optional[int]) -> Dict[str, Any]:
@@ -847,8 +865,12 @@ def _natal_aspects_to_planet(target_planet: str, chart_data: Dict[str, Any]) -> 
                 {
                     "planet": str(other),
                     "from_house": other_house,
-                    "nature": _natural_nature(str(other)),
-                    "aspect_tone": "benefic" if _natural_nature(str(other)) == "benefic" else "malefic",
+                    "nature": _natural_nature(str(other), chart_data),
+                    "aspect_tone": (
+                        "benefic" if _natural_nature(str(other), chart_data) == "benefic"
+                        else "malefic" if _natural_nature(str(other), chart_data) == "malefic"
+                        else "mixed_or_variable"
+                    ),
                 }
             )
     return out[:5]
@@ -890,13 +912,28 @@ def _planet_prediction_status(
     lordships = list(row.get("lordships") or [])
     sign_index = _sign_index_from_row(((chart_data or {}).get("planets") or {}).get(planet) or {})
     dignity = _planet_dignity_status(planet, sign_index)
+    try:
+        ascendant_sign = int(float((chart_data or {}).get("ascendant")) / 30.0) % 12
+    except (TypeError, ValueError):
+        ascendant_sign = None
+    functional_details = (
+        calculate_classical_functional_nature(ascendant_sign, planet)
+        if isinstance(ascendant_sign, int) and planet in {"Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"}
+        else None
+    )
     return {
         "planet": planet,
         "natal_house": row.get("natal_house"),
         "natal_sign": row.get("natal_sign"),
         "lordships": lordships,
-        "natural_nature": _natural_nature(planet),
-        "functional_nature": _functional_nature(lordships if lordships else list((house_lordships or {}).get(planet) or [])),
+        "natural_nature": _natural_nature(planet, chart_data),
+        "natural_nature_details": calculate_natural_nature(chart_data, planet),
+        "functional_nature": _functional_nature(
+            lordships if lordships else list((house_lordships or {}).get(planet) or []),
+            planet=planet,
+            ascendant_sign=ascendant_sign,
+        ),
+        "functional_nature_details": functional_details,
         "dignity": dignity.get("dignity"),
         "sign_relation": dignity.get("sign_relation"),
         "in_own_sign": dignity.get("in_own_sign"),
@@ -8283,8 +8320,18 @@ def _enrich_calculated_chart_for_prediction(
             "sign_name": _chart_fact_sign_label(row),
             "house": house,
             "lordships": planet_lordships,
-            "natural_nature": _natural_nature(str(name)),
-            "functional_nature": _functional_nature(planet_lordships),
+            "natural_nature": _natural_nature(str(name), chart_like),
+            "natural_nature_details": calculate_natural_nature(chart_like, str(name)),
+            "functional_nature": _functional_nature(
+                planet_lordships,
+                planet=str(name),
+                ascendant_sign=asc_sign if isinstance(asc_sign, int) else None,
+            ),
+            "functional_nature_details": (
+                calculate_classical_functional_nature(asc_sign, str(name))
+                if isinstance(asc_sign, int) and str(name) in {"Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"}
+                else None
+            ),
             "dignity": dignity.get("dignity"),
             "sign_relation": dignity.get("sign_relation"),
             "in_own_sign": dignity.get("in_own_sign"),
@@ -18559,9 +18606,81 @@ def _validate_foreign_technical_explanation(answer: str, *, technical: bool) -> 
 
 
 def _validate_career_chart_frame_answer(answer: str, foundation: Any) -> List[str]:
-    """Career facts are constrained before generation, not parsed from prose."""
-    _ = (answer, foundation)
-    return []
+    """Reject D1/D10 Lagna-lord identity and placement cross-contamination.
+
+    The evidence contract prevents most errors before composition.  This small
+    post-composition guard catches the especially misleading case where a
+    perfectly valid D10 fact is presented as a fact about the native's D1
+    Lagna lord (or vice versa).
+    """
+    if not isinstance(foundation, dict) or not str(answer or "").strip():
+        return []
+    identities = foundation.get("chart_identities")
+    identities = identities if isinstance(identities, dict) else {}
+    d1 = identities.get("D1") if isinstance(identities.get("D1"), dict) else {}
+    d10 = identities.get("D10") if isinstance(identities.get("D10"), dict) else {}
+    errors: List[str] = []
+    text = str(answer)
+
+    d1_lord = str(d1.get("ascendant_lord") or "").strip()
+    d1_house = _safe_int(d1.get("ascendant_lord_house_in_same_chart"))
+    native_lord_mentions = re.findall(
+        r"\b(Sun|Moon|Mars|Mercury|Jupiter|Venus|Saturn|Rahu|Ketu)\b"
+        r"\s*,?\s*(?:is\s+)?(?:your|the\s+native(?:'s)?)\s+lagna\s+lord\b"
+        r"|(?:your|the\s+native(?:'s)?)\s+lagna\s+lord\s*[,:(-]*\s*"
+        r"\b(Sun|Moon|Mars|Mercury|Jupiter|Venus|Saturn|Rahu|Ketu)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+    for pair in native_lord_mentions:
+        reported = next((value for value in pair if value), "")
+        if d1_lord and reported.lower() != d1_lord.lower():
+            errors.append(
+                f"The answer calls {reported} the native Lagna lord, but the calculated lord is {d1_lord}."
+            )
+
+    d10_lord = str(d10.get("ascendant_lord") or "").strip()
+    d10_house = _safe_int(d10.get("ascendant_lord_house_in_same_chart"))
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        if not re.search(r"\bD10\s+lagna\s+lord\b", sentence, flags=re.IGNORECASE):
+            continue
+        planet_match = re.search(
+            r"\b(Sun|Moon|Mars|Mercury|Jupiter|Venus|Saturn|Rahu|Ketu)\b"
+            r"\s*,?\s*(?:is\s+)?(?:the\s+)?D10\s+lagna\s+lord\b",
+            sentence,
+            flags=re.IGNORECASE,
+        )
+        if planet_match and d10_lord and planet_match.group(1).lower() != d10_lord.lower():
+            errors.append(
+                f"The answer calls {planet_match.group(1)} the D10 Lagna lord, but the calculated lord is {d10_lord}."
+            )
+        house_match = re.search(
+            r"(?:occup(?:y|ies)|placed|is\s+placed)\s+(?:in\s+)?(?:the\s+)?(\d+)(?:st|nd|rd|th)?\s+house",
+            sentence,
+            flags=re.IGNORECASE,
+        )
+        if house_match and d10_house is not None and int(house_match.group(1)) != d10_house:
+            errors.append(
+                f"The stated D10 Lagna-lord placement is house {house_match.group(1)}, but the calculated D10 placement is house {d10_house}."
+            )
+
+    # Also guard an explicitly stated D1 Lagna-lord placement when present.
+    if d1_lord and d1_house is not None:
+        for sentence in re.split(r"(?<=[.!?])\s+", text):
+            if not re.search(r"(?:your|native(?:'s)?)\s+lagna\s+lord", sentence, flags=re.IGNORECASE):
+                continue
+            if not re.search(rf"\b{re.escape(d1_lord)}\b", sentence, flags=re.IGNORECASE):
+                continue
+            house_match = re.search(
+                r"(?:occup(?:y|ies)|placed|is\s+placed)\s+(?:in\s+)?(?:the\s+)?(\d+)(?:st|nd|rd|th)?\s+house",
+                sentence,
+                flags=re.IGNORECASE,
+            )
+            if house_match and int(house_match.group(1)) != d1_house:
+                errors.append(
+                    f"The stated native Lagna-lord placement is house {house_match.group(1)}, but the calculated D1 placement is house {d1_house}."
+                )
+    return errors
 
 
 def _career_profile_answer_from_evidence(

@@ -166,6 +166,9 @@ class ChartCalculator(BaseCalculator):
             planet_sign = int(longitude / 30)
             planets[planet_names[i]] = {
                 'longitude': longitude,
+                'latitude': pos_array[1] if len(pos_array) > 1 else None,
+                'distance_au': pos_array[2] if len(pos_array) > 2 else None,
+                'speed': speed,
                 'sign': planet_sign,
                 'sign_name': self.SIGN_NAMES[planet_sign],
                 'degree': longitude % 30,
@@ -267,6 +270,11 @@ class ChartCalculator(BaseCalculator):
                 )
         from .classical_combustion import attach_classical_combustion
         attach_classical_combustion(result)
+        # Publish the same canonical placement/state fields consumed by the
+        # Positions screen. Chart renderers display these values rather than
+        # maintaining a second JavaScript astrology implementation.
+        from .planetary_dignities_calculator import attach_canonical_position_states
+        attach_canonical_position_states(result)
         from .planet_result_delivery import attach_planet_result_delivery
         attach_planet_result_delivery(result)
         return result

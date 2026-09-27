@@ -82,15 +82,14 @@ def initialize_predictor(birth_data_dict: dict):
         def __init__(self, cd):
             self.chart_data = cd
         def calculate_functional_benefics(self):
+            from calculators.classical_functional_nature import compatibility_lists
+
             asc_sign = int(self.chart_data.get('ascendant', 0) / 30)
-            benefics_map = {
-                0: ['Sun', 'Mars', 'Jupiter'], 1: ['Mercury', 'Venus', 'Saturn'],
-                2: ['Mercury', 'Venus'], 3: ['Moon', 'Mars'], 4: ['Sun', 'Mars'],
-                5: ['Mercury', 'Venus'], 6: ['Venus', 'Saturn'], 7: ['Moon', 'Jupiter'],
-                8: ['Sun', 'Mars', 'Jupiter'], 9: ['Venus', 'Saturn'], 10: ['Venus', 'Saturn'],
-                11: ['Sun', 'Mars', 'Jupiter']
+            benefics, malefics, _ = compatibility_lists()
+            return {
+                'benefics': list(benefics.get(asc_sign, [])),
+                'malefics': list(malefics.get(asc_sign, [])),
             }
-            return {'benefics': benefics_map.get(asc_sign, []), 'malefics': []}
     
     func_benefics_calc = SimpleFunctionalBenefics(chart_data)
     

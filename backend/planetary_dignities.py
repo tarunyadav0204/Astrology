@@ -1,14 +1,12 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Dict, Any
-from vedic_predictions.config.planetary_dignity import (
-    EXALTATION_DATA, DEBILITATION_DATA, OWN_SIGNS, MOOLATRIKONA_DATA
+from copy import deepcopy
+from calculators.planetary_dignities_calculator import (
+    PlanetaryDignitiesCalculator,
+    SIGN_LORDS,
+    SIGN_NAMES,
 )
-from vedic_predictions.config.functional_nature import (
-    FUNCTIONAL_BENEFICS, FUNCTIONAL_MALEFICS, FUNCTIONAL_NEUTRALS
-)
-from calculators.classical_combustion import calculate_planet_combustion
-from calculators.planetary_dignities_calculator import PlanetaryDignitiesCalculator
 # Retrograde status is already available in chart data
 
 router = APIRouter()
@@ -30,9 +28,17 @@ async def calculate_planetary_dignities(request: Dict[str, Any]):
             raise HTTPException(status_code=400, detail="Chart data with planets required")
 
         ascendant_sign = int(chart_data.get('ascendant', 0) / 30)
-        dignities = PlanetaryDignitiesCalculator(chart_data).calculate_planetary_dignities()
+        calculator = PlanetaryDignitiesCalculator(chart_data)
+        dignities = calculator.calculate_planetary_dignities()
+        positions = calculator.calculate_position_tables(
+            request.get('condition_chart_data') or chart_data,
+            dignities=dignities,
+            birth_data=request.get('birth_data'),
+        )
+        _attach_professional_strength(positions, chart_data, request.get('birth_data'))
         return {
             "dignities": dignities,
+            "positions": positions,
             "ascendant_sign": ascendant_sign,
             "summary": _generate_summary(dignities)
         }
@@ -42,162 +48,146 @@ async def calculate_planetary_dignities(request: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to calculate dignities: {str(e)}")
 
-def _calculate_dignity(planet, sign, degree=None):
-    """Calculate planetary dignity"""
-    # Rahu and Ketu don't have traditional dignities
-    if planet in ['Rahu', 'Ketu']:
-        return _calculate_rahu_ketu_dignity(planet, sign)
-    
-    # Check exaltation
-    if planet in EXALTATION_DATA:
-        exalt_data = EXALTATION_DATA[planet]
-        if sign == exalt_data['sign']:
-            if degree is not None and abs(degree - exalt_data['degree']) <= 5:
+
+def _attach_professional_strength(positions, chart_data, birth_data):
+    """Attach established strength worksheets without changing old fields.
+
+    Failures are explicit in ``calculation_status``.  The client never creates
+    a substitute value locally.
+    """
+    rows = {row.get('name'): row for row in positions.get('planets', [])}
+    try:
+        from calculators.divisional_chart_calculator import DivisionalChartCalculator
+        working = deepcopy(chart_data)
+        div_calc = DivisionalChartCalculator(working)
+        divisions = div_calc.calculate_all_divisional_charts()
+        working['divisions'] = divisions
+        d9_result = div_calc.calculate_divisional_chart(9)
+        d9_planets = (d9_result.get('divisional_chart') or {}).get('planets', {})
+        calc = PlanetaryDignitiesCalculator(working)
+        shodashavarga_weights = {
+            'D1': 3.5, 'D2': 1.0, 'D3': 1.0, 'D4': 0.5,
+            'D7': 0.5, 'D9': 3.0, 'D10': 0.5, 'D12': 0.5,
+            'D16': 2.0, 'D20': 0.5, 'D24': 0.5, 'D27': 0.5,
+            'D30': 1.0, 'D40': 0.5, 'D45': 0.5, 'D60': 4.0,
+        }
+        panchadha_points = {
+            'greatFriend': 18.0, 'friend': 15.0, 'neutral': 10.0,
+            'enemy': 7.0, 'greatEnemy': 5.0,
+        }
+        natal_signs = {
+            planet: int(data.get('sign', 0)) % 12
+            for planet, data in (chart_data.get('planets') or {}).items()
+            if isinstance(data, dict)
+        }
+
+        def varga_dignity(planet, sign):
+            """Varga sign dignity; D1 degree-bounded Moolatrikona is separate."""
+            if sign == (calc.EXALTATION_DATA.get(planet) or {}).get('sign'):
                 return 'exalted'
-            return 'exalted'
-    
-    # Check debilitation
-    if planet in DEBILITATION_DATA:
-        debil_data = DEBILITATION_DATA[planet]
-        if sign == debil_data['sign']:
-            if degree is not None and abs(degree - debil_data['degree']) <= 5:
+            if sign == (calc.DEBILITATION_DATA.get(planet) or {}).get('sign'):
                 return 'debilitated'
-            return 'debilitated'
-    
-    # Check moolatrikona
-    if planet in MOOLATRIKONA_DATA:
-        mool_data = MOOLATRIKONA_DATA[planet]
-        if sign == mool_data['sign']:
-            if degree is not None:
-                if mool_data['start_degree'] <= degree <= mool_data['end_degree']:
-                    return 'moolatrikona'
-            else:
-                return 'moolatrikona'
-    
-    # Check own sign
-    if planet in OWN_SIGNS:
-        if sign in OWN_SIGNS[planet]:
-            return 'own_sign'
-    
-    return 'neutral'
+            if sign in calc.OWN_SIGNS.get(planet, []):
+                return 'own_sign'
+            return 'neutral'
 
-def _calculate_rahu_ketu_dignity(planet, sign):
-    """Calculate dignity for Rahu/Ketu based on sign preferences"""
-    # Rahu is considered strong in: Gemini, Virgo, Libra, Sagittarius, Pisces
-    # Ketu is considered strong in: Sagittarius, Pisces, Scorpio
-    
-    if planet == 'Rahu':
-        if sign in [2, 5, 6, 8, 11]:  # Gemini, Virgo, Libra, Sagittarius, Pisces
-            return 'favorable'
-        elif sign in [3, 4, 7]:  # Cancer, Leo, Scorpio
-            return 'unfavorable'
-    elif planet == 'Ketu':
-        if sign in [8, 11, 7]:  # Sagittarius, Pisces, Scorpio
-            return 'favorable'
-        elif sign in [2, 5, 6]:  # Gemini, Virgo, Libra
-            return 'unfavorable'
-    
-    return 'neutral'
+        def vimshopaka_for(planet):
+            total = 0.0
+            details = []
+            for code, weight in shodashavarga_weights.items():
+                pdata = (divisions.get(code) or {}).get(planet)
+                if not isinstance(pdata, dict):
+                    continue
+                sign = int(pdata.get('sign', 0)) % 12
+                dignity = varga_dignity(planet, sign)
+                lord = SIGN_LORDS[sign]
+                if dignity in {'exalted', 'moolatrikona', 'own_sign'}:
+                    relation_key, happiness = 'ownOrHigher', 20.0
+                elif planet in natal_signs and lord in natal_signs:
+                    natural = calc._natural_relationship(planet, lord)
+                    temporary = calc._temporary_relationship(natal_signs[planet], natal_signs[lord])
+                    compound = calc._compound_relationship(natural, temporary)
+                    relation_key = compound['key']
+                    happiness = panchadha_points.get(relation_key, 10.0)
+                else:
+                    relation_key, happiness = 'notGraded', 10.0
+                contribution = weight * happiness / 20.0
+                total += contribution
+                details.append({'varga': code, 'weight': weight, 'sign': sign,
+                                'relation': relation_key, 'contribution': round(contribution, 4)})
+            return {'score': round(total, 4), 'maximum': 20.0,
+                    'scheme': 'shodashavarga', 'details': details,
+                    'reference': 'Brihat Parashara Hora Shastra, Shodashavarga chapter, Vimsopaka Bala verses'}
+        for name, row in rows.items():
+            if name not in {'Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'}:
+                continue
+            repeated = {'exalted': [], 'own_sign': [], 'debilitated': []}
+            for code, planets in divisions.items():
+                pdata = planets.get(name) if isinstance(planets, dict) else None
+                if not isinstance(pdata, dict):
+                    continue
+                sign = int(pdata.get('sign', 0)) % 12
+                dignity = varga_dignity(name, sign)
+                if dignity in repeated:
+                    repeated[dignity].append(code)
+            d9 = d9_planets.get(name) or {}
+            d9_sign = d9.get('sign')
+            row['varga_strength'] = {
+                'd9_sign': d9_sign,
+                'd9_sign_name': SIGN_NAMES[d9_sign] if isinstance(d9_sign, int) else None,
+                'd9_dignity': calc._dignity_display(name, varga_dignity(name, d9_sign)) if isinstance(d9_sign, int) else None,
+                'vargottama': bool(isinstance(d9_sign, int) and d9_sign == row.get('sign')),
+                'repetitions': repeated,
+                'charts_checked': list(divisions.keys()),
+                'vimshopaka_bala': vimshopaka_for(name),
+                'vimshopaka_status': 'calculated',
+                'method_note': 'Shodashavarga Vimsopaka uses the classical 20-point weights and Panchadha Maitri from D1.',
+            }
+    except Exception as exc:
+        positions['varga_strength_status'] = {'status': 'unavailable', 'reason': str(exc)}
 
-def _calculate_functional_nature(planet, ascendant_sign):
-    """Calculate functional benefic/malefic nature"""
-    if planet in FUNCTIONAL_BENEFICS.get(ascendant_sign, []):
-        return 'benefic'
-    elif planet in FUNCTIONAL_MALEFICS.get(ascendant_sign, []):
-        return 'malefic'
-    elif planet in FUNCTIONAL_NEUTRALS.get(ascendant_sign, []):
-        return 'neutral'
-    else:
-        return 'neutral'
-
-def _calculate_combustion(planet, planet_longitude, sun_longitude, retrograde=False):
-    """Calculate combustion status"""
-    row = calculate_planet_combustion(
-        planet,
-        {"longitude": planet_longitude, "retrograde": retrograde},
-        {"longitude": sun_longitude},
-    )
-    return "combust" if row["is_combust"] else "normal"
-
-def _calculate_strength_multiplier(dignity_info):
-    """Calculate overall strength multiplier (legacy function)"""
-    result = _calculate_strength_multiplier_with_breakdown(dignity_info)
-    return result['final_multiplier']
-
-def _calculate_strength_multiplier_with_breakdown(dignity_info):
-    """Calculate overall strength multiplier with detailed breakdown"""
-    breakdown = []
-    multiplier = 1.0
-    
-    # Dignity multiplier
-    dignity_multipliers = {
-        'exalted': 1.5,
-        'moolatrikona': 1.3,
-        'own_sign': 1.2,
-        'favorable': 1.2,  # For Rahu/Ketu
-        'unfavorable': 0.8,  # For Rahu/Ketu
-        'debilitated': 0.6
-    }
-    dignity_mult = dignity_multipliers.get(dignity_info['dignity'], 1.0)
-    if dignity_mult != 1.0:
-        breakdown.append(f"Dignity ({dignity_info['dignity'].title()}): {dignity_mult}x")
-    multiplier *= dignity_mult
-    
-    # Functional nature multiplier
-    functional_multipliers = {
-        'benefic': 1.2,
-        'malefic': 0.8
-    }
-    functional_mult = functional_multipliers.get(dignity_info['functional_nature'], 1.0)
-    if functional_mult != 1.0:
-        breakdown.append(f"Functional ({dignity_info['functional_nature'].title()}): {functional_mult}x")
-    multiplier *= functional_mult
-    
-    # Combustion multiplier
-    combustion_multipliers = {}
-    combustion_mult = combustion_multipliers.get(dignity_info['combustion_status'], 1.0)
-    if combustion_mult != 1.0:
-        breakdown.append(f"Combustion ({dignity_info['combustion_status'].title()}): {combustion_mult}x")
-    multiplier *= combustion_mult
-    
-    # Retrograde effect (slight reduction for most planets)
-    if dignity_info['retrograde'] and dignity_info['planet'] not in ['Jupiter', 'Venus']:
-        breakdown.append(f"Retrograde: 0.9x")
-        multiplier *= 0.9
-    
-    # If no factors, show base
-    if not breakdown:
-        breakdown.append("Base strength: 1.0x")
-    
-    return {
-        'final_multiplier': round(multiplier, 2),
-        'breakdown': breakdown,
-        'calculation': ' × '.join([str(dignity_mult), str(functional_mult), str(combustion_mult)] + (['0.9'] if dignity_info['retrograde'] and dignity_info['planet'] not in ['Jupiter', 'Venus'] else []))
-    }
-
-def _compile_states(dignity_info):
-    """Compile all planetary states"""
-    states = []
-    
-    # Add dignity state
-    if dignity_info['dignity'] != 'neutral':
-        states.append(dignity_info['dignity'].title())
-    
-    # Add functional nature
-    if dignity_info['functional_nature'] != 'neutral':
-        states.append(f"Functional {dignity_info['functional_nature'].title()}")
-    
-    # Add combustion state
-    if dignity_info['combustion_status'] == 'combust':
-        states.append('Combust')
-    elif dignity_info['combustion_status'] == 'cazimi':
-        states.append('Cazimi')
-    
-    # Add retrograde state
-    if dignity_info['retrograde']:
-        states.append('Retrograde')
-    
-    return states
+    if not birth_data:
+        positions['shadbala_status'] = {'status': 'unavailable', 'reason': 'birthDataRequired'}
+        return
+    try:
+        from calculators.classical_shadbala import calculate_classical_shadbala
+        working = deepcopy(chart_data)
+        if not working.get('divisions'):
+            from calculators.divisional_chart_calculator import DivisionalChartCalculator
+            working['divisions'] = DivisionalChartCalculator(working).calculate_all_divisional_charts()
+        strength = calculate_classical_shadbala(birth_data, working)
+        for name, result in strength.items():
+            row = rows.get(name)
+            if not row:
+                continue
+            components = result.get('components') or {}
+            strongest = max(components.items(), key=lambda item: item[1]) if components else None
+            weakest = min(components.items(), key=lambda item: item[1]) if components else None
+            row['shadbala'] = {
+                'total_rupas': result.get('total_rupas'),
+                'minimum_required_rupas': result.get('minimum_required_rupas'),
+                'required_percent': result.get('required_percent'),
+                'meets_minimum': result.get('meets_minimum'),
+                'strongest_component': {'key': strongest[0], 'virupas': strongest[1]} if strongest else None,
+                'weakest_component': {'key': weakest[0], 'virupas': weakest[1]} if weakest else None,
+                'method': 'BPHS Shadbala worksheet',
+            }
+            row['ishta_kashta'] = {
+                'ishta_phala': result.get('ishta_phala'),
+                'kashta_phala': result.get('kashta_phala'),
+                'tendency': result.get('result_tendency'),
+                'method': 'Classical Ishta/Kashta Phala from Uccha and Chesta Bala',
+            }
+        for row in rows.values():
+            for dispositor in (row.get('dispositors') or {}).values():
+                target = rows.get(dispositor.get('planet')) if isinstance(dispositor, dict) else None
+                if not target:
+                    continue
+                dispositor['shadbala'] = target.get('shadbala')
+                dispositor['aspects_received'] = (target.get('aspects') or {}).get('received', [])
+        positions['shadbala_status'] = {'status': 'calculated'}
+    except Exception as exc:
+        positions['shadbala_status'] = {'status': 'unavailable', 'reason': str(exc)}
 
 def _generate_summary(dignities):
     """Generate summary of dignities"""

@@ -23,7 +23,7 @@ import NorthIndianChart, { dashaPaint } from './NorthIndianChart';
 import SouthIndianChart from './SouthIndianChart';
 import ChartDrawingLayer from './ChartDrawingLayer';
 import { NADI_PLANETS, lagnaRoleLords } from './chartAspects';
-import { combustSet, isMooltrikona, isVargottama } from '../../utils/positionTables';
+import { combustSet } from '../../utils/positionTables';
 import DateNavigator from '../Common/DateNavigator';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -837,11 +837,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       };
       Object.entries(data?.planets || {}).forEach(([name, planet]) => {
         if (!planet || typeof planet !== 'object') return;
-        const sign = planet.sign;
-        const degree = typeof planet.degree === 'number' ? planet.degree : (typeof planet.longitude === 'number' ? planet.longitude % 30 : null);
-        const longitude = typeof planet.longitude === 'number' ? planet.longitude : (typeof sign === 'number' && degree != null ? sign * 30 + degree : null);
-        if (showMooltrikona && isMooltrikona(name, sign, degree)) addRole(name, t('chartScreen.mooltrikona', 'Mooltrikona'));
-        if (showVargottama && name !== 'Gulika' && name !== 'Mandi' && isVargottama(sign, longitude)) addRole(name, t('chartScreen.vargottama', 'Vargottama'));
+        if (showMooltrikona && planet.dignity === 'moolatrikona') addRole(name, t('chartScreen.mooltrikona', 'Mooltrikona'));
+        if (showVargottama && planet.vargottama === true) addRole(name, t('chartScreen.vargottama', 'Vargottama'));
       });
     }
     return chartStyle === 'north' ? (

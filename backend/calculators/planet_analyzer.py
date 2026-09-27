@@ -1,5 +1,7 @@
 from .base_calculator import BaseCalculator
 from .avayogi_policy import avayogi_effect
+from .classical_functional_nature import calculate_functional_nature
+from .classical_natural_nature import calculate_natural_nature
 
 class PlanetAnalyzer(BaseCalculator):
     """Comprehensive planet analyzer - reusable for any planet analysis"""
@@ -127,6 +129,7 @@ class PlanetAnalyzer(BaseCalculator):
         return {
             'dignity': dignity_data['dignity'],
             'functional_nature': dignity_data['functional_nature'],
+            'functional_nature_details': dignity_data.get('functional_nature_details'),
             'strength_multiplier': dignity_data['strength_multiplier'],
             'states': dignity_data['states'],
             'dignity_description': self._get_dignity_description(dignity_data['dignity'])
@@ -227,7 +230,19 @@ class PlanetAnalyzer(BaseCalculator):
         # Yogi/Avayogi analysis
         is_yogi = self.yogi_data.get('yogi', {}).get('lord') == planet_name
         is_avayogi = self.yogi_data.get('avayogi', {}).get('lord') == planet_name
-        is_dagdha = self.yogi_data.get('dagdha_rashi', {}).get('lord') == planet_name
+        # A tithi can burn more than one rashi.  ``dagdha_rashi`` is retained
+        # only as a legacy single-row alias, so consumers that classify a
+        # planet must use the complete calculated list first.
+        dagdha_lords = {
+            row.get('lord')
+            for row in self.yogi_data.get('tithi_dagdha_rashis', [])
+            if isinstance(row, dict) and row.get('lord')
+        }
+        if not dagdha_lords:
+            legacy_dagdha = self.yogi_data.get('dagdha_rashi') or {}
+            if legacy_dagdha.get('lord'):
+                dagdha_lords.add(legacy_dagdha['lord'])
+        is_dagdha = planet_name in dagdha_lords
         is_tithi_shunya = self.yogi_data.get('tithi_shunya_rashi', {}).get('lord') == planet_name
         is_avayogi_tithi_shunya_benefic = is_avayogi and is_tithi_shunya
         placement_house = (self.chart_data.get('planets', {}).get(planet_name) or {}).get('house')
@@ -666,19 +681,22 @@ class PlanetAnalyzer(BaseCalculator):
         calculation_details = []
         
         # 1. Natural benefic/malefic nature
-        natural_benefics = ['Jupiter', 'Venus']
-        natural_malefics = ['Sun', 'Mars', 'Saturn', 'Rahu', 'Ketu']
-        conditional_benefics = ['Mercury', 'Moon']
-        
-        if aspecting_planet in natural_benefics:
+        natural = calculate_natural_nature(self.chart_data, aspecting_planet)
+
+        if natural['nature'] == 'benefic':
             effect_score += 2
             calculation_details.append(f"Natural benefic ({aspecting_planet}): +2 points")
-        elif aspecting_planet in natural_malefics:
+        elif natural['nature'] == 'malefic':
             effect_score -= 2
             calculation_details.append(f"Natural malefic ({aspecting_planet}): -2 points")
-        elif aspecting_planet in conditional_benefics:
-            effect_score += 1
-            calculation_details.append(f"Conditional benefic ({aspecting_planet}): +1 point")
+        else:
+            calculation_details.append(
+                f"Context-dependent natural nature ({aspecting_planet}): 0 points"
+            )
+        if aspecting_planet == 'Moon':
+            calculation_details.append(
+                f"Moon phase: {natural.get('phase')} at {natural.get('elongation')}° Sun–Moon elongation"
+            )
         
         # 2. Functional benefic/malefic based on ascendant
         functional_nature = self._get_functional_nature(aspecting_planet, ascendant_sign)
@@ -780,44 +798,8 @@ class PlanetAnalyzer(BaseCalculator):
         }
     
     def _get_functional_nature(self, planet, ascendant_sign):
-        """Get functional benefic/malefic nature based on ascendant"""
-        # Simplified functional benefic/malefic system
-        functional_benefics = {
-            0: ['Sun', 'Mars', 'Jupiter'],  # Aries
-            1: ['Mercury', 'Venus', 'Saturn'],  # Taurus
-            2: ['Mercury', 'Venus'],  # Gemini
-            3: ['Moon', 'Mars'],  # Cancer
-            4: ['Sun', 'Mars'],  # Leo
-            5: ['Mercury', 'Venus'],  # Virgo
-            6: ['Venus', 'Saturn'],  # Libra
-            7: ['Moon', 'Jupiter'],  # Scorpio
-            8: ['Sun', 'Mars', 'Jupiter'],  # Sagittarius
-            9: ['Venus', 'Saturn'],  # Capricorn
-            10: ['Venus', 'Saturn'],  # Aquarius
-            11: ['Sun', 'Mars', 'Jupiter']  # Pisces
-        }
-        
-        functional_malefics = {
-            0: ['Mercury', 'Venus', 'Saturn'],
-            1: ['Sun', 'Mars', 'Jupiter'],
-            2: ['Mars', 'Jupiter'],
-            3: ['Sun', 'Venus', 'Saturn'],
-            4: ['Mercury', 'Venus', 'Saturn'],
-            5: ['Sun', 'Mars', 'Jupiter'],
-            6: ['Sun', 'Mars', 'Jupiter'],
-            7: ['Sun', 'Venus', 'Saturn'],
-            8: ['Mercury', 'Venus', 'Saturn'],
-            9: ['Sun', 'Mars', 'Jupiter'],
-            10: ['Sun', 'Mars', 'Jupiter'],
-            11: ['Mercury', 'Venus', 'Saturn']
-        }
-        
-        if planet in functional_benefics.get(ascendant_sign, []):
-            return 'benefic'
-        elif planet in functional_malefics.get(ascendant_sign, []):
-            return 'malefic'
-        else:
-            return 'neutral'
+        """Compatibility value from the canonical BPHS Chapter 34 result."""
+        return calculate_functional_nature(ascendant_sign, planet)['functional_nature']
     
     def _get_house_effect(self, house):
         """Get effect of planet's house placement"""

@@ -357,40 +357,6 @@ class DivisionalChartCalculator(BaseCalculator):
     
     def _get_functional_nature_for_ascendant(self, planet, ascendant_sign):
         """Get functional benefic/malefic nature based on ascendant sign"""
-        # Simplified functional benefic/malefic system for divisional charts
-        functional_benefics = {
-            0: ['Sun', 'Mars', 'Jupiter'],  # Aries
-            1: ['Mercury', 'Venus', 'Saturn'],  # Taurus
-            2: ['Mercury', 'Venus'],  # Gemini
-            3: ['Moon', 'Mars'],  # Cancer
-            4: ['Sun', 'Mars'],  # Leo
-            5: ['Mercury', 'Venus'],  # Virgo
-            6: ['Venus', 'Saturn'],  # Libra
-            7: ['Moon', 'Jupiter'],  # Scorpio
-            8: ['Sun', 'Mars', 'Jupiter'],  # Sagittarius
-            9: ['Venus', 'Saturn'],  # Capricorn
-            10: ['Venus', 'Saturn'],  # Aquarius
-            11: ['Sun', 'Mars', 'Jupiter']  # Pisces
-        }
-        
-        functional_malefics = {
-            0: ['Mercury', 'Venus', 'Saturn'],
-            1: ['Sun', 'Mars', 'Jupiter'],
-            2: ['Mars', 'Jupiter'],
-            3: ['Sun', 'Venus', 'Saturn'],
-            4: ['Mercury', 'Venus', 'Saturn'],
-            5: ['Sun', 'Mars', 'Jupiter'],
-            6: ['Sun', 'Mars', 'Jupiter'],
-            7: ['Sun', 'Venus', 'Saturn'],
-            8: ['Mercury', 'Venus', 'Saturn'],
-            9: ['Sun', 'Mars', 'Jupiter'],
-            10: ['Sun', 'Mars', 'Jupiter'],
-            11: ['Mercury', 'Venus', 'Saturn']
-        }
-        
-        if planet in functional_benefics.get(ascendant_sign, []):
-            return 'benefic'
-        elif planet in functional_malefics.get(ascendant_sign, []):
-            return 'malefic'
-        else:
-            return 'neutral'
+        from .classical_functional_nature import calculate_functional_nature
+
+        return calculate_functional_nature(ascendant_sign, planet)['functional_nature']

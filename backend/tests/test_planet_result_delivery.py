@@ -46,7 +46,10 @@ def test_mercury_channels_merge_lordship_occupation_and_aspect():
 def test_special_mars_aspects_are_exposed_as_house_channels():
     result = calculate_planet_result_delivery(_chart())
     mars = result["planets"]["Mars"]
-    assert mars["relevant"] is True
+    # Retrogression does not create special delivery houses or make this
+    # explanatory card relevant by itself. The ordinary channels remain in
+    # the additive API data for clients that need them.
+    assert mars["relevant"] is False
     assert mars["aspected_houses"] == [
         {"house": 6, "aspect_number": 4},
         {"house": 9, "aspect_number": 7},
@@ -67,3 +70,11 @@ def test_retrogression_is_explicitly_not_recorded_as_support():
     assert {row["key"] for row in mars["limiting_factors"]} == {
         "retrograde_not_automatically_positive"
     }
+
+
+def test_debilitation_remains_the_presentation_trigger_when_also_retrograde():
+    result = calculate_planet_result_delivery(_chart())
+    mercury = result["planets"]["Mercury"]
+    assert mercury["conditions"]["debilitated"] is True
+    assert mercury["conditions"]["retrograde"] is True
+    assert mercury["relevant"] is True

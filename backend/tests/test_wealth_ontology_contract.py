@@ -601,10 +601,21 @@ def test_reference_chart_overall_wealth_is_qualified_and_d2_is_mixed() -> None:
         row for row in foundation["route_adjudication"]["carrier_cautions"]
         if row["house"] == 5 and row["lord"] == "Mars"
     )
-    assert {"gandanta", "dagdha_lord", "mixed_or_malefic_conjunctions"}.issubset(
+    assert {"gandanta", "mixed_or_malefic_conjunctions"}.issubset(
         mars_caution["flags"]
     )
-    assert "avayogi_lord" in mars_caution["flags"] or "avayogi_tithi_shunya_override" in mars_caution["flags"]
+    # Dwitiya tithi burns Sagittarius and Pisces in the configured classical
+    # table; both are Jupiter-ruled.  Mars must not inherit the obsolete
+    # single-sign Dagdha classification.
+    assert "dagdha_lord" not in mars_caution["flags"]
+    assert (
+        foundation["route_carrier_conditions"]["Jupiter"]["special_lordships"]["is_dagdha_lord"]
+        is True
+    )
+    # The calculated Avayogi lord is Saturn, so Mars must not receive either
+    # the Avayogi flag or its Tithi-Shunya overlap resolution.
+    assert "avayogi_lord" not in mars_caution["flags"]
+    assert "avayogi_tithi_shunya_override" not in mars_caution["flags"]
     assert "wealth_score" not in foundation["natal_wealth"]
     assert "wealth_constitution" not in foundation["natal_wealth"]
     assert foundation["availability"]["dignity_strength"] is True
@@ -831,13 +842,12 @@ def test_reference_chart_investment_synthesis_is_specific_and_generic_answer_fai
     synthesis = foundation["investment_synthesis"]
     assert synthesis["verdict"] == "disciplined_investing_favored_over_high_risk_speculation"
     assert synthesis["fifth_lord"]["planet"] == "Mars"
-    assert {"gandanta", "dagdha_lord", "mixed_or_malefic_conjunctions"}.issubset(
+    assert {"gandanta", "mixed_or_malefic_conjunctions"}.issubset(
         synthesis["fifth_lord"]["caution_flags"]
     )
-    assert (
-        "avayogi_lord" in synthesis["fifth_lord"]["caution_flags"]
-        or "avayogi_tithi_shunya_override" in synthesis["fifth_lord"]["caution_flags"]
-    )
+    assert "dagdha_lord" not in synthesis["fifth_lord"]["caution_flags"]
+    assert "avayogi_lord" not in synthesis["fifth_lord"]["caution_flags"]
+    assert "avayogi_tithi_shunya_override" not in synthesis["fifth_lord"]["caution_flags"]
     assert any(row["planet"] == "Jupiter" and row["house"] == 11 for row in synthesis["d5"]["supporting_placements"])
     assert any(row["planet"] == "Moon" and "debilitated" in row["reasons"] for row in synthesis["d5"]["caution_placements"])
     assert any(row["node"] == "Rahu" and "Mars" in row["companions"] for row in synthesis["d5"]["node_cooccupancies"])

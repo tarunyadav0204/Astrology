@@ -22,6 +22,7 @@ from calculators.indu_lagna_calculator import InduLagnaCalculator
 from calculators.jaimini_chart_calculator import JaiminiChartCalculator
 from calculators.classical_neecha_bhanga import calculate_classical_neecha_bhanga
 from calculators.classical_combustion import attach_classical_combustion
+from calculators.planetary_dignities_calculator import attach_canonical_position_states
 from calculators.planet_result_delivery import attach_planet_result_delivery
 from charts.house_insight_service import build_house_insight
 from charts.double_transit_service import (
@@ -67,6 +68,7 @@ def _attach_classical_neecha_bhanga(chart_data: Dict[str, Any]) -> Dict[str, Any
         if isinstance(planets.get(planet_name), dict):
             planets[planet_name]["neecha_bhanga"] = bool(row.get("neecha_bhanga_present"))
     attach_classical_combustion(chart_data)
+    attach_canonical_position_states(chart_data)
     return attach_planet_result_delivery(chart_data)
 
 

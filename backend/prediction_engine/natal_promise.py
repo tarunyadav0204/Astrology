@@ -16,6 +16,7 @@ from calculators.classical_neecha_bhanga import (
     calculate_classical_neecha_bhanga,
     legacy_reason_ids,
 )
+from calculators.classical_functional_nature import calculate_functional_nature
 
 from .contracts import Polarity
 from .primitives import CLASSICAL_PLANETS, aspected_houses, planetary_connections, ruled_houses
@@ -244,7 +245,14 @@ def _natural_nature_context(chart: Dict[str, Any], planet: str) -> Dict[str, Any
 
 
 def _functional_lordship(chart: Dict[str, Any], planet: str) -> Dict[str, Any]:
-    owned = tuple(sorted(ruled_houses(chart, planet)))
+    raw_ascendant = chart.get("ascendant")
+    ascendant_sign = (
+        int(float(raw_ascendant) / 30.0) % 12
+        if raw_ascendant is not None
+        else int((chart.get("houses") or [{}])[0].get("sign", 0)) % 12
+    )
+    classical = calculate_functional_nature(ascendant_sign, planet)
+    owned = tuple(classical["ruled_houses"])
     owned_set = set(owned)
     supportive = tuple(sorted(owned_set & FUNCTIONALLY_SUPPORTIVE_HOUSES))
     challenging = tuple(sorted(owned_set & FUNCTIONALLY_CHALLENGING_HOUSES))
@@ -254,11 +262,15 @@ def _functional_lordship(chart: Dict[str, Any], planet: str) -> Dict[str, Any]:
         if placement_house in DUSTHANA_HOUSES else set()
     ))
     effective_challenging = tuple(sorted(set(challenging) - set(reversal_houses)))
-    yogakaraka = bool(owned_set & KENDRA_HOUSES) and bool(owned_set & TRIKONA_HOUSES)
+    yogakaraka = bool(classical["is_yogakaraka"])
     if yogakaraka:
         polarity = Polarity.SUPPORTIVE
         role = "yogakaraka"
     elif supportive and effective_challenging:
+        # A planet can carry both supportive and difficult house agendas even
+        # when the lagna-specific BPHS catalogue gives an overall verdict.
+        # Event clients need both directions; the exact verdict is retained in
+        # classical_functional_nature below.
         polarity = Polarity.MIXED
         role = "mixed_lordship"
     elif supportive:
@@ -285,6 +297,7 @@ def _functional_lordship(chart: Dict[str, Any], planet: str) -> Dict[str, Any]:
             if original_directional_count else 1.0
         ),
         "yogakaraka": yogakaraka,
+        "classical_functional_nature": classical,
     }
 
 

@@ -1,9 +1,11 @@
-"""Structured house channels for debilitated and retrograde planets.
+"""Structured house channels used to explain debilitation and Neecha Bhanga.
 
-This module deliberately does not turn retrogression into exaltation or a
-promise of positive results.  It exposes the houses through which a planet can
-deliver its results, then records the classical conditions that qualify that
-delivery.  Consumers remain responsible for judging an actual dasha or
+Lordship, occupation and graha drishti describe a planet's ordinary result
+channels; retrogression does not create a separate set of delivery houses.
+The channels remain available as additive structured data for existing
+clients, but ``relevant`` only asks the UI to present this explanation for a
+debilitated planet.  Retrogression and combustion are retained as qualifying
+conditions.  Consumers remain responsible for judging an actual dasha or
 transit period.
 """
 
@@ -107,7 +109,10 @@ def calculate_planet_result_delivery(chart_data: Dict[str, Any]) -> Dict[str, An
 
         result["planets"][planet_name] = {
             "planet": planet_name,
-            "relevant": debilitated or retrograde,
+            # Do not show a special result-delivery card merely because a
+            # planet is retrograde. Its owned, occupied and aspected houses
+            # are the same channels used for a direct planet.
+            "relevant": debilitated,
             "delivery_state": _delivery_state(
                 debilitated=debilitated,
                 neecha_bhanga=nb_present,

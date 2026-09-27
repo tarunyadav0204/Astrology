@@ -14,6 +14,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from calculators.classical_functional_nature import calculate_functional_nature
+from calculators.classical_natural_nature import calculate_natural_nature
+
 from calculators.avayogi_policy import avayogi_effect
 
 
@@ -199,23 +202,38 @@ def _aspectors(chart: dict[str, Any], house: int) -> list[str]:
 
 
 def _functional_role(chart: dict[str, Any], planet: str) -> dict[str, Any]:
-    ruled = _houses_ruled(chart, planet)
+    try:
+        raw_ascendant = chart.get("ascendant")
+        ascendant_sign = (
+            int(float(raw_ascendant) / 30.0) % 12
+            if raw_ascendant is not None
+            else int(_house_sign(chart, 1) or 0) % 12
+        )
+        classical = calculate_functional_nature(ascendant_sign, planet)
+    except (TypeError, ValueError):
+        classical = None
+    ruled = list(classical["ruled_houses"]) if classical else _houses_ruled(chart, planet)
     supportive = sorted(set(ruled) & SUPPORT_HOUSES)
     challenging = sorted(set(ruled) & CHALLENGE_HOUSES)
     maraka = sorted(set(ruled) & MARAKA_HOUSES)
     structural = sorted(set(ruled) & set(KENDRAS))
-    yogakaraka = bool(set(ruled) & TRIKONAS and set(ruled) & {4, 7, 10})
+    yogakaraka = bool(classical["is_yogakaraka"]) if classical else bool(set(ruled) & TRIKONAS and set(ruled) & {4, 7, 10})
     kendradhipati = planet in {"Moon", "Mercury", "Jupiter", "Venus"} and bool(structural) and not bool(set(ruled) & TRIKONAS)
+    stated_nature = classical["functional_nature"] if classical else None
     if yogakaraka:
         classification = "yogakaraka"
     elif supportive and challenging:
+        # Keep support and pressure visible in health pillar calculations.  The
+        # exact BPHS lagna-specific verdict remains available additively.
         classification = "mixed"
-    elif supportive:
-        classification = "supportive"
-    elif challenging:
-        classification = "challenging"
     elif maraka:
+        # Maraka is a separate health-sensitive role, not a synonym for
+        # functional malefic.  Existing health clients depend on this label.
         classification = "vitality_sensitive"
+    elif stated_nature == "benefic":
+        classification = "supportive"
+    elif stated_nature == "malefic":
+        classification = "challenging"
     elif kendradhipati:
         classification = "kendra_qualified"
     else:
@@ -229,6 +247,7 @@ def _functional_role(chart: dict[str, Any], planet: str) -> dict[str, Any]:
         "structural_houses": structural,
         "is_yogakaraka": yogakaraka,
         "kendradhipati_qualification": kendradhipati,
+        "classical_functional_nature": classical,
     }
 
 
@@ -278,33 +297,20 @@ def _combustion(chart: dict[str, Any], planet: str) -> dict[str, Any]:
 
 
 def _natural_nature(chart: dict[str, Any], planet: str) -> str:
-    if planet in {"Jupiter", "Venus"}:
-        return "benefic"
-    if planet == "Moon":
-        sun, moon = _longitude(chart, "Sun"), _longitude(chart, "Moon")
-        if sun is None or moon is None:
-            return "variable"
-        separation = (moon - sun) % 360.0
-        return "benefic" if 0.0 < separation <= 180.0 else "malefic"
-    if planet == "Mercury":
-        house = _house(chart, "Mercury")
-        joined = set(_residents(chart, house or 0)) - {"Mercury"}
-        return "malefic" if joined & NATURAL_MALEFICS else "benefic"
-    return "malefic"
+    return str(calculate_natural_nature(chart, planet)["nature"])
 
 
 def _natural_nature_context(chart: dict[str, Any], planet: str) -> dict[str, Any]:
-    nature = _natural_nature(chart, planet)
+    detail = calculate_natural_nature(chart, planet)
+    nature = str(detail["nature"])
     if planet != "Moon":
-        return {"nature": nature, "basis": "standard_natural_nature"}
-    sun, moon = _longitude(chart, "Sun"), _longitude(chart, "Moon")
-    if sun is None or moon is None:
-        return {"nature": nature, "basis": "lunar_phase_unavailable"}
-    elongation = (moon - sun) % 360.0
+        return {**detail, "basis": "standard_natural_nature"}
+    if detail.get("elongation") is None:
+        return {**detail, "basis": "lunar_phase_unavailable"}
     return {
+        **detail,
         "nature": nature,
-        "basis": "waxing_moon" if 0.0 < elongation <= 180.0 else "waning_or_dark_moon",
-        "elongation": round(elongation, 4),
+        "basis": "waxing_moon" if detail.get("phase") == "waxing" else "waning_or_dark_moon",
     }
 
 
@@ -561,7 +567,7 @@ class ConstitutionalStrengthEngine:
         protection.extend(jupiter["protective_reaches"])
         condition = {
             "rule_version": "constitutional-protection/1.3.0",
-            "functional_nature_method": "derived_lordship_with_mixed_roles",
+            "functional_nature_method": "bphs_34_stated_plus_derived_lordship",
             "planet_conditions": planets,
             "vitality_anchors": vitality_anchors,
             "kendra_pillars": pillars,

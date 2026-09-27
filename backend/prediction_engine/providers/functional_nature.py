@@ -5,6 +5,7 @@ from typing import List
 from vedic_predictions.config.functional_nature import (
     FUNCTIONAL_BENEFICS,
     FUNCTIONAL_MALEFICS,
+    get_functional_nature,
 )
 
 from ..context import EvaluationContext
@@ -34,6 +35,7 @@ class FunctionalNatureProvider(EvidenceProvider):
                 else "malefic" if planet in malefics
                 else "neutral"
             )
+            classical = get_functional_nature(ascendant_sign, planet)
             output.append(evidence_row(
                 self, context, rule_id="functional_nature", planet=planet,
                 house=int(chart["planets"][planet]["house"]),
@@ -42,7 +44,12 @@ class FunctionalNatureProvider(EvidenceProvider):
                     else Polarity.CHALLENGING if nature == "malefic"
                     else Polarity.NEUTRAL
                 ),
-                facts={"dasha_level": level, "functional_nature": nature, "ascendant_sign": ascendant_sign},
+                facts={
+                    "dasha_level": level,
+                    "functional_nature": nature,
+                    "ascendant_sign": ascendant_sign,
+                    "classical_functional_nature": classical,
+                },
                 independent_key=f"functional-nature:{planet}",
             ))
         return output

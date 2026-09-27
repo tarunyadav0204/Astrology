@@ -939,6 +939,13 @@ export const chartAPI = {
     api.post(getEndpoint('/chara-dasha/antardasha'), { ...birthData, maha_sign_id: mahaSignId }),
   calculateCharaKarakas: (chartData, birthData) => 
     api.post(getEndpoint('/chara-karakas'), { chart_data: chartData, birth_data: birthData }),
+
+  calculatePlanetaryDignities: (chartData, conditionChartData = chartData, birthData = null) =>
+    api.post(getEndpoint('/planetary-dignities'), {
+      chart_data: chartData,
+      condition_chart_data: conditionChartData,
+      birth_data: birthData,
+    }),
   
   calculateJaiminiLagnas: (chartData, d9Chart, atmakaraka) =>
     api.post(getEndpoint('/jaimini-special-lagnas'), { chart_data: chartData, d9_chart: d9Chart, atmakaraka }),

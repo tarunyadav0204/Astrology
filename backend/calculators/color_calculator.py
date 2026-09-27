@@ -11,15 +11,10 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 
 from calculators.base_calculator import BaseCalculator
+from calculators.classical_functional_nature import calculate_functional_nature
 from calculators.remedy_engine import RemedyEngine
-from vedic_predictions.config.functional_nature import (
-    FUNCTIONAL_BENEFICS,
-    FUNCTIONAL_MALEFICS,
-)
 
 PLANETS = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"]
-KENDRA = {1, 4, 7, 10}
-TRIKONA = {1, 5, 9}
 DUSTHANA = {6, 8, 12}
 
 FAVOR_THRESHOLD = 2.0
@@ -108,19 +103,13 @@ class ColorCalculator:
         reasons: List[str] = []
         score = 0.0
         house_set = set(int(h) for h in houses)
-        # Yogakaraka: owns both a kendra and a trikona (lagna-only lordship is not enough).
-        is_yogakaraka = (
-            bool(house_set & KENDRA)
-            and bool(house_set & TRIKONA)
-            and len(house_set) >= 2
-        )
+        classical = calculate_functional_nature(asc, planet)
+        is_yogakaraka = bool(classical["is_yogakaraka"])
 
-        benefics = set(FUNCTIONAL_BENEFICS.get(asc) or [])
-        malefics = set(FUNCTIONAL_MALEFICS.get(asc) or [])
-        if planet in benefics:
+        if classical["functional_nature"] == "benefic":
             score += 3
             reasons.append("functional benefic")
-        elif planet in malefics:
+        elif classical["functional_nature"] == "malefic":
             score -= 3
             reasons.append("functional malefic")
 
@@ -137,6 +126,9 @@ class ColorCalculator:
         if (house_set & DUSTHANA) and not is_yogakaraka:
             score -= 1
             reasons.append("dusthana lord")
+        if classical["is_maraka_lord"] and not is_yogakaraka:
+            score -= 1
+            reasons.append("maraka lordship")
 
         dignity = self._dignity(planet)
         if dignity in {"Exalted", "Own Sign"}:
@@ -172,6 +164,8 @@ class ColorCalculator:
             "score": round(score, 2),
             "houses_ruled": sorted(house_set),
             "yogakaraka": is_yogakaraka,
+            "functional_nature": classical["functional_nature"],
+            "functional_nature_details": classical,
             "dignity": dignity,
             "reasons": reasons,
         }

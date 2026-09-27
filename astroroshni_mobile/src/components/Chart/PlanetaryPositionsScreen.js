@@ -1,12 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
-import { buildHouseRows, buildNakshatraRows, buildPlanetRows } from '../../utils/positionTables';
 
 const isSpecialPoint = (value) => (
   Boolean(value)
@@ -23,7 +22,13 @@ const formatPointDegrees = (value) => {
 const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { chartData, birthData, conditionChartData } = route.params || {};
+  const isTablet = windowWidth >= 768;
+  const planetDockRef = React.useRef(null);
+  const lastChartKeyRef = React.useRef(null);
+  const chartKey = `${birthData?.id || birthData?.name || ''}|${birthData?.date || ''}|${birthData?.time || ''}`;
   React.useEffect(() => {
     if (!birthData?.name) {
       navigation.replace('BirthProfileIntro', { returnTo: 'PlanetaryPositions' });
@@ -32,6 +37,8 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
 
   const [activeTab, setActiveTab] = React.useState('planets');
   const [karakas, setKarakas] = React.useState(null);
+  const [planetaryDignities, setPlanetaryDignities] = React.useState({});
+  const [canonicalPositions, setCanonicalPositions] = React.useState(null);
   const [jaiminiLagnas, setJaiminiLagnas] = React.useState(null);
   const [yogiPoints, setYogiPoints] = React.useState(null);
   const [sniperPoints, setSniperPoints] = React.useState(null);
@@ -42,10 +49,12 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const [lagnasLoading, setLagnasLoading] = React.useState(false);
   const [specialLoading, setSpecialLoading] = React.useState(false);
   const [specialLoaded, setSpecialLoaded] = React.useState(false);
+  const [expandedPlanets, setExpandedPlanets] = React.useState({});
+  const [selectedPlanetName, setSelectedPlanetName] = React.useState(route.params?.selectedPlanetName || null);
 
   React.useEffect(() => {
-    loadKarakas();
-  }, []);
+    loadInitialPlanetData();
+  }, [chartData, conditionChartData, birthData]);
 
   React.useEffect(() => {
     if (activeTab === 'lagnas' && !jaiminiLagnas) {
@@ -59,13 +68,30 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     }
   }, [activeTab]);
 
-  const loadKarakas = async () => {
+  const loadInitialPlanetData = async () => {
+    setLoading(true);
+    setCanonicalPositions(null);
+    setPlanetaryDignities({});
     try {
       const { chartAPI } = require('../../services/api');
-      const response = await chartAPI.calculateCharaKarakas(chartData, birthData);
-      setKarakas(response.data.karakas || response.data.chara_karakas || response.data);
+      const [karakaResult, dignityResult] = await Promise.allSettled([
+        chartAPI.calculateCharaKarakas(chartData, birthData),
+        chartAPI.calculatePlanetaryDignities(chartData, conditionChartData || chartData, birthData),
+      ]);
+      if (karakaResult.status === 'fulfilled') {
+        const response = karakaResult.value;
+        setKarakas(response.data.karakas || response.data.chara_karakas || response.data);
+      } else {
+        console.error('Error loading karakas:', karakaResult.reason);
+      }
+      if (dignityResult.status === 'fulfilled') {
+        setPlanetaryDignities(dignityResult.value?.data?.dignities || {});
+        setCanonicalPositions(dignityResult.value?.data?.positions || null);
+      } else {
+        console.error('Error loading canonical positions:', dignityResult.reason);
+      }
     } catch (error) {
-      console.error('Error loading karakas:', error);
+      console.error('Error loading planet details:', error);
     } finally {
       setLoading(false);
     }
@@ -126,16 +152,68 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   };
 
   const planetRows = React.useMemo(
-    () => buildPlanetRows(chartData, karakas, conditionChartData || chartData),
-    [chartData, conditionChartData, karakas],
+    () => (canonicalPositions?.planets || []).map((row) => ({
+      ...row,
+      signName: row.sign_name,
+      signAbbr: row.sign_abbr,
+      lord: row.sign_lord,
+      lordAbbr: row.sign_lord_abbr,
+      signLordRelationship: row.sign_lord_relationship,
+      nakLord: row.nakshatra_lord,
+      nakLordRelationship: row.nakshatra_lord_relationship,
+      retro: row.retrograde,
+      neechaBhanga: row.neecha_bhanga,
+      combustion: row.combustion ? {
+        applicable: row.combustion.applicable !== false,
+        isCombust: row.combustion.is_combust,
+        distance: row.combustion.angular_distance,
+        threshold: row.combustion.threshold,
+        motion: row.combustion.motion,
+      } : null,
+    })),
+    [canonicalPositions],
   );
   const houseRows = React.useMemo(
-    () => buildHouseRows(chartData, conditionChartData || chartData),
-    [chartData, conditionChartData],
+    () => (canonicalPositions?.houses || []).map((row) => ({
+      ...row,
+      signName: row.sign_name,
+      signAbbr: row.sign_abbr,
+      lordAbbr: row.lord_abbr,
+      lordHouse: row.lord_house ?? '—',
+      dignity: row.lord_dignity,
+      lordCombust: row.lord_combust,
+      occupantList: row.occupants || [],
+    })),
+    [canonicalPositions],
   );
-  const nakshatraRows = React.useMemo(() => buildNakshatraRows(planetRows), [planetRows]);
+  const nakshatraRows = React.useMemo(
+    () => (canonicalPositions?.nakshatras || []).map((row) => ({
+      ...row,
+      people: row.people || [],
+    })),
+    [canonicalPositions],
+  );
 
-  if (!birthData?.name) return null;
+  React.useEffect(() => {
+    if (lastChartKeyRef.current === null) {
+      lastChartKeyRef.current = chartKey;
+      return;
+    }
+    if (lastChartKeyRef.current !== chartKey) {
+      lastChartKeyRef.current = chartKey;
+      setSelectedPlanetName(null);
+      setExpandedPlanets({});
+    }
+  }, [chartKey]);
+
+  React.useEffect(() => {
+    const available = (canonicalPositions?.planets || [])
+      .map((row) => row.name)
+      .filter((name) => ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'].includes(name));
+    if (!available.length) return;
+    if (!selectedPlanetName || available.includes(selectedPlanetName)) return;
+    setSelectedPlanetName(null);
+  }, [canonicalPositions, selectedPlanetName]);
 
   const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
                       'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
@@ -152,40 +230,48 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     'Darapada': '🤝'
   };
 
-  const getNakshatra = (longitude) => {
-    const nakshatras = [
-      'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra',
-      'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni',
-      'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha',
-      'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha',
-      'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'
-    ];
-    const nakshatraIndex = Math.floor(longitude / 13.333333);
-    return nakshatras[nakshatraIndex] || 'Unknown';
-  };
-
-  const getNakshatraPada = (longitude) => {
-    const degreeInNakshatra = longitude % 13.333333;
-    return Math.floor(degreeInNakshatra / 3.333333) + 1;
-  };
-
-  const planetOrder = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
-
   const planetsPayload = chartData && typeof chartData === 'object' ? chartData.planets : null;
+  const planets = planetRows.filter((row) => (
+    ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'].includes(row.name)
+  )).map((row) => ({
+    name: row.name,
+    sign: row.sign,
+    degree: row.degree,
+    longitude: row.longitude,
+    house: row.house,
+    retrograde: row.retrograde,
+    nakshatra: row.nakshatra,
+    pada: row.pada,
+  }));
+  const selectedPlanet = selectedPlanetName
+    ? planets.find((planet) => planet.name === selectedPlanetName) || null
+    : null;
+  const planetDockOptionCount = planets.length + 1;
+  const dockItemWidth = isTablet
+    ? Math.max(68, (windowWidth - 16 - (Math.max(planetDockOptionCount - 1, 0) * 3)) / Math.max(planetDockOptionCount, 1))
+    : 76;
 
-  const planets = planetsPayload && typeof planetsPayload === 'object'
-    ? planetOrder
-        .filter((name) => planetsPayload[name])
-        .map((name) => ({
-          name,
-          ...planetsPayload[name],
-          nakshatra: getNakshatra(planetsPayload[name].longitude),
-          pada: getNakshatraPada(planetsPayload[name].longitude),
-        }))
-    : [];
+  React.useEffect(() => {
+    if (isTablet || !planetDockRef.current) return;
+    const planetIndex = planets.findIndex((planet) => planet.name === selectedPlanetName);
+    const index = selectedPlanetName && planetIndex >= 0 ? planetIndex + 1 : 0;
+    const x = Math.max(0, (index * dockItemWidth) - ((windowWidth - dockItemWidth) / 2));
+    requestAnimationFrame(() => planetDockRef.current?.scrollTo?.({ x, animated: true }));
+  }, [selectedPlanetName, isTablet, dockItemWidth, windowWidth, planets.length]);
+
+  React.useEffect(() => {
+    if (!selectedPlanetName || !planets.some((planet) => planet.name === selectedPlanetName)) return;
+    setExpandedPlanets((current) => (
+      current[selectedPlanetName] === undefined
+        ? { ...current, [selectedPlanetName]: true }
+        : current
+    ));
+  }, [selectedPlanetName, planets.length]);
+
+  if (!birthData?.name) return null;
 
   const ascendantLon = (() => {
-    const asc = chartData?.ascendant;
+    const asc = canonicalPositions?.ascendant?.longitude;
     if (typeof asc === 'number' && !Number.isNaN(asc)) return asc;
     if (asc != null && asc !== '') {
       const n = parseFloat(String(asc));
@@ -197,24 +283,29 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   // Lagnas data (needs ascendant + chart payload)
   const lagnas = [];
   if (ascendantLon != null) {
+    const ascendant = canonicalPositions.ascendant;
     lagnas.push({
       name: 'Ascendant (Lagna)',
-      longitude: ascendantLon,
-      sign: Math.floor(ascendantLon / 30),
-      degree: ascendantLon % 30,
+      longitude: ascendant.longitude,
+      sign: ascendant.sign,
+      degree: ascendant.degree,
       house: 1,
-      nakshatra: getNakshatra(ascendantLon),
-      pada: getNakshatraPada(ascendantLon),
+      nakshatra: ascendant.nakshatra,
+      pada: ascendant.pada,
       description: 'Self, Personality, Physical Body',
     });
   }
 
-  if (planetsPayload?.InduLagna) {
+  if (canonicalPositions?.indu_lagna) {
+    const indu = canonicalPositions.indu_lagna;
     lagnas.push({
       name: 'Indu Lagna',
-      ...planetsPayload.InduLagna,
-      nakshatra: getNakshatra(planetsPayload.InduLagna.longitude),
-      pada: getNakshatraPada(planetsPayload.InduLagna.longitude),
+      longitude: indu.longitude,
+      sign: indu.sign,
+      degree: indu.degree,
+      house: indu.house,
+      nakshatra: indu.nakshatra,
+      pada: indu.pada,
       description: 'Wealth Indicator',
     });
   }
@@ -267,6 +358,94 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     </TouchableOpacity>
   );
 
+  const selectPlanet = (planetName) => {
+    setSelectedPlanetName(planetName);
+    setExpandedPlanets((current) => (
+      planetName ? { ...current, [planetName]: true } : {}
+    ));
+    navigation.setParams?.({ selectedPlanetName: planetName || null });
+  };
+
+  const PlanetDock = () => (
+    <View
+      style={[
+        styles.planetDock,
+        {
+          backgroundColor: colors.surfaceRaised,
+          borderTopColor: colors.cardBorder,
+          paddingBottom: Math.max(insets.bottom, 8),
+        },
+      ]}
+      accessibilityLabel={t('premiumUi.planetaryPositions.planetSelector', 'Select a planet')}
+    >
+      <GHScrollView
+        ref={planetDockRef}
+        horizontal
+        scrollEnabled={!isTablet}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={[styles.planetDockContent, isTablet && styles.planetDockContentTablet]}
+      >
+        <TouchableOpacity
+          key="planet-dock-all"
+          style={[
+            styles.planetDockItem,
+            { width: dockItemWidth },
+            !selectedPlanetName && {
+              backgroundColor: colors.selectionSurface,
+              borderColor: colors.selectionBorder,
+            },
+          ]}
+          onPress={() => selectPlanet(null)}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: !selectedPlanetName }}
+          accessibilityLabel={t('premiumUi.planetaryPositions.allPlanets', 'All planets')}
+        >
+          <Ionicons
+            name="apps-outline"
+            size={19}
+            color={!selectedPlanetName ? colors.selectionText : colors.textSecondary}
+          />
+          <Text
+            style={[styles.planetDockName, { color: !selectedPlanetName ? colors.selectionText : colors.textSecondary }]}
+            numberOfLines={1}
+          >
+            {t('premiumUi.planetaryPositions.all', 'All')}
+          </Text>
+        </TouchableOpacity>
+        {planets.map((planet) => {
+          const selected = planet.name === selectedPlanetName;
+          return (
+            <TouchableOpacity
+              key={`planet-dock-${planet.name}`}
+              style={[
+                styles.planetDockItem,
+                { width: dockItemWidth },
+                selected && {
+                  backgroundColor: colors.selectionSurface,
+                  borderColor: colors.selectionBorder,
+                },
+              ]}
+              onPress={() => selectPlanet(planet.name)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              accessibilityLabel={planet.name}
+            >
+              <Text style={[styles.planetDockSymbol, { color: selected ? colors.selectionText : colors.textSecondary }]}>
+                {planetEmojis[planet.name]}
+              </Text>
+              <Text
+                style={[styles.planetDockName, { color: selected ? colors.selectionText : colors.textSecondary }]}
+                numberOfLines={1}
+              >
+                {planet.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </GHScrollView>
+    </View>
+  );
+
   const karakaNameFor = (planetName) => {
     if (!karakas || typeof karakas !== 'object') return null;
     const found = Object.entries(karakas).find(([, value]) => {
@@ -299,10 +478,17 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   };
 
   const relationshipColor = (relationship) => {
-    if (relationship?.key === 'friend' || relationship?.key === 'self') return colors.success;
-    if (relationship?.key === 'enemy') return colors.error;
+    if (['friend', 'greatFriend', 'self', 'temporaryFriend'].includes(relationship?.key)) return colors.success;
+    if (['enemy', 'greatEnemy', 'temporaryEnemy'].includes(relationship?.key)) return colors.error;
     return colors.textSecondary;
   };
+
+  const professionalValue = (label, value, color = colors.text) => (
+    <View style={styles.professionalRow}>
+      <Text style={[styles.professionalLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <Text style={[styles.professionalValue, { color }]}>{value || '—'}</Text>
+    </View>
+  );
 
   const combustionEvidenceText = (combustion) => {
     if (!combustion?.applicable || !Number.isFinite(Number(combustion.distance))) return null;
@@ -326,6 +512,9 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
 
   const PlanetCard = ({ planet }) => {
     const row = planetRows.find((item) => item.name === planet.name);
+    const dignityResult = planetaryDignities?.[planet.name];
+    const functional = dignityResult?.functional_nature_details;
+    const natural = dignityResult?.natural_nature_details;
     const delivery = (
       conditionChartData?.planet_result_delivery?.planets?.[planet.name]
       || chartData?.planet_result_delivery?.planets?.[planet.name]
@@ -336,6 +525,46 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     if (row?.neechaBhanga) notes.push(t('premiumUi.planetaryPositions.notes.neechaBhangaFull', 'Neecha Bhanga'));
     if (row?.vargottama) notes.push(t('premiumUi.planetaryPositions.notes.vargottamaFull', 'Vargottama'));
     const karaka = karakaNameFor(planet.name);
+    const expanded = !!expandedPlanets[planet.name];
+    const advanced = row || {};
+    const signFriendship = advanced.friendships?.sign_lord;
+    const nakFriendship = advanced.friendships?.nakshatra_lord;
+    const aspectsCast = (advanced.aspects?.cast || []).map((item) => (
+      t('premiumUi.planetaryPositions.aspectCastValue', '{{number}}th → H{{house}}{{planets}}', {
+        number: item.aspect_number,
+        house: item.target_house,
+        planets: item.planets?.length ? ` (${item.planets.join(', ')})` : '',
+      })
+    )).join(' · ');
+    const aspectsReceived = (advanced.aspects?.received || []).map((item) => (
+      `${item.planet} (${item.aspect_numbers.join('/')})`
+    )).join(' · ');
+    const conjunctions = (advanced.conjunctions || []).map((item) => (
+      `${item.planet} · ${Number(item.separation_degrees).toFixed(2)}°`
+    )).join(' · ');
+    const repetitions = advanced.varga_strength?.repetitions || {};
+    const naturalRoleText = planet.name === 'Moon' && natural?.phase === 'waxing'
+      ? t('premiumUi.planetaryPositions.waxingMoonBenefic', 'Waxing Moon · natural benefic')
+      : planet.name === 'Moon' && natural?.phase === 'waning_or_dark'
+        ? t('premiumUi.planetaryPositions.waningMoonMalefic', 'Waning or dark Moon · natural malefic')
+        : t(
+          `premiumUi.planetaryPositions.naturalNature.${natural?.nature}`,
+          natural?.nature === 'benefic' ? 'Natural benefic' : natural?.nature === 'malefic' ? 'Natural malefic' : 'Context-dependent',
+        );
+    const functionalRoleText = t(
+      `premiumUi.planetaryPositions.functionalNature.${functional?.functional_nature}`,
+      functional?.functional_nature === 'benefic'
+        ? 'Functional benefic'
+        : functional?.functional_nature === 'malefic'
+          ? 'Functional malefic'
+          : 'Neutral or qualified',
+    );
+    const naturalRoleColor = natural?.nature === 'benefic'
+      ? colors.success
+      : natural?.nature === 'malefic' ? colors.error : colors.textSecondary;
+    const functionalRoleColor = functional?.functional_nature === 'benefic'
+      ? colors.success
+      : functional?.functional_nature === 'malefic' ? colors.error : colors.textSecondary;
     return (
       <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
         <View style={styles.cardHeader}>
@@ -423,6 +652,131 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
               <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.charaKaraka', 'Chara karaka')}</Text>
               <Text style={[styles.detailValue, { color: colors.text }]}>{karaka}</Text>
             </View>
+          ) : null}
+        </View>
+        {natural?.applicable || functional?.applicable ? (
+          <View style={[styles.roleSummaryCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+            <View style={styles.roleSummaryTitleRow}>
+              <Ionicons name="git-branch-outline" size={18} color={colors.primaryStrong} />
+              <Text style={[styles.roleSummaryTitle, { color: colors.text }]}>
+                {t('premiumUi.planetaryPositions.roleInChart', 'Role in this chart')}
+              </Text>
+            </View>
+            {natural?.applicable ? (
+              <View style={styles.roleSummaryRow}>
+                <Text style={[styles.roleSummaryLabel, { color: colors.textSecondary }]}>
+                  {t('premiumUi.planetaryPositions.naturalRole', 'Natural nature')}
+                </Text>
+                <Text style={[styles.roleSummaryValue, { color: naturalRoleColor }]}>{naturalRoleText}</Text>
+              </View>
+            ) : null}
+            {functional?.applicable ? (
+              <View style={styles.roleSummaryRow}>
+                <Text style={[styles.roleSummaryLabel, { color: colors.textSecondary }]}>
+                  {t('premiumUi.planetaryPositions.functionalRole', 'Role for this Lagna')}
+                </Text>
+                <Text style={[styles.roleSummaryValue, { color: functionalRoleColor }]}>{functionalRoleText}</Text>
+              </View>
+            ) : null}
+            {functional?.applicable ? (
+              <Text style={[styles.roleSummaryReason, { color: colors.textSecondary, borderTopColor: colors.cardBorder }]}>
+                {t('premiumUi.planetaryPositions.rulesHouses', 'Rules House(s) {{houses}}', {
+                  houses: (functional.ruled_houses || []).join(', ') || '—',
+                })}
+              </Text>
+            ) : null}
+            {functional?.is_yogakaraka ? (
+              <Text style={[styles.roleSummaryCondition, { color: colors.success }]}>
+                {t('premiumUi.planetaryPositions.yogakarakaRole', 'Yogakaraka: owns both a Kendra and a Trikona')}
+              </Text>
+            ) : null}
+            {functional?.is_maraka_lord ? (
+              <Text style={[styles.roleSummaryCondition, { color: colors.textSecondary }]}>
+                {t('premiumUi.planetaryPositions.marakaRole', 'Maraka lordship: House(s) {{houses}}', {
+                  houses: (functional.maraka_houses || []).join(', '),
+                })}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+        <View style={[styles.professionalAccordion, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceMuted }]}>
+          <TouchableOpacity
+            style={styles.professionalToggle}
+            onPress={() => setExpandedPlanets((current) => ({ ...current, [planet.name]: !current[planet.name] }))}
+            accessibilityRole="button"
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.professionalToggleTitle, { color: colors.text }]}>
+                {t('premiumUi.planetaryPositions.professionalDetails', 'Professional details')}
+              </Text>
+              <Text style={[styles.professionalToggleHint, { color: colors.textSecondary }]}>
+                {t('premiumUi.planetaryPositions.professionalDetailsHint', 'Strength, motion, aspects, dispositors and special states')}
+              </Text>
+            </View>
+            <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={20} color={colors.primaryStrong} />
+          </TouchableOpacity>
+          {expanded ? (
+          <View style={[styles.professionalPanel, { borderTopColor: colors.cardBorder }]}>
+            <Text style={[styles.professionalSectionTitle, { color: colors.primaryStrong }]}>
+              {t('premiumUi.planetaryPositions.precisePlacement', 'Precise placement')}
+            </Text>
+            {professionalValue(t('premiumUi.planetaryPositions.exactLongitude', 'Exact longitude'), `${Number(advanced.longitude).toFixed(6)}° · ${advanced.degree_dms?.text || '—'}`)}
+            {professionalValue(t('premiumUi.planetaryPositions.houseComparison', 'Rashi / Bhava Chalit house'), `H${advanced.rashi_house || planet.house} / ${advanced.bhava_chalit_house ? `H${advanced.bhava_chalit_house}` : '—'}`)}
+            {professionalValue(t('premiumUi.planetaryPositions.motion', 'Motion'), t(`premiumUi.planetaryPositions.motionStates.${advanced.motion?.key || 'unknown'}`, advanced.motion?.key || '—') + (advanced.motion?.speed_degrees_per_day != null && Number.isFinite(Number(advanced.motion.speed_degrees_per_day)) ? ` · ${Number(advanced.motion.speed_degrees_per_day).toFixed(6)}°/${t('premiumUi.planetaryPositions.day', 'day')}` : ''))}
+            {advanced.deep_point ? professionalValue(t('premiumUi.planetaryPositions.deepPoint', 'Exact dignity point'), t('premiumUi.planetaryPositions.deepPointValue', '{{type}} at {{degree}}° · {{distance}}° away', { type: t(`premiumUi.planetaryPositions.deepPointTypes.${advanced.deep_point.type}`, advanced.deep_point.type), degree: advanced.deep_point.exact_degree, distance: Number(advanced.deep_point.distance_degrees).toFixed(2) })) : null}
+            {professionalValue(t('premiumUi.planetaryPositions.boundaries', 'Nearest boundaries'), t('premiumUi.planetaryPositions.boundaryValue', 'Rashi {{rashi}}° · Nakshatra {{nakshatra}}°', { rashi: Number(advanced.boundary_proximity?.rashi_degrees).toFixed(2), nakshatra: Number(advanced.boundary_proximity?.nakshatra_degrees).toFixed(2) }))}
+
+            {natural?.applicable || functional?.applicable ? (
+              <>
+                <Text style={[styles.professionalSectionTitle, { color: colors.primaryStrong }]}>
+                  {t('premiumUi.planetaryPositions.roleReasoning', 'Role reasoning')}
+                </Text>
+                {natural?.applicable ? professionalValue(t('premiumUi.planetaryPositions.naturalRole', 'Natural nature'), naturalRoleText, naturalRoleColor) : null}
+                {planet.name === 'Moon' && Number.isFinite(Number(natural?.elongation)) ? professionalValue(
+                  t('premiumUi.planetaryPositions.moonPhaseEvidence', 'Moon phase evidence'),
+                  t('premiumUi.planetaryPositions.moonElongation', '{{degrees}}° ahead of the Sun', { degrees: Number(natural.elongation).toFixed(2) }),
+                ) : null}
+                {functional?.applicable ? professionalValue(t('premiumUi.planetaryPositions.functionalRole', 'Role for this Lagna'), functionalRoleText, functionalRoleColor) : null}
+                {functional?.applicable ? professionalValue(t('premiumUi.planetaryPositions.houseOwnership', 'House ownership'), t('premiumUi.planetaryPositions.rulesHouses', 'Rules House(s) {{houses}}', { houses: (functional.ruled_houses || []).join(', ') || '—' })) : null}
+                {functional?.applicable ? professionalValue(
+                  t('premiumUi.planetaryPositions.classicalReference', 'Classical reference'),
+                  t('premiumUi.planetaryPositions.functionalReference', 'Classical basis: Brihat Parashara Hora Shastra · {{verses}}', { verses: functional.stated_verses || 'Chapter 34' }),
+                ) : null}
+              </>
+            ) : null}
+
+            <Text style={[styles.professionalSectionTitle, { color: colors.primaryStrong }]}>
+              {t('premiumUi.planetaryPositions.friendshipsAndDispositors', 'Friendships and dispositors')}
+            </Text>
+            {signFriendship ? professionalValue(t('premiumUi.planetaryPositions.rashiLord', 'Rashi lord'), `${advanced.lord} · ${relationshipText(signFriendship.natural)} · ${relationshipText(signFriendship.temporary)} · ${relationshipText(signFriendship.compound)}`, relationshipColor(signFriendship.compound)) : null}
+            {nakFriendship ? professionalValue(t('premiumUi.planetaryPositions.nakshatraLord', 'Nakshatra lord'), `${advanced.nakLord} · ${relationshipText(nakFriendship.natural)} · ${relationshipText(nakFriendship.temporary)} · ${relationshipText(nakFriendship.compound)}`, relationshipColor(nakFriendship.compound)) : null}
+            {professionalValue(t('premiumUi.planetaryPositions.signDispositor', 'Sign dispositor'), advanced.dispositors?.sign?.available ? `${advanced.dispositors.sign.planet} · H${advanced.dispositors.sign.house} · ${dignityText(advanced.dispositors.sign.dignity)}${advanced.dispositors.sign.shadbala ? ` · ${advanced.dispositors.sign.shadbala.required_percent}% ${t('premiumUi.planetaryPositions.shadbala', 'Shadbala')}` : ''}${advanced.dispositors.sign.aspects_received?.length ? ` · ${advanced.dispositors.sign.aspects_received.length} ${t('premiumUi.planetaryPositions.aspectsReceived', 'aspects received')}` : ''}${advanced.dispositors.sign.combust ? ` · ${t('premiumUi.planetaryPositions.notes.combustFull', 'Combust')}` : ''}` : '—')}
+            {professionalValue(t('premiumUi.planetaryPositions.nakshatraDispositor', 'Nakshatra dispositor'), advanced.dispositors?.nakshatra?.available ? `${advanced.dispositors.nakshatra.planet} · H${advanced.dispositors.nakshatra.house} · ${dignityText(advanced.dispositors.nakshatra.dignity)}${advanced.dispositors.nakshatra.shadbala ? ` · ${advanced.dispositors.nakshatra.shadbala.required_percent}% ${t('premiumUi.planetaryPositions.shadbala', 'Shadbala')}` : ''}${advanced.dispositors.nakshatra.aspects_received?.length ? ` · ${advanced.dispositors.nakshatra.aspects_received.length} ${t('premiumUi.planetaryPositions.aspectsReceived', 'aspects received')}` : ''}${advanced.dispositors.nakshatra.combust ? ` · ${t('premiumUi.planetaryPositions.notes.combustFull', 'Combust')}` : ''}` : '—')}
+
+            <Text style={[styles.professionalSectionTitle, { color: colors.primaryStrong }]}>
+              {t('premiumUi.planetaryPositions.connections', 'Connections')}
+            </Text>
+            {professionalValue(t('premiumUi.planetaryPositions.aspectsCast', 'Aspects cast'), aspectsCast || t('premiumUi.planetaryPositions.none', 'None'))}
+            {professionalValue(t('premiumUi.planetaryPositions.aspectsReceived', 'Aspects received'), aspectsReceived || t('premiumUi.planetaryPositions.none', 'None'))}
+            {professionalValue(t('premiumUi.planetaryPositions.conjunctions', 'Same-sign conjunctions'), conjunctions || t('premiumUi.planetaryPositions.none', 'None'))}
+            {advanced.graha_yuddha ? professionalValue(t('premiumUi.planetaryPositions.grahaYuddha', 'Graha Yuddha'), t('premiumUi.planetaryPositions.grahaYuddhaValue', 'Eligible close conjunction with {{planet}} · {{distance}}° · winner not graded', { planet: advanced.graha_yuddha.planet_1 === planet.name ? advanced.graha_yuddha.planet_2 : advanced.graha_yuddha.planet_1, distance: Number(advanced.graha_yuddha.separation_degrees).toFixed(3) }), colors.warning) : null}
+
+            <Text style={[styles.professionalSectionTitle, { color: colors.primaryStrong }]}>
+              {t('premiumUi.planetaryPositions.strengthAndSpecialStates', 'Strength and special states')}
+            </Text>
+            {advanced.baladi_avastha ? professionalValue(t('premiumUi.planetaryPositions.baladiAvastha', 'Baladi Avastha'), `${t(`premiumUi.planetaryPositions.avasthas.${advanced.baladi_avastha.key}`, advanced.baladi_avastha.key)} · ${advanced.baladi_avastha.strength_percent}%`) : null}
+            {advanced.shadbala ? professionalValue(t('premiumUi.planetaryPositions.shadbala', 'Shadbala'), t('premiumUi.planetaryPositions.shadbalaValue', '{{rupas}} Rupas · requires {{required}} · {{percent}}%', { rupas: advanced.shadbala.total_rupas, required: advanced.shadbala.minimum_required_rupas, percent: advanced.shadbala.required_percent }), advanced.shadbala.meets_minimum ? colors.success : colors.error) : null}
+            {advanced.shadbala?.strongest_component ? professionalValue(t('premiumUi.planetaryPositions.shadbalaComponents', 'Shadbala components'), t('premiumUi.planetaryPositions.shadbalaComponentsValue', 'Strongest: {{strongest}} · weakest: {{weakest}}', { strongest: t(`premiumUi.planetaryPositions.shadbalaComponentNames.${advanced.shadbala.strongest_component.key}`, advanced.shadbala.strongest_component.key), weakest: t(`premiumUi.planetaryPositions.shadbalaComponentNames.${advanced.shadbala.weakest_component?.key}`, advanced.shadbala.weakest_component?.key || '—') })) : null}
+            {!advanced.shadbala && canonicalPositions?.shadbala_status?.status === 'unavailable' ? professionalValue(t('premiumUi.planetaryPositions.shadbala', 'Shadbala'), t('premiumUi.planetaryPositions.strengthUnavailable', 'Strength worksheet unavailable'), colors.warning) : null}
+            {advanced.ishta_kashta ? professionalValue(t('premiumUi.planetaryPositions.ishtaKashta', 'Ishta / Kashta Phala'), `${advanced.ishta_kashta.ishta_phala} / ${advanced.ishta_kashta.kashta_phala}`) : null}
+            {advanced.varga_strength ? professionalValue(t('premiumUi.planetaryPositions.vargaStrength', 'Varga strength'), t('premiumUi.planetaryPositions.vargaStrengthValue', 'D9 {{sign}} · {{dignity}} · Vimshopaka {{vimshopaka}}/20 · exalted {{exalted}} · own {{own}} · debilitated {{debilitated}}', { sign: advanced.varga_strength.d9_sign_name || '—', dignity: dignityText(advanced.varga_strength.d9_dignity), vimshopaka: advanced.varga_strength.vimshopaka_bala?.score ?? '—', exalted: (repetitions.exalted || []).length, own: (repetitions.own_sign || []).length, debilitated: (repetitions.debilitated || []).length })) : null}
+            {advanced.gandanta?.is_gandanta ? professionalValue(t('premiumUi.planetaryPositions.gandanta', 'Gandanta'), t('premiumUi.planetaryPositions.gandantaValue', '{{junction}} · {{distance}}° from junction', { junction: t(`premiumUi.planetaryPositions.gandantaJunctions.${advanced.gandanta.junction_key}`, advanced.gandanta.junction_key), distance: Number(advanced.gandanta.distance_degrees).toFixed(2) }), colors.warning) : null}
+            {advanced.pushkara?.is_pushkara_navamsa || advanced.pushkara?.is_pushkara_bhaga ? professionalValue(t('premiumUi.planetaryPositions.pushkara', 'Pushkara'), [advanced.pushkara.is_pushkara_navamsa ? t('premiumUi.planetaryPositions.pushkaraNavamsha', 'Pushkara Navamsha') : null, advanced.pushkara.is_pushkara_bhaga ? t('premiumUi.planetaryPositions.pushkaraBhaga', 'Pushkara Bhaga') : null].filter(Boolean).join(' · '), colors.success) : null}
+            {advanced.navatara ? professionalValue(t('premiumUi.planetaryPositions.navatara', 'Navatara from natal Moon'), t(`premiumUi.planetaryPositions.navataraValues.${advanced.navatara.key}`, advanced.navatara.key)) : null}
+            <Text style={[styles.methodDisclosure, { color: colors.textSecondary, borderTopColor: colors.cardBorder }]}>
+              {t('premiumUi.planetaryPositions.professionalMethodNote', 'Parashari whole-sign aspects are used. Rahu and Ketu use only the 7th aspect here. Exact separations are shown without Western aspect orbs.')}
+            </Text>
+          </View>
           ) : null}
         </View>
         {delivery?.relevant ? (
@@ -646,6 +1000,14 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
 
   // Render Tab Content
   const renderTabContent = () => {
+    if (loading && ['planets', 'houses', 'nakshatras'].includes(activeTab)) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('premiumUi.common.loading', 'Loading…')}</Text>
+        </View>
+      );
+    }
     if (activeTab === 'planets') {
       if (!planetsPayload || planets.length === 0) return chartUnavailable;
       return (
@@ -659,7 +1021,9 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
               )}
             </Text>
           </View>
-          {planets.map((planet) => <PlanetCard key={planet.name} planet={planet} />)}
+          {selectedPlanet
+            ? <PlanetCard key={selectedPlanet.name} planet={selectedPlanet} />
+            : planets.map((planet) => <PlanetCard key={planet.name} planet={planet} />)}
         </View>
       );
     }
@@ -951,6 +1315,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
             {renderTabContent()}
             <View style={{ height: 32 }} />
           </GHScrollView>
+          {activeTab === 'planets' && !loading && planets.length > 0 ? <PlanetDock /> : null}
     </View>
   );
 };
@@ -1021,6 +1386,30 @@ const styles = StyleSheet.create({
   },
   tabLabelActive: {},
 
+  planetDock: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 7,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.08, shadowRadius: 10 },
+      android: { elevation: 8 },
+      default: { boxShadow: '0 -4px 14px rgba(0,0,0,0.07)' },
+    }),
+  },
+  planetDockContent: { paddingHorizontal: 8, gap: 3 },
+  planetDockContentTablet: { flexGrow: 1, justifyContent: 'space-between' },
+  planetDockItem: {
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 5,
+  },
+  planetDockSymbol: { fontSize: 19, lineHeight: 22, fontWeight: '700' },
+  planetDockName: { fontSize: 9, lineHeight: 12, fontWeight: '800', marginTop: 1 },
+
   scrollView: {
     flex: 1,
   },
@@ -1062,6 +1451,24 @@ const styles = StyleSheet.create({
   },
   yogaLink: { marginTop: 14, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
   yogaLinkText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  roleSummaryCard: { marginTop: 14, borderWidth: 1, borderRadius: 15, padding: 13, gap: 8 },
+  roleSummaryTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  roleSummaryTitle: { flex: 1, fontFamily: DISPLAY_FONT_FAMILY, fontSize: 17, lineHeight: 21 },
+  roleSummaryRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  roleSummaryLabel: { flex: 0.42, fontSize: 11, lineHeight: 16, fontWeight: '700' },
+  roleSummaryValue: { flex: 0.58, fontSize: 12, lineHeight: 17, fontWeight: '800', textAlign: 'right' },
+  roleSummaryReason: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  roleSummaryCondition: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
+  professionalAccordion: { marginTop: 14, borderWidth: 1, borderRadius: 15, overflow: 'hidden' },
+  professionalToggle: { paddingHorizontal: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  professionalToggleTitle: { fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  professionalToggleHint: { fontSize: 10, lineHeight: 14, fontWeight: '500', marginTop: 2 },
+  professionalPanel: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 13, paddingTop: 4, paddingBottom: 13 },
+  professionalSectionTitle: { fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 0.9, textTransform: 'uppercase', marginTop: 9, marginBottom: 5 },
+  professionalRow: { paddingVertical: 7, gap: 3 },
+  professionalLabel: { fontSize: 10, lineHeight: 14, fontWeight: '700' },
+  professionalValue: { fontSize: 12, lineHeight: 18, fontWeight: '600' },
+  methodDisclosure: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 10, paddingTop: 10, fontSize: 10, lineHeight: 15, fontStyle: 'italic' },
   deliveryCard: { marginTop: 14, borderWidth: 1, borderRadius: 15, padding: 13 },
   deliveryTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 7 },
   deliveryTitle: { flex: 1, fontFamily: DISPLAY_FONT_FAMILY, fontSize: 17, lineHeight: 21 },
