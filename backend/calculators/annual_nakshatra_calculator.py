@@ -63,7 +63,7 @@ class AnnualNakshatraCalculator:
         }
     
     def _moon_sidereal_lon(self, jd: float, ayanamsa_correction_degrees: float = 0.0) -> float:
-        """Moon's sidereal longitude in [0, 360). Uses Lahiri + optional correction to align with Drik Panchang."""
+        """Moon's sidereal longitude in [0, 360). Uses Lahiri; correction is an explicit caller override."""
         if ayanamsa_correction_degrees == 0.0:
             lon = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
             return lon % 360.0
@@ -82,7 +82,7 @@ class AnnualNakshatraCalculator:
         """
         Find the next UT JD after jd_start when Moon's sidereal longitude crosses target_lon (0-360).
         Moon moves forward ~13°/day. Returns None if no crossing in max_days.
-        Precision: ~1 minute (1/1440 day).
+        Precision: better than one second after the coarse bracket is found.
         """
         target_lon = target_lon % 360.0
         step = 1.0 / 24.0  # 1 hour
@@ -93,29 +93,26 @@ class AnnualNakshatraCalculator:
         while jd < end_jd:
             jd += step
             curr_lon = self._moon_sidereal_lon(jd, ayanamsa_correction_degrees)
-            # Detect crossing: Moon moves forward; handle wrap at 360
-            crossed = False
-            if prev_lon < curr_lon:
-                if prev_lon < target_lon <= curr_lon:
-                    crossed = True
-            else:
-                # wrap: prev_lon > curr_lon (e.g. 350 -> 10)
-                if prev_lon < target_lon or target_lon <= curr_lon:
-                    crossed = True
+            # Detect whether the target lies on the short forward arc swept by
+            # the Moon during this step.  This also handles 360° -> 0°.
+            forward_motion = (curr_lon - prev_lon) % 360.0
+            forward_to_target = (target_lon - prev_lon) % 360.0
+            crossed = 0.0 < forward_to_target <= forward_motion
             if crossed:
-                # Binary search in [jd - step, jd] for precision (~1 min)
+                # Binary-search the bracket.  The prior implementation moved
+                # ``hi`` when the midpoint was still before the boundary and
+                # ``lo`` when it was after it, i.e. exactly backwards.  That
+                # returned a grid-dependent edge of the one-hour bracket and
+                # shifted published timings by roughly 30-60 minutes.
                 lo, hi = jd - step, jd
                 for _ in range(30):
                     mid = (lo + hi) / 2.0
                     mid_lon = self._moon_sidereal_lon(mid, ayanamsa_correction_degrees)
-                    # Moon moves forward; "before" target = need to go forward in time (lo = mid)
-                    diff = (target_lon - mid_lon + 360.0) % 360.0
-                    if diff > 180.0:
-                        lo = mid
-                    else:
+                    signed_from_target = (mid_lon - target_lon + 180.0) % 360.0 - 180.0
+                    if signed_from_target >= 0.0:
                         hi = mid
-                    if hi - lo < 1.0 / 1440.0:
-                        return (lo + hi) / 2.0
+                    else:
+                        lo = mid
                 return (lo + hi) / 2.0
             prev_lon = curr_lon
         return None
@@ -241,8 +238,8 @@ class AnnualNakshatraCalculator:
         """
         Calculate all periods when Moon is in this nakshatra for the year.
         Uses exact Moon longitude crossing (Lahiri sidereal) and converts to local time.
-        Optional ayanamsa_correction_degrees: add to sidereal longitude (positive = crossings earlier).
-        Use a small value (e.g. -0.2 to +0.2) to align with Drik Panchang if needed.
+        Optional ayanamsa_correction_degrees is an explicit non-default override
+        added to sidereal longitude (positive values move crossings earlier).
         """
         if nakshatra_name not in self.NAKSHATRA_NAMES:
             raise ValueError(f"Invalid nakshatra name: {nakshatra_name}")

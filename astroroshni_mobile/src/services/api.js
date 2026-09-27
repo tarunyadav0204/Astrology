@@ -843,27 +843,36 @@ export const chartAPI = {
     const latR = Math.round(lat * 10000) / 10000;
     const lonR = Math.round(lon * 10000) / 10000;
     const CACHE_KEY_PREFIX = 'nakshatra_year_';
-    const NAKSHATRA_CACHE_VERSION = 5; // bump when backend nakshatra logic/response changes
+    const NAKSHATRA_CACHE_VERSION = 6; // v6: corrected exact Nakshatra boundary solver
     const CACHE_HOURS = 24;
     const cacheKey = `${CACHE_KEY_PREFIX}v${NAKSHATRA_CACHE_VERSION}_${year}_${latR}_${lonR}`;
-    try {
-      const cached = await AsyncStorage.getItem(cacheKey);
-      if (cached) {
-        const { cachedAt, data } = JSON.parse(cached);
-        const ageHours = (Date.now() - (cachedAt || 0)) / (1000 * 60 * 60);
-        if (ageHours <= CACHE_HOURS && data) {
-          return { data };
+    // The backend already caches this expensive annual calculation.  During
+    // local development always hit it directly so a backend restart or
+    // calculator correction is immediately visible instead of being masked by
+    // a 24-hour AsyncStorage entry.
+    const useDeviceCache = !__DEV__;
+    if (useDeviceCache) {
+      try {
+        const cached = await AsyncStorage.getItem(cacheKey);
+        if (cached) {
+          const { cachedAt, data } = JSON.parse(cached);
+          const ageHours = (Date.now() - (cachedAt || 0)) / (1000 * 60 * 60);
+          if (ageHours <= CACHE_HOURS && data) {
+            return { data };
+          }
         }
-      }
-    } catch (_) { /* ignore parse/storage errors */ }
+      } catch (_) { /* ignore parse/storage errors */ }
+    }
     return api.get(getEndpoint(`/nakshatra/year/${year}`), { params: { latitude: lat, longitude: lon } })
       .then(async (response) => {
-        try {
-          await AsyncStorage.setItem(cacheKey, JSON.stringify({
-            cachedAt: Date.now(),
-            data: response.data,
-          }));
-        } catch (_) { /* ignore */ }
+        if (useDeviceCache) {
+          try {
+            await AsyncStorage.setItem(cacheKey, JSON.stringify({
+              cachedAt: Date.now(),
+              data: response.data,
+            }));
+          } catch (_) { /* ignore */ }
+        }
         return response;
       })
       .catch(error => {

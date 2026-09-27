@@ -42,6 +42,7 @@ import ashtakavargaStudy from './ashtakavarga-study.json';
 import eventTimelineSample from './event-timeline-sample.json';
 import healthBlueprint from './health-blueprint.json';
 import professionalAnalysis from './professional-analysis.json';
+import nakshatraCalendar from './nakshatra-calendar.json';
 
 const INSTANT_MODE_ACTION_COPY = Object.freeze({
   english: 'Mode',
@@ -314,6 +315,15 @@ Object.entries(normalizedPremiumUi).forEach(([language, copy]) => {
   [ru, professionalAnalysis.russian], [zh, professionalAnalysis.chinese],
 ].forEach(([baseCopy, copy]) => {
   baseCopy.professionalAnalysis = copy;
+});
+
+[
+  [en, nakshatraCalendar.english], [es, nakshatraCalendar.spanish], [hi, nakshatraCalendar.hindi],
+  [tamil, nakshatraCalendar.tamil], [te, nakshatraCalendar.telugu], [gu, nakshatraCalendar.gujarati],
+  [mr, nakshatraCalendar.marathi], [de, nakshatraCalendar.german], [fr, nakshatraCalendar.french],
+  [ru, nakshatraCalendar.russian], [zh, nakshatraCalendar.chinese],
+].forEach(([baseCopy, copy]) => {
+  baseCopy.nakshatraCalendar = copy;
 });
 
 i18n

@@ -10,7 +10,7 @@ router = APIRouter()
 
 # In-memory cache for nakshatra year calendar (slow to compute). Key -> response dict. Max 100 entries.
 # Bump NAKSHATRA_YEAR_RESPONSE_VERSION when dedupe/response shape changes so old cache entries are not reused.
-NAKSHATRA_YEAR_RESPONSE_VERSION = 3
+NAKSHATRA_YEAR_RESPONSE_VERSION = 4
 NAKSHATRA_YEAR_CACHE: OrderedDict = OrderedDict()
 NAKSHATRA_YEAR_CACHE_MAX = 100
 
@@ -88,7 +88,7 @@ async def get_nakshatra_year_by_month(
     year: int,
     latitude: Optional[float] = Query(28.6139, description="Latitude for location"),
     longitude: Optional[float] = Query(77.2090, description="Longitude for location"),
-    ayanamsa_correction: Optional[float] = Query(0.0, description="Ayanamsa correction in degrees (e.g. -0.2 for Drik Panchang alignment)"),
+    ayanamsa_correction: Optional[float] = Query(0.0, description="Optional explicit ayanamsa correction in degrees; default Lahiri requires no correction"),
 ):
     """Get all nakshatra periods for a year, grouped by month (1-12). Cached on server."""
     try:

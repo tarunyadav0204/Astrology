@@ -2240,7 +2240,7 @@ const loadHomeData = async (nativeData = null) => {
           speechPerMinuteCost={pricing.speech_chat_per_minute ?? 5}
           onOpenCharts={() => requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data }))}
           onOpenDasha={() => requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data, tab: 'dasha' }))}
-          onOpenNakshatra={() => requireBirthChart((data) => navigation.navigate('NakshatraCalendar', { birthData: data }))}
+          onOpenNakshatra={() => navigation.navigate('NakshatraCalendar', { birthData: displayData?.date ? displayData : null })}
           onOpenPanchang={() => onOptionSelect?.({ action: 'panchang' })}
           onOpenCareer={() => onOptionSelect({ action: 'analysis', type: 'career', cost: pricing.career ?? 12 })}
           onOpenKarma={() => onOptionSelect({ action: 'analysis', type: 'karma', cost: pricing.karma ?? 25 })}
@@ -2443,11 +2443,7 @@ const loadHomeData = async (nativeData = null) => {
                 <View style={[styles.tickerSeparator, theme === 'light' && { backgroundColor: colors.cardBorder }]} />
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() =>
-                    requireBirthChart((data) =>
-                      navigation.navigate('NakshatraCalendar', { birthData: data }),
-                    )
-                  }
+                  onPress={() => navigation.navigate('NakshatraCalendar', { birthData: displayData?.date ? displayData : null })}
                 >
                   <TickerItem
                     icon="star-outline"

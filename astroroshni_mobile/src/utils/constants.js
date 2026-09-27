@@ -42,7 +42,12 @@ const ENV_API_BASE_URL = (
     : ''
 ).replace(/\/+$/, '');
 // Set to true to test against local backend (emulator: Android 10.0.2.2:8001, iOS localhost:8001). Set false to use PROD (or TEST) below even while __DEV__ / Metro.
-const USE_DEV_API = false;
+// Development builds must default to the local backend.  An explicit
+// EXPO_PUBLIC_API_BASE_URL still wins above, so a developer can deliberately
+// target test/prod without changing source.  Previously this was false, which
+// made a debug build silently call production whenever Expo did not inline the
+// local .env value.
+const USE_DEV_API = true;
 // For simulator/emulator leave empty (uses localhost/10.0.2.2). For physical device set your machine IP, e.g. 'http://192.168.1.10:8001'
 const DEV_API_HOST = '';
 // Test VM backend over HTTPS (recommended for physical devices)
