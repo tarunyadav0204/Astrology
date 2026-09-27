@@ -17,6 +17,7 @@ from calculators.yogi_calculator import YogiCalculator
 from calculators.badhaka_calculator import BadhakaCalculator
 from calculators.friendship_calculator import FriendshipCalculator
 from calculators.yoga_calculator import YogaCalculator
+from calculators.classical_pitri_shapa import compact_pitri_shapa_for_ai
 from calculators.argala_calculator import ArgalaCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from shared.dasha_calculator import DashaCalculator
@@ -767,7 +768,7 @@ class ChatContextBuilder:
             },
             
             # Yogas
-            "yogas": yoga_calc.calculate_all_yogas(),
+            "yogas": compact_pitri_shapa_for_ai(yoga_calc.calculate_all_yogas()),
             
             # Chara Karakas
             "chara_karakas": karaka_data,
@@ -876,7 +877,11 @@ class ChatContextBuilder:
             'combustion_status': {
                 'is_combust': full_analysis['combustion_status']['is_combust'],
                 'is_cazimi': full_analysis['combustion_status']['is_cazimi'],
-                'status': full_analysis['combustion_status']['status']
+                'status': full_analysis['combustion_status']['status'],
+                'angular_distance': full_analysis['combustion_status'].get('angular_distance'),
+                'threshold': full_analysis['combustion_status'].get('threshold'),
+                'motion': full_analysis['combustion_status'].get('motion'),
+                'source': full_analysis['combustion_status'].get('source'),
             },
             'retrograde_analysis': {
                 'is_retrograde': full_analysis['retrograde_analysis']['is_retrograde']
@@ -2684,21 +2689,6 @@ class ChatContextBuilder:
                     "planets": f"{activation['transit_planet']} -> {activation['natal_planet']}",
                     "confidence": "95%_certainty"
                 })
-        
-        # Check for Neecha Bhanga + Dasha alignment
-        neecha_data = context.get('advanced_analysis', {}).get('neecha_bhanga', {})
-        current_dasha = context.get('current_dashas', {})
-        
-        if neecha_data.get('neecha_bhanga_planets'):
-            maha_planet = current_dasha.get('mahadasha', {}).get('planet')
-            for nb_planet in neecha_data['neecha_bhanga_planets']:
-                if nb_planet['planet'] == maha_planet and nb_planet['strength'] in ['Complete Cancellation', 'Strong Cancellation']:
-                    triggers.append({
-                        "type": "RAGS_TO_RICHES_ACTIVATION",
-                        "period": "Current Mahadasha Period",
-                        "reason": f"Neecha Bhanga {nb_planet['planet']} dasha creates legendary transformation",
-                        "confidence": "90%_certainty"
-                    })
         
         return {
             'total_triggers': len(triggers),

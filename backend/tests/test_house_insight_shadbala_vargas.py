@@ -48,3 +48,27 @@ def test_house_10_has_related_varga_and_karakas():
     assert insight["related_varga"]["name"]
     assert insight["related_varga"]["lord"]
     assert insight["natural_karakas"]
+
+
+def test_house_factors_keep_combustion_and_neecha_bhanga_separate():
+    # Mercury is debilitated, combust and classically cancelled in this D1.
+    # Cancellation mitigates the debilitation once; it does not erase the
+    # independent combustion pressure.
+    birth = {
+        "name": "Condition sample",
+        "date": "1978-03-10",
+        "time": "04:08:00",
+        "timezone": "Asia/Kolkata",
+        "latitude": 28.4595,
+        "longitude": 77.0266,
+        "place": "Gurgaon",
+    }
+    insight = build_house_insight(birth, house_num=3, chart_id="lagna")
+    support = [row["label"] for row in insight["support_factors"]]
+    pressure = [row["label"] for row in insight["stress_factors"]]
+
+    assert support.count(
+        "Mercury has Neecha Bhanga, mitigating its debilitation while it occupies this house."
+    ) == 1
+    assert "Mercury occupies this house in debilitated dignity." in pressure
+    assert "Mercury is combust, so its contribution to this house is under pressure." in pressure

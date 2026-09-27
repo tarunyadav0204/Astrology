@@ -741,8 +741,8 @@ def assemble_partnership_pages(context: Dict[str, Any], premium_report: Dict[str
             if manglik:
                 manglik_rows.append({
                     "Dosha": "Manglik compatibility",
-                    "Status": _clean(manglik.get("status"), "--"),
-                    "Score": _clean(manglik.get("score"), "--"),
+                    "Status": _clean(manglik.get("classical_status") or manglik.get("status"), "--"),
+                    "Score": "Not scored — categorical rule",
                     "Note": _short_interpretation(manglik.get("description"), 100),
                 })
             for issue in _as_list(ashtakoota.get("effective_critical_issues") or ashtakoota.get("critical_issues"))[:5]:

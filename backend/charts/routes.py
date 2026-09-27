@@ -20,6 +20,9 @@ from calculators.yogi_calculator import YogiCalculator
 from calculators.mudakku_calculator import MudakkuCalculator
 from calculators.indu_lagna_calculator import InduLagnaCalculator
 from calculators.jaimini_chart_calculator import JaiminiChartCalculator
+from calculators.classical_neecha_bhanga import calculate_classical_neecha_bhanga
+from calculators.classical_combustion import attach_classical_combustion
+from calculators.planet_result_delivery import attach_planet_result_delivery
 from charts.house_insight_service import build_house_insight
 from charts.double_transit_service import (
     DoubleTransitCalculationError,
@@ -48,6 +51,23 @@ SUPPORTED_PARASHARI_DIVISIONS = frozenset({2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27
 _GUEST_CHART_ONLY_WINDOW_SEC = 60
 _GUEST_CHART_ONLY_MAX = 20
 _guest_chart_only_hits: Dict[str, deque] = defaultdict(deque)
+
+
+def _attach_classical_neecha_bhanga(chart_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Upgrade cached and newly calculated D1 payloads to the current additive contract."""
+    if not isinstance(chart_data, dict):
+        return chart_data
+    results = calculate_classical_neecha_bhanga(chart_data)
+    chart_data["neecha_bhanga"] = results
+    planets = chart_data.get("planets") or {}
+    for planet_name in ("Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"):
+        if isinstance(planets.get(planet_name), dict):
+            planets[planet_name]["neecha_bhanga"] = False
+    for planet_name, row in results.items():
+        if isinstance(planets.get(planet_name), dict):
+            planets[planet_name]["neecha_bhanga"] = bool(row.get("neecha_bhanga_present"))
+    attach_classical_combustion(chart_data)
+    return attach_planet_result_delivery(chart_data)
 
 
 def _client_ip(request: Request) -> str:
@@ -484,11 +504,14 @@ async def calculate_chart_only(
             with get_conn() as conn:
                 cached_payload = fetch_cached_chart_payload(conn, cache_key)
             if cached_payload:
-                return cached_payload
+                # Older cached charts predate the additive Neecha Bhanga fields.
+                # Enrich them on read so callers never receive a stale contract.
+                return _attach_classical_neecha_bhanga(cached_payload)
 
         # Calculate chart
         calculator = ChartCalculator({})
         chart_data = calculator.calculate_chart(birth_obj, node_type=node_type, ayanamsha=ayanamsha)
+        _attach_classical_neecha_bhanga(chart_data)
         if explicit_profile:
             chart_data["calculation_profile"] = {"ayanamsha": ayanamsha, "node_type": node_type}
 
@@ -579,6 +602,9 @@ async def calculate_all_charts(
             with get_conn() as conn:
                 cached_payload = fetch_cached_chart_payload(conn, cache_key)
             if cached_payload:
+                cached_chart = cached_payload.get("chart_data") if isinstance(cached_payload, dict) else None
+                if isinstance(cached_chart, dict):
+                    _attach_classical_neecha_bhanga(cached_chart)
                 return cached_payload
         
         # Create birth data object - simple class like in main.py backup
@@ -929,6 +955,7 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
                     store_chart_payload(conn, cache_key, chart_birth_hash, chart_data)
                     conn.commit()
 
+        _attach_classical_neecha_bhanga(chart_data)
         chart_data['birth_chart_id'] = new_chart_id
         return chart_data
         

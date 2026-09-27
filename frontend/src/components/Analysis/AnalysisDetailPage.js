@@ -194,7 +194,7 @@ const marriageFaqItems = [
   {
     question: 'Does the report identify delays or doshas?',
     answer:
-      'Yes. It can highlight Saturn delay, Mars/Mangal factors, Rahu-Ketu irregularity, 6th/8th/12th pressure, cancellation factors, and practical guidance without fear-based language.'
+      'Yes. It can highlight Saturn delay, the exact classical Mars/Mangal rule, Rahu-Ketu irregularity, 6th/8th/12th pressure, source-backed qualifying conditions, and practical guidance without fear-based language.'
   },
   {
     question: 'Is marriage prediction guaranteed?',

@@ -3,13 +3,19 @@ import React from 'react';
 const CompatibilityReport = ({ analysis, boyDetails, girlDetails }) => {
   const { manglik_analysis, recommendation, timing_overlay: timingOverlay } = analysis;
 
-  const getManglikSeverityColor = (severity) => {
-    switch (severity) {
-      case 'High': return '#f44336';
-      case 'Medium': return '#ff9800';
-      case 'Low': return '#ffc107';
+  const getManglikStatusColor = (status) => {
+    switch (status) {
+      case 'formed': return '#f44336';
+      case 'unavailable': return '#ff9800';
       default: return '#4caf50';
     }
+  };
+
+  const getManglikStatusLabel = (result) => {
+    if (result?.status === 'formed') return 'Formed';
+    if (result?.status === 'protected') return 'Complete condition not formed';
+    if (result?.status === 'unavailable') return 'Unavailable';
+    return 'Not formed';
   };
 
   const getCompatibilityStatusColor = (status) => {
@@ -26,12 +32,9 @@ const CompatibilityReport = ({ analysis, boyDetails, girlDetails }) => {
             <span className="status-label">Manglik Status:</span>
             <span 
               className="status-value"
-              style={{ color: getManglikSeverityColor(manglik_analysis.boy_manglik.severity) }}
+              style={{ color: getManglikStatusColor(manglik_analysis.boy_manglik.status) }}
             >
-              {manglik_analysis.boy_manglik.is_manglik 
-                ? `Yes (${manglik_analysis.boy_manglik.severity})` 
-                : 'No'
-              }
+              {getManglikStatusLabel(manglik_analysis.boy_manglik)}
             </span>
           </div>
         </div>
@@ -45,12 +48,9 @@ const CompatibilityReport = ({ analysis, boyDetails, girlDetails }) => {
             <span className="status-label">Manglik Status:</span>
             <span 
               className="status-value"
-              style={{ color: getManglikSeverityColor(manglik_analysis.girl_manglik.severity) }}
+              style={{ color: getManglikStatusColor(manglik_analysis.girl_manglik.status) }}
             >
-              {manglik_analysis.girl_manglik.is_manglik 
-                ? `Yes (${manglik_analysis.girl_manglik.severity})` 
-                : 'No'
-              }
+              {getManglikStatusLabel(manglik_analysis.girl_manglik)}
             </span>
           </div>
         </div>

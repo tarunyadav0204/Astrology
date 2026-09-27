@@ -5,6 +5,7 @@ import { dashaLevelSuffix, dashaPaint, labelBox, placeCircleClear, placeTransitL
 import { aspectArrow, aspectHouse, ChartAspectArrows, jaiminiTargetSigns, planetAspectCounts } from './chartAspects';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
+import { combustSet } from '../../utils/positionTables';
 
 const AnimatedG = Animated.createAnimatedComponent(G);
 
@@ -27,10 +28,12 @@ const SouthIndianChart = ({
   aspectMode = null,
   aspectFocus = null,
   planetRoles = null,
+  combustPlanets = new Set(),
 }) => {
   const [contextMenu, setContextMenu] = useState({ show: false, rashiIndex: null, signName: null });
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
+  const transitCombustPlanets = combustSet(transitOverlay);
 
   const lastDataRef = useRef(null);
 
@@ -164,6 +167,8 @@ const SouthIndianChart = ({
         }
 
         const status = getPlanetStatus(name, signIndex);
+        if (data.retrograde && name !== 'Rahu' && name !== 'Ketu') symbol += '(R)';
+        if (combustPlanets.has(name)) symbol += '(C)';
         if (status === 'exalted') symbol += '↑';
         if (status === 'debilitated') symbol += '↓';
 
@@ -173,6 +178,11 @@ const SouthIndianChart = ({
           degree: typeof data.degree === 'number' ? data.degree : 0,
           longitude: data.longitude || 0,
           retrograde: !!data.retrograde,
+          combust: combustPlanets.has(name),
+          neecha_bhanga: Boolean(
+            data.neecha_bhanga
+            || chartData?.neecha_bhanga?.[name]?.neecha_bhanga_present
+          ),
           nakshatra: getNakshatra(data.longitude || 0),
           shortNakshatra: getShortNakshatra(data.longitude || 0),
           pada: getNakshatraPada(data.longitude || 0),
@@ -194,6 +204,7 @@ const SouthIndianChart = ({
         degree: typeof chartData.planets.InduLagna.degree === 'number' ? chartData.planets.InduLagna.degree : 0,
         longitude: chartData.planets.InduLagna.longitude || 0,
         retrograde: !!chartData.planets.InduLagna.retrograde,
+        combust: false,
         nakshatra: getNakshatra(chartData.planets.InduLagna.longitude || 0),
         shortNakshatra: getShortNakshatra(chartData.planets.InduLagna.longitude || 0),
         pada: getNakshatraPada(chartData.planets.InduLagna.longitude || 0),
@@ -217,6 +228,7 @@ const SouthIndianChart = ({
         symbol: t(`planets.${name}`, name.substring(0, 2)),
         name,
         retrograde,
+        combust: transitCombustPlanets.has(name),
         bav: transitBav(bavBySign, name, data.sign),
         shortNakshatra: getShortNakshatra(data.longitude || 0),
         formattedDegree: formatDegree(data.degree ?? 0),
@@ -483,10 +495,11 @@ const SouthIndianChart = ({
                   const tagFont = Math.max(6, Math.round(symbolFont * 0.42));
                   const symbolHalf = textHalfWidth(planet.symbol, symbolFont);
                   const tagExtra = dashaTag ? textHalfWidth(dashaTag, tagFont) + 2 : 0;
+                  const neechaBhangaExtra = planet.neecha_bhanga ? textHalfWidth(t('premiumUi.chart.neechaBhangaShort'), tagFont) + 3 : 0;
                   const degreeHalf = slot.degreesFit
                     ? textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, slot.degreeFont)
                     : 0;
-                  const half = Math.max(symbolHalf + tagExtra, degreeHalf) + 4;
+                  const half = Math.max(symbolHalf + Math.max(tagExtra, neechaBhangaExtra), degreeHalf) + 4;
                   const above = Math.ceil(symbolFont * 0.95) + (dashaTag ? tagFont : 1);
                   const below = slot.degreesFit ? Math.max(4, slot.degreeY - slot.symbolY + 3) : 3;
                   return labelBox(pos.x + pos.width / 2, slot.symbolY, half, above, below);
@@ -606,6 +619,19 @@ const SouthIndianChart = ({
                       {dashaTag}
                     </SvgText>
                   ) : null}
+                  {planet.neecha_bhanga ? (
+                    <SvgText
+                      x={symbolX + textHalfWidth(planet.symbol, planetFont) + 3}
+                      y={symbolY}
+                      fontSize={Math.max(6, Math.round(planetFont * 0.46))}
+                      fill={colors.success || '#1E7A46'}
+                      fontWeight="900"
+                      textAnchor="start"
+                      pointerEvents="none"
+                    >
+                      {t('premiumUi.chart.neechaBhangaShort')}
+                    </SvgText>
+                  ) : null}
                   {planetRoles?.[planet.name] ? (() => {
                     const role = roleLabelPlace(symbolX, planet.symbol, planetRoles[planet.name], planetFont, 340);
                     return (
@@ -693,6 +719,7 @@ const SouthIndianChart = ({
                 const layout = placeTransitLabels(polygon, occupied, transits.map((planet) => ({
                   symbol: planet.symbol,
                   retrograde: planet.retrograde,
+                  combust: planet.combust,
                   degree: planet.formattedDegree,
                   nakshatra: planet.shortNakshatra,
                   name: planet.name,

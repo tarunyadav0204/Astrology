@@ -27,9 +27,10 @@ class CareerYogaAnalyzer(YogaCalculator):
             career_impact = self._get_mahapurusha_career_impact(yoga['name'])
             career_yogas.append(self._format_career_yoga(yoga, 'Mahapurusha Yoga', 'Very High - Professional excellence', career_impact))
         
-        # Process Neecha Bhanga Yogas
-        for yoga in all_yogas['neecha_bhanga_yogas']:
-            career_yogas.append(self._format_career_yoga(yoga, 'Professional Excellence Yoga', 'Medium - Recovery periods', 'Overcoming career obstacles'))
+        # Phaladeepika 7.26-30 gives a general royal result for Neecha Bhanga,
+        # but does not supply a career-specific score, "recovery period", or
+        # timing rule. Keep it in the canonical yoga payload rather than inventing
+        # those claims inside the career ranking.
         
         # Process Gaja Kesari Yogas
         for yoga in all_yogas['gaja_kesari_yogas']:
@@ -142,7 +143,6 @@ class CareerYogaAnalyzer(YogaCalculator):
             'Hamsa Yoga': 75,    # BPHS Ch. 76 Pañcha Mahāpuruṣa Yogas
             'Malavya Yoga': 75,  # BPHS Ch. 76 Pañcha Mahāpuruṣa Yogas
             'Sasha Yoga': 75,    # BPHS Ch. 76 Pañcha Mahāpuruṣa Yogas
-            'Neecha Bhanga Yoga': 55,  # BPHS Ch. 39, Phaladīpikā 6.31-6.33
             'Gaja Kesari Yoga': 70,  # BPHS Ch. 40 § 31, Phaladīpikā 6.26
             'Amala Yoga': 70,  # Phaladīpikā 6.37, Jātaka Pārijāta 16.62
             'Viparita Raja Yoga': 50,  # BPHS Ch. 40 § 56-58, Phaladīpikā 6.22

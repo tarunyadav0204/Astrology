@@ -704,10 +704,30 @@ def _dosha_table(doshas: Dict[str, Any], language: str) -> Dict[str, Any]:
     kaal = doshas.get("kaal_sarp_dosha") or {}
     pitra = doshas.get("pitra_dosha") or {}
     def _dosha_detail(row: Dict[str, Any]) -> str:
-        raw = _clean(row.get("type") or row.get("note") or row.get("strength"))
+        raw = _clean(row.get("summary") or row.get("type") or row.get("note") or row.get("strength"))
         if not raw:
             return "—"
         return label_strength(raw, language) or localize_evidence_text(raw, language) or raw
+
+    def _nodal_detail(row: Dict[str, Any]) -> str:
+        status = row.get("status")
+        direction = row.get("direction_label") or "Rahu → Ketu"
+        outside = ", ".join(row.get("outside_planets") or []) or "—"
+        boundary = ", ".join(item.get("planet", "") for item in (row.get("boundary_planets") or [])) or "—"
+        if is_hindi(language):
+            if status == "complete":
+                return f"सभी सात दृश्य ग्रह {direction} वाले नोडल अर्धभाग के भीतर हैं।"
+            if status == "boundary":
+                return f"सभी सात दृश्य ग्रह {direction} में हैं; {boundary} नोड की सीमा पर है।"
+            if status == "not_formed":
+                return f"पूर्ण नोडल घेरा नहीं बनता; {outside} चुने हुए अर्धभाग से बाहर है।"
+            return "सटीक देशांतर उपलब्ध न होने के कारण जाँच पूरी नहीं हो सकी।"
+        return _clean(row.get("summary")) or _dosha_detail(row)
+
+    def _pitri_detail(row: Dict[str, Any]) -> str:
+        summary = _clean(row.get("summary")) or _dosha_detail(row)
+        reference = _clean((row.get("source") or {}).get("reference_label"))
+        return f"{summary} Reference: {reference}" if reference else summary
 
     rows = [
         [
@@ -716,16 +736,16 @@ def _dosha_table(doshas: Dict[str, Any], language: str) -> Dict[str, Any]:
             _dosha_detail(mangal if isinstance(mangal, dict) else {}),
         ],
         [
-            t(language, "Kaal Sarp Dosha", "काल सर्प दोष"),
+            t(language, "Rahu–Ketu nodal enclosure (modern convention)", "राहु–केतु नोडल घेरा (आधुनिक मान्यता)"),
             yes_no(language, bool(kaal.get("present"))),
-            _dosha_detail(kaal if isinstance(kaal, dict) else {}),
+            _nodal_detail(kaal if isinstance(kaal, dict) else {}),
         ],
     ]
     if isinstance(pitra, dict):
         rows.append([
-            t(language, "Pitra Dosha check", "पितृ दोष जाँच"),
+            t(language, "Pitṛ-śāpa · progeny check", "पितृ-शाप · संतान संबंधी जाँच"),
             yes_no(language, bool(pitra.get("present"))),
-            _dosha_detail(pitra),
+            _pitri_detail(pitra),
         ])
     return {
         "title": t(language, "Dosha checklist", "दोष जाँच सूची"),
@@ -1413,9 +1433,9 @@ def assemble_janam_kundli_pages(context: Dict[str, Any], premium_report: Dict[st
             tables = [_dosha_table(fact.get("doshas") or {}, language)]
             if not summary:
                 summary = (
-                    "मंगल, काल सर्प और संबंधित प्रमुख दोष कैलकुलेटर से दोष जाँच सूची।"
+                    "मंगल, राहु–केतु घेरे और संबंधित जाँचों की सूची।"
                     if hi
-                    else "Dosha checklist from Mangal, Kaal Sarp, and related major-dosha calculators."
+                    else "Checklist covering Mangal, the modern Rahu–Ketu enclosure convention, and related checks."
                 )
 
         elif key == "sade_sati":

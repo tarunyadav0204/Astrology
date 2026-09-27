@@ -8,6 +8,7 @@ from calculators.chara_karaka_calculator import CharaKarakaCalculator
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.jaimini_point_calculator import JaiminiPointCalculator
 from calculators.sniper_points_calculator import SniperPointsCalculator
+from calculators.classical_neecha_bhanga import calculate_classical_neecha_bhanga
 from shared.dasha_calculator import DashaCalculator
 
 SIGN_NAMES = [
@@ -176,6 +177,7 @@ def build_lord_worksheet(
     lord_analysis: Dict[str, Any],
     chart_data: Dict[str, Any],
     shadbala_data: Dict[str, Any],
+    include_neecha_bhanga: bool = True,
 ) -> Dict[str, Any]:
     basic = lord_analysis.get("basic_info") or {}
     dignity = lord_analysis.get("dignity_analysis") or {}
@@ -188,6 +190,9 @@ def build_lord_worksheet(
         nakshatra_num = int((((float(longitude) % 360) + 360) % 360) / 13.333333) + 1
         nakshatra_num = min(max(nakshatra_num, 1), 27)
     shadbala = shadbala_data.get(lord) or {}
+    neecha_bhanga = {}
+    if include_neecha_bhanga:
+        neecha_bhanga = calculate_classical_neecha_bhanga(chart_data).get(lord) or {}
     return {
         "planet": lord,
         "sign_name": basic.get("sign_name"),
@@ -206,6 +211,9 @@ def build_lord_worksheet(
         "required_rupas": shadbala.get("minimum_required_rupas"),
         "meets_minimum": shadbala.get("meets_minimum"),
         "classical_status": shadbala.get("classical_status"),
+        "neecha_bhanga": bool(neecha_bhanga.get("neecha_bhanga_present")),
+        "neecha_bhanga_conditions": neecha_bhanga.get("conditions_met") or [],
+        "neecha_bhanga_source": neecha_bhanga.get("source"),
     }
 
 
@@ -488,6 +496,7 @@ def build_house_worksheets(
             lord_analysis=lord_analysis,
             chart_data=chart_data,
             shadbala_data=shadbala_data,
+            include_neecha_bhanga=chart_id == "lagna",
         ),
         "argala": build_argala(chart_data, house_num),
         "points_in_house": build_points_in_house(

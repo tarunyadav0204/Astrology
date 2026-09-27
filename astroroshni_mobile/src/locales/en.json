@@ -582,8 +582,7 @@
         "badhakaAxis": "This house falls in the badhaka axis for the ascendant.",
         "cuspGandanta": "The house cusp itself falls in Gandanta.",
         "mangalDosha": "Mangal Dosha is impacting this house axis.",
-        "kaalSarp": "Kaal Sarp Dosha adds pressure to the chart pattern here.",
-        "pitraDosha": "Pitra Dosha is directly affecting ninth-house themes.",
+        "pitraDosha": "A complete BPHS Pitri-shapa combination concerns progeny in this chart.",
         "uttama": "Overall house assessment comes through as Uttama.",
         "adhama": "Overall house assessment comes through as Adhama.",
         "gandantaResidents": "Gandanta affects resident planet(s) {{planets}}.",
@@ -625,7 +624,8 @@
         "dashaLord": "{{dasha}} is running through {{planet}}, the house lord.",
         "dashaOccupant": "{{dasha}} is running through {{planet}}, an occupant of this house.",
         "dashaAspect": "{{dasha}} is running through {{planet}}, which aspects this house.",
-        "transitsInclude": "Current transits through this sign include {{planets}}."
+        "transitsInclude": "Current transits through this sign include {{planets}}.",
+        "pitriShapa": "A complete BPHS Pitri-shapa combination concerns progeny in this chart."
       }
     },
     "grahaDrishti": "Graha drishti",
@@ -1729,14 +1729,26 @@
       "younger_sibling": "Younger sibling",
       "elder_sibling": "Elder sibling"
     },
-    "lifeOptions": { "living": "Yes", "deceased": "No", "unknown": "Prefer not to say" },
+    "lifeOptions": {
+      "living": "Yes",
+      "deceased": "No",
+      "unknown": "Prefer not to say"
+    },
     "workOptions": {
-      "employed": "Working", "self_employed": "Business", "homemaker": "Homemaker",
-      "student": "Studying", "retired": "Retired", "unemployed": "Not working", "unknown": "Not sure"
+      "employed": "Working",
+      "self_employed": "Business",
+      "homemaker": "Homemaker",
+      "student": "Studying",
+      "retired": "Retired",
+      "unemployed": "Not working",
+      "unknown": "Not sure"
     },
     "locationOptions": {
-      "with_native": "Lives with you", "same_city": "Same city", "elsewhere_india": "Elsewhere in India",
-      "abroad": "Abroad", "unknown": "Not sure"
+      "with_native": "Lives with you",
+      "same_city": "Same city",
+      "elsewhere_india": "Elsewhere in India",
+      "abroad": "Abroad",
+      "unknown": "Not sure"
     }
   },
   "monthlyDeepScreen": {

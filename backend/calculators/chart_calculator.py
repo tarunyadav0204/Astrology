@@ -256,6 +256,19 @@ class ChartCalculator(BaseCalculator):
             "bhav_chalit": bhav_chalit,
         }
         attach_graha_drishti_to_chart(result)
+        # Additive chart metadata: existing clients can ignore it, while every
+        # consumer that needs Neecha Bhanga now receives the canonical result.
+        from .classical_neecha_bhanga import calculate_classical_neecha_bhanga
+        result["neecha_bhanga"] = calculate_classical_neecha_bhanga(result)
+        for planet_name, nb_result in result["neecha_bhanga"].items():
+            if planet_name in result["planets"]:
+                result["planets"][planet_name]["neecha_bhanga"] = bool(
+                    nb_result.get("neecha_bhanga_present")
+                )
+        from .classical_combustion import attach_classical_combustion
+        attach_classical_combustion(result)
+        from .planet_result_delivery import attach_planet_result_delivery
+        attach_planet_result_delivery(result)
         return result
     
     def _calculate_bhav_chalit_professional(self, jd, lat, lon, planets, ayanamsa, sid_mode=swe.SIDM_LAHIRI):

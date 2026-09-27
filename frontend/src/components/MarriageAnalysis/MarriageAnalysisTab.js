@@ -255,28 +255,8 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
     
     // MALEFIC YOGAS CAUSING DELAYS/PROBLEMS
     
-    // 1. Manglik Dosha
-    if (manglik.is_manglik) {
-      maleficYogas.push({ strength: manglik.severity === 'High' ? 'Very Strong' : 'Moderate' });
-    }
-    
-    // 2. Kala Sarpa Yoga - All planets between Rahu-Ketu
-    if (rahuData && ketuData) {
-      const rahuSign = rahuData.sign;
-      const ketuSign = ketuData.sign;
-      const planetsBetween = Object.entries(chartData?.planets || {})
-        .filter(([name, data]) => !['Rahu', 'Ketu'].includes(name))
-        .every(([name, data]) => {
-          const planetSign = data.sign;
-          return (rahuSign < ketuSign) ? 
-            (planetSign > rahuSign && planetSign < ketuSign) :
-            (planetSign > rahuSign || planetSign < ketuSign);
-        });
-      
-      if (planetsBetween) {
-        maleficYogas.push({ strength: 'Strong' });
-      }
-    }
+    // Mangal Dosha is a categorical classical check and is not converted into
+    // a strength band or deducted from this product score.
     
     // 3. Shani Dosha - Saturn in 7th house
     if (saturnData) {
@@ -348,8 +328,7 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
     const yogaScore = yogaData.yogaScore; // Max 1.5
     const d9Score = (d9Analysis?.overall_strength || 0) / 10 * 2.0; // Max 2.0
     
-    const manglikPenalty = manglik.is_manglik ? 
-      (manglik.severity === 'High' ? 1.5 : 0.8) : 0;
+    const manglikPenalty = 0;
     
     const totalScore = seventhScore + venusScore + jupiterScore + darakarkaScore + yogaScore + d9Score - manglikPenalty;
     const finalScore = Math.max(0, Math.min(10, totalScore));
@@ -569,15 +548,15 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
               <span className="score-label">🔥 Manglik Status:</span>
               <div className="manglik-compact">
                 <span className={`manglik-indicator ${manglik.is_manglik ? 'manglik' : 'non-manglik'}`}>
-                  {manglik.is_manglik ? `${manglik.severity} Manglik` : 'Non-Manglik'}
+                  {manglik.status === 'protected' ? 'Complete condition not formed' : manglik.is_manglik ? 'Mangal Dosha formed' : 'Mangal Dosha not formed'}
                 </span>
                 <span className="score-value" style={{ color: manglik.is_manglik ? '#f44336' : '#4caf50' }}>
-                  {manglik.is_manglik ? `-${frontendOverallScore.components.manglik_penalty}` : '+0.0'}
+                  Not scored
                 </span>
                 {manglik.is_manglik && (
                   <div className="manglik-details-compact">
                     <span>Mars in {manglik.mars_house}th house</span>
-                    {manglik.cancellation?.has_cancellation && <span className="cancellation-note">• Cancellation present</span>}
+                    {manglik.individual_exceptions?.applied && <span className="cancellation-note">• Benefic relation prevents the complete condition</span>}
                   </div>
                 )}
               </div>
@@ -594,8 +573,8 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
           <div className="score-formula">
             <div className="formula-title">📋 Enhanced Parasara Formula (D9 Weight: 30%):</div>
             <div className="formula-text">
-              <strong>Formula:</strong> 7th House + Venus + Jupiter + Darakarka + Yogas + D9 Navamsa - Manglik Penalty<br/>
-              <strong>Calculation:</strong> {frontendOverallScore.components.seventh_house_d1} + {frontendOverallScore.components.venus_d1} + {frontendOverallScore.components.jupiter_d1} + {frontendOverallScore.components.darakarka} + {frontendOverallScore.components.yoga_score >= 0 ? frontendOverallScore.components.yoga_score : `(${frontendOverallScore.components.yoga_score})`} + {frontendOverallScore.components.d9_strength}{frontendOverallScore.components.manglik_penalty > 0 ? ` - ${frontendOverallScore.components.manglik_penalty}` : ' - 0'} = <strong>{frontendOverallScore.score}/10</strong>
+              <strong>Formula:</strong> 7th House + Venus + Jupiter + Darakarka + Yogas + D9 Navamsa<br/>
+              <strong>Calculation:</strong> {frontendOverallScore.components.seventh_house_d1} + {frontendOverallScore.components.venus_d1} + {frontendOverallScore.components.jupiter_d1} + {frontendOverallScore.components.darakarka} + {frontendOverallScore.components.yoga_score >= 0 ? frontendOverallScore.components.yoga_score : `(${frontendOverallScore.components.yoga_score})`} + {frontendOverallScore.components.d9_strength} = <strong>{frontendOverallScore.score}/10</strong>
             </div>
           </div>
         </div>
@@ -705,10 +684,9 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
               <div className="explanation-item manglik-explanation">
                 <span className="item-icon">🔥</span>
                 <div className="item-content">
-                  <h5>Your Manglik Status: {manglik.severity === 'High' ? 'High Risk' : 'Manageable'}</h5>
-                  <p>{manglik.severity === 'High' ? 
-                    'You have strong Mars energy that can create conflicts in marriage. This is serious and requires either marrying another Manglik person or performing specific rituals before marriage.' :
-                    'You have mild Mars energy that may cause some initial friction in marriage. This is easily manageable with simple remedies like fasting on Tuesdays or prayers to Hanuman ji.'}</p>
+                  <h5>Mangal Dosha formed</h5>
+                  <p>{manglik.summary || `Mars is in House ${manglik.mars_house} and meets the complete selected classical rule.`}</p>
+                  <p>This single-chart result is kept separate from partner comparison. The cited pair rule is evaluated only when both charts are available.</p>
                 </div>
               </div>
             )}
@@ -751,20 +729,11 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
                 }
                 
                 if (manglik.is_manglik) {
-                  const severity = manglik.severity;
-                  if (severity === 'High') {
-                    recommendations.push({
-                      icon: '🔥',
-                      text: `Strong Manglik dosha detected. Essential: Marry another Manglik, perform Mangal Shanti puja, or do Kumbh Vivah ritual before marriage.`,
-                      type: 'challenging'
-                    });
-                  } else {
-                    recommendations.push({
-                      icon: '🕯️',
-                      text: `Mild Manglik dosha present. Remedy: Fast on Tuesdays, offer red flowers to Hanuman ji, and recite Hanuman Chalisa daily.`,
-                      type: 'neutral'
-                    });
-                  }
+                  recommendations.push({
+                    icon: '🔥',
+                    text: 'Mangal Dosha is present under BPHS 80.47. Compare the partner chart before drawing a pair-level conclusion.',
+                    type: 'neutral'
+                  });
                 }
                 
                 if (d9Analysis && d9Analysis.overall_strength < 5) {
@@ -877,10 +846,7 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
                   
                   // Astrological timing based on planetary maturity and Saturn cycles
                   let suggestedAge;
-                  if (manglik.is_manglik && manglik.severity === 'High') {
-                    // High Manglik: After Mars maturity (28) + remedial period
-                    suggestedAge = Math.max(currentAge + 2, 30);
-                  } else if ((karakas.venus?.strength || 0) < 2 && (karakas.jupiter?.strength || 0) < 2) {
+                  if ((karakas.venus?.strength || 0) < 2 && (karakas.jupiter?.strength || 0) < 2) {
                     // Both Venus & Jupiter critically weak: After Saturn return (29.5 years)
                     suggestedAge = Math.max(currentAge + 2, 30);
                   } else if ((seventhHouse.strength_score || 0) < 20) {
@@ -891,11 +857,9 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
                     suggestedAge = Math.max(currentAge + 2, 27);
                   }
                   
-                  const remedialPeriod = manglik.is_manglik && manglik.severity === 'High' ? '24-36 months' : 
-                                        ((karakas.venus?.strength || 0) < 2 || (karakas.jupiter?.strength || 0) < 2) ? '18-24 months' : '12-18 months';
+                  const remedialPeriod = ((karakas.venus?.strength || 0) < 2 || (karakas.jupiter?.strength || 0) < 2) ? '18-24 months' : '12-18 months';
                   
-                  const astrologicalReason = manglik.is_manglik && manglik.severity === 'High' ? 'after Mars maturity (28) and Manglik remedies' :
-                                            ((karakas.venus?.strength || 0) < 2 && (karakas.jupiter?.strength || 0) < 2) ? 'after Saturn return (30) when planets mature' :
+                  const astrologicalReason = ((karakas.venus?.strength || 0) < 2 && (karakas.jupiter?.strength || 0) < 2) ? 'after Saturn return (30) when planets mature' :
                                             (seventhHouse.strength_score || 0) < 20 ? 'after 7th house strengthening and planetary maturity' :
                                             'after Venus maturity (25) and remedial completion';
                   
@@ -1438,35 +1402,11 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
                 if (manglik.is_manglik) {
                   maleficYogas.push({
                     name: 'Mangal Dosha',
-                    description: `Mars in ${manglik.mars_house}th house - ${manglik.severity} severity`,
-                    strength: manglik.severity === 'High' ? 'Very Strong' : 'Moderate',
-                    effect: 'Conflicts in marriage, aggressive spouse, delays, need for remedies',
-                    remedy: manglik.severity === 'High' ? 'Marry another Manglik, Kumbh Vivah, Mangal Shanti puja' : 'Tuesday fasting, Hanuman worship'
+                    description: manglik.summary || `Mars in House ${manglik.mars_house} meets the selected classical rule.`,
+                    strength: 'Classical rule formed',
+                    effect: 'A single-chart formation that must be compared separately with the partner chart.',
+                    reference: manglik.source?.reference_label
                   });
-                }
-                
-                // 2. Kala Sarpa Yoga - All planets between Rahu-Ketu
-                if (rahuData && ketuData) {
-                  const rahuSign = rahuData.sign;
-                  const ketuSign = ketuData.sign;
-                  const planetsBetween = Object.entries(chartData?.planets || {})
-                    .filter(([name, data]) => !['Rahu', 'Ketu'].includes(name))
-                    .every(([name, data]) => {
-                      const planetSign = data.sign;
-                      return (rahuSign < ketuSign) ? 
-                        (planetSign > rahuSign && planetSign < ketuSign) :
-                        (planetSign > rahuSign || planetSign < ketuSign);
-                    });
-                  
-                  if (planetsBetween) {
-                    maleficYogas.push({
-                      name: 'Kala Sarpa Yoga',
-                      description: 'All planets hemmed between Rahu-Ketu axis',
-                      strength: 'Strong',
-                      effect: 'Delays in marriage, karmic relationships, spiritual lessons through marriage',
-                      remedy: 'Rahu-Ketu remedies, spiritual practices, patience'
-                    });
-                  }
                 }
                 
                 // 3. Shani Dosha - Saturn in 7th house
@@ -1645,7 +1585,7 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
                         </div>
                         <div className="yoga-score-explanation">
                           <h5>📊 How Yoga Score Affects Overall Rating:</h5>
-                          <p>The yoga score ({calculateYogaScore(kalatraYogas, beneficYogas, maleficYogas) >= 0 ? '+' : ''}{calculateYogaScore(kalatraYogas, beneficYogas, maleficYogas).toFixed(1)}/1.5) contributes 15% to your overall marriage score. Powerful yogas like Malavya or Kalatra Karaka can significantly boost your prospects, while malefic yogas like Kala Sarpa or strong Manglik dosha can create challenges that require specific remedies.</p>
+                          <p>The yoga score ({calculateYogaScore(kalatraYogas, beneficYogas, maleficYogas) >= 0 ? '+' : ''}{calculateYogaScore(kalatraYogas, beneficYogas, maleficYogas).toFixed(1)}/1.5) contributes 15% to your overall marriage score. Mangal Dosha is shown separately as a categorical classical rule and does not add or deduct points here.</p>
                         </div>
                       </div>
                     )}
@@ -2287,9 +2227,9 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
                   {manglik.is_manglik ? '🔥' : '✅'}
                 </div>
                 <div className="manglik-info">
-                  <h4>{manglik.is_manglik ? `${manglik.severity} Manglik` : 'Non-Manglik'}</h4>
+                  <h4>{manglik.status === 'protected' ? 'Complete condition not formed' : manglik.is_manglik ? 'Mangal Dosha formed' : 'Mangal Dosha not formed'}</h4>
                   <span className="manglik-subtitle">
-                    {manglik.is_manglik ? `Mars in ${manglik.mars_house}th house` : 'No Manglik dosha detected'}
+                    {manglik.mars_house ? `Mars in House ${manglik.mars_house} from Lagna` : 'Required chart data unavailable'}
                   </span>
                 </div>
               </div>
@@ -2298,90 +2238,24 @@ const SingleChartAnalysis = ({ analysis, chartData, birthDetails }) => {
                 {manglik.is_manglik ? (
                   <div className="manglik-present">
                     <div className="manglik-explanation">
-                      <h5>🔍 What This Means:</h5>
-                      <p>
-                        {manglik.severity === 'High' ? 
-                          'You have strong Manglik dosha which can create significant conflicts and aggression in marriage. This requires serious attention and proper remedies before marriage.' :
-                          'You have mild Manglik dosha which may cause some initial friction or arguments in marriage. This is manageable with simple remedies.'
-                        }
-                      </p>
+                      <h5>🔍 Classical result</h5>
+                      <p>{manglik.summary}</p>
+                      <p>Reference: {manglik.source?.reference_label || 'Brihat Parashara Hora Shastra 80.47'}</p>
                     </div>
-                    
                     <div className="manglik-effects">
-                      <h5>⚠️ Potential Effects:</h5>
-                      <ul>
-                        <li>Arguments and conflicts with spouse</li>
-                        <li>Aggressive or dominating behavior in marriage</li>
-                        <li>Possible delays in marriage</li>
-                        {manglik.severity === 'High' && <li>Risk of separation if not properly addressed</li>}
-                      </ul>
+                      <h5>Partner comparison</h5>
+                      <p>The single-chart formation remains visible. The separate classical pair rule is applied only after the partner chart is supplied.</p>
                     </div>
-                    
-                    <div className="manglik-remedies">
-                      <h5>🛡️ Remedies:</h5>
-                      <div className="remedies-list">
-                        {manglik.severity === 'High' ? (
-                          <div className="high-manglik-remedies">
-                            <div className="remedy-item critical">
-                              <span className="remedy-icon">👫</span>
-                              <span className="remedy-text">Marry another Manglik person (most effective)</span>
-                            </div>
-                            <div className="remedy-item critical">
-                              <span className="remedy-icon">🏺</span>
-                              <span className="remedy-text">Perform Kumbh Vivah (marriage to a pot/tree) before actual marriage</span>
-                            </div>
-                            <div className="remedy-item critical">
-                              <span className="remedy-icon">🕯️</span>
-                              <span className="remedy-text">Mangal Shanti Puja by qualified priest</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mild-manglik-remedies">
-                            <div className="remedy-item moderate">
-                              <span className="remedy-icon">🙏</span>
-                              <span className="remedy-text">Fast on Tuesdays and recite Hanuman Chalisa</span>
-                            </div>
-                            <div className="remedy-item moderate">
-                              <span className="remedy-icon">🌺</span>
-                              <span className="remedy-text">Offer red flowers to Hanuman ji every Tuesday</span>
-                            </div>
-                            <div className="remedy-item moderate">
-                              <span className="remedy-icon">💎</span>
-                              <span className="remedy-text">Wear red coral (if suitable) after astrological consultation</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {manglik.cancellation?.has_cancellation && (
-                      <div className="manglik-cancellation">
-                        <h5>✨ Good News - Cancellation Present!</h5>
-                        <p>Your chart shows some cancellation factors that reduce the negative effects of Manglik dosha:</p>
-                        <ul>
-                          {manglik.cancellation.factors?.map((factor, index) => (
-                            <li key={index}>{factor}</li>
-                          ))}
-                        </ul>
-                        <p className="cancellation-note">This significantly reduces the severity, but basic remedies are still recommended.</p>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <div className="non-manglik">
                     <div className="non-manglik-benefits">
-                      <h5>✅ Benefits of Non-Manglik Status:</h5>
-                      <ul>
-                        <li>No restrictions on marriage partner selection</li>
-                        <li>Natural harmony and peace in marriage</li>
-                        <li>Less likelihood of conflicts due to Mars energy</li>
-                        <li>Can marry at any suitable time without Mars-related delays</li>
-                      </ul>
-                    </div>
-                    
-                    <div className="non-manglik-advice">
-                      <h5>💡 Advice:</h5>
-                      <p>Since you are non-Manglik, you have more flexibility in marriage partner selection. However, if you're considering a Manglik partner, ensure they perform proper remedies to balance the energy difference.</p>
+                      <h5>✅ Classical result</h5>
+                      <p>{manglik.summary || 'The selected classical condition is not formed.'}</p>
+                      {manglik.individual_exceptions?.applied && (
+                        <p>Benefic relationship to Mars: {(manglik.individual_exceptions.matched_rules || []).map((row) => `${row.planet} ${row.relation}`).join(', ')}.</p>
+                      )}
+                      <p>Reference: {manglik.source?.reference_label || 'Brihat Parashara Hora Shastra 80.47'}</p>
                     </div>
                   </div>
                 )}

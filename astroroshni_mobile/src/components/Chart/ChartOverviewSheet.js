@@ -196,6 +196,8 @@ function ChartOverviewSheet({
                           row.sign_name ? t(`signs.${row.sign_name}`, row.sign_name) : null,
                           row.house != null ? `H${row.house}` : null,
                           prettyDignity(row.dignity),
+                          row.retrograde ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde') : null,
+                          row.combust ? t('premiumUi.planetaryPositions.notes.combustFull', 'Combust') : null,
                         ].filter(Boolean).join(' · ')}
                       </Text>
                       <Text style={[styles.houseLabel, { color: colors.textSecondary }]}>
@@ -263,10 +265,10 @@ function ChartOverviewSheet({
                 >
                   <View style={styles.yogaCtaCopy}>
                     <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 4 }]}>
-                      {t('chartScreen.overview.yogas', 'Yogas')}
+                      {t('premiumUi.yogasDoshas.title', 'Yogas & Doshas')}
                     </Text>
                     <Text style={[styles.body, { color: colors.text }]}>
-                      {t('chartScreen.overview.openYogas', 'Open the full categorized yoga list for this kundli.')}
+                      {t('premiumUi.yogasDoshas.doshaHeroBody', 'Review named classical Yoga and Dosha rules with their exact chart evidence.')}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={22} color={colors.accent} />

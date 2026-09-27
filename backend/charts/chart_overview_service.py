@@ -344,14 +344,14 @@ def _collect_special_marks(
     ) or {}
     for key, label in (
         ("mangal_dosha", "Mangal Dosha"),
-        ("kaal_sarp_dosha", "Kaal Sarp Dosha"),
-        ("pitra_dosha", "Pitra Dosha"),
+        ("kaal_sarp_dosha", "Rahu–Ketu enclosure"),
+        ("pitra_dosha", "Pitṛ-śāpa · progeny"),
     ):
         info = doshas.get(key) or {}
         if info.get("present"):
             chips.append(_special_chip(
                 key,
-                "Dosha",
+                "Modern convention" if key == "kaal_sarp_dosha" else "Classical check",
                 label,
                 "dagdha",
                 title=str(info.get("type") or info.get("description") or label),

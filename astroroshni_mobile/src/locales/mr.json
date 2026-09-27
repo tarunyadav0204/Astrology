@@ -222,7 +222,10 @@
       "vargaEmpty": " · रिकामे",
       "timingNow": "आता",
       "timingNext": "पुढे",
-      "houseMark": " · H{{house}}"
+      "houseMark": " · H{{house}}",
+      "factors": {
+        "pitriShapa": "या कुंडलीतील पूर्ण BPHS पितृ-शाप योग संततीशी संबंधित आहे."
+      }
     }
   },
   "planets": {
@@ -388,7 +391,18 @@
     "close": "बंद करा"
   },
   "authOnboarding": {
-    "welcomeEyebrow": "तुमची वैदिक मार्गदर्शिका", "welcomeHero": "ताराला भेटा.\nतुमचे जीवन वाचा.", "welcomeHeroBody": "पाराशरी, नाडी, जैमिनी आणि केपीच्या संयुक्त अभ्यासातून तुमची संपूर्ण कुंडली स्पष्ट मार्गदर्शनात.", "analysisLayers": "विश्लेषण स्तर", "vedicSystems": "वैदिक पद्धती", "createAccount": "खाते तयार करा", "signIn": "साइन इन", "languageEyebrow": "तुमचे बनवा", "legalPrefix": "पुढे जाऊन तुम्ही आमच्या", "terms": "सेवा अटी", "and": "आणि", "privacy": "गोपनीयता धोरणाशी सहमत आहात",
+    "welcomeEyebrow": "तुमची वैदिक मार्गदर्शिका",
+    "welcomeHero": "ताराला भेटा.\nतुमचे जीवन वाचा.",
+    "welcomeHeroBody": "पाराशरी, नाडी, जैमिनी आणि केपीच्या संयुक्त अभ्यासातून तुमची संपूर्ण कुंडली स्पष्ट मार्गदर्शनात.",
+    "analysisLayers": "विश्लेषण स्तर",
+    "vedicSystems": "वैदिक पद्धती",
+    "createAccount": "खाते तयार करा",
+    "signIn": "साइन इन",
+    "languageEyebrow": "तुमचे बनवा",
+    "legalPrefix": "पुढे जाऊन तुम्ही आमच्या",
+    "terms": "सेवा अटी",
+    "and": "आणि",
+    "privacy": "गोपनीयता धोरणाशी सहमत आहात",
     "chooseLanguageTitle": "आपली भाषा निवडा",
     "chooseLanguageSubtitle": "आम्ही संपूर्ण अॅपमध्ये याचा वापर करू. प्रोफाइलमधून कधीही बदला.",
     "continue": "पुढे जा",
@@ -423,7 +437,21 @@
       "talkToTara": "ताराला बोला",
       "needsMore": "आणखी {{count}} लागतात"
     },
-    "firstPurchaseOffer": {"eyebrow":"मर्यादित वेळेची ऑफर","title":"बोनस क्रेडिट्स अनलॉक","doubleTitle":"डबल क्रेडिट्स अनलॉक","body":"पहिल्या खरेदीत {{credits}} क्रेडिट्स घेतल्यावर {{bonus}} बोनस क्रेडिट्स मिळवा. ही ऑफर पुढील {{minutes}} मिनिटांसाठी वैध आहे.","priceLine":"{{price}} द्या आणि {{credits}} क्रेडिट्स मिळवा","bonusLine":"{{bonus}} बोनस क्रेडिट्स FREE","extraCredits":"अतिरिक्त क्रेडिट्स","bonusCreditsWord":"बोनस क्रेडिट्स","discountWord":"सूट","cta":"बोनस क्रेडिट्स मिळवा","ctaWithPack":"{{price}} मध्ये {{credits}} क्रेडिट्स मिळवा →","continueReading":"वाचन सुरू ठेवा","expiresIn":"{{time}} बाकी"},
+    "firstPurchaseOffer": {
+      "eyebrow": "मर्यादित वेळेची ऑफर",
+      "title": "बोनस क्रेडिट्स अनलॉक",
+      "doubleTitle": "डबल क्रेडिट्स अनलॉक",
+      "body": "पहिल्या खरेदीत {{credits}} क्रेडिट्स घेतल्यावर {{bonus}} बोनस क्रेडिट्स मिळवा. ही ऑफर पुढील {{minutes}} मिनिटांसाठी वैध आहे.",
+      "priceLine": "{{price}} द्या आणि {{credits}} क्रेडिट्स मिळवा",
+      "bonusLine": "{{bonus}} बोनस क्रेडिट्स FREE",
+      "extraCredits": "अतिरिक्त क्रेडिट्स",
+      "bonusCreditsWord": "बोनस क्रेडिट्स",
+      "discountWord": "सूट",
+      "cta": "बोनस क्रेडिट्स मिळवा",
+      "ctaWithPack": "{{price}} मध्ये {{credits}} क्रेडिट्स मिळवा →",
+      "continueReading": "वाचन सुरू ठेवा",
+      "expiresIn": "{{time}} बाकी"
+    },
     "betaNotice": "⚠️ बीटा: टाइमलाइन भाकीत प्रायोगिक आहेत. तर्क आणि विवेक वापरा.",
     "disclaimerNotice": "⚖️ अस्वीकरण: ज्योतिष हे मार्गदर्शनासाठी एक संभाव्य साधन आहे. हे वैद्यकीय, कायदेशीर, आर्थिक किंवा मानसिक आरोग्य सल्ल्यासाठी पर्याय नाही. महत्त्वाच्या निर्णयांसाठी तज्ज्ञांचा सल्ला घ्या.",
     "verified": "AstroRoshni सत्यापित",

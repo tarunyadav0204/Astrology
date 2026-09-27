@@ -222,7 +222,10 @@
       "vargaEmpty": " · vacío",
       "timingNow": "Ahora",
       "timingNext": "Siguiente",
-      "houseMark": " · H{{house}}"
+      "houseMark": " · H{{house}}",
+      "factors": {
+        "pitriShapa": "Una combinación completa de Pitṛ-śāpa del BPHS se refiere a la descendencia en esta carta."
+      }
     }
   },
   "planets": {
@@ -388,7 +391,18 @@
     "close": "Cerrar"
   },
   "authOnboarding": {
-    "welcomeEyebrow": "TU GUÍA VÉDICA", "welcomeHero": "Conoce a Tara.\nLee tu vida.", "welcomeHeroBody": "Tu carta completa, sintetizada mediante Parashari, Nadi, Jaimini y KP, convertida en orientación clara.", "analysisLayers": "capas de análisis", "vedicSystems": "sistemas védicos", "createAccount": "Crear cuenta", "signIn": "Iniciar sesión", "languageEyebrow": "HAZLO TUYO", "legalPrefix": "Al continuar, aceptas nuestros", "terms": "Términos del servicio", "and": "y", "privacy": "Política de privacidad",
+    "welcomeEyebrow": "TU GUÍA VÉDICA",
+    "welcomeHero": "Conoce a Tara.\nLee tu vida.",
+    "welcomeHeroBody": "Tu carta completa, sintetizada mediante Parashari, Nadi, Jaimini y KP, convertida en orientación clara.",
+    "analysisLayers": "capas de análisis",
+    "vedicSystems": "sistemas védicos",
+    "createAccount": "Crear cuenta",
+    "signIn": "Iniciar sesión",
+    "languageEyebrow": "HAZLO TUYO",
+    "legalPrefix": "Al continuar, aceptas nuestros",
+    "terms": "Términos del servicio",
+    "and": "y",
+    "privacy": "Política de privacidad",
     "chooseLanguageTitle": "Elige tu idioma",
     "chooseLanguageSubtitle": "Lo usaremos en toda la app. Puedes cambiarlo cuando quieras en Perfil.",
     "continue": "Continuar",
@@ -423,7 +437,21 @@
       "talkToTara": "Hablar con Tara",
       "needsMore": "Faltan {{count}}"
     },
-    "firstPurchaseOffer": {"eyebrow":"OFERTA POR TIEMPO LIMITADO","title":"CRÉDITOS EXTRA DESBLOQUEADOS","doubleTitle":"CRÉDITOS DOBLES DESBLOQUEADOS","body":"En tu primera compra, recibe {{bonus}} créditos extra al comprar {{credits}} créditos. Esta oferta es válida durante los próximos {{minutes}} minutos.","priceLine":"Paga {{price}} y obtén {{credits}} créditos","bonusLine":"{{bonus}} créditos de bonificación GRATIS","extraCredits":"créditos extra","bonusCreditsWord":"créditos de bonificación","discountWord":"de descuento","cta":"Obtener créditos extra","ctaWithPack":"Obtén {{credits}} créditos por {{price}} →","continueReading":"Seguir leyendo","expiresIn":"Quedan {{time}}"},
+    "firstPurchaseOffer": {
+      "eyebrow": "OFERTA POR TIEMPO LIMITADO",
+      "title": "CRÉDITOS EXTRA DESBLOQUEADOS",
+      "doubleTitle": "CRÉDITOS DOBLES DESBLOQUEADOS",
+      "body": "En tu primera compra, recibe {{bonus}} créditos extra al comprar {{credits}} créditos. Esta oferta es válida durante los próximos {{minutes}} minutos.",
+      "priceLine": "Paga {{price}} y obtén {{credits}} créditos",
+      "bonusLine": "{{bonus}} créditos de bonificación GRATIS",
+      "extraCredits": "créditos extra",
+      "bonusCreditsWord": "créditos de bonificación",
+      "discountWord": "de descuento",
+      "cta": "Obtener créditos extra",
+      "ctaWithPack": "Obtén {{credits}} créditos por {{price}} →",
+      "continueReading": "Seguir leyendo",
+      "expiresIn": "Quedan {{time}}"
+    },
     "betaNotice": "⚠️ BETA: Las predicciones de la línea de tiempo son experimentales. Usa la lógica y discreción.",
     "disclaimerNotice": "⚖️ AVISO LEGAL: La astrología es una herramienta probabilística de guía. No sustituye el consejo médico, legal, financiero o de salud mental. Consulta a profesionales calificados para decisiones importantes.",
     "verified": "AstroRoshni Verificado",

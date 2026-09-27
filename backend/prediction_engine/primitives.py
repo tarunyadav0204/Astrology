@@ -197,18 +197,14 @@ def _transit_states_for_day(
             f"Strict transit calculation failed on {day.isoformat()}"
         ) from exc
 
-    sun_longitude = states["Sun"]["longitude"]
-    thresholds = PlanetaryDignitiesCalculator({}).COMBUSTION_THRESHOLDS
+    from calculators.classical_combustion import calculate_planet_combustion
+
+    sun_state = states["Sun"]
     for planet, state in states.items():
-        threshold = thresholds.get(planet)
-        distance = angular_distance(state["longitude"], sun_longitude)
-        state["sun_distance"] = distance
-        # Parashari profile: proximity inside the classical combustion orb is
-        # combustion. Do not import the Western cazimi exception into this
-        # engine, even though a legacy dignity helper exposes that label.
-        state["combustion"] = (
-            "combust" if threshold is not None and distance <= threshold else "normal"
-        )
+        combustion = calculate_planet_combustion(planet, state, sun_state)
+        state["sun_distance"] = combustion["angular_distance"]
+        state["combustion"] = "combust" if combustion["is_combust"] else "normal"
+        state["combustion_evidence"] = combustion
     return states
 
 

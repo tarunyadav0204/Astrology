@@ -62,7 +62,6 @@ MOOLATRIKONA = {
     "Mercury": (5, 16.0, 20.0), "Jupiter": (8, 0.0, 10.0),
     "Venus": (6, 0.0, 15.0), "Saturn": (10, 0.0, 20.0),
 }
-COMBUSTION_ORBS = {"Mars": 17.0, "Mercury": 14.0, "Jupiter": 11.0, "Venus": 10.0, "Saturn": 15.0}
 NAKSHATRA_LORDS = ("Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury")
 NAKSHATRAS = (
     "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra",
@@ -266,16 +265,16 @@ def _sign_relationship(chart: dict[str, Any], planet: str) -> dict[str, Any]:
 
 
 def _combustion(chart: dict[str, Any], planet: str) -> dict[str, Any]:
-    if planet not in COMBUSTION_ORBS:
-        return {"is_combust": False, "distance_from_sun": None, "orb": None}
-    sun, value = _longitude(chart, "Sun"), _longitude(chart, planet)
-    if sun is None or value is None:
-        return {"is_combust": False, "distance_from_sun": None, "orb": COMBUSTION_ORBS[planet]}
-    orb = COMBUSTION_ORBS[planet]
-    if bool(_planet(chart, planet).get("retrograde")) and planet in {"Mercury", "Venus"}:
-        orb -= 2.0
-    distance = _angular_distance(sun, value)
-    return {"is_combust": distance <= orb, "distance_from_sun": round(distance, 4), "orb": orb}
+    from calculators.classical_combustion import calculate_planet_combustion
+
+    row = calculate_planet_combustion(planet, _planet(chart, planet), _planet(chart, "Sun"))
+    return {
+        **row,
+        # Preserve the established health contract while exposing the full
+        # canonical evidence under the additive keys above.
+        "distance_from_sun": row["angular_distance"],
+        "orb": row["threshold"],
+    }
 
 
 def _natural_nature(chart: dict[str, Any], planet: str) -> str:
@@ -354,16 +353,17 @@ def _afflictions(chart: dict[str, Any], planet: str) -> list[str]:
 def _neecha_bhanga_factors(chart: dict[str, Any], planet: str) -> list[str]:
     if _dignity(chart, planet) != "debilitated":
         return []
-    deb_sign = DEBILITATION_SIGNS[planet]
-    dispositor = SIGN_LORDS[deb_sign]
-    moon_house = _house(chart, "Moon")
+    from calculators.classical_neecha_bhanga import calculate_classical_neecha_bhanga
+
+    result = calculate_classical_neecha_bhanga(chart).get(planet) or {}
     factors: list[str] = []
-    for reference, reference_house in (("Lagna", 1), ("Moon", moon_house)):
-        disp_house = _house(chart, dispositor)
-        if reference_house and disp_house and ((disp_house - reference_house) % 12) + 1 in KENDRAS:
-            factors.append(f"dispositor {dispositor} is in a Kendra from {reference}")
-    if dispositor in _residents(chart, _house(chart, planet) or 0):
-        factors.append(f"joined by debilitation-sign lord {dispositor}")
+    for condition in result.get("conditions_met") or []:
+        description = str(condition.get("description") or "")
+        # Preserve the familiar dispositor wording used in existing health
+        # evidence while attaching the exact classical citation.
+        if "lord of" in description.lower() and result.get("debilitation_sign_lord") in description:
+            description = f"dispositor {result['debilitation_sign_lord']}: {description}"
+        factors.append(f"{description} ({condition['reference']})")
     return list(dict.fromkeys(factors))
 
 

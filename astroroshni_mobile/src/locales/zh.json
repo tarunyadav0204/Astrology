@@ -222,7 +222,10 @@
       "vargaEmpty": " · 空",
       "timingNow": "现在",
       "timingNext": "接下来",
-      "houseMark": " · H{{house}}"
+      "houseMark": " · H{{house}}",
+      "factors": {
+        "pitriShapa": "此命盘中的完整《BPHS》父系诅咒组合涉及子嗣。"
+      }
     }
   },
   "planets": {
@@ -388,7 +391,18 @@
     "close": "关闭"
   },
   "authOnboarding": {
-    "welcomeEyebrow": "你的吠陀指南", "welcomeHero": "认识 Tara。\n读懂你的人生。", "welcomeHeroBody": "通过帕拉沙里、纳迪、杰米尼和 KP 综合解读完整命盘，并转化为清晰指引。", "analysisLayers": "分析层", "vedicSystems": "吠陀体系", "createAccount": "创建账户", "signIn": "登录", "languageEyebrow": "打造你的体验", "legalPrefix": "继续即表示你同意我们的", "terms": "服务条款", "and": "和", "privacy": "隐私政策",
+    "welcomeEyebrow": "你的吠陀指南",
+    "welcomeHero": "认识 Tara。\n读懂你的人生。",
+    "welcomeHeroBody": "通过帕拉沙里、纳迪、杰米尼和 KP 综合解读完整命盘，并转化为清晰指引。",
+    "analysisLayers": "分析层",
+    "vedicSystems": "吠陀体系",
+    "createAccount": "创建账户",
+    "signIn": "登录",
+    "languageEyebrow": "打造你的体验",
+    "legalPrefix": "继续即表示你同意我们的",
+    "terms": "服务条款",
+    "and": "和",
+    "privacy": "隐私政策",
     "chooseLanguageTitle": "选择您的语言",
     "chooseLanguageSubtitle": "我们将在整个应用中使用此设置。您可以随时在「个人资料」中更改。",
     "continue": "继续",
@@ -423,7 +437,21 @@
       "talkToTara": "与 Tara 通话",
       "needsMore": "还差 {{count}}"
     },
-    "firstPurchaseOffer": {"eyebrow":"限时优惠","title":"赠送积分已解锁","doubleTitle":"双倍积分已解锁","body":"首次购买时，购买{{credits}}积分即可获得{{bonus}}赠送积分。本优惠还剩{{minutes}}分钟有效。","priceLine":"支付{{price}}即可获得{{credits}}积分","bonusLine":"{{bonus}}赠送积分 FREE","extraCredits":"额外积分","bonusCreditsWord":"赠送积分","discountWord":"折扣","cta":"领取赠送积分","ctaWithPack":"以{{price}}领取{{credits}}积分 →","continueReading":"继续阅读","expiresIn":"剩余 {{time}}"},
+    "firstPurchaseOffer": {
+      "eyebrow": "限时优惠",
+      "title": "赠送积分已解锁",
+      "doubleTitle": "双倍积分已解锁",
+      "body": "首次购买时，购买{{credits}}积分即可获得{{bonus}}赠送积分。本优惠还剩{{minutes}}分钟有效。",
+      "priceLine": "支付{{price}}即可获得{{credits}}积分",
+      "bonusLine": "{{bonus}}赠送积分 FREE",
+      "extraCredits": "额外积分",
+      "bonusCreditsWord": "赠送积分",
+      "discountWord": "折扣",
+      "cta": "领取赠送积分",
+      "ctaWithPack": "以{{price}}领取{{credits}}积分 →",
+      "continueReading": "继续阅读",
+      "expiresIn": "剩余 {{time}}"
+    },
     "betaNotice": "⚠️ 测试版：时间线预测仅供参考。请运用逻辑和判断。",
     "disclaimerNotice": "⚖️ 免责声明：占星学是一种概率性的引导工具。它不能替代医疗、法律、财务或心理健康建议。重大决定请咨询专业人士。",
     "verified": "AstroRoshni 已认证",

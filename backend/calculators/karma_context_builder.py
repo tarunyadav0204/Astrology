@@ -11,6 +11,7 @@ from .mrityu_bhaga_calculator import MrityuBhagaCalculator
 from .vargottama_calculator import VargottamaCalculator
 from .nadi_linkage_calculator import NadiLinkageCalculator
 from .nakshatra_calculator import NakshatraCalculator
+from .classical_pitri_shapa import calculate_classical_pitri_shapa
 
 class KarmaContextBuilder:
     """Comprehensive Past Life Karma and Soul Mission Analysis"""
@@ -696,28 +697,21 @@ class KarmaContextBuilder:
         }
     
     def _analyze_pitru_dosha(self) -> Dict:
-        """Pitru Dosha - ancestral/paternal karma"""
-        planets = self.chart_data.get('planets', {})
-        sun = planets.get('Sun', {})
-        rahu = planets.get('Rahu', {})
-        saturn = planets.get('Saturn', {})
-        gulika = planets.get('Gulika', {})
-        
-        has_pitru = (
-            sun.get('house') == rahu.get('house') or
-            sun.get('house') == saturn.get('house') or
-            (sun.get('house') == 9 and (rahu.get('house') == 9 or saturn.get('house') == 9))
-        )
-        
-        gulika_affliction = gulika.get('house') in [2, 9]
-        
+        """Compatibility wrapper around the canonical BPHS Pitṛ-śāpa result."""
+        result = calculate_classical_pitri_shapa(self.chart_data)
         return {
-            "has_ancestral_debt": has_pitru or gulika_affliction,
-            "type": "Pitru Dosha (Paternal)" if has_pitru else "No Pitru Dosha",
-            "gulika_factor": "Gulika in 2nd/9th confirms family curses" if gulika_affliction else "No Gulika affliction",
-            "indication": "Sun afflicted by Rahu/Saturn" if has_pitru else "Ancestral blessings strong",
-            "remedy": "Tarpana for ancestors, feed Brahmins, donate on Amavasya" if has_pitru or gulika_affliction else "Continue ancestral worship",
-            "karmic_meaning": "Unresolved obligations to father's lineage" if has_pitru or gulika_affliction else "Paternal blessings active"
+            **result,
+            # Legacy keys remain available, but no broad ancestral-debt claim is made.
+            "has_ancestral_debt": False,
+            "pitri_shapa_present": result.get("present", False),
+            "type": result.get("display_name"),
+            "gulika_factor": "Gulika is not part of the selected BPHS 83.20-30 rules.",
+            "indication": result.get("summary"),
+            "remedy": (
+                "BPHS 83.31-32 gives Gayā Śrāddha, feeding Brahmins, kanyādāna and godāna after a complete match."
+                if result.get("present") else "No remedy is inferred because no complete classical combination matches."
+            ),
+            "karmic_meaning": "The cited chapter limits this result to progeny; broader ancestral effects are not inferred.",
         }
     
     def _analyze_matru_dosha(self) -> Dict:

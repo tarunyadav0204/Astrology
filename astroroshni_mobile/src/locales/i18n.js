@@ -33,6 +33,7 @@ import copyAlert from './copy-alert.json';
 import partnershipExit from './partnership-exit.json';
 import themeDiscovery from './theme-discovery.json';
 import planetaryPositions from './planetary-positions.json';
+import planetResultDelivery from './planet-result-delivery.json';
 import firstPurchaseStarter from './first-purchase-starter.json';
 import instantChatPacing from './instant-chat-pacing.json';
 import instantBilling from './instant-billing.json';
@@ -43,6 +44,8 @@ import eventTimelineSample from './event-timeline-sample.json';
 import healthBlueprint from './health-blueprint.json';
 import professionalAnalysis from './professional-analysis.json';
 import nakshatraCalendar from './nakshatra-calendar.json';
+import pitriShapaInfo from './pitri-shapa-info.json';
+import mangalDoshaInfo from './mangal-dosha-info.json';
 
 const INSTANT_MODE_ACTION_COPY = Object.freeze({
   english: 'Mode',
@@ -175,6 +178,9 @@ const normalizedPremiumUi = Object.fromEntries(
         houseAreas: houseLifeAreas[language] || houseLifeAreas.english,
       },
       homeNextPeak: homeNextPeak[language] || homeNextPeak.english,
+      pitriShapaInfo: pitriShapaInfo[language] || pitriShapaInfo.english,
+      mangalDoshaInfo: mangalDoshaInfo[language] || mangalDoshaInfo.english,
+      planetResultDelivery: planetResultDelivery[language] || planetResultDelivery.english,
     },
   ]),
 );

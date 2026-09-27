@@ -23,7 +23,7 @@ import NorthIndianChart, { dashaPaint } from './NorthIndianChart';
 import SouthIndianChart from './SouthIndianChart';
 import ChartDrawingLayer from './ChartDrawingLayer';
 import { NADI_PLANETS, lagnaRoleLords } from './chartAspects';
-import { isMooltrikona, isVargottama } from '../../utils/positionTables';
+import { combustSet, isMooltrikona, isVargottama } from '../../utils/positionTables';
 import DateNavigator from '../Common/DateNavigator';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -813,6 +813,13 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     const dashaHighlight = showDashaHighlight && currentChartType !== 'transit' && dashaLords
       ? dashaLords
       : null;
+    // Combustion is an astronomical D1 condition, so divisional charts retain
+    // the natal result instead of recalculating it from divided longitudes.
+    // A transit chart uses the selected date's transit Sun and planets.
+    const combustionSource = type === 'transit'
+      ? data
+      : (lagnaChartData || chartDataCacheRef.current.lagna || chartData || data);
+    const combustPlanets = combustSet(combustionSource);
     const lagnaSign = rotatedAscendant != null ? rotatedAscendant : data?.houses?.[0]?.sign;
     const roleLords = lagnaRoleLords(lagnaSign);
     const planetRoles = {};
@@ -858,6 +865,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         aspectMode={aspectMode}
         aspectFocus={aspectFocus}
         planetRoles={planetRoles}
+        combustPlanets={combustPlanets}
         {...sizeProp}
       />
     ) : (
@@ -880,10 +888,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         aspectMode={aspectMode}
         aspectFocus={aspectFocus}
         planetRoles={planetRoles}
+        combustPlanets={combustPlanets}
         {...sizeProp}
       />
     );
-  }, [chartStyle, birthData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType, signPoints, bavBySign, handleTransitPlanetPress, drawingMode, aspectMode, aspectFocus, showBadhaka, showMaraka, showVargottama, showMooltrikona, t]);
+  }, [chartStyle, birthData, chartData, lagnaChartData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType, signPoints, bavBySign, handleTransitPlanetPress, drawingMode, aspectMode, aspectFocus, showBadhaka, showMaraka, showVargottama, showMooltrikona, t]);
 
   const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
     const iconColor = primary ? colors.onPrimary : (active ? colors.onAccent : colors.text);
@@ -1388,14 +1397,17 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
               onPress={() => {
                 const cd = getChartData();
                 if (cd?.planets && birthData) {
-                  navigation?.navigate('PlanetaryPositions', { chartData: cd, birthData });
+                  const conditionChartData = currentChartType === 'transit'
+                    ? cd
+                    : (lagnaChartData || chartDataCacheRef.current.lagna || chartData || cd);
+                  navigation?.navigate('PlanetaryPositions', { chartData: cd, conditionChartData, birthData });
                 }
               }}
             />
             {currentChartType === 'lagna' && (
               <QuickActionButton
                 icon="body-outline"
-                label={t('chartScreen.yogas', 'Yogas')}
+                label={t('premiumUi.yogasDoshas.title', 'Yogas & Doshas')}
                 onPress={() => navigation?.navigate('Yogas')}
               />
             )}
@@ -1467,7 +1479,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                   • {t('chartScreen.legendSigns', 'The small number inside each diamond is the zodiac sign number (1–12), not the house number.')}{'\n'}
                   • {t('chartScreen.legendPlanets', 'Planet symbols show where each planet sits in the chart.')}{'\n'}
                   • {t('chartScreen.legendRetro', '(R) after a planet means it is retrograde.')}{'\n'}
+                  • {t('premiumUi.planetaryPositions.chartLegendCombust', '(C) after a planet means it is combust, within its classical orb from the Sun.')}{'\n'}
                   • {t('chartScreen.legendExaltDebil', '↑ and ↓ indicate exalted or debilitated planets.')}{'\n'}
+                  • {t('premiumUi.planetaryPositions.chartLegendNeechaBhanga', '(NB) means the planet meets a classical Neecha Bhanga condition. Open Yogas for the exact rule.')}{'\n'}
                   • {t('chartScreen.legendNakshatra', 'Turn on the eye icon to see exact degrees and nakshatra names under each planet.')}
                 </Text>
               </ScrollView>

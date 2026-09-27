@@ -254,8 +254,8 @@ const KundliMatchingPage = ({
             <article>
               <h3>Manglik compatibility</h3>
               <p>
-                Instead of treating Manglik as a simple yes/no fear label, the match checks severity and pair-level balance
-                so the result is more useful for real relationship decisions.
+                The report shows the exact BPHS placement and benefic condition for each chart, then applies the separate
+                classical pair-balancing rule without inventing severity levels or points.
               </p>
             </article>
             <article>

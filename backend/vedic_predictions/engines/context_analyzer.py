@@ -90,28 +90,16 @@ class ContextAnalyzer(BasePredictionEngine):
         
         return 'neutral_sign'
     
-    def _check_combustion(self, planet, planet_longitude, sun_longitude):
-        """Check if planet is combust or cazimi"""
-        from ..config.combustion import COMBUSTION_THRESHOLDS, CAZIMI_THRESHOLD, CAZIMI_CAPABLE
-        
-        if planet == 'Sun' or planet not in COMBUSTION_THRESHOLDS:
-            return 'normal'
-        
-        # Calculate angular distance
-        distance = abs(planet_longitude - sun_longitude)
-        if distance > 180:
-            distance = 360 - distance
-        
-        # Check cazimi first (within 1 degree for Mercury/Venus)
-        if distance <= CAZIMI_THRESHOLD and planet in CAZIMI_CAPABLE:
-            return 'cazimi'
-        
-        # Check combustion
-        threshold = COMBUSTION_THRESHOLDS[planet]
-        if distance <= threshold:
-            return 'combust'
-        
-        return 'normal'
+    def _check_combustion(self, planet, planet_longitude, sun_longitude, retrograde=False):
+        """Compatibility status backed by the canonical Parashari service."""
+        from calculators.classical_combustion import calculate_planet_combustion
+
+        row = calculate_planet_combustion(
+            planet,
+            {"longitude": planet_longitude, "retrograde": retrograde},
+            {"longitude": sun_longitude},
+        )
+        return "combust" if row["is_combust"] else "normal"
     
     def _check_retrograde_status(self, planet, planet_data):
         """Check retrograde status and motion type"""
@@ -321,7 +309,8 @@ class ContextAnalyzer(BasePredictionEngine):
                     sun_longitude = planets['Sun'].get('longitude', 0)
                     trans_longitude = trans_data.get('longitude', 0)
                     transiting_combustion = self._check_combustion(
-                        enhanced['transiting_planet'], trans_longitude, sun_longitude
+                        enhanced['transiting_planet'], trans_longitude, sun_longitude,
+                        bool(trans_data.get('retrograde')),
                     )
                 
                 # Check retrograde status for transiting planet
@@ -347,7 +336,8 @@ class ContextAnalyzer(BasePredictionEngine):
                 sun_longitude = planets['Sun'].get('longitude', 0)
                 natal_longitude = natal_data.get('longitude', 0)
                 natal_combustion = self._check_combustion(
-                    enhanced['natal_planet'], natal_longitude, sun_longitude
+                    enhanced['natal_planet'], natal_longitude, sun_longitude,
+                    bool(natal_data.get('retrograde')),
                 )
                 
                 # Check retrograde status for natal planet

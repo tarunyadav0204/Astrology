@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from calculators.ashtakavarga import AshtakavargaCalculator
 from calculators.chart_calculator import ChartCalculator
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
+from calculators.classical_neecha_bhanga import calculate_classical_neecha_bhanga
 from calculators.house_analyzer import HouseAnalyzer
 from calculators.transit_calculator import TransitCalculator
 from calculators.yoga_calculator import YogaCalculator
@@ -319,18 +320,20 @@ def _prioritize_factors(factors: List[Dict[str, str]], limit: Optional[int] = No
         "occupant_nakshatra": 0,
         "occupant_friendship": 1,
         "dignity": 2,
-        "placement": 3,
-        "occupant": 4,
-        "ashtakavarga": 5,
-        "special": 6,
-        "special_house": 7,
-        "gandanta": 8,
-        "aspect": 9,
-        "yoga": 10,
-        "strength": 11,
-        "dasha": 12,
-        "transit": 13,
-        "dosha": 14,
+        "neecha_bhanga": 3,
+        "combustion": 4,
+        "placement": 5,
+        "occupant": 6,
+        "ashtakavarga": 7,
+        "special": 8,
+        "special_house": 9,
+        "gandanta": 10,
+        "aspect": 11,
+        "yoga": 12,
+        "strength": 13,
+        "dasha": 14,
+        "transit": 15,
+        "dosha": 16,
     }
     ordered = sorted(
         factors,
@@ -403,6 +406,15 @@ def _collect_house_factors(
     avayogi_overlap = bool(
         (yogi_data.get("avayogi_tithi_shunya_overlap") or {}).get("is_active")
     )
+    neecha_bhanga_results = (
+        calculate_classical_neecha_bhanga(chart_data) if chart_id == "lagna" else {}
+    )
+    lord_neecha_bhanga = bool(
+        (neecha_bhanga_results.get(lord) or {}).get("neecha_bhanga_present")
+    )
+    lord_combust = bool(
+        (lord_analysis.get("combustion_status") or {}).get("is_combust")
+    )
 
     def append_avayogi_factor(
         planet: str,
@@ -443,6 +455,19 @@ def _collect_house_factors(
         support.append(_factor(f"{lord} is {lord_dignity.replace('_', ' ')}.", "good", "dignity"))
     elif lord_dignity in {"debilitated", "unfavorable"}:
         stress.append(_factor(f"{lord} is {lord_dignity.replace('_', ' ')}.", "warn", "dignity"))
+
+    if lord_neecha_bhanga:
+        support.append(_factor(
+            f"{lord}, the house lord, has Neecha Bhanga; this specifically mitigates its debilitation.",
+            "good",
+            "neecha_bhanga",
+        ))
+    if lord_combust:
+        stress.append(_factor(
+            f"{lord}, the house lord, is combust, reducing how freely it can support this house.",
+            "warn",
+            "combustion",
+        ))
 
     if "Kendra" in lord_house_types:
         support.append(_factor(f"{lord}, the house lord, sits in a kendra.", "good", "placement"))
@@ -548,6 +573,12 @@ def _collect_house_factors(
         resident_sign_lord = analyzer.get_sign_lord(resident_sign) if resident_sign is not None else None
         resident_nakshatra_lord = _nakshatra_lord_from_longitude(resident_longitude)
         resident_friendship = planet_analysis.get("friendship_analysis", {}).get("friendship_matrix", {})
+        resident_combust = bool(
+            (planet_analysis.get("combustion_status") or {}).get("is_combust")
+        )
+        resident_neecha_bhanga = bool(
+            (neecha_bhanga_results.get(planet) or {}).get("neecha_bhanga_present")
+        )
         added_specific_support = False
         added_specific_stress = False
         occupant_roles.setdefault(planet, [])
@@ -634,6 +665,21 @@ def _collect_house_factors(
         elif planet in MALEFICS and not added_specific_stress:
             stress.append(_factor(f"{planet} occupies this house and adds pressure to its matters.", "warn", "occupant"))
 
+        # The house lord is already described above. Avoid counting the same
+        # planetary condition twice when it also occupies the selected house.
+        if planet != lord and resident_neecha_bhanga:
+            support.append(_factor(
+                f"{planet} has Neecha Bhanga, mitigating its debilitation while it occupies this house.",
+                "good",
+                "neecha_bhanga",
+            ))
+        if planet != lord and resident_combust:
+            stress.append(_factor(
+                f"{planet} is combust, so its contribution to this house is under pressure.",
+                "warn",
+                "combustion",
+            ))
+
         if resident_retrograde:
             if dignity in {"debilitated", "unfavorable"} or planet in MALEFICS:
                 stress.append(_factor(f"{planet} is retrograde here, making its results more irregular or delayed.", "warn", "retrograde"))
@@ -646,6 +692,9 @@ def _collect_house_factors(
         aspect_planet_analysis = aspect.get("planet_analysis", {}) or {}
         aspect_house = aspect_planet_analysis.get("basic_info", {}).get("house")
         aspect_dignity = aspect_planet_analysis.get("dignity_analysis", {}).get("dignity", "neutral")
+        aspect_neecha_bhanga = bool(
+            (neecha_bhanga_results.get(planet) or {}).get("neecha_bhanga_present")
+        )
         aspect_retrograde = (
             planet not in NODE_PLANETS
             and aspect_planet_analysis.get("retrograde_analysis", {}).get("is_retrograde", False)
@@ -672,7 +721,7 @@ def _collect_house_factors(
             or aspect_special.get("is_dagdha_lord")
             or aspect_special.get("is_badhaka_lord")
             or sits_in_dusthana
-            or aspect_dignity in {"debilitated", "unfavorable"}
+            or (aspect_dignity in {"debilitated", "unfavorable"} and not aspect_neecha_bhanga)
             or (aspect_retrograde and (planet in MALEFICS or rules_dusthana))
             or (rules_dusthana and not rules_trikona)
         ):
@@ -703,6 +752,13 @@ def _collect_house_factors(
                 support.append(_factor(f"{planet} is retrograde while aspecting this house, so its influence is more inward and reconsidering than direct.", "good", "retrograde"))
         else:
             stress.append(_factor(f"{planet} aspects this house with pressure.", "warn", "aspect"))
+
+        if aspect_neecha_bhanga and planet != lord:
+            support.append(_factor(
+                f"{planet} has Neecha Bhanga, so debilitation alone does not weaken its aspect to this house.",
+                "good",
+                "neecha_bhanga",
+            ))
 
     house_strength = analysis.get("overall_house_assessment", {})
     classical_grade = house_strength.get("classical_grade")
@@ -791,16 +847,20 @@ def _collect_house_factors(
 
         major_doshas = all_yogas.get("major_doshas", {})
         mangal_dosha = major_doshas.get("mangal_dosha", {})
-        if mangal_dosha.get("present") and house_num in {1, 2, 4, 7, 8, 12}:
-            stress.append(_factor("Mangal Dosha is impacting this house axis.", "warn", "dosha"))
-
-        kaal_sarp = major_doshas.get("kaal_sarp_dosha", {})
-        if kaal_sarp.get("present"):
-            stress.append(_factor("Kaal Sarp Dosha adds pressure to the chart pattern here.", "warn", "dosha"))
+        if mangal_dosha.get("present") and house_num == mangal_dosha.get("mars_house_lagna"):
+            stress.append(_factor(
+                f"Mars forms the selected Mangal Dosha reading from House {house_num}.",
+                "warn",
+                "dosha",
+            ))
 
         pitra_dosha = major_doshas.get("pitra_dosha", {})
-        if pitra_dosha.get("present") and house_num == 9:
-            stress.append(_factor("Pitra Dosha is directly affecting ninth-house themes.", "warn", "dosha"))
+        if pitra_dosha.get("present") and house_num == 5:
+            stress.append(_factor(
+                "A complete BPHS Pitri-shapa combination concerns progeny in this chart.",
+                "warn",
+                "dosha",
+            ))
     except Exception:
         pass
 
@@ -905,6 +965,9 @@ def _collect_house_factors(
         if ashtakavarga_summary.get("sav") is None and sav_givers.get("total") is not None:
             ashtakavarga_summary["sav"] = {"house_points": sav_givers.get("total")}
 
+    classical_neecha_bhanga = (
+        calculate_classical_neecha_bhanga(chart_data) if chart_id == "lagna" else {}
+    )
     return {
         "house_num": house_num,
         "chart_id": chart_id,
@@ -925,6 +988,15 @@ def _collect_house_factors(
         "points_in_house": worksheets.get("points_in_house") or [],
         "chara_karakas_here": worksheets.get("chara_karakas_here") or [],
         "natural_karakas": worksheets.get("natural_karakas") or [],
+        "planet_conditions": {
+            planet: {
+                "neecha_bhanga": bool(row.get("neecha_bhanga_present")),
+                "conditions": row.get("conditions_met") or [],
+                "source": row.get("source"),
+            }
+            for planet, row in classical_neecha_bhanga.items()
+            if row.get("neecha_bhanga_present")
+        },
         "related_varga": worksheets.get("related_varga"),
         "sav_givers": sav_givers,
         "timing": worksheets.get("timing") or {},

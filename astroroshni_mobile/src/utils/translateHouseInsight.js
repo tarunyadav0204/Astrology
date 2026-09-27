@@ -135,6 +135,27 @@ export function translateHouseInsightFactor(t, label) {
 
   let m;
 
+  m = text.match(new RegExp(`^(${PLANET_RE}), the house lord, has Neecha Bhanga; this specifically mitigates its debilitation\\.$`));
+  if (m) {
+    return t('premiumUi.chart.factorLordNeechaBhanga', { planet: tp(t, m[1]), defaultValue: text });
+  }
+  m = text.match(new RegExp(`^(${PLANET_RE}), the house lord, is combust, reducing how freely it can support this house\\.$`));
+  if (m) {
+    return t('premiumUi.chart.factorLordCombust', { planet: tp(t, m[1]), defaultValue: text });
+  }
+  m = text.match(new RegExp(`^(${PLANET_RE}) has Neecha Bhanga, mitigating its debilitation while it occupies this house\\.$`));
+  if (m) {
+    return t('premiumUi.chart.factorOccupantNeechaBhanga', { planet: tp(t, m[1]), defaultValue: text });
+  }
+  m = text.match(new RegExp(`^(${PLANET_RE}) is combust, so its contribution to this house is under pressure\\.$`));
+  if (m) {
+    return t('premiumUi.chart.factorOccupantCombust', { planet: tp(t, m[1]), defaultValue: text });
+  }
+  m = text.match(new RegExp(`^(${PLANET_RE}) has Neecha Bhanga, so debilitation alone does not weaken its aspect to this house\\.$`));
+  if (m) {
+    return t('premiumUi.chart.factorAspectNeechaBhanga', { planet: tp(t, m[1]), defaultValue: text });
+  }
+
   m = text.match(new RegExp(`^(${PLANET_RE}) is (.+)\\.$`));
   if (m && DIGNITY_KEYS[m[2]]) {
     return t('chartScreen.houseDrawer.factors.planetIsDignity', {
@@ -237,11 +258,8 @@ export function translateHouseInsightFactor(t, label) {
   if (text === 'Mangal Dosha is impacting this house axis.') {
     return t('chartScreen.houseDrawer.factors.mangalDosha', 'Mangal Dosha is impacting this house axis.');
   }
-  if (text === 'Kaal Sarp Dosha adds pressure to the chart pattern here.') {
-    return t('chartScreen.houseDrawer.factors.kaalSarp', 'Kaal Sarp Dosha adds pressure to the chart pattern here.');
-  }
-  if (text === 'Pitra Dosha is directly affecting ninth-house themes.') {
-    return t('chartScreen.houseDrawer.factors.pitraDosha', 'Pitra Dosha is directly affecting ninth-house themes.');
+  if (text === 'A complete BPHS Pitri-shapa combination concerns progeny in this chart.') {
+    return t('chartScreen.houseDrawer.factors.pitriShapa', 'A complete BPHS Pitri-shapa combination concerns progeny in this chart.');
   }
   if (text === 'Overall house assessment comes through as Uttama.') {
     return t('chartScreen.houseDrawer.factors.uttama', 'Overall house assessment comes through as Uttama.');

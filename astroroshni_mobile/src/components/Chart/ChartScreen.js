@@ -1711,6 +1711,10 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       {selectedHouse.planets && selectedHouse.planets.length > 0 ? (
                         selectedHouse.planets.map((planet, idx) => {
                           const roles = houseInsight?.raw?.occupant_roles?.[planet.name] || [];
+                          const classicalCondition = houseInsight?.planet_conditions?.[planet.name];
+                          const hasNeechaBhanga = Boolean(
+                            planet.neecha_bhanga || classicalCondition?.neecha_bhanga
+                          );
                           const showRetrograde = planet.retrograde && planet.name !== 'Rahu' && planet.name !== 'Ketu';
                           return (
                           <View key={idx} style={styles.planetRow}>
@@ -1732,6 +1736,23 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                                     <Text style={[styles.retrogradeChipText, { color: colors.text }]}>
                                       {t('chartScreen.houseDrawer.retrograde', 'Retrograde')}
                                     </Text>
+                                  </View>
+                                )}
+                                {planet.combust && (
+                                  <View
+                                    style={[
+                                      styles.retrogradeChip,
+                                      { backgroundColor: withAlpha(colors.warning, '28') },
+                                    ]}
+                                  >
+                                    <Text style={[styles.retrogradeChipText, { color: colors.text }]}>
+                                      {t('chartScreen.houseDrawer.combust', 'Combust')}
+                                    </Text>
+                                  </View>
+                                )}
+                                {hasNeechaBhanga && (
+                                  <View style={[styles.retrogradeChip, { backgroundColor: withAlpha(colors.success, '28') }]}>
+                                    <Text style={[styles.retrogradeChipText, { color: colors.text }]}>{t('premiumUi.chart.neechaBhangaShort')}</Text>
                                   </View>
                                 )}
                                 {roles.map((role) => (
@@ -1762,6 +1783,32 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                                   ? ` · ${t('chartScreen.houseDrawer.pada', { pada: planet.pada, defaultValue: 'Pada {{pada}}' })}`
                                   : ''}
                               </Text>
+                              {hasNeechaBhanga ? (
+                                <View style={[styles.sheetStat, nestedCard]}>
+                                  <Text style={[styles.sheetStatLabel, { color: colors.success }]}>
+                                    {t('premiumUi.chart.neechaBhanga')}
+                                  </Text>
+                                  <Text style={[styles.planetDetails, { color: colors.text }]}>
+                                    {t('premiumUi.chart.neechaBhangaExplanation', {
+                                      planet: t(`home.planet_names.${planet.name}`, planet.name),
+                                    })}
+                                  </Text>
+                                  <Text style={[styles.sheetFoot, { color: colors.textSecondary }]}>
+                                    {classicalCondition?.source?.reference_label || 'Phaladeepika 7.26–30'}
+                                  </Text>
+                                  <TouchableOpacity
+                                    onPress={() => {
+                                      setSelectedHouse(null);
+                                      navigation.navigate('Yogas');
+                                    }}
+                                    accessibilityRole="button"
+                                  >
+                                    <Text style={[styles.sheetFoot, { color: colors.primary, fontWeight: '700' }]}>
+                                      {t('premiumUi.chart.viewNeechaBhangaRule')}
+                                    </Text>
+                                  </TouchableOpacity>
+                                </View>
+                              ) : null}
                             </View>
                           </View>
                           );
@@ -1846,10 +1893,19 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                                   <Text style={[styles.sheetChipText, { color: colors.text }]}>{t('chartScreen.houseDrawer.combust', 'Combust')}</Text>
                                 </View>
                               ) : null}
+                              {houseInsight.lord_worksheet.neecha_bhanga ? (
+                                <View style={[styles.sheetChip, { backgroundColor: withAlpha(colors.success, '22') }]}>
+                                  <Text style={[styles.sheetChipText, { color: colors.text }]}>
+                                    {t('premiumUi.chart.neechaBhanga')}
+                                  </Text>
+                                </View>
+                              ) : null}
                               {houseInsight.lord_worksheet.meets_minimum != null ? (
                                 <View style={[styles.sheetChip, { backgroundColor: withAlpha(houseInsight.lord_worksheet.meets_minimum ? colors.success : colors.error, '22') }]}>
                                   <Text style={[styles.sheetChipText, { color: colors.text }]}>
-                                    {houseInsight.lord_worksheet.meets_minimum ? 'Meets requirement' : 'Below requirement'}
+                                    {houseInsight.lord_worksheet.meets_minimum
+                                      ? t('premiumUi.chart.shadbalaAboveMinimum')
+                                      : t('premiumUi.chart.shadbalaBelowMinimum')}
                                   </Text>
                                 </View>
                               ) : null}
@@ -1863,6 +1919,40 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                                     {` / ${houseInsight.lord_worksheet.required_rupas ?? '—'} rupas`}
                                   </Text>
                                 </Text>
+                              </View>
+                            ) : null}
+                            {houseInsight.lord_worksheet.shadbala_rupas != null ? (
+                              <Text style={[styles.sheetFoot, { color: colors.textSecondary }]}>
+                                {t('premiumUi.chart.shadbalaMinimumExplanation')}
+                              </Text>
+                            ) : null}
+                            {houseInsight.lord_worksheet.neecha_bhanga ? (
+                              <View style={[styles.sheetStat, nestedCard]}>
+                                <Text style={[styles.sheetStatLabel, { color: colors.success }]}>
+                                  {t('premiumUi.chart.neechaBhanga')}
+                                </Text>
+                                <Text style={[styles.planetDetails, { color: colors.text }]}>
+                                  {t('premiumUi.chart.neechaBhangaExplanation', {
+                                    planet: t(
+                                      `home.planet_names.${houseInsight.lord_worksheet.planet}`,
+                                      houseInsight.lord_worksheet.planet,
+                                    ),
+                                  })}
+                                </Text>
+                                <Text style={[styles.sheetFoot, { color: colors.textSecondary }]}>
+                                  {houseInsight.lord_worksheet.neecha_bhanga_source?.reference_label || 'Phaladeepika 7.26–30'}
+                                </Text>
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    setSelectedHouse(null);
+                                    navigation.navigate('Yogas');
+                                  }}
+                                  accessibilityRole="button"
+                                >
+                                  <Text style={[styles.sheetFoot, { color: colors.primary, fontWeight: '700' }]}>
+                                    {t('premiumUi.chart.viewNeechaBhangaRule')}
+                                  </Text>
+                                </TouchableOpacity>
                               </View>
                             ) : null}
                             {(houseInsight.lord_worksheet.other_lordships || []).length ? (

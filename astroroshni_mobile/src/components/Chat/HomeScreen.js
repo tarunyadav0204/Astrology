@@ -1903,7 +1903,7 @@ const loadHomeData = async (nativeData = null) => {
       },
       {
         key: 'yogas',
-        title: t('menu.yogas', 'Yogas'),
+        title: t('premiumUi.yogasDoshas.title', 'Yogas & Doshas'),
         accent: '#DB2777',
         tint: isLightSurface ? 'rgba(219, 39, 119, 0.12)' : 'rgba(236, 72, 153, 0.12)',
         border: 'rgba(219, 39, 119, 0.28)',

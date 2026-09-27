@@ -79,7 +79,9 @@ BENCHMARK_CASES: List[Dict[str, Any]] = [
         "id": "both_manglik_balanced",
         "rule_profile": "balanced_modern",
         "boy_chart": _chart(0.0, 45.0, mars_long=180.0),
-        "girl_chart": _chart(30.0, 75.0, mars_long=210.0),
+        # Venus is kept away from a conjunction or full aspect to Mars so the
+        # complete BPHS 80.47 condition forms in both charts.
+        "girl_chart": _chart(30.0, 75.0, mars_long=210.0, venus_long=75.0),
         "expects": {
             "manglik_status": "Compatible",
             "pair_cancellation": True,

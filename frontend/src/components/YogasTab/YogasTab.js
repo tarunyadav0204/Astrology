@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { apiService } from '../../services/apiService';
 
 const YogasTab = ({ chartData, birthData }) => {
   const [yogas, setYogas] = useState([]);
   const [selectedYoga, setSelectedYoga] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [canonicalDoshas, setCanonicalDoshas] = useState(null);
 
   // Common data used across multiple yoga checks (0-indexed signs)
   const exaltationSigns = { 'Sun': 0, 'Moon': 1, 'Mars': 9, 'Mercury': 5, 'Jupiter': 3, 'Venus': 11, 'Saturn': 6 };
@@ -11,10 +13,26 @@ const YogasTab = ({ chartData, birthData }) => {
   const ownSigns = { 'Sun': [4], 'Moon': [3], 'Mars': [0, 7], 'Mercury': [2, 5], 'Jupiter': [8, 11], 'Venus': [1, 6], 'Saturn': [9, 10] };
 
   useEffect(() => {
+    let cancelled = false;
+    if (!birthData?.date || !birthData?.time) {
+      setCanonicalDoshas(null);
+      return undefined;
+    }
+    apiService.getYogas(birthData)
+      .then((data) => {
+        if (!cancelled) setCanonicalDoshas((data?.yogas || data)?.major_doshas || null);
+      })
+      .catch(() => {
+        if (!cancelled) setCanonicalDoshas(null);
+      });
+    return () => { cancelled = true; };
+  }, [birthData]);
+
+  useEffect(() => {
     if (chartData && birthData) {
       calculateYogas();
     }
-  }, [chartData, birthData]);
+  }, [chartData, birthData, canonicalDoshas]);
 
   const calculateYogas = () => {
     setLoading(true);
@@ -176,37 +194,6 @@ const YogasTab = ({ chartData, birthData }) => {
       }
     });
 
-    // Kala Sarpa Dosha - All planets between Rahu and Ketu
-    if (planets.Rahu && planets.Ketu) {
-      const rahuSign = planets.Rahu.sign;
-      const ketuSign = planets.Ketu.sign;
-      
-      const allPlanetsBetween = mainPlanets.every(planet => {
-        if (!planets[planet]) return true;
-        const planetSign = planets[planet].sign;
-        
-        // Check if planet is between Rahu and Ketu
-        if (rahuSign < ketuSign) {
-          return planetSign > rahuSign && planetSign < ketuSign;
-        } else {
-          return planetSign > rahuSign || planetSign < ketuSign;
-        }
-      });
-      
-      if (allPlanetsBetween) {
-        detectedYogas.push({
-          name: 'Kala Sarpa Dosha',
-          type: 'Dosha',
-          strength: 'Negative',
-          description: 'All planets are hemmed between Rahu and Ketu.',
-          effects: 'Obstacles, delays, struggles in life, but can give spiritual growth and ultimate success.',
-          planets: ['Rahu', 'Ketu'],
-          houses: [rahuSign, ketuSign],
-          remedies: 'Rahu-Ketu remedies, Sarpa Dosha puja, charity, and spiritual practices.'
-        });
-      }
-    }
-
     // Kemadrum Yoga - Moon isolated
     if (planets.Moon) {
       const moonSign = planets.Moon.sign;
@@ -237,6 +224,37 @@ const YogasTab = ({ chartData, birthData }) => {
           remedies: 'Strengthen Moon through pearl gemstone, Moon mantras, and Monday fasting.'
         });
       }
+    }
+
+    const nodal = canonicalDoshas?.kaal_sarp_dosha;
+    if (nodal) {
+      detectedYogas.push({
+        name: 'Rahu–Ketu nodal enclosure',
+        type: 'Modern convention',
+        strength: nodal.status === 'complete' ? 'Complete enclosure' : nodal.status === 'boundary' ? 'Boundary case' : 'Not formed',
+        description: nodal.summary,
+        effects: nodal.source?.textual_note,
+        planets: ['Rahu', 'Ketu'],
+        houses: [],
+      });
+    }
+
+    const pitri = canonicalDoshas?.pitra_dosha;
+    if (pitri) {
+      const matchedVerses = (pitri.matched_rules || []).map((rule) => rule.reference).join(', ');
+      detectedYogas.push({
+        name: 'Pitṛ-śāpa · progeny',
+        type: 'Classical check',
+        strength: pitri.status === 'formed' ? 'Formed' : pitri.status === 'unavailable' ? 'Unavailable' : 'Not formed',
+        description: pitri.summary,
+        effects: [
+          matchedVerses,
+          pitri.source?.reference_label,
+          pitri.source?.textual_note,
+        ].filter(Boolean).join('. '),
+        planets: pitri.planets || [],
+        houses: pitri.present ? [5] : [],
+      });
     }
 
     setYogas(detectedYogas);

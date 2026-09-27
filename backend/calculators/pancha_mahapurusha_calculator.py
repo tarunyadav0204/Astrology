@@ -160,15 +160,15 @@ class PanchaMahapurushaCalculator:
         # Check if planet is in favorable nakshatra
         # This would require nakshatra calculation - placeholder for now
         
-        # Check if planet is not combust (too close to Sun)
+        # Check combustion through the canonical Parashari service.
         planets = self.chart_data.get('planets', {})
-        sun_data = planets.get('Sun', {})
-        sun_position = sun_data.get('longitude', 0)
-        distance_from_sun = abs(planet_position - sun_position)
-        if distance_from_sun > 180:
-            distance_from_sun = 360 - distance_from_sun
-        
-        if distance_from_sun > 8:  # Not combust
+        from .classical_combustion import calculate_planet_combustion
+        combustion = calculate_planet_combustion(
+            planet,
+            planets.get(planet) or {"longitude": planet_position},
+            planets.get('Sun') or {},
+        )
+        if combustion['applicable'] and not combustion['is_combust']:
             factors.append('Not combust (+1)')
             total_strength += 1
         

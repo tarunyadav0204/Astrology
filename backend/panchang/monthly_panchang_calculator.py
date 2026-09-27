@@ -447,14 +447,6 @@ class MonthlyPanchangCalculator:
                 # Check if retrograde (negative speed)
                 is_retrograde = planet_speed < 0
                 
-                # Check combustion (within 8 degrees of Sun, except Moon)
-                is_combust = False
-                if sun_longitude is not None and planet_name != 'Sun' and planet_name != 'Moon':
-                    angular_distance = abs(planet_pos - sun_longitude)
-                    if angular_distance > 180:
-                        angular_distance = 360 - angular_distance
-                    is_combust = angular_distance < 8
-                
                 planetary_data[planet_name] = {
                     'sign': signs[sign_num],
                     'sign_number': sign_num,
@@ -462,7 +454,7 @@ class MonthlyPanchangCalculator:
                     'longitude': round(planet_pos, 2),
                     'speed': round(planet_speed, 4),
                     'is_retrograde': is_retrograde,
-                    'is_combust': is_combust
+                    'is_combust': False
                 }
                 
             except Exception as e:
@@ -476,15 +468,20 @@ class MonthlyPanchangCalculator:
                     'is_combust': False
                 }
         
-        # Second pass to calculate combustion for all planets now that we have Sun's position
+        # Second pass uses the same classical service as natal charts, chat,
+        # reports, health and prediction clients.
         if sun_longitude is not None:
-            for planet_name in planetary_data:
-                if planet_name != 'Sun' and planet_name != 'Moon':
-                    planet_pos = planetary_data[planet_name]['longitude']
-                    angular_distance = abs(planet_pos - sun_longitude)
-                    if angular_distance > 180:
-                        angular_distance = 360 - angular_distance
-                    planetary_data[planet_name]['is_combust'] = angular_distance < 8
+            from calculators.classical_combustion import calculate_planet_combustion
+
+            sun_data = {"longitude": sun_longitude, "retrograde": False}
+            for planet_name, row in planetary_data.items():
+                evidence = calculate_planet_combustion(
+                    planet_name,
+                    {"longitude": row['longitude'], "retrograde": row['is_retrograde']},
+                    sun_data,
+                )
+                row['is_combust'] = evidence['is_combust']
+                row['combustion'] = evidence
         
         return planetary_data
 

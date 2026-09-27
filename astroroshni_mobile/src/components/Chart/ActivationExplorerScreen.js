@@ -20,6 +20,7 @@ import { storage } from '../../services/storage';
 import NorthIndianChart from './NorthIndianChart';
 import EventFocusPanel from './EventFocusPanel';
 import DoubleTransitPanel from './DoubleTransitPanel';
+import { combustSet } from '../../utils/positionTables';
 
 const HOUSE_LABELS = {
   1: 'Self, body and direction', 2: 'Savings, family, speech and face/mouth',
@@ -491,6 +492,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
               <View style={[styles.activationChart, { borderColor: ui.border, backgroundColor: ui.surfaceMuted }]}>
                 <NorthIndianChart
                   chartData={d1ChartData}
+                  combustPlanets={combustSet(d1ChartData)}
                   birthData={birthData}
                   cosmicTheme
                   hideInstructions

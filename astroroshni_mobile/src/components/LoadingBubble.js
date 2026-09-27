@@ -6,6 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { stopAnimatedValue, stopAnimationLoop } from '../utils/safeAnimated';
 import { DISPLAY_FONT_FAMILY } from '../theme/tokens';
+import { combustSet } from '../utils/positionTables';
 
 const PLANET_NAMES = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'];
 
@@ -294,6 +295,7 @@ const LoadingBubble = ({
                         <Animated.View style={[styles.chartContainer, { opacity: fadeAnim, borderColor: colors.cosmicLine, backgroundColor: colors.cosmicSurface }]}>
                             <NorthIndianChart 
                                 chartData={chartData}
+                                combustPlanets={combustSet(chartData)}
                                 showDegreeNakshatra={false}
                                 highlightHouse={insightHouse}
                                 highlightColor={colors.accent}

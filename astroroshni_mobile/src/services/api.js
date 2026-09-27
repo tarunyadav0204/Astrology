@@ -194,10 +194,20 @@ async function tryDirectPaymentGetThenFallback(path, fallbackFn) {
 }
 
 // ---- Transparent client-side caching (charts) ----
-const CHART_ONLY_CACHE_VERSION = 3;
+// Bump whenever the additive chart display contract changes. Version 6 makes
+// canonical Neecha Bhanga and combustion evidence mandatory for display caches.
+const CHART_ONLY_CACHE_VERSION = 7;
 const CHART_ONLY_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const chartOnlyInFlight = new Map(); // storageKey -> Promise
 const chartOnlyMemory = new Map(); // storageKey -> { expiresAt, data }
+
+const hasCurrentChartDisplayContract = (data) => Boolean(
+  data
+  && typeof data === 'object'
+  && data.planets
+  && Object.prototype.hasOwnProperty.call(data, 'neecha_bhanga')
+  && Object.prototype.hasOwnProperty.call(data, 'combustion')
+);
 
 const normalizeChartOnlyBirthDataKey = (birthData) => {
   // Prefer the unique birth chart id when available.
@@ -710,9 +720,14 @@ export const chartAPI = {
     const storageKey = `chart_only_cache:v${CHART_ONLY_CACHE_VERSION}:${cacheKey}`;
 
     const mem = chartOnlyMemory.get(storageKey);
-    if (mem && mem.expiresAt > Date.now() && mem.data) {
+    if (
+      mem
+      && mem.expiresAt > Date.now()
+      && hasCurrentChartDisplayContract(mem.data)
+    ) {
       return Promise.resolve({ data: mem.data, status: 200 });
     }
+    if (mem) chartOnlyMemory.delete(storageKey);
 
     const existingPromise = chartOnlyInFlight.get(storageKey);
     if (existingPromise) return existingPromise;
@@ -723,10 +738,14 @@ export const chartAPI = {
         const cached = await AsyncStorage.getItem(storageKey);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed?.expiresAt > Date.now() && parsed?.data) {
+          if (
+            parsed?.expiresAt > Date.now()
+            && hasCurrentChartDisplayContract(parsed?.data)
+          ) {
             chartOnlyMemory.set(storageKey, { expiresAt: parsed.expiresAt, data: parsed.data });
             return { data: parsed.data, status: 200 };
           }
+          await AsyncStorage.removeItem(storageKey);
         }
       } catch (_) {
         // ignore cache errors
@@ -739,7 +758,7 @@ export const chartAPI = {
       try {
         const expiresAt = Date.now() + CHART_ONLY_CACHE_TTL_MS;
         const chartData = response?.data;
-        if (chartData) {
+        if (hasCurrentChartDisplayContract(chartData)) {
           chartOnlyMemory.set(storageKey, { expiresAt, data: chartData });
           await AsyncStorage.setItem(storageKey, JSON.stringify({ expiresAt, data: chartData }));
         }

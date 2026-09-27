@@ -11,7 +11,7 @@ import { buildHouseRows, buildNakshatraRows, buildPlanetRows } from '../../utils
 const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const { chartData, birthData } = route.params || {};
+  const { chartData, birthData, conditionChartData } = route.params || {};
   React.useEffect(() => {
     if (!birthData?.name) {
       navigation.replace('BirthProfileIntro', { returnTo: 'PlanetaryPositions' });
@@ -63,13 +63,13 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     setLagnasLoading(true);
     try {
       const { chartAPI } = require('../../services/api');
-      
+
       if (!karakas?.Atmakaraka?.planet) {
         console.error('Atmakaraka not available, cannot load Jaimini lagnas');
         setLagnasLoading(false);
         return;
       }
-      
+
       const atmakaraka = karakas.Atmakaraka.planet;
       const d9Chart = route.params?.d9Chart || {};
       const response = await chartAPI.calculateJaiminiLagnas(chartData, d9Chart, atmakaraka);
@@ -108,17 +108,20 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   };
 
   const planetRows = React.useMemo(
-    () => buildPlanetRows(chartData, karakas),
-    [chartData, karakas],
+    () => buildPlanetRows(chartData, karakas, conditionChartData || chartData),
+    [chartData, conditionChartData, karakas],
   );
-  const houseRows = React.useMemo(() => buildHouseRows(chartData), [chartData]);
+  const houseRows = React.useMemo(
+    () => buildHouseRows(chartData, conditionChartData || chartData),
+    [chartData, conditionChartData],
+  );
   const nakshatraRows = React.useMemo(() => buildNakshatraRows(planetRows), [planetRows]);
 
   if (!birthData?.name) return null;
 
-  const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
+  const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
                       'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
-  
+
   const rashiIcons = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
 
   const planetEmojis = {
@@ -261,13 +264,59 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     return fallback || '—';
   };
 
+  const dignityText = (dignity) => {
+    if (!dignity) return t('premiumUi.planetaryPositions.dignities.notGraded', 'Not classically graded');
+    return t(
+      `premiumUi.planetaryPositions.dignities.${dignity.labelKey || 'notGraded'}`,
+      dignity.label || 'Not classically graded',
+    );
+  };
+
+  const relationshipText = (relationship) => {
+    if (!relationship) return '—';
+    return t(
+      `premiumUi.planetaryPositions.relationships.${relationship.labelKey || 'traditionDependent'}`,
+      relationship.label || 'Tradition-dependent',
+    );
+  };
+
+  const relationshipColor = (relationship) => {
+    if (relationship?.key === 'friend' || relationship?.key === 'self') return colors.success;
+    if (relationship?.key === 'enemy') return colors.error;
+    return colors.textSecondary;
+  };
+
+  const combustionEvidenceText = (combustion) => {
+    if (!combustion?.applicable || !Number.isFinite(Number(combustion.distance))) return null;
+    const motion = combustion.motion === 'retrograde'
+      ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde')
+      : t('premiumUi.planetaryPositions.direct', 'Direct');
+    const status = combustion.isCombust
+      ? t('premiumUi.planetaryPositions.notes.combustFull', 'Combust')
+      : t('premiumUi.planetaryPositions.clearOfCombustion', 'Clear');
+    return t(
+      'premiumUi.planetaryPositions.combustionEvidence',
+      '{{distance}}° from Sun · {{threshold}}° limit · {{motion}} · {{status}}',
+      {
+        distance: Number(combustion.distance).toFixed(2),
+        threshold: Number(combustion.threshold).toFixed(0),
+        motion,
+        status,
+      },
+    );
+  };
+
   const PlanetCard = ({ planet }) => {
     const row = planetRows.find((item) => item.name === planet.name);
+    const delivery = (
+      conditionChartData?.planet_result_delivery?.planets?.[planet.name]
+      || chartData?.planet_result_delivery?.planets?.[planet.name]
+    );
     const retrograde = !!(planet.retrograde && planet.name !== 'Rahu' && planet.name !== 'Ketu');
     const notes = [];
     if (row?.combust) notes.push(t('premiumUi.planetaryPositions.notes.combustFull', 'Combust'));
+    if (row?.neechaBhanga) notes.push(t('premiumUi.planetaryPositions.notes.neechaBhangaFull', 'Neecha Bhanga'));
     if (row?.vargottama) notes.push(t('premiumUi.planetaryPositions.notes.vargottamaFull', 'Vargottama'));
-    if (row?.dignity?.label) notes.push(row.dignity.label);
     const karaka = karakaNameFor(planet.name);
     return (
       <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
@@ -303,10 +352,40 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
               <Text style={[styles.detailValue, { color: colors.text }]}>{rashiNames[planet.sign] || row?.signName}</Text>
             </View>
           </View>
+          {combustionEvidenceText(row?.combustion) ? (
+            <View style={styles.detailItemFull}>
+              <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.solarDistance', 'Solar distance')}</Text>
+              <Text style={[
+                styles.detailValue,
+                styles.detailValueWide,
+                { color: row?.combustion?.isCombust ? colors.error : colors.textSecondary },
+              ]}>
+                {combustionEvidenceText(row.combustion)}
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.detailItem}>
             <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.degree', 'Degree')}</Text>
             <Text style={[styles.detailValue, { color: colors.text }]}>{degreeText(planet.degree, row?.degree)}</Text>
           </View>
+          <View style={styles.detailItemFull}>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.dignity', 'Dignity')}</Text>
+            <Text style={[
+              styles.detailValue,
+              styles.detailValueWide,
+              { color: row?.dignity?.key === 'db' || row?.dignity?.key === 'enemy' ? colors.error : colors.text },
+            ]}>
+              {dignityText(row?.dignity)}
+            </Text>
+          </View>
+          {row?.lord ? (
+            <View style={styles.detailItemFull}>
+              <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.rashiLord', 'Rashi lord')}</Text>
+              <Text style={[styles.detailValue, styles.detailValueWide, { color: colors.text }]}>
+                {row.lord} · <Text style={{ color: relationshipColor(row.signLordRelationship) }}>{relationshipText(row.signLordRelationship)}</Text>
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.detailItemFull}>
             <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.nakshatra', 'Nakshatra')}</Text>
             <Text style={[styles.detailValue, styles.detailValueWide, { color: colors.text }]}>
@@ -314,9 +393,11 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
             </Text>
           </View>
           {row?.nakLord ? (
-            <View style={styles.detailItem}>
+            <View style={styles.detailItemFull}>
               <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.nakshatraLord', 'Nakshatra lord')}</Text>
-              <Text style={[styles.detailValue, { color: colors.text }]}>{row.nakLord}</Text>
+              <Text style={[styles.detailValue, styles.detailValueWide, { color: colors.text }]}>
+                {row.nakLord} · <Text style={{ color: relationshipColor(row.nakLordRelationship) }}>{relationshipText(row.nakLordRelationship)}</Text>
+              </Text>
             </View>
           ) : null}
           {karaka ? (
@@ -326,6 +407,86 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
             </View>
           ) : null}
         </View>
+        {delivery?.relevant ? (
+          <View style={[styles.deliveryCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+            <View style={styles.deliveryTitleRow}>
+              <Ionicons name="navigate-circle-outline" size={19} color={colors.primaryStrong} />
+              <Text style={[styles.deliveryTitle, { color: colors.text }]}>
+                {t('premiumUi.planetResultDelivery.title', 'Where this planet can deliver results')}
+              </Text>
+            </View>
+
+            {delivery.conditions?.neecha_bhanga ? (
+              <Text style={[styles.deliveryExplanation, { color: colors.textSecondary }]}>
+                {t('premiumUi.planetResultDelivery.neechaBhanga')}
+              </Text>
+            ) : delivery.conditions?.debilitated ? (
+              <Text style={[styles.deliveryExplanation, { color: colors.textSecondary }]}>
+                {t('premiumUi.planetResultDelivery.debilitated')}
+              </Text>
+            ) : null}
+            {delivery.conditions?.retrograde ? (
+              <Text style={[styles.deliveryExplanation, { color: colors.textSecondary }]}>
+                {t('premiumUi.planetResultDelivery.retrograde')}
+              </Text>
+            ) : null}
+            {delivery.conditions?.combust ? (
+              <Text style={[styles.deliveryExplanation, { color: colors.textSecondary }]}>
+                {t('premiumUi.planetResultDelivery.combust')}
+              </Text>
+            ) : null}
+
+            <Text style={[styles.deliverySectionLabel, { color: colors.primaryStrong }]}>
+              {t('premiumUi.planetResultDelivery.houseChannels', 'House channels')}
+            </Text>
+            <View style={styles.deliveryChannels}>
+              {(delivery.channels || []).map((channel) => {
+                const roleLabels = (channel.roles || []).map((role) => {
+                  if (role !== 'aspected') return t(`premiumUi.planetResultDelivery.${role}`, role);
+                  const aspects = (channel.aspect_numbers || []).map((number) => (
+                    t('premiumUi.planetResultDelivery.aspect', '{{number}}th aspect', { number })
+                  ));
+                  return aspects.length ? aspects.join(', ') : t('premiumUi.planetResultDelivery.aspected', 'Aspects');
+                });
+                return (
+                  <View key={`${planet.name}-delivery-${channel.house}`} style={[styles.deliveryChannel, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceRaised }]}>
+                    <View style={[styles.deliveryHouseBadge, { backgroundColor: colors.selectionSurface }]}>
+                      <Text style={[styles.deliveryHouseBadgeText, { color: colors.selectionText }]}>H{channel.house}</Text>
+                    </View>
+                    <View style={styles.deliveryChannelCopy}>
+                      <Text style={[styles.deliveryHouseArea, { color: colors.text }]}>
+                        {t(`premiumUi.home.houseAreas.${channel.house}`, `House ${channel.house}`)}
+                      </Text>
+                      <Text style={[styles.deliveryRoles, { color: colors.textSecondary }]}>{roleLabels.join(' · ')}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+            <Text style={[styles.deliverySectionLabel, { color: colors.primaryStrong }]}>
+              {t('premiumUi.planetResultDelivery.timingTitle', 'When this matters')}
+            </Text>
+            <Text style={[styles.deliveryExplanation, { color: colors.textSecondary }]}>
+              {t('premiumUi.planetResultDelivery.timing')}
+            </Text>
+            <Text style={[styles.deliveryBoundary, { color: colors.textSecondary, borderTopColor: colors.cardBorder }]}>
+              {t('premiumUi.planetResultDelivery.boundary')}
+            </Text>
+          </View>
+        ) : null}
+        {row?.neechaBhanga ? (
+          <TouchableOpacity
+            style={[styles.yogaLink, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}
+            onPress={() => navigation.navigate('Yogas')}
+            accessibilityRole="button"
+          >
+            <Ionicons name="library-outline" size={16} color={colors.selectionText} />
+            <Text style={[styles.yogaLinkText, { color: colors.selectionText }]}>
+              {t('premiumUi.planetaryPositions.openNeechaBhanga', 'See the classical Neecha Bhanga rule')}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.selectionText} />
+          </TouchableOpacity>
+        ) : null}
       </View>
     );
   };
@@ -333,11 +494,13 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const HouseCard = ({ row }) => {
     const people = row.occupantList || [];
     const occupantText = people.length
-      ? people.map((person) => (
-        person.retro
-          ? `${person.name} (${t('premiumUi.planetaryPositions.retrograde', 'Retrograde')})`
-          : person.name
-      )).join(', ')
+      ? people.map((person) => {
+        const states = [
+          person.retro ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde') : null,
+          person.combust ? t('premiumUi.planetaryPositions.notes.combustFull', 'Combust') : null,
+        ].filter(Boolean);
+        return states.length ? `${person.name} (${states.join(', ')})` : person.name;
+      }).join(', ')
       : t('premiumUi.planetaryPositions.none', 'None');
     const lordText = row.lordHouse === '—'
       ? row.lord
@@ -350,9 +513,14 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
               <Text style={[styles.planetName, { color: colors.text }]}>
                 {t('premiumUi.planetaryPositions.house', 'House {{number}}', { number: row.house })}
               </Text>
-              {row.dignity?.label ? (
-                <Text style={[styles.lagnaDescription, { color: row.dignity.key === 'db' ? colors.error : colors.success }]}>
-                  {row.dignity.label}
+              {row.dignity ? (
+                <Text style={[styles.lagnaDescription, { color: row.dignity.key === 'db' || row.dignity.key === 'enemy' ? colors.error : colors.textSecondary }]}>
+                  {dignityText(row.dignity)}
+                </Text>
+              ) : null}
+              {row.lordCombust ? (
+                <Text style={[styles.lagnaDescription, { color: colors.warning }]}>
+                  {t('premiumUi.planetaryPositions.notes.combustFull', 'Combust')}
                 </Text>
               ) : null}
             </View>
@@ -385,7 +553,8 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     const occupantText = people.map((person) => {
       const pada = t('premiumUi.planetaryPositions.pada', 'Pada {{number}}', { number: person.pada });
       const retro = person.retro ? ` (${t('premiumUi.planetaryPositions.retrograde', 'Retrograde')})` : '';
-      return `${person.name} · ${pada}${retro}`;
+      const combust = person.combust ? ` (${t('premiumUi.planetaryPositions.notes.combustFull', 'Combust')})` : '';
+      return `${person.name} · ${pada}${retro}${combust}`;
     }).join(', ');
     return (
       <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
@@ -461,7 +630,20 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const renderTabContent = () => {
     if (activeTab === 'planets') {
       if (!planetsPayload || planets.length === 0) return chartUnavailable;
-      return planets.map((planet) => <PlanetCard key={planet.name} planet={planet} />);
+      return (
+        <View>
+          <View style={[styles.methodNote, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+            <Ionicons name="book-outline" size={17} color={colors.primary} />
+            <Text style={[styles.methodNoteText, { color: colors.textSecondary }]}>
+              {t(
+                'premiumUi.planetaryPositions.combustionReference',
+                'Combustion: BPHS 7.28–29; direct/retrograde limits from R. Santhanam, Vol. I, pp. 99–100.',
+              )}
+            </Text>
+          </View>
+          {planets.map((planet) => <PlanetCard key={planet.name} planet={planet} />)}
+        </View>
+      );
     }
 
     if (activeTab === 'houses') {
@@ -795,6 +977,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
+  yogaLink: { marginTop: 14, borderWidth: 1, borderRadius: 13, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  yogaLinkText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  deliveryCard: { marginTop: 14, borderWidth: 1, borderRadius: 15, padding: 13 },
+  deliveryTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 7 },
+  deliveryTitle: { flex: 1, fontFamily: DISPLAY_FONT_FAMILY, fontSize: 17, lineHeight: 21 },
+  deliveryExplanation: { fontSize: 12, lineHeight: 18, fontWeight: '500', marginBottom: 7 },
+  deliverySectionLabel: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 1, marginTop: 5, marginBottom: 7, textTransform: 'uppercase' },
+  deliveryChannels: { gap: 7 },
+  deliveryChannel: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 9, gap: 9 },
+  deliveryHouseBadge: { minWidth: 38, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 7 },
+  deliveryHouseBadgeText: { fontSize: 12, fontWeight: '900' },
+  deliveryChannelCopy: { flex: 1 },
+  deliveryHouseArea: { fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  deliveryRoles: { fontSize: 10, lineHeight: 14, fontWeight: '600', marginTop: 2 },
+  deliveryBoundary: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 9, marginTop: 3, fontSize: 10, lineHeight: 15, fontStyle: 'italic' },
+  methodNote: { marginBottom: 12, borderWidth: 1, borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
+  methodNoteText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' },
   lagnaDescription: {
     fontSize: 11,
     marginTop: 2,
@@ -844,7 +1043,7 @@ const styles = StyleSheet.create({
   rashiIcon: {
     fontSize: 16,
   },
-  
+
   // Karakas Grid
   karakasGrid: {
     flexDirection: 'row',

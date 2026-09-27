@@ -7,7 +7,8 @@ from vedic_predictions.config.planetary_dignity import (
 from vedic_predictions.config.functional_nature import (
     FUNCTIONAL_BENEFICS, FUNCTIONAL_MALEFICS, FUNCTIONAL_NEUTRALS
 )
-from vedic_predictions.config.combustion import COMBUSTION_THRESHOLDS, CAZIMI_THRESHOLD, CAZIMI_CAPABLE
+from calculators.classical_combustion import calculate_planet_combustion
+from calculators.planetary_dignities_calculator import PlanetaryDignitiesCalculator
 # Retrograde status is already available in chart data
 
 router = APIRouter()
@@ -25,64 +26,19 @@ async def calculate_planetary_dignities(request: Dict[str, Any]):
     """Calculate comprehensive planetary dignities and states"""
     try:
         chart_data = request.get('chart_data', {})
-        birth_data = request.get('birth_data', {})
-        
         if not chart_data or not chart_data.get('planets'):
             raise HTTPException(status_code=400, detail="Chart data with planets required")
-        
-        planets = chart_data['planets']
+
         ascendant_sign = int(chart_data.get('ascendant', 0) / 30)
-        
-        dignities = {}
-        
-        for planet_name, planet_data in planets.items():
-            if planet_name in ['Gulika', 'Mandi']:
-                continue
-                
-            planet_sign = planet_data.get('sign', 0)
-            planet_degree = planet_data.get('degree', 0)
-            planet_longitude = planet_data.get('longitude', 0)
-            is_retrograde = planet_data.get('retrograde', False)
-            
-            dignity_info = {
-                'planet': planet_name,
-                'sign': planet_sign,
-                'degree': round(planet_degree, 2),
-                'dignity': 'neutral',
-                'functional_nature': 'neutral',
-                'combustion_status': 'normal',
-                'retrograde': is_retrograde,
-                'strength_multiplier': 1.0,
-                'states': []
-            }
-            
-            # Calculate dignity
-            dignity_info['dignity'] = _calculate_dignity(planet_name, planet_sign, planet_degree)
-            
-            # Calculate functional nature based on ascendant
-            dignity_info['functional_nature'] = _calculate_functional_nature(planet_name, ascendant_sign)
-            
-            # Calculate combustion status
-            if planet_name != 'Sun' and 'Sun' in planets:
-                sun_longitude = planets['Sun'].get('longitude', 0)
-                dignity_info['combustion_status'] = _calculate_combustion(planet_name, planet_longitude, sun_longitude)
-            
-            # Calculate strength multiplier with breakdown
-            strength_result = _calculate_strength_multiplier_with_breakdown(dignity_info)
-            dignity_info['strength_multiplier'] = strength_result['final_multiplier']
-            dignity_info['strength_breakdown'] = strength_result['breakdown']
-            
-            # Compile states
-            dignity_info['states'] = _compile_states(dignity_info)
-            
-            dignities[planet_name] = dignity_info
-        
+        dignities = PlanetaryDignitiesCalculator(chart_data).calculate_planetary_dignities()
         return {
             "dignities": dignities,
             "ascendant_sign": ascendant_sign,
             "summary": _generate_summary(dignities)
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to calculate dignities: {str(e)}")
 
@@ -154,27 +110,14 @@ def _calculate_functional_nature(planet, ascendant_sign):
     else:
         return 'neutral'
 
-def _calculate_combustion(planet, planet_longitude, sun_longitude):
+def _calculate_combustion(planet, planet_longitude, sun_longitude, retrograde=False):
     """Calculate combustion status"""
-    if planet not in COMBUSTION_THRESHOLDS:
-        return 'normal'
-    
-    # Calculate angular distance
-    angular_distance = abs(planet_longitude - sun_longitude)
-    if angular_distance > 180:
-        angular_distance = 360 - angular_distance
-    
-    threshold = COMBUSTION_THRESHOLDS[planet]
-    
-    # Check cazimi (heart of Sun)
-    if planet in CAZIMI_CAPABLE and angular_distance <= CAZIMI_THRESHOLD:
-        return 'cazimi'
-    
-    # Check combustion
-    if angular_distance <= threshold:
-        return 'combust'
-    
-    return 'normal'
+    row = calculate_planet_combustion(
+        planet,
+        {"longitude": planet_longitude, "retrograde": retrograde},
+        {"longitude": sun_longitude},
+    )
+    return "combust" if row["is_combust"] else "normal"
 
 def _calculate_strength_multiplier(dignity_info):
     """Calculate overall strength multiplier (legacy function)"""
@@ -211,10 +154,7 @@ def _calculate_strength_multiplier_with_breakdown(dignity_info):
     multiplier *= functional_mult
     
     # Combustion multiplier
-    combustion_multipliers = {
-        'cazimi': 1.8,
-        'combust': 0.3
-    }
+    combustion_multipliers = {}
     combustion_mult = combustion_multipliers.get(dignity_info['combustion_status'], 1.0)
     if combustion_mult != 1.0:
         breakdown.append(f"Combustion ({dignity_info['combustion_status'].title()}): {combustion_mult}x")

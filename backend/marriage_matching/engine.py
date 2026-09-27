@@ -113,7 +113,6 @@ class KundliMatchingEngine:
     ) -> Dict[str, Any]:
         pair_manglik = self.manglik.compatibility(boy_manglik, girl_manglik)
         kuta_pct = float(kuta["effective_percentage"])
-        manglik_pct = float(pair_manglik["score"]) * 10.0
         d1_d9_avg = (
             boy_profile["seventh_house"]["d1_strength"]["score"] * 0.25
             + boy_profile["seventh_house"]["d9_strength"]["score"] * 0.15
@@ -121,13 +120,12 @@ class KundliMatchingEngine:
             + girl_profile["seventh_house"]["d9_strength"]["score"] * 0.15
         )
         overall = round(
-            (kuta_pct * 0.45)
-            + (manglik_pct * 0.2)
-            + (d1_d9_avg * 0.2)
-            + (cross["score"] * 0.15),
+            (kuta_pct * 0.5625)
+            + (d1_d9_avg * 0.25)
+            + (cross["score"] * 0.1875),
             1,
         )
-        if kuta["effective_critical_issues"] and not pair_manglik["pair_cancellation"]:
+        if kuta["effective_critical_issues"]:
             overall = round(max(0.0, overall - 5.0), 1)
         grade = (
             "Excellent" if overall >= 85 else
@@ -140,10 +138,12 @@ class KundliMatchingEngine:
             "percentage": overall,
             "grade": grade,
             "components": {
-                "ashtakoota": round(kuta_pct * 0.45, 1),
-                "manglik": round(manglik_pct * 0.2, 1),
-                "marriage_support_d1_d9": round(d1_d9_avg * 0.2, 1),
-                "cross_chart_chemistry": round(cross["score"] * 0.15, 1),
+                "ashtakoota": round(kuta_pct * 0.5625, 1),
+                "manglik": 0.0,
+                "manglik_scored": False,
+                "manglik_note": "The classical pair rule is categorical and is not converted into points.",
+                "marriage_support_d1_d9": round(d1_d9_avg * 0.25, 1),
+                "cross_chart_chemistry": round(cross["score"] * 0.1875, 1),
             },
         }
 
@@ -305,8 +305,8 @@ class KundliMatchingEngine:
             evidence_item(
                 code="MANGLIK_PAIR_STATUS",
                 category="manglik",
-                polarity="supportive" if pair_manglik["status"] == "Compatible" else "neutral" if pair_manglik["status"] == "Manageable" else "challenging",
-                weight=pair_manglik["score"] / 10.0,
+                polarity="supportive" if pair_manglik["classical_status"] in {"balanced", "not_applicable"} else "challenging",
+                weight=0.0,
                 summary=pair_manglik["description"],
                 facts=pair_manglik,
                 rule_profile=self.rule_profile.key,

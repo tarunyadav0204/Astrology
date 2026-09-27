@@ -66,9 +66,9 @@ CRITICAL: You MUST respond with ONLY a JSON object. NO other text.
     },
     {
       "question": "Are there doshas, delays, or friction factors?",
-      "answer": "Analyze Mangal Dosha/cancellations if present, Saturn delay, Rahu/Ketu irregularity, 6/8/12 pressure, and marriage_evidence.parashari.px.relationship.fr. Name negative evidence directly without fear language.",
+      "answer": "Use the canonical Mangal Dosha status and its exact BPHS 80.47 evidence if present; do not invent severity, own-sign cancellation, age expiry, D9 counting, or remedies. Analyze Saturn delay, Rahu/Ketu irregularity, 6/8/12 pressure, and marriage_evidence.parashari.px.relationship.fr. Name negative evidence directly without fear language.",
       "key_points": ["Friction point 1", "Cancellation/support point 2"],
-      "astrological_basis": "Mars, Saturn, nodes, 6/8/12, dosha cancellation"
+      "astrological_basis": "Canonical Mangal rule, Saturn, nodes, 6/8/12, source-backed qualifying conditions"
     },
     {
       "question": "What does Navamsa (D9) reveal about marriage maturity?",

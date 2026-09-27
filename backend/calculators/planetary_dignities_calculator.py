@@ -1,4 +1,5 @@
 from .base_calculator import BaseCalculator
+from .classical_combustion import calculate_chart_combustion
 
 class PlanetaryDignitiesCalculator(BaseCalculator):
     """Extract planetary dignities calculation from planetary_dignities.py"""
@@ -35,15 +36,13 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
             'Saturn': {'sign': 10, 'start_degree': 0, 'end_degree': 20}
         }
         
-        self.COMBUSTION_THRESHOLDS = {
-            'Moon': 12, 'Mars': 17, 'Mercury': 14, 'Jupiter': 11, 'Venus': 10, 'Saturn': 15
-        }
-    
+
     def calculate_planetary_dignities(self):
         """Calculate comprehensive planetary dignities"""
         planets = self.chart_data.get('planets', {})
         ascendant_sign = int(self.chart_data.get('ascendant', 0) / 30)
         dignities = {}
+        combustion_rows = calculate_chart_combustion(self.chart_data)["planets"]
         
         for planet_name, planet_data in planets.items():
             if planet_name in ['Gulika', 'Mandi']:
@@ -61,15 +60,14 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
                 'dignity': self._calculate_dignity(planet_name, planet_sign, planet_degree),
                 'functional_nature': self._calculate_functional_nature(planet_name, ascendant_sign),
                 'combustion_status': 'normal',
+                'combustion': combustion_rows.get(planet_name),
                 'retrograde': is_retrograde,
                 'strength_multiplier': 1.0,
                 'states': []
             }
             
-            # Calculate combustion
-            if planet_name != 'Sun' and 'Sun' in planets:
-                sun_longitude = planets['Sun'].get('longitude', 0)
-                dignity_info['combustion_status'] = self._calculate_combustion(planet_name, planet_longitude, sun_longitude)
+            combustion = combustion_rows.get(planet_name) or {}
+            dignity_info['combustion_status'] = 'combust' if combustion.get('is_combust') else 'normal'
             
             # Calculate strength multiplier
             dignity_info['strength_multiplier'] = self._calculate_strength_multiplier(dignity_info)
@@ -142,24 +140,6 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
             return 'benefic'
         return 'neutral'
     
-    def _calculate_combustion(self, planet, planet_longitude, sun_longitude):
-        """Calculate combustion status"""
-        if planet not in self.COMBUSTION_THRESHOLDS:
-            return 'normal'
-        
-        angular_distance = abs(planet_longitude - sun_longitude)
-        if angular_distance > 180:
-            angular_distance = 360 - angular_distance
-        
-        threshold = self.COMBUSTION_THRESHOLDS[planet]
-        
-        if angular_distance <= 1:  # Cazimi
-            return 'cazimi'
-        elif angular_distance <= threshold:
-            return 'combust'
-        
-        return 'normal'
-    
     def _calculate_strength_multiplier(self, dignity_info):
         """Calculate overall strength multiplier"""
         multiplier = 1.0
@@ -173,8 +153,8 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
         if dignity_info['functional_nature'] == 'benefic':
             multiplier *= 1.2
         
-        combustion_multipliers = {'cazimi': 1.8, 'combust': 0.3}
-        multiplier *= combustion_multipliers.get(dignity_info['combustion_status'], 1.0)
+        # Combustion is preserved as structured classical evidence.  No
+        # arbitrary numeric multiplier is claimed by the selected source.
         
         if dignity_info['retrograde'] and dignity_info['planet'] not in ['Jupiter', 'Venus']:
             multiplier *= 0.9
@@ -193,9 +173,7 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
         
         if dignity_info['combustion_status'] == 'combust':
             states.append('Combust')
-        elif dignity_info['combustion_status'] == 'cazimi':
-            states.append('Cazimi')
-        
+
         if dignity_info['retrograde']:
             states.append('Retrograde')
         

@@ -6,6 +6,10 @@ import { parse } from '@babel/parser';
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const reportAll = process.argv.includes('--report');
 const premiumCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/premium-ui.json'), 'utf8'));
+const pitriShapaInfoCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/pitri-shapa-info.json'), 'utf8'));
+const mangalDoshaInfoCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/mangal-dosha-info.json'), 'utf8'));
+const planetaryPositionsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/planetary-positions.json'), 'utf8'));
+const planetResultDeliveryCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/planet-result-delivery.json'), 'utf8'));
 const shadbalaUiCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/shadbala-ui.json'), 'utf8'));
 const lifeAnalysisCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/life-analysis.json'), 'utf8'));
 const lifeAnalysisPdfCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/life-analysis-pdf.json'), 'utf8'));
@@ -33,6 +37,9 @@ const normalizedPremiumCopy = Object.fromEntries(Object.entries(premiumCopy).map
       ...shadbalaUiCopy.technical,
       ...(shadbalaUiCopy[language] || shadbalaUiCopy.english),
     },
+    pitriShapaInfo: pitriShapaInfoCopy[language] || pitriShapaInfoCopy.english,
+    mangalDoshaInfo: mangalDoshaInfoCopy[language] || mangalDoshaInfoCopy.english,
+    planetResultDelivery: planetResultDeliveryCopy[language] || planetResultDeliveryCopy.english,
   },
 ]));
 const protectedFiles = [
@@ -97,7 +104,11 @@ const isPluralVariant = (key, englishKeySet) => /_(few|many|zero|two)$/.test(key
 
 const mergedPremiumCopy = Object.fromEntries(Object.entries(normalizedPremiumCopy).map(([language, copy]) => [
   language,
-  { ...copy, homeRecommendations: homeRecommendationsCopy[language] || homeRecommendationsCopy.english },
+  {
+    ...copy,
+    homeRecommendations: homeRecommendationsCopy[language] || homeRecommendationsCopy.english,
+    planetaryPositions: planetaryPositionsCopy[language] || planetaryPositionsCopy.english,
+  },
 ]));
 const failures = [];
 const prashnaEnglish = flatten(prashnaCopy.english);

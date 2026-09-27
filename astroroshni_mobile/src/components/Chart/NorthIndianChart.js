@@ -4,6 +4,7 @@ import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Sto
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { aspectArrow, aspectHouse, ChartAspectArrows, jaiminiTargetSigns, planetAspectCounts } from './chartAspects';
+import { combustSet } from '../../utils/positionTables';
 
 // Create animated versions of SVG components
 const AnimatedLine = Animated.createAnimatedComponent(Line);
@@ -473,8 +474,8 @@ export const transitBav = (bavBySign, planetName, signIndex) => {
 // Try roomy labels first, then shorter ones. Never overlap a natal box.
 export const placeTransitLabels = (polygon, occupied, labels, showDegree) => {
   if (!labels.length) return null;
-  const fullText = (label) => `${label.symbol}${label.retrograde ? '(R)' : ''}${TRANSIT_MARK}${bavSuffix(label)}`;
-  const shortText = (label) => `${label.symbol}${TRANSIT_MARK}${bavSuffix(label)}`;
+  const fullText = (label) => `${label.symbol}${label.retrograde ? '(R)' : ''}${label.combust ? '(C)' : ''}${TRANSIT_MARK}${bavSuffix(label)}`;
+  const shortText = (label) => `${label.symbol}${label.combust ? '(C)' : ''}${TRANSIT_MARK}${bavSuffix(label)}`;
   const detailText = (label) => `${label.degree || ''} ${label.nakshatra || ''}`.trim();
   const detailSpec = (label, fontSize, detailSize) => {
     const text = fullText(label);
@@ -582,6 +583,7 @@ const NorthIndianChart = ({
   aspectMode = null,
   aspectFocus = null,
   planetRoles = null,
+  combustPlanets = new Set(),
 }) => {
   const { theme, colors } = useTheme();
   const { t } = useTranslation();
@@ -590,6 +592,7 @@ const NorthIndianChart = ({
   const themedChartLine = onDarkSurface ? colors.cosmicLine : colors.chartLine;
   const resolvedGridLine = gridLineColor || themedChartLine;
   const resolvedGridLineWidth = gridLineWidth || (cosmicTheme ? 1 : 2);
+  const transitCombustPlanets = combustSet(transitOverlay);
 
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
 
@@ -649,7 +652,10 @@ const NorthIndianChart = ({
       onTransitPlanetPress(planet.name);
       return;
     }
-    const tooltipText = `${planet.name}: ${planet.formattedDegree} in ${planet.nakshatra} · Pada ${planet.pada}`;
+    const condition = planet.combust
+      ? ` · ${t('premiumUi.planetaryPositions.notes.combustFull', 'Combust')}`
+      : '';
+    const tooltipText = `${planet.name}: ${planet.formattedDegree} in ${planet.nakshatra} · Pada ${planet.pada}${condition}`;
     setTooltip({ show: true, text: tooltipText });
     setTimeout(() => setTooltip({ show: false, text: '' }), 2000);
   };
@@ -742,6 +748,7 @@ const NorthIndianChart = ({
     const isRetrograde = planetData?.retrograde;
     let symbol = planet.symbol;
     if (isRetrograde && planet.name !== 'Rahu' && planet.name !== 'Ketu') symbol += '(R)';
+    if (combustPlanets.has(planet.name)) symbol += '(C)';
     if (status === 'exalted') symbol += '↑';
     if (status === 'debilitated') symbol += '↓';
     if (showKarakas && karakas && typeof karakas === 'object') {
@@ -753,6 +760,12 @@ const NorthIndianChart = ({
     }
     return symbol;
   };
+
+  const hasNeechaBhanga = (planetName, planetData = null) => Boolean(
+    planetData?.neecha_bhanga
+    || chartData?.planets?.[planetName]?.neecha_bhanga
+    || chartData?.neecha_bhanga?.[planetName]?.neecha_bhanga_present
+  );
 
   const getNakshatra = (longitude) => {
     const nakshatras = ['Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra', 'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni', 'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha', 'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'];
@@ -806,6 +819,8 @@ const NorthIndianChart = ({
           degree: typeof data.degree === 'number' ? data.degree : 0,
           longitude: data.longitude || 0,
           retrograde: !!data.retrograde,
+          combust: combustPlanets.has(name),
+          neecha_bhanga: hasNeechaBhanga(name, data),
           nakshatra: getNakshatra(data.longitude || 0),
           shortNakshatra: getShortNakshatra(data.longitude || 0),
           pada: getNakshatraPada(data.longitude || 0),
@@ -826,6 +841,7 @@ const NorthIndianChart = ({
         degree: typeof planets.InduLagna.degree === 'number' ? planets.InduLagna.degree : 0,
         longitude: planets.InduLagna.longitude || 0,
         retrograde: !!planets.InduLagna.retrograde,
+        combust: false,
         nakshatra: getNakshatra(planets.InduLagna.longitude || 0),
         shortNakshatra: getShortNakshatra(planets.InduLagna.longitude || 0),
         pada: getNakshatraPada(planets.InduLagna.longitude || 0),
@@ -849,6 +865,7 @@ const NorthIndianChart = ({
         symbol: t(`planets.${name}`, name.substring(0, 2)),
         name,
         retrograde,
+        combust: transitCombustPlanets.has(name),
         sign: data.sign,
         bav: transitBav(bavBySign, name, data.sign),
         nakshatra: getNakshatra(data.longitude || 0),
@@ -870,10 +887,11 @@ const NorthIndianChart = ({
       const tagFont = Math.max(6, Math.round(symbolFont * 0.42));
       const symbolHalf = textHalfWidth(symbol, symbolFont);
       const tagExtra = dashaTag ? textHalfWidth(dashaTag, tagFont) + 2 : 0;
+      const neechaBhangaExtra = planet.neecha_bhanga ? textHalfWidth(t('premiumUi.chart.neechaBhangaShort'), tagFont) + 3 : 0;
       const degreeHalf = showDegreeNakshatra
         ? textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, degreeFont)
         : 0;
-      const half = Math.max(symbolHalf + tagExtra, degreeHalf) + 6;
+      const half = Math.max(symbolHalf + Math.max(tagExtra, neechaBhangaExtra), degreeHalf) + 6;
       const above = Math.ceil(symbolFont * 0.95) + (dashaTag ? tagFont + 1 : 2) + 2;
       const below = (showDegreeNakshatra ? 16 + Math.ceil(degreeFont * 0.5) + 2 : 4) + 2;
       return labelBox(anchor.x, symbolY, half, above, below);
@@ -910,6 +928,7 @@ const NorthIndianChart = ({
     const layout = placeTransitLabels(polygon, occupied, list.map((planet) => ({
       symbol: planet.symbol,
       retrograde: planet.retrograde,
+      combust: planet.combust,
       degree: planet.formattedDegree,
       nakshatra: planet.shortNakshatra,
       name: planet.name,
@@ -1223,8 +1242,21 @@ const NorthIndianChart = ({
                         fontWeight="700"
                         textAnchor="start"
                         pointerEvents="none"
+                    >
+                      {dashaTag}
+                    </SvgText>
+                  ) : null}
+                    {planet.neecha_bhanga ? (
+                      <SvgText
+                        x={planetX + textHalfWidth(symbol, planetFont) + 3}
+                        y={planetY - 8}
+                        fontSize={Math.max(6, Math.round(planetFont * 0.46))}
+                        fill={colors.success || '#1E7A46'}
+                        fontWeight="900"
+                        textAnchor="start"
+                        pointerEvents="none"
                       >
-                        {dashaTag}
+                        {t('premiumUi.chart.neechaBhangaShort')}
                       </SvgText>
                     ) : null}
                     {planetRoles?.[planet.name] ? (() => {

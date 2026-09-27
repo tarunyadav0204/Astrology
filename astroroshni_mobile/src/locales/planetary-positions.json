@@ -13,7 +13,14 @@
     "degree": "Degree",
     "nakshatra": "Nakshatra",
     "pada": "Pada {{number}}",
-    "tabs": { "planets": "Planets", "houses": "Houses", "nakshatras": "Nakshatras", "karakas": "Karakas", "lagnas": "Lagnas", "special": "Special" },
+    "tabs": {
+      "planets": "Planets",
+      "houses": "Houses",
+      "nakshatras": "Nakshatras",
+      "karakas": "Karakas",
+      "lagnas": "Lagnas",
+      "special": "Special"
+    },
     "tables": {
       "planets": "Planets",
       "houses": "Houses",
@@ -42,8 +49,41 @@
       "exalted": "Ex",
       "moolatrikona": "MT",
       "own": "Own",
-      "debilitated": "Db"
-    }
+      "debilitated": "Db",
+      "combustFull": "Combust",
+      "neechaBhanga": "NB",
+      "neechaBhangaFull": "Neecha Bhanga",
+      "vargottamaFull": "Vargottama"
+    },
+    "chartLegendCombust": "(C) after a planet means it is combust, within its classical orb from the Sun.",
+    "chartLegendNeechaBhanga": "(NB) means the planet meets a classical Neecha Bhanga condition. Open Yogas for the exact rule.",
+    "openNeechaBhanga": "See the classical Neecha Bhanga rule",
+    "dignity": "Dignity",
+    "dignities": {
+      "exalted": "Exalted",
+      "moolatrikona": "Moolatrikona",
+      "ownSign": "Own sign",
+      "friendlySign": "Friend's sign",
+      "neutralSign": "Neutral sign",
+      "enemySign": "Enemy's sign",
+      "debilitated": "Debilitated",
+      "notGraded": "Not classically graded",
+      "ordinary": "Ordinary dignity"
+    },
+    "rashiLord": "Rashi lord",
+    "nakshatraLord": "Nakshatra lord",
+    "relationships": {
+      "self": "Own lord",
+      "friend": "Natural friend",
+      "neutral": "Natural neutral",
+      "enemy": "Natural enemy",
+      "traditionDependent": "Tradition-dependent"
+    },
+    "direct": "Direct",
+    "clearOfCombustion": "Clear",
+    "solarDistance": "Solar distance",
+    "combustionEvidence": "{{distance}}° from Sun · {{threshold}}° limit · {{motion}} · {{status}}",
+    "combustionReference": "Combustion: BPHS 7.28–29; direct/retrograde limits from R. Santhanam, Vol. I, pp. 99–100."
   },
   "hindi": {
     "title": "ग्रह स्थितियाँ",
@@ -59,7 +99,14 @@
     "degree": "अंश",
     "nakshatra": "नक्षत्र",
     "pada": "पाद {{number}}",
-    "tabs": { "planets": "ग्रह", "houses": "भाव", "nakshatras": "नक्षत्र", "karakas": "कारक", "lagnas": "लग्न", "special": "विशेष" },
+    "tabs": {
+      "planets": "ग्रह",
+      "houses": "भाव",
+      "nakshatras": "नक्षत्र",
+      "karakas": "कारक",
+      "lagnas": "लग्न",
+      "special": "विशेष"
+    },
     "tables": {
       "planets": "ग्रह",
       "houses": "भाव",
@@ -88,8 +135,41 @@
       "exalted": "Ex",
       "moolatrikona": "MT",
       "own": "Own",
-      "debilitated": "Db"
-    }
+      "debilitated": "Db",
+      "combustFull": "अस्त",
+      "neechaBhanga": "NB",
+      "neechaBhangaFull": "नीच भंग",
+      "vargottamaFull": "वर्गोत्तम"
+    },
+    "chartLegendCombust": "किसी ग्रह के बाद (C) का अर्थ है कि वह सूर्य से अपनी शास्त्रीय सीमा के भीतर अस्त है।",
+    "chartLegendNeechaBhanga": "(NB) का अर्थ है कि ग्रह शास्त्रीय नीच भंग की शर्त पूरी करता है। सटीक नियम के लिए योग खोलें।",
+    "openNeechaBhanga": "शास्त्रीय नीच भंग नियम देखें",
+    "dignity": "ग्रह बल",
+    "dignities": {
+      "exalted": "उच्च",
+      "moolatrikona": "मूलत्रिकोण",
+      "ownSign": "स्वराशि",
+      "friendlySign": "मित्र राशि",
+      "neutralSign": "सम राशि",
+      "enemySign": "शत्रु राशि",
+      "debilitated": "नीच",
+      "notGraded": "शास्त्रीय रूप से निर्धारित नहीं",
+      "ordinary": "सामान्य स्थिति"
+    },
+    "rashiLord": "राशि स्वामी",
+    "nakshatraLord": "नक्षत्र स्वामी",
+    "relationships": {
+      "self": "स्वामी स्वयं",
+      "friend": "नैसर्गिक मित्र",
+      "neutral": "नैसर्गिक सम",
+      "enemy": "नैसर्गिक शत्रु",
+      "traditionDependent": "परंपरा के अनुसार भिन्न"
+    },
+    "direct": "मार्गी",
+    "clearOfCombustion": "अस्त नहीं",
+    "solarDistance": "सूर्य से दूरी",
+    "combustionEvidence": "सूर्य से {{distance}}° · सीमा {{threshold}}° · {{motion}} · {{status}}",
+    "combustionReference": "अस्त स्थिति: बृहत् पाराशर होरा शास्त्र 7.28–29; मार्गी/वक्री सीमाएँ आर. संथानम, खंड I, पृ. 99–100।"
   },
   "es": {
     "title": "Posiciones planetarias",
@@ -105,7 +185,14 @@
     "degree": "Grado",
     "nakshatra": "Nakshatra",
     "pada": "Pada {{number}}",
-    "tabs": { "planets": "Planetas", "houses": "Casas", "nakshatras": "Nakshatras", "karakas": "Karakas", "lagnas": "Lagnas", "special": "Especial" },
+    "tabs": {
+      "planets": "Planetas",
+      "houses": "Casas",
+      "nakshatras": "Nakshatras",
+      "karakas": "Karakas",
+      "lagnas": "Lagnas",
+      "special": "Especial"
+    },
     "tables": {
       "planets": "Planetas",
       "houses": "Casas",
@@ -134,8 +221,41 @@
       "exalted": "Ex",
       "moolatrikona": "MT",
       "own": "Own",
-      "debilitated": "Db"
-    }
+      "debilitated": "Db",
+      "combustFull": "Combusto",
+      "neechaBhanga": "NB",
+      "neechaBhangaFull": "Neecha Bhanga",
+      "vargottamaFull": "Vargottama"
+    },
+    "chartLegendCombust": "(C) después de un planeta indica que está combusto, dentro de su orbe clásico respecto al Sol.",
+    "chartLegendNeechaBhanga": "(NB) indica que el planeta cumple una condición clásica de Neecha Bhanga. Abre Yogas para ver la regla exacta.",
+    "openNeechaBhanga": "Ver la regla clásica de Neecha Bhanga",
+    "dignity": "Dignidad",
+    "dignities": {
+      "exalted": "Exaltado",
+      "moolatrikona": "Moolatrikona",
+      "ownSign": "Signo propio",
+      "friendlySign": "Signo amigo",
+      "neutralSign": "Signo neutral",
+      "enemySign": "Signo enemigo",
+      "debilitated": "Debilitado",
+      "notGraded": "Sin clasificación clásica",
+      "ordinary": "Dignidad ordinaria"
+    },
+    "rashiLord": "Señor del rashi",
+    "nakshatraLord": "Señor del nakshatra",
+    "relationships": {
+      "self": "Señor propio",
+      "friend": "Amigo natural",
+      "neutral": "Neutral natural",
+      "enemy": "Enemigo natural",
+      "traditionDependent": "Depende de la tradición"
+    },
+    "direct": "Directo",
+    "clearOfCombustion": "Sin combustión",
+    "solarDistance": "Distancia solar",
+    "combustionEvidence": "A {{distance}}° del Sol · límite {{threshold}}° · {{motion}} · {{status}}",
+    "combustionReference": "Combustión: BPHS 7.28–29; límites directos/retrógrados de R. Santhanam, Vol. I, pp. 99–100."
   },
   "fr": {
     "title": "Positions planétaires",
@@ -151,7 +271,14 @@
     "degree": "Degré",
     "nakshatra": "Nakshatra",
     "pada": "Pada {{number}}",
-    "tabs": { "planets": "Planètes", "houses": "Maisons", "nakshatras": "Nakshatras", "karakas": "Karakas", "lagnas": "Lagnas", "special": "Spécial" },
+    "tabs": {
+      "planets": "Planètes",
+      "houses": "Maisons",
+      "nakshatras": "Nakshatras",
+      "karakas": "Karakas",
+      "lagnas": "Lagnas",
+      "special": "Spécial"
+    },
     "tables": {
       "planets": "Planètes",
       "houses": "Maisons",
@@ -180,8 +307,41 @@
       "exalted": "Ex",
       "moolatrikona": "MT",
       "own": "Own",
-      "debilitated": "Db"
-    }
+      "debilitated": "Db",
+      "combustFull": "Combuste",
+      "neechaBhanga": "NB",
+      "neechaBhangaFull": "Neecha Bhanga",
+      "vargottamaFull": "Vargottama"
+    },
+    "chartLegendCombust": "(C) après une planète indique qu’elle est combustée, dans son orbe classique autour du Soleil.",
+    "chartLegendNeechaBhanga": "(NB) indique que la planète remplit une condition classique de Neecha Bhanga. Ouvrez Yogas pour voir la règle exacte.",
+    "openNeechaBhanga": "Voir la règle classique de Neecha Bhanga",
+    "dignity": "Dignité",
+    "dignities": {
+      "exalted": "Exalté",
+      "moolatrikona": "Moolatrikona",
+      "ownSign": "Signe propre",
+      "friendlySign": "Signe ami",
+      "neutralSign": "Signe neutre",
+      "enemySign": "Signe ennemi",
+      "debilitated": "En chute",
+      "notGraded": "Non classé dans la tradition classique",
+      "ordinary": "Dignité ordinaire"
+    },
+    "rashiLord": "Maître du rashi",
+    "nakshatraLord": "Maître du nakshatra",
+    "relationships": {
+      "self": "Propre maître",
+      "friend": "Ami naturel",
+      "neutral": "Neutre naturel",
+      "enemy": "Ennemi naturel",
+      "traditionDependent": "Selon la tradition"
+    },
+    "direct": "Direct",
+    "clearOfCombustion": "Hors combustion",
+    "solarDistance": "Distance solaire",
+    "combustionEvidence": "À {{distance}}° du Soleil · limite {{threshold}}° · {{motion}} · {{status}}",
+    "combustionReference": "Combustion : BPHS 7.28–29 ; limites directes/rétrogrades selon R. Santhanam, vol. I, p. 99–100."
   },
   "german": {
     "title": "Planetenpositionen",
@@ -197,7 +357,14 @@
     "degree": "Grad",
     "nakshatra": "Nakshatra",
     "pada": "Pada {{number}}",
-    "tabs": { "planets": "Planeten", "houses": "Häuser", "nakshatras": "Nakshatras", "karakas": "Karakas", "lagnas": "Lagnas", "special": "Besonderes" },
+    "tabs": {
+      "planets": "Planeten",
+      "houses": "Häuser",
+      "nakshatras": "Nakshatras",
+      "karakas": "Karakas",
+      "lagnas": "Lagnas",
+      "special": "Besonderes"
+    },
     "tables": {
       "planets": "Planeten",
       "houses": "Häuser",
@@ -226,8 +393,41 @@
       "exalted": "Ex",
       "moolatrikona": "MT",
       "own": "Own",
-      "debilitated": "Db"
-    }
+      "debilitated": "Db",
+      "combustFull": "Verbrannt",
+      "neechaBhanga": "NB",
+      "neechaBhangaFull": "Neecha Bhanga",
+      "vargottamaFull": "Vargottama"
+    },
+    "chartLegendCombust": "(C) nach einem Planeten bedeutet, dass er sich innerhalb seines klassischen Orbis zur Sonne befindet.",
+    "chartLegendNeechaBhanga": "(NB) bedeutet, dass der Planet eine klassische Neecha-Bhanga-Bedingung erfüllt. Öffnen Sie Yogas für die genaue Regel.",
+    "openNeechaBhanga": "Klassische Neecha-Bhanga-Regel ansehen",
+    "dignity": "Würde",
+    "dignities": {
+      "exalted": "Erhöht",
+      "moolatrikona": "Moolatrikona",
+      "ownSign": "Eigenes Zeichen",
+      "friendlySign": "Befreundetes Zeichen",
+      "neutralSign": "Neutrales Zeichen",
+      "enemySign": "Feindliches Zeichen",
+      "debilitated": "Im Fall",
+      "notGraded": "Klassisch nicht eingestuft",
+      "ordinary": "Gewöhnliche Würde"
+    },
+    "rashiLord": "Zeichenherrscher",
+    "nakshatraLord": "Nakshatra-Herrscher",
+    "relationships": {
+      "self": "Eigener Herrscher",
+      "friend": "Natürlicher Freund",
+      "neutral": "Natürlich neutral",
+      "enemy": "Natürlicher Feind",
+      "traditionDependent": "Traditionsabhängig"
+    },
+    "direct": "Direktläufig",
+    "clearOfCombustion": "Nicht verbrannt",
+    "solarDistance": "Sonnenabstand",
+    "combustionEvidence": "{{distance}}° von der Sonne · Grenze {{threshold}}° · {{motion}} · {{status}}",
+    "combustionReference": "Verbrennung: BPHS 7.28–29; Direkt-/Rückläufigkeitsgrenzen nach R. Santhanam, Bd. I, S. 99–100."
   },
   "russian": {
     "title": "Положения планет",
@@ -243,7 +443,14 @@
     "degree": "Градус",
     "nakshatra": "Накшатра",
     "pada": "Пада {{number}}",
-    "tabs": { "planets": "Планеты", "houses": "Дома", "nakshatras": "Накшатры", "karakas": "Караки", "lagnas": "Лагны", "special": "Особое" },
+    "tabs": {
+      "planets": "Планеты",
+      "houses": "Дома",
+      "nakshatras": "Накшатры",
+      "karakas": "Караки",
+      "lagnas": "Лагны",
+      "special": "Особое"
+    },
     "tables": {
       "planets": "Планеты",
       "houses": "Дома",
@@ -272,8 +479,41 @@
       "exalted": "Ex",
       "moolatrikona": "MT",
       "own": "Own",
-      "debilitated": "Db"
-    }
+      "debilitated": "Db",
+      "combustFull": "Сожжён",
+      "neechaBhanga": "NB",
+      "neechaBhangaFull": "Нича Бханга",
+      "vargottamaFull": "Варготтама"
+    },
+    "chartLegendCombust": "(C) после планеты означает, что она сожжена и находится в пределах классического орбиса от Солнца.",
+    "chartLegendNeechaBhanga": "(NB) означает, что планета выполняет классическое условие Нича Бханги. Точное правило приведено в разделе йог.",
+    "openNeechaBhanga": "Посмотреть классическое правило Нича Бханги",
+    "dignity": "Достоинство",
+    "dignities": {
+      "exalted": "Экзальтация",
+      "moolatrikona": "Мулатрикона",
+      "ownSign": "Собственный знак",
+      "friendlySign": "Дружественный знак",
+      "neutralSign": "Нейтральный знак",
+      "enemySign": "Враждебный знак",
+      "debilitated": "Падение",
+      "notGraded": "Не оценивается классической системой",
+      "ordinary": "Обычное достоинство"
+    },
+    "rashiLord": "Управитель знака",
+    "nakshatraLord": "Управитель накшатры",
+    "relationships": {
+      "self": "Собственный управитель",
+      "friend": "Естественный друг",
+      "neutral": "Естественно нейтрален",
+      "enemy": "Естественный враг",
+      "traditionDependent": "Зависит от традиции"
+    },
+    "direct": "Прямое движение",
+    "clearOfCombustion": "Вне сожжения",
+    "solarDistance": "Расстояние от Солнца",
+    "combustionEvidence": "{{distance}}° от Солнца · предел {{threshold}}° · {{motion}} · {{status}}",
+    "combustionReference": "Сожжение: BPHS 7.28–29; пределы прямого/ретроградного движения по Р. Сантханаму, т. I, с. 99–100."
   },
   "chinese": {
     "title": "行星位置",
@@ -289,7 +529,14 @@
     "degree": "度数",
     "nakshatra": "宿",
     "pada": "第 {{number}} 足",
-    "tabs": { "planets": "行星", "houses": "宫位", "nakshatras": "宿", "karakas": "象征星", "lagnas": "上升点", "special": "特殊点" },
+    "tabs": {
+      "planets": "行星",
+      "houses": "宫位",
+      "nakshatras": "宿",
+      "karakas": "象征星",
+      "lagnas": "上升点",
+      "special": "特殊点"
+    },
     "tables": {
       "planets": "行星",
       "houses": "宫位",
@@ -318,8 +565,41 @@
       "exalted": "Ex",
       "moolatrikona": "MT",
       "own": "Own",
-      "debilitated": "Db"
-    }
+      "debilitated": "Db",
+      "combustFull": "灼伤",
+      "neechaBhanga": "NB",
+      "neechaBhangaFull": "落陷化解",
+      "vargottamaFull": "同宫强化"
+    },
+    "chartLegendCombust": "行星后的 (C) 表示它处于与太阳的传统燃烧容许度内。",
+    "chartLegendNeechaBhanga": "(NB) 表示该行星符合一项古典 Neecha Bhanga 条件。请打开瑜伽页面查看确切规则。",
+    "openNeechaBhanga": "查看古典 Neecha Bhanga 规则",
+    "dignity": "尊贵状态",
+    "dignities": {
+      "exalted": "旺相",
+      "moolatrikona": "本源三分宫",
+      "ownSign": "守护星座",
+      "friendlySign": "友好星座",
+      "neutralSign": "中性星座",
+      "enemySign": "敌对星座",
+      "debilitated": "落陷",
+      "notGraded": "古典体系未评级",
+      "ordinary": "普通状态"
+    },
+    "rashiLord": "星座主星",
+    "nakshatraLord": "宿主星",
+    "relationships": {
+      "self": "本身为主星",
+      "friend": "天然友星",
+      "neutral": "天然中性",
+      "enemy": "天然敌星",
+      "traditionDependent": "依传统而异"
+    },
+    "direct": "顺行",
+    "clearOfCombustion": "未燃烧",
+    "solarDistance": "距太阳角度",
+    "combustionEvidence": "距太阳 {{distance}}° · 界限 {{threshold}}° · {{motion}} · {{status}}",
+    "combustionReference": "燃烧依据：BPHS 7.28–29；顺行/逆行界限见 R. Santhanam 第 I 卷，第 99–100 页。"
   },
   "tamil": {
     "title": "கிரக நிலைகள்",
@@ -335,7 +615,14 @@
     "degree": "பாகை",
     "nakshatra": "நட்சத்திரம்",
     "pada": "பாதம் {{number}}",
-    "tabs": { "planets": "கிரகங்கள்", "houses": "பாவங்கள்", "nakshatras": "நட்சத்திரங்கள்", "karakas": "காரகர்கள்", "lagnas": "லக்னங்கள்", "special": "சிறப்பு" },
+    "tabs": {
+      "planets": "கிரகங்கள்",
+      "houses": "பாவங்கள்",
+      "nakshatras": "நட்சத்திரங்கள்",
+      "karakas": "காரகர்கள்",
+      "lagnas": "லக்னங்கள்",
+      "special": "சிறப்பு"
+    },
     "tables": {
       "planets": "கிரகங்கள்",
       "houses": "பாவங்கள்",
@@ -364,8 +651,41 @@
       "exalted": "Ex",
       "moolatrikona": "MT",
       "own": "Own",
-      "debilitated": "Db"
-    }
+      "debilitated": "Db",
+      "combustFull": "அஸ்தம்",
+      "neechaBhanga": "NB",
+      "neechaBhangaFull": "நீச பங்கம்",
+      "vargottamaFull": "வர்க்கோத்தமம்"
+    },
+    "chartLegendCombust": "ஒரு கிரகத்திற்குப் பின் வரும் (C), அது சூரியனிடமிருந்து அதன் பாரம்பரிய அஸ்த வரம்புக்குள் இருப்பதைக் குறிக்கிறது.",
+    "chartLegendNeechaBhanga": "(NB) என்பது அந்தக் கிரகம் ஒரு செவ்வியல் நீச பங்க நிபந்தனையை நிறைவேற்றுகிறது என்பதாகும். துல்லிய விதிக்கு யோகங்கள் பகுதியைத் திறக்கவும்.",
+    "openNeechaBhanga": "செவ்வியல் நீச பங்க விதியைப் பார்க்கவும்",
+    "dignity": "கிரக நிலை",
+    "dignities": {
+      "exalted": "உச்சம்",
+      "moolatrikona": "மூலத்திரிகோணம்",
+      "ownSign": "சொந்த ராசி",
+      "friendlySign": "நட்பு ராசி",
+      "neutralSign": "சம ராசி",
+      "enemySign": "பகை ராசி",
+      "debilitated": "நீசம்",
+      "notGraded": "செவ்வியல் முறையில் தரப்படுத்தப்படவில்லை",
+      "ordinary": "சாதாரண நிலை"
+    },
+    "rashiLord": "ராசி அதிபதி",
+    "nakshatraLord": "நட்சத்திர அதிபதி",
+    "relationships": {
+      "self": "சொந்த அதிபதி",
+      "friend": "இயற்கை நண்பர்",
+      "neutral": "இயற்கை சமம்",
+      "enemy": "இயற்கை பகைவர்",
+      "traditionDependent": "மரபைப் பொறுத்தது"
+    },
+    "direct": "நேர்கதி",
+    "clearOfCombustion": "அஸ்தமனம் இல்லை",
+    "solarDistance": "சூரிய இடைவெளி",
+    "combustionEvidence": "சூரியனிலிருந்து {{distance}}° · வரம்பு {{threshold}}° · {{motion}} · {{status}}",
+    "combustionReference": "அஸ்தமனம்: BPHS 7.28–29; நேர்கதி/வக்கிரகதி வரம்புகள் R. Santhanam, தொகுதி I, பக். 99–100."
   },
   "telugu": {
     "title": "గ్రహ స్థానాలు",
@@ -381,7 +701,14 @@
     "degree": "డిగ్రీ",
     "nakshatra": "నక్షత్రం",
     "pada": "పాదం {{number}}",
-    "tabs": { "planets": "గ్రహాలు", "houses": "భావాలు", "nakshatras": "నక్షత్రాలు", "karakas": "కారకాలు", "lagnas": "లగ్నాలు", "special": "ప్రత్యేకం" },
+    "tabs": {
+      "planets": "గ్రహాలు",
+      "houses": "భావాలు",
+      "nakshatras": "నక్షత్రాలు",
+      "karakas": "కారకాలు",
+      "lagnas": "లగ్నాలు",
+      "special": "ప్రత్యేకం"
+    },
     "tables": {
       "planets": "గ్రహాలు",
       "houses": "భావాలు",
@@ -410,8 +737,41 @@
       "exalted": "Ex",
       "moolatrikona": "MT",
       "own": "Own",
-      "debilitated": "Db"
-    }
+      "debilitated": "Db",
+      "combustFull": "అస్తంగతం",
+      "neechaBhanga": "NB",
+      "neechaBhangaFull": "నీచ భంగం",
+      "vargottamaFull": "వర్గోత్తమం"
+    },
+    "chartLegendCombust": "గ్రహం తర్వాత (C) ఉంటే, అది సూర్యుని నుండి తన శాస్త్రీయ అస్త పరిమితిలో ఉందని అర్థం.",
+    "chartLegendNeechaBhanga": "(NB) అంటే ఆ గ్రహం ఒక శాస్త్రీయ నీచ భంగ నియమాన్ని నెరవేర్చిందని అర్థం. ఖచ్చితమైన నియమం కోసం యోగాలు తెరవండి.",
+    "openNeechaBhanga": "శాస్త్రీయ నీచ భంగ నియమాన్ని చూడండి",
+    "dignity": "గ్రహ స్థితి",
+    "dignities": {
+      "exalted": "ఉచ్చ",
+      "moolatrikona": "మూలత్రికోణ",
+      "ownSign": "స్వరాశి",
+      "friendlySign": "మిత్ర రాశి",
+      "neutralSign": "సమ రాశి",
+      "enemySign": "శత్రు రాశి",
+      "debilitated": "నీచ",
+      "notGraded": "శాస్త్రీయంగా వర్గీకరించబడలేదు",
+      "ordinary": "సాధారణ స్థితి"
+    },
+    "rashiLord": "రాశి అధిపతి",
+    "nakshatraLord": "నక్షత్ర అధిపతి",
+    "relationships": {
+      "self": "స్వయంగా అధిపతి",
+      "friend": "సహజ మిత్రుడు",
+      "neutral": "సహజ సముడు",
+      "enemy": "సహజ శత్రువు",
+      "traditionDependent": "సంప్రదాయాన్ని బట్టి మారుతుంది"
+    },
+    "direct": "మార్గి",
+    "clearOfCombustion": "అస్తంగతం కాదు",
+    "solarDistance": "సూర్య దూరం",
+    "combustionEvidence": "సూర్యుని నుంచి {{distance}}° · పరిమితి {{threshold}}° · {{motion}} · {{status}}",
+    "combustionReference": "అస్తంగతం: BPHS 7.28–29; మార్గి/వక్ర పరిమితులు R. Santhanam, సంపుటి I, పుటలు 99–100."
   },
   "gujarati": {
     "title": "ગ્રહ સ્થિતિઓ",
@@ -427,7 +787,14 @@
     "degree": "અંશ",
     "nakshatra": "નક્ષત્ર",
     "pada": "પાદ {{number}}",
-    "tabs": { "planets": "ગ્રહો", "houses": "ભાવો", "nakshatras": "નક્ષત્રો", "karakas": "કારકો", "lagnas": "લગ્નો", "special": "વિશેષ" },
+    "tabs": {
+      "planets": "ગ્રહો",
+      "houses": "ભાવો",
+      "nakshatras": "નક્ષત્રો",
+      "karakas": "કારકો",
+      "lagnas": "લગ્નો",
+      "special": "વિશેષ"
+    },
     "tables": {
       "planets": "ગ્રહો",
       "houses": "ભાવો",
@@ -456,8 +823,41 @@
       "exalted": "Ex",
       "moolatrikona": "MT",
       "own": "Own",
-      "debilitated": "Db"
-    }
+      "debilitated": "Db",
+      "combustFull": "અસ્ત",
+      "neechaBhanga": "NB",
+      "neechaBhangaFull": "નીચ ભંગ",
+      "vargottamaFull": "વર્ગોત્તમ"
+    },
+    "chartLegendCombust": "ગ્રહ પછીનું (C) દર્શાવે છે કે તે સૂર્યથી તેની શાસ્ત્રીય અસ્ત મર્યાદામાં છે.",
+    "chartLegendNeechaBhanga": "(NB)નો અર્થ છે કે ગ્રહ શાસ્ત્રીય નીચ ભંગની શરત પૂરી કરે છે. ચોક્કસ નિયમ માટે યોગ ખોલો.",
+    "openNeechaBhanga": "શાસ્ત્રીય નીચ ભંગ નિયમ જુઓ",
+    "dignity": "ગ્રહ સ્થિતિ",
+    "dignities": {
+      "exalted": "ઉચ્ચ",
+      "moolatrikona": "મૂલત્રિકોણ",
+      "ownSign": "સ્વરાશિ",
+      "friendlySign": "મિત્ર રાશિ",
+      "neutralSign": "સમ રાશિ",
+      "enemySign": "શત્રુ રાશિ",
+      "debilitated": "નીચ",
+      "notGraded": "શાસ્ત્રીય રીતે વર્ગીકૃત નથી",
+      "ordinary": "સામાન્ય સ્થિતિ"
+    },
+    "rashiLord": "રાશિ સ્વામી",
+    "nakshatraLord": "નક્ષત્ર સ્વામી",
+    "relationships": {
+      "self": "પોતાનો સ્વામી",
+      "friend": "નૈસર્ગિક મિત્ર",
+      "neutral": "નૈસર્ગિક સમ",
+      "enemy": "નૈસર્ગિક શત્રુ",
+      "traditionDependent": "પરંપરા અનુસાર ભિન્ન"
+    },
+    "direct": "માર્ગી",
+    "clearOfCombustion": "અસ્ત નથી",
+    "solarDistance": "સૂર્યથી અંતર",
+    "combustionEvidence": "સૂર્યથી {{distance}}° · મર્યાદા {{threshold}}° · {{motion}} · {{status}}",
+    "combustionReference": "અસ્ત સ્થિતિ: BPHS 7.28–29; માર્ગી/વક્રી મર્યાદા R. Santhanam, ખંડ I, પૃ. 99–100."
   },
   "marathi": {
     "title": "ग्रहस्थिती",
@@ -473,7 +873,14 @@
     "degree": "अंश",
     "nakshatra": "नक्षत्र",
     "pada": "पाद {{number}}",
-    "tabs": { "planets": "ग्रह", "houses": "भाव", "nakshatras": "नक्षत्रे", "karakas": "कारक", "lagnas": "लग्ने", "special": "विशेष" },
+    "tabs": {
+      "planets": "ग्रह",
+      "houses": "भाव",
+      "nakshatras": "नक्षत्रे",
+      "karakas": "कारक",
+      "lagnas": "लग्ने",
+      "special": "विशेष"
+    },
     "tables": {
       "planets": "ग्रह",
       "houses": "भाव",
@@ -502,7 +909,40 @@
       "exalted": "Ex",
       "moolatrikona": "MT",
       "own": "Own",
-      "debilitated": "Db"
-    }
+      "debilitated": "Db",
+      "combustFull": "अस्त",
+      "neechaBhanga": "NB",
+      "neechaBhangaFull": "नीच भंग",
+      "vargottamaFull": "वर्गोत्तम"
+    },
+    "chartLegendCombust": "ग्रहानंतरचे (C) म्हणजे तो सूर्यापासूनच्या आपल्या शास्त्रीय अस्त मर्यादेत आहे.",
+    "chartLegendNeechaBhanga": "(NB) म्हणजे ग्रह शास्त्रीय नीच भंगाची अट पूर्ण करतो. नेमका नियम पाहण्यासाठी योग उघडा.",
+    "openNeechaBhanga": "शास्त्रीय नीच भंग नियम पहा",
+    "dignity": "ग्रह स्थिती",
+    "dignities": {
+      "exalted": "उच्च",
+      "moolatrikona": "मूलत्रिकोण",
+      "ownSign": "स्वराशी",
+      "friendlySign": "मित्र राशी",
+      "neutralSign": "सम राशी",
+      "enemySign": "शत्रू राशी",
+      "debilitated": "नीच",
+      "notGraded": "शास्त्रीय पद्धतीत श्रेणीबद्ध नाही",
+      "ordinary": "सामान्य स्थिती"
+    },
+    "rashiLord": "राशी स्वामी",
+    "nakshatraLord": "नक्षत्र स्वामी",
+    "relationships": {
+      "self": "स्वामी स्वतः",
+      "friend": "नैसर्गिक मित्र",
+      "neutral": "नैसर्गिक सम",
+      "enemy": "नैसर्गिक शत्रू",
+      "traditionDependent": "परंपरेनुसार भिन्न"
+    },
+    "direct": "मार्गी",
+    "clearOfCombustion": "अस्त नाही",
+    "solarDistance": "सूर्यापासून अंतर",
+    "combustionEvidence": "सूर्यापासून {{distance}}° · मर्यादा {{threshold}}° · {{motion}} · {{status}}",
+    "combustionReference": "अस्त स्थिती: BPHS 7.28–29; मार्गी/वक्री मर्यादा आर. संथानम, खंड I, पृ. 99–100."
   }
 }

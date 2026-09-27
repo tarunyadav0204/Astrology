@@ -4,6 +4,7 @@ Handles Rasi chart analysis for marriage indicators
 """
 import swisseph as swe
 from typing import Dict, List, Tuple, Any
+from calculators.classical_mangal_dosha import calculate_classical_mangal_dosha
 
 class MarriageCoreCalculator:
     def __init__(self, chart_data: Dict):
@@ -55,22 +56,8 @@ class MarriageCoreCalculator:
         }
     
     def check_manglik_dosha(self) -> Dict[str, Any]:
-        """Check for Mangal/Kuja Dosha (Mars in 7th, 8th houses only)"""
-        mars_data = self.planets.get('Mars', {})
-        mars_house = mars_data.get('house')
-        
-        is_manglik = mars_house in [7, 8]
-        
-        # Check cancellation conditions
-        cancellation = self._check_manglik_cancellation() if is_manglik else None
-        
-        return {
-            'is_manglik': is_manglik,
-            'mars_house': mars_house,
-            'mars_sign': mars_data.get('sign'),
-            'cancellation': cancellation,
-            'severity': self._get_manglik_severity(mars_house) if is_manglik else None
-        }
+        """Use the shared classical calculator without local severity rules."""
+        return calculate_classical_mangal_dosha(self.chart_data)
     
     def _get_house_lord(self, house_num: int) -> str:
         """Get the lord of a house"""
@@ -237,35 +224,9 @@ class MarriageCoreCalculator:
         return aspected
     
     def _check_manglik_cancellation(self) -> Dict[str, Any]:
-        """Check for Manglik dosha cancellation"""
-        mars_data = self.planets.get('Mars', {})
-        mars_house = mars_data.get('house')
-        
-        cancellation_factors = []
-        
-        # Check if Mars is aspected by benefics
-        mars_aspects = self._get_planet_aspects('Mars')
-        benefics = ['Venus', 'Jupiter']
-        
-        for benefic in benefics:
-            if benefic in mars_aspects:
-                cancellation_factors.append(f"Mars aspected by {benefic}")
-        
-        # Check if Mars is conjunct with benefics
-        planets_in_mars_house = self._get_planets_in_house(mars_house)
-        for planet in planets_in_mars_house:
-            if planet in benefics:
-                cancellation_factors.append(f"Mars conjunct with {planet}")
-        
-        return {
-            'has_cancellation': len(cancellation_factors) > 0,
-            'factors': cancellation_factors
-        }
+        """Legacy field exposing the BPHS benefic-relation qualifying clause."""
+        return calculate_classical_mangal_dosha(self.chart_data)["cancellation"]
     
     def _get_manglik_severity(self, mars_house: int) -> str:
-        """Get Manglik dosha severity"""
-        if mars_house == 7:
-            return 'High'  # Direct impact on marriage house
-        elif mars_house == 8:
-            return 'Medium'  # Longevity and obstacles
-        return 'Low'
+        """Legacy compatibility method; the selected classic supplies no severity band."""
+        return 'Present' if calculate_classical_mangal_dosha(self.chart_data)["present"] else 'None'

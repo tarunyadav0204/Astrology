@@ -12,6 +12,10 @@ from typing import Any, Dict, Iterable, List, Sequence, Set, Tuple
 from calculators.badhaka_calculator import BadhakaCalculator
 from calculators.avayogi_policy import avayogi_effect
 from calculators.friendship_calculator import FriendshipCalculator
+from calculators.classical_neecha_bhanga import (
+    calculate_classical_neecha_bhanga,
+    legacy_reason_ids,
+)
 
 from .contracts import Polarity
 from .primitives import CLASSICAL_PLANETS, aspected_houses, planetary_connections, ruled_houses
@@ -76,37 +80,21 @@ def _house_lord(chart: Dict[str, Any], house: int) -> str:
 
 
 def _neecha_bhanga(chart: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    """Conservative D1 cancellation conditions with exact provenance.
+    """Compatibility view of the canonical Phaladeepika 7.26-30 result."""
 
-    Cancellation removes an automatic debilitation penalty; it does not turn a
-    debilitated planet into an unqualified benefic or Raja Yoga.
-    """
-
-    moon_house = int(chart["planets"]["Moon"]["house"])
     result: Dict[str, Dict[str, Any]] = {}
-    for planet, debilitation_sign in DEBILITATION_SIGNS.items():
-        placement = chart["planets"].get(planet)
-        if not placement or int(placement["sign"]) != debilitation_sign:
-            continue
-        reasons: List[str] = []
-        debilitation_lord = BadhakaCalculator.SIGN_LORDS[debilitation_sign]
-        exaltation_lord = BadhakaCalculator.SIGN_LORDS[EXALTATION_SIGNS[planet]]
-        for role, lord in (
-            ("debilitation_sign_lord", debilitation_lord),
-            ("exaltation_sign_lord", exaltation_lord),
-        ):
-            lord_house = int(chart["planets"][lord]["house"])
-            if _is_kendra_from(1, lord_house):
-                reasons.append(f"{role}_in_kendra_from_lagna")
-            if _is_kendra_from(moon_house, lord_house):
-                reasons.append(f"{role}_in_kendra_from_moon")
-        if planetary_connections(chart, planet, debilitation_lord):
-            reasons.append("debilitated_planet_connected_to_sign_lord")
+    for planet, row in calculate_classical_neecha_bhanga(chart).items():
+        # Existing prediction contracts keep their compact reason aliases while
+        # the complete classical evidence remains available additively.
+        reasons = legacy_reason_ids(row) or list(row["matched_rule_ids"])
         result[planet] = {
-            "cancelled": bool(reasons),
-            "reasons": tuple(dict.fromkeys(reasons)),
-            "debilitation_sign_lord": debilitation_lord,
-            "exaltation_sign_lord": exaltation_lord,
+            "cancelled": bool(row["neecha_bhanga_present"]),
+            "reasons": tuple(reasons),
+            "debilitation_sign_lord": row["debilitation_sign_lord"],
+            "exaltation_sign_lord": row["exaltation_sign_lord"],
+            "matched_rule_ids": tuple(row["matched_rule_ids"]),
+            "classical_conditions": tuple(row["conditions_met"]),
+            "source": row["source"],
         }
     return result
 

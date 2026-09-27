@@ -313,12 +313,19 @@ class PlanetAnalyzer(BaseCalculator):
         
         dignity_data = self.dignities_data[planet_name]
         combustion_status = dignity_data.get('combustion_status', 'normal')
+        combustion = dignity_data.get('combustion') or {}
         
         return {
             'is_combust': combustion_status == 'combust',
-            'is_cazimi': combustion_status == 'cazimi',
+            'is_cazimi': False,
             'status': combustion_status,
-            'effect': self._get_combustion_effect(combustion_status)
+            'effect': self._get_combustion_effect(combustion_status),
+            'angular_distance': combustion.get('angular_distance'),
+            'threshold': combustion.get('threshold'),
+            'motion': combustion.get('motion'),
+            'direct_threshold': combustion.get('direct_threshold'),
+            'retrograde_threshold': combustion.get('retrograde_threshold'),
+            'source': combustion.get('source'),
         }
     
     def _get_retrograde_analysis(self, planet_name, planet_data):
@@ -545,7 +552,6 @@ class PlanetAnalyzer(BaseCalculator):
         """Get combustion effect"""
         effects = {
             'combust': 'Planet is weakened by Sun, may struggle to express qualities',
-            'cazimi': 'Planet is empowered by Sun, enhanced expression of qualities',
             'normal': 'No combustion effects'
         }
         return effects.get(status, 'Unknown status')
@@ -714,9 +720,6 @@ class PlanetAnalyzer(BaseCalculator):
         if combustion_status == 'combust':
             effect_score -= 2
             calculation_details.append(f"Planet is combust: -2 points")
-        elif combustion_status == 'cazimi':
-            effect_score += 2
-            calculation_details.append(f"Planet is cazimi: +2 points")
         else:
             calculation_details.append(f"No combustion effects: 0 points")
         
@@ -953,10 +956,7 @@ class PlanetAnalyzer(BaseCalculator):
         if analysis['combustion_status']['is_combust']:
             score -= 25
             conditions.append('Combust')
-        elif analysis['combustion_status']['is_cazimi']:
-            score += 20
-            conditions.append('Cazimi')
-        
+
         # Retrograde analysis
         planet_name = analysis['basic_info']['planet']
         if analysis['retrograde_analysis']['is_retrograde']:
@@ -1032,10 +1032,6 @@ class PlanetAnalyzer(BaseCalculator):
         benefic_conjunctions = [c for c in analysis['conjunctions']['conjunctions'] if c['type'] == 'benefic']
         if len(benefic_conjunctions) >= 1:
             strengths.append(f"Benefic conjunctions ({len(benefic_conjunctions)})")
-        
-        # Special conditions
-        if analysis['combustion_status']['is_cazimi']:
-            strengths.append("Cazimi empowerment")
         
         return strengths
     

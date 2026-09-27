@@ -11,6 +11,8 @@ class RuleProfile:
     key: str
     label: str
     description: str
+    # Deprecated compatibility fields. The canonical BPHS 80.47 calculator
+    # owns Mangal Dosha rules; profiles may not alter the cited verse.
     manglik_houses: FrozenSet[int]
     nadi_same_nakshatra_diff_pada_exception: bool
     nadi_same_rashi_exception: bool
@@ -27,7 +29,7 @@ RULE_PROFILES: Dict[str, RuleProfile] = {
         key="classical_strict",
         label="Classical Strict",
         description="Conservative rule handling with minimal exception relief.",
-        manglik_houses=frozenset({1, 2, 4, 7, 8, 12}),
+        manglik_houses=frozenset({1, 4, 7, 8, 12}),
         nadi_same_nakshatra_diff_pada_exception=False,
         nadi_same_rashi_exception=False,
         bhakoot_same_ruler_exception=True,
@@ -35,13 +37,13 @@ RULE_PROFILES: Dict[str, RuleProfile] = {
         manglik_pair_cancellation=True,
         manglik_benefic_cancellation=True,
         manglik_jupiter_aspect_cancellation=True,
-        manglik_own_exalted_cancellation=True,
+        manglik_own_exalted_cancellation=False,
     ),
     "balanced_modern": RuleProfile(
         key="balanced_modern",
         label="Balanced Modern",
         description="Classical raw scoring with practical exception handling for real-world matching.",
-        manglik_houses=frozenset({1, 2, 4, 7, 8, 12}),
+        manglik_houses=frozenset({1, 4, 7, 8, 12}),
         nadi_same_nakshatra_diff_pada_exception=True,
         nadi_same_rashi_exception=True,
         bhakoot_same_ruler_exception=True,
@@ -49,13 +51,13 @@ RULE_PROFILES: Dict[str, RuleProfile] = {
         manglik_pair_cancellation=True,
         manglik_benefic_cancellation=True,
         manglik_jupiter_aspect_cancellation=True,
-        manglik_own_exalted_cancellation=True,
+        manglik_own_exalted_cancellation=False,
     ),
     "southern_practical": RuleProfile(
         key="southern_practical",
         label="Southern Practical",
-        description="Practical profile with broader Manglik house scope and generous cancellation handling.",
-        manglik_houses=frozenset({1, 2, 4, 7, 8, 12}),
+        description="Regional matching profile; Mangal Dosha itself remains fixed to the cited classical method.",
+        manglik_houses=frozenset({1, 4, 7, 8, 12}),
         nadi_same_nakshatra_diff_pada_exception=True,
         nadi_same_rashi_exception=True,
         bhakoot_same_ruler_exception=True,
@@ -63,7 +65,7 @@ RULE_PROFILES: Dict[str, RuleProfile] = {
         manglik_pair_cancellation=True,
         manglik_benefic_cancellation=True,
         manglik_jupiter_aspect_cancellation=True,
-        manglik_own_exalted_cancellation=True,
+        manglik_own_exalted_cancellation=False,
     ),
 }
 

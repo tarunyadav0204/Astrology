@@ -1,5 +1,10 @@
 from .base_calculator import BaseCalculator
 from .aspect_calculator import AspectCalculator
+from .classical_mangal_dosha import calculate_classical_mangal_dosha
+from .classical_neecha_bhanga import calculate_classical_neecha_bhanga
+from .classical_pitri_shapa import calculate_classical_pitri_shapa
+from .nodal_enclosure_calculator import calculate_nodal_enclosure
+from .planet_result_delivery import calculate_planet_result_delivery
 
 class YogaCalculator(BaseCalculator):
     """Calculate various Vedic yogas and combinations"""
@@ -127,78 +132,43 @@ class YogaCalculator(BaseCalculator):
         return mahapurusha_yogas
     
     def calculate_neecha_bhanga_yogas(self):
-        """Calculate Neecha Bhanga Yogas (debilitation cancellation)"""
-        planets = self.chart_data.get('planets', {})
-        neecha_bhanga_yogas = []
-        
-        debilitation_signs = {
-            'Sun': 6, 'Moon': 7, 'Mars': 3, 'Mercury': 11,
-            'Jupiter': 9, 'Venus': 5, 'Saturn': 0
-        }
-        exaltation_signs = {
-            'Sun': 0, 'Moon': 1, 'Mars': 9, 'Mercury': 5,
-            'Jupiter': 3, 'Venus': 11, 'Saturn': 6
-        }
-
-        for planet_name, debil_sign in debilitation_signs.items():
-            if planet_name in planets:
-                planet_data = planets[planet_name]
-                current_sign = planet_data.get('sign', 0)
-                
-                if current_sign == debil_sign:
-                    cancellation_reasons = []
-                    
-                    # Rule 1: Lord of the debilitation sign is in a Kendra from Lagna or Moon.
-                    debil_lord = self.SIGN_LORDS[debil_sign]
-                    if debil_lord in planets:
-                        debil_lord_house = planets[debil_lord].get('house', 1)
-                        moon_house = planets['Moon'].get('house', 1)
-                        debil_lord_house_from_moon = (debil_lord_house - moon_house + 12) % 12 + 1
-                        if debil_lord_house in [1, 4, 7, 10] or debil_lord_house_from_moon in [1, 4, 7, 10]:
-                            cancellation_reasons.append(f"Lord of debilitation sign, {debil_lord}, is in a Kendra from Lagna or Moon.")
-
-                    # Rule 2: Lord of the exaltation sign of the debilitated planet is in a Kendra from Lagna or Moon.
-                    exalt_sign = exaltation_signs[planet_name]
-                    exalt_lord = self.SIGN_LORDS[exalt_sign]
-                    if exalt_lord in planets:
-                        exalt_lord_house = planets[exalt_lord].get('house', 1)
-                        moon_house = planets['Moon'].get('house', 1)
-                        exalt_lord_house_from_moon = (exalt_lord_house - moon_house + 12) % 12 + 1
-                        if exalt_lord_house in [1, 4, 7, 10] or exalt_lord_house_from_moon in [1, 4, 7, 10]:
-                            cancellation_reasons.append(f"Lord of exaltation sign, {exalt_lord}, is in a Kendra from Lagna or Moon.")
-                    
-                    # Rule 3: The debilitated planet is aspected by its exaltation lord.
-                    exalt_lord_aspects = self.aspect_calc.get_aspecting_planets(planet_data.get('house'))
-                    if exalt_lord in exalt_lord_aspects:
-                        cancellation_reasons.append(f"Debilitated planet is aspected by its exaltation lord, {exalt_lord}.")
-
-                    # Rule 4: The debilitated planet is in conjunction with its exaltation lord.
-                    if exalt_lord in planets and planets[exalt_lord].get('house') == planet_data.get('house'):
-                         cancellation_reasons.append(f"Debilitated planet is conjunct with its exaltation lord, {exalt_lord}.")
-                    
-                    # Rule 5: The debilitated planet is aspected by the lord of the sign it is in.
-                    debil_lord_aspects = self.aspect_calc.get_aspecting_planets(planet_data.get('house'))
-                    if debil_lord in debil_lord_aspects:
-                        cancellation_reasons.append(f"Debilitated planet is aspected by the lord of its sign, {debil_lord}.")
-
-                    # Rule 6: Two debilitated planets aspecting each other.
-                    for other_planet, other_debil_sign in debilitation_signs.items():
-                        if other_planet != planet_name and other_planet in planets and planets[other_planet].get('sign') == other_debil_sign:
-                            other_planet_data = planets[other_planet]
-                            # Check for mutual aspect
-                            if self._are_planets_connected(planet_data, other_planet_data):
-                                cancellation_reasons.append(f"Debilitated planet is in mutual aspect with another debilitated planet, {other_planet}.")
-
-                    if cancellation_reasons:
-                        neecha_bhanga_yogas.append({
-                            'name': 'Neecha Bhanga Raja Yoga',
-                            'planet': planet_name,
-                            'reason': " ".join(cancellation_reasons),
-                            'strength': 'Medium',
-                            'description': f'{planet_name} debilitation cancelled.'
-                        })
-        
-        return neecha_bhanga_yogas
+        """Calculate only Phaladeepika 7.26-30 Neecha Bhanga Raja Yogas."""
+        yogas = []
+        classical_results = calculate_classical_neecha_bhanga(self.chart_data)
+        delivery_planets = (self.chart_data.get("planet_result_delivery") or {}).get("planets")
+        if not isinstance(delivery_planets, dict):
+            delivery_chart = dict(self.chart_data)
+            delivery_chart["neecha_bhanga"] = classical_results
+            delivery_planets = calculate_planet_result_delivery(delivery_chart)["planets"]
+        for planet, result in classical_results.items():
+            if not result["neecha_bhanga_present"]:
+                continue
+            conditions = result["conditions_met"]
+            references = sorted({row["reference"] for row in conditions})
+            yogas.append({
+                # Existing client fields are retained.
+                "name": "Neecha Bhanga Raja Yoga",
+                "planet": planet,
+                "planets": [planet],
+                "house": self.chart_data["planets"][planet].get("house"),
+                "houses": [self.chart_data["planets"][planet].get("house")],
+                "strength": "Established",
+                "description": (
+                    f"{planet} is debilitated in {result['debilitation_sign']} and meets "
+                    f"{len(conditions)} condition(s) stated in Phaladeepika 7.26-30."
+                ),
+                "reason": " ".join(row["description"] for row in conditions),
+                # Additive structured fields for the new UI and downstream clients.
+                "raja_yoga_present": True,
+                "condition_count": len(conditions),
+                "classical_conditions": conditions,
+                "matched_rule_ids": result["matched_rule_ids"],
+                "references": references,
+                "classical_result": result["classical_result"],
+                "source": result["source"],
+                "result_delivery": delivery_planets.get(planet),
+            })
+        return yogas
     
     def calculate_gaja_kesari_yoga(self):
         """Calculate Gaja Kesari Yoga (Moon-Jupiter)"""
@@ -1403,28 +1373,28 @@ class YogaCalculator(BaseCalculator):
         return yogas
     
     def _calculate_mangal_dosha(self):
-        """Calculate Mangal Dosha (Mars affliction in marriage houses)"""
-        yogas = []
-        planets = self.chart_data.get('planets', {})
-        
-        if 'Mars' not in planets:
-            return yogas
-        
-        mars_house = planets['Mars'].get('house', 1)
-        mangal_dosha_houses = [1, 2, 4, 7, 8, 12]
-        
-        if mars_house in mangal_dosha_houses:
-            severity = 'High' if mars_house in [1, 7, 8] else 'Medium'
-            yogas.append({
-                'name': 'Mangal Dosha',
-                'planet': 'Mars',
-                'house': mars_house,
-                'strength': severity,
-                'type': 'affliction',
-                'description': f'Mars in {mars_house}th house - marriage delays and conflicts'
-            })
-        
-        return yogas
+        """Compatibility yoga-card view of the canonical Mangal Dosha result."""
+        result = calculate_classical_mangal_dosha(self.chart_data)
+        if not result["present"]:
+            return []
+        return [{
+            'name': 'Mangal Dosha',
+            'planet': 'Mars',
+            'planets': ['Mars'],
+            'house': result['mars_house'],
+            'houses': [result['mars_house']],
+            'strength': None,
+            'type': 'affliction',
+            'description': result['summary'],
+            'classical_status': result['status'],
+            'classical_conditions': [{
+                'rule_id': row['rule_id'],
+                'description': row['fact'],
+                'matched': row['matched'],
+            } for row in result['evidence']],
+            'source': result['source'],
+            'textual_variants': result['textual_variants'],
+        }]
     
     def _calculate_kalatra_yogas(self):
         """Calculate Kalatra (marriage) yogas"""
@@ -1543,167 +1513,13 @@ class YogaCalculator(BaseCalculator):
         }
     
     def _check_mangal_dosha(self):
-        """Mars in 1, 2, 4, 7, 8, 12 from Lagna or Moon"""
-        planets = self.chart_data.get('planets', {})
-        if 'Mars' not in planets or 'Moon' not in planets:
-            return {"present": False, "note": "Missing planetary data"}
-        
-        mars_sign = planets['Mars']['sign']
-        moon_sign = planets['Moon']['sign']
-        
-        dosha_houses = [1, 2, 4, 7, 8, 12]
-        
-        # Check from Lagna
-        mars_house_lagna = ((mars_sign - self.ascendant_sign) % 12) + 1
-        is_manglik_lagna = mars_house_lagna in dosha_houses
-        
-        # Check from Moon
-        mars_house_moon = ((mars_sign - moon_sign) % 12) + 1
-        is_manglik_moon = mars_house_moon in dosha_houses
-        
-        return {
-            "present": is_manglik_lagna or is_manglik_moon,
-            "type": "High" if (is_manglik_lagna and is_manglik_moon) else "Low",
-            "from_lagna": is_manglik_lagna,
-            "from_moon": is_manglik_moon,
-            "mars_house_lagna": mars_house_lagna,
-            "mars_house_moon": mars_house_moon
-        }
+        """Canonical result with all legacy keys preserved additively."""
+        return calculate_classical_mangal_dosha(self.chart_data)
     
     def _check_kaal_sarp(self):
-        """All planets hemmed between Rahu and Ketu"""
-        planets = self.chart_data.get('planets', {})
-        if 'Rahu' not in planets or 'Ketu' not in planets:
-            return {"present": False, "note": "Missing node data"}
-
-        rahu_house = planets['Rahu'].get('house')
-        ketu_house = planets['Ketu'].get('house')
-        
-        # All other planets
-        other_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
-        
-        # Check if all other planets are between Rahu and Ketu
-        is_kal_sarp = True
-        for planet in other_planets:
-            if planet in planets:
-                p_house = planets[planet].get('house')
-                # This is a simplified check, a more accurate one would be to check the longitude
-                if not (rahu_house < p_house < ketu_house or (ketu_house < rahu_house and (p_house > rahu_house or p_house < ketu_house))):
-                     is_kal_sarp = False
-                     break
-        
-        if not is_kal_sarp:
-            # Check the other way around
-            is_kal_sarp = True
-            for planet in other_planets:
-                if planet in planets:
-                    p_house = planets[planet].get('house')
-                    if not (ketu_house < p_house < rahu_house or (rahu_house < ketu_house and (p_house > ketu_house or p_house < rahu_house))):
-                        is_kal_sarp = False
-                        break
-
-        if not is_kal_sarp:
-            return {"present": False}
-
-        # Determine the type of Kaal Sarp Yoga
-        kaal_sarp_type = ""
-        if rahu_house == 1:
-            kaal_sarp_type = "Anant"
-        elif rahu_house == 2:
-            kaal_sarp_type = "Kulik"
-        elif rahu_house == 3:
-            kaal_sarp_type = "Vasuki"
-        elif rahu_house == 4:
-            kaal_sarp_type = "Shankhpal"
-        elif rahu_house == 5:
-            kaal_sarp_type = "Padma"
-        elif rahu_house == 6:
-            kaal_sarp_type = "Mahapadma"
-        elif rahu_house == 7:
-            kaal_sarp_type = "Takshak"
-        elif rahu_house == 8:
-            kaal_sarp_type = "Karkotak"
-        elif rahu_house == 9:
-            kaal_sarp_type = "Shankhachood"
-        elif rahu_house == 10:
-            kaal_sarp_type = "Ghatak"
-        elif rahu_house == 11:
-            kaal_sarp_type = "Vishdhar"
-        elif rahu_house == 12:
-            kaal_sarp_type = "Sheshnag"
-
-        # Check for cancellations
-        cancellation_reasons = []
-        # 1. If Lagna lord is strong
-        lagna_lord = self._get_house_lord(1)
-        if lagna_lord and lagna_lord in planets:
-            # This is a simplified check for strength. A more detailed check would be needed for a world-class calculator.
-            if planets[lagna_lord].get('strength', 'Medium') == 'High':
-                cancellation_reasons.append("Lagna lord is strong.")
-                
-        # 2. If there is a strong Raja Yoga
-        if self.calculate_raj_yogas():
-            cancellation_reasons.append("A strong Raja Yoga is present.")
-
-        return {
-            "present": True,
-            "type": kaal_sarp_type,
-            "cancellation": bool(cancellation_reasons),
-            "cancellation_reason": " ".join(cancellation_reasons)
-        }
+        """Exact geometry for the explicitly modern nodal-enclosure convention."""
+        return calculate_nodal_enclosure(self.chart_data)
     
     def _check_pitra_dosha(self):
-        """Sun or Moon afflicted by Nodes or Saturn in 9th"""
-        planets = self.chart_data.get('planets', {})
-        if not planets:
-            return {"present": False, "note": "Missing planetary data"}
-
-        pitra_dosha_reasons = []
-
-        # 1. Check afflictions to the 9th house from Lagna, Sun, and Moon
-        for ref_point in ['ascendant', 'Sun', 'Moon']:
-            if ref_point == 'ascendant':
-                ref_house = 1
-            elif ref_point in planets:
-                ref_house = planets[ref_point].get('house')
-            else:
-                continue
-                
-            ninth_house = (ref_house + 8 - 1) % 12 + 1
-            
-            for malefic in ['Rahu', 'Ketu', 'Saturn']:
-                if malefic in planets and planets[malefic].get('house') == ninth_house:
-                    pitra_dosha_reasons.append(f"{malefic} in the 9th house from {ref_point}.")
-
-        # 2. Check afflictions to the 9th lord
-        ninth_lord = self._get_house_lord(9)
-        if ninth_lord and ninth_lord in planets:
-            ninth_lord_house = planets[ninth_lord].get('house')
-            # Affliction by conjunction
-            for malefic in ['Rahu', 'Ketu', 'Saturn']:
-                if malefic in planets and planets[malefic].get('house') == ninth_lord_house:
-                    pitra_dosha_reasons.append(f"9th lord {ninth_lord} is conjunct with {malefic}.")
-            # Affliction by aspect
-            aspecting_planets = self.aspect_calc.get_aspecting_planets(ninth_lord_house)
-            for malefic in ['Rahu', 'Ketu', 'Saturn']:
-                if malefic in aspecting_planets:
-                    pitra_dosha_reasons.append(f"9th lord {ninth_lord} is aspected by {malefic}.")
-
-        # 3. Check afflictions to Sun and Moon
-        for luminary in ['Sun', 'Moon']:
-            if luminary in planets:
-                luminary_house = planets[luminary].get('house')
-                for malefic in ['Rahu', 'Ketu', 'Saturn']:
-                    if malefic in planets and planets[malefic].get('house') == luminary_house:
-                        pitra_dosha_reasons.append(f"{luminary} is conjunct with {malefic}.")
-                    aspecting_planets = self.aspect_calc.get_aspecting_planets(luminary_house)
-                    if malefic in aspecting_planets:
-                        pitra_dosha_reasons.append(f"{luminary} is aspected by {malefic}.")
-
-        if pitra_dosha_reasons:
-            return {
-                "present": True,
-                "reasons": list(set(pitra_dosha_reasons)) # remove duplicates
-            }
-
-        return {"present": False}
+        """Legacy method name; result now follows BPHS 83.20-30 only."""
+        return calculate_classical_pitri_shapa(self.chart_data)

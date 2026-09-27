@@ -49,7 +49,7 @@ DEFAULT_BROADCAST_NUDGES = [
     {"title": "Master Numbers", "body": "Does your birth date hold a hidden numerology code for extreme success? Let's decode it before your birthday.", "category": "hidden_traits_karma"},
     {"title": "Your Spirit Guide", "body": "Which cosmic energy is protecting you? Find your Ishta Devata for ultimate peace, protection, and success.", "category": "hidden_traits_karma"},
     {"title": "Foreign Land Calling", "body": "Does your chart say you belong in another country? Find out if your fortune actually lies across the ocean.", "category": "hidden_traits_karma"},
-    {"title": "Ancestral Blessings", "body": "Are your ancestors angry or blessing you? Check for Pitra Dosha and clear the invisible obstacles in your path.", "category": "hidden_traits_karma"},
+    {"title": "Family Lineage Reflection", "body": "Explore the family and lineage patterns shown in your chart without treating every ninth-house pressure as Pitra Dosha.", "category": "hidden_traits_karma"},
     {"title": "Gemstone Magic", "body": "You might be wearing the wrong colors! Discover the one gemstone that can instantly turn your luck around.", "category": "hidden_traits_karma"},
     {"title": "Avoid These Dates!", "body": "Every month has highly inauspicious dates for your specific zodiac sign. Note them down before planning anything big.", "category": "hidden_traits_karma"},
     {"title": "Your Ultimate Destiny", "body": "What is the main purpose of your birth? Stop wandering aimlessly and find out what you were truly born to do.", "category": "hidden_traits_karma"},

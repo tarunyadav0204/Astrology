@@ -11,6 +11,7 @@ from calculators.planet_analyzer import PlanetAnalyzer
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.chara_karaka_calculator import CharaKarakaCalculator
 from calculators.yoga_calculator import YogaCalculator
+from calculators.classical_pitri_shapa import compact_pitri_shapa_for_ai
 from calculators.badhaka_calculator import BadhakaCalculator
 from calculators.argala_calculator import ArgalaCalculator
 from calculators.planetary_war_calculator import PlanetaryWarCalculator
@@ -64,7 +65,7 @@ Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g.,
 ### If the user asks about MARRIAGE/RELATIONSHIPS:
 - Analyze 7th House, 7th Lord, and Venus (for men) / Jupiter (for women).
 - Crucial: Check the D9 Navamsa 7th house and Lagna.
-- Mangal Dosha: If the JSON flags Mangal Dosha, check for cancellations (e.g., Mars in own sign, aspected by Jupiter). Do not bluntly say "Marriage will fail." Say "Marriage requires patience and conscious effort."
+- Mangal Dosha: Use only the canonical structured result. BPHS 80.47 requires Mars in House 1, 4, 7, 8, or 12 from Lagna and no benefic aspect or conjunction. Do not add own-sign, age, D9, severity, ritual, or percentage shortcuts. Keep the single-chart formation separate from the cited two-chart pair rule, and never turn it into a claim that marriage will fail.
 
 ### If the user asks about CAREER:
 - Analyze 10th House, Saturn, and the Amatyakaraka.
@@ -232,7 +233,7 @@ For every user query, structure your response exactly as follows:
             },
             
             # Yogas
-            "yogas": yoga_calc.calculate_all_yogas(),
+            "yogas": compact_pitri_shapa_for_ai(yoga_calc.calculate_all_yogas()),
             
             # Chara Karakas
             "chara_karakas": chara_karaka_calc.calculate_chara_karakas(),

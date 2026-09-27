@@ -210,11 +210,13 @@ D60 refines hidden karmic residue, but it is not a standalone verdict. If D9/D1 
 **Planets:** {self._format_vargottama(vargottama.get('vargottama_planets', []))}
 **Significance:** {vargottama.get('significance', '')}
 
-## ANCESTRAL KARMA (Pitru Dosha)
-**Has Ancestral Debt:** {pitru.get('has_ancestral_debt', False)}
+## CLASSICAL PITRI-SHAPA CHECK (PROGENY SCOPE ONLY)
+Do not generalize this result into career, money, health, marriage, or an all-purpose ancestral debt.
+**Complete BPHS Combination Present:** {pitru.get('present', False)}
 **Type:** {pitru.get('type', 'None')}
+**Matched Verses:** {', '.join(pitru.get('matched_rule_ids', [])) or 'None'}
 **Remedy:** {pitru.get('remedy', '')}
-**Karmic Meaning:** {pitru.get('karmic_meaning', '')}
+**Scope Note:** {pitru.get('karmic_meaning', '')}
 
 ## MATERNAL KARMA (Matru Dosha)
 **Has Maternal Debt:** {matru.get('has_maternal_debt', False)}

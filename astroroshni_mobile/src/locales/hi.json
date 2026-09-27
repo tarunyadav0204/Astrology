@@ -283,8 +283,7 @@
         "badhakaAxis": "यह भाव लग्न के बाधक अक्ष में पड़ता है।",
         "cuspGandanta": "भाव की कुस्प स्वयं गंडांत में पड़ती है।",
         "mangalDosha": "मंगल दोष इस भाव अक्ष को प्रभावित कर रहा है।",
-        "kaalSarp": "काल सर्प दोष यहाँ कुंडली पैटर्न पर दबाव बढ़ाता है।",
-        "pitraDosha": "पितृ दोष सीधे नवम भाव के विषयों को प्रभावित कर रहा है।",
+        "pitraDosha": "इस कुंडली में BPHS का पूर्ण पितृ-शाप योग संतान से संबंधित है।",
         "uttama": "समग्र भाव मूल्यांकन उत्तम आता है।",
         "adhama": "समग्र भाव मूल्यांकन अधम आता है।",
         "gandantaResidents": "गंडांत स्थित ग्रह {{planets}} को प्रभावित करता है।",
@@ -326,7 +325,8 @@
         "dashaLord": "{{dasha}} भावेश {{planet}} के माध्यम से चल रही है।",
         "dashaOccupant": "{{dasha}} इस भाव के स्थित ग्रह {{planet}} के माध्यम से चल रही है।",
         "dashaAspect": "{{dasha}} {{planet}} के माध्यम से चल रही है, जो इस भाव पर दृष्टि डालते हैं।",
-        "transitsInclude": "इस राशि में वर्तमान गोचर में {{planets}} शामिल हैं।"
+        "transitsInclude": "इस राशि में वर्तमान गोचर में {{planets}} शामिल हैं।",
+        "pitriShapa": "इस कुंडली में BPHS का पूर्ण पितृ-शाप योग संतान से संबंधित है।"
       },
       "gandantaPlanets": "इस भाव में एक या अधिक ग्रह गंडांत में हैं।"
     },
@@ -504,7 +504,18 @@
     "close": "बंद करें"
   },
   "authOnboarding": {
-    "welcomeEyebrow": "आपकी वैदिक मार्गदर्शिका", "welcomeHero": "तारा से मिलें।\nअपना जीवन पढ़ें।", "welcomeHeroBody": "आपकी संपूर्ण कुंडली—पाराशरी, नाड़ी, जैमिनी और केपी के संयुक्त अध्ययन से—स्पष्ट मार्गदर्शन में।", "analysisLayers": "विश्लेषण परतें", "vedicSystems": "वैदिक पद्धतियाँ", "createAccount": "खाता बनाएँ", "signIn": "साइन इन", "languageEyebrow": "इसे अपना बनाएँ", "legalPrefix": "आगे बढ़कर आप हमारी", "terms": "सेवा की शर्तों", "and": "और", "privacy": "गोपनीयता नीति से सहमत हैं",
+    "welcomeEyebrow": "आपकी वैदिक मार्गदर्शिका",
+    "welcomeHero": "तारा से मिलें।\nअपना जीवन पढ़ें।",
+    "welcomeHeroBody": "आपकी संपूर्ण कुंडली—पाराशरी, नाड़ी, जैमिनी और केपी के संयुक्त अध्ययन से—स्पष्ट मार्गदर्शन में।",
+    "analysisLayers": "विश्लेषण परतें",
+    "vedicSystems": "वैदिक पद्धतियाँ",
+    "createAccount": "खाता बनाएँ",
+    "signIn": "साइन इन",
+    "languageEyebrow": "इसे अपना बनाएँ",
+    "legalPrefix": "आगे बढ़कर आप हमारी",
+    "terms": "सेवा की शर्तों",
+    "and": "और",
+    "privacy": "गोपनीयता नीति से सहमत हैं",
     "chooseLanguageTitle": "अपनी भाषा चुनें",
     "chooseLanguageSubtitle": "हम इसे पूरे ऐप में उपयोग करेंगे। आप इसे कभी भी प्रोफ़ाइल से बदल सकते हैं।",
     "continue": "जारी रखें",
@@ -1350,14 +1361,26 @@
       "younger_sibling": "छोटे भाई या बहन",
       "elder_sibling": "बड़े भाई या बहन"
     },
-    "lifeOptions": { "living": "हाँ", "deceased": "नहीं", "unknown": "नहीं बताना चाहते" },
+    "lifeOptions": {
+      "living": "हाँ",
+      "deceased": "नहीं",
+      "unknown": "नहीं बताना चाहते"
+    },
     "workOptions": {
-      "employed": "नौकरी", "self_employed": "व्यवसाय", "homemaker": "गृहस्थी संभालते हैं",
-      "student": "पढ़ाई", "retired": "सेवानिवृत्त", "unemployed": "काम नहीं करते", "unknown": "पता नहीं"
+      "employed": "नौकरी",
+      "self_employed": "व्यवसाय",
+      "homemaker": "गृहस्थी संभालते हैं",
+      "student": "पढ़ाई",
+      "retired": "सेवानिवृत्त",
+      "unemployed": "काम नहीं करते",
+      "unknown": "पता नहीं"
     },
     "locationOptions": {
-      "with_native": "आपके साथ", "same_city": "उसी शहर में", "elsewhere_india": "भारत में किसी और जगह",
-      "abroad": "विदेश में", "unknown": "पता नहीं"
+      "with_native": "आपके साथ",
+      "same_city": "उसी शहर में",
+      "elsewhere_india": "भारत में किसी और जगह",
+      "abroad": "विदेश में",
+      "unknown": "पता नहीं"
     }
   },
   "monthlyDeepScreen": {

@@ -86,9 +86,10 @@ FUNCTIONAL_MULTIPLIERS = {
 
 # Combustion effects
 COMBUSTION_EFFECTS = {
-    'cazimi': 1.5,
     'normal': 1.0,
-    'combust': 0.4
+    # The selected classical source supplies no numeric multiplier. Keep the
+    # condition available in evidence without inventing score precision.
+    'combust': 1.0
 }
 
 # Ashtakavarga thresholds

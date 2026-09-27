@@ -112,19 +112,9 @@ class MarriageAnalyzer:
         }
     
     def _check_manglik_dosha(self, chart_data: Dict) -> Dict[str, Any]:
-        """Check for Mangal/Kuja Dosha (Mars in 7th, 8th houses only)"""
-        mars_data = chart_data['planets'].get('Mars', {})
-        mars_house = self._get_planet_house(mars_data, chart_data)
-        
-        is_manglik = mars_house in [7, 8]
-        
-        return {
-            'is_manglik': is_manglik,
-            'mars_house': mars_house,
-            'mars_sign': self._get_sign_name(mars_data.get('sign', 0)),
-            'severity': 'High' if mars_house == 7 else 'Medium' if mars_house == 8 else None,
-            'cancellation': {'has_cancellation': False}
-        }
+        """Use the shared classical calculator without D9 or severity shortcuts."""
+        from calculators.classical_mangal_dosha import calculate_classical_mangal_dosha
+        return calculate_classical_mangal_dosha(chart_data)
     
     def _calculate_overall_score(self, house_strength: Dict, karakas: Dict, manglik: Dict, d9_analysis: Dict = None) -> Dict[str, Any]:
         """Calculate overall marriage score with D9 integration and yoga scoring"""
@@ -140,13 +130,9 @@ class MarriageAnalyzer:
         # Calculate yoga score
         yoga_score = self._calculate_yoga_score(karakas, manglik)
         
+        # The selected classical rule supplies a formation and a pair rule,
+        # not a numeric deduction. Keep evidence separate from this score.
         manglik_penalty = 0
-        if manglik['is_manglik']:
-            severity = manglik.get('severity', 'Low')
-            if severity == 'High':
-                manglik_penalty = 1.5
-            elif severity == 'Medium':
-                manglik_penalty = 0.8
         
         # Updated weightage: D1 (70%) + D9 (30%) with yoga integration
         d1_component = (seventh_score * 0.3 + venus_score * 0.15 + jupiter_score * 0.1 + yoga_score * 0.15) * 0.7
@@ -277,7 +263,9 @@ class MarriageAnalyzer:
             recommendations.append("Strengthen Jupiter for wisdom in marriage decisions")
         
         if manglik['is_manglik']:
-            recommendations.append("Consider Manglik remedies or match with another Manglik")
+            recommendations.append(
+                "Mangal Dosha is present in the selected Lagna reading; compare the partner chart before drawing a pair-level conclusion"
+            )
         
         # D9 specific recommendations
         if d9_analysis:
@@ -324,7 +312,7 @@ class MarriageAnalyzer:
         if boy_manglik and girl_manglik:
             recommendations.append("Both are Manglik - mutual cancellation of dosha")
         elif boy_manglik or girl_manglik:
-            recommendations.append("One partner is Manglik - requires remedial measures")
+            recommendations.append("Mangal Dosha is present in one chart; apply the cited pair rule before drawing a compatibility conclusion")
         
         return recommendations
     
@@ -790,13 +778,8 @@ class MarriageAnalyzer:
         if venus_strength >= 6 and jupiter_strength >= 6:
             yoga_score += 0.2
         
-        # Malefic yogas
-        if manglik['is_manglik']:
-            severity = manglik.get('severity', 'Low')
-            if severity == 'High':
-                yoga_score -= 0.4
-            elif severity == 'Medium':
-                yoga_score -= 0.2
+        # Mangal Dosha remains structured evidence. The selected classical
+        # verse provides no numeric deduction for this product score.
         
         # Cap between -1.5 and +1.5
         return max(-1.5, min(1.5, yoga_score))

@@ -72,6 +72,24 @@ const DEBILITATION_SIGNS = { Sun: 6, Moon: 7, Mars: 3, Mercury: 11, Jupiter: 9, 
 const OWN_SIGNS = {
   Sun: [4], Moon: [3], Mars: [0, 7], Mercury: [2, 5], Jupiter: [8, 11], Venus: [1, 6], Saturn: [9, 10],
 };
+const NATURAL_FRIENDS = {
+  Sun: ['Moon', 'Mars', 'Jupiter'],
+  Moon: ['Sun', 'Mercury'],
+  Mars: ['Sun', 'Moon', 'Jupiter'],
+  Mercury: ['Sun', 'Venus'],
+  Jupiter: ['Sun', 'Moon', 'Mars'],
+  Venus: ['Mercury', 'Saturn'],
+  Saturn: ['Mercury', 'Venus'],
+};
+const NATURAL_ENEMIES = {
+  Sun: ['Venus', 'Saturn'],
+  Moon: [],
+  Mars: ['Mercury'],
+  Mercury: ['Moon'],
+  Jupiter: ['Mercury', 'Venus'],
+  Venus: ['Sun', 'Moon'],
+  Saturn: ['Sun', 'Moon', 'Mars'],
+};
 const MOOLATRIKONA_RANGES = {
   Sun: { sign: 4, start: 0, end: 20 },
   Moon: { sign: 1, start: 4, end: 30 },
@@ -82,13 +100,13 @@ const MOOLATRIKONA_RANGES = {
   Saturn: { sign: 10, start: 0, end: 20 },
 };
 
-const COMBUSTION_ORBS = {
-  Moon: 12,
-  Mars: 17,
-  Mercury: 14,
-  Jupiter: 11,
-  Venus: 10,
-  Saturn: 15,
+const COMBUSTION_LIMITS = {
+  Moon: { direct: 12, retrograde: null },
+  Mars: { direct: 17, retrograde: 8 },
+  Mercury: { direct: 14, retrograde: 12 },
+  Jupiter: { direct: 11, retrograde: 11 },
+  Venus: { direct: 10, retrograde: 8 },
+  Saturn: { direct: 16, retrograde: 16 },
 };
 
 export function normLon(lon) {
@@ -130,8 +148,16 @@ export function nakshatraLordOf(lon) {
 }
 
 export function getPlanetDignity(planet, sign, degree) {
-  if (EXALTATION_SIGNS[planet] === sign) return { key: 'ex', label: 'Exalted', short: 'Ex' };
-  if (DEBILITATION_SIGNS[planet] === sign) return { key: 'db', label: 'Debilitated', short: 'Db' };
+  // Nodes and mathematical points do not have one uncontested Parashari
+  // exaltation/ownership scheme.  Keep them explicit instead of silently
+  // applying a modern school-specific table.
+  if (!OWN_SIGNS[planet]) {
+    return { key: 'notGraded', labelKey: 'notGraded', label: 'Not classically graded', short: '—' };
+  }
+
+  // Moolatrikona is degree-bounded inside an own/exaltation sign, so it must
+  // be checked first.  This preserves, for example, Mercury 16°–20° Virgo as
+  // Moolatrikona rather than flattening all of Virgo into exaltation.
   const moola = MOOLATRIKONA_RANGES[planet];
   if (
     moola
@@ -139,12 +165,47 @@ export function getPlanetDignity(planet, sign, degree) {
     && degree != null
     && Number.isFinite(Number(degree))
     && Number(degree) >= moola.start
-    && Number(degree) <= moola.end
+    && Number(degree) < moola.end
   ) {
-    return { key: 'mt', label: 'Moolatrikona', short: 'MT' };
+    return { key: 'mt', labelKey: 'moolatrikona', label: 'Moolatrikona', short: 'MT' };
   }
-  if (OWN_SIGNS[planet]?.includes(sign)) return { key: 'own', label: 'Own', short: 'Own' };
-  return null;
+  if (EXALTATION_SIGNS[planet] === sign) {
+    // Mercury's Virgo dignity is degree-sensitive: after the 16°–20°
+    // Moolatrikona portion, the remaining own-sign portion is not labelled
+    // exalted merely because Virgo is also Mercury's exaltation sign.
+    if (
+      moola?.sign === sign
+      && Number.isFinite(Number(degree))
+      && Number(degree) >= moola.end
+      && OWN_SIGNS[planet].includes(sign)
+    ) {
+      return { key: 'own', labelKey: 'ownSign', label: 'Own sign', short: 'Own' };
+    }
+    return { key: 'ex', labelKey: 'exalted', label: 'Exalted', short: 'Ex' };
+  }
+  if (DEBILITATION_SIGNS[planet] === sign) {
+    return { key: 'db', labelKey: 'debilitated', label: 'Debilitated', short: 'Db' };
+  }
+  if (OWN_SIGNS[planet].includes(sign)) {
+    return { key: 'own', labelKey: 'ownSign', label: 'Own sign', short: 'Own' };
+  }
+  return { key: 'ordinary', labelKey: 'ordinary', label: 'Ordinary dignity', short: '—' };
+}
+
+export function getNaturalRelationship(planet, otherPlanet) {
+  if (!OWN_SIGNS[planet] || !OWN_SIGNS[otherPlanet]) {
+    return { key: 'traditionDependent', labelKey: 'traditionDependent', label: 'Tradition-dependent' };
+  }
+  if (planet === otherPlanet) {
+    return { key: 'self', labelKey: 'self', label: 'Own lord' };
+  }
+  if (NATURAL_FRIENDS[planet]?.includes(otherPlanet)) {
+    return { key: 'friend', labelKey: 'friend', label: 'Natural friend' };
+  }
+  if (NATURAL_ENEMIES[planet]?.includes(otherPlanet)) {
+    return { key: 'enemy', labelKey: 'enemy', label: 'Natural enemy' };
+  }
+  return { key: 'neutral', labelKey: 'neutral', label: 'Natural neutral' };
 }
 
 export function navamsaSign(longitude) {
@@ -169,7 +230,7 @@ export function isMooltrikona(planet, sign, degree) {
     && degree != null
     && Number.isFinite(Number(degree))
     && Number(degree) >= range.start
-    && Number(degree) <= range.end
+    && Number(degree) < range.end
   );
 }
 
@@ -180,17 +241,39 @@ function angularDistance(a, b) {
 }
 
 export function combustSet(chartData) {
-  const sunLon = longitudeOf(chartData?.planets?.Sun);
-  if (sunLon == null) return new Set();
   const set = new Set();
   Object.entries(chartData?.planets || {}).forEach(([planet, data]) => {
-    const orb = COMBUSTION_ORBS[planet];
-    if (!orb) return;
-    const lon = longitudeOf(data);
-    if (lon == null) return;
-    if (angularDistance(lon, sunLon) <= orb) set.add(planet);
+    if (combustionDetails(chartData, planet, data)?.isCombust) set.add(planet);
   });
   return set;
+}
+
+export function combustionDetails(chartData, planet, suppliedData) {
+  const data = suppliedData || chartData?.planets?.[planet];
+  const canonical = data?.combustion || chartData?.combustion?.planets?.[planet];
+  if (canonical && typeof canonical.is_combust === 'boolean') {
+    return {
+      applicable: canonical.applicable !== false,
+      isCombust: canonical.is_combust,
+      distance: canonical.angular_distance,
+      threshold: canonical.threshold,
+      motion: canonical.motion,
+    };
+  }
+  const limits = COMBUSTION_LIMITS[planet];
+  if (!limits) return { applicable: false, isCombust: false, distance: null, threshold: null, motion: null };
+  const sunLon = longitudeOf(chartData?.planets?.Sun);
+  const lon = longitudeOf(data);
+  const retrograde = !!data?.retrograde;
+  const threshold = retrograde && limits.retrograde != null ? limits.retrograde : limits.direct;
+  const distance = sunLon != null && lon != null ? angularDistance(lon, sunLon) : null;
+  return {
+    applicable: true,
+    isCombust: distance != null && distance <= threshold,
+    distance,
+    threshold,
+    motion: retrograde ? 'retrograde' : 'direct',
+  };
 }
 
 export function longitudeOf(data) {
@@ -228,12 +311,12 @@ function lordAbbr(lord) {
   return PLANET_ABBR[lord] || String(lord).slice(0, 2);
 }
 
-export function buildPlanetRows(chartData, karakas) {
+export function buildPlanetRows(chartData, karakas, conditionChartData = chartData) {
   const planets = chartData?.planets;
   if (!planets) return [];
   const lagnaSign = lagnaSignOf(chartData);
   const ck = karakaByPlanet(karakas);
-  const combust = combustSet(chartData);
+  const combust = combustSet(conditionChartData);
   const rows = [];
 
   const ascLon = longitudeOf(chartData?.ascendant) ?? longitudeOf(chartData?.houses?.[0]);
@@ -267,6 +350,8 @@ export function buildPlanetRows(chartData, karakas) {
     if (!data || typeof data.sign !== 'number') return;
     const lon = longitudeOf(data);
     const degree = typeof data.degree === 'number' ? data.degree : (lon != null ? normLon(lon) % 30 : null);
+    const nakLord = lon != null ? nakshatraLordOf(lon) : '—';
+    const signLord = SIGN_LORDS[data.sign];
     rows.push({
       name,
       abbr: planetAbbr(name),
@@ -274,17 +359,21 @@ export function buildPlanetRows(chartData, karakas) {
       sign: data.sign,
       signAbbr: SIGN_ABBR[data.sign] || '—',
       signName: SIGN_NAMES[data.sign] || '—',
-      lord: SIGN_LORDS[data.sign],
-      lordAbbr: lordAbbr(SIGN_LORDS[data.sign]),
+      lord: signLord,
+      lordAbbr: lordAbbr(signLord),
+      signLordRelationship: getNaturalRelationship(name, signLord),
       house: typeof data.house === 'number' ? data.house : houseOf(data.sign, lagnaSign),
       degree: fmtDeg(degree),
       nakshatra: lon != null ? nakshatraOf(lon) : '—',
       nakAbbr: lon != null ? nakshatraAbbr(lon) : '—',
       pada: lon != null ? padaOf(lon) : '—',
-      nakLord: lon != null ? nakshatraLordOf(lon) : '—',
+      nakLord,
+      nakLordRelationship: nakLord !== '—' ? getNaturalRelationship(name, nakLord) : null,
       longitude: lon,
       retro: !!data.retrograde && name !== 'Rahu' && name !== 'Ketu',
       combust: combust.has(name),
+      combustion: combustionDetails(conditionChartData, name, conditionChartData?.planets?.[name]),
+      neechaBhanga: !!data.neecha_bhanga,
       vargottama: lon != null && isVargottama(data.sign, lon),
       dignity: getPlanetDignity(name, data.sign, degree),
     });
@@ -293,8 +382,9 @@ export function buildPlanetRows(chartData, karakas) {
   return rows;
 }
 
-export function buildHouseRows(chartData) {
+export function buildHouseRows(chartData, conditionChartData = chartData) {
   const lagnaSign = lagnaSignOf(chartData);
+  const combust = combustSet(conditionChartData);
   const tenantsByHouse = {};
   TENANT_PLANETS.forEach((name) => {
     const data = chartData?.planets?.[name];
@@ -303,10 +393,12 @@ export function buildHouseRows(chartData) {
     if (!h) return;
     if (!tenantsByHouse[h]) tenantsByHouse[h] = [];
     const retro = !!(data.retrograde && name !== 'Rahu' && name !== 'Ketu');
+    const isCombust = combust.has(name);
     tenantsByHouse[h].push({
       name,
       retro,
-      mark: retro ? `${planetAbbr(name)}(R)` : planetAbbr(name),
+      combust: isCombust,
+      mark: `${planetAbbr(name)}${retro ? '(R)' : ''}${isCombust ? '(C)' : ''}`,
     });
   });
 
@@ -333,6 +425,7 @@ export function buildHouseRows(chartData) {
       lordAbbr: lordAbbr(lord),
       lordHouse: lordHouse || '—',
       dignity,
+      lordCombust: combust.has(lord),
       occupants: (tenantsByHouse[house] || []).map((person) => person.mark).join(' '),
       occupantList: tenantsByHouse[house] || [],
     };
@@ -355,12 +448,13 @@ export function buildNakshatraRows(planetRows) {
         people: [],
       });
     }
-    const mark = `${row.abbr}·${row.pada}${row.retro ? 'R' : ''}`;
+    const mark = `${row.abbr}·${row.pada}${row.retro ? 'R' : ''}${row.combust ? 'C' : ''}`;
     grouped.get(key).occupants.push(mark);
     grouped.get(key).people.push({
       name: row.name,
       pada: row.pada,
       retro: row.retro,
+      combust: row.combust,
     });
   });
   return Array.from(grouped.values()).sort((a, b) => a.index - b.index);

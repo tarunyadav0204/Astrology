@@ -79,8 +79,8 @@ PAGE_META = {
         "hi": ("योग सूची", "योग स्क्रीन वाले इंजन से सभी योग"),
     },
     "dosha_checks": {
-        "en": ("Dosha Checks", "Manglik, Kaal Sarp, and related checks"),
-        "hi": ("दोष जाँच", "मांगलिक, काल सर्प और संबंधित जाँच"),
+        "en": ("Chart Checks", "Classical doshas and clearly labelled later conventions"),
+        "hi": ("कुंडली जाँच", "शास्त्रीय दोष और स्पष्ट रूप से चिह्नित बाद की मान्यताएँ"),
     },
     "sade_sati": {
         "en": ("Shani Sade Sati", "Timelines from Moon-based Saturn transit"),
