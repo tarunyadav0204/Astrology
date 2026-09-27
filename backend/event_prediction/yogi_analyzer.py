@@ -1,7 +1,4 @@
-import swisseph as swe
-from datetime import datetime, timedelta
-from .house_significations import SIGN_LORDS, NATURAL_BENEFICS, NATURAL_MALEFICS, EXALTATION_SIGNS, DEBILITATION_SIGNS
-from utils.timezone_service import parse_timezone_offset
+from .house_significations import NATURAL_BENEFICS, NATURAL_MALEFICS, EXALTATION_SIGNS, DEBILITATION_SIGNS
 from calculators.yogi_calculator import YogiCalculator
 from calculators.avayogi_policy import avayogi_effect
 
@@ -14,54 +11,8 @@ class YogiAnalyzer:
         self.yogi_data = YogiCalculator(chart_data).calculate_yogi_points(birth_data)
         
     def _calculate_yogi_points(self):
-        """Calculate Yogi, Avayogi, and Dagdha Rashi points"""
-        time_parts = self.birth_data.time.split(':')
-        hour = float(time_parts[0]) + float(time_parts[1])/60
-        
-        tz_offset = parse_timezone_offset(
-            self.birth_data.timezone,
-            self.birth_data.latitude,
-            self.birth_data.longitude
-        )
-        
-        utc_hour = hour - tz_offset
-        jd = swe.julday(
-            int(self.birth_data.date.split('-')[0]),
-            int(self.birth_data.date.split('-')[1]),
-            int(self.birth_data.date.split('-')[2]),
-            utc_hour
-        )
-        
-        # Set Lahiri Ayanamsa for accurate Vedic calculations
-
-        
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
-
-        
-        sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
-        moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
-        
-        yogi_point = (sun_pos + moon_pos) % 360
-        avayogi_point = (yogi_point + 186.666667) % 360
-        dagdha_point = (avayogi_point + 12) % 360
-        
-        return {
-            'yogi': {
-                'longitude': yogi_point,
-                'sign': int(yogi_point / 30),
-                'lord': SIGN_LORDS[int(yogi_point / 30)]
-            },
-            'avayogi': {
-                'longitude': avayogi_point,
-                'sign': int(avayogi_point / 30),
-                'lord': SIGN_LORDS[int(avayogi_point / 30)]
-            },
-            'dagdha_rashi': {
-                'longitude': dagdha_point,
-                'sign': int(dagdha_point / 30),
-                'lord': SIGN_LORDS[int(dagdha_point / 30)]
-            }
-        }
+        """Compatibility entry point; the shared calculator is authoritative."""
+        return YogiCalculator(self.chart_data).calculate_yogi_points(self.birth_data)
     
     def analyze_yogi_impact_on_house(self, house_num):
         """Analyze how Yogi/Avayogi affects a specific house"""
@@ -70,7 +21,7 @@ class YogiAnalyzer:
         
         yogi_lord = self.yogi_data['yogi']['lord']
         avayogi_lord = self.yogi_data['avayogi']['lord']
-        dagdha_lord = self.yogi_data['dagdha_rashi']['lord']
+        dagdha_lord = (self.yogi_data.get('dagdha_rashi') or {}).get('lord')
         
         # Yogi lord impact (beneficial)
         yogi_impact = self._calculate_planet_impact_on_house(yogi_lord, house_num)

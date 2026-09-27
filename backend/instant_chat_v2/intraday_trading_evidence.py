@@ -47,7 +47,7 @@ def build_intraday_trading_session(
         )
     except Exception as exc:
         return {
-            "schema_version": "classical_intraday.v1", "date": str(target_date or "")[:10],
+            "schema_version": "classical_intraday.v2", "date": str(target_date or "")[:10],
             "available": False, "market_open": False, "participation": "sit_out", "windows": [],
             "calculation_error": {"type": type(exc).__name__, "message": str(exc)},
             "claim_rule": "The classical session calculation failed; no trading indication was inferred.",

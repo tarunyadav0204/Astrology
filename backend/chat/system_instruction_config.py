@@ -26,6 +26,10 @@ FETAL_SEX_ETHICS = """
 [NO-FETAL-SEX] You must NEVER predict, guess, or state the biological sex or gender of an unborn child, fetus, or pregnancy—including indirect or euphemistic wording in any language. Do not use chart factors (5th house, Jupiter, Putra karaka, D7, etc.) to imply boy/girl/ladka/ladki or equivalent. If the user asks for that, refuse briefly and offer safe alternatives (e.g. general progeny themes, pregnancy well-being framing without sex, timing of children as a topic without determining sex). This is independent of how strongly the chart might appear to "suggest" a sex; do not comply.
 """
 
+SPECIAL_POINTS_IDENTITY_LOCK = """
+[SPECIAL-POINTS-IDENTITY] When `special_points.yogi_points` is present, it is authoritative calculator output. Copy `yogi.lord`, `duplicate_yogi.lord`, `avayogi.lord`, and `tithi_dagdha_rashis` exactly. Never infer or recalculate those identities from dignity, lordship, yogas, dashas, or specialist prose. If another statement conflicts with these fields, these fields win. When the user asks about these points, state `Yogi: <planet>; Duplicate Yogi: <planet>; Avayogi: <planet>` before interpretation. Never merge Yogi and Duplicate Yogi into a plural "Yogis" label.
+"""
+
 # 2. SYNTHESIS RULES (Logic Gates)
 SYNTHESIS_RULES = """
 [GATE-0] DASHA IS KING (NON-NEGOTIABLE): Start from period activation, not static natal description. For predictive questions, first identify the active Vimshottari stack (MD/AD/PD and deeper levels when present) from the timeframe-matched source, then judge houses/lords/karakas those period lords signify, then apply transits as triggers.
@@ -718,7 +722,7 @@ def build_system_instruction(analysis_type=None, intent_category=None, include_a
         instruction += "\n" + CHART_ANALYSIS_STRUCTURE
 
     # Always add citations, memory, compliance, and data rules
-    instruction += "\n" + CLASSICAL_CITATIONS + "\n" + USER_MEMORY + "\n" + COMPLIANCE_RULES + "\n" + DASHA_DATES_SOVEREIGNTY + "\n" + TRANSIT_DATES_SOVEREIGNTY + "\n" + HOUSE_SIGNIFICATIONS + "\n" + BHAVAM_BHAVESH_RULES + "\n" + DATA_SOVEREIGNTY + "\n" + PERSONAL_CONSULTATION_RULES + "\n" + AVAYOGI_CHAT_DOCTRINE + "\n" + HOLISTIC_SYNTHESIS_RULE
+    instruction += "\n" + CLASSICAL_CITATIONS + "\n" + USER_MEMORY + "\n" + COMPLIANCE_RULES + "\n" + DASHA_DATES_SOVEREIGNTY + "\n" + TRANSIT_DATES_SOVEREIGNTY + "\n" + HOUSE_SIGNIFICATIONS + "\n" + BHAVAM_BHAVESH_RULES + "\n" + DATA_SOVEREIGNTY + "\n" + PERSONAL_CONSULTATION_RULES + "\n" + SPECIAL_POINTS_IDENTITY_LOCK + "\n" + AVAYOGI_CHAT_DOCTRINE + "\n" + HOLISTIC_SYNTHESIS_RULE
     
     return instruction
 
@@ -745,6 +749,7 @@ def build_merge_synthesis_instruction(*, mode: str | None = None, death_analysis
         death_ethics_block(death_analysis_unlocked),
         FETAL_SEX_ETHICS,
         DATA_SOVEREIGNTY,
+        SPECIAL_POINTS_IDENTITY_LOCK,
         AVAYOGI_CHAT_DOCTRINE,
         MERGE_BRANCH_TRUST_RULE,
     ]
@@ -921,7 +926,7 @@ For every user query, structure your response exactly as follows:
 - **The Master Clock (Vimshottari):** What the main Dasha indicates. Cite BPHS for dasha interpretations.
 - **Timing Synthesis (Multi-System):** [MANDATORY] You MUST cite the Chara Sign and Yogini Lord from the JSON here. Format: "This is confirmed by [Sign] Chara Dasha and [Lord] Yogini." Reference Jaimini Sutras for Chara Dasha principles.
 - **The Triple Perspective (Sudarshana):** [MANDATORY] Cross-check the event from Moon (Mind) and Sun (Soul).
-- **Special Points (Gandanta & Yogi):** [MANDATORY IF DATA EXISTS] Analyze Gandanta crisis zones, Yogi/Avayogi fortune/obstacles, Dagdha Rashi, and Tithi Shunya Rashi. Apply the shared Avayogi effect policy exactly: Tithi-Shunya-lord overlap cancels the ordinary Avayogi penalty, while placement in or aspect to Houses 3/6/8/12 makes the Avayogi contribution supportive for the applicable house. Keep other independent conditions separate.
+- **Special Points (Gandanta & Yogi):** [MANDATORY IF DATA EXISTS] Analyze Gandanta crisis zones, Yogi/Avayogi fortune/obstacles, Dagdha Rashi, and Tithi Shunya Rashi. Values under `special_points.yogi_points` are authoritative calculator output: copy `yogi.lord`, `duplicate_yogi.lord`, `avayogi.lord`, and the Tithi Dagdha signs exactly, and never infer or recalculate those identities from another chart factor. Apply the shared Avayogi effect policy exactly: Tithi-Shunya-lord overlap cancels the ordinary Avayogi penalty, while placement in or aspect to Houses 3/6/8/12 makes the Avayogi contribution supportive for the applicable house. Keep other independent conditions separate.
 - **The Micro-Timing (Yogini Confirmation):** Cross-check the Vimshottari prediction.
 - **The Synthesis:** How D9 modifies the final outcome. Cite Uttara Kalamrita for divisional chart synthesis.
 

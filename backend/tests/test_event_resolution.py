@@ -190,11 +190,14 @@ def test_same_native_house_across_subject_frames_is_returned_as_alternatives():
     assert jupiter_functional["facts"]["supportive_houses"] == (9,)
     assert jupiter_functional["facts"]["challenging_houses"] == (6,)
     mars_rules = {component["rule_id"] for component in mars["components"]}
-    assert {"planet_gandanta", "combined_special_status"}.issubset(mars_rules)
+    assert "planet_gandanta" in mars_rules
+    assert "combined_special_status" not in mars_rules
     assert "fivefold_friendship_with_nakshatra_lord" not in mars_rules
-    special = next(component for component in mars["components"] if component["rule_id"] == "combined_special_status")
+    special = next(component for component in jupiter["components"] if component["rule_id"] == "combined_special_status")
     special_rules = {status["rule_id"] for status in special["facts"]["statuses"]}
-    assert {"avayogi_lord", "dagdha_rashi_lord", "tithi_shunya_lord"}.issubset(special_rules)
+    assert special_rules == {"dagdha_rashi_lord"}
+    dagdha_status = special["facts"]["statuses"][0]
+    assert dagdha_status["facts"]["special_sign_names"] == ("Sagittarius", "Pisces")
     gandanta_reason = next(
         component for component in mars["components"]
         if component["rule_id"] == "planet_gandanta"
@@ -203,7 +206,7 @@ def test_same_native_house_across_subject_frames_is_returned_as_alternatives():
     assert gandanta_reason["facts"]["distance_from_junction"] == 2.39
     assert gandanta_reason["facts"]["intensity"] == "Medium"
     assert house_two.outcome.supportive_factors == 0
-    assert house_two.outcome.mixed_factors == 3
+    assert house_two.outcome.mixed_factors == 4
     assert house_two.outcome.challenging_factors == 3
     mercury = next(reason for reason in house_two.outcome.mixed_reasons if reason["planet"] == "Mercury")
     mercury_natural = next(

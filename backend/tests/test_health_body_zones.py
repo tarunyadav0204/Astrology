@@ -406,6 +406,56 @@ def test_bp_signal_requires_convergence_and_recommends_checking_not_diagnosis():
     assert "routine BP checks" in vascular["responsible_guidance"]
 
 
+def test_cardiac_surgery_pattern_requires_heart_chest_and_direct_mars_layers():
+    chart = _chart()
+    chart["planets"]["Sun"] = {"house": 5, "sign": 4}
+    chart["planets"]["Mars"] = {"house": 5, "sign": 4}
+    chart["planets"]["Saturn"] = {"house": 4, "sign": 3}
+    chart["graha_drishti_by_house"] = {
+        4: [{"planet": "Rahu"}],
+        5: [{"planet": "Saturn"}],
+    }
+
+    result = build_priority_body_zones(chart)
+    pattern = next(
+        row for row in result["event_patterns"]
+        if row["key"] == "cardiac_surgery_susceptibility"
+    )
+
+    evidence = " ".join(pattern["evidence"])
+    assert "House 5" in evidence
+    assert "Leo" in evidence
+    assert "Sun" in evidence
+    assert "House 4" in evidence
+    assert "Mars" in evidence
+    assert "not a prediction that heart surgery will occur" in pattern["summary"]
+    assert pattern["source_references"]
+
+
+def test_general_surgery_pattern_is_not_relabelled_as_cardiac_surgery():
+    chart = _chart()  # Mars in H6 supplies a general surgery indication.
+    chart["planets"]["Sun"] = {"house": 5, "sign": 4}
+    chart["planets"]["Saturn"] = {"house": 4, "sign": 3}
+    chart["graha_drishti_by_house"] = {
+        4: [{"planet": "Rahu"}],
+        5: [{"planet": "Saturn"}],
+    }
+
+    keys = {row["key"] for row in build_priority_body_zones(chart)["event_patterns"]}
+    assert "surgery_crisis_susceptibility" in keys
+    assert "cardiac_surgery_susceptibility" not in keys
+
+
+def test_single_mars_contact_does_not_alone_become_heart_surgery_indication():
+    chart = _chart()
+    chart["planets"]["Sun"] = {"house": 5, "sign": 4}
+    chart["planets"]["Mars"] = {"house": 4, "sign": 3}
+    chart["graha_drishti_by_house"] = {5: [{"planet": "Saturn"}]}
+
+    keys = {row["key"] for row in build_priority_body_zones(chart)["event_patterns"]}
+    assert "cardiac_surgery_susceptibility" not in keys
+
+
 def test_metabolic_signal_requires_independent_factors_and_names_screening():
     chart = _chart()
     chart["planets"]["Jupiter"] = {"house": 2, "sign": 1}

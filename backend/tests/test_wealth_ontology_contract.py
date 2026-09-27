@@ -1432,6 +1432,10 @@ def test_intraday_trading_session_evidence_is_calculated_for_a_weekday() -> None
     assert session["market_open"] is True
     assert session["participation"] in {"sit_out", "reduce_size", "participate", "cautious"}
     assert isinstance(session.get("windows"), list)
+    assert all(row["start"] != row["end"] for row in session["windows"])
+    daily = session["daily_climate"]
+    moon_av = next(row for row in daily["ashtakavarga"] if row["planet"] == "Moon")
+    assert moon_av["nakshatra_number"] == daily["tara_bala"]["transit_nakshatra"]
     context = _foundation_context(timing=True)
     context["normalized_evidence"]["wealth_foundation"]["intraday_trading_session"] = session
     packet = apply_live_graph_policy(
@@ -1450,6 +1454,34 @@ def test_intraday_trading_session_evidence_is_calculated_for_a_weekday() -> None
     assert policy["runtime_key"] == "intraday_trading"
     assert policy.get("missing_required_factors") == []
     assert packet["verdict"]["direction"] == session["participation"]
+
+
+def test_wealth_foundation_receives_intraday_location_without_hidden_intent_state() -> None:
+    birth = {
+        "name": "Tarun", "date": "1980-04-02", "time": "14:55:00",
+        "latitude": 29.2396596, "longitude": 75.8174505,
+        "timezone": "UTC+5:30", "place": "Hisar, Haryana, India",
+    }
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth))
+    foundation = _compact_wealth_foundation(
+        chart,
+        birth,
+        {},
+        category="investment",
+        answer_mode="timing_window",
+        wealth_subtype="intraday_trading",
+        period_window={"kind": "day", "start": "2026-09-22", "end": "2026-09-22"},
+        query_context={
+            "current_location": {
+                "latitude": 28.4595, "longitude": 77.0266,
+                "timezone": "Asia/Kolkata", "name": "Gurugram",
+            },
+            "exchange": "NSE",
+        },
+    )
+    assert foundation["intraday_trading_session"]["available"] is True
+    assert foundation["availability"]["trading_session_climate"] is True
+    assert foundation["availability"]["intraday_market_windows"] is True
 
 
 def test_intraday_daily_signal_is_not_downgraded_by_static_natal_qualification() -> None:
@@ -1479,6 +1511,7 @@ def test_intraday_answer_renders_calculated_times_and_removes_invented_periods()
     }
     packet = {
         "answer_spec": {
+            "visible_astrology": {"response_style": "technical"},
             "knowledge_graph_policy": {
                 "wealth_answer_rules": {
                     "runtime_key": "intraday_trading",
@@ -1530,6 +1563,95 @@ def test_intraday_answer_closes_session_without_inventing_windows() -> None:
 
     assert "Market closed" in answer
     assert "09:30" not in answer
+
+
+def test_intraday_simple_sit_out_collapses_identical_avoid_windows() -> None:
+    packet = {
+        "answer_spec": {
+            "visible_astrology": {"response_style": "simple"},
+            "knowledge_graph_policy": {
+                "wealth_answer_rules": {
+                    "runtime_key": "intraday_trading",
+                    "intraday_trading_session": {
+                        "available": True,
+                        "market_open": True,
+                        "participation": "sit_out",
+                        "period_permission": {
+                            "status": "adverse",
+                            "speculation_gain_core": False,
+                            "loss_chain_active": True,
+                        },
+                        "daily_climate": {
+                            "status": "adverse",
+                            "tara_bala": {"name": "Parama Mitra"},
+                            "chandra_bala": {"house_from_natal_moon": 5},
+                        },
+                        "windows": [
+                            {"start": "09:15", "end": "12:00", "verdict": "avoid", "hora_lord": "Venus", "choghadiya": "Kala", "ascendant_sign": 6},
+                            {"start": "12:00", "end": "15:30", "verdict": "avoid", "hora_lord": "Sun", "choghadiya": "Labha", "ascendant_sign": 9},
+                        ],
+                    },
+                },
+            },
+        },
+    }
+
+    answer = enforce_live_graph_answer(
+        "Protect capital today. What setup are you considering?",
+        packet,
+    )
+
+    assert "Sit out" in answer
+    assert "09:15–15:30: no usable new-entry window" in answer
+    assert "Venus Hora" not in answer
+    assert "Ascendant sign" not in answer
+    assert "D1" not in answer and "D2" not in answer
+    assert "What setup are you considering?" in answer
+
+
+def test_intraday_simple_mixed_day_explains_short_delivery_without_technical_dump() -> None:
+    packet = {
+        "answer_spec": {
+            "visible_astrology": {"response_style": "simple"},
+            "knowledge_graph_policy": {
+                "wealth_answer_rules": {
+                    "runtime_key": "intraday_trading",
+                    "intraday_trading_session": {
+                        "available": True,
+                        "market_open": True,
+                        "participation": "reduce_size",
+                        "period_permission": {
+                            "status": "mixed",
+                            "loss_chain_active": True,
+                            "terminal_trigger": {"planet": "Venus", "speculation_gain_core": True},
+                        },
+                        "daily_climate": {
+                            "status": "strong",
+                            "supports": [
+                                {"code": "Parama Mitra"},
+                                {"code": "Venus BAV"},
+                            ],
+                        },
+                        "windows": [
+                            {"start": "09:15", "end": "15:15", "verdict": "neutral", "usable_for_new_entry": False},
+                            {"start": "15:15", "end": "15:30", "verdict": "supportive", "usable_for_new_entry": True},
+                        ],
+                    },
+                },
+            },
+        },
+    }
+
+    answer = enforce_live_graph_answer(
+        "Protect gains and follow your planned exit. What setup are you considering?",
+        packet,
+    )
+
+    assert "Opportunity is present" in answer
+    assert "blanket instruction to avoid trading is not supported" in answer
+    assert "15:15–15:30" in answer
+    assert "09:15–15:15" not in answer
+    assert "Ascendant sign" not in answer and "Choghadiya" not in answer
 
 
 def test_wealth_routing_guard_only_rewrites_intraday_trading_subtype() -> None:

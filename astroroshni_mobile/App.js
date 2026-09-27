@@ -33,7 +33,9 @@ import ProfileScreen from './src/components/Profile/ProfileScreen';
 import AccountSecurityScreen from './src/components/Profile/AccountSecurityScreen';
 import AnalysisHubScreen from './src/components/Analysis/AnalysisHubScreen';
 import AnalysisDetailScreen from './src/components/Analysis/AnalysisDetailScreen';
+import ProfessionalAnalysisScreen from './src/components/Analysis/ProfessionalAnalysisScreen';
 import LongevityScreen from './src/components/Longevity/LongevityScreen';
+import HealthBlueprintScreen from './src/components/Health/HealthBlueprintScreen';
 import RelationshipMatchScreen from './src/components/Relationship/RelationshipMatchScreen';
 import ReportsStudioScreen from './src/components/Reports/ReportsStudioScreen';
 import ReportViewerScreen from './src/components/Reports/ReportViewerScreen';
@@ -346,6 +348,8 @@ const linking = {
       NakshatraCalendar: 'nakshatras',
       NakshatraGuide: 'nakshatra-study',
       AnalysisHub: 'analysis',
+      ProfessionalAnalysis: 'charts/analysis',
+      HealthBlueprint: 'charts/analysis/health',
       AshtakvargaStudy: 'charts/ashtakavarga/study',
     },
   },
@@ -1175,8 +1179,18 @@ export default function App() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="ProfessionalAnalysis"
+            component={ProfessionalAnalysisScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="Longevity"
             component={LongevityScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="HealthBlueprint"
+            component={HealthBlueprintScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

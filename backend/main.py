@@ -68,6 +68,7 @@ from utils.admin_settings import get_setting, get_home_screen_banner
 from panchang.muhurat_routes import router as muhurat_router
 from muhurat_routes import router as childbirth_router
 from health.health_routes import router as health_router
+from health_v2.routes import router as health_v2_router
 from wealth.wealth_routes import router as wealth_router
 from longevity.routes import router as longevity_router
 from chat.chat_routes import router as chat_router
@@ -1044,6 +1045,7 @@ app.include_router(muhurat_router, prefix="/api/panchang")
 app.include_router(childbirth_router, prefix="/api")
 # Note: childbirth_router already includes vehicle and griha pravesh endpoints
 app.include_router(health_router, prefix="/api")
+app.include_router(health_v2_router, prefix="/api")
 app.include_router(charts_router, prefix="/api")
 app.include_router(prashna_router, prefix="/api")
 app.include_router(birth_charts_router, prefix="/api")
@@ -3636,77 +3638,10 @@ async def calculate_transits(request: TransitRequest):
 
 
 async def calculate_yogi(birth_data: BirthData):
-    time_parts = birth_data.time.split(':')
-    hour = float(time_parts[0]) + float(time_parts[1])/60
-    
-    tz_offset = parse_timezone_offset(
-        birth_data.timezone,
-        birth_data.latitude,
-        birth_data.longitude
-    )
-    
-    utc_hour = hour - tz_offset
-    by, bm, bd = parse_calendar_date_y_m_d(birth_data.date)
-    jd = swe.julday(by, bm, bd, utc_hour)
-    
-    sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
-    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
-    
-    yogi_point = (sun_pos + moon_pos) % 360
-    yogi_sign = int(yogi_point / 30)
-    yogi_degree = yogi_point % 30
-    
-    avayogi_point = (yogi_point + 186.666667) % 360
-    avayogi_sign = int(avayogi_point / 30)
-    avayogi_degree = avayogi_point % 30
-    
-    dagdha_point = (avayogi_point + 12) % 360
-    dagdha_sign = int(dagdha_point / 30)
-    dagdha_degree = dagdha_point % 30
-    
-    # Calculate Tithi Shunya Rashi
-    tithi_deg = (moon_pos - sun_pos) % 360
-    tithi_num = int(tithi_deg / 12) + 1
-    
-    # Tithi Shunya Rashi calculation based on Tithi
-    tithi_shunya_signs = {
-        1: 11, 2: 5, 3: 6, 4: 7, 5: 8, 6: 9, 7: 10, 8: 11,
-        9: 0, 10: 1, 11: 2, 12: 3, 13: 4, 14: 5, 15: 6
-    }
-    
-    tithi_shunya_sign = tithi_shunya_signs.get(tithi_num, 0)
-    tithi_shunya_point = tithi_shunya_sign * 30 + 15  # Middle of the sign
-    tithi_shunya_degree = 15.0
-    
-    SIGN_NAMES = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 
-                  'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
-    
-    return {
-        "yogi": {
-            "longitude": yogi_point,
-            "sign": yogi_sign,
-            "sign_name": SIGN_NAMES[yogi_sign],
-            "degree": round(yogi_degree, 2)
-        },
-        "avayogi": {
-            "longitude": avayogi_point,
-            "sign": avayogi_sign,
-            "sign_name": SIGN_NAMES[avayogi_sign],
-            "degree": round(avayogi_degree, 2)
-        },
-        "dagdha_rashi": {
-            "longitude": dagdha_point,
-            "sign": dagdha_sign,
-            "sign_name": SIGN_NAMES[dagdha_sign],
-            "degree": round(dagdha_degree, 2)
-        },
-        "tithi_shunya_rashi": {
-            "longitude": tithi_shunya_point,
-            "sign": tithi_shunya_sign,
-            "sign_name": SIGN_NAMES[tithi_shunya_sign],
-            "degree": round(tithi_shunya_degree, 2)
-        }
-    }
+    from calculators.yogi_calculator import YogiCalculator
+
+    chart_data = await calculate_chart(birth_data, 'mean')
+    return YogiCalculator(chart_data).calculate_yogi_points(birth_data)
 
 @app.post("/api/calculate-yogi-impact")
 async def calculate_yogi_impact(birth_data: BirthData):

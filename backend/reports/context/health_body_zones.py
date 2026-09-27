@@ -26,7 +26,10 @@ SIGN_BODY: Dict[int, Dict[str, Any]] = {
     4: {"zones": ["heart", "spine", "upper back", "blood pressure tone"], "tone": "heart-spine heat and vascular tone"},
     5: {"zones": ["intestines", "digestion", "abdomen"], "tone": "digestive / gut sensitivity"},
     6: {"zones": ["kidneys", "lower back", "skin", "lumbar"], "tone": "kidney-lumbar / skin balance"},
-    7: {"zones": ["reproductive organs", "pelvis", "excretory"], "tone": "pelvic / excretory sensitivity"},
+    7: {
+        "zones": ["reproductive organs", "pelvis", "anus", "rectum", "excretory"],
+        "tone": "pelvic / anorectal / excretory sensitivity",
+    },
     8: {"zones": ["hips", "thighs", "liver", "sciatic nerve"], "tone": "hip-thigh-liver axis"},
     9: {"zones": ["knees", "bones", "joints", "teeth"], "tone": "knees / skeletal stiffness"},
     10: {"zones": ["calves", "ankles", "circulation", "nerves"], "tone": "calf-ankle circulation / nerve tone"},
@@ -177,7 +180,13 @@ ANATOMICAL_FAMILIES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("face and jaw (including lips and chin)", ("face", "forehead", "lips", "chin", "mouth")),
     ("heart and upper spine/back", ("heart", "spine", "upper back", "heart region")),
     ("hips and thighs", ("hips", "thighs", "right thigh", "left thigh")),
-    ("anorectal and pelvic region", ("anus", "rectum", "pelvis", "excretory organs")),
+    (
+        "anorectal and pelvic region",
+        (
+            "reproductive organs", "private parts", "groins", "anus", "rectum",
+            "pelvis", "excretory organs", "excretory",
+        ),
+    ),
 )
 
 MALEFICS = {"Mars", "Saturn", "Rahu", "Ketu"}
@@ -1090,6 +1099,7 @@ def _build_medical_profile(
     pattern_by_key = {str(row.get("key") or ""): row for row in event_patterns}
     condition_keys = {
         "vascular_pressure_tone",
+        "cardiac_surgery_susceptibility",
         "mental_emotional_regulation_susceptibility",
         "metabolic_blood_sugar_susceptibility",
     }
@@ -1254,6 +1264,130 @@ def _build_event_patterns(
                 list((PLANET_KARAKA.get("Mars") or {}).get("zones") or [])[:3],
             ),
             "evidence": [f"Mars in H{mars_h}", f"Company: {', '.join(mars_co) or 'none'}"],
+        })
+
+    # Cardiac surgery indication (Dr. K. S. Charak rule family): establish a
+    # heart/chest susceptibility first, then require a direct Mars cutting or
+    # surgical link to that same field. A general surgery yoga elsewhere in
+    # the chart must never be relabelled as heart surgery.
+    def house_pressure(house: int, label: str) -> List[str]:
+        row = house_row(house)
+        residents = [p for p in (row.get("residents") or []) if p in MALEFICS]
+        aspectors = [p for p in (row.get("aspecting_planets") or []) if p in MALEFICS]
+        evidence: List[str] = []
+        actors = list(dict.fromkeys(residents + aspectors))
+        if actors:
+            evidence.append(f"House {house} ({label}) is under pressure from {', '.join(actors)}")
+        lord = _lord_of_house(houses, house)
+        lord_pressure = pressure_on_planet(lord) if lord else []
+        if lord_pressure:
+            evidence.append(f"House {house} lord {lord}: {lord_pressure[0]}")
+        return evidence
+
+    h4_pressure = house_pressure(4, "chest and cardiac foundation")
+    h5_pressure = house_pressure(5, "heart")
+    sun_heart_pressure = pressure_on_planet("Sun")
+    leo_house = next(
+        (house for house in range(1, 13) if _house_sign(houses, house) == 4),
+        None,
+    )
+    leo_pressure: List[str] = []
+    if leo_house:
+        leo_row = house_row(leo_house)
+        leo_actors = list(dict.fromkeys(
+            [p for p in (leo_row.get("residents") or []) if p in MALEFICS]
+            + [p for p in (leo_row.get("aspecting_planets") or []) if p in MALEFICS]
+        ))
+        if leo_actors:
+            leo_pressure.append(
+                f"Leo, the natural fifth sign and heart field, is under pressure in House {leo_house} "
+                f"from {', '.join(leo_actors)}"
+            )
+
+    direct_mars_heart_links: List[str] = []
+    mars_house = _planet_house(planets, "Mars")
+    sun_house = _planet_house(planets, "Sun")
+    for heart_house, label in ((4, "chest"), (5, "heart")):
+        row = house_row(heart_house)
+        if "Mars" in (row.get("residents") or []):
+            direct_mars_heart_links.append(f"Mars occupies House {heart_house} ({label})")
+        if "Mars" in (row.get("aspecting_planets") or []):
+            direct_mars_heart_links.append(f"Mars aspects House {heart_house} ({label})")
+    if _planet_sign(planets, "Mars") == 4:
+        direct_mars_heart_links.append("Mars occupies Leo, the natural heart sign")
+    if sun_house and mars_house == sun_house and "Mars" in company("Sun"):
+        direct_mars_heart_links.append(f"Mars is conjunct the Sun in House {sun_house}")
+    elif sun_house and "Mars" in (house_row(sun_house).get("aspecting_planets") or []):
+        direct_mars_heart_links.append(f"Mars aspects the Sun in House {sun_house}")
+    direct_mars_heart_links = list(dict.fromkeys(direct_mars_heart_links))
+
+    heart_anchor_groups = [
+        evidence for evidence in (h5_pressure, leo_pressure, sun_heart_pressure) if evidence
+    ]
+    # The fourth house must be genuinely pressured, not merely present in the
+    # chart. Two pressure channels indicate a severe chest affliction; a
+    # direct Mars contact supplies the second channel when another malefic or
+    # the fourth lord is already under pressure.
+    h4_row = house_row(4)
+    h4_pressure_actors = set(
+        p for p in list(h4_row.get("residents") or []) + list(h4_row.get("aspecting_planets") or [])
+        if p in MALEFICS
+    )
+    h4_lord = _lord_of_house(houses, 4)
+    h4_lord_house = _planet_house(planets, h4_lord) if h4_lord else None
+    h4_lord_pressure_actors: set[str] = set()
+    if h4_lord and h4_lord_house:
+        h4_lord_pressure_actors.update(
+            p for p in company(h4_lord) if p in MALEFICS and p != h4_lord
+        )
+        h4_lord_pressure_actors.update(
+            p for p in (house_row(h4_lord_house).get("aspecting_planets") or [])
+            if p in MALEFICS and p != h4_lord
+        )
+    distinct_lord_pressure = h4_lord_pressure_actors - h4_pressure_actors
+    # One Mars contact supplies the surgical link but cannot, by itself, also
+    # satisfy the separate requirement that the chest field is badly afflicted.
+    h4_badly_afflicted = (
+        len(h4_pressure_actors) >= 2
+        or (
+            bool(h4_pressure_actors)
+            and (h4_lord_house in DUSTHANA or bool(distinct_lord_pressure))
+        )
+    )
+    if len(heart_anchor_groups) >= 2 and h4_badly_afflicted and direct_mars_heart_links:
+        general_surgery = next(
+            (row for row in patterns if row.get("key") == "surgery_crisis_susceptibility"),
+            None,
+        )
+        cardiac_evidence = list(dict.fromkeys(
+            h5_pressure[:2]
+            + leo_pressure[:1]
+            + sun_heart_pressure[:2]
+            + h4_pressure[:2]
+            + direct_mars_heart_links[:3]
+        ))
+        if general_surgery:
+            cardiac_evidence.append("A separate natal surgery/cutting combination is also present")
+        patterns.append({
+            "key": "cardiac_surgery_susceptibility",
+            "title": "Classical heart-surgery indication",
+            "summary": (
+                "The fifth house, Leo and the Sun establish the cardiac field; the afflicted fourth house "
+                "adds the chest, and a direct Mars link adds a cutting or invasive-procedure indication. "
+                "This is a natal susceptibility pattern, not a prediction that heart surgery will occur."
+            ),
+            "zones": ["heart", "chest", "blood", "circulation"],
+            "evidence": cardiac_evidence[:8],
+            "risk_level": "elevated" if general_surgery else "moderate",
+            "user_framing": (
+                "The chart contains a classical combination associated with invasive cardiac treatment. "
+                "It does not diagnose heart disease or guarantee surgery; timing must be judged separately "
+                "and physical symptoms require medical assessment."
+            ),
+            "source_references": [
+                "Dr. K. S. Charak, Essentials of Medical Astrology — cardiac disease and surgery rule family "
+                "(edition and page not encoded)"
+            ],
         })
 
     # Feet / rest / hospitalization: 12th × rashi (classical; not 9th)
@@ -1488,7 +1622,7 @@ def _build_event_patterns(
     # Keep distinct responsible condition signals available to the prompt and
     # evidence UI. The previous six-item cap could silently discard mental or
     # metabolic findings after accident/surgery/house patterns were added.
-    return patterns[:10]
+    return patterns
 
 
 def _lords_nakshatra_from_chart(chart: Dict[str, Any]) -> Dict[str, Any]:

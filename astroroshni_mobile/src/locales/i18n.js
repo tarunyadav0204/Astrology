@@ -40,6 +40,8 @@ import instantExperience from './instant-experience.json';
 import ashtakavargaUi from './ashtakavarga-ui.json';
 import ashtakavargaStudy from './ashtakavarga-study.json';
 import eventTimelineSample from './event-timeline-sample.json';
+import healthBlueprint from './health-blueprint.json';
+import professionalAnalysis from './professional-analysis.json';
 
 const INSTANT_MODE_ACTION_COPY = Object.freeze({
   english: 'Mode',
@@ -294,6 +296,24 @@ Object.entries(normalizedPremiumUi).forEach(([language, copy]) => {
   [fr, partnershipExit.fr], [ru, partnershipExit.russian], [zh, partnershipExit.chinese],
 ].forEach(([baseCopy, exitCopy]) => {
   baseCopy.partnershipExit = exitCopy;
+});
+
+[
+  [en, healthBlueprint.english], [es, healthBlueprint.es], [hi, healthBlueprint.hindi],
+  [tamil, healthBlueprint.tamil], [te, healthBlueprint.telugu], [gu, healthBlueprint.gujarati],
+  [mr, healthBlueprint.marathi], [de, healthBlueprint.german], [fr, healthBlueprint.french],
+  [ru, healthBlueprint.russian], [zh, healthBlueprint.chinese],
+].forEach(([baseCopy, copy]) => {
+  baseCopy.healthBlueprint = copy;
+});
+
+[
+  [en, professionalAnalysis.english], [es, professionalAnalysis.es], [hi, professionalAnalysis.hindi],
+  [tamil, professionalAnalysis.tamil], [te, professionalAnalysis.telugu], [gu, professionalAnalysis.gujarati],
+  [mr, professionalAnalysis.marathi], [de, professionalAnalysis.german], [fr, professionalAnalysis.french],
+  [ru, professionalAnalysis.russian], [zh, professionalAnalysis.chinese],
+].forEach(([baseCopy, copy]) => {
+  baseCopy.professionalAnalysis = copy;
 });
 
 i18n

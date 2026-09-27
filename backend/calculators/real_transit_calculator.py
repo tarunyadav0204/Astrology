@@ -42,7 +42,14 @@ class RealTransitCalculator:
         if planet_num is None:
             raise ValueError(f"Unsupported transit planet: {planet}")
         try:
-            jd = swe.julday(date.year, date.month, date.day, 12.0)
+            # Preserve the historical noon default for date-only/midnight
+            # callers, while allowing timing engines to supply an exact UTC
+            # observation moment (needed especially for the Moon).
+            decimal_hour = (
+                12.0 if not (date.hour or date.minute or date.second or date.microsecond)
+                else date.hour + date.minute / 60.0 + date.second / 3600.0
+            )
+            jd = swe.julday(date.year, date.month, date.day, decimal_hour)
             result = swe.calc_ut(
                 jd,
                 planet_num,

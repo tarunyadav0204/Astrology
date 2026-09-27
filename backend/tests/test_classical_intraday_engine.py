@@ -28,7 +28,9 @@ def test_full_four_gate_packet_has_no_shortcut_layers(engine, location):
     assert row["available"] is True
     assert row["market_open"] is True
     assert row["natal_baseline"]["d2_retention_evidence"]
-    assert [x["level"] for x in row["period_permission"]["active_periods"]] == ["mahadasha", "antardasha", "pratyantardasha"]
+    assert [x["level"] for x in row["period_permission"]["active_periods"]] == [
+        "mahadasha", "antardasha", "pratyantardasha", "sookshma", "prana",
+    ]
     assert row["daily_climate"]["tara_bala"]["name"]
     assert row["daily_climate"]["chandra_bala"]["house_from_natal_moon"]
     assert row["daily_climate"]["ashtakavarga"]
@@ -81,3 +83,28 @@ def test_no_supportive_window_can_override_sit_out(engine, location):
     if row["participation"] == "sit_out":
         assert not row["entry_windows"]
         assert all(window["usable_for_new_entry"] is False for window in row["windows"])
+
+
+def test_short_period_gain_delivery_is_not_omitted(engine, location):
+    row = engine.calculate("2026-09-24", current_location=location)
+    period = row["period_permission"]
+
+    assert period["active_periods"][-2]["planet"] == "Mercury"
+    assert period["active_periods"][-1]["planet"] == "Venus"
+    assert period["short_period_delivery"]["speculation_gain_core"] is True
+    assert period["terminal_trigger"] == {
+        "level": "prana",
+        "planet": "Venus",
+        "houses": [4, 5, 11],
+        "speculation_gain_core": True,
+        "has_reversal_or_loss": False,
+    }
+    assert period["gain_chain_complete"] is True
+    assert period["status"] == "mixed"
+    assert row["daily_climate"]["status"] == "strong"
+    assert row["participation"] == "reduce_size"
+    assert row["entry_windows"]
+    assert all(
+        len(window["supports"]) >= len(window["cautions"])
+        for window in row["entry_windows"]
+    )

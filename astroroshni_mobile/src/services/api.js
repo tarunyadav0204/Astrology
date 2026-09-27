@@ -647,6 +647,22 @@ export const healthAPI = {
 export const chartAPI = {
   getChartGuideVideoUrl: () => api.get(getEndpoint('/credits/settings/chart-guide-video-url')),
   getNakshatraGuideVideos: () => api.get(getEndpoint('/credits/settings/nakshatra-guide-videos')),
+  getHealthBlueprint: ({ birthData, chartData = null }) => api.post(
+    getEndpoint('/health-v2/natal-blueprint'),
+    {
+      birth_data: birthData,
+      ...(chartData ? { chart_data: chartData } : {}),
+    }
+  ),
+  getHealthTimingHeatmap: ({ birthData, chartData = null, startDate, days = 120 }) => api.post(
+    getEndpoint('/health-v2/timing-heatmap'),
+    {
+      birth_data: birthData,
+      ...(chartData ? { chart_data: chartData } : {}),
+      start_date: startDate,
+      days,
+    }
+  ),
   getActivationExplorer: ({ birthChartId, birthData, asOf, horizonDays = 90, trace = true }) => api.post(
     getEndpoint('/prediction-engine/activation-explorer'),
     {

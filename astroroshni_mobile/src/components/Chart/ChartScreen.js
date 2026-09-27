@@ -293,6 +293,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           const pending = pendingTimingRef.current;
           pendingTimingRef.current = null;
           if (pending) chartWidgetRef.current?.enableTiming(pending);
+        } else if (prompt === 'analysis') {
+          navigation.navigate('ProfessionalAnalysis', { birthData, chartData });
         } else {
           navigation.navigate('ActivationExplorer', { birthData, chartData });
         }
@@ -342,6 +344,11 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const openActivationExplorer = useCallback(() => {
     pendingTimingRef.current = null;
     presentAstrologerLicense('activation');
+  }, [presentAstrologerLicense]);
+
+  const openProfessionalAnalysis = useCallback(() => {
+    pendingTimingRef.current = null;
+    presentAstrologerLicense('analysis');
   }, [presentAstrologerLicense]);
 
   const requestTimingLicense = useCallback((kind) => {
@@ -1214,6 +1221,32 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                           : <Ionicons name="chevron-forward" size={wideSheet ? 28 : 22} color={colors.accent} />}
                       </View>
                     </TouchableOpacity>
+                    {chartTypes[currentChartIndex]?.id === 'lagna' && (
+                      <TouchableOpacity
+                        style={[styles.activationExplorerCta, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
+                        onPress={openProfessionalAnalysis}
+                        activeOpacity={0.88}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('professionalAnalysis.openAccessibility')}
+                      >
+                        <View style={[
+                          styles.activationExplorerCtaGradient,
+                          wideSheet && styles.activationExplorerCtaGradientTablet,
+                          { backgroundColor: colors.surfaceRaised },
+                        ]}>
+                          <View style={[styles.activationExplorerCtaIcon, wideSheet && styles.activationExplorerCtaIconTablet]}>
+                            <Ionicons name="albums-outline" size={wideSheet ? 28 : 20} color={colors.primary} />
+                          </View>
+                          <View style={styles.activationExplorerCtaCopy}>
+                            <Text style={[styles.activationExplorerCtaTitle, wideSheet && styles.activationExplorerCtaTitleTablet, { color: colors.text }]}>{t('professionalAnalysis.title')}</Text>
+                            <Text style={[styles.activationExplorerCtaSubtitle, wideSheet && styles.activationExplorerCtaSubtitleTablet, { color: colors.textSecondary }]}>{t('professionalAnalysis.chartCardSubtitle')}</Text>
+                          </View>
+                          {checkingAstrologerLicense
+                            ? <ActivityIndicator size="small" color={colors.primary} />
+                            : <Ionicons name="chevron-forward" size={wideSheet ? 28 : 22} color={colors.primary} />}
+                        </View>
+                      </TouchableOpacity>
+                    )}
                     </View>
                   )}
                 </View>
@@ -1236,8 +1269,10 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                   setShowAstrologerLicenseModal(false);
                   navigation.navigate('Credits', {
                     focusSubscriptionFamily: 'astrologer',
-                    returnTo: licensePrompt === 'timing' ? 'Chart' : 'ActivationExplorer',
-                    returnParams: licensePrompt === 'timing' ? (route?.params || {}) : { birthData },
+                    returnTo: licensePrompt === 'timing'
+                      ? 'Chart'
+                      : licensePrompt === 'analysis' ? 'ProfessionalAnalysis' : 'ActivationExplorer',
+                    returnParams: licensePrompt === 'timing' ? (route?.params || {}) : { birthData, chartData },
                   });
                 }}
                 onSecondaryPress={() => setShowAstrologerLicenseModal(false)}

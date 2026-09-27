@@ -11332,6 +11332,7 @@ def _compact_wealth_foundation(
     answer_mode: str,
     wealth_subtype: str = "",
     period_window: Optional[Dict[str, Any]] = None,
+    query_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Calculate the bounded evidence ledger required by the Wealth graph."""
     from calculators.indu_lagna_calculator import InduLagnaCalculator
@@ -12980,13 +12981,13 @@ def _compact_wealth_foundation(
                 target_date=target_date,
                 natal_qualified=natal_qualified,
                 current_location=(
-                    ((intent.get("query_context") or {}).get("current_location"))
-                    if isinstance(intent.get("query_context"), Mapping)
+                    ((query_context or {}).get("current_location"))
+                    if isinstance(query_context, Mapping)
                     else None
                 ),
                 exchange=str(
-                    ((intent.get("query_context") or {}).get("exchange") or "NSE")
-                    if isinstance(intent.get("query_context"), Mapping)
+                    ((query_context or {}).get("exchange") or "NSE")
+                    if isinstance(query_context, Mapping)
                     else "NSE"
                 ),
             )
@@ -13921,6 +13922,11 @@ def _build_instant_context(
             answer_mode=answer_mode,
             wealth_subtype=str((intent or {}).get("wealth_subtype") or ""),
             period_window=period_window,
+            query_context=(
+                (intent or {}).get("query_context")
+                if isinstance((intent or {}).get("query_context"), dict)
+                else None
+            ),
         )
     if is_education_category(category):
         normalized_evidence["education_foundation"] = _compact_education_foundation(
@@ -15580,7 +15586,11 @@ def _fit_composer_brief(context: Dict[str, Any], *, target_chars: int = 9500) ->
         source_chart_facts.get("requested_houses")
         and source_chart_facts.get("single_house_analysis")
     )
-    if source_wealth:
+    is_intraday_wealth = bool(
+        source_wealth
+        and isinstance(source_wealth.get("intraday_trading_session"), dict)
+    )
+    if source_wealth and not is_intraday_wealth:
         # Wealth needs nested D1 house/lord rows, D2 placements and the Indu
         # chain. A slightly larger bounded brief is safer than flattening those
         # facts into generic financial prose.
@@ -17205,6 +17215,33 @@ def _build_instant_composer_context(
         ):
             compact_answer_contract.pop(key, None)
         career_contract = {}
+        if str(intent.get("wealth_subtype") or query_plan.get("wealth_subtype") or "") == "intraday_trading":
+            graph_contract = compact_answer_contract.get("knowledge_graph_policy")
+            graph_contract = graph_contract if isinstance(graph_contract, dict) else {}
+            safety_contract = compact_answer_contract.get("financial_safety_rules")
+            compact_answer_contract = {
+                "max_words": min(int(compact_answer_contract.get("max_words") or 220), 220),
+                "target_framing": compact_answer_contract.get("target_framing"),
+                "knowledge_graph_policy": {
+                    key: graph_contract.get(key)
+                    for key in (
+                        "live", "runtime_key", "evidence_status",
+                        "missing_required_factors", "claim_permission", "guardrails",
+                    )
+                    if graph_contract.get(key) not in (None, "", [], {})
+                },
+                "financial_safety_rules": safety_contract,
+                "personal_presence": {
+                    "verdict_fidelity": "Do not change the calculated session verdict or timing.",
+                    "privacy_rule": "Do not expose birth details or unrelated profile data.",
+                    "closing_question": "Ask at most one question about the concrete setup or decision pressure.",
+                },
+            }
+            compact_answer_contract = {
+                key: value
+                for key, value in compact_answer_contract.items()
+                if value not in (None, "", [], {})
+            }
     if career_contract:
         # The normalized evidence contract is category-level.  Replace its
         # generic career contract with the exact subtype/family contract that
@@ -17957,10 +17994,80 @@ def _build_instant_composer_context(
         # Do not let broad-period timing, generic active-area summaries, or slow
         # transit timelines compete with KP/Moon/Tara and five-level dashas in
         # the composer prompt.
+        exact_day_wealth = evidence.get("wealth_foundation") if is_wealth_graph else None
+        if (
+            isinstance(exact_day_wealth, dict)
+            and str(wealth_rules.get("runtime_key") or "") == "intraday_trading"
+        ):
+            full_session = (
+                exact_day_wealth.get("intraday_trading_session")
+                if isinstance(exact_day_wealth.get("intraday_trading_session"), dict)
+                else {}
+            )
+            period_permission = (
+                full_session.get("period_permission")
+                if isinstance(full_session.get("period_permission"), dict)
+                else {}
+            )
+            daily_climate = (
+                full_session.get("daily_climate")
+                if isinstance(full_session.get("daily_climate"), dict)
+                else {}
+            )
+            exact_day_wealth = {
+                "scope": exact_day_wealth.get("scope"),
+                "route_adjudication": {
+                    key: (exact_day_wealth.get("route_adjudication") or {}).get(key)
+                    for key in ("direction", "strength_claim_permission")
+                },
+                "intraday_trading_session": {
+                    "available": full_session.get("available"),
+                    "market_open": full_session.get("market_open"),
+                    "participation": full_session.get("participation"),
+                    "period_permission": {
+                        "status": period_permission.get("status"),
+                        "active_periods": [
+                            {
+                                key: row.get(key)
+                                for key in ("level", "planet", "supports", "pressures")
+                                if row.get(key) not in (None, "", [], {})
+                            }
+                            for row in list(period_permission.get("active_periods") or [])
+                            if isinstance(row, dict)
+                        ],
+                        "gain_chain_complete": period_permission.get("gain_chain_complete"),
+                        "speculation_gain_core": period_permission.get("speculation_gain_core"),
+                        "loss_chain_active": period_permission.get("loss_chain_active"),
+                        "short_period_delivery": period_permission.get("short_period_delivery"),
+                        "terminal_trigger": period_permission.get("terminal_trigger"),
+                    },
+                    "daily_climate": {
+                        "status": daily_climate.get("status"),
+                        "tara_bala": daily_climate.get("tara_bala"),
+                        "chandra_bala": daily_climate.get("chandra_bala"),
+                        "supports": list(daily_climate.get("supports") or [])[:3],
+                        "obstructions": list(daily_climate.get("obstructions") or [])[:4],
+                    },
+                    "window_summary": {
+                        "entry_window_count": len(full_session.get("entry_windows") or []),
+                        "caution_window_count": len(full_session.get("caution_windows") or []),
+                        "session_start": ((full_session.get("windows") or [{}])[0] or {}).get("start"),
+                        "session_end": ((full_session.get("windows") or [{}])[-1] or {}).get("end"),
+                    },
+                    "claim_rule": full_session.get("claim_rule"),
+                },
+            }
         evidence = {
-            "wealth_foundation": evidence.get("wealth_foundation") if is_wealth_graph else None,
+            "wealth_foundation": exact_day_wealth,
             "natal_promise": None if is_wealth_graph else evidence.get("natal_promise"),
-            "daily_prediction": evidence.get("daily_prediction"),
+            # The intraday engine already supplies its own daily Panchanga,
+            # gochara and period decision. The generic daily packet is a
+            # competing astrology system and needlessly bloats the writer call.
+            "daily_prediction": (
+                None
+                if str(wealth_rules.get("runtime_key") or "") == "intraday_trading"
+                else evidence.get("daily_prediction")
+            ),
             "_wealth_rules": wealth_rules if is_wealth_graph else None,
             "education_foundation": evidence.get("education_foundation") if is_education_graph else None,
             "_education_rules": evidence.get("_education_rules") if is_education_graph else None,

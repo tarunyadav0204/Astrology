@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import json
 from threading import RLock
@@ -115,7 +115,7 @@ class ClassicalIntradayTradingEngine:
     the changing climate, and the Muhurta layer ranks actual session segments.
     """
 
-    schema_version = "classical_intraday.v1"
+    schema_version = "classical_intraday.v2"
 
     def __init__(self, natal_chart: Mapping[str, Any], birth_data: Mapping[str, Any]):
         self.natal_chart = deepcopy(dict(natal_chart))
@@ -128,7 +128,7 @@ class ClassicalIntradayTradingEngine:
         location = self._location(current_location)
         packet: dict[str, Any] = {
             "schema_version": self.schema_version,
-            "method": "D1/D2 → Vimshottari MD/AD/PD → daily gochara/Panchanga/AV → trading Muhurta",
+            "method": "D1/D2 → five-level Vimshottari MD/AD/PD/Sookshma/Prana → daily gochara/Panchanga/AV → trading Muhurta",
             "scope": "native_judgment_and_execution_climate",
             "market": market,
             "location": location,
@@ -225,7 +225,18 @@ class ClassicalIntradayTradingEngine:
         dashas = DashaCalculator().calculate_current_dashas(self.birth_data, moment, strict=True)
         periods = []
         union: set[int] = set()
-        for level, key in (("mahadasha", "mahadasha"), ("antardasha", "antardasha"), ("pratyantardasha", "pratyantardasha")):
+        # Intraday judgment needs the complete running Vimshottari stack.  The
+        # three broad periods describe the background, but Sookshma and Prana
+        # are the levels capable of changing the delivery within a short date
+        # band.  Omitting them can turn a live 5-11 gain trigger into a false
+        # blanket denial for the whole day.
+        for level, key in (
+            ("mahadasha", "mahadasha"),
+            ("antardasha", "antardasha"),
+            ("pratyantardasha", "pratyantardasha"),
+            ("sookshma", "sookshma"),
+            ("prana", "prana"),
+        ):
             planet = str((dashas.get(key) or {}).get("planet"))
             linked = sorted(_connections(self.natal_chart, planet))
             union.update(linked)
@@ -236,7 +247,31 @@ class ClassicalIntradayTradingEngine:
         if severe_pressure and not gain_complete: status = "adverse"
         elif gain_complete and not severe_pressure: status = "supportive"
         else: status = "mixed"
-        return {"status": status, "active_periods": periods, "activated_houses": sorted(union), "gain_chain_complete": gain_complete, "speculation_gain_core": gain_core, "loss_chain_active": severe_pressure}
+        delivery_periods = [row for row in periods if row["level"] in {"sookshma", "prana"}]
+        delivery_houses = set().union(*(set(row["houses"]) for row in delivery_periods))
+        terminal = periods[-1]
+        terminal_houses = set(terminal["houses"])
+        return {
+            "status": status,
+            "active_periods": periods,
+            "activated_houses": sorted(union),
+            "gain_chain_complete": gain_complete,
+            "speculation_gain_core": gain_core,
+            "loss_chain_active": severe_pressure,
+            "short_period_delivery": {
+                "houses": sorted(delivery_houses),
+                "gain_chain_complete": ANCHORS.issubset(delivery_houses),
+                "speculation_gain_core": {5, 11}.issubset(delivery_houses),
+                "loss_chain_active": PRESSURE.issubset(delivery_houses),
+            },
+            "terminal_trigger": {
+                "level": terminal["level"],
+                "planet": terminal["planet"],
+                "houses": terminal["houses"],
+                "speculation_gain_core": {5, 11}.issubset(terminal_houses),
+                "has_reversal_or_loss": bool(terminal_houses & PRESSURE),
+            },
+        }
 
     def daily_climate(self, moment: datetime, location: Mapping[str, Any], period: Mapping[str, Any]) -> dict[str, Any]:
         transit = self._chart(moment, location)
@@ -260,7 +295,20 @@ class ClassicalIntradayTradingEngine:
             if h in PRESSURE: transit_pressure.append(f"{planet}:H{h}")
         if transit_support: support.append({"group": "dasha_transit", "code": ", ".join(transit_support), "reason": "Active Vimshottari lords occupy trading-support houses in today's gochara chart."})
         if transit_pressure: obstruction.append({"group": "dasha_transit", "code": ", ".join(transit_pressure), "major": False, "reason": "Active Vimshottari lords occupy reversal or loss houses today."})
-        av_rows = AshtakavargaTransitCalculator(self.birth_data, self.natal_chart).calculate_transit_snapshot(moment)
+        # The AV calculator receives a naive UTC moment, while this engine
+        # evaluates the trader's local civil time. Convert explicitly so its
+        # transit rows describe the same instant as Panchanga and gochara.
+        try:
+            av_moment = (
+                moment.replace(tzinfo=ZoneInfo(str(location["timezone"])))
+                .astimezone(timezone.utc)
+                .replace(tzinfo=None)
+            )
+        except Exception:
+            av_moment = moment
+        av_rows = AshtakavargaTransitCalculator(
+            self.birth_data, self.natal_chart
+        ).calculate_transit_snapshot(av_moment)
         relevant = [r for r in av_rows if r["planet"] in set(active_lords + ["Moon"])]
         rich = [r["planet"] for r in relevant if r["natal_bav_band"] == "bindu_rich" and r["natal_sav_band"] != "weak"]
         poor = [r["planet"] for r in relevant if r["natal_bav_band"] == "bindu_poor" and r["natal_sav_band"] == "weak"]
@@ -278,8 +326,18 @@ class ClassicalIntradayTradingEngine:
         obstruction.extend(self._panchanga_obstructions(p))
         major_groups = {r["group"] for r in obstruction if r.get("major")}
         support_groups = {r["group"] for r in support}
-        if period["status"] == "adverse" or len(major_groups) >= 2: status = "adverse"
-        elif period["status"] == "supportive" and len(support_groups) >= 2 and not major_groups: status = "strong"
+        terminal = period.get("terminal_trigger") or {}
+        exact_gain_delivery = bool(
+            terminal.get("speculation_gain_core")
+            and not terminal.get("has_reversal_or_loss")
+        )
+        if len(major_groups) >= 2: status = "adverse"
+        elif len(support_groups) >= 2 and not major_groups and (
+            period["status"] == "supportive" or exact_gain_delivery
+        ):
+            status = "strong"
+        elif period["status"] == "adverse" and not exact_gain_delivery:
+            status = "adverse"
         else: status = "mixed"
         return {"status": status, "tara_bala": {"name": tara, "natal_nakshatra": natal_nak, "transit_nakshatra": transit_nak}, "chandra_bala": {"house_from_natal_moon": chandra_house}, "supports": support, "obstructions": obstruction, "ashtakavarga": relevant, "panchanga": self._compact_panchanga(p)}
 
@@ -322,7 +380,14 @@ class ClassicalIntradayTradingEngine:
                 boundaries.add(right.replace(second=0, microsecond=0))
             scan, old_sign, old_pstate = nxt, new_sign, new_pstate
         points = sorted(boundaries)
-        return [self._judge_window(points[i], points[i + 1], location, period, daily, chogh, horas) for i in range(len(points) - 1) if points[i] < points[i + 1]]
+        windows = [
+            self._judge_window(points[i], points[i + 1], location, period, daily, chogh, horas)
+            for i in range(len(points) - 1)
+            if points[i] < points[i + 1]
+        ]
+        # Client-facing timestamps are minute-granular. Suppress sub-minute
+        # transition fragments that would display as 10:35-10:35.
+        return [row for row in windows if row["start"] != row["end"]]
 
     def _judge_window(self, start: datetime, end: datetime, location: Mapping[str, Any], period: Mapping[str, Any], daily: Mapping[str, Any], chogh: list[dict[str, Any]], horas: list[dict[str, Any]]) -> dict[str, Any]:
         mid = start + (end - start) / 2
@@ -343,8 +408,12 @@ class ClassicalIntradayTradingEngine:
         asc_lord = BaseCalculator.SIGN_LORDS[asc_sign]
         asc_state = dignity.get(asc_lord, {})
         major = _is_weak(asc_state) or _house(chart, asc_lord) in {8, 12}
-        if not major and (_is_strong(asc_state) or _house(chart, asc_lord) in SUPPORT_HOUSES): supports.append("Muhurta ascendant lord is usable")
-        else: cautions.append("Muhurta ascendant lord is weak or placed in a loss/reversal house")
+        if major:
+            cautions.append("Muhurta ascendant lord is weak or placed in a loss/reversal house")
+        elif _is_strong(asc_state) or _house(chart, asc_lord) in SUPPORT_HOUSES:
+            supports.append("Muhurta ascendant lord is usable")
+        else:
+            cautions.append("Muhurta ascendant lord lacks clear strength")
         moon_house = _house(chart, "Moon")
         moon_state = dignity.get("Moon", {})
         if moon_house in GOOD_CHANDRA and not _is_weak(moon_state):
@@ -372,9 +441,12 @@ class ClassicalIntradayTradingEngine:
             p_obstructions.append({"group": "moon_gandanta", "code": "Moon Gandanta", "major": True, "reason": "Moon Gandanta makes this segment unsuitable for a fresh speculative entry."})
         if p_obstructions: cautions.extend(r["reason"] for r in p_obstructions)
         if any(r.get("major") for r in p_obstructions): major = True
-        if daily["status"] == "adverse" or major: verdict = "avoid"
-        elif len(supports) >= 2: verdict = "supportive"
-        else: verdict = "neutral"
+        if daily["status"] == "adverse" or major:
+            verdict = "avoid"
+        elif len(supports) >= 2 and len(supports) >= len(cautions):
+            verdict = "supportive"
+        else:
+            verdict = "neutral"
         return {"start": self._exchange_clock(start, location), "end": self._exchange_clock(end, location), "local_start": _at(start), "local_end": _at(end), "verdict": verdict, "usable_for_new_entry": verdict == "supportive", "hora_lord": hora.get("lord"), "choghadiya": ch.get("name"), "ascendant_sign": asc_sign, "panchanga": self._compact_panchanga(p), "trading_house_lords": anchor_lords, "supports": supports, "cautions": cautions}
 
     @staticmethod

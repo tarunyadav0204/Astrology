@@ -633,6 +633,10 @@ def build_natal_promises(
     avayogi_lord = (yogi_points.get("avayogi") or {}).get("lord")
     dagdha = yogi_points.get("dagdha_rashi") or {}
     tithi_shunya = yogi_points.get("tithi_shunya_rashi") or {}
+    has_classical_dagdha_list = "tithi_dagdha_rashis" in yogi_points
+    tithi_dagdha_rows = list(yogi_points.get("tithi_dagdha_rashis") or [])
+    tithi_dagdha_lords = {row.get("lord") for row in tithi_dagdha_rows if row.get("lord")}
+    tithi_dagdha_signs = {int(row["sign"]) for row in tithi_dagdha_rows if row.get("sign") is not None}
     overlap = bool((yogi_points.get("avayogi_tithi_shunya_overlap") or {}).get("is_active"))
     promises: List[Dict[str, Any]] = []
     for house in range(1, 13):
@@ -860,12 +864,14 @@ def build_natal_promises(
                 relation=role_names,
                 tithi_shunya_overlap=overlap and planet == avayogi_lord,
             )
+            legacy_dagdha_roles = () if has_classical_dagdha_list else (
+                ("dagdha_rashi_lord", dagdha.get("lord"), Polarity.CHALLENGING, dagdha),
+                ("tithi_shunya_lord", tithi_shunya.get("lord"), Polarity.NEUTRAL if overlap and planet == avayogi_lord else Polarity.CHALLENGING, tithi_shunya),
+            )
             for source, special_lord, polarity, details in (
                 ("yogi_lord", yogi_lord, Polarity.SUPPORTIVE, yogi_points.get("yogi") or {}),
                 ("avayogi_lord", avayogi_lord, Polarity(avayogi_resolution["polarity"]), yogi_points.get("avayogi") or {}),
-                ("dagdha_rashi_lord", dagdha.get("lord"), Polarity.CHALLENGING, dagdha),
-                ("tithi_shunya_lord", tithi_shunya.get("lord"), Polarity.NEUTRAL if overlap and planet == avayogi_lord else Polarity.CHALLENGING, tithi_shunya),
-            ):
+            ) + legacy_dagdha_roles:
                 if special_lord and planet == special_lord:
                     factors.append({
                         "source": source,
@@ -882,7 +888,32 @@ def build_natal_promises(
                             "avayogi_effect": avayogi_resolution if source == "avayogi_lord" else None,
                         },
                     })
-            if dagdha.get("sign") is not None and int(placement["sign"]) == int(dagdha["sign"]):
+            if has_classical_dagdha_list and planet in tithi_dagdha_lords:
+                matching = [row for row in tithi_dagdha_rows if row.get("lord") == planet]
+                factors.append({
+                    "source": "dagdha_rashi_lord",
+                    "planet": planet,
+                    "polarity": Polarity.CHALLENGING.value,
+                    "weight": 0.75,
+                    "facts": {
+                        "roles": role_names,
+                        "placement_house": int(placement["house"]),
+                        "target_house": house,
+                        "special_signs": tuple(row.get("sign") for row in matching),
+                        "special_sign_names": tuple(row.get("sign_name") for row in matching),
+                        "tithi_derived": True,
+                    },
+                })
+            if has_classical_dagdha_list and int(placement["sign"]) in tithi_dagdha_signs:
+                row = next(row for row in tithi_dagdha_rows if int(row["sign"]) == int(placement["sign"]))
+                factors.append({
+                    "source": "planet_in_dagdha_rashi",
+                    "planet": planet,
+                    "polarity": Polarity.CHALLENGING.value,
+                    "weight": 0.75,
+                    "facts": {"roles": role_names, "placement_house": int(placement["house"]), "target_house": house, "dagdha_sign": row.get("sign"), "dagdha_sign_name": row.get("sign_name")},
+                })
+            elif not has_classical_dagdha_list and dagdha.get("sign") is not None and int(placement["sign"]) == int(dagdha["sign"]):
                 factors.append({
                     "source": "planet_in_dagdha_rashi",
                     "planet": planet,
@@ -890,7 +921,7 @@ def build_natal_promises(
                     "weight": 0.75,
                     "facts": {"roles": role_names, "placement_house": int(placement["house"]), "target_house": house, "dagdha_sign": dagdha.get("sign"), "dagdha_sign_name": dagdha.get("sign_name")},
                 })
-            if tithi_shunya.get("sign") is not None and int(placement["sign"]) == int(tithi_shunya["sign"]):
+            if not has_classical_dagdha_list and tithi_shunya.get("sign") is not None and int(placement["sign"]) == int(tithi_shunya["sign"]):
                 factors.append({
                     "source": "planet_in_tithi_shunya_rashi",
                     "planet": planet,

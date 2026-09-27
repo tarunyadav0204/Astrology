@@ -532,8 +532,8 @@ class LeadershipAnalyzer:
         # Check if key leadership planets are Yogi lords
         yogi_lord = yogi_data['yogi']['lord']
         avayogi_lord = yogi_data['avayogi']['lord']
-        dagdha_lord = yogi_data['dagdha_rashi']['lord']
-        tithi_shunya_lord = yogi_data['tithi_shunya_rashi']['lord']
+        dagdha_lord = (yogi_data.get('dagdha_rashi') or {}).get('lord')
+        tithi_shunya_lord = (yogi_data.get('tithi_shunya_rashi') or {}).get('lord')
         
         leadership_planets = ['Sun', 'Mars', 'Jupiter', amk_planet]
         
@@ -702,9 +702,9 @@ class LeadershipAnalyzer:
                 else 'avayogi_neutralized' if resolution['polarity'] == 'neutral'
                 else 'avayogi'
             )
-        elif planet == yogi_data['dagdha_rashi']['lord']:
+        elif planet == (yogi_data.get('dagdha_rashi') or {}).get('lord'):
             return 'dagdha'
-        elif planet == yogi_data['tithi_shunya_rashi']['lord']:
+        elif planet == (yogi_data.get('tithi_shunya_rashi') or {}).get('lord'):
             return 'tithi_shunya'
         else:
             return 'neutral'

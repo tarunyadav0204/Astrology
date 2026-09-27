@@ -121,6 +121,19 @@ const boxGap = (a, b) => {
 
 export const textHalfWidth = (text, fontSize) => Math.max(4, String(text || '').length * fontSize * 0.34);
 
+export const roleLabelPlace = (x, symbol, role, planetFont, chartSize) => {
+  const font = Math.max(7, Math.round(planetFont * 0.45));
+  const roleWidth = textHalfWidth(role, font) * 2;
+  const symbolHalf = textHalfWidth(symbol, planetFont);
+  if (x + symbolHalf + 2 + roleWidth <= chartSize - 4) {
+    return { x: x + symbolHalf + 1, anchor: 'start', font };
+  }
+  if (x - symbolHalf - 2 - roleWidth >= 4) {
+    return { x: x - symbolHalf - 1, anchor: 'end', font };
+  }
+  return { x, anchor: 'middle', font };
+};
+
 const colorLuminance = (hex) => {
   const raw = String(hex || '').replace('#', '');
   if (raw.length < 6) return 0;
@@ -981,14 +994,14 @@ const NorthIndianChart = ({
       );
       if (arrow) aspectArrows.push(arrow);
     });
-  } else if (aspectMode === 'parashari' || (aspectMode === 'nadi' && aspectFocus)) {
+  } else if ((aspectMode === 'parashari' || aspectMode === 'nadi') && Array.isArray(aspectFocus) && aspectFocus.length) {
     for (let houseNumber = 1; houseNumber <= 12; houseNumber += 1) {
       const planetsInHouse = getPlanetsInHouse(houseNumber - 1);
       const fromCenter = getHouseData(houseNumber).center;
       planetsInHouse.forEach((planet, pIndex) => {
         const counts = planetAspectCounts(aspectMode, planet.name);
         if (!counts) return;
-        if (aspectMode === 'nadi' && planet.name !== aspectFocus) return;
+        if ((aspectMode === 'nadi' || aspectMode === 'parashari') && !(Array.isArray(aspectFocus) && aspectFocus.includes(planet.name))) return;
         const from = natalPlanetAnchor(houseNumber, fromCenter, planetsInHouse.length, pIndex);
         counts.forEach((count) => {
           const target = aspectHouse(houseNumber, count);
@@ -1080,7 +1093,7 @@ const NorthIndianChart = ({
           />
         </G>
 
-        <ChartAspectArrows arrows={aspectArrows} color={colors.primary} />
+        <ChartAspectArrows arrows={aspectArrows} color={colors.chartText || colors.text} />
 
         {/* Houses */}
         {[1,2,3,4,5,6,7,8,9,10,11,12].map((houseNumber) => {
@@ -1214,19 +1227,22 @@ const NorthIndianChart = ({
                         {dashaTag}
                       </SvgText>
                     ) : null}
-                    {planetRoles?.[planet.name] ? (
-                      <SvgText
-                        x={planetX + textHalfWidth(symbol, planetFont) + 1}
-                        y={planetY + (dashaTag ? 2 : -2)}
-                        fontSize={Math.max(7, Math.round(planetFont * 0.45))}
-                        fill={colors.primary}
-                        fontWeight="700"
-                        textAnchor="start"
-                        pointerEvents="none"
-                      >
-                        {planetRoles[planet.name]}
-                      </SvgText>
-                    ) : null}
+                    {planetRoles?.[planet.name] ? (() => {
+                      const role = roleLabelPlace(planetX, symbol, planetRoles[planet.name], planetFont, CHART_SIZE);
+                      return (
+                        <SvgText
+                          x={role.x}
+                          y={planetY + (dashaTag ? 2 : -2)}
+                          fontSize={role.font}
+                          fill={colors.primary}
+                          fontWeight="700"
+                          textAnchor={role.anchor}
+                          pointerEvents="none"
+                        >
+                          {planetRoles[planet.name]}
+                        </SvgText>
+                      );
+                    })() : null}
                     {chartType === 'transit' && transitBav(bavBySign, planet.name, rashiIndex) != null ? (
                       <SvgText
                         x={planetX + textHalfWidth(symbol, planetFont) + 2}

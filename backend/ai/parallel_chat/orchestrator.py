@@ -1490,6 +1490,8 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         f"{time_context}\n\n"
         f"{merge_cached_note}"
         f"{lifespan_evidence_block}"
+        f"SPECIAL_POINTS_AUTHORITY_JSON:\n"
+        f"{_json_compact(ctx.get('special_points') or {})}\n"
         f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n"
         f"{_json_compact(branch_bundle)}\n"
         f"{'' if _runtime_for('merge')['cached_model'] else hist_text + chr(10)}"

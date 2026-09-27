@@ -324,8 +324,8 @@ class WorkStyleAnalyzer:
         return {
             'is_yogi_lord': planet == yogi_data['yogi']['lord'],
             'is_avayogi_lord': is_avayogi,
-            'is_dagdha_lord': planet == yogi_data['dagdha_rashi']['lord'],
-            'is_tithi_shunya_lord': planet == yogi_data['tithi_shunya_rashi']['lord'],
+            'is_dagdha_lord': planet == (yogi_data.get('dagdha_rashi') or {}).get('lord'),
+            'is_tithi_shunya_lord': planet == (yogi_data.get('tithi_shunya_rashi') or {}).get('lord'),
             'avayogi_effect': (
                 avayogi_effect(
                     placement_house=(self.planets.get(planet) or {}).get('house'),

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, Easing, Platform } from 'react-native';
 import Svg, { Circle, Rect, Text as SvgText, G, Line, ClipPath, Defs } from 'react-native-svg';
-import { dashaLevelSuffix, dashaPaint, labelBox, placeCircleClear, placeTransitLabels, signPointAt, textHalfWidth, transitBav } from './NorthIndianChart';
+import { dashaLevelSuffix, dashaPaint, labelBox, placeCircleClear, placeTransitLabels, roleLabelPlace, signPointAt, textHalfWidth, transitBav } from './NorthIndianChart';
 import { aspectArrow, aspectHouse, ChartAspectArrows, jaiminiTargetSigns, planetAspectCounts } from './chartAspects';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
@@ -293,7 +293,7 @@ const SouthIndianChart = ({
         if (arrow) aspectArrows.push(arrow);
       });
     }
-  } else if (aspectMode === 'parashari' || (aspectMode === 'nadi' && aspectFocus)) {
+  } else if ((aspectMode === 'parashari' || aspectMode === 'nadi') && Array.isArray(aspectFocus) && aspectFocus.length) {
     gridPositions.forEach((pos) => {
       const houseNumber = getHouseNumber(pos.sign);
       if (typeof houseNumber !== 'number') return;
@@ -301,7 +301,7 @@ const SouthIndianChart = ({
       planetsInSign.forEach((planet, pIndex) => {
         const counts = planetAspectCounts(aspectMode, planet.name);
         if (!counts) return;
-        if (aspectMode === 'nadi' && planet.name !== aspectFocus) return;
+        if ((aspectMode === 'nadi' || aspectMode === 'parashari') && !(Array.isArray(aspectFocus) && aspectFocus.includes(planet.name))) return;
         const slot = southPlanetSlot(pos, pIndex, planetsInSign.length, houseNumber);
         const from = { x: pos.x + pos.width / 2, y: slot.symbolY - 4 };
         counts.forEach((count) => {
@@ -437,7 +437,7 @@ const SouthIndianChart = ({
           />
         </G>
 
-        <ChartAspectArrows arrows={aspectArrows} color={colors.primary} />
+        <ChartAspectArrows arrows={aspectArrows} color={colors.chartText || colors.text} />
 
         {/* Grid cells */}
         {gridPositions.map((pos, index) => {
@@ -606,19 +606,22 @@ const SouthIndianChart = ({
                       {dashaTag}
                     </SvgText>
                   ) : null}
-                  {planetRoles?.[planet.name] ? (
-                    <SvgText
-                      x={symbolX + textHalfWidth(planet.symbol, planetFont) + 1}
-                      y={symbolY + (dashaTag ? Math.round(planetFont * 0.7) : 1)}
-                      fontSize={Math.max(7, Math.round(planetFont * 0.5))}
-                      fill={colors.primary}
-                      fontWeight="700"
-                      textAnchor="start"
-                      pointerEvents="none"
-                    >
-                      {planetRoles[planet.name]}
-                    </SvgText>
-                  ) : null}
+                  {planetRoles?.[planet.name] ? (() => {
+                    const role = roleLabelPlace(symbolX, planet.symbol, planetRoles[planet.name], planetFont, 340);
+                    return (
+                      <SvgText
+                        x={role.x}
+                        y={symbolY + (dashaTag ? Math.round(planetFont * 0.7) : 1)}
+                        fontSize={role.font}
+                        fill={colors.primary}
+                        fontWeight="700"
+                        textAnchor={role.anchor}
+                        pointerEvents="none"
+                      >
+                        {planetRoles[planet.name]}
+                      </SvgText>
+                    );
+                  })() : null}
                   {slot.degreesFit && (
                     <SvgText
                       x={symbolX}

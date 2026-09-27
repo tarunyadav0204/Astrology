@@ -2189,13 +2189,111 @@ def enforce_live_graph_answer(
                 "participate": "Participation is permitted with normal risk controls",
                 "cautious": "Proceed cautiously",
             }.get(participation, "Proceed cautiously")
+            visible_astrology = (
+                spec.get("visible_astrology")
+                if isinstance(spec.get("visible_astrology"), Mapping)
+                else {}
+            )
+            simple_style = str(visible_astrology.get("response_style") or "simple").lower() != "technical"
+            period = session.get("period_permission") if isinstance(session.get("period_permission"), Mapping) else {}
+            daily = session.get("daily_climate") if isinstance(session.get("daily_climate"), Mapping) else {}
+            tara = daily.get("tara_bala") if isinstance(daily.get("tara_bala"), Mapping) else {}
+            chandra = daily.get("chandra_bala") if isinstance(daily.get("chandra_bala"), Mapping) else {}
+
+            # A sit-out day has no usable entry window. In Simple mode, listing
+            # every technical transition as fourteen identical "avoid" rows is
+            # harder to understand and falsely suggests that the user must pick
+            # among them. Keep the full ledger in evidence/debug and render its
+            # single practical conclusion here.
+            if participation == "sit_out" and simple_style:
+                session_start = str(windows[0].get("start") or "09:15") if windows else "09:15"
+                session_end = str(windows[-1].get("end") or "15:30") if windows else "15:30"
+                lines = [
+                    f"**Today's session indication: {decision}**",
+                    "",
+                    (
+                        "Your active planetary period connects money and possible gains with reversal and loss "
+                        "factors, while the speculation-to-gain chain is incomplete. That makes today's judgment, "
+                        "entry discipline and exits less dependable than usual."
+                    ),
+                ]
+                if tara:
+                    lines.append(
+                        f"{tara.get('name') or 'Tara Bala'} is a supportive lunar-star influence, but it is not "
+                        "strong enough to override the adverse period permission and today's loss pressure."
+                    )
+                lines.extend([
+                    "",
+                    f"**{session_start}–{session_end}: no usable new-entry window**",
+                    (
+                        "Some shorter periods have individually supportive qualities, but none can override the "
+                        "day-level sit-out verdict. Avoid opening a fresh speculative position for this session."
+                    ),
+                    "",
+                    (
+                        "This judges your decision and execution climate for the session. It does not predict "
+                        "whether the market or any security will rise or fall."
+                    ),
+                ])
+                if question_sentence:
+                    lines.extend(["", question_sentence])
+                return "\n".join(lines)
+
+            if simple_style:
+                terminal = (
+                    period.get("terminal_trigger")
+                    if isinstance(period.get("terminal_trigger"), Mapping)
+                    else {}
+                )
+                entry_windows = [
+                    row for row in windows
+                    if row.get("verdict") == "supportive" and row.get("usable_for_new_entry", True)
+                ]
+                heading = {
+                    "reduce_size": "Opportunity is present, with higher reversal risk",
+                    "participate": "The session is supportive",
+                    "cautious": "Mixed opportunity; proceed selectively",
+                }.get(participation, decision)
+                lines = [f"**Today's session indication: {heading}**", ""]
+                if terminal.get("speculation_gain_core"):
+                    lines.append(
+                        "The shortest active planetary period connects speculative judgment with realized gains, "
+                        "so a blanket instruction to avoid trading is not supported."
+                    )
+                if period.get("loss_chain_active"):
+                    lines.append(
+                        "The broader period also carries reversal and leakage factors. A profitable move can occur, "
+                        "but protecting gains and following the planned exit matter more than usual."
+                    )
+                supports = [
+                    str(row.get("code") or row.get("reason") or "")
+                    for row in list(daily.get("supports") or [])
+                    if isinstance(row, Mapping)
+                ]
+                if supports:
+                    lines.append("Today's supporting factors include " + " and ".join(supports[:2]) + ".")
+                lines.extend(["", "**Best calculated new-entry window**" if len(entry_windows) == 1 else "**Best calculated new-entry windows**"])
+                if entry_windows:
+                    for row in entry_windows:
+                        lines.append(f"- {row.get('start')}–{row.get('end')}")
+                else:
+                    lines.append("- No market-hour interval passed every new-entry check; this does not imply that an existing position must lose.")
+                lines.extend([
+                    "",
+                    (
+                        "This is an astrological opportunity-and-risk assessment for your execution. It cannot establish "
+                        "the direction of the market, a security, or the size of profit or loss."
+                    ),
+                ])
+                if question_sentence:
+                    lines.extend(["", question_sentence])
+                return "\n".join(lines)
+
             lines = [
                 f"**Today's session indication: {decision}**",
                 "",
                 "**Why today's result**",
             ]
-            period = session.get("period_permission") if isinstance(session.get("period_permission"), Mapping) else {}
-            daily = session.get("daily_climate") if isinstance(session.get("daily_climate"), Mapping) else {}
             active = [row for row in list(period.get("active_periods") or []) if isinstance(row, Mapping)]
             if active:
                 lines.append(
@@ -2203,8 +2301,6 @@ def enforce_live_graph_answer(
                     + " / ".join(str(row.get("planet")) for row in active)
                     + f" activate houses {', '.join(str(x) for x in period.get('activated_houses') or [])}."
                 )
-            tara = daily.get("tara_bala") if isinstance(daily.get("tara_bala"), Mapping) else {}
-            chandra = daily.get("chandra_bala") if isinstance(daily.get("chandra_bala"), Mapping) else {}
             if not tara and isinstance(session.get("tara_bala"), Mapping):
                 tara = session.get("tara_bala")
             if not chandra and isinstance(session.get("chandra_bala"), Mapping):

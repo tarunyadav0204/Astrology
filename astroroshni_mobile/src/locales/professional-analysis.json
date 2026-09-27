@@ -1,0 +1,277 @@
+{
+  "english": {
+    "title": "Professional Analysis",
+    "selectedChart": "Selected chart",
+    "actions": {
+      "back": "Back"
+    },
+    "eyebrow": "Astrologer workspace",
+    "heroTitle": "Study this chart by area of life",
+    "heroBody": "Open a focused classical analysis for the selected person. Each area keeps natal promise and timing clearly separated.",
+    "areasTitle": "Analysis areas",
+    "health": {
+      "title": "Health",
+      "body": "Study constitution, vulnerable areas, protection, disease indications and timing.",
+      "accessibility": "Open health analysis",
+      "topics": {
+        "constitution": "Constitution",
+        "vulnerabilities": "Vulnerable areas",
+        "protection": "Protection",
+        "disease": "Disease indications",
+        "timing": "Timing"
+      }
+    },
+    "openAccessibility": "Open professional analysis",
+    "chartCardSubtitle": "Health and future specialist studies in one place."
+  },
+  "hindi": {
+    "title": "व्यावसायिक विश्लेषण",
+    "selectedChart": "चुनी हुई कुंडली",
+    "actions": {
+      "back": "वापस"
+    },
+    "eyebrow": "ज्योतिषी कार्यक्षेत्र",
+    "heroTitle": "जीवन के क्षेत्र के अनुसार कुंडली का अध्ययन करें",
+    "heroBody": "चुने हुए व्यक्ति के लिए केंद्रित शास्त्रीय विश्लेषण खोलें। हर क्षेत्र में जन्मकुंडली के संकेत और समय अलग रखे गए हैं।",
+    "areasTitle": "विश्लेषण क्षेत्र",
+    "health": {
+      "title": "स्वास्थ्य",
+      "body": "शारीरिक प्रकृति, संवेदनशील क्षेत्र, सुरक्षा, रोग संकेत और समय का अध्ययन करें।",
+      "accessibility": "स्वास्थ्य विश्लेषण खोलें",
+      "topics": {
+        "constitution": "शारीरिक प्रकृति",
+        "vulnerabilities": "संवेदनशील क्षेत्र",
+        "protection": "सुरक्षा",
+        "disease": "रोग संकेत",
+        "timing": "समय"
+      }
+    },
+    "openAccessibility": "व्यावसायिक विश्लेषण खोलें",
+    "chartCardSubtitle": "स्वास्थ्य और आगे के विशेषज्ञ अध्ययन एक ही स्थान पर।"
+  },
+  "es": {
+    "title": "Análisis profesional",
+    "selectedChart": "Carta seleccionada",
+    "actions": {
+      "back": "Atrás"
+    },
+    "eyebrow": "Espacio del astrólogo",
+    "heroTitle": "Estudia esta carta por área de vida",
+    "heroBody": "Abre un análisis clásico enfocado para la persona seleccionada. Cada área separa claramente la promesa natal y el momento.",
+    "areasTitle": "Áreas de análisis",
+    "health": {
+      "title": "Salud",
+      "body": "Estudia constitución, zonas vulnerables, protección, indicaciones de enfermedad y tiempos.",
+      "accessibility": "Abrir análisis de salud",
+      "topics": {
+        "constitution": "Constitución",
+        "vulnerabilities": "Zonas vulnerables",
+        "protection": "Protección",
+        "disease": "Indicaciones",
+        "timing": "Tiempos"
+      }
+    },
+    "openAccessibility": "Abrir análisis profesional",
+    "chartCardSubtitle": "Salud y futuros estudios especializados en un solo lugar."
+  },
+  "french": {
+    "title": "Analyse professionnelle",
+    "selectedChart": "Thème sélectionné",
+    "actions": {
+      "back": "Retour"
+    },
+    "eyebrow": "Espace de l’astrologue",
+    "heroTitle": "Étudier ce thème par domaine de vie",
+    "heroBody": "Ouvrez une analyse classique ciblée pour la personne sélectionnée. Chaque domaine distingue clairement le potentiel natal et la période.",
+    "areasTitle": "Domaines d’analyse",
+    "health": {
+      "title": "Santé",
+      "body": "Étudiez la constitution, les zones vulnérables, les protections, les indications de maladie et les périodes.",
+      "accessibility": "Ouvrir l’analyse de santé",
+      "topics": {
+        "constitution": "Constitution",
+        "vulnerabilities": "Zones vulnérables",
+        "protection": "Protections",
+        "disease": "Indications",
+        "timing": "Périodes"
+      }
+    },
+    "openAccessibility": "Ouvrir l’analyse professionnelle",
+    "chartCardSubtitle": "La santé et les futures études spécialisées au même endroit."
+  },
+  "german": {
+    "title": "Professionelle Analyse",
+    "selectedChart": "Ausgewähltes Horoskop",
+    "actions": {
+      "back": "Zurück"
+    },
+    "eyebrow": "Arbeitsbereich für Astrologen",
+    "heroTitle": "Dieses Horoskop nach Lebensbereich untersuchen",
+    "heroBody": "Öffne eine gezielte klassische Analyse für die ausgewählte Person. Anlage und zeitliche Aktivierung bleiben klar getrennt.",
+    "areasTitle": "Analysebereiche",
+    "health": {
+      "title": "Gesundheit",
+      "body": "Untersuche Konstitution, empfindliche Bereiche, Schutzfaktoren, Krankheitsanzeigen und Zeitphasen.",
+      "accessibility": "Gesundheitsanalyse öffnen",
+      "topics": {
+        "constitution": "Konstitution",
+        "vulnerabilities": "Empfindliche Bereiche",
+        "protection": "Schutz",
+        "disease": "Krankheitsanzeigen",
+        "timing": "Zeitphasen"
+      }
+    },
+    "openAccessibility": "Professionelle Analyse öffnen",
+    "chartCardSubtitle": "Gesundheit und künftige Fachanalysen an einem Ort."
+  },
+  "russian": {
+    "title": "Профессиональный анализ",
+    "selectedChart": "Выбранная карта",
+    "actions": {
+      "back": "Назад"
+    },
+    "eyebrow": "Рабочее место астролога",
+    "heroTitle": "Исследуйте карту по сферам жизни",
+    "heroBody": "Откройте углублённый классический анализ выбранного человека. Натальные показатели и время проявления разделены.",
+    "areasTitle": "Области анализа",
+    "health": {
+      "title": "Здоровье",
+      "body": "Изучите конституцию, уязвимые зоны, защиту, признаки заболеваний и сроки.",
+      "accessibility": "Открыть анализ здоровья",
+      "topics": {
+        "constitution": "Конституция",
+        "vulnerabilities": "Уязвимые зоны",
+        "protection": "Защита",
+        "disease": "Признаки заболеваний",
+        "timing": "Сроки"
+      }
+    },
+    "openAccessibility": "Открыть профессиональный анализ",
+    "chartCardSubtitle": "Здоровье и будущие специальные исследования в одном месте."
+  },
+  "chinese": {
+    "title": "专业分析",
+    "selectedChart": "已选命盘",
+    "actions": {
+      "back": "返回"
+    },
+    "eyebrow": "占星师工作区",
+    "heroTitle": "按人生领域研读命盘",
+    "heroBody": "为所选人物打开专门的古典分析，并清楚区分本命倾向与时间触发。",
+    "areasTitle": "分析领域",
+    "health": {
+      "title": "健康",
+      "body": "研读体质、脆弱部位、保护因素、疾病征象与时间。",
+      "accessibility": "打开健康分析",
+      "topics": {
+        "constitution": "体质",
+        "vulnerabilities": "脆弱部位",
+        "protection": "保护因素",
+        "disease": "疾病征象",
+        "timing": "时间"
+      }
+    },
+    "openAccessibility": "打开专业分析",
+    "chartCardSubtitle": "健康与未来专项研读集中在一处。"
+  },
+  "tamil": {
+    "title": "தொழில்முறை பகுப்பாய்வு",
+    "selectedChart": "தேர்ந்தெடுத்த ஜாதகம்",
+    "actions": {
+      "back": "பின்செல்"
+    },
+    "eyebrow": "ஜோதிடர் பணியிடம்",
+    "heroTitle": "வாழ்க்கைப் பகுதி வாரியாக ஜாதகத்தை ஆராயுங்கள்",
+    "heroBody": "தேர்ந்தெடுத்த நபருக்கான கவனமுள்ள பாரம்பரிய பகுப்பாய்வைத் திறக்கவும். பிறப்பு வாக்குறுதியும் காலமும் தெளிவாகப் பிரிக்கப்படும்.",
+    "areasTitle": "பகுப்பாய்வு பகுதிகள்",
+    "health": {
+      "title": "உடல்நலம்",
+      "body": "உடல் இயல்பு, பாதிக்கப்படக்கூடிய பகுதிகள், பாதுகாப்பு, நோய் அறிகுறிகள் மற்றும் காலத்தை ஆராயுங்கள்.",
+      "accessibility": "உடல்நல பகுப்பாய்வைத் திறக்கவும்",
+      "topics": {
+        "constitution": "உடல் இயல்பு",
+        "vulnerabilities": "பாதிப்பு பகுதிகள்",
+        "protection": "பாதுகாப்பு",
+        "disease": "நோய் அறிகுறிகள்",
+        "timing": "காலம்"
+      }
+    },
+    "openAccessibility": "தொழில்முறை பகுப்பாய்வைத் திறக்கவும்",
+    "chartCardSubtitle": "உடல்நலமும் எதிர்கால சிறப்பு ஆய்வுகளும் ஒரே இடத்தில்."
+  },
+  "telugu": {
+    "title": "వృత్తిపర విశ్లేషణ",
+    "selectedChart": "ఎంచుకున్న జాతకం",
+    "actions": {
+      "back": "వెనుకకు"
+    },
+    "eyebrow": "జ్యోతిష్కుల కార్యస్థలం",
+    "heroTitle": "జీవిత విభాగం ప్రకారం ఈ జాతకాన్ని పరిశీలించండి",
+    "heroBody": "ఎంచుకున్న వ్యక్తికి కేంద్రీకృత శాస్త్రీయ విశ్లేషణను తెరవండి. జన్మ సూచనలు, సమయం స్పష్టంగా వేరుగా ఉంటాయి.",
+    "areasTitle": "విశ్లేషణ విభాగాలు",
+    "health": {
+      "title": "ఆరోగ్యం",
+      "body": "శరీర స్వభావం, బలహీన ప్రాంతాలు, రక్షణ, వ్యాధి సూచనలు మరియు సమయాన్ని పరిశీలించండి.",
+      "accessibility": "ఆరోగ్య విశ్లేషణను తెరవండి",
+      "topics": {
+        "constitution": "శరీర స్వభావం",
+        "vulnerabilities": "బలహీన ప్రాంతాలు",
+        "protection": "రక్షణ",
+        "disease": "వ్యాధి సూచనలు",
+        "timing": "సమయం"
+      }
+    },
+    "openAccessibility": "వృత్తిపర విశ్లేషణను తెరవండి",
+    "chartCardSubtitle": "ఆరోగ్యం మరియు భవిష్యత్ ప్రత్యేక అధ్యయనాలు ఒకే చోట."
+  },
+  "gujarati": {
+    "title": "વ્યાવસાયિક વિશ્લેષણ",
+    "selectedChart": "પસંદ કરેલી કુંડળી",
+    "actions": {
+      "back": "પાછા"
+    },
+    "eyebrow": "જ્યોતિષી કાર્યક્ષેત્ર",
+    "heroTitle": "જીવનના ક્ષેત્ર પ્રમાણે કુંડળીનો અભ્યાસ કરો",
+    "heroBody": "પસંદ કરેલી વ્યક્તિ માટે કેન્દ્રિત શાસ્ત્રીય વિશ્લેષણ ખોલો. જન્મકુંડળીના સંકેતો અને સમય સ્પષ્ટ રીતે અલગ રહે છે.",
+    "areasTitle": "વિશ્લેષણ ક્ષેત્રો",
+    "health": {
+      "title": "આરોગ્ય",
+      "body": "શારીરિક પ્રકૃતિ, સંવેદનશીલ ભાગો, રક્ષણ, રોગ સંકેતો અને સમયનો અભ્યાસ કરો.",
+      "accessibility": "આરોગ્ય વિશ્લેષણ ખોલો",
+      "topics": {
+        "constitution": "શારીરિક પ્રકૃતિ",
+        "vulnerabilities": "સંવેદનશીલ ભાગો",
+        "protection": "રક્ષણ",
+        "disease": "રોગ સંકેતો",
+        "timing": "સમય"
+      }
+    },
+    "openAccessibility": "વ્યાવસાયિક વિશ્લેષણ ખોલો",
+    "chartCardSubtitle": "આરોગ્ય અને ભવિષ્યના વિશેષ અભ્યાસ એક જ જગ્યાએ."
+  },
+  "marathi": {
+    "title": "व्यावसायिक विश्लेषण",
+    "selectedChart": "निवडलेली कुंडली",
+    "actions": {
+      "back": "मागे"
+    },
+    "eyebrow": "ज्योतिषी कार्यक्षेत्र",
+    "heroTitle": "जीवनक्षेत्रानुसार कुंडलीचा अभ्यास करा",
+    "heroBody": "निवडलेल्या व्यक्तीसाठी केंद्रित शास्त्रीय विश्लेषण उघडा. जन्मकुंडलीतील संकेत आणि वेळ स्पष्टपणे वेगळे ठेवले आहेत.",
+    "areasTitle": "विश्लेषण क्षेत्रे",
+    "health": {
+      "title": "आरोग्य",
+      "body": "शरीरप्रकृती, संवेदनशील भाग, संरक्षण, रोग संकेत आणि वेळ यांचा अभ्यास करा.",
+      "accessibility": "आरोग्य विश्लेषण उघडा",
+      "topics": {
+        "constitution": "शरीरप्रकृती",
+        "vulnerabilities": "संवेदनशील भाग",
+        "protection": "संरक्षण",
+        "disease": "रोग संकेत",
+        "timing": "वेळ"
+      }
+    },
+    "openAccessibility": "व्यावसायिक विश्लेषण उघडा",
+    "chartCardSubtitle": "आरोग्य आणि पुढील विशेष अभ्यास एकाच ठिकाणी."
+  }
+}

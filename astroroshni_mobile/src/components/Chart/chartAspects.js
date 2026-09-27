@@ -13,7 +13,9 @@ const NADI_ASPECTS = [5, 7, 9];
 
 export const planetAspectCounts = (mode, planetName) => {
   if (mode === 'nadi') return NADI_PLANET_SET.has(planetName) ? NADI_ASPECTS : null;
-  if (mode === 'parashari') return SPECIAL_ASPECTS[planetName] || null;
+  if (mode === 'parashari' && NADI_PLANET_SET.has(planetName)) {
+    return [7, ...(SPECIAL_ASPECTS[planetName] || [])].sort((a, b) => a - b);
+  }
   return null;
 };
 
@@ -107,18 +109,18 @@ export function ChartAspectArrows({ arrows, color }) {
             x2={arrow.x2}
             y2={arrow.y2}
             stroke={color}
-            strokeOpacity={0.28}
-            strokeWidth={1.1}
+            strokeOpacity={0.55}
+            strokeWidth={1.15}
             strokeLinecap="round"
           />
-          <Polygon points={arrow.head} fill={color} fillOpacity={0.28} />
+          <Polygon points={arrow.head} fill={color} fillOpacity={0.55} />
           {arrow.aspect ? (
             <SvgText
               x={arrow.labelX}
               y={arrow.labelY}
               fontSize="8"
               fill={color}
-              fillOpacity={0.42}
+              fillOpacity={0.8}
               fontWeight="600"
               textAnchor="middle"
             >

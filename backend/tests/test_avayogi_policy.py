@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from calculators.avayogi_policy import AVAYOGI_CHAT_DOCTRINE, avayogi_effect  # noqa: E402
 from calculators.planetary_dignities_calculator import PlanetaryDignitiesCalculator  # noqa: E402
-from ai.parallel_chat.prompt_blocks import _parashari_json_footer  # noqa: E402
+from ai.parallel_chat.prompt_blocks import _parashari_json_footer, build_merge_role_preamble  # noqa: E402
 from chat.instant_chat_pipeline import (  # noqa: E402
     _build_budgeted_instant_prompt,
     _build_instant_composer_prompt_v3,
@@ -136,6 +136,15 @@ def test_standard_premium_and_merge_prompts_share_the_same_policy() -> None:
         assert AVAYOGI_CHAT_DOCTRINE in prompt
         assert "House 3, 6, 8 or 12" in prompt
         assert "ordinary Avayogi obstruction is cancelled" in prompt
+
+
+def test_chat_prompts_lock_calculated_special_point_identities() -> None:
+    standard = build_system_instruction(intent_category="career")
+    merge = build_merge_role_preamble()
+    parashari = _parashari_json_footer()
+    assert "Never infer or recalculate those identities" in standard
+    assert "SPECIAL_POINTS_AUTHORITY_JSON" in merge
+    assert "copy them exactly and never infer or recalculate them" in parashari
 
 
 def test_instant_full_and_budget_prompts_share_the_same_policy() -> None:

@@ -1187,18 +1187,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           />
         ) : null}
       </View>
-      {aspectMode === 'parashari' ? (
-        <TouchableOpacity
-          onPress={() => { setAspectMode(null); setAspectFocus(null); }}
-          accessibilityRole="button"
-          accessibilityLabel={t('chartScreen.aspects', 'Aspects')}
-          style={[styles.aspectsOff, { borderColor: colors.chartLine, backgroundColor: colors.chartRaised }]}
-        >
-          <Text style={[styles.aspectsOffText, { color: colors.chartText || colors.text }]}>{t('chartScreen.aspects', 'Aspects')}</Text>
-          <Ionicons name="close" size={14} color={colors.chartTextMuted} />
-        </TouchableOpacity>
-      ) : null}
-      {aspectMode === 'nadi' || aspectMode === 'jaimini' ? (
+      {aspectMode === 'parashari' || aspectMode === 'nadi' || aspectMode === 'jaimini' ? (
         <View style={[styles.aspectPickRow, { borderColor: colors.chartLine, backgroundColor: colors.chartRaised }]}>
           <ScrollView
             horizontal
@@ -1206,22 +1195,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             contentContainerStyle={styles.aspectPickScroll}
             keyboardShouldPersistTaps="handled"
           >
-            {aspectMode === 'nadi' ? NADI_PLANETS.map((name) => {
-              const selected = aspectFocus === name;
-              const label = t(`planets.${name}`, name.substring(0, 2));
-              return (
-                <TouchableOpacity
-                  key={name}
-                  onPress={() => setAspectFocus(selected ? null : name)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={t(`home.planet_names.${name}`, name)}
-                  style={[styles.aspectPickChip, selected && { backgroundColor: colors.primary }]}
-                >
-                  <Text style={[styles.aspectPickText, { color: selected ? colors.onPrimary : (colors.chartText || colors.text) }]}>{label}</Text>
-                </TouchableOpacity>
-              );
-            }) : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((house) => {
+            {aspectMode === 'jaimini' ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((house) => {
               const selected = aspectFocus === house;
               return (
                 <TouchableOpacity
@@ -1235,12 +1209,35 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                   <Text style={[styles.aspectPickText, { color: selected ? colors.onPrimary : (colors.chartText || colors.text) }]}>{house}</Text>
                 </TouchableOpacity>
               );
+            }) : NADI_PLANETS.map((name) => {
+              const selectedNames = Array.isArray(aspectFocus) ? aspectFocus : [];
+              const selected = selectedNames.includes(name);
+              const label = t(`planets.${name}`, name.substring(0, 2));
+              return (
+                <TouchableOpacity
+                  key={name}
+                  onPress={() => setAspectFocus((current) => {
+                    const names = Array.isArray(current) ? current : [];
+                    return names.includes(name) ? names.filter((item) => item !== name) : [...names, name];
+                  })}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={t(`home.planet_names.${name}`, name)}
+                  style={[styles.aspectPickChip, selected && { backgroundColor: colors.primary }]}
+                >
+                  <Text style={[styles.aspectPickText, { color: selected ? colors.onPrimary : (colors.chartText || colors.text) }]}>{label}</Text>
+                </TouchableOpacity>
+              );
             })}
           </ScrollView>
           <TouchableOpacity
             onPress={() => { setAspectMode(null); setAspectFocus(null); }}
             accessibilityRole="button"
-            accessibilityLabel={aspectMode === 'nadi' ? t('chartScreen.nadiAspects', 'Nadi aspects') : t('chartScreen.jaiminiAspects', 'Jaimini aspects')}
+            accessibilityLabel={aspectMode === 'nadi'
+              ? t('chartScreen.nadiAspects', 'Nadi aspects')
+              : aspectMode === 'jaimini'
+                ? t('chartScreen.jaiminiAspects', 'Jaimini aspects')
+                : t('chartScreen.aspects', 'Aspects')}
             style={styles.aspectPickClose}
           >
             <Ionicons name="close" size={16} color={colors.chartTextMuted} />

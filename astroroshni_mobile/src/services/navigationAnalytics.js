@@ -19,6 +19,8 @@ const ROUTE_VIEW_META = {
   NudgeInbox: { content_id: 'nudge_inbox', content_type: 'notifications' },
   AnalysisHub: { content_id: 'analysis_hub', content_type: 'analysis' },
   AnalysisDetail: { content_type: 'analysis' },
+  ProfessionalAnalysis: { content_id: 'professional_analysis', content_type: 'astrologer_tools' },
+  HealthBlueprint: { content_id: 'professional_health', content_type: 'astrologer_tools' },
   RelationshipMatch: { content_id: 'kundli_matching', content_type: 'analysis' },
   ReportsStudio: { content_id: 'reports_studio', content_type: 'reports' },
   ReportViewer: { content_id: 'report_viewer', content_type: 'reports' },
