@@ -83,7 +83,23 @@
     "clearOfCombustion": "Clear",
     "solarDistance": "Solar distance",
     "combustionEvidence": "{{distance}}° from Sun · {{threshold}}° limit · {{motion}} · {{status}}",
-    "combustionReference": "Combustion: BPHS 7.28–29; direct/retrograde limits from R. Santhanam, Vol. I, pp. 99–100."
+    "combustionReference": "Combustion: BPHS 7.28–29; direct/retrograde limits from R. Santhanam, Vol. I, pp. 99–100.",
+    "specialPoints": {
+      "yogiPoints": "Yogi points",
+      "yogi": "Yogi",
+      "yogiExplanation": "The lord of the nakshatra containing the Yogi point.",
+      "duplicateYogi": "Duplicate Yogi",
+      "duplicateYogiExplanation": "The lord of the zodiac sign containing the Yogi point.",
+      "avayogi": "Avayogi",
+      "avayogiExplanation": "The lord of the nakshatra containing the Avayogi point.",
+      "lord": "Lord: {{planet}}",
+      "nakshatra": "Nakshatra: {{name}}",
+      "dualRoleTitle": "One planet, two separate roles",
+      "dualRoleBody": "{{planet}} is Duplicate Yogi because it rules the Yogi point’s sign, and Avayogi because it rules the Avayogi point’s nakshatra. These roles come from separate calculations and must be read together as an overlap.",
+      "tithiDagdhaRashis": "Tithi Dagdha Rashis",
+      "noneForTithi": "None for this tithi",
+      "noneForTithiBody": "Purnima and Amavasya have no Tithi Dagdha Rashi in the selected table."
+    }
   },
   "hindi": {
     "title": "ग्रह स्थितियाँ",
@@ -169,7 +185,23 @@
     "clearOfCombustion": "अस्त नहीं",
     "solarDistance": "सूर्य से दूरी",
     "combustionEvidence": "सूर्य से {{distance}}° · सीमा {{threshold}}° · {{motion}} · {{status}}",
-    "combustionReference": "अस्त स्थिति: बृहत् पाराशर होरा शास्त्र 7.28–29; मार्गी/वक्री सीमाएँ आर. संथानम, खंड I, पृ. 99–100।"
+    "combustionReference": "अस्त स्थिति: बृहत् पाराशर होरा शास्त्र 7.28–29; मार्गी/वक्री सीमाएँ आर. संथानम, खंड I, पृ. 99–100।",
+    "specialPoints": {
+      "yogiPoints": "योगी बिंदु",
+      "yogi": "योगी",
+      "yogiExplanation": "योगी बिंदु जिस नक्षत्र में है, उसका स्वामी।",
+      "duplicateYogi": "डुप्लिकेट योगी",
+      "duplicateYogiExplanation": "योगी बिंदु जिस राशि में है, उसका स्वामी।",
+      "avayogi": "अवयोगी",
+      "avayogiExplanation": "अवयोगी बिंदु जिस नक्षत्र में है, उसका स्वामी।",
+      "lord": "स्वामी: {{planet}}",
+      "nakshatra": "नक्षत्र: {{name}}",
+      "dualRoleTitle": "एक ग्रह, दो अलग भूमिकाएँ",
+      "dualRoleBody": "{{planet}} योगी बिंदु की राशि के स्वामी होने से डुप्लिकेट योगी हैं और अवयोगी बिंदु के नक्षत्र के स्वामी होने से अवयोगी हैं। दोनों भूमिकाएँ अलग गणनाओं से आती हैं और इस मेल को साथ पढ़ना चाहिए।",
+      "tithiDagdhaRashis": "तिथि दग्ध राशियाँ",
+      "noneForTithi": "इस तिथि के लिए कोई नहीं",
+      "noneForTithiBody": "चुनी गई सारणी में पूर्णिमा और अमावस्या की कोई तिथि दग्ध राशि नहीं है।"
+    }
   },
   "es": {
     "title": "Posiciones planetarias",
@@ -255,7 +287,23 @@
     "clearOfCombustion": "Sin combustión",
     "solarDistance": "Distancia solar",
     "combustionEvidence": "A {{distance}}° del Sol · límite {{threshold}}° · {{motion}} · {{status}}",
-    "combustionReference": "Combustión: BPHS 7.28–29; límites directos/retrógrados de R. Santhanam, Vol. I, pp. 99–100."
+    "combustionReference": "Combustión: BPHS 7.28–29; límites directos/retrógrados de R. Santhanam, Vol. I, pp. 99–100.",
+    "specialPoints": {
+      "yogiPoints": "Puntos Yogi",
+      "yogi": "Yogi",
+      "yogiExplanation": "El regente del nakshatra que contiene el punto Yogi.",
+      "duplicateYogi": "Yogi duplicado",
+      "duplicateYogiExplanation": "El regente del signo zodiacal que contiene el punto Yogi.",
+      "avayogi": "Avayogi",
+      "avayogiExplanation": "El regente del nakshatra que contiene el punto Avayogi.",
+      "lord": "Regente: {{planet}}",
+      "nakshatra": "Nakshatra: {{name}}",
+      "dualRoleTitle": "Un planeta, dos funciones distintas",
+      "dualRoleBody": "{{planet}} es Yogi duplicado porque rige el signo del punto Yogi, y Avayogi porque rige el nakshatra del punto Avayogi. Ambas funciones proceden de cálculos distintos y deben leerse juntas como una superposición.",
+      "tithiDagdhaRashis": "Rashis Tithi Dagdha",
+      "noneForTithi": "Ninguno para este tithi",
+      "noneForTithiBody": "Purnima y Amavasya no tienen Tithi Dagdha Rashi en la tabla seleccionada."
+    }
   },
   "fr": {
     "title": "Positions planétaires",
@@ -341,7 +389,23 @@
     "clearOfCombustion": "Hors combustion",
     "solarDistance": "Distance solaire",
     "combustionEvidence": "À {{distance}}° du Soleil · limite {{threshold}}° · {{motion}} · {{status}}",
-    "combustionReference": "Combustion : BPHS 7.28–29 ; limites directes/rétrogrades selon R. Santhanam, vol. I, p. 99–100."
+    "combustionReference": "Combustion : BPHS 7.28–29 ; limites directes/rétrogrades selon R. Santhanam, vol. I, p. 99–100.",
+    "specialPoints": {
+      "yogiPoints": "Points Yogi",
+      "yogi": "Yogi",
+      "yogiExplanation": "Le maître du nakshatra contenant le point Yogi.",
+      "duplicateYogi": "Yogi secondaire",
+      "duplicateYogiExplanation": "Le maître du signe zodiacal contenant le point Yogi.",
+      "avayogi": "Avayogi",
+      "avayogiExplanation": "Le maître du nakshatra contenant le point Avayogi.",
+      "lord": "Maître : {{planet}}",
+      "nakshatra": "Nakshatra : {{name}}",
+      "dualRoleTitle": "Une planète, deux rôles distincts",
+      "dualRoleBody": "{{planet}} est Yogi secondaire car elle gouverne le signe du point Yogi, et Avayogi car elle gouverne le nakshatra du point Avayogi. Ces rôles proviennent de calculs distincts et doivent être lus ensemble comme un chevauchement.",
+      "tithiDagdhaRashis": "Rashis Tithi Dagdha",
+      "noneForTithi": "Aucun pour ce tithi",
+      "noneForTithiBody": "Purnima et Amavasya n’ont pas de Tithi Dagdha Rashi dans la table sélectionnée."
+    }
   },
   "german": {
     "title": "Planetenpositionen",
@@ -427,7 +491,23 @@
     "clearOfCombustion": "Nicht verbrannt",
     "solarDistance": "Sonnenabstand",
     "combustionEvidence": "{{distance}}° von der Sonne · Grenze {{threshold}}° · {{motion}} · {{status}}",
-    "combustionReference": "Verbrennung: BPHS 7.28–29; Direkt-/Rückläufigkeitsgrenzen nach R. Santhanam, Bd. I, S. 99–100."
+    "combustionReference": "Verbrennung: BPHS 7.28–29; Direkt-/Rückläufigkeitsgrenzen nach R. Santhanam, Bd. I, S. 99–100.",
+    "specialPoints": {
+      "yogiPoints": "Yogi-Punkte",
+      "yogi": "Yogi",
+      "yogiExplanation": "Der Herrscher des Nakshatras, in dem der Yogi-Punkt liegt.",
+      "duplicateYogi": "Duplikat-Yogi",
+      "duplicateYogiExplanation": "Der Herrscher des Tierkreiszeichens, in dem der Yogi-Punkt liegt.",
+      "avayogi": "Avayogi",
+      "avayogiExplanation": "Der Herrscher des Nakshatras, in dem der Avayogi-Punkt liegt.",
+      "lord": "Herrscher: {{planet}}",
+      "nakshatra": "Nakshatra: {{name}}",
+      "dualRoleTitle": "Ein Planet, zwei getrennte Rollen",
+      "dualRoleBody": "{{planet}} ist Duplikat-Yogi als Herrscher des Zeichens des Yogi-Punkts und Avayogi als Herrscher des Nakshatras des Avayogi-Punkts. Beide Rollen entstehen aus getrennten Berechnungen und müssen als Überschneidung zusammen gelesen werden.",
+      "tithiDagdhaRashis": "Tithi-Dagdha-Zeichen",
+      "noneForTithi": "Keines für dieses Tithi",
+      "noneForTithiBody": "Purnima und Amavasya haben in der gewählten Tabelle kein Tithi-Dagdha-Zeichen."
+    }
   },
   "russian": {
     "title": "Положения планет",
@@ -513,7 +593,23 @@
     "clearOfCombustion": "Вне сожжения",
     "solarDistance": "Расстояние от Солнца",
     "combustionEvidence": "{{distance}}° от Солнца · предел {{threshold}}° · {{motion}} · {{status}}",
-    "combustionReference": "Сожжение: BPHS 7.28–29; пределы прямого/ретроградного движения по Р. Сантханаму, т. I, с. 99–100."
+    "combustionReference": "Сожжение: BPHS 7.28–29; пределы прямого/ретроградного движения по Р. Сантханаму, т. I, с. 99–100.",
+    "specialPoints": {
+      "yogiPoints": "Точки Йоги",
+      "yogi": "Йоги",
+      "yogiExplanation": "Управитель накшатры, в которой находится точка Йоги.",
+      "duplicateYogi": "Дублирующий Йоги",
+      "duplicateYogiExplanation": "Управитель знака зодиака, в котором находится точка Йоги.",
+      "avayogi": "Авайоги",
+      "avayogiExplanation": "Управитель накшатры, в которой находится точка Авайоги.",
+      "lord": "Управитель: {{planet}}",
+      "nakshatra": "Накшатра: {{name}}",
+      "dualRoleTitle": "Одна планета, две отдельные роли",
+      "dualRoleBody": "{{planet}} является Дублирующим Йоги как управитель знака точки Йоги и Авайоги как управитель накшатры точки Авайоги. Эти роли получены отдельными расчётами и должны рассматриваться вместе как совпадение.",
+      "tithiDagdhaRashis": "Титхи Дагдха раши",
+      "noneForTithi": "Для этого титхи нет",
+      "noneForTithiBody": "В выбранной таблице Пурнима и Амавасья не имеют Титхи Дагдха раши."
+    }
   },
   "chinese": {
     "title": "行星位置",
@@ -599,7 +695,23 @@
     "clearOfCombustion": "未燃烧",
     "solarDistance": "距太阳角度",
     "combustionEvidence": "距太阳 {{distance}}° · 界限 {{threshold}}° · {{motion}} · {{status}}",
-    "combustionReference": "燃烧依据：BPHS 7.28–29；顺行/逆行界限见 R. Santhanam 第 I 卷，第 99–100 页。"
+    "combustionReference": "燃烧依据：BPHS 7.28–29；顺行/逆行界限见 R. Santhanam 第 I 卷，第 99–100 页。",
+    "specialPoints": {
+      "yogiPoints": "Yogi点",
+      "yogi": "Yogi",
+      "yogiExplanation": "Yogi点所在宿的主星。",
+      "duplicateYogi": "副Yogi",
+      "duplicateYogiExplanation": "Yogi点所在黄道星座的主星。",
+      "avayogi": "Avayogi",
+      "avayogiExplanation": "Avayogi点所在宿的主星。",
+      "lord": "主星：{{planet}}",
+      "nakshatra": "宿：{{name}}",
+      "dualRoleTitle": "同一行星，两种独立角色",
+      "dualRoleBody": "{{planet}}因掌管Yogi点所在星座而成为副Yogi，又因掌管Avayogi点所在宿而成为Avayogi。两种角色来自不同计算，应作为重叠情况一并解读。",
+      "tithiDagdhaRashis": "Tithi Dagdha星座",
+      "noneForTithi": "此tithi无对应星座",
+      "noneForTithiBody": "在所选表格中，满月和新月没有Tithi Dagdha星座。"
+    }
   },
   "tamil": {
     "title": "கிரக நிலைகள்",
@@ -685,7 +797,23 @@
     "clearOfCombustion": "அஸ்தமனம் இல்லை",
     "solarDistance": "சூரிய இடைவெளி",
     "combustionEvidence": "சூரியனிலிருந்து {{distance}}° · வரம்பு {{threshold}}° · {{motion}} · {{status}}",
-    "combustionReference": "அஸ்தமனம்: BPHS 7.28–29; நேர்கதி/வக்கிரகதி வரம்புகள் R. Santhanam, தொகுதி I, பக். 99–100."
+    "combustionReference": "அஸ்தமனம்: BPHS 7.28–29; நேர்கதி/வக்கிரகதி வரம்புகள் R. Santhanam, தொகுதி I, பக். 99–100.",
+    "specialPoints": {
+      "yogiPoints": "யோகி புள்ளிகள்",
+      "yogi": "யோகி",
+      "yogiExplanation": "யோகி புள்ளி அமைந்துள்ள நட்சத்திரத்தின் அதிபதி.",
+      "duplicateYogi": "துணை யோகி",
+      "duplicateYogiExplanation": "யோகி புள்ளி அமைந்துள்ள ராசியின் அதிபதி.",
+      "avayogi": "அவயோகி",
+      "avayogiExplanation": "அவயோகி புள்ளி அமைந்துள்ள நட்சத்திரத்தின் அதிபதி.",
+      "lord": "அதிபதி: {{planet}}",
+      "nakshatra": "நட்சத்திரம்: {{name}}",
+      "dualRoleTitle": "ஒரே கிரகம், இரண்டு தனித்த பங்குகள்",
+      "dualRoleBody": "{{planet}} யோகி புள்ளியின் ராசியை ஆள்வதால் துணை யோகி; அவயோகி புள்ளியின் நட்சத்திரத்தை ஆள்வதால் அவயோகி. இரு பங்குகளும் தனித்தனி கணக்குகளில் இருந்து வருகின்றன; இந்த இணைப்பை ஒன்றாகப் படிக்க வேண்டும்.",
+      "tithiDagdhaRashis": "திதி தக்த ராசிகள்",
+      "noneForTithi": "இந்த திதிக்கு இல்லை",
+      "noneForTithiBody": "தேர்ந்தெடுக்கப்பட்ட அட்டவணையில் பௌர்ணமி மற்றும் அமாவாசைக்கு திதி தக்த ராசி இல்லை."
+    }
   },
   "telugu": {
     "title": "గ్రహ స్థానాలు",
@@ -771,7 +899,23 @@
     "clearOfCombustion": "అస్తంగతం కాదు",
     "solarDistance": "సూర్య దూరం",
     "combustionEvidence": "సూర్యుని నుంచి {{distance}}° · పరిమితి {{threshold}}° · {{motion}} · {{status}}",
-    "combustionReference": "అస్తంగతం: BPHS 7.28–29; మార్గి/వక్ర పరిమితులు R. Santhanam, సంపుటి I, పుటలు 99–100."
+    "combustionReference": "అస్తంగతం: BPHS 7.28–29; మార్గి/వక్ర పరిమితులు R. Santhanam, సంపుటి I, పుటలు 99–100.",
+    "specialPoints": {
+      "yogiPoints": "యోగి బిందువులు",
+      "yogi": "యోగి",
+      "yogiExplanation": "యోగి బిందువు ఉన్న నక్షత్రాధిపతి.",
+      "duplicateYogi": "డూప్లికేట్ యోగి",
+      "duplicateYogiExplanation": "యోగి బిందువు ఉన్న రాశి అధిపతి.",
+      "avayogi": "అవయోగి",
+      "avayogiExplanation": "అవయోగి బిందువు ఉన్న నక్షత్రాధిపతి.",
+      "lord": "అధిపతి: {{planet}}",
+      "nakshatra": "నక్షత్రం: {{name}}",
+      "dualRoleTitle": "ఒక గ్రహం, రెండు వేర్వేరు పాత్రలు",
+      "dualRoleBody": "{{planet}} యోగి బిందువు రాశిని పాలించడం వల్ల డూప్లికేట్ యోగి; అవయోగి బిందువు నక్షత్రాన్ని పాలించడం వల్ల అవయోగి. ఈ రెండు పాత్రలు వేర్వేరు గణనల నుండి వస్తాయి; ఈ కలయికను కలిసి చదవాలి.",
+      "tithiDagdhaRashis": "తిథి దగ్ధ రాశులు",
+      "noneForTithi": "ఈ తిథికి లేవు",
+      "noneForTithiBody": "ఎంచుకున్న పట్టికలో పౌర్ణమి, అమావాస్యలకు తిథి దగ్ధ రాశి లేదు."
+    }
   },
   "gujarati": {
     "title": "ગ્રહ સ્થિતિઓ",
@@ -857,7 +1001,23 @@
     "clearOfCombustion": "અસ્ત નથી",
     "solarDistance": "સૂર્યથી અંતર",
     "combustionEvidence": "સૂર્યથી {{distance}}° · મર્યાદા {{threshold}}° · {{motion}} · {{status}}",
-    "combustionReference": "અસ્ત સ્થિતિ: BPHS 7.28–29; માર્ગી/વક્રી મર્યાદા R. Santhanam, ખંડ I, પૃ. 99–100."
+    "combustionReference": "અસ્ત સ્થિતિ: BPHS 7.28–29; માર્ગી/વક્રી મર્યાદા R. Santhanam, ખંડ I, પૃ. 99–100.",
+    "specialPoints": {
+      "yogiPoints": "યોગી બિંદુઓ",
+      "yogi": "યોગી",
+      "yogiExplanation": "યોગી બિંદુ જે નક્ષત્રમાં છે તેનો સ્વામી.",
+      "duplicateYogi": "ડુપ્લિકેટ યોગી",
+      "duplicateYogiExplanation": "યોગી બિંદુ જે રાશિમાં છે તેનો સ્વામી.",
+      "avayogi": "અવયોગી",
+      "avayogiExplanation": "અવયોગી બિંદુ જે નક્ષત્રમાં છે તેનો સ્વામી.",
+      "lord": "સ્વામી: {{planet}}",
+      "nakshatra": "નક્ષત્ર: {{name}}",
+      "dualRoleTitle": "એક ગ્રહ, બે અલગ ભૂમિકાઓ",
+      "dualRoleBody": "{{planet}} યોગી બિંદુની રાશિનો સ્વામી હોવાથી ડુપ્લિકેટ યોગી છે અને અવયોગી બિંદુના નક્ષત્રનો સ્વામી હોવાથી અવયોગી છે. બંને ભૂમિકાઓ અલગ ગણતરીથી આવે છે અને આ મેળને સાથે વાંચવો જોઈએ.",
+      "tithiDagdhaRashis": "તિથિ દગ્ધ રાશિઓ",
+      "noneForTithi": "આ તિથિ માટે કોઈ નથી",
+      "noneForTithiBody": "પસંદ કરેલા કોષ્ટકમાં પૂર્ણિમા અને અમાવાસ્યા માટે તિથિ દગ્ધ રાશિ નથી."
+    }
   },
   "marathi": {
     "title": "ग्रहस्थिती",
@@ -943,6 +1103,22 @@
     "clearOfCombustion": "अस्त नाही",
     "solarDistance": "सूर्यापासून अंतर",
     "combustionEvidence": "सूर्यापासून {{distance}}° · मर्यादा {{threshold}}° · {{motion}} · {{status}}",
-    "combustionReference": "अस्त स्थिती: BPHS 7.28–29; मार्गी/वक्री मर्यादा आर. संथानम, खंड I, पृ. 99–100."
+    "combustionReference": "अस्त स्थिती: BPHS 7.28–29; मार्गी/वक्री मर्यादा आर. संथानम, खंड I, पृ. 99–100.",
+    "specialPoints": {
+      "yogiPoints": "योगी बिंदू",
+      "yogi": "योगी",
+      "yogiExplanation": "योगी बिंदू ज्या नक्षत्रात आहे त्याचा स्वामी.",
+      "duplicateYogi": "डुप्लिकेट योगी",
+      "duplicateYogiExplanation": "योगी बिंदू ज्या राशीत आहे तिचा स्वामी.",
+      "avayogi": "अवयोगी",
+      "avayogiExplanation": "अवयोगी बिंदू ज्या नक्षत्रात आहे त्याचा स्वामी.",
+      "lord": "स्वामी: {{planet}}",
+      "nakshatra": "नक्षत्र: {{name}}",
+      "dualRoleTitle": "एक ग्रह, दोन स्वतंत्र भूमिका",
+      "dualRoleBody": "{{planet}} योगी बिंदूच्या राशीचा स्वामी असल्यामुळे डुप्लिकेट योगी आहे आणि अवयोगी बिंदूच्या नक्षत्राचा स्वामी असल्यामुळे अवयोगी आहे. दोन्ही भूमिका स्वतंत्र गणनांतून येतात आणि हा संयोग एकत्र वाचला पाहिजे.",
+      "tithiDagdhaRashis": "तिथी दग्ध राशी",
+      "noneForTithi": "या तिथीसाठी नाही",
+      "noneForTithiBody": "निवडलेल्या तक्त्यात पौर्णिमा आणि अमावास्येला तिथी दग्ध राशी नाही."
+    }
   }
 }

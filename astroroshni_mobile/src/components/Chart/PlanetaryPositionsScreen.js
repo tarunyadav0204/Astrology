@@ -8,6 +8,18 @@ import { useTheme } from '../../context/ThemeContext';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 import { buildHouseRows, buildNakshatraRows, buildPlanetRows } from '../../utils/positionTables';
 
+const isSpecialPoint = (value) => (
+  Boolean(value)
+  && typeof value === 'object'
+  && !Array.isArray(value)
+  && typeof value.sign_name === 'string'
+);
+
+const formatPointDegrees = (value) => {
+  const degree = Number(value);
+  return Number.isFinite(degree) ? `${degree.toFixed(2)}°` : '';
+};
+
 const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -87,18 +99,24 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     try {
       const { chartAPI } = require('../../services/api');
       const d9Chart = route.params?.d9Chart || {};
-      const [yogiResponse, sniperResponse, pushkaraResponse, mudakkuResponse, gandantaResponse] = await Promise.all([
+      const results = await Promise.allSettled([
         chartAPI.calculateYogiPoints(birthData),
         chartAPI.calculateSniperPoints(chartData),
         chartAPI.calculatePushkaraNavamsha(chartData, d9Chart),
         chartAPI.calculateMudakkuAnalysis(chartData),
         chartAPI.calculateGandantaAnalysis(chartData),
       ]);
-      setYogiPoints(yogiResponse.data.yogi_points);
-      setSniperPoints(sniperResponse.data.sniper_points);
-      setPushkaraData(pushkaraResponse.data.pushkara_analysis);
-      setMudakkuData(mudakkuResponse?.data?.mudakku_analysis);
-      setGandantaData(gandantaResponse?.data?.gandanta_analysis);
+      const [yogiResult, sniperResult, pushkaraResult, mudakkuResult, gandantaResult] = results;
+      if (yogiResult.status === 'fulfilled') setYogiPoints(yogiResult.value?.data?.yogi_points || null);
+      if (sniperResult.status === 'fulfilled') setSniperPoints(sniperResult.value?.data?.sniper_points || null);
+      if (pushkaraResult.status === 'fulfilled') setPushkaraData(pushkaraResult.value?.data?.pushkara_analysis || null);
+      if (mudakkuResult.status === 'fulfilled') setMudakkuData(mudakkuResult.value?.data?.mudakku_analysis || null);
+      if (gandantaResult.status === 'fulfilled') setGandantaData(gandantaResult.value?.data?.gandanta_analysis || null);
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error(`Error loading special point source ${index + 1}:`, result.reason);
+        }
+      });
     } catch (error) {
       console.error('Error loading special points:', error);
     } finally {
@@ -715,21 +733,86 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
 
       const specialCardBg = colors.surfaceRaised;
       const specialCardBorder = colors.cardBorder;
+      const yogiPoint = isSpecialPoint(yogiPoints?.yogi) ? yogiPoints.yogi : null;
+      const duplicateYogi = isSpecialPoint(yogiPoints?.duplicate_yogi) ? yogiPoints.duplicate_yogi : null;
+      const avayogiPoint = isSpecialPoint(yogiPoints?.avayogi) ? yogiPoints.avayogi : null;
+      const tithiDagdhaRashis = Array.isArray(yogiPoints?.tithi_dagdha_rashis)
+        ? yogiPoints.tithi_dagdha_rashis.filter(isSpecialPoint)
+        : [];
+      const duplicateAvayogiOverlap = Boolean(
+        yogiPoints?.duplicate_yogi_avayogi_overlap?.is_active
+        || (
+          duplicateYogi?.lord
+          && avayogiPoint?.lord
+          && duplicateYogi.lord === avayogiPoint.lord
+        ),
+      );
+
+      const renderYogiPoint = ({ key, title, point, explanation }) => {
+        if (!point) return null;
+        return (
+          <View key={key} style={[styles.specialCard, { backgroundColor: specialCardBg, borderColor: specialCardBorder }]}>
+            <Text style={[styles.specialPointName, { color: colors.text }]}>{title}</Text>
+            <Text style={[styles.specialPointValue, { color: colors.primary }]}>
+              {point.sign_name} {formatPointDegrees(point.degree)}
+            </Text>
+            <Text style={[styles.specialPointLord, { color: colors.textSecondary }]}>
+              {t('premiumUi.planetaryPositions.specialPoints.lord', 'Lord: {{planet}}', { planet: point.lord || '—' })}
+            </Text>
+            {point.nakshatra_name ? (
+              <Text style={[styles.specialPointDesc, { color: colors.textSecondary }]}>
+                {t('premiumUi.planetaryPositions.specialPoints.nakshatra', 'Nakshatra: {{name}}', { name: point.nakshatra_name })}
+              </Text>
+            ) : null}
+            <Text style={[styles.specialPointDesc, { color: colors.textSecondary }]}>{explanation}</Text>
+          </View>
+        );
+      };
+
       return (
         <View>
           {/* Yogi Points */}
           {yogiPoints && (
             <View style={styles.specialSection}>
-              <Text style={[styles.specialSectionTitle, { color: colors.text }]}>Yogi Points</Text>
-              {Object.entries(yogiPoints).map(([key, point]) => (
-                <View key={key} style={[styles.specialCard, { backgroundColor: specialCardBg, borderColor: specialCardBorder }]}>
-                  <Text style={[styles.specialPointName, { color: colors.text }]}>{key.replace('_', ' ').toUpperCase()}</Text>
-                  <Text style={[styles.specialPointValue, { color: colors.primary }]}>
-                    {point.sign_name} {point.degree?.toFixed(2)}°
+              <Text style={[styles.specialSectionTitle, { color: colors.text }]}>{t('premiumUi.planetaryPositions.specialPoints.yogiPoints', 'Yogi points')}</Text>
+              {renderYogiPoint({
+                key: 'yogi',
+                title: t('premiumUi.planetaryPositions.specialPoints.yogi', 'Yogi'),
+                point: yogiPoint,
+                explanation: t('premiumUi.planetaryPositions.specialPoints.yogiExplanation', 'The lord of the nakshatra containing the Yogi point.'),
+              })}
+              {renderYogiPoint({
+                key: 'duplicate-yogi',
+                title: t('premiumUi.planetaryPositions.specialPoints.duplicateYogi', 'Duplicate Yogi'),
+                point: duplicateYogi,
+                explanation: t('premiumUi.planetaryPositions.specialPoints.duplicateYogiExplanation', 'The lord of the zodiac sign containing the Yogi point.'),
+              })}
+              {renderYogiPoint({
+                key: 'avayogi',
+                title: t('premiumUi.planetaryPositions.specialPoints.avayogi', 'Avayogi'),
+                point: avayogiPoint,
+                explanation: t('premiumUi.planetaryPositions.specialPoints.avayogiExplanation', 'The lord of the nakshatra containing the Avayogi point.'),
+              })}
+              {duplicateAvayogiOverlap ? (
+                <View style={[styles.specialCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.specialPointName, { color: colors.text }]}>{t('premiumUi.planetaryPositions.specialPoints.dualRoleTitle', 'One planet, two separate roles')}</Text>
+                  <Text style={[styles.specialPointDesc, { color: colors.textSecondary }]}>
+                    {t('premiumUi.planetaryPositions.specialPoints.dualRoleBody', '{{planet}} is Duplicate Yogi because it rules the Yogi point’s sign, and Avayogi because it rules the Avayogi point’s nakshatra. These roles come from separate calculations and must be read together as an overlap.', { planet: duplicateYogi.lord })}
                   </Text>
-                  <Text style={[styles.specialPointLord, { color: colors.textSecondary }]}>Lord: {point.lord}</Text>
                 </View>
-              ))}
+              ) : null}
+              <Text style={[styles.specialSectionTitle, { color: colors.text }]}>{t('premiumUi.planetaryPositions.specialPoints.tithiDagdhaRashis', 'Tithi Dagdha Rashis')}</Text>
+              {tithiDagdhaRashis.length > 0 ? tithiDagdhaRashis.map((row) => (
+                <View key={`dagdha-${row.sign}`} style={[styles.specialCard, { backgroundColor: specialCardBg, borderColor: specialCardBorder }]}>
+                  <Text style={[styles.specialPointName, { color: colors.text }]}>{row.sign_name}</Text>
+                  <Text style={[styles.specialPointLord, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.specialPoints.lord', 'Lord: {{planet}}', { planet: row.lord || '—' })}</Text>
+                </View>
+              )) : (
+                <View style={[styles.specialCard, { backgroundColor: specialCardBg, borderColor: specialCardBorder }]}>
+                  <Text style={[styles.specialPointName, { color: colors.text }]}>{t('premiumUi.planetaryPositions.specialPoints.noneForTithi', 'None for this tithi')}</Text>
+                  <Text style={[styles.specialPointDesc, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.specialPoints.noneForTithiBody', 'Purnima and Amavasya have no Tithi Dagdha Rashi in the selected table.')}</Text>
+                </View>
+              )}
             </View>
           )}
 

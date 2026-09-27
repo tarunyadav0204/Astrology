@@ -56,6 +56,26 @@ def test_nakshatra_boundaries_and_longitude_wrap_are_stable() -> None:
     assert wrapped["nakshatra_name"] == "Ashwini"
 
 
+def test_duplicate_yogi_and_avayogi_can_be_the_same_planet_by_separate_derivations() -> None:
+    # Sun 0° + Moon 6°40′ + 93°20′ gives a 100° Yogi point in Cancer.
+    # Moon therefore rules the Yogi point's sign (Duplicate Yogi). Five
+    # nakshatras forward is Hasta, also ruled by Moon (Avayogi).
+    result = YogiCalculator(_chart(0.0, 6 + 40 / 60)).calculate_yogi_points({})
+
+    assert result["duplicate_yogi"]["lord"] == "Moon"
+    assert result["avayogi"]["nakshatra_name"] == "Hasta"
+    assert result["avayogi"]["lord"] == "Moon"
+    assert result["duplicate_yogi_avayogi_overlap"] == {
+        "is_active": True,
+        "planet": "Moon",
+        "interpretation": (
+            "The same planet has two independently derived roles: it rules "
+            "the Yogi point's zodiac sign (Duplicate Yogi) and the Avayogi "
+            "point's nakshatra (Avayogi)."
+        ),
+    }
+
+
 def test_tithi_dagdha_is_not_invented_from_avayogi_plus_twelve_degrees() -> None:
     result = YogiCalculator(_chart(100.0, 200.0)).calculate_yogi_points({})
 

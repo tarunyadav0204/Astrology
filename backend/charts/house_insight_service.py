@@ -861,6 +861,13 @@ def _collect_house_factors(
                 "warn",
                 "dosha",
             ))
+        matru_dosha = major_doshas.get("matru_dosha", {})
+        if matru_dosha.get("present") and house_num == 5:
+            stress.append(_factor(
+                "A complete BPHS Matri-shapa combination concerns progeny in this chart.",
+                "warn",
+                "dosha",
+            ))
     except Exception:
         pass
 

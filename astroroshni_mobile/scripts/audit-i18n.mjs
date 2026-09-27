@@ -8,6 +8,7 @@ const reportAll = process.argv.includes('--report');
 const premiumCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/premium-ui.json'), 'utf8'));
 const pitriShapaInfoCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/pitri-shapa-info.json'), 'utf8'));
 const mangalDoshaInfoCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/mangal-dosha-info.json'), 'utf8'));
+const matriShapaInfoCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/matri-shapa-info.json'), 'utf8'));
 const planetaryPositionsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/planetary-positions.json'), 'utf8'));
 const planetResultDeliveryCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/planet-result-delivery.json'), 'utf8'));
 const shadbalaUiCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/shadbala-ui.json'), 'utf8'));
@@ -39,6 +40,7 @@ const normalizedPremiumCopy = Object.fromEntries(Object.entries(premiumCopy).map
     },
     pitriShapaInfo: pitriShapaInfoCopy[language] || pitriShapaInfoCopy.english,
     mangalDoshaInfo: mangalDoshaInfoCopy[language] || mangalDoshaInfoCopy.english,
+    matriShapaInfo: matriShapaInfoCopy[language] || matriShapaInfoCopy.english,
     planetResultDelivery: planetResultDeliveryCopy[language] || planetResultDeliveryCopy.english,
   },
 ]));

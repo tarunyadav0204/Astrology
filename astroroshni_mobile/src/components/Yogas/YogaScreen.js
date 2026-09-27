@@ -39,6 +39,7 @@ const CATEGORY_ICONS = {
 };
 
 const PITRI_SHAPA_VERSES = Array.from({ length: 11 }, (_, index) => String(index + 20));
+const MATRI_SHAPA_VERSES = Array.from({ length: 13 }, (_, index) => String(index + 34));
 
 const formatCategoryLabel = (category, t) => {
   const fallback = category.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
@@ -55,6 +56,7 @@ const YogaScreen = ({ navigation }) => {
   const [expandedCategories, setExpandedCategories] = useState(new Set());
   const [initialized, setInitialized] = useState(false);
   const [pitriInfoVisible, setPitriInfoVisible] = useState(false);
+  const [matriInfoVisible, setMatriInfoVisible] = useState(false);
   const [mangalInfoVisible, setMangalInfoVisible] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -94,6 +96,7 @@ const YogaScreen = ({ navigation }) => {
     const mangal = yogas?.major_doshas?.mangal_dosha;
     const nodal = yogas?.major_doshas?.kaal_sarp_dosha;
     const pitri = yogas?.major_doshas?.pitra_dosha;
+    const matri = yogas?.major_doshas?.matru_dosha;
     const checks = [];
     if (mangal) checks.push({
       key: 'mangal_dosha', iconKey: 'major_doshas', items: [{
@@ -184,6 +187,37 @@ const YogaScreen = ({ navigation }) => {
             'premiumUi.yogasDoshas.pitriScopeNote',
             'This classical check concerns progeny. A Sun–Rahu or Sun–Saturn conjunction, a node in House 9, or an afflicted ninth lord does not form it by itself.'
           ),
+        }],
+      });
+    }
+    if (matri) {
+      const matchedRules = matri.matched_rules || [];
+      const evidence = matchedRules.length
+        ? matchedRules.flatMap((rule) => [
+          { rule_id: rule.rule_id, description: `${rule.reference}: ${rule.description}`, matched: true },
+          ...(rule.conditions || []).map((condition) => ({
+            rule_id: `${rule.rule_id}-${condition.key}`,
+            description: condition.label,
+            matched: condition.matched,
+          })),
+        ])
+        : [{
+          rule_id: 'BPHS-MS-NONE',
+          description: t('premiumUi.matriShapaInfo.noMatchEvidence'),
+          matched: false,
+        }];
+      checks.push({
+        key: 'matri_shapa', iconKey: 'major_doshas', items: [{
+          name: t('premiumUi.matriShapaInfo.cardName'),
+          description: matri.present
+            ? t('premiumUi.matriShapaInfo.formedSummary', { count: matchedRules.length })
+            : t('premiumUi.matriShapaInfo.notFormedSummary'),
+          displayStatus: matri.status,
+          planets: matri.planets || [],
+          houses: matri.present ? [4, 5] : [],
+          classical_conditions: evidence,
+          source: matri.source,
+          textualNote: t('premiumUi.matriShapaInfo.scopeNote'),
         }],
       });
     }
@@ -324,10 +358,7 @@ const YogaScreen = ({ navigation }) => {
                   {t('premiumUi.yogas.classicalResult', 'What the classic says')}
                 </Text>
                 <Text style={[styles.classicalConditionText, { color: colors.textSecondary }]}>
-                  {t(
-                    'premiumUi.yogas.classicalResultBody',
-                    'Phaladeepika describes this yoga in royal terms: power, status, fame and wealth.'
-                  )}
+                  {yoga.classical_result}
                 </Text>
               </View>
             ) : null}
@@ -337,11 +368,24 @@ const YogaScreen = ({ navigation }) => {
                 {t('premiumUi.yogas.reference', 'Reference')}: {yoga.source?.reference_label || yoga.references?.join(', ')}
               </Text>
             </View>
-            {yoga.textualNote ? (
+            {(yoga.textualNote || yoga.source?.textual_note) ? (
               <Text style={[styles.textualNote, { color: colors.textSecondary }]}>
-                {t('premiumUi.yogas.textualNote', 'Textual note')}: {yoga.textualNote}
+                {t('premiumUi.yogas.textualNote', 'Textual note')}: {yoga.textualNote || yoga.source?.textual_note}
               </Text>
             ) : null}
+            {yoga.variant_readings?.map((variant, variantIndex) => (
+              <View
+                key={(variant.source?.reference_label || 'variant') + '-' + variantIndex}
+                style={[styles.classicalResult, { borderTopColor: colors.cardBorder }]}
+              >
+                <Text style={[styles.classicalResultTitle, { color: colors.text }]}>
+                  {t('premiumUi.yogasDoshas.separateReading', 'Separate reading')}: {variant.source?.reference_label}
+                </Text>
+                <Text style={[styles.classicalConditionText, { color: colors.textSecondary }]}>
+                  {variant.reason}
+                </Text>
+              </View>
+            ))}
             {yoga.variantSource ? (
               <Text style={[styles.textualNote, { color: colors.textSecondary }]}>
                 {t('premiumUi.yogasDoshas.separateReading', 'Separate reading')}: {yoga.variantSource}
@@ -425,6 +469,8 @@ const YogaScreen = ({ navigation }) => {
                   ? t('premiumUi.yogasDoshas.nodalEnclosure', 'Rahu–Ketu nodal enclosure')
                   : key === 'pitri_shapa'
                     ? t('premiumUi.yogasDoshas.pitriShapa', 'Pitṛ-śāpa · progeny')
+                    : key === 'matri_shapa'
+                      ? t('premiumUi.matriShapaInfo.cardName', 'Mātṛ-śāpa · progeny')
                   : formatCategoryLabel(key, t)}
             </Text>
             <Text style={[styles.categoryCount, { color: colors.textSecondary }]}>
@@ -433,11 +479,12 @@ const YogaScreen = ({ navigation }) => {
                 : t('premiumUi.yogas.combinationsFound', { count: items.length })}
             </Text>
           </View>
-          {key === 'pitri_shapa' || key === 'mangal_dosha' ? (
+          {key === 'pitri_shapa' || key === 'matri_shapa' || key === 'mangal_dosha' ? (
             <TouchableOpacity
               onPress={(event) => {
                 event.stopPropagation?.();
                 if (key === 'pitri_shapa') setPitriInfoVisible(true);
+                else if (key === 'matri_shapa') setMatriInfoVisible(true);
                 else setMangalInfoVisible(true);
               }}
               activeOpacity={0.72}
@@ -445,6 +492,8 @@ const YogaScreen = ({ navigation }) => {
               accessibilityRole="button"
               accessibilityLabel={key === 'pitri_shapa'
                 ? t('premiumUi.pitriShapaInfo.open', 'Read the complete classical Pitri-shapa rules')
+                : key === 'matri_shapa'
+                  ? t('premiumUi.matriShapaInfo.open', 'Read the complete classical Matri-shapa rules')
                 : t('premiumUi.mangalDoshaInfo.open', 'Read the complete classical Mangal Dosha rules')}
               hitSlop={8}
             >
@@ -790,6 +839,102 @@ const YogaScreen = ({ navigation }) => {
     );
   };
 
+  const renderMatriInfoModal = () => {
+    const matri = yogas?.major_doshas?.matru_dosha;
+    const matchedRuleIds = new Set(matri?.matched_rule_ids || []);
+    return (
+      <Modal
+        visible={matriInfoVisible}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setMatriInfoVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={StyleSheet.absoluteFill}
+            onPress={() => setMatriInfoVisible(false)}
+            accessibilityLabel={t('premiumUi.common.close', 'Close')}
+          />
+          <SafeAreaView edges={['top', 'bottom']} style={styles.modalSafeArea}>
+            <View style={[styles.modalSheet, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: colors.cardBorder }]}>
+                <View style={styles.modalHeaderCopy}>
+                  <Text style={[styles.modalEyebrow, { color: colors.primaryStrong }]}>{t('premiumUi.matriShapaInfo.verseRange')}</Text>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>{t('premiumUi.matriShapaInfo.title')}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setMatriInfoVisible(false)}
+                  style={[styles.modalClose, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('premiumUi.common.close', 'Close')}
+                >
+                  <Ionicons name="close" size={22} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+                <Text style={[styles.modalIntro, { color: colors.textSecondary }]}>{t('premiumUi.matriShapaInfo.intro')}</Text>
+                <View style={[styles.scopeCard, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
+                  <Ionicons name="people-outline" size={21} color={colors.selectionText} />
+                  <View style={styles.scopeCopy}>
+                    <Text style={[styles.scopeTitle, { color: colors.selectionText }]}>{t('premiumUi.matriShapaInfo.scopeTitle')}</Text>
+                    <Text style={[styles.scopeBody, { color: colors.textSecondary }]}>{t('premiumUi.matriShapaInfo.scopeBody')}</Text>
+                  </View>
+                </View>
+                <Text style={[styles.logicTitle, { color: colors.text }]}>{t('premiumUi.matriShapaInfo.formationTitle')}</Text>
+                <Text style={[styles.logicBody, { color: colors.textSecondary }]}>{t('premiumUi.matriShapaInfo.formationBody')}</Text>
+                <View style={styles.ruleList}>
+                  {MATRI_SHAPA_VERSES.map((verse) => {
+                    const ruleId = `BPHS-MS-${verse}`;
+                    const matched = matchedRuleIds.has(ruleId);
+                    return (
+                      <View
+                        key={ruleId}
+                        style={[styles.ruleCard, {
+                          backgroundColor: matched ? (colors.errorSoft || colors.surfaceMuted) : colors.surfaceMuted,
+                          borderColor: matched ? colors.error : colors.cardBorder,
+                        }]}
+                      >
+                        <View style={styles.ruleHeader}>
+                          <Text style={[styles.ruleReference, { color: matched ? colors.error : colors.primaryStrong }]}>
+                            {t('premiumUi.matriShapaInfo.verseReference', { verse })}
+                          </Text>
+                          {matched ? (
+                            <View style={[styles.matchBadge, { backgroundColor: colors.error }]}>
+                              <Ionicons name="checkmark" size={12} color={colors.onPrimary} />
+                              <Text style={[styles.matchBadgeText, { color: colors.onPrimary }]}>{t('premiumUi.matriShapaInfo.matchesChart')}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <Text style={[styles.ruleText, { color: colors.text }]}>{t(`premiumUi.matriShapaInfo.rules.${verse}`)}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+                <Text style={[styles.logicTitle, { color: colors.text }]}>{t('premiumUi.matriShapaInfo.methodTitle')}</Text>
+                {['complete', 'malefics', 'navamsha', 'nodes', 'noGrade'].map((note) => (
+                  <View key={note} style={styles.methodRow}>
+                    <View style={[styles.methodDot, { backgroundColor: colors.primaryStrong }]} />
+                    <Text style={[styles.methodText, { color: colors.textSecondary }]}>{t(`premiumUi.matriShapaInfo.method.${note}`)}</Text>
+                  </View>
+                ))}
+                <View style={[styles.sourceCard, { borderColor: colors.cardBorder }]}>
+                  <View style={styles.sourceHeadingRow}>
+                    <Ionicons name="library-outline" size={17} color={colors.primaryStrong} />
+                    <Text style={[styles.sourceTitle, { color: colors.text }]}>{t('premiumUi.matriShapaInfo.referenceTitle')}</Text>
+                  </View>
+                  <Text style={[styles.sourceText, { color: colors.textSecondary }]}>{t('premiumUi.matriShapaInfo.referenceBody')}</Text>
+                  <Text style={[styles.editionNote, { color: colors.textSecondary }]}>{t('premiumUi.matriShapaInfo.remedies')}</Text>
+                </View>
+              </ScrollView>
+            </View>
+          </SafeAreaView>
+        </View>
+      </Modal>
+    );
+  };
+
   const renderHeader = () => (
     <View style={[styles.headerShell, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine }]}>
       <SafeAreaView edges={['top']}>
@@ -919,6 +1064,7 @@ const YogaScreen = ({ navigation }) => {
       </ScrollView>
       {renderPitriInfoModal()}
       {renderMangalInfoModal()}
+      {renderMatriInfoModal()}
     </View>
   );
 };

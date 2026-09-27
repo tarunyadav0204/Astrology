@@ -154,7 +154,7 @@ def test_benefic_context_is_reported_without_cancelling_a_matched_verse():
 def test_legacy_major_dosha_key_returns_canonical_result():
     value = chart(0, {"Mercury": 5, "Jupiter": 6, "Rahu": 6})
     result = YogaCalculator(None, value).calculate_major_doshas()
-    assert set(result) == {"mangal_dosha", "kaal_sarp_dosha", "pitra_dosha"}
+    assert set(result) == {"mangal_dosha", "kaal_sarp_dosha", "pitra_dosha", "matru_dosha"}
     assert result["pitra_dosha"]["method"] == "bphs_pitri_shapa_83_20_30"
     assert "BPHS-PS-30" in result["pitra_dosha"]["matched_rule_ids"]
 
@@ -189,6 +189,6 @@ def test_report_labels_the_result_as_progeny_scoped_pitri_shapa():
 
     canonical = calculate_classical_pitri_shapa(chart())
     table = _dosha_table({"pitra_dosha": canonical}, "en")
-    pitri_row = table["rows"][-1]
+    pitri_row = next(row for row in table["rows"] if row[0] == "Pitṛ-śāpa · progeny check")
     assert pitri_row[0] == "Pitṛ-śāpa · progeny check"
     assert "eleven complete" in pitri_row[2]

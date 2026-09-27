@@ -257,6 +257,24 @@ const YogasTab = ({ chartData, birthData }) => {
       });
     }
 
+    const matri = canonicalDoshas?.matru_dosha;
+    if (matri) {
+      const matchedVerses = (matri.matched_rules || []).map((rule) => rule.reference).join(', ');
+      detectedYogas.push({
+        name: 'Mātṛ-śāpa · progeny',
+        type: 'Classical check',
+        strength: matri.status === 'formed' ? 'Formed' : matri.status === 'unavailable' ? 'Unavailable' : 'Not formed',
+        description: matri.summary,
+        effects: [
+          matchedVerses,
+          matri.source?.reference_label,
+          matri.source?.textual_note,
+        ].filter(Boolean).join('. '),
+        planets: matri.planets || [],
+        houses: matri.present ? [4, 5] : [],
+      });
+    }
+
     setYogas(detectedYogas);
     setLoading(false);
   };
@@ -468,6 +486,11 @@ const YogasTab = ({ chartData, birthData }) => {
               <h4 style={{ color: '#ff6f00', fontSize: window.innerWidth <= 768 ? '0.9rem' : '1rem', marginBottom: '0.5rem' }}>📖 Description</h4>
               <p style={{ fontSize: window.innerWidth <= 768 ? '0.8rem' : '0.9rem', lineHeight: '1.5', color: '#333', textAlign: 'justify' }}>
                 {selectedYoga.description}
+                {selectedYoga.classical_result ? (
+                  <p style={{ marginTop: '0.75rem' }}>
+                    <strong>Result: </strong>{selectedYoga.classical_result}
+                  </p>
+                ) : null}
               </p>
             </div>
             

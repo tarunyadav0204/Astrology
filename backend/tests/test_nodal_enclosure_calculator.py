@@ -82,6 +82,6 @@ def test_partial_configuration_is_described_but_not_claimed_as_a_dosha():
 def test_yoga_calculator_preserves_major_dosha_contract():
     result = YogaCalculator(None, chart([20, 45, 70, 95, 120, 145, 180])).calculate_major_doshas()
 
-    assert set(result) == {"mangal_dosha", "kaal_sarp_dosha", "pitra_dosha"}
+    assert set(result) == {"mangal_dosha", "kaal_sarp_dosha", "pitra_dosha", "matru_dosha"}
     assert result["kaal_sarp_dosha"]["present"] is True
     assert result["kaal_sarp_dosha"]["type"] == "Nodal enclosure"

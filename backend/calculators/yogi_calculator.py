@@ -153,6 +153,7 @@ class YogiCalculator(BaseCalculator):
         yogi_lord = yogi_nakshatra["nakshatra_lord"]
         duplicate_yogi_lord = self.get_sign_lord(yogi_sign)
         avayogi_lord = avayogi_nakshatra["nakshatra_lord"]
+        duplicate_yogi_avayogi_overlap = duplicate_yogi_lord == avayogi_lord
 
         dagdha_signs = calculated["tithi_dagdha_signs"]
         dagdha_rows = [
@@ -199,6 +200,17 @@ class YogiCalculator(BaseCalculator):
                 "lord": avayogi_lord,
                 "sign_lord": self.get_sign_lord(avayogi_sign),
                 **avayogi_nakshatra,
+            },
+            "duplicate_yogi_avayogi_overlap": {
+                "is_active": duplicate_yogi_avayogi_overlap,
+                "planet": avayogi_lord if duplicate_yogi_avayogi_overlap else None,
+                "interpretation": (
+                    "The same planet has two independently derived roles: it rules "
+                    "the Yogi point's zodiac sign (Duplicate Yogi) and the Avayogi "
+                    "point's nakshatra (Avayogi)."
+                    if duplicate_yogi_avayogi_overlap
+                    else None
+                ),
             },
             "tithi_number": calculated["tithi_number"],
             "paksha_tithi_number": calculated["paksha_tithi_number"],

@@ -46,6 +46,7 @@ import professionalAnalysis from './professional-analysis.json';
 import nakshatraCalendar from './nakshatra-calendar.json';
 import pitriShapaInfo from './pitri-shapa-info.json';
 import mangalDoshaInfo from './mangal-dosha-info.json';
+import matriShapaInfo from './matri-shapa-info.json';
 
 const INSTANT_MODE_ACTION_COPY = Object.freeze({
   english: 'Mode',
@@ -180,6 +181,7 @@ const normalizedPremiumUi = Object.fromEntries(
       homeNextPeak: homeNextPeak[language] || homeNextPeak.english,
       pitriShapaInfo: pitriShapaInfo[language] || pitriShapaInfo.english,
       mangalDoshaInfo: mangalDoshaInfo[language] || mangalDoshaInfo.english,
+      matriShapaInfo: matriShapaInfo[language] || matriShapaInfo.english,
       planetResultDelivery: planetResultDelivery[language] || planetResultDelivery.english,
     },
   ]),

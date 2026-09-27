@@ -18,6 +18,7 @@ from calculators.badhaka_calculator import BadhakaCalculator
 from calculators.friendship_calculator import FriendshipCalculator
 from calculators.yoga_calculator import YogaCalculator
 from calculators.classical_pitri_shapa import compact_pitri_shapa_for_ai
+from calculators.classical_matri_shapa import compact_matri_shapa_for_ai
 from calculators.argala_calculator import ArgalaCalculator
 from calculators.real_transit_calculator import RealTransitCalculator
 from shared.dasha_calculator import DashaCalculator
@@ -768,7 +769,7 @@ class ChatContextBuilder:
             },
             
             # Yogas
-            "yogas": compact_pitri_shapa_for_ai(yoga_calc.calculate_all_yogas()),
+            "yogas": compact_matri_shapa_for_ai(compact_pitri_shapa_for_ai(yoga_calc.calculate_all_yogas())),
             
             # Chara Karakas
             "chara_karakas": karaka_data,

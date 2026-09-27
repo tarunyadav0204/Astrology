@@ -3,8 +3,22 @@ from .aspect_calculator import AspectCalculator
 from .classical_mangal_dosha import calculate_classical_mangal_dosha
 from .classical_neecha_bhanga import calculate_classical_neecha_bhanga
 from .classical_pitri_shapa import calculate_classical_pitri_shapa
+from .classical_matri_shapa import calculate_classical_matri_shapa
 from .nodal_enclosure_calculator import calculate_nodal_enclosure
 from .planet_result_delivery import calculate_planet_result_delivery
+from .classical_core_yogas import (
+    amala as calculate_classical_amala,
+    chandra_yogas as calculate_classical_chandra_yogas,
+    dhana_yogas as calculate_classical_dhana_yogas,
+    dharma_karma_yoga as calculate_classical_dharma_karma_yoga,
+    gaja_kesari as calculate_classical_gaja_kesari,
+    nabhasa_yogas as calculate_classical_nabhasa_yogas,
+    pancha_mahapurusha as calculate_classical_pancha_mahapurusha,
+    raj_yogas as calculate_classical_raj_yogas,
+    saraswati as calculate_classical_saraswati,
+    surya_yogas as calculate_classical_surya_yogas,
+    viparita_yogas as calculate_classical_viparita_yogas,
+)
 
 class YogaCalculator(BaseCalculator):
     """Calculate various Vedic yogas and combinations"""
@@ -24,112 +38,23 @@ class YogaCalculator(BaseCalculator):
         self.aspect_calc = AspectCalculator(chart_data)
     
     def calculate_raj_yogas(self):
-        """Calculate Raj Yogas (royal combinations)"""
-        planets = self.chart_data.get('planets', {})
-        raj_yogas = []
-        
-        # Kendra-Trikona Raj Yoga: Lords of Kendra and Trikona houses connected
-        kendra_houses = [1, 4, 7, 10]
-        trikona_houses = [1, 5, 9]
-        processed_pairs = set()
-        
-        for kendra_house in kendra_houses:
-            kendra_lord = self._get_house_lord(kendra_house)
-            if not kendra_lord or kendra_lord not in planets:
-                continue
-                
-            for trikona_house in trikona_houses:
-                if kendra_house == trikona_house:  # Skip same house
-                    continue
-                    
-                trikona_lord = self._get_house_lord(trikona_house)
-                if not trikona_lord or trikona_lord not in planets:
-                    continue
-                
-                if kendra_lord == trikona_lord:  # Same planet can't form yoga with itself
-                    continue
-                
-                # Prevent duplicate pairs
-                pair = tuple(sorted([kendra_lord, trikona_lord]))
-                if pair in processed_pairs:
-                    continue
-                processed_pairs.add(pair)
-                
-                # Check if lords are connected
-                kendra_lord_data = planets[kendra_lord].copy()
-                kendra_lord_data['name'] = kendra_lord
-                trikona_lord_data = planets[trikona_lord].copy()
-                trikona_lord_data['name'] = trikona_lord
-                
-                if self._are_planets_connected(kendra_lord_data, trikona_lord_data):
-                    raj_yogas.append({
-                        'name': 'Kendra-Trikona Raj Yoga',
-                        'planets': [kendra_lord, trikona_lord],
-                        'houses': [planets[kendra_lord].get('house', 1), planets[trikona_lord].get('house', 1)],
-                        'strength': 'High',
-                        'description': f'{self._ordinal(kendra_house)} lord {kendra_lord} and {self._ordinal(trikona_house)} lord {trikona_lord} connected'
-                    })
-        
-        return raj_yogas
+        """BPHS 34.11–15 Kendra–Trikona lord relationships."""
+        return calculate_classical_raj_yogas(
+            self.chart_data,
+            self._get_house_lord,
+            self.aspect_calc.get_aspecting_planets,
+        )
     
     def calculate_dhana_yogas(self):
-        """Calculate Dhana Yogas (wealth combinations)"""
-        planets = self.chart_data.get('planets', {})
-        dhana_yogas = []
-        valid_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
-        
-        # 2nd and 11th house lords in conjunction/mutual aspect
-        house_2_lord = self._get_house_lord(2)
-        house_11_lord = self._get_house_lord(11)
-        
-        if (house_2_lord and house_11_lord and house_2_lord != house_11_lord and
-            house_2_lord in valid_planets and house_11_lord in valid_planets):
-            planet1_data = planets.get(house_2_lord, {})
-            planet2_data = planets.get(house_11_lord, {})
-            
-            if self._are_planets_connected(planet1_data, planet2_data):
-                dhana_yogas.append({
-                    'name': 'Dhana Yoga',
-                    'planets': [house_2_lord, house_11_lord],
-                    'houses': [planet1_data.get('house', 1), planet2_data.get('house', 1)],
-                    'description': '2nd and 11th house lords connected - wealth yoga',
-                    'strength': 'Medium'
-                })
-        
-        return dhana_yogas
+        """BPHS 41.2–15 special Dhana combinations."""
+        return calculate_classical_dhana_yogas(
+            self.chart_data,
+            self.aspect_calc.get_aspecting_planets,
+        )
     
     def calculate_panch_mahapurusha_yogas(self):
-        """Calculate Panch Mahapurusha Yogas"""
-        planets = self.chart_data.get('planets', {})
-        mahapurusha_yogas = []
-        
-        yoga_definitions = {
-            'Mars': {'name': 'Ruchaka Yoga', 'houses': [1, 4, 7, 10], 'signs': [0, 7, 9]},  # Aries, Scorpio, Capricorn(exalt)
-            'Mercury': {'name': 'Bhadra Yoga', 'houses': [1, 4, 7, 10], 'signs': [2, 5]},  # Gemini, Virgo(own+exalt)
-            'Jupiter': {'name': 'Hamsa Yoga', 'houses': [1, 4, 7, 10], 'signs': [8, 11, 3]},  # Sagittarius, Pisces, Cancer(exalt)
-            'Venus': {'name': 'Malavya Yoga', 'houses': [1, 4, 7, 10], 'signs': [1, 6, 11]},  # Taurus, Libra, Pisces(exalt)
-            'Saturn': {'name': 'Sasha Yoga', 'houses': [1, 4, 7, 10], 'signs': [9, 10, 6]}  # Capricorn, Aquarius, Libra(exalt)
-        }
-        
-        for planet_name, yoga_data in yoga_definitions.items():
-            if planet_name in planets:
-                planet_data = planets[planet_name]
-                house = planet_data.get('house', 1)
-                sign = planet_data.get('sign', 0)
-                
-                # Check if planet is in Kendra and own/exaltation sign
-                if house in yoga_data['houses'] and sign in yoga_data['signs']:
-                    mahapurusha_yogas.append({
-                        'name': yoga_data['name'],
-                        'planet': planet_name,
-                        'house': house,
-                        'sign': sign,
-                        'houses': [house],  # Add for consistency
-                        'strength': 'High',
-                        'description': f'{planet_name} in Kendra in own/exaltation sign'
-                    })
-        
-        return mahapurusha_yogas
+        """Phaladeepika 6.1 Pancha Mahapurusha formations."""
+        return calculate_classical_pancha_mahapurusha(self.chart_data)
     
     def calculate_neecha_bhanga_yogas(self):
         """Calculate only Phaladeepika 7.26-30 Neecha Bhanga Raja Yogas."""
@@ -171,103 +96,34 @@ class YogaCalculator(BaseCalculator):
         return yogas
     
     def calculate_gaja_kesari_yoga(self):
-        """Calculate Gaja Kesari Yoga (Moon-Jupiter)"""
-        yogas = []
-        planets = self.chart_data.get('planets', {})
-        
-        if 'Moon' in planets and 'Jupiter' in planets:
-            moon_house = planets['Moon'].get('house', 1)
-            jupiter_house = planets['Jupiter'].get('house', 1)
-            
-            # Check if Moon and Jupiter are in Kendra from each other
-            house_diff = abs(moon_house - jupiter_house)
-            if house_diff in [0, 3, 6, 9] or (moon_house + jupiter_house) == 13:
-                yogas.append({
-                    'name': 'Gaja Kesari Yoga',
-                    'planets': ['Moon', 'Jupiter'],
-                    'houses': [moon_house, jupiter_house],
-                    'strength': 'High',
-                    'description': 'Moon and Jupiter in mutual Kendra - wisdom and prosperity'
-                })
-        return yogas
+        """BPHS 36.3–4 Gaja Kesari, including its stated qualifiers."""
+        return calculate_classical_gaja_kesari(
+            self.chart_data,
+            self.aspect_calc.get_aspecting_planets,
+        )
     
     def calculate_amala_yoga(self):
-        """Calculate Amala Yoga (Benefic in 10th from Moon/Ascendant)"""
-        yogas = []
-        planets = self.chart_data.get('planets', {})
-        moon_house = planets.get('Moon', {}).get('house', 1)
-        tenth_from_moon = ((moon_house - 1 + 9) % 12) + 1
-        
-        benefics_in_tenth = []
-        for planet in ['Jupiter', 'Venus', 'Mercury']:
-            if planet in planets:
-                planet_house = planets[planet].get('house', 1)
-                if planet_house == 10 or planet_house == tenth_from_moon:
-                    benefics_in_tenth.append(planet)
-        
-        if benefics_in_tenth:
-            yogas.append({
-                'name': 'Amala Yoga',
-                'planets': benefics_in_tenth,
-                'strength': 'High',
-                'description': f'Benefic planets {", ".join(benefics_in_tenth)} in 10th house - spotless reputation'
-            })
-        return yogas
+        """BPHS 36.5–6 Amala, enforcing the text's exclusive benefic condition."""
+        return calculate_classical_amala(self.chart_data)
     
     def calculate_viparita_raja_yogas(self):
-        """Calculate Viparita Raja Yogas (6th/8th/12th lords in dusthanas)"""
-        yogas = []
-        dusthana_lords = [self._get_house_lord(h) for h in [6, 8, 12]]
-        planets = self.chart_data.get('planets', {})
-        
-        for lord in dusthana_lords:
-            if lord and lord in planets:
-                lord_house = planets[lord].get('house', 1)
-                if lord_house in [6, 8, 12]:
-                    yogas.append({
-                        'name': 'Viparita Raja Yoga',
-                        'planet': lord,
-                        'house': lord_house,
-                        'strength': 'Medium',
-                        'description': f'Dusthana lord {lord} in dusthana house {lord_house}'
-                    })
-        return yogas
+        """Phaladeepika 6.57, including both stated formation branches."""
+        return calculate_classical_viparita_yogas(
+            self.chart_data,
+            self._get_house_lord,
+            self.aspect_calc.get_aspecting_planets,
+        )
     
     def calculate_dharma_karma_yogas(self):
-        """Calculate 9th-10th lord relationships"""
-        yogas = []
-        planets = self.chart_data.get('planets', {})
-        ninth_lord = self._get_house_lord(9)
-        tenth_lord = self._get_house_lord(10)
-        
-        valid_planets = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
-        if (ninth_lord and tenth_lord and ninth_lord != tenth_lord and 
-            ninth_lord in valid_planets and tenth_lord in valid_planets):
-            planet1_data = planets.get(ninth_lord, {})
-            planet2_data = planets.get(tenth_lord, {})
-            
-            if self._are_planets_connected(planet1_data, planet2_data):
-                yogas.append({
-                    'name': 'Dharma-Karma Yoga',
-                    'planets': [ninth_lord, tenth_lord],
-                    'strength': 'High',
-                    'description': f'{ninth_lord} and {tenth_lord} create dharmic career success'
-                })
-        return yogas
+        """Phaladeepika 6.37 with its distinct two-lord conjunction."""
+        return calculate_classical_dharma_karma_yoga(
+            self.chart_data,
+            self._get_house_lord,
+        )
     
     def calculate_nabhasa_yogas(self):
-        """Calculate Nabhasa Yogas"""
-        yogas = {}
-        sankhya_yogas = self._calculate_sankhya_yogas()
-        if sankhya_yogas:
-            yogas['sankhya_yogas'] = sankhya_yogas
-        akriti_yogas = self._calculate_akriti_yogas()
-        if akriti_yogas:
-            yogas['akriti_yogas'] = akriti_yogas
-        ashraya_yogas = self._calculate_ashraya_yogas()
-        if ashraya_yogas:
-            yogas['ashraya_yogas'] = ashraya_yogas
-        return yogas
+        """BPHS 35 complete 32-name Nabhasa formation scheme."""
+        return calculate_classical_nabhasa_yogas(self.chart_data)
 
     def _calculate_ashraya_yogas(self):
         """Calculate Ashraya Yogas (dependency-based)"""
@@ -563,7 +419,7 @@ class YogaCalculator(BaseCalculator):
         other_parivartana_yogas = [y for y in parivartana_yogas if y['name'] == 'Parivartana Yoga']
         
         return {
-            'raj_yogas': self.calculate_raj_yogas() + maha_yogas,
+            'raj_yogas': self.calculate_raj_yogas(),
             'dhana_yogas': self.calculate_dhana_yogas(),
             'mahapurusha_yogas': self.calculate_panch_mahapurusha_yogas(),
             'neecha_bhanga_yogas': self.calculate_neecha_bhanga_yogas(),
@@ -580,10 +436,17 @@ class YogaCalculator(BaseCalculator):
                 'khala_yogas': khala_yogas,
                 'other_parivartana_yogas': other_parivartana_yogas
             },
-            'career_specific_yogas': self.calculate_career_specific_yogas(),
-            'health_yogas': self.calculate_health_yogas(),
+            # These legacy keys remain in the contract.  The former entries
+            # were product interpretations (for example "Career Discipline
+            # Yoga" and "Hormonal Balance Yoga"), not sourced named yogas.
+            # Keep them empty here instead of presenting invented formations
+            # on the classical Yogas screen.  Dedicated career and health
+            # analyzers remain separate clients and can be migrated rule by
+            # rule without changing this response contract.
+            'career_specific_yogas': [],
+            'health_yogas': [],
             'education_yogas': self.calculate_education_yogas(),
-            'marriage_yogas': self.calculate_marriage_yogas(),
+            'marriage_yogas': [],
             'major_doshas': self.calculate_major_doshas()
         }
 
@@ -668,7 +531,7 @@ class YogaCalculator(BaseCalculator):
         return yogas
         
     def calculate_parivartana_yogas(self):
-        """Calculate Parivartana Yogas (exchange of house lords)"""
+        """Phaladeepika 6.32 classification of the 66 house-lord exchanges."""
         planets = self.chart_data.get('planets', {})
         if not planets:
             return []
@@ -699,173 +562,51 @@ class YogaCalculator(BaseCalculator):
                         # Classify the yoga
                         yoga_type = ''
                         description = ''
-                        strength = 'Medium'
-                        
                         dusthana_houses = [6, 8, 12]
-                        trikona_houses = [1, 5, 9]
-                        kendra_houses = [1, 4, 7, 10]
-                        
                         is_h1_dusthana = h1 in dusthana_houses
                         is_h2_dusthana = h2 in dusthana_houses
-                        
-                        is_h1_trikona = h1 in trikona_houses
-                        is_h2_trikona = h2 in trikona_houses
-                        
-                        is_h1_kendra = h1 in kendra_houses
-                        is_h2_kendra = h2 in kendra_houses
 
                         if is_h1_dusthana or is_h2_dusthana:
                             yoga_type = 'Dainya Yoga'
-                            description = f"Exchange between lord of {h1} and {h2}. Indicates struggles and challenges."
-                            strength = 'Low'
+                            description = f"House-lord exchange between Houses {h1} and {h2}; one of the houses is 6, 8 or 12, so Phaladeepika classifies it as Dainya."
+                            classical_result = "Phaladeepika 6.34 gives misery from this exchange: dependence, want and humiliation."
                         elif h1 == 3 or h2 == 3:
                             yoga_type = 'Khala Yoga'
-                            description = f"Exchange between lord of {h1} and {h2}. Indicates a person who is clever and cunning."
-                        elif (is_h1_kendra and is_h2_trikona) or (is_h1_trikona and is_h2_kendra):
-                            yoga_type = 'Maha Yoga'
-                            description = f"Exchange between lord of {h1} and {h2}. A powerful Raj Yoga, indicating success and high status."
-                            strength = 'High'
+                            description = f"House-lord exchange between Houses {h1} and {h2}; House 3 is involved without a dusthana, so Phaladeepika classifies it as Khala."
+                            classical_result = "Phaladeepika 6.35 gives a changing result from this exchange: quarrel, meanness and fortune that does not stay."
                         else:
-                            yoga_type = 'Parivartana Yoga'
-                            description = f"Exchange between lord of {h1} and {h2}."
+                            yoga_type = 'Maha Yoga'
+                            description = f"House-lord exchange between Houses {h1} and {h2}; it is neither Dainya nor Khala, so Phaladeepika classifies it among the remaining Maha exchanges."
+                            classical_result = "Phaladeepika 6.33 gives a ruler's result from this exchange: wealth, happiness and fame."
 
                         yogas.append({
                             'name': yoga_type,
                             'planets': [l1, l2],
                             'houses': [h1, h2],
-                            'strength': strength,
-                            'description': description
+                            'strength': None,
+                            'description': description,
+                            'classical_result': classical_result,
+                            'classical_conditions': [{
+                                'rule_id': f'PD-6.32-{yoga_type.split()[0].upper()}',
+                                'description': f'{l1}, lord of House {h1}, occupies House {h2}; {l2}, lord of House {h2}, occupies House {h1}',
+                                'matched': True,
+                            }],
+                            'source': {
+                                'work': 'Phaladeepika',
+                                'reference_label': 'Phaladeepika 6.32',
+                                'url': 'https://sanskritdocuments.org/doc_z_misc_sociology_astrology/phaladIpika.html',
+                            },
                         })
 
         return yogas
 
     def calculate_surya_yogas(self):
-        """Calculate Surya Yogas (Sun-based)"""
-        planets = self.chart_data.get('planets', {})
-        if 'Sun' not in planets:
-            return []
-
-        yogas = []
-        sun_house = planets['Sun'].get('house')
-        
-        planets_in_second_from_sun = []
-        planets_in_twelfth_from_sun = []
-        
-        second_from_sun = (sun_house % 12) + 1
-        twelfth_from_sun = (sun_house - 2 + 12) % 12 + 1
-
-        for planet, data in planets.items():
-            if planet not in ['Sun', 'Rahu', 'Ketu', 'Moon']:
-                if data.get('house') == second_from_sun:
-                    planets_in_second_from_sun.append(planet)
-                if data.get('house') == twelfth_from_sun:
-                    planets_in_twelfth_from_sun.append(planet)
-
-        if planets_in_second_from_sun and not planets_in_twelfth_from_sun:
-            yogas.append({
-                'name': 'Vesi Yoga',
-                'strength': 'Medium',
-                'description': 'Planets in the 2nd house from the Sun. Makes the person truthful, and skillful.'
-            })
-        elif not planets_in_second_from_sun and planets_in_twelfth_from_sun:
-            yogas.append({
-                'name': 'Vasi Yoga',
-                'strength': 'Medium',
-                'description': 'Planets in the 12th house from the Sun. Makes the person charitable, and famous.'
-            })
-        elif planets_in_second_from_sun and planets_in_twelfth_from_sun:
-            yogas.append({
-                'name': 'Ubhayachari Yoga',
-                'strength': 'High',
-                'description': 'Planets in both the 2nd and 12th houses from the Sun. Makes the person a king or a ruler.'
-            })
-            
-        return yogas
+        """BPHS 38.1–4 Sun-based yogas and their natural composition."""
+        return calculate_classical_surya_yogas(self.chart_data)
     
     def calculate_chandra_yogas(self):
-        """Calculate Chandra Yogas (Moon-based)"""
-        planets = self.chart_data.get('planets', {})
-        if 'Moon' not in planets:
-            return []
-
-        yogas = []
-        moon_house = planets['Moon'].get('house')
-        
-        planets_in_second_from_moon = []
-        planets_in_twelfth_from_moon = []
-        
-        second_from_moon = (moon_house % 12) + 1
-        twelfth_from_moon = (moon_house - 2 + 12) % 12 + 1
-
-        for planet, data in planets.items():
-            if planet not in ['Sun', 'Rahu', 'Ketu', 'Moon']:
-                if data.get('house') == second_from_moon:
-                    planets_in_second_from_moon.append(planet)
-                if data.get('house') == twelfth_from_moon:
-                    planets_in_twelfth_from_moon.append(planet)
-
-        if planets_in_second_from_moon and not planets_in_twelfth_from_moon:
-            yogas.append({
-                'name': 'Sunapha Yoga',
-                'strength': 'Medium',
-                'description': 'Planets in the 2nd house from the Moon. Indicates self-earned wealth and intelligence.'
-            })
-        elif not planets_in_second_from_moon and planets_in_twelfth_from_moon:
-            yogas.append({
-                'name': 'Anapha Yoga',
-                'strength': 'Medium',
-                'description': 'Planets in the 12th house from the Moon. Indicates good health, and an attractive personality.'
-            })
-        elif planets_in_second_from_moon and planets_in_twelfth_from_moon:
-            yogas.append({
-                'name': 'Durudhura Yoga',
-                'strength': 'High',
-                'description': 'Planets in both the 2nd and 12th houses from the Moon. Indicates a person who enjoys a luxurious life.'
-            })
-        else:
-            # Kemadruma Yoga check
-            # No planets in 2nd or 12th from Moon.
-            # Also check for cancellation: No planets in kendra from Moon
-            kendra_from_moon = [(moon_house + i - 1) % 12 + 1 for i in [1, 4, 7, 10]]
-            planets_in_kendra_from_moon = False
-            for planet, data in planets.items():
-                if planet != 'Moon' and data.get('house') in kendra_from_moon:
-                    planets_in_kendra_from_moon = True
-                    break
-            if not planets_in_kendra_from_moon:
-                 yogas.append({
-                    'name': 'Kemadruma Yoga',
-                    'strength': 'Low',
-                    'description': 'No planets in the 2nd or 12th from the Moon, and no planets in a kendra from the Moon. Indicates poverty, struggle, and loneliness.'
-                })
-
-
-        # Adhi Yoga
-        benefics = ['Mercury', 'Venus', 'Jupiter']
-        benefics_in_6_7_8 = {'6': [], '7': [], '8': []}
-        
-        sixth_from_moon = (moon_house + 5 - 1) % 12 + 1
-        seventh_from_moon = (moon_house + 6 - 1) % 12 + 1
-        eighth_from_moon = (moon_house + 7 - 1) % 12 + 1
-
-        for planet in benefics:
-            if planet in planets:
-                p_house = planets[planet].get('house')
-                if p_house == sixth_from_moon:
-                    benefics_in_6_7_8['6'].append(planet)
-                if p_house == seventh_from_moon:
-                    benefics_in_6_7_8['7'].append(planet)
-                if p_house == eighth_from_moon:
-                    benefics_in_6_7_8['8'].append(planet)
-                    
-        if benefics_in_6_7_8['6'] or benefics_in_6_7_8['7'] or benefics_in_6_7_8['8']:
-            yogas.append({
-                'name': 'Adhi Yoga',
-                'strength': 'High',
-                'description': 'Benefics in the 6th, 7th, or 8th from the Moon. Indicates leadership, wealth, and a happy life.'
-            })
-            
-        return yogas
+        """BPHS 37.5–13 Moon-based yogas under one documented reading."""
+        return calculate_classical_chandra_yogas(self.chart_data)
     
     def calculate_career_specific_yogas(self):
         """Calculate career-specific yogas"""
@@ -1123,92 +864,9 @@ class YogaCalculator(BaseCalculator):
         return yogas
     
     def calculate_education_yogas(self):
-        """Calculate education-specific yogas"""
-        yogas = []
-        planets = self.chart_data.get('planets', {})
-        
-        # Saraswati Yoga - Mercury, Jupiter, Venus in conjunction/mutual aspect
-        if all(p in planets for p in ['Mercury', 'Jupiter', 'Venus']):
-            mercury_house = planets['Mercury'].get('house', 1)
-            jupiter_house = planets['Jupiter'].get('house', 1)
-            venus_house = planets['Venus'].get('house', 1)
-            
-            # Check for conjunction (same house)
-            if mercury_house == jupiter_house == venus_house:
-                house_significance = self._get_saraswati_house_significance(mercury_house)
-                yogas.append({
-                    'name': 'Saraswati Yoga',
-                    'planets': ['Mercury', 'Jupiter', 'Venus'],
-                    'houses': [mercury_house],
-                    'strength': 'High',
-                    'description': f'Mercury, Jupiter, Venus conjunction in {mercury_house}th house - {house_significance}'
-                })
-            # Check for mutual aspects
-            elif self._planets_in_mutual_aspect(['Mercury', 'Jupiter', 'Venus'], planets):
-                yogas.append({
-                    'name': 'Saraswati Yoga (Aspect)',
-                    'planets': ['Mercury', 'Jupiter', 'Venus'],
-                    'houses': [mercury_house, jupiter_house, venus_house],
-                    'strength': 'Medium',
-                    'description': 'Mercury, Jupiter, Venus in mutual aspect - good learning ability'
-                })
-        
-        # Budh-Aditya Yoga - Sun-Mercury conjunction
-        if 'Sun' in planets and 'Mercury' in planets:
-            sun_house = planets['Sun'].get('house', 1)
-            mercury_house = planets['Mercury'].get('house', 1)
-            
-            if sun_house == mercury_house:
-                house_significance = self._get_budh_aditya_house_significance(sun_house)
-                strength = 'High' if sun_house in [1, 4, 5, 9, 10] else 'Medium'
-                yogas.append({
-                    'name': 'Budh-Aditya Yoga',
-                    'planets': ['Sun', 'Mercury'],
-                    'houses': [sun_house],
-                    'strength': strength,
-                    'description': f'Sun-Mercury conjunction in {sun_house}th house - {house_significance}'
-                })
-        
-        # Guru-Mangal Yoga - Jupiter-Mars conjunction/aspect
-        if 'Jupiter' in planets and 'Mars' in planets:
-            jupiter_house = planets['Jupiter'].get('house', 1)
-            mars_house = planets['Mars'].get('house', 1)
-            
-            if jupiter_house == mars_house or self._are_planets_connected(planets['Jupiter'], planets['Mars']):
-                yogas.append({
-                    'name': 'Guru-Mangal Yoga',
-                    'planets': ['Jupiter', 'Mars'],
-                    'houses': [jupiter_house, mars_house],
-                    'strength': 'Medium',
-                    'description': 'Jupiter-Mars connection - technical and scientific education aptitude'
-                })
-        
-        # Education Lord Yoga - 4th, 5th, 9th lords connected
-        fourth_lord = self._get_house_lord(4)
-        fifth_lord = self._get_house_lord(5)
-        ninth_lord = self._get_house_lord(9)
-        
-        if fourth_lord and fifth_lord and ninth_lord:
-            connected_lords = []
-            if fourth_lord in planets and fifth_lord in planets:
-                if self._are_planets_connected(planets[fourth_lord], planets[fifth_lord]):
-                    connected_lords.extend([fourth_lord, fifth_lord])
-            
-            if fifth_lord in planets and ninth_lord in planets:
-                if self._are_planets_connected(planets[fifth_lord], planets[ninth_lord]):
-                    if ninth_lord not in connected_lords:
-                        connected_lords.append(ninth_lord)
-            
-            if len(connected_lords) >= 2:
-                yogas.append({
-                    'name': 'Education Lord Yoga',
-                    'planets': connected_lords,
-                    'strength': 'High',
-                    'description': f'Education house lords {" and ".join(connected_lords)} connected - strong educational foundation'
-                })
-        
-        return yogas
-    
+        """Return only the sourced Phaladeepika Saraswati formation."""
+        return calculate_classical_saraswati(self.chart_data)
+
     def _get_saraswati_house_significance(self, house: int) -> str:
         """Get house-specific significance for Saraswati Yoga"""
         significances = {
@@ -1509,7 +1167,8 @@ class YogaCalculator(BaseCalculator):
         return {
             "mangal_dosha": self._check_mangal_dosha(),
             "kaal_sarp_dosha": self._check_kaal_sarp(),
-            "pitra_dosha": self._check_pitra_dosha()
+            "pitra_dosha": self._check_pitra_dosha(),
+            "matru_dosha": self._check_matru_dosha(),
         }
     
     def _check_mangal_dosha(self):
@@ -1523,3 +1182,7 @@ class YogaCalculator(BaseCalculator):
     def _check_pitra_dosha(self):
         """Legacy method name; result now follows BPHS 83.20-30 only."""
         return calculate_classical_pitri_shapa(self.chart_data)
+
+    def _check_matru_dosha(self):
+        """Legacy-friendly key; result follows BPHS 83.34-46 only."""
+        return calculate_classical_matri_shapa(self.chart_data)

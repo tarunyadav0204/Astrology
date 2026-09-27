@@ -703,6 +703,7 @@ def _dosha_table(doshas: Dict[str, Any], language: str) -> Dict[str, Any]:
     mangal = doshas.get("mangal_dosha") or {}
     kaal = doshas.get("kaal_sarp_dosha") or {}
     pitra = doshas.get("pitra_dosha") or {}
+    matru = doshas.get("matru_dosha") or {}
     def _dosha_detail(row: Dict[str, Any]) -> str:
         raw = _clean(row.get("summary") or row.get("type") or row.get("note") or row.get("strength"))
         if not raw:
@@ -726,8 +727,18 @@ def _dosha_table(doshas: Dict[str, Any], language: str) -> Dict[str, Any]:
 
     def _pitri_detail(row: Dict[str, Any]) -> str:
         summary = _clean(row.get("summary")) or _dosha_detail(row)
+        matched = ", ".join(
+            _clean(rule.get("reference"))
+            for rule in (row.get("matched_rules") or [])
+            if isinstance(rule, dict) and _clean(rule.get("reference"))
+        )
         reference = _clean((row.get("source") or {}).get("reference_label"))
-        return f"{summary} Reference: {reference}" if reference else summary
+        details = [summary]
+        if matched:
+            details.append(f"Matched: {matched}")
+        if reference:
+            details.append(f"Reference: {reference}")
+        return " ".join(details)
 
     rows = [
         [
@@ -746,6 +757,12 @@ def _dosha_table(doshas: Dict[str, Any], language: str) -> Dict[str, Any]:
             t(language, "Pitṛ-śāpa · progeny check", "पितृ-शाप · संतान संबंधी जाँच"),
             yes_no(language, bool(pitra.get("present"))),
             _pitri_detail(pitra),
+        ])
+    if isinstance(matru, dict):
+        rows.append([
+            t(language, "Mātṛ-śāpa · progeny check", "मातृ-शाप · संतान संबंधी जाँच"),
+            yes_no(language, bool(matru.get("present"))),
+            _pitri_detail(matru),
         ])
     return {
         "title": t(language, "Dosha checklist", "दोष जाँच सूची"),

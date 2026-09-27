@@ -346,6 +346,7 @@ def _collect_special_marks(
         ("mangal_dosha", "Mangal Dosha"),
         ("kaal_sarp_dosha", "Rahu–Ketu enclosure"),
         ("pitra_dosha", "Pitṛ-śāpa · progeny"),
+        ("matru_dosha", "Mātṛ-śāpa · progeny"),
     ):
         info = doshas.get(key) or {}
         if info.get("present"):

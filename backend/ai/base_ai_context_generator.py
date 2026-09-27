@@ -12,6 +12,7 @@ from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.chara_karaka_calculator import CharaKarakaCalculator
 from calculators.yoga_calculator import YogaCalculator
 from calculators.classical_pitri_shapa import compact_pitri_shapa_for_ai
+from calculators.classical_matri_shapa import compact_matri_shapa_for_ai
 from calculators.badhaka_calculator import BadhakaCalculator
 from calculators.argala_calculator import ArgalaCalculator
 from calculators.planetary_war_calculator import PlanetaryWarCalculator
@@ -233,7 +234,7 @@ For every user query, structure your response exactly as follows:
             },
             
             # Yogas
-            "yogas": compact_pitri_shapa_for_ai(yoga_calc.calculate_all_yogas()),
+            "yogas": compact_matri_shapa_for_ai(compact_pitri_shapa_for_ai(yoga_calc.calculate_all_yogas())),
             
             # Chara Karakas
             "chara_karakas": chara_karaka_calc.calculate_chara_karakas(),
