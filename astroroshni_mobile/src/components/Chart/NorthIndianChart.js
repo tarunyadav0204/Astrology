@@ -4,6 +4,7 @@ import Svg, { Rect, Polygon, Line, Text as SvgText, G, Defs, LinearGradient, Sto
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { aspectArrow, aspectHouse, ChartAspectArrows, jaiminiTargetSigns, planetAspectCounts } from './chartAspects';
+import { layoutNatalHouse } from './chartPlacement';
 import { combustSet } from '../../utils/positionTables';
 
 // Create animated versions of SVG components
@@ -390,6 +391,7 @@ export const placeClearLabels = (polygon, occupied, specs, minGap = 3) => {
     let best = null;
     candidates.forEach((candidate) => {
       const box = labelBox(candidate.x, candidate.y, spec.halfW, spec.above, spec.below);
+      if (box.left < 5 || box.right > 395 || box.top < 5 || box.bottom > 395) return;
       let inside;
       if (spec.lineOffsets) {
         inside = transitLabelInside(candidate.x, candidate.y, spec, polygon);
@@ -448,7 +450,8 @@ const placeForcedLabel = (polygon, occupied, spec) => {
       const box = labelBox(x, y, spec.halfW, spec.above, spec.below);
       const gap = occupied.reduce((min, rect) => Math.min(min, boxGap(box, rect)), Infinity);
       const dist = Math.hypot(x - centroid.x, y - centroid.y);
-      const score = gap - dist * 0.04;
+      const inFrame = box.left >= 5 && box.right <= 395 && box.top >= 5 && box.bottom <= 395;
+      const score = gap - dist * 0.04 - (inFrame ? 0 : 50);
       if (!best || score > best.score) best = { x, y, score, box };
     }
   }
@@ -876,56 +879,24 @@ const NorthIndianChart = ({
     });
   };
 
-  const collectNatalBoxes = (houseNumber, houseData, planetsInHouse) => {
-    const occupied = planetsInHouse.map((planet, pIndex) => {
-      const anchor = natalPlanetAnchor(houseNumber, houseData.center, planetsInHouse.length, pIndex);
-      const dashaTag = dashaLevelSuffix(planet.name, dashaHighlight);
-      const symbolFont = (planetsInHouse.length > 4 ? 10 : planetsInHouse.length > 2 ? 12 : 14) + (dashaTag ? 4 : 0);
-      const degreeFont = planetsInHouse.length > 4 ? 7 : planetsInHouse.length > 2 ? 9 : 10;
-      const symbol = getPlanetSymbolWithStatus(planet);
-      const symbolY = anchor.y - 8;
-      const tagFont = Math.max(6, Math.round(symbolFont * 0.42));
-      const symbolHalf = textHalfWidth(symbol, symbolFont);
-      const tagExtra = dashaTag ? textHalfWidth(dashaTag, tagFont) + 2 : 0;
-      const neechaBhangaExtra = planet.neecha_bhanga ? textHalfWidth(t('premiumUi.chart.neechaBhangaShort'), tagFont) + 3 : 0;
-      const degreeHalf = showDegreeNakshatra
-        ? textHalfWidth(`${planet.formattedDegree} ${planet.shortNakshatra}`, degreeFont)
-        : 0;
-      const half = Math.max(symbolHalf + Math.max(tagExtra, neechaBhangaExtra), degreeHalf) + 6;
-      const above = Math.ceil(symbolFont * 0.95) + (dashaTag ? tagFont + 1 : 2) + 2;
-      const below = (showDegreeNakshatra ? 16 + Math.ceil(degreeFont * 0.5) + 2 : 4) + 2;
-      return labelBox(anchor.x, symbolY, half, above, below);
-    });
-    const sign = signAnchor(houseNumber, houseData.center);
-    const signLabel = String(getRashiForHouse(houseNumber - 1) + 1);
-    const signHalf = textHalfWidth(signLabel, 18) + 4;
-    occupied.push(labelBox(sign.x + signHalf, sign.y - 2, signHalf, 16, 8));
-    if (houseNumber === 1) {
-      const ascX = houseData.center.x + 25;
-      const ascY = houseData.center.y + 35;
-      occupied.push(labelBox(ascX, ascY, 28, 16, showDegreeNakshatra ? 26 : 8));
-    }
-    return occupied;
-  };
-
-  const savSpotFor = (houseNumber, houseData, planetsInHouse) => {
+  const savSpotFor = (houseNumber, occupied) => {
     if (signPointAt(signPoints, getRashiForHouse(houseNumber - 1)) == null) return null;
     return placeCircleClear(
       HOUSE_POLYGONS[houseNumber],
-      collectNatalBoxes(houseNumber, houseData, planetsInHouse),
+      occupied,
       SAV_RADIUS,
     );
   };
 
-  const renderTransitOverlay = (houseNumber, houseData, planetsInHouse) => {
+  const renderTransitOverlay = (houseNumber, occupied) => {
     const list = getTransitPlanetsInHouse(houseNumber - 1);
     const polygon = HOUSE_POLYGONS[houseNumber];
     if (!list.length || !polygon) return null;
-    const occupied = collectNatalBoxes(houseNumber, houseData, planetsInHouse);
-    const savSpot = savSpotFor(houseNumber, houseData, planetsInHouse);
-    if (savSpot?.box) occupied.push(savSpot.box);
+    const boxes = occupied.slice();
+    const savSpot = savSpotFor(houseNumber, boxes);
+    if (savSpot?.box) boxes.push(savSpot.box);
 
-    const layout = placeTransitLabels(polygon, occupied, list.map((planet) => ({
+    const layout = placeTransitLabels(polygon, boxes, list.map((planet) => ({
       symbol: planet.symbol,
       retrograde: planet.retrograde,
       combust: planet.combust,
@@ -992,6 +963,33 @@ const NorthIndianChart = ({
     ? {}
     : { strokeDasharray: '1200', strokeDashoffset: gridStrokeDash };
 
+  const houseLayouts = {};
+  for (let houseNumber = 1; houseNumber <= 12; houseNumber += 1) {
+    const planetsInHouse = getPlanetsInHouse(houseNumber - 1);
+    const center = getHouseData(houseNumber).center;
+    const ascendant = chartData?.ascendant;
+    houseLayouts[houseNumber] = layoutNatalHouse({
+      polygon: HOUSE_POLYGONS[houseNumber],
+      center,
+      sign: signAnchor(houseNumber, center),
+      signLabel: String(getRashiForHouse(houseNumber - 1) + 1),
+      showDegree: showDegreeNakshatra,
+      planets: planetsInHouse.map((planet) => ({
+        symbol: getPlanetSymbolWithStatus(planet),
+        degreeText: `${planet.formattedDegree} ${planet.shortNakshatra}`,
+        shortDegree: planet.formattedDegree,
+        tag: dashaLevelSuffix(planet.name, dashaHighlight),
+        role: planetRoles?.[planet.name] || '',
+        neecha: planet.neecha_bhanga ? t('premiumUi.chart.neechaBhangaShort') : '',
+      })),
+      asc: houseNumber === 1 ? {
+        label: 'ASC',
+        degreeText: ascendant == null ? '' : `${formatDegree(ascendant % 30)} ${getShortNakshatra(ascendant)}`,
+        shortDegree: ascendant == null ? '' : formatDegree(ascendant % 30),
+      } : null,
+    }) || { planets: [], occupied: [] };
+  }
+
   const aspectArrows = [];
   if (aspectMode === 'jaimini' && aspectFocus) {
     const houseBySign = {};
@@ -1021,7 +1019,8 @@ const NorthIndianChart = ({
         const counts = planetAspectCounts(aspectMode, planet.name);
         if (!counts) return;
         if ((aspectMode === 'nadi' || aspectMode === 'parashari') && !(Array.isArray(aspectFocus) && aspectFocus.includes(planet.name))) return;
-        const from = natalPlanetAnchor(houseNumber, fromCenter, planetsInHouse.length, pIndex);
+        const slot = houseLayouts[houseNumber].planets[pIndex];
+        const from = slot || natalPlanetAnchor(houseNumber, fromCenter, planetsInHouse.length, pIndex);
         counts.forEach((count) => {
           const target = aspectHouse(houseNumber, count);
           const arrow = aspectArrow(
@@ -1121,6 +1120,7 @@ const NorthIndianChart = ({
           const planetsInHouse = getPlanetsInHouse(houseIndex);
           const houseData = getHouseData(houseNumber);
           const activatedHouseText = houseActivation?.[houseNumber]?.text;
+          const natalLayout = houseLayouts[houseNumber];
 
           return (
             <G key={houseNumber}>
@@ -1169,7 +1169,7 @@ const NorthIndianChart = ({
               </SvgText>
 
               {(() => {
-                const savSpot = savSpotFor(houseNumber, houseData, planetsInHouse);
+                const savSpot = savSpotFor(houseNumber, natalLayout.occupied);
                 if (!savSpot) return null;
                 return (
                   <G pointerEvents="none">
@@ -1195,37 +1195,38 @@ const NorthIndianChart = ({
                 );
               })()}
 
-              {houseNumber === 1 && (
+              {houseNumber === 1 && natalLayout.asc && (
                 <G>
-                  <SvgText x={houseData.center.x + 25} y={houseData.center.y + 35} fontSize="12" fill={activatedHouseText || (cosmicTheme ? colors.primary : "#e91e63")} fontWeight="900" textAnchor="middle">ASC</SvgText>
-                  {(chartData?.ascendant ?? null) != null && (
-                    <SvgText x={houseData.center.x + 25} y={houseData.center.y + 50} fontSize="8" fill={activatedHouseText || (cosmicTheme ? themedChartTextMuted : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666"))} fontWeight="500" textAnchor="middle">
-                      {formatDegree(chartData.ascendant % 30)} {getShortNakshatra(chartData.ascendant)}
+                  <SvgText x={natalLayout.asc.x} y={natalLayout.asc.y} fontSize={natalLayout.asc.symbolFont} fill={activatedHouseText || (cosmicTheme ? colors.primary : "#e91e63")} fontWeight="900" textAnchor="middle">ASC</SvgText>
+                  {natalLayout.asc.degreeGap ? (
+                    <SvgText x={natalLayout.asc.x} y={natalLayout.asc.y + natalLayout.asc.degreeGap} fontSize={natalLayout.asc.degreeFont} fill={activatedHouseText || (cosmicTheme ? themedChartTextMuted : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666"))} fontWeight="500" textAnchor="middle">
+                      {natalLayout.fonts.short ? formatDegree(chartData.ascendant % 30) : `${formatDegree(chartData.ascendant % 30)} ${getShortNakshatra(chartData.ascendant)}`}
                     </SvgText>
-                  )}
+                  ) : (chartData?.ascendant ?? null) != null ? (
+                    <SvgText x={natalLayout.asc.x + textHalfWidth('ASC', natalLayout.asc.symbolFont) + 2} y={natalLayout.asc.y} fontSize={natalLayout.asc.degreeFont} fill={activatedHouseText || (cosmicTheme ? themedChartTextMuted : (theme === 'dark' ? "rgba(255, 255, 255, 0.7)" : "#666"))} fontWeight="500" textAnchor="start">
+                      {natalLayout.fonts.short ? formatDegree(chartData.ascendant % 30) : `${formatDegree(chartData.ascendant % 30)} ${getShortNakshatra(chartData.ascendant)}`}
+                    </SvgText>
+                  ) : null}
                 </G>
               )}
 
               {planetsInHouse.map((planet, pIndex) => {
-                const totalPlanets = planetsInHouse.length;
-                const { x: planetX, y: planetY } = natalPlanetAnchor(
-                  houseNumber,
-                  houseData.center,
-                  totalPlanets,
-                  pIndex,
-                );
-
+                const slot = natalLayout.planets[pIndex];
+                const fallback = natalPlanetAnchor(houseNumber, houseData.center, planetsInHouse.length, pIndex);
+                const planetX = slot?.x ?? fallback.x;
+                const planetY = slot?.y ?? (fallback.y - 8);
                 const dashaTag = dashaLevelSuffix(planet.name, dashaHighlight);
-                const planetFont = (showKarakas
-                  ? (totalPlanets > 4 ? 8 : totalPlanets > 2 ? 10 : 11)
-                  : (totalPlanets > 4 ? 10 : totalPlanets > 2 ? 12 : 14)) + (dashaTag ? 4 : 0);
+                const planetFont = slot?.symbolFont || (planetsInHouse.length > 4 ? 10 : planetsInHouse.length > 2 ? 12 : 14);
                 const symbol = getPlanetSymbolWithStatus(planet);
                 const paint = dashaTag ? dashaPaint(colors) : null;
+                const degreeText = natalLayout.fonts?.short
+                  ? planet.formattedDegree
+                  : `${planet.formattedDegree} ${planet.shortNakshatra}`;
                 return (
                   <G key={pIndex}>
                     <SvgText
                       x={planetX}
-                      y={planetY - 8}
+                      y={planetY}
                       fontSize={planetFont}
                       fill={paint ? paint.fill : getPlanetColor(planet, houseNumber)}
                       fontWeight="900"
@@ -1236,8 +1237,8 @@ const NorthIndianChart = ({
                     {dashaTag ? (
                       <SvgText
                         x={planetX + textHalfWidth(symbol, planetFont)}
-                        y={planetY - 8 - Math.round(planetFont * 0.55)}
-                        fontSize={Math.max(6, Math.round(planetFont * 0.42))}
+                        y={planetY - (slot?.tagRise || Math.round(planetFont * 0.55))}
+                        fontSize={slot?.tagFont || Math.max(6, Math.round(planetFont * 0.42))}
                         fill={paint.glow}
                         fontWeight="700"
                         textAnchor="start"
@@ -1249,7 +1250,7 @@ const NorthIndianChart = ({
                     {planet.neecha_bhanga ? (
                       <SvgText
                         x={planetX + textHalfWidth(symbol, planetFont) + 3}
-                        y={planetY - 8}
+                        y={planetY}
                         fontSize={Math.max(6, Math.round(planetFont * 0.46))}
                         fill={colors.success || '#1E7A46'}
                         fontWeight="900"
@@ -1278,7 +1279,7 @@ const NorthIndianChart = ({
                     {chartType === 'transit' && transitBav(bavBySign, planet.name, rashiIndex) != null ? (
                       <SvgText
                         x={planetX + textHalfWidth(symbol, planetFont) + 2}
-                        y={planetY - 8}
+                        y={planetY}
                         fontSize={Math.max(7, Math.round(planetFont * 0.62))}
                         fill={themedChartTextMuted}
                         fontWeight="700"
@@ -1288,22 +1289,22 @@ const NorthIndianChart = ({
                         {transitBav(bavBySign, planet.name, rashiIndex)}
                       </SvgText>
                     ) : null}
-                    {showDegreeNakshatra && (
+                    {showDegreeNakshatra && slot?.degreeFont ? (
                       <SvgText
-                        x={planetX}
-                        y={planetY + 8}
-                        fontSize={totalPlanets > 4 ? "7" : totalPlanets > 2 ? "9" : "10"}
+                        x={slot.inline ? planetX + textHalfWidth(symbol, planetFont) + 2 : planetX}
+                        y={slot.inline ? planetY : planetY + slot.degreeGap}
+                        fontSize={slot.degreeFont}
                         fill={paint ? paint.fill : (activatedHouseText || (cosmicTheme ? themedChartTextMuted : "#666"))}
                         fontWeight="500"
-                        textAnchor="middle"
+                        textAnchor={slot.inline ? 'start' : 'middle'}
                         onPress={() => handlePlanetPress(planet)}>
-                        {planet.formattedDegree} {planet.shortNakshatra}
+                        {degreeText}
                       </SvgText>
-                    )}
+                    ) : null}
                   </G>
                 );
               })}
-              {renderTransitOverlay(houseNumber, houseData, planetsInHouse)}
+              {renderTransitOverlay(houseNumber, natalLayout.occupied)}
             </G>
           );
         })}

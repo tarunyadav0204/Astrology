@@ -33,6 +33,9 @@ from calculators.classical_jaimini import (
     ClassicalJaiminiInputError,
 )
 from charts.house_insight_service import build_house_insight
+from classical_rules.bphs.chapter_24 import evaluate_chapter_24
+from classical_rules.reading import build_classical_reading
+from classical_rules.models import RuleInputUnavailable
 from charts.double_transit_service import (
     DoubleTransitCalculationError,
     DoubleTransitInputError,
@@ -1060,6 +1063,55 @@ async def calculate_professional_jaimini(request: dict, current_user: User = Dep
     except Exception as exc:
         logger.exception('error calculating professional Jaimini worksheet')
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/classical-natal-promise")
+async def calculate_classical_natal_promise(request: dict, current_user: User = Depends(get_current_user)):
+    """Return the matched BPHS Chapter 24 natal judgments for a D1 chart."""
+    chart_data = request.get("chart_data") or {}
+    if not chart_data.get("planets") or chart_data.get("ascendant") is None:
+        raise HTTPException(status_code=400, detail="D1 chart with planets and ascendant is required")
+    try:
+        return {"success": True, "natal_promise": evaluate_chapter_24(chart_data)}
+    except RuleInputUnavailable as exc:
+        raise HTTPException(status_code=422, detail={"message": str(exc), "fallback_used": False}) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("error calculating classical natal promise")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/classical-reading")
+async def calculate_classical_reading(request: dict, current_user: User = Depends(get_current_user)):
+    """Return all published chart-reading insights through one stable contract."""
+    chart_data = request.get("chart_data") or {}
+    birth_data = request.get("birth_data") or None
+    area_keys = request.get("area_keys") or None
+    if not chart_data.get("planets") or chart_data.get("ascendant") is None:
+        raise HTTPException(status_code=400, detail="D1 chart with planets and ascendant is required")
+    if area_keys is not None and not isinstance(area_keys, list):
+        raise HTTPException(status_code=400, detail="area_keys must be a list when provided")
+    try:
+        return {
+            "success": True,
+            "classical_reading": build_classical_reading(
+                chart_data,
+                birth_data=birth_data,
+                area_keys=area_keys,
+            ),
+        }
+    except RuleInputUnavailable as exc:
+        raise HTTPException(status_code=422, detail={"message": str(exc), "fallback_used": False}) from exc
+    except (TypeError, ValueError) as exc:
+        logger.exception("invalid published classical reading contract")
+        raise HTTPException(status_code=500, detail={
+            "message": str(exc),
+            "fallback_used": False,
+        }) from exc
+    except Exception as exc:
+        logger.exception("error calculating corpus-wide classical reading")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 @router.post("/sniper-points")
 async def calculate_sniper_points(request: dict, current_user: User = Depends(get_current_user)):

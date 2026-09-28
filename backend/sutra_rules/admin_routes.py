@@ -126,6 +126,21 @@ def get_catalog(_: Any = Depends(require_admin)):
     return {**catalog(), "visibility": VISIBILITY}
 
 
+@router.get("/classical-packs")
+def list_classical_packs(_: Any = Depends(require_admin)):
+    from classical_rules.registry import list_packs
+    return {"packs": list(list_packs())}
+
+
+@router.get("/classical-packs/{work_key}/{chapter}")
+def get_classical_pack(work_key: str, chapter: int, _: Any = Depends(require_admin)):
+    from classical_rules.registry import get_pack
+    try:
+        return get_pack(work_key, chapter)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("")
 def list_rules(_: Any = Depends(require_admin)):
     with get_conn() as conn:

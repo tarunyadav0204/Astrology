@@ -70,7 +70,8 @@ def test_planet_analyzer_uses_phase_when_judging_a_moon_aspect():
 
 def test_mercury_association_uses_the_actual_moon_phase():
     chart = _chart(250.0)
-    chart["planets"]["Mercury"]["house"] = 2
+    chart["planets"]["Mercury"].update({"sign": 8, "longitude": 250.0, "degree": 10.0})
+    chart["planets"]["Ketu"].update({"sign": 8, "longitude": 251.0, "degree": 11.0})
     nature = calculate_natural_nature(chart, "Mercury")
     assert nature["nature"] == "malefic"
     assert nature["malefic_associates"] == ["Ketu", "Moon"]

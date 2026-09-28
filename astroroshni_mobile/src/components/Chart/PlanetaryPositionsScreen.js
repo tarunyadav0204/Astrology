@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ActivityIndicator, Linking, Modal, Pressable, Platform, useWindowDimensions } from 'react-native';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -30,6 +30,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const nakshatraDockRef = React.useRef(null);
   const jaiminiRequestRef = React.useRef(0);
   const specialPointsRequestRef = React.useRef(0);
+  const natalPromiseRequestRef = React.useRef(0);
   const lastChartKeyRef = React.useRef(null);
   const chartKey = `${birthData?.id || birthData?.name || ''}|${birthData?.date || ''}|${birthData?.time || ''}`;
   React.useEffect(() => {
@@ -47,6 +48,15 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const [jaiminiLoaded, setJaiminiLoaded] = React.useState(false);
   const [jaiminiError, setJaiminiError] = React.useState(null);
   const [jaiminiScheme, setJaiminiScheme] = React.useState('seven');
+  const [natalPromise, setNatalPromise] = React.useState(null);
+  const [natalPromiseLoading, setNatalPromiseLoading] = React.useState(false);
+  const [natalPromiseLoaded, setNatalPromiseLoaded] = React.useState(false);
+  const [natalPromiseError, setNatalPromiseError] = React.useState(null);
+  const [selectedPromiseHouse, setSelectedPromiseHouse] = React.useState(1);
+  const [showPromiseEvidence, setShowPromiseEvidence] = React.useState(false);
+  const [promiseAreaPickerOpen, setPromiseAreaPickerOpen] = React.useState(false);
+  const [selectedPromiseSubject, setSelectedPromiseSubject] = React.useState('all');
+  const [promiseSubjectPickerOpen, setPromiseSubjectPickerOpen] = React.useState(false);
   const [yogiPoints, setYogiPoints] = React.useState(null);
   const [sniperPoints, setSniperPoints] = React.useState(null);
   const [pushkaraData, setPushkaraData] = React.useState(null);
@@ -75,6 +85,10 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       loadProfessionalJaimini();
     }
   }, [activeTab, jaiminiLoaded]);
+
+  React.useEffect(() => {
+    if (activeTab === 'promise' && !natalPromiseLoaded) loadNatalPromise();
+  }, [activeTab, natalPromiseLoaded]);
 
   React.useEffect(() => {
     if (activeTab === 'special' && !specialLoaded) {
@@ -137,6 +151,32 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       if (requestId === jaiminiRequestRef.current) {
         setJaiminiLoading(false);
         setJaiminiLoaded(true);
+      }
+    }
+  };
+
+  const loadNatalPromise = async () => {
+    const requestId = ++natalPromiseRequestRef.current;
+    setNatalPromiseLoading(true);
+    setNatalPromiseError(null);
+    try {
+      const { chartAPI } = require('../../services/api');
+      const response = await chartAPI.calculateClassicalReading(chartData, birthData);
+      const payload = response?.data?.classical_reading;
+      if (!payload?.areas?.length) throw new Error('Classical reading response is empty');
+      if (requestId === natalPromiseRequestRef.current) {
+        setNatalPromise(payload);
+        setSelectedPromiseHouse((current) => payload.areas.some((row) => row.house === current) ? current : payload.areas[0].house);
+      }
+    } catch (error) {
+      console.error('Error loading classical natal promise:', error);
+      if (requestId === natalPromiseRequestRef.current) {
+        setNatalPromiseError(error?.response?.data?.detail?.message || error?.response?.data?.detail || error.message);
+      }
+    } finally {
+      if (requestId === natalPromiseRequestRef.current) {
+        setNatalPromiseLoading(false);
+        setNatalPromiseLoaded(true);
       }
     }
   };
@@ -260,6 +300,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       lastChartKeyRef.current = chartKey;
       jaiminiRequestRef.current += 1;
       specialPointsRequestRef.current += 1;
+      natalPromiseRequestRef.current += 1;
       setSelectedPlanetName(null);
       setExpandedPlanets({});
       setSelectedHouseNumber(null);
@@ -270,6 +311,14 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       setJaiminiLoaded(false);
       setJaiminiError(null);
       setJaiminiScheme('seven');
+      setNatalPromise(null);
+      setNatalPromiseLoaded(false);
+      setNatalPromiseError(null);
+      setSelectedPromiseHouse(1);
+      setShowPromiseEvidence(false);
+      setPromiseAreaPickerOpen(false);
+      setSelectedPromiseSubject('all');
+      setPromiseSubjectPickerOpen(false);
       setYogiPoints(null);
       setSniperPoints(null);
       setPushkaraData(null);
@@ -1711,6 +1760,397 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     );
   };
 
+  const renderNatalPromiseTab = () => {
+    if (natalPromiseLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            {t('premiumUi.planetaryPositions.natalPromise.loading', 'Reading the published classical rules…')}
+          </Text>
+        </View>
+      );
+    }
+    if (natalPromiseError || !natalPromise?.areas?.length) {
+      return (
+        <View style={[styles.methodNote, { backgroundColor: colors.surfaceMuted, borderColor: colors.warning }]}>
+          <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.methodNoteText, { color: colors.textSecondary }]}>
+              {natalPromiseError || t('premiumUi.planetaryPositions.natalPromise.unavailable', 'The classical natal reading is unavailable for this chart.')}
+            </Text>
+            <TouchableOpacity onPress={() => { setNatalPromiseLoaded(false); }} style={styles.promiseRetry}>
+              <Text style={[styles.promiseRetryText, { color: colors.primary }]}>{t('premiumUi.common.tryAgain', 'Try again')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+    const selected = natalPromise.areas.find((row) => row.house === selectedPromiseHouse) || natalPromise.areas[0];
+    const allSelectedInsights = selected.insights || [];
+    const subjects = selected.subjects || [];
+    const activeSubject = selectedPromiseSubject === 'all' || subjects.some((subject) => subject.key === selectedPromiseSubject)
+      ? selectedPromiseSubject
+      : 'all';
+    const selectedInsights = activeSubject === 'all'
+      ? allSelectedInsights
+      : allSelectedInsights.filter((insight) => insight.subject?.key === activeSubject);
+    const visibleSupports = [...new Set(selectedInsights.flatMap((insight) => insight.supports || []))];
+    const visiblePressures = [...new Set(selectedInsights.flatMap((insight) => insight.pressures || []))];
+    const conditionKey = visibleSupports.length && visiblePressures.length
+      ? 'mixed'
+      : visibleSupports.length ? 'supported' : visiblePressures.length ? 'under_pressure' : 'unqualified';
+    const visibleSources = selectedInsights
+      .flatMap((insight) => insight.sources || [])
+      .filter((source, index, rows) => rows.findIndex((row) => row.rule_key === source.rule_key && row.reference === source.reference) === index);
+    const conditionLabels = {
+      supported: t('premiumUi.planetaryPositions.natalPromise.supported', 'Supported'),
+      mixed: t('premiumUi.planetaryPositions.natalPromise.mixed', 'Support and pressure'),
+      under_pressure: t('premiumUi.planetaryPositions.natalPromise.underPressure', 'Under pressure'),
+      unqualified: t('premiumUi.planetaryPositions.natalPromise.unqualified', 'No strong modifier'),
+    };
+    const conditionColor = conditionKey === 'supported' ? colors.success : conditionKey === 'under_pressure' ? colors.warning : colors.primary;
+    const insightReading = (insight) => (insight.statements || [])
+      .map((statement) => t(statement.key, statement.text || '', statement.parameters || {}))
+      .filter(Boolean)
+      .map((outcome) => `${outcome.charAt(0).toUpperCase()}${outcome.slice(1).replace(/[.!?]+$/, '')}.`)
+      .join(' ');
+    return (
+      <View>
+        <View style={[styles.methodNote, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+          <Ionicons name="book-outline" size={18} color={colors.primary} />
+          <Text style={[styles.methodNoteText, { color: colors.textSecondary }]}>
+            {t('premiumUi.planetaryPositions.natalPromise.intro', 'This natal reading brings together every published classical indication for the selected area. It describes tendencies in the birth chart; timing is evaluated separately.')}
+          </Text>
+        </View>
+
+        <Text style={[styles.promiseSelectorLabel, { color: colors.textSecondary }]}>
+          {t('premiumUi.planetaryPositions.natalPromise.currentArea', 'Life area')}
+        </Text>
+        <TouchableOpacity
+          style={[styles.promiseSelector, { backgroundColor: colors.surface, borderColor: colors.selectionBorder }]}
+          onPress={() => setPromiseAreaPickerOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t('premiumUi.planetaryPositions.natalPromise.lifeOverview', 'Choose an area of life')}
+        >
+          <View style={[styles.promiseSelectorHouse, { backgroundColor: colors.selectionBackground }]}>
+            <Text style={[styles.promiseSelectorHouseText, { color: colors.primary }]}>H{selected.house}</Text>
+          </View>
+          <Text numberOfLines={2} style={[styles.promiseSelectorValue, { color: colors.text }]}>
+            {t(`premiumUi.planetaryPositions.natalPromise.areas.${selected.house}`, selected.label)}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color={colors.primary} />
+        </TouchableOpacity>
+
+        <Modal
+          visible={promiseAreaPickerOpen}
+          transparent
+          animationType="slide"
+          statusBarTranslucent
+          onRequestClose={() => setPromiseAreaPickerOpen(false)}
+        >
+          <View style={styles.promiseModalRoot}>
+            <Pressable
+              style={styles.promiseModalBackdrop}
+              onPress={() => setPromiseAreaPickerOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel={t('premiumUi.common.close', 'Close')}
+            />
+            <View
+              style={[
+                styles.promiseSheet,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.cardBorder,
+                  paddingBottom: Math.max(insets.bottom, 16),
+                },
+              ]}
+            >
+              <View style={[styles.promiseSheetGrabber, { backgroundColor: colors.cardBorder }]} />
+              <View style={styles.promiseSheetHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.promiseSheetTitle, { color: colors.text }]}>
+                    {t('premiumUi.planetaryPositions.natalPromise.lifeOverview', 'Choose an area of life')}
+                  </Text>
+                  <Text style={[styles.promiseSheetSubtitle, { color: colors.textSecondary }]}>
+                    {t('premiumUi.planetaryPositions.natalPromise.pickerHint', 'The reading below will change to the area you select.')}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setPromiseAreaPickerOpen(false)}
+                  style={[styles.promiseSheetClose, { backgroundColor: colors.surfaceMuted }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('premiumUi.common.close', 'Close')}
+                >
+                  <Ionicons name="close" size={21} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+              <GHScrollView
+                style={styles.promiseSheetList}
+                contentContainerStyle={styles.promiseSheetListContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {natalPromise.areas.map((row) => {
+                  const active = row.house === selected.house;
+                  return (
+                    <TouchableOpacity
+                      key={row.key}
+                      onPress={() => {
+                        setSelectedPromiseHouse(row.house);
+                        setShowPromiseEvidence(false);
+                        setSelectedPromiseSubject('all');
+                        setPromiseAreaPickerOpen(false);
+                      }}
+                      style={[
+                        styles.promiseSheetRow,
+                        {
+                          backgroundColor: active ? colors.selectionBackground : colors.surface,
+                          borderColor: active ? colors.selectionBorder : colors.cardBorder,
+                        },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <View style={[styles.promiseSheetHouse, { backgroundColor: active ? colors.primary : colors.surfaceMuted }]}>
+                        <Text style={[styles.promiseSheetHouseText, { color: active ? colors.onPrimary : colors.textSecondary }]}>H{row.house}</Text>
+                      </View>
+                      <Text style={[styles.promiseSheetRowTitle, { color: colors.text }]}>
+                        {t(`premiumUi.planetaryPositions.natalPromise.areas.${row.house}`, row.label)}
+                      </Text>
+                      {active ? <Ionicons name="checkmark-circle" size={21} color={colors.primary} /> : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </GHScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {subjects.length > 1 ? (
+          <>
+            <Text style={[styles.promiseSelectorLabel, { color: colors.textSecondary }]}>
+              {t('premiumUi.planetaryPositions.natalPromise.currentTopic', 'Topic')}
+            </Text>
+            <TouchableOpacity
+              style={[styles.promiseTopicSelector, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+              onPress={() => setPromiseSubjectPickerOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('premiumUi.planetaryPositions.natalPromise.chooseTopic', 'Choose a topic')}
+            >
+              <Ionicons name="layers-outline" size={19} color={colors.primary} />
+              <Text style={[styles.promiseTopicValue, { color: colors.text }]}>
+                {activeSubject === 'all'
+                  ? t('premiumUi.planetaryPositions.natalPromise.allTopics', 'All indications')
+                  : t(
+                    subjects.find((subject) => subject.key === activeSubject)?.label_key,
+                    subjects.find((subject) => subject.key === activeSubject)?.label,
+                  )}
+              </Text>
+              <Ionicons name="chevron-down" size={18} color={colors.primary} />
+            </TouchableOpacity>
+            <Modal
+              visible={promiseSubjectPickerOpen}
+              transparent
+              animationType="slide"
+              statusBarTranslucent
+              onRequestClose={() => setPromiseSubjectPickerOpen(false)}
+            >
+              <View style={styles.promiseModalRoot}>
+                <Pressable style={styles.promiseModalBackdrop} onPress={() => setPromiseSubjectPickerOpen(false)} />
+                <View
+                  style={[
+                    styles.promiseSheet,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.cardBorder,
+                      paddingBottom: Math.max(insets.bottom, 16),
+                    },
+                  ]}
+                >
+                  <View style={[styles.promiseSheetGrabber, { backgroundColor: colors.cardBorder }]} />
+                  <View style={styles.promiseSheetHeader}>
+                    <Text style={[styles.promiseSheetTitle, { color: colors.text, flex: 1 }]}>
+                      {t('premiumUi.planetaryPositions.natalPromise.chooseTopic', 'Choose a topic')}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setPromiseSubjectPickerOpen(false)}
+                      style={[styles.promiseSheetClose, { backgroundColor: colors.surfaceMuted }]}
+                    >
+                      <Ionicons name="close" size={21} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
+                  <GHScrollView style={styles.promiseSheetList} contentContainerStyle={styles.promiseSheetListContent}>
+                    {[
+                      {
+                        key: 'all',
+                        label: t('premiumUi.planetaryPositions.natalPromise.allTopics', 'All indications'),
+                        count: allSelectedInsights.length,
+                      },
+                      ...subjects.map((subject) => ({
+                        key: subject.key,
+                        label: t(subject.label_key, subject.label),
+                        count: subject.insight_ids?.length || 0,
+                      })),
+                    ].map((subject) => {
+                      const active = subject.key === activeSubject;
+                      return (
+                        <TouchableOpacity
+                          key={subject.key}
+                          onPress={() => {
+                            setSelectedPromiseSubject(subject.key);
+                            setShowPromiseEvidence(false);
+                            setPromiseSubjectPickerOpen(false);
+                          }}
+                          style={[
+                            styles.promiseSheetRow,
+                            {
+                              backgroundColor: active ? colors.selectionBackground : colors.surface,
+                              borderColor: active ? colors.selectionBorder : colors.cardBorder,
+                            },
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: active }}
+                        >
+                          <Text style={[styles.promiseSheetRowTitle, { color: colors.text }]}>{subject.label}</Text>
+                          <Text style={[styles.promiseTopicCount, { color: colors.textSecondary }]}>{subject.count}</Text>
+                          {active ? <Ionicons name="checkmark-circle" size={21} color={colors.primary} /> : null}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </GHScrollView>
+                </View>
+              </View>
+            </Modal>
+          </>
+        ) : null}
+
+        <View style={[styles.promiseCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+          <Text style={[styles.promiseEyebrow, { color: colors.primary }]}>
+            {t(`premiumUi.planetaryPositions.natalPromise.areas.${selected.house}`, selected.label)}
+          </Text>
+          <Text style={[styles.promiseReadingLabel, { color: colors.textSecondary }]}>
+            {t('premiumUi.planetaryPositions.natalPromise.yourReading', 'Your reading')}
+          </Text>
+          <View style={styles.promiseReadingStack}>
+            {selectedInsights.map((insight) => (
+              <View key={insight.insight_id}>
+                {selectedInsights.length > 1 ? (
+                  <Text style={[styles.promiseInsightSubject, { color: colors.primary }]}>
+                    {t(insight.subject?.label_key, insight.subject?.label)}
+                  </Text>
+                ) : null}
+                <Text style={[styles.promiseReading, { color: colors.text }]}>{insightReading(insight)}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={[styles.promiseCondition, { backgroundColor: colors.surfaceMuted, borderColor: conditionColor }]}>
+            <Text style={[styles.promiseConditionLabel, { color: conditionColor }]}>{conditionLabels[conditionKey]}</Text>
+          </View>
+
+          {(visibleSupports.length || visiblePressures.length) ? (
+            <View style={styles.promiseBalanceGrid}>
+              {visibleSupports.length ? (
+                <View style={[styles.promiseBalanceCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.success }]}>
+                  <Text style={[styles.promiseBalanceTitle, { color: colors.success }]}>{t('premiumUi.planetaryPositions.natalPromise.supportTitle', 'What supports this area')}</Text>
+                  <Text style={[styles.promiseBalanceText, { color: colors.textSecondary }]}>{visibleSupports.join(' · ')}</Text>
+                </View>
+              ) : null}
+              {visiblePressures.length ? (
+                <View style={[styles.promiseBalanceCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.warning }]}>
+                  <Text style={[styles.promiseBalanceTitle, { color: colors.warning }]}>{t('premiumUi.planetaryPositions.natalPromise.effortTitle', 'What may require effort')}</Text>
+                  <Text style={[styles.promiseBalanceText, { color: colors.textSecondary }]}>{visiblePressures.join(' · ')}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          <TouchableOpacity
+            style={[styles.promiseBasisLink, { borderTopColor: colors.cardBorder }]}
+            onPress={() => setShowPromiseEvidence((open) => !open)}
+            accessibilityRole="button"
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.promiseBasisTitle, { color: colors.primary }]}>
+                {t('premiumUi.planetaryPositions.natalPromise.classicalBasisCount', 'Classical basis · {{count}} indication', {
+                  count: selectedInsights.length,
+                })}
+              </Text>
+              <Text style={[styles.promiseBasisReference, { color: colors.textSecondary }]}>
+                {visibleSources.map((source) => source.reference).filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+            <Ionicons name={showPromiseEvidence ? 'chevron-up' : 'chevron-down'} size={18} color={colors.primary} />
+          </TouchableOpacity>
+
+          {showPromiseEvidence ? (
+            <View style={[styles.promiseBasisPanel, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+              {selectedInsights.map((insight, insightIndex) => (
+                <View
+                  key={insight.insight_id}
+                  style={[
+                    styles.promiseInsightEvidence,
+                    insightIndex > 0 ? { borderTopColor: colors.cardBorder, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 5, paddingTop: 12 } : null,
+                  ]}
+                >
+                  {selectedInsights.length > 1 ? (
+                    <Text style={[styles.promiseSectionTitle, { color: colors.text }]}>
+                      {t(insight.subject?.label_key, insight.subject?.label)}
+                    </Text>
+                  ) : null}
+                  {(insight.contributions || []).map((contribution) => {
+                    const evidence = contribution.evidence || {};
+                    return (
+                      <View key={`${insight.insight_id}-${contribution.work_key}-${contribution.chapter}`} style={styles.promiseContribution}>
+                        <Text style={[styles.promiseBasisPlacement, { color: colors.text }]}>
+                          {t(evidence.summary?.key, evidence.summary?.text, evidence.summary?.parameters || {})}
+                        </Text>
+                        {(evidence.facts || []).map((fact) => (
+                          <Text
+                            key={fact.key}
+                            style={[
+                              styles.promiseEvidenceText,
+                              {
+                                color: fact.state === 'support'
+                                  ? colors.success
+                                  : fact.state === 'pressure' ? colors.warning : colors.textSecondary,
+                              },
+                            ]}
+                          >
+                            {fact.label}: {fact.value}
+                          </Text>
+                        ))}
+                        {(contribution.sources || []).map((source) => (
+                          <TouchableOpacity
+                            key={`${source.rule_key}-${source.reference}`}
+                            onPress={() => Linking.openURL(source.witness_url)}
+                            disabled={!source.witness_url}
+                          >
+                            <Text style={[styles.promiseSourceLink, { color: colors.primary }]}>
+                              {t('premiumUi.planetaryPositions.natalPromise.openSource', 'Open source witness')} · {source.reference}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    );
+                  })}
+                  {(insight.controls || []).map((control) => (
+                    <Text key={control.key} style={[styles.promiseEvidenceText, { color: colors.textSecondary }]}>
+                      {control.reference}: {t(control.key, control.text)}
+                    </Text>
+                  ))}
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <Text style={[styles.promiseBoundary, { color: colors.textSecondary, borderTopColor: colors.cardBorder }]}>
+            {t('premiumUi.planetaryPositions.natalPromise.notCertainty', 'A natal tendency is not a guaranteed event; timing is not evaluated here.')}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   const chartUnavailable = (
     <View style={styles.loadingContainer}>
       <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
@@ -1817,6 +2257,8 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     }
 
     if (activeTab === 'jaimini') return renderJaiminiTab();
+
+    if (activeTab === 'promise') return renderNatalPromiseTab();
 
     if (activeTab === 'lagnas') {
       if (!professionalSpecialLoaded) {
@@ -2231,6 +2673,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
             <GHScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
               <TabButton label={t('premiumUi.planetaryPositions.tabs.planets', 'Planets')} emoji="🪐" value="planets" active={activeTab === 'planets'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.houses', 'Houses')} emoji="🏠" value="houses" active={activeTab === 'houses'} />
+              <TabButton label={t('premiumUi.planetaryPositions.tabs.promise', 'Life')} emoji="📜" value="promise" active={activeTab === 'promise'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.nakshatras', 'Nakshatras')} emoji="⭐" value="nakshatras" active={activeTab === 'nakshatras'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.jaimini', 'Jaimini')} emoji="🔱" value="jaimini" active={activeTab === 'jaimini'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.lagnas', 'Lagnas')} emoji="🎯" value="lagnas" active={activeTab === 'lagnas'} />
@@ -2461,6 +2904,59 @@ const styles = StyleSheet.create({
   deliveryBoundary: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 9, marginTop: 3, fontSize: 10, lineHeight: 15, fontStyle: 'italic' },
   methodNote: { marginBottom: 12, borderWidth: 1, borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
   methodNoteText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: '600' },
+  promiseRetry: { alignSelf: 'flex-start', marginTop: 9, paddingVertical: 5 },
+  promiseRetryText: { fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  promiseSelectorLabel: { fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
+  promiseSelector: { minHeight: 64, borderWidth: 1.5, borderRadius: 17, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  promiseSelectorHouse: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  promiseSelectorHouseText: { fontSize: 12, lineHeight: 16, fontWeight: '900' },
+  promiseSelectorValue: { flex: 1, fontFamily: DISPLAY_FONT_FAMILY, fontSize: 17, lineHeight: 22 },
+  promiseTopicSelector: { minHeight: 52, borderWidth: 1, borderRadius: 15, paddingHorizontal: 13, paddingVertical: 9, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  promiseTopicValue: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  promiseTopicCount: { fontSize: 11, lineHeight: 15, fontWeight: '900' },
+  promiseModalRoot: { flex: 1, justifyContent: 'flex-end' },
+  promiseModalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(20, 7, 14, 0.55)' },
+  promiseSheet: { width: '100%', maxWidth: 680, maxHeight: '78%', alignSelf: 'center', borderWidth: 1, borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 16, paddingTop: 9 },
+  promiseSheetGrabber: { width: 42, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 13 },
+  promiseSheetHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 13 },
+  promiseSheetTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 22, lineHeight: 28 },
+  promiseSheetSubtitle: { fontSize: 11, lineHeight: 16, fontWeight: '600', marginTop: 3 },
+  promiseSheetClose: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  promiseSheetList: { flexGrow: 0, flexShrink: 1 },
+  promiseSheetListContent: { gap: 8, paddingBottom: 4 },
+  promiseSheetRow: { minHeight: 58, borderWidth: 1, borderRadius: 15, paddingHorizontal: 11, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  promiseSheetHouse: { width: 39, height: 39, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  promiseSheetHouseText: { fontSize: 11, lineHeight: 15, fontWeight: '900' },
+  promiseSheetRowTitle: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  promiseCard: { borderWidth: 1, borderRadius: 20, padding: 16, marginBottom: 12 },
+  promiseEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5 },
+  promiseTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 22, lineHeight: 28 },
+  promiseReadingLabel: { fontSize: 10, lineHeight: 14, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginTop: 8, marginBottom: 6 },
+  promiseReadingStack: { gap: 13 },
+  promiseInsightSubject: { fontSize: 11, lineHeight: 15, fontWeight: '900', marginBottom: 4 },
+  promiseReading: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 19, lineHeight: 29 },
+  promiseCondition: { borderWidth: 1, borderRadius: 13, paddingHorizontal: 11, paddingVertical: 9, marginTop: 12 },
+  promiseConditionLabel: { fontSize: 11, lineHeight: 15, fontWeight: '900' },
+  promiseConditionMeta: { fontSize: 10, lineHeight: 14, fontWeight: '600', marginTop: 2, textTransform: 'capitalize' },
+  promiseSectionTitle: { fontSize: 12, lineHeight: 17, fontWeight: '900', marginTop: 15, marginBottom: 8 },
+  promiseBulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, marginBottom: 8 },
+  promiseBullet: { width: 5, height: 5, borderRadius: 3, marginTop: 7 },
+  promiseBulletText: { flex: 1, fontSize: 12, lineHeight: 19, fontWeight: '600' },
+  promiseEvidence: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 10, paddingTop: 2, gap: 6 },
+  promiseEvidenceText: { fontSize: 10, lineHeight: 16, fontWeight: '700' },
+  promiseBalanceGrid: { gap: 8, marginTop: 13 },
+  promiseBalanceCard: { borderWidth: 1, borderRadius: 13, paddingHorizontal: 11, paddingVertical: 10 },
+  promiseBalanceTitle: { fontSize: 10, lineHeight: 14, fontWeight: '900', marginBottom: 4 },
+  promiseBalanceText: { fontSize: 11, lineHeight: 17, fontWeight: '600' },
+  promiseBasisLink: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 15, paddingTop: 13, paddingBottom: 5, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  promiseBasisTitle: { fontSize: 12, lineHeight: 17, fontWeight: '900' },
+  promiseBasisReference: { fontSize: 9, lineHeight: 13, fontWeight: '600', marginTop: 2 },
+  promiseBasisPanel: { borderWidth: 1, borderRadius: 14, padding: 12, marginTop: 8, gap: 8 },
+  promiseInsightEvidence: { gap: 8, paddingVertical: 5 },
+  promiseContribution: { gap: 5 },
+  promiseBasisPlacement: { fontSize: 13, lineHeight: 19, fontWeight: '900' },
+  promiseSourceLink: { fontSize: 11, lineHeight: 16, fontWeight: '900', paddingVertical: 4 },
+  promiseBoundary: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 13, paddingTop: 11, fontSize: 9, lineHeight: 14, fontWeight: '500' },
   lagnaDescription: {
     fontSize: 11,
     marginTop: 2,

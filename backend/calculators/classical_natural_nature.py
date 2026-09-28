@@ -33,6 +33,17 @@ def _house(chart: Dict[str, Any], name: str) -> Optional[int]:
         return None
 
 
+def _sign(chart: Dict[str, Any], name: str) -> Optional[int]:
+    row = _planet(chart, name)
+    try:
+        if row.get("sign") is not None:
+            return int(row["sign"]) % 12
+        longitude = float(row["longitude"]) % 360.0
+        return int(longitude / 30.0)
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def moon_natural_nature(chart: Dict[str, Any]) -> Dict[str, Any]:
     sun = _longitude(chart, "Sun")
     moon = _longitude(chart, "Moon")
@@ -60,12 +71,12 @@ def moon_natural_nature(chart: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _co_occupants(chart: Dict[str, Any], planet: str) -> Iterable[str]:
-    house = _house(chart, planet)
-    if house is None:
+    sign = _sign(chart, planet)
+    if sign is None:
         return ()
     return tuple(
         str(name) for name, row in ((chart or {}).get("planets") or {}).items()
-        if name != planet and isinstance(row, dict) and _house(chart, str(name)) == house
+        if name != planet and isinstance(row, dict) and _sign(chart, str(name)) == sign
     )
 
 
@@ -83,10 +94,10 @@ def calculate_natural_nature(chart: Dict[str, Any], planet: str) -> Dict[str, An
                 benefic_associates.append(associate)
             elif nature == "malefic":
                 malefic_associates.append(associate)
-        if malefic_associates and not benefic_associates:
+        # BPHS 3.11 says Mercury becomes cruel when joined to a cruel graha.
+        # It does not supply a cancellation when a benefic is also in the sign.
+        if malefic_associates:
             nature = "malefic"
-        elif malefic_associates and benefic_associates:
-            nature = "mixed"
         else:
             nature = "benefic"
         return {
@@ -99,7 +110,11 @@ def calculate_natural_nature(chart: Dict[str, Any], planet: str) -> Dict[str, An
             "associates": list(associates),
             "benefic_associates": benefic_associates,
             "malefic_associates": malefic_associates,
-            "reason": "Mercury is naturally benefic when unafflicted and is conditioned by planets joined with it.",
+            "reason": (
+                "Mercury is treated as a natural malefic because it shares its sign with a natural malefic."
+                if malefic_associates else
+                "Mercury remains a natural benefic because it does not share its sign with a natural malefic."
+            ),
         }
     if planet in NATURAL_BENEFICS:
         nature = "benefic"

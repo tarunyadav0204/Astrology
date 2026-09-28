@@ -950,6 +950,16 @@ export const chartAPI = {
 
   calculateProfessionalJaimini: (chartData, d9Chart = {}) =>
     api.post(getEndpoint('/professional-jaimini'), { chart_data: chartData, d9_chart: d9Chart }),
+
+  calculateClassicalNatalPromise: (chartData) =>
+    api.post(getEndpoint('/classical-natal-promise'), { chart_data: chartData }),
+
+  calculateClassicalReading: (chartData, birthData = null, areaKeys = null) =>
+    api.post(getEndpoint('/classical-reading'), {
+      chart_data: chartData,
+      ...(birthData ? { birth_data: birthData } : {}),
+      ...(areaKeys?.length ? { area_keys: areaKeys } : {}),
+    }),
   
   calculateYogiPoints: (birthData) =>
     api.post(getEndpoint('/yogi-points'), { birth_data: birthData }),

@@ -33,6 +33,7 @@ import copyAlert from './copy-alert.json';
 import partnershipExit from './partnership-exit.json';
 import themeDiscovery from './theme-discovery.json';
 import planetaryPositions from './planetary-positions.json';
+import classicalNatalPromise from './classical-natal-promise.json';
 import planetResultDelivery from './planet-result-delivery.json';
 import firstPurchaseStarter from './first-purchase-starter.json';
 import instantChatPacing from './instant-chat-pacing.json';
@@ -214,7 +215,13 @@ const normalizedPremiumUi = Object.fromEntries(
 });
 
 Object.entries(normalizedPremiumUi).forEach(([language, copy]) => {
-  copy.planetaryPositions = planetaryPositions[language] || planetaryPositions.english;
+  const positionsCopy = planetaryPositions[language] || planetaryPositions.english;
+  const natalPromiseCopy = classicalNatalPromise[language] || classicalNatalPromise.english;
+  copy.planetaryPositions = {
+    ...positionsCopy,
+    tabs: { ...(positionsCopy.tabs || {}), promise: natalPromiseCopy.tab },
+    natalPromise: natalPromiseCopy,
+  };
 });
 
 [

@@ -8625,6 +8625,33 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
+                      closeMenuDrawer(() => {
+                        navigation.navigate('NakshatraCalendar', {
+                          birthData: birthData?.date ? birthData : null,
+                        });
+                      });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={menuAccentIconGradient}
+                          style={styles.menuIconGradient}
+                        >
+                          <Ionicons name="moon-outline" size={19} color={colors.selectionText} />
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('nakshatraCalendar.title', 'Nakshatra Calendar')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
                       closeMenuDrawer(() => { navigation.navigate('Yogas'); });
                     }}
                   >
