@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
+import { useCredits } from '../../credits/CreditContext';
 
 const isSpecialPoint = (value) => (
   Boolean(value)
@@ -22,9 +23,21 @@ const formatPointDegrees = (value) => {
 const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const { pricingFeatures, fetchPricing } = useCredits();
+  const lifeTabEnabled = Boolean(pricingFeatures?.classical_life_tab_enabled);
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const { chartData, birthData, conditionChartData } = route.params || {};
+  const {
+    chartData,
+    birthData,
+    conditionChartData,
+    natalChartData,
+    d9Chart: routedD9Chart,
+    chartType = 'lagna',
+  } = route.params || {};
+  const canonicalNatalChart = natalChartData || conditionChartData || chartData;
+  const canonicalD9Chart = routedD9Chart || (chartType === 'navamsa' ? chartData : {});
+  const usesNatalCombustion = chartType !== 'lagna' && chartType !== 'transit';
   const isTablet = windowWidth >= 768;
   const planetDockRef = React.useRef(null);
   const nakshatraDockRef = React.useRef(null);
@@ -78,7 +91,17 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
 
   React.useEffect(() => {
     loadInitialPlanetData();
-  }, [chartData, conditionChartData, birthData]);
+  }, [chartData, conditionChartData, canonicalNatalChart, birthData]);
+
+  React.useEffect(() => {
+    fetchPricing({ force: true });
+  }, [fetchPricing]);
+
+  React.useEffect(() => {
+    if (!lifeTabEnabled && activeTab === 'promise') {
+      setActiveTab('planets');
+    }
+  }, [activeTab, lifeTabEnabled]);
 
   React.useEffect(() => {
     if (activeTab === 'jaimini' && !jaiminiLoaded) {
@@ -87,8 +110,8 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   }, [activeTab, jaiminiLoaded]);
 
   React.useEffect(() => {
-    if (activeTab === 'promise' && !natalPromiseLoaded) loadNatalPromise();
-  }, [activeTab, natalPromiseLoaded]);
+    if (lifeTabEnabled && activeTab === 'promise' && !natalPromiseLoaded) loadNatalPromise();
+  }, [activeTab, lifeTabEnabled, natalPromiseLoaded]);
 
   React.useEffect(() => {
     if (activeTab === 'special' && !specialLoaded) {
@@ -109,7 +132,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     try {
       const { chartAPI } = require('../../services/api');
       const [karakaResult, dignityResult] = await Promise.allSettled([
-        chartAPI.calculateCharaKarakas(chartData, birthData),
+        chartAPI.calculateCharaKarakas(canonicalNatalChart, birthData),
         chartAPI.calculatePlanetaryDignities(chartData, conditionChartData || chartData, birthData),
       ]);
       if (karakaResult.status === 'fulfilled') {
@@ -137,8 +160,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     setJaiminiError(null);
     try {
       const { chartAPI } = require('../../services/api');
-      const d9Chart = route.params?.d9Chart || {};
-      const response = await chartAPI.calculateProfessionalJaimini(chartData, d9Chart);
+      const response = await chartAPI.calculateProfessionalJaimini(canonicalNatalChart, canonicalD9Chart);
       const payload = response?.data?.professional_jaimini;
       if (!payload) throw new Error('Professional Jaimini response is empty');
       if (requestId === jaiminiRequestRef.current) setProfessionalJaimini(payload);
@@ -161,7 +183,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     setNatalPromiseError(null);
     try {
       const { chartAPI } = require('../../services/api');
-      const response = await chartAPI.calculateClassicalReading(chartData, birthData);
+      const response = await chartAPI.calculateClassicalReading(canonicalNatalChart, birthData);
       const payload = response?.data?.classical_reading;
       if (!payload?.areas?.length) throw new Error('Classical reading response is empty');
       if (requestId === natalPromiseRequestRef.current) {
@@ -186,8 +208,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     setProfessionalSpecialError(null);
     try {
       const { chartAPI } = require('../../services/api');
-      const d9Chart = route.params?.d9Chart || {};
-      const response = await chartAPI.calculateProfessionalSpecialPoints(chartData, birthData, d9Chart);
+      const response = await chartAPI.calculateProfessionalSpecialPoints(canonicalNatalChart, birthData, canonicalD9Chart);
       if (requestId === specialPointsRequestRef.current) {
         setProfessionalSpecialPoints(response?.data?.professional_special_points || null);
       }
@@ -206,16 +227,15 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     setSpecialFailures([]);
     try {
       const { chartAPI } = require('../../services/api');
-      const d9Chart = route.params?.d9Chart || {};
       const results = await Promise.allSettled([
         chartAPI.calculateYogiPoints(birthData),
         chartAPI.calculateSniperPoints(chartData),
-        chartAPI.calculatePushkaraNavamsha(chartData, d9Chart),
+        chartAPI.calculatePushkaraNavamsha(chartData, canonicalD9Chart),
         chartAPI.calculateMudakkuAnalysis(chartData),
         chartAPI.calculateGandantaAnalysis(chartData),
         professionalSpecialPoints
           ? Promise.resolve({ data: { professional_special_points: professionalSpecialPoints } })
-          : chartAPI.calculateProfessionalSpecialPoints(chartData, birthData, d9Chart),
+          : chartAPI.calculateProfessionalSpecialPoints(canonicalNatalChart, birthData, canonicalD9Chart),
       ]);
       const [yogiResult, sniperResult, pushkaraResult, mudakkuResult, gandantaResult, professionalResult] = results;
       const sourceKeys = ['lunarConditions', 'sensitivePoints', 'fortifyingPlacements', 'mudakku', 'gandanta', 'classicalPoints'];
@@ -708,6 +728,10 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     return colors.textSecondary;
   };
 
+  const combustionLabel = () => usesNatalCombustion
+    ? t('premiumUi.planetaryPositions.natalCombustionD1', 'Natal combustion (D1)')
+    : t('premiumUi.planetaryPositions.notes.combustFull', 'Combust');
+
   const professionalValue = (label, value, color = colors.text) => (
     <View style={styles.professionalRow}>
       <Text style={[styles.professionalLabel, { color: colors.textSecondary }]}>{label}</Text>
@@ -721,7 +745,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde')
       : t('premiumUi.planetaryPositions.direct', 'Direct');
     const status = combustion.isCombust
-      ? t('premiumUi.planetaryPositions.notes.combustFull', 'Combust')
+      ? combustionLabel()
       : t('premiumUi.planetaryPositions.clearOfCombustion', 'Clear');
     return t(
       'premiumUi.planetaryPositions.combustionEvidence',
@@ -746,7 +770,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     );
     const retrograde = !!(planet.retrograde && planet.name !== 'Rahu' && planet.name !== 'Ketu');
     const notes = [];
-    if (row?.combust) notes.push(t('premiumUi.planetaryPositions.notes.combustFull', 'Combust'));
+    if (row?.combust) notes.push(combustionLabel());
     if (row?.neechaBhanga) notes.push(t('premiumUi.planetaryPositions.notes.neechaBhangaFull', 'Neecha Bhanga'));
     if (row?.vargottama) notes.push(t('premiumUi.planetaryPositions.notes.vargottamaFull', 'Vargottama'));
     const karaka = karakaNameFor(planet.name);
@@ -826,7 +850,11 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
           </View>
           {combustionEvidenceText(row?.combustion) ? (
             <View style={styles.detailItemFull}>
-              <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('premiumUi.planetaryPositions.solarDistance', 'Solar distance')}</Text>
+              <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>
+                {usesNatalCombustion
+                  ? t('premiumUi.planetaryPositions.natalSolarDistanceD1', 'Natal solar distance (D1)')
+                  : t('premiumUi.planetaryPositions.solarDistance', 'Solar distance')}
+              </Text>
               <Text style={[
                 styles.detailValue,
                 styles.detailValueWide,
@@ -975,8 +1003,8 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
             </Text>
             {signFriendship ? professionalValue(t('premiumUi.planetaryPositions.rashiLord', 'Rashi lord'), `${advanced.lord} · ${relationshipText(signFriendship.natural)} · ${relationshipText(signFriendship.temporary)} · ${relationshipText(signFriendship.compound)}`, relationshipColor(signFriendship.compound)) : null}
             {nakFriendship ? professionalValue(t('premiumUi.planetaryPositions.nakshatraLord', 'Nakshatra lord'), `${advanced.nakLord} · ${relationshipText(nakFriendship.natural)} · ${relationshipText(nakFriendship.temporary)} · ${relationshipText(nakFriendship.compound)}`, relationshipColor(nakFriendship.compound)) : null}
-            {professionalValue(t('premiumUi.planetaryPositions.signDispositor', 'Sign dispositor'), advanced.dispositors?.sign?.available ? `${advanced.dispositors.sign.planet} · H${advanced.dispositors.sign.house} · ${dignityText(advanced.dispositors.sign.dignity)}${advanced.dispositors.sign.shadbala ? ` · ${advanced.dispositors.sign.shadbala.required_percent}% ${t('premiumUi.planetaryPositions.shadbala', 'Shadbala')}` : ''}${advanced.dispositors.sign.aspects_received?.length ? ` · ${advanced.dispositors.sign.aspects_received.length} ${t('premiumUi.planetaryPositions.aspectsReceived', 'aspects received')}` : ''}${advanced.dispositors.sign.combust ? ` · ${t('premiumUi.planetaryPositions.notes.combustFull', 'Combust')}` : ''}` : '—')}
-            {professionalValue(t('premiumUi.planetaryPositions.nakshatraDispositor', 'Nakshatra dispositor'), advanced.dispositors?.nakshatra?.available ? `${advanced.dispositors.nakshatra.planet} · H${advanced.dispositors.nakshatra.house} · ${dignityText(advanced.dispositors.nakshatra.dignity)}${advanced.dispositors.nakshatra.shadbala ? ` · ${advanced.dispositors.nakshatra.shadbala.required_percent}% ${t('premiumUi.planetaryPositions.shadbala', 'Shadbala')}` : ''}${advanced.dispositors.nakshatra.aspects_received?.length ? ` · ${advanced.dispositors.nakshatra.aspects_received.length} ${t('premiumUi.planetaryPositions.aspectsReceived', 'aspects received')}` : ''}${advanced.dispositors.nakshatra.combust ? ` · ${t('premiumUi.planetaryPositions.notes.combustFull', 'Combust')}` : ''}` : '—')}
+            {professionalValue(t('premiumUi.planetaryPositions.signDispositor', 'Sign dispositor'), advanced.dispositors?.sign?.available ? `${advanced.dispositors.sign.planet} · H${advanced.dispositors.sign.house} · ${dignityText(advanced.dispositors.sign.dignity)}${advanced.dispositors.sign.shadbala ? ` · ${advanced.dispositors.sign.shadbala.required_percent}% ${t('premiumUi.planetaryPositions.shadbala', 'Shadbala')}` : ''}${advanced.dispositors.sign.aspects_received?.length ? ` · ${advanced.dispositors.sign.aspects_received.length} ${t('premiumUi.planetaryPositions.aspectsReceived', 'aspects received')}` : ''}${advanced.dispositors.sign.combust ? ` · ${combustionLabel()}` : ''}` : '—')}
+            {professionalValue(t('premiumUi.planetaryPositions.nakshatraDispositor', 'Nakshatra dispositor'), advanced.dispositors?.nakshatra?.available ? `${advanced.dispositors.nakshatra.planet} · H${advanced.dispositors.nakshatra.house} · ${dignityText(advanced.dispositors.nakshatra.dignity)}${advanced.dispositors.nakshatra.shadbala ? ` · ${advanced.dispositors.nakshatra.shadbala.required_percent}% ${t('premiumUi.planetaryPositions.shadbala', 'Shadbala')}` : ''}${advanced.dispositors.nakshatra.aspects_received?.length ? ` · ${advanced.dispositors.nakshatra.aspects_received.length} ${t('premiumUi.planetaryPositions.aspectsReceived', 'aspects received')}` : ''}${advanced.dispositors.nakshatra.combust ? ` · ${combustionLabel()}` : ''}` : '—')}
 
             <Text style={[styles.professionalSectionTitle, { color: colors.primaryStrong }]}>
               {t('premiumUi.planetaryPositions.connections', 'Connections')}
@@ -1095,7 +1123,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       ? people.map((person) => {
         const states = [
           (person.retrograde || person.retro) ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde') : null,
-          person.combust ? t('premiumUi.planetaryPositions.notes.combustFull', 'Combust') : null,
+          person.combust ? combustionLabel() : null,
         ].filter(Boolean);
         const name = t(`planets.${person.name}`, person.name);
         return states.length ? `${name} (${states.join(', ')})` : name;
@@ -1108,7 +1136,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     const lordConditions = [
       lordState?.dignity ? dignityText(lordState.dignity) : null,
       lordState?.retrograde ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde') : null,
-      lordState?.combust ? t('premiumUi.planetaryPositions.notes.combustFull', 'Combust') : null,
+      lordState?.combust ? combustionLabel() : null,
       lordState?.neecha_bhanga ? t('premiumUi.planetaryPositions.notes.neechaBhangaFull', 'Neecha Bhanga') : null,
       lordState?.vargottama ? t('premiumUi.planetaryPositions.notes.vargottamaFull', 'Vargottama') : null,
     ].filter(Boolean);
@@ -1199,7 +1227,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
               const conditions = [
                 person.dignity ? dignityText(person.dignity) : null,
                 person.retrograde ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde') : null,
-                person.combust ? t('premiumUi.planetaryPositions.notes.combustFull', 'Combust') : null,
+                person.combust ? combustionLabel() : null,
                 person.neecha_bhanga ? t('premiumUi.planetaryPositions.notes.neechaBhangaFull', 'Neecha Bhanga') : null,
                 person.vargottama ? t('premiumUi.planetaryPositions.notes.vargottamaFull', 'Vargottama') : null,
               ].filter(Boolean);
@@ -1219,7 +1247,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
               const aspectConditions = [
                 aspect.dignity ? dignityText(aspect.dignity) : null,
                 aspect.retrograde ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde') : null,
-                aspect.combust ? t('premiumUi.planetaryPositions.notes.combustFull', 'Combust') : null,
+                aspect.combust ? combustionLabel() : null,
               ].filter(Boolean);
               return professionalValue(
                 t(`planets.${aspect.planet}`, aspect.planet),
@@ -1258,7 +1286,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
       row.pushkara?.is_pushkara_navamsa ? t('premiumUi.planetaryPositions.pushkaraNavamsha', 'Pushkara Navamsha') : null,
       row.pushkara?.is_pushkara_bhaga ? t('premiumUi.planetaryPositions.pushkaraBhaga', 'Pushkara Bhaga') : null,
       row.vargottama ? t('premiumUi.planetaryPositions.notes.vargottamaFull', 'Vargottama') : null,
-      row.combust ? t('premiumUi.planetaryPositions.notes.combustFull', 'Combust') : null,
+      row.combust ? combustionLabel() : null,
       row.retrograde ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde') : null,
       ...(row.special_roles || []).map((role) => t(
         `premiumUi.planetaryPositions.specialNakshatraRoles.${role}`,
@@ -1354,7 +1382,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
             {lord.available ? professionalValue(t('premiumUi.planetaryPositions.lordCondition', 'Nakshatra lord condition'), [
               dignityText(lord.dignity),
               lord.retrograde ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde') : null,
-              lord.combust ? t('premiumUi.planetaryPositions.notes.combustFull', 'Combust') : null,
+              lord.combust ? combustionLabel() : null,
               lord.neecha_bhanga ? t('premiumUi.planetaryPositions.notes.neechaBhangaFull', 'Neecha Bhanga') : null,
               lord.vargottama ? t('premiumUi.planetaryPositions.notes.vargottamaFull', 'Vargottama') : null,
             ].filter(Boolean).join(' · ')) : null}
@@ -2011,7 +2039,9 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
                           accessibilityRole="button"
                           accessibilityState={{ selected: active }}
                         >
-                          <Text style={[styles.promiseSheetRowTitle, { color: colors.text }]}>{subject.label}</Text>
+                          <Text style={[styles.promiseSheetRowTitle, { color: colors.text }]}>
+                            {subject.key === 'all' ? subject.label : t(subjects.find((row) => row.key === subject.key)?.label_key, subject.label)}
+                          </Text>
                           <Text style={[styles.promiseTopicCount, { color: colors.textSecondary }]}>{subject.count}</Text>
                           {active ? <Ionicons name="checkmark-circle" size={21} color={colors.primary} /> : null}
                         </TouchableOpacity>
@@ -2673,7 +2703,9 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
             <GHScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
               <TabButton label={t('premiumUi.planetaryPositions.tabs.planets', 'Planets')} emoji="🪐" value="planets" active={activeTab === 'planets'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.houses', 'Houses')} emoji="🏠" value="houses" active={activeTab === 'houses'} />
-              <TabButton label={t('premiumUi.planetaryPositions.tabs.promise', 'Life')} emoji="📜" value="promise" active={activeTab === 'promise'} />
+              {lifeTabEnabled ? (
+                <TabButton label={t('premiumUi.planetaryPositions.tabs.promise', 'Life')} emoji="📜" value="promise" active={activeTab === 'promise'} />
+              ) : null}
               <TabButton label={t('premiumUi.planetaryPositions.tabs.nakshatras', 'Nakshatras')} emoji="⭐" value="nakshatras" active={activeTab === 'nakshatras'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.jaimini', 'Jaimini')} emoji="🔱" value="jaimini" active={activeTab === 'jaimini'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.lagnas', 'Lagnas')} emoji="🎯" value="lagnas" active={activeTab === 'lagnas'} />

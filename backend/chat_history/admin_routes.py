@@ -3044,6 +3044,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             is_chat_subject_gate_enabled,
             get_chat_subject_gate_user_allowlist,
             is_homepage_fomo_enabled,
+            is_classical_life_tab_enabled,
+            get_classical_life_tab_user_allowlist,
             get_homepage_fomo_user_allowlist,
             get_first_purchase_bonus_config,
             get_first_purchase_bonus_user_allowlist,
@@ -3152,6 +3154,10 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
                 str(uid) for uid in sorted(get_chat_subject_gate_user_allowlist())
             ),
             "homepage_fomo_enabled": is_homepage_fomo_enabled(),
+            "classical_life_tab_enabled": is_classical_life_tab_enabled(),
+            "classical_life_tab_user_allowlist": ",".join(
+                str(uid) for uid in sorted(get_classical_life_tab_user_allowlist())
+            ),
             "homepage_fomo_user_allowlist": ",".join(
                 str(uid) for uid in sorted(get_homepage_fomo_user_allowlist())
             ),
@@ -3368,7 +3374,7 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
                 status_code=400,
                 detail="Event Timeline mode must be 'deterministic' or 'legacy_ai'.",
             )
-        if key == "event_timeline_rollout_user_ids":
+        if key in {"event_timeline_rollout_user_ids", "classical_life_tab_user_allowlist"}:
             raw_user_ids = str(setting.value or "")
             tokens = [
                 token.strip()
@@ -3382,7 +3388,7 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
             if invalid_tokens:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid Event Timeline user ID: {invalid_tokens[0]}",
+                    detail=f"Invalid user ID: {invalid_tokens[0]}",
                 )
         settings_version = None
         credits_version = None

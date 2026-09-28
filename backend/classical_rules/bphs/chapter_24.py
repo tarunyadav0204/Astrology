@@ -307,7 +307,7 @@ def _reading_insight(match: Mapping[str, Any]) -> Dict[str, Any]:
         "subject": {
             "key": "house_lord_placement",
             "label": "House lord placement",
-            "label_key": "classical.subject.house_lord_placement",
+            "label_key": "premiumUi.planetaryPositions.natalPromise.subjects.houseLordPlacement",
         },
         "kind": "natal_promise",
         "priority": 100,

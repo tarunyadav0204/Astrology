@@ -87,7 +87,6 @@ export function translateHouseInterpretation(t, insight, houseNum) {
   const chartName = t(`chartScreen.chartNames.${insight.chart_id}`, insight.chart_name || insight.chart_id);
   const area = t(`houses.${houseNum}.area`, t(`houses.${houseNum}.title`, `House ${houseNum}`));
   const conditionLabel = translateHouseVerdictLabel(t, insight.verdict?.label);
-  const timingLabel = translateHouseVerdictLabel(t, insight.timing_verdict?.label);
   const conditionKey = insight.verdict?.key;
   const conditionExact = insight.verdict?.label;
 
@@ -97,9 +96,8 @@ export function translateHouseInterpretation(t, insight, houseNum) {
       house: houseNum,
       condition: conditionLabel.toLowerCase(),
       area,
-      timing: timingLabel.toLowerCase(),
       defaultValue:
-        'In {{chart}}, the {{house}} house is coming through as {{condition}}. {{area}} has cleaner support here, and the current timing is {{timing}}.',
+        'In {{chart}}, the natal {{house}} house is {{condition}}. {{area}} has cleaner support in the birth chart.',
     });
   }
   if (conditionExact === 'Supported but pressured') {
@@ -108,7 +106,7 @@ export function translateHouseInterpretation(t, insight, houseNum) {
       house: houseNum,
       area,
       defaultValue:
-        'In {{chart}}, the {{house}} house shows both support and pressure. {{area}} can deliver, but results are shaped by effort, maturity, and timing.',
+        'In {{chart}}, the natal {{house}} house shows both support and pressure. {{area}} can deliver, though its results need more effort and maturity.',
     });
   }
   if (conditionExact === 'Under stress') {
@@ -117,7 +115,7 @@ export function translateHouseInterpretation(t, insight, houseNum) {
       house: houseNum,
       area,
       defaultValue:
-        'In {{chart}}, the {{house}} house is under noticeable pressure. {{area}} may require patience, better choices, and stronger timing support.',
+        'In {{chart}}, the natal {{house}} house is under noticeable pressure. {{area}} needs greater care and stronger support from the rest of the birth chart.',
     });
   }
   return t('chartScreen.houseDrawer.interpretation.balanced', {
@@ -125,7 +123,7 @@ export function translateHouseInterpretation(t, insight, houseNum) {
     house: houseNum,
     area,
     defaultValue:
-      'In {{chart}}, the {{house}} house is not weak, but it is not overemphasized either. {{area}} depends more on the lord, aspects, and timing than on a single dominant signature.',
+      'In {{chart}}, the natal {{house}} house is neither distinctly strong nor distinctly strained. {{area}} depends on how its lord, occupants and aspects work together.',
   });
 }
 
@@ -134,6 +132,37 @@ export function translateHouseInsightFactor(t, label) {
   const text = String(label);
 
   let m;
+
+  m = text.match(new RegExp(`^(${PLANET_RE}) has (strong|weak) Shadbala at ([0-9.]+) rupas\\.$`));
+  if (m) {
+    return t(`chartScreen.houseDrawer.evidence.lordShadbala${m[2] === 'strong' ? 'Strong' : 'Weak'}`, {
+      planet: tp(t, m[1]), rupas: m[3], defaultValue: text,
+    });
+  }
+  m = text.match(new RegExp(`^Resident (${PLANET_RE}) has (strong|weak) Shadbala at ([0-9.]+) rupas\\.$`));
+  if (m) {
+    return t(`chartScreen.houseDrawer.evidence.residentShadbala${m[2] === 'strong' ? 'Strong' : 'Weak'}`, {
+      planet: tp(t, m[1]), rupas: m[3], defaultValue: text,
+    });
+  }
+  if (text === 'Argala gives net support to this house.') {
+    return t('chartScreen.houseDrawer.evidence.argalaSupport', text);
+  }
+  if (text === 'Argala obstruction outweighs support to this house.') {
+    return t('chartScreen.houseDrawer.evidence.argalaPressure', text);
+  }
+  m = text.match(/^This house is classically supported by its (.+) nature\.$/);
+  if (m) {
+    return t('chartScreen.houseDrawer.evidence.houseTypeSupport', {
+      types: m[1], defaultValue: text,
+    });
+  }
+  m = text.match(/^This house is classically demanding because of its (.+) nature\.$/);
+  if (m) {
+    return t('chartScreen.houseDrawer.evidence.houseTypePressure', {
+      types: m[1], defaultValue: text,
+    });
+  }
 
   m = text.match(new RegExp(`^(${PLANET_RE}), the house lord, has Neecha Bhanga; this specifically mitigates its debilitation\\.$`));
   if (m) {

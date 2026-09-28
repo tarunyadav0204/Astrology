@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from calculators.avayogi_policy import AVAYOGI_CHAT_DOCTRINE, avayogi_effect  # noqa: E402
+from calculators.planet_analyzer import PlanetAnalyzer  # noqa: E402
 from calculators.planetary_dignities_calculator import PlanetaryDignitiesCalculator  # noqa: E402
 from ai.parallel_chat.prompt_blocks import _parashari_json_footer, build_merge_role_preamble  # noqa: E402
 from chat.instant_chat_pipeline import (  # noqa: E402
@@ -70,6 +71,23 @@ def test_avayogi_tithi_shunya_overlap_cancels_instead_of_remaining_mixed() -> No
     result = avayogi_effect(placement_house=2, tithi_shunya_overlap=True)
     assert result["polarity"] == "neutral"
     assert result["rule"] == "avayogi_tithi_shunya_cancellation"
+
+
+def test_planet_analyzer_accepts_no_tithi_dagdha_sign_on_full_or_new_moon() -> None:
+    analyzer = PlanetAnalyzer(_chart(), compute_shadbala=False)
+    analyzer.yogi_data = {
+        "yogi": {"lord": "Jupiter"},
+        "avayogi": {"lord": "Saturn"},
+        "tithi_dagdha_rashis": [],
+        "dagdha_rashi": None,
+        "tithi_shunya_rashi": None,
+    }
+
+    result = analyzer._get_special_lordships("Jupiter")
+
+    assert result["is_yogi_lord"] is True
+    assert result["is_dagdha_lord"] is False
+    assert result["is_tithi_shunya_lord"] is False
 
 
 def test_avayogi_placement_in_declared_reversal_houses_is_supportive() -> None:

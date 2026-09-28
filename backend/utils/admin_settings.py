@@ -949,6 +949,46 @@ def homepage_fomo_enabled_for_user(user_id: Optional[int]) -> bool:
         return False
 
 
+def is_classical_life_tab_enabled() -> bool:
+    """Master UI switch for the in-progress classical Life tab."""
+    return _parse_bool_setting(
+        get_setting("classical_life_tab_enabled"),
+        default=False,
+    )
+
+
+def get_classical_life_tab_user_allowlist() -> Set[int]:
+    """Optional user IDs. Empty means all users when the master switch is on."""
+    raw = (get_setting("classical_life_tab_user_allowlist") or "").strip()
+    if not raw:
+        return set()
+    user_ids: Set[int] = set()
+    for token in raw.replace("\n", ",").replace("\t", ",").replace(" ", ",").split(","):
+        cleaned = token.strip()
+        if not cleaned:
+            continue
+        try:
+            parsed = int(cleaned)
+        except (TypeError, ValueError):
+            continue
+        if parsed > 0:
+            user_ids.add(parsed)
+    return user_ids
+
+
+def classical_life_tab_enabled_for_user(user_id: Optional[int]) -> bool:
+    """Global ON + empty allowlist enables all users; otherwise only listed users."""
+    if not is_classical_life_tab_enabled():
+        return False
+    allowlist = get_classical_life_tab_user_allowlist()
+    if not allowlist:
+        return True
+    try:
+        return int(user_id) in allowlist
+    except (TypeError, ValueError):
+        return False
+
+
 def _parse_int_setting(value: Optional[str], default: int, minimum: Optional[int] = None, maximum: Optional[int] = None) -> int:
     try:
         parsed = int(float(str(value).strip()))

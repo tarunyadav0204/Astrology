@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from calculators.ashtakavarga import AshtakavargaCalculator
 from calculators.chart_calculator import ChartCalculator
+from calculators.classical_combustion import calculate_chart_combustion
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.classical_neecha_bhanga import calculate_classical_neecha_bhanga
 from calculators.house_analyzer import HouseAnalyzer
@@ -179,8 +180,21 @@ def _normalize_transit_chart_data(chart_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _factor(label: str, tone: str, category: str) -> Dict[str, str]:
-    return {"label": label, "tone": tone, "category": category}
+def _factor(
+    label: str,
+    tone: str,
+    category: str,
+    *,
+    evidence_key: Optional[str] = None,
+    contributes: bool = True,
+) -> Dict[str, Any]:
+    return {
+        "label": label,
+        "tone": tone,
+        "category": category,
+        "evidence_key": evidence_key or f"{category}:{label}",
+        "contributes": contributes,
+    }
 
 
 def _relation_label(relation: str) -> Optional[str]:
@@ -268,6 +282,48 @@ def _verdict_for_counts(support_count: int, stress_count: int) -> Dict[str, str]
     return {"key": "quiet", "label": "Balanced but not strongly marked"}
 
 
+def _build_natal_evidence_ledger(
+    support_factors: List[Dict[str, Any]],
+    stress_factors: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Count every distinct natal testimony exactly once.
+
+    A factor is omitted only when it is an explanatory summary of evidence already
+    present, or when another row carries the same explicit evidence key. Dasha and
+    transit factors never enter this ledger.
+    """
+    entries: List[Dict[str, Any]] = []
+    seen = set()
+    for polarity, factors in (("support", support_factors), ("pressure", stress_factors)):
+        for factor in factors:
+            if factor.get("contributes", True) is False:
+                continue
+            evidence_key = factor.get("evidence_key") or (
+                factor.get("category"),
+                factor.get("label"),
+            )
+            if evidence_key in seen:
+                continue
+            seen.add(evidence_key)
+            entries.append({
+                "evidence_key": evidence_key,
+                "polarity": polarity,
+                "category": factor.get("category"),
+                "label": factor.get("label"),
+            })
+
+    supporting = [row for row in entries if row["polarity"] == "support"]
+    pressuring = [row for row in entries if row["polarity"] == "pressure"]
+    return {
+        "method_version": "distinct_testimonies_v1",
+        "verdict": _verdict_for_counts(len(supporting), len(pressuring)),
+        "supporting_testimonies": supporting,
+        "pressuring_testimonies": pressuring,
+        "support_count": len(supporting),
+        "pressure_count": len(pressuring),
+    }
+
+
 def _timing_verdict(activation_count: int) -> Dict[str, str]:
     if activation_count >= 2:
         return {"key": "active", "label": "Actively unfolding now"}
@@ -287,7 +343,7 @@ def _build_summary(
     if condition["key"] == "strong":
         return (
             f"In {chart_name}, the {_house_ordinal(house_num)} house is coming through as {condition['label'].lower()}. "
-            f"{area.capitalize()} has cleaner support here, and the current timing is {timing['label'].lower()}."
+            f"{area.capitalize()} has cleaner natal support here."
         )
     if condition["label"] == "Supported but pressured":
         return (
@@ -315,39 +371,48 @@ def _houses_ruled_by_planet(chart_data: Dict[str, Any], planet: str) -> List[int
     return ruled
 
 
-def _prioritize_factors(factors: List[Dict[str, str]], limit: Optional[int] = None) -> List[Dict[str, str]]:
+def _prioritize_factors(factors: List[Dict[str, Any]], limit: Optional[int] = None) -> List[Dict[str, Any]]:
     priority = {
         "occupant_nakshatra": 0,
         "occupant_friendship": 1,
-        "dignity": 2,
-        "neecha_bhanga": 3,
-        "combustion": 4,
-        "placement": 5,
-        "occupant": 6,
-        "ashtakavarga": 7,
-        "special": 8,
-        "special_house": 9,
-        "gandanta": 10,
-        "aspect": 11,
-        "yoga": 12,
-        "strength": 13,
-        "dasha": 14,
-        "transit": 15,
-        "dosha": 16,
+        "shadbala": 2,
+        "dignity": 3,
+        "neecha_bhanga": 4,
+        "combustion": 5,
+        "placement": 6,
+        "occupant": 7,
+        "ashtakavarga": 8,
+        "argala": 9,
+        "house_type": 10,
+        "special": 11,
+        "special_house": 12,
+        "gandanta": 13,
+        "aspect": 14,
+        "yoga": 15,
+        "strength": 16,
+        "dasha": 17,
+        "transit": 18,
+        "dosha": 19,
     }
     ordered = sorted(
         factors,
         key=lambda item: (priority.get(item.get("category", ""), 99), factors.index(item)),
     )
 
-    deduped: List[Dict[str, str]] = []
+    deduped: List[Dict[str, Any]] = []
     seen = set()
     for item in ordered:
-        key = (item.get("category"), item.get("label"))
+        key = item.get("evidence_key") or (item.get("category"), item.get("label"))
         if key in seen:
             continue
         seen.add(key)
-        deduped.append(item)
+        # Keep evidence metadata internal so the established client contract
+        # remains label/tone/category only.
+        deduped.append({
+            "label": item.get("label", ""),
+            "tone": item.get("tone", ""),
+            "category": item.get("category", ""),
+        })
 
     if limit is None:
         return deduped
@@ -373,6 +438,9 @@ def _collect_house_factors(
     analyzer = analyzer or HouseAnalyzer(chart_data, birth_obj, shadbala_chart_data=natal_for_shadbala)
     analysis = analyzer.analyze_house(house_num)
     yogi_data = getattr(analyzer, "yogi_data", None) or YogiCalculator(chart_data).calculate_yogi_points(birth_data)
+    combustion_source_chart = "D1" if chart_id not in {"lagna", "transit"} else chart_id
+    combustion_chart = natal_for_shadbala if combustion_source_chart == "D1" else chart_data
+    combustion_rows = calculate_chart_combustion(combustion_chart).get("planets", {})
 
     support: List[Dict[str, str]] = []
     stress: List[Dict[str, str]] = []
@@ -397,12 +465,21 @@ def _collect_house_factors(
     lord_gandanta = lord_analysis.get("gandanta_analysis", {})
     house_sign = analysis["basic_info"]["house_sign"]
     sign_owner = analyzer.get_sign_lord(lord_sign)
-    yogi_sign = yogi_data.get("yogi", {}).get("sign")
-    avayogi_sign = yogi_data.get("avayogi", {}).get("sign")
-    dagdha_sign = yogi_data.get("dagdha_rashi", {}).get("sign")
-    yogi_lord = yogi_data.get("yogi", {}).get("lord")
-    avayogi_lord = yogi_data.get("avayogi", {}).get("lord")
-    dagdha_lord = yogi_data.get("dagdha_rashi", {}).get("lord")
+    yogi_row = yogi_data.get("yogi") or {}
+    avayogi_row = yogi_data.get("avayogi") or {}
+    legacy_dagdha_row = yogi_data.get("dagdha_rashi") or {}
+    dagdha_rows = [
+        row for row in (yogi_data.get("tithi_dagdha_rashis") or [])
+        if isinstance(row, dict)
+    ]
+    if not dagdha_rows and legacy_dagdha_row:
+        dagdha_rows = [legacy_dagdha_row]
+    dagdha_signs = {row.get("sign") for row in dagdha_rows if row.get("sign") is not None}
+    dagdha_lords = {row.get("lord") for row in dagdha_rows if row.get("lord")}
+    yogi_sign = yogi_row.get("sign")
+    avayogi_sign = avayogi_row.get("sign")
+    yogi_lord = yogi_row.get("lord")
+    avayogi_lord = avayogi_row.get("lord")
     avayogi_overlap = bool(
         (yogi_data.get("avayogi_tithi_shunya_overlap") or {}).get("is_active")
     )
@@ -412,9 +489,8 @@ def _collect_house_factors(
     lord_neecha_bhanga = bool(
         (neecha_bhanga_results.get(lord) or {}).get("neecha_bhanga_present")
     )
-    lord_combust = bool(
-        (lord_analysis.get("combustion_status") or {}).get("is_combust")
-    )
+    lord_combustion = combustion_rows.get(lord) or {}
+    lord_combust = bool(lord_combustion.get("is_combust"))
 
     def append_avayogi_factor(
         planet: str,
@@ -479,7 +555,10 @@ def _collect_house_factors(
         support.append(_factor(f"{lord} gains strength through an upachaya placement.", "good", "placement"))
 
     if lord_special.get("is_yogi_lord"):
-        support.append(_factor(f"{lord} is the Yogi lord.", "good", "special"))
+        support.append(_factor(
+            f"{lord} is the Yogi lord.", "good", "special",
+            evidence_key=f"lord:{lord}:yogi",
+        ))
     if lord_special.get("is_avayogi_lord"):
         append_avayogi_factor(
             lord,
@@ -488,7 +567,10 @@ def _collect_house_factors(
             subject=f"{lord}, the house lord",
         )
     if lord_special.get("is_dagdha_lord"):
-        stress.append(_factor(f"{lord} is functioning as a Dagdha lord.", "warn", "special"))
+        stress.append(_factor(
+            f"{lord} is functioning as a Dagdha lord.", "warn", "special",
+            evidence_key=f"lord:{lord}:dagdha",
+        ))
 
     if lord_retrograde:
         if lord_house in {6, 8, 12} or lord_dignity in {"debilitated", "unfavorable"}:
@@ -497,7 +579,10 @@ def _collect_house_factors(
             support.append(_factor(f"{lord}, the house lord, is retrograde, making this house more reflective and internally active.", "good", "retrograde"))
 
     if lord_gandanta.get("is_gandanta"):
-        stress.append(_factor(f"{lord} is in Gandanta.", "warn", "gandanta"))
+        stress.append(_factor(
+            f"{lord} is in Gandanta.", "warn", "gandanta",
+            evidence_key=f"planet:{lord}:gandanta",
+        ))
 
     friendship_matrix = lord_analysis.get("friendship_analysis", {}).get("friendship_matrix", {})
     relation = friendship_matrix.get(sign_owner) if isinstance(friendship_matrix, dict) else None
@@ -509,20 +594,32 @@ def _collect_house_factors(
             stress.append(_factor(f"{lord} has {relation_label}.", "warn", "friendship"))
 
     if house_sign == yogi_sign:
-        support.append(_factor("This house falls on the Yogi sign axis.", "good", "special_house"))
+        support.append(_factor(
+            "This house falls on the Yogi sign axis.", "good", "special_house",
+            evidence_key=f"house:{house_num}:yogi_axis",
+        ))
     if house_sign == avayogi_sign:
         stress.append(_factor("This house falls on the Avayogi sign axis.", "warn", "special_house"))
-    if house_sign == dagdha_sign:
+    if house_sign in dagdha_signs:
         stress.append(_factor("This house falls on the Dagdha sign axis.", "warn", "special_house"))
 
     if lord == yogi_lord:
-        support.append(_factor(f"{lord} is the Yogi lord for this chart.", "good", "special"))
-    if lord == dagdha_lord:
-        stress.append(_factor(f"{lord} is the Dagdha lord for this chart.", "warn", "special"))
+        support.append(_factor(
+            f"{lord} is the Yogi lord for this chart.", "good", "special",
+            evidence_key=f"lord:{lord}:yogi",
+        ))
+    if lord in dagdha_lords:
+        stress.append(_factor(
+            f"{lord} is the Dagdha lord for this chart.", "warn", "special",
+            evidence_key=f"lord:{lord}:dagdha",
+        ))
 
     special_house = analysis.get("special_house_analysis", {})
     if special_house.get("is_yogi_house"):
-        support.append(_factor("This is marked as a yogi house in the chart.", "good", "special_house"))
+        support.append(_factor(
+            "This is marked as a yogi house in the chart.", "good", "special_house",
+            evidence_key=f"house:{house_num}:yogi_axis",
+        ))
     if special_house.get("is_badhaka_house"):
         stress.append(_factor("This house falls in the badhaka axis for the ascendant.", "warn", "special_house"))
     if special_house.get("dusthana_cancellation"):
@@ -547,7 +644,10 @@ def _collect_house_factors(
     house_lord_gandanta = gandanta_analysis.get("house_lord_gandanta", {}) or {}
     if house_lord_gandanta.get("is_gandanta"):
         has_specific_gandanta_reason = True
-        stress.append(_factor(f"The house lord {lord} is in Gandanta.", "warn", "gandanta"))
+        stress.append(_factor(
+            f"The house lord {lord} is in Gandanta.", "warn", "gandanta",
+            evidence_key=f"planet:{lord}:gandanta",
+        ))
     house_cusp_gandanta = gandanta_analysis.get("house_cusp_gandanta", {}) or {}
     if house_cusp_gandanta.get("is_gandanta"):
         has_specific_gandanta_reason = True
@@ -573,9 +673,8 @@ def _collect_house_factors(
         resident_sign_lord = analyzer.get_sign_lord(resident_sign) if resident_sign is not None else None
         resident_nakshatra_lord = _nakshatra_lord_from_longitude(resident_longitude)
         resident_friendship = planet_analysis.get("friendship_analysis", {}).get("friendship_matrix", {})
-        resident_combust = bool(
-            (planet_analysis.get("combustion_status") or {}).get("is_combust")
-        )
+        resident_combustion = combustion_rows.get(planet) or {}
+        resident_combust = bool(resident_combustion.get("is_combust"))
         resident_neecha_bhanga = bool(
             (neecha_bhanga_results.get(planet) or {}).get("neecha_bhanga_present")
         )
@@ -597,7 +696,7 @@ def _collect_house_factors(
             added_specific_support = avayogi_polarity == "supportive"
             added_specific_stress = avayogi_polarity == "challenging"
             occupant_roles[planet].append("Avayogi lord")
-        if planet == dagdha_lord:
+        if planet in dagdha_lords:
             stress.append(_factor(f"{planet} occupies this house as the Dagdha lord.", "warn", "special"))
             added_specific_stress = True
             occupant_roles[planet].append("Dagdha lord")
@@ -717,7 +816,7 @@ def _collect_house_factors(
             )
 
         if (
-            planet == dagdha_lord
+            planet in dagdha_lords
             or aspect_special.get("is_dagdha_lord")
             or aspect_special.get("is_badhaka_lord")
             or sits_in_dusthana
@@ -761,11 +860,92 @@ def _collect_house_factors(
             ))
 
     house_strength = analysis.get("overall_house_assessment", {})
+    assessment_factors = house_strength.get("assessment_factors") or {}
+
+    # Add primary classical testimonies that are not already represented by a
+    # placement, dignity, occupant, or aspect row above. These are independent
+    # facts and therefore each receives its own ledger entry.
+    lord_shadbala = assessment_factors.get("lord_shadbala_strength") or {}
+    if lord_shadbala.get("grade") == "Uttama":
+        support.append(_factor(
+            f"{lord} has strong Shadbala at {float(lord_shadbala.get('value') or 0):.2f} rupas.",
+            "good",
+            "shadbala",
+            evidence_key=f"lord:{lord}:shadbala",
+        ))
+    elif lord_shadbala.get("grade") == "Adhama":
+        stress.append(_factor(
+            f"{lord} has weak Shadbala at {float(lord_shadbala.get('value') or 0):.2f} rupas.",
+            "warn",
+            "shadbala",
+            evidence_key=f"lord:{lord}:shadbala",
+        ))
+
+    resident_shadbala = getattr(analyzer.planet_analyzer, "shadbala_data", {}) or {}
+    for resident in residents:
+        planet = resident.get("planet")
+        if planet in NODE_PLANETS or not planet:
+            continue
+        rupas = float((resident_shadbala.get(planet) or {}).get("total_rupas") or 0)
+        if rupas >= 6:
+            support.append(_factor(
+                f"Resident {planet} has strong Shadbala at {rupas:.2f} rupas.",
+                "good",
+                "shadbala",
+                evidence_key=f"resident:{planet}:shadbala",
+            ))
+        elif rupas < 4:
+            stress.append(_factor(
+                f"Resident {planet} has weak Shadbala at {rupas:.2f} rupas.",
+                "warn",
+                "shadbala",
+                evidence_key=f"resident:{planet}:shadbala",
+            ))
+
+    argala_strength = assessment_factors.get("argala_strength") or {}
+    if argala_strength.get("grade") == "Uttama":
+        support.append(_factor(
+            "Argala gives net support to this house.",
+            "good",
+            "argala",
+            evidence_key=f"house:{house_num}:argala",
+        ))
+    elif argala_strength.get("grade") == "Adhama":
+        stress.append(_factor(
+            "Argala obstruction outweighs support to this house.",
+            "warn",
+            "argala",
+            evidence_key=f"house:{house_num}:argala",
+        ))
+
+    house_type_strength = assessment_factors.get("house_type_strength") or {}
+    house_types = ", ".join(house_type_strength.get("house_types") or []) or "house type"
+    if house_type_strength.get("grade") == "Uttama":
+        support.append(_factor(
+            f"This house is classically supported by its {house_types} nature.",
+            "good",
+            "house_type",
+            evidence_key=f"house:{house_num}:type",
+        ))
+    elif house_type_strength.get("grade") == "Adhama":
+        stress.append(_factor(
+            f"This house is classically demanding because of its {house_types} nature.",
+            "warn",
+            "house_type",
+            evidence_key=f"house:{house_num}:type",
+        ))
+
     classical_grade = house_strength.get("classical_grade")
     if classical_grade == "Uttama":
-        support.append(_factor("Overall house assessment comes through as Uttama.", "good", "strength"))
+        support.append(_factor(
+            "Overall house assessment comes through as Uttama.", "good", "strength",
+            contributes=False,
+        ))
     elif classical_grade == "Adhama":
-        stress.append(_factor("Overall house assessment comes through as Adhama.", "warn", "strength"))
+        stress.append(_factor(
+            "Overall house assessment comes through as Adhama.", "warn", "strength",
+            contributes=False,
+        ))
 
     try:
         ashtakavarga = AshtakavargaCalculator(birth_data, chart_data)
@@ -801,9 +981,15 @@ def _collect_house_factors(
                 elif lord_bav <= 3:
                     stress.append(_factor(f"{lord}'s Bhinnashtakavarga is thin here with {lord_bav} points.", "warn", "ashtakavarga"))
                 if house_points and lord_bav == max(house_points):
-                    support.append(_factor(f"This is one of the strongest BAV houses for {lord}.", "good", "ashtakavarga"))
+                    support.append(_factor(
+                        f"This is one of the strongest BAV houses for {lord}.", "good", "ashtakavarga",
+                        contributes=False,
+                    ))
                 elif house_points and lord_bav == min(house_points):
-                    stress.append(_factor(f"This is one of the weakest BAV houses for {lord}.", "warn", "ashtakavarga"))
+                    stress.append(_factor(
+                        f"This is one of the weakest BAV houses for {lord}.", "warn", "ashtakavarga",
+                        contributes=False,
+                    ))
                 max_bav = max(house_points) if house_points else None
                 min_bav = min(house_points) if house_points else None
                 strongest_houses = [idx + 1 for idx, points in enumerate(house_points) if points == max_bav] if house_points else []
@@ -925,7 +1111,8 @@ def _collect_house_factors(
         except Exception:
             pass
 
-    condition = _verdict_for_counts(len(support), len(stress))
+    natal_assessment = _build_natal_evidence_ledger(support, stress)
+    condition = natal_assessment["verdict"]
     timing = _timing_verdict(len(activation))
     chart_name = _chart_display_name(chart_id)
     summary = _build_summary(
@@ -939,6 +1126,13 @@ def _collect_house_factors(
     worksheets: Dict[str, Any] = {}
     if include_worksheets:
         from charts.house_insight_worksheets import build_house_worksheets
+        worksheet_lord_analysis = {
+            **lord_analysis,
+            "combustion_status": {
+                **lord_combustion,
+                "source_chart": combustion_source_chart,
+            },
+        }
         worksheets = build_house_worksheets(
             birth_data=birth_data,
             chart_data=chart_data,
@@ -947,7 +1141,7 @@ def _collect_house_factors(
             house_sign=house_sign,
             chart_id=chart_id,
             lord=lord,
-            lord_analysis=lord_analysis,
+            lord_analysis=worksheet_lord_analysis,
             residents=residents,
             aspects_received=analysis.get("aspects_received") or [],
             yogi_data=yogi_data,
@@ -975,6 +1169,21 @@ def _collect_house_factors(
     classical_neecha_bhanga = (
         calculate_classical_neecha_bhanga(chart_data) if chart_id == "lagna" else {}
     )
+    planet_conditions: Dict[str, Any] = {}
+    for planet in set(classical_neecha_bhanga) | set(combustion_rows):
+        nb_row = classical_neecha_bhanga.get(planet) or {}
+        combustion_row = combustion_rows.get(planet) or {}
+        if not nb_row.get("neecha_bhanga_present") and not combustion_row.get("is_combust"):
+            continue
+        planet_conditions[planet] = {
+            "neecha_bhanga": bool(nb_row.get("neecha_bhanga_present")),
+            "conditions": nb_row.get("conditions_met") or [],
+            "source": nb_row.get("source"),
+            "combustion": {
+                **combustion_row,
+                "source_chart": combustion_source_chart,
+            } if combustion_row.get("is_combust") else None,
+        }
     return {
         "house_num": house_num,
         "chart_id": chart_id,
@@ -983,6 +1192,7 @@ def _collect_house_factors(
         "house_lord": lord,
         "significance": analysis["basic_info"]["significance"],
         "verdict": condition,
+        "natal_assessment": natal_assessment,
         "timing_verdict": timing,
         "interpretation": summary,
         "support_factors": _prioritize_factors(support),
@@ -995,15 +1205,7 @@ def _collect_house_factors(
         "points_in_house": worksheets.get("points_in_house") or [],
         "chara_karakas_here": worksheets.get("chara_karakas_here") or [],
         "natural_karakas": worksheets.get("natural_karakas") or [],
-        "planet_conditions": {
-            planet: {
-                "neecha_bhanga": bool(row.get("neecha_bhanga_present")),
-                "conditions": row.get("conditions_met") or [],
-                "source": row.get("source"),
-            }
-            for planet, row in classical_neecha_bhanga.items()
-            if row.get("neecha_bhanga_present")
-        },
+        "planet_conditions": planet_conditions,
         "related_varga": worksheets.get("related_varga"),
         "sav_givers": sav_givers,
         "timing": worksheets.get("timing") or {},
@@ -1011,9 +1213,15 @@ def _collect_house_factors(
             "classical_grade": classical_grade,
             "lord_dignity": lord_dignity,
             "lord_house": lord_house,
-            "support_count": len(support),
-            "stress_count": len(stress),
+            "support_count": natal_assessment["support_count"],
+            "stress_count": natal_assessment["pressure_count"],
+            "display_support_count": len(support),
+            "display_stress_count": len(stress),
             "activation_count": len(activation),
+            "natal_testimony_counts": {
+                "support": natal_assessment["support_count"],
+                "pressure": natal_assessment["pressure_count"],
+            },
             "occupant_roles": occupant_roles,
             "ashtakavarga": ashtakavarga_summary,
         },

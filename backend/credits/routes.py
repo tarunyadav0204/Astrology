@@ -3558,6 +3558,7 @@ _PRICING_KEYS_MAP = [
 async def get_my_pricing(current_user: User = Depends(get_current_user)):
     """Authenticated: return user pricing quickly with one DB roundtrip for settings + one for subscription."""
     from utils.admin_settings import (
+        classical_life_tab_enabled_for_user,
         instant_chat_enabled_for_user,
         speech_chat_enabled_for_user,
         get_speech_tts_provider,
@@ -3661,6 +3662,7 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
         "subscription_discount_percent": discount_percent,
         "chat_countdown_seconds": _get_chat_countdown_settings(),
         "features": {
+            "classical_life_tab_enabled": classical_life_tab_enabled_for_user(current_user.userid),
             "instant_chat_enabled": instant_chat_enabled_for_user(current_user.userid),
             "speech_chat_enabled": speech_chat_enabled_for_user(current_user.userid),
             "speech_tts_provider": get_speech_tts_provider(),

@@ -1533,7 +1533,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       <View style={[styles.drawerSection, accentSurface]}>
                         <View style={styles.insightHeaderRow}>
                           <Text style={[styles.sectionTitle, { color: colors.onAccent, marginBottom: 0 }]}>
-                            {t('chartScreen.houseDrawer.chartReading', 'Chart reading')}
+                            {t('chartScreen.houseDrawer.natalCondition', 'Natal house condition')}
                           </Text>
                           <View
                             style={[
@@ -1573,6 +1573,44 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       </View>
                     )}
 
+                    {houseInsight && (
+                      <View style={[styles.drawerSection, sectionSurface]}>
+                        <View style={styles.insightHeaderRow}>
+                          <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>
+                            {t('chartScreen.houseDrawer.currentActivation', 'Current activation')}
+                          </Text>
+                          <View
+                            style={[
+                              styles.verdictBadge,
+                              {
+                                backgroundColor: houseInsight.timing_verdict?.key === 'active'
+                                  ? withAlpha(colors.info, '28')
+                                  : colors.surfaceMuted,
+                                borderColor: colors.cardBorder,
+                              },
+                            ]}
+                          >
+                            <Text style={[styles.verdictBadgeText, { color: colors.text }]}>
+                              {translateHouseVerdictLabel(t, houseInsight.timing_verdict?.label)}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.sectionDesc, { color: colors.textSecondary, marginTop: 12 }]}>
+                          {houseInsight.activation_factors?.length
+                            ? t('chartScreen.houseDrawer.currentActivationActive', 'Dasha or transit factors are currently emphasizing this natal house.')
+                            : t('chartScreen.houseDrawer.currentActivationQuiet', 'No distinct Dasha or transit emphasis is currently strengthening this natal house.')}
+                        </Text>
+                        {houseInsight.activation_factors?.map((item, idx) => (
+                          <View key={`${selectedHouse.houseNum}-activation-${idx}`} style={styles.reasonRow}>
+                            <View style={[styles.reasonDot, { backgroundColor: colors.primary }]} />
+                            <Text style={[styles.reasonText, { color: colors.text }]}>
+                              {translateHouseInsightFactor(t, item.label)}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
                     {houseInsight?.support_factors?.length > 0 && (
                       <View style={[styles.drawerSection, sectionSurface]}>
                         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
@@ -1597,22 +1635,6 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         {houseInsight.stress_factors.map((item, idx) => (
                           <View key={`${selectedHouse.houseNum}-stress-${idx}`} style={styles.reasonRow}>
                             <View style={[styles.reasonDot, { backgroundColor: colors.error }]} />
-                            <Text style={[styles.reasonText, { color: colors.text }]}>
-                              {translateHouseInsightFactor(t, item.label)}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-
-                    {houseInsight?.activation_factors?.length > 0 && (
-                      <View style={[styles.drawerSection, sectionSurface]}>
-                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-                          {t('chartScreen.houseDrawer.activating', 'What is activating it now')}
-                        </Text>
-                        {houseInsight.activation_factors.map((item, idx) => (
-                          <View key={`${selectedHouse.houseNum}-activation-${idx}`} style={styles.reasonRow}>
-                            <View style={[styles.reasonDot, { backgroundColor: colors.primary }]} />
                             <Text style={[styles.reasonText, { color: colors.text }]}>
                               {translateHouseInsightFactor(t, item.label)}
                             </Text>
@@ -1694,9 +1716,11 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         {(houseInsight.sav_givers?.givers || houseInsight.raw?.ashtakavarga?.givers || []).length > 0 && (
                           <View style={styles.giverRow}>
                             {(houseInsight.sav_givers?.givers || houseInsight.raw.ashtakavarga.givers).map((row) => (
-                              <Text key={row.planet} style={[styles.giverChip, { color: colors.text, borderColor: colors.cardBorder }]}>
-                                {row.planet === 'Lagna' ? 'Lg' : row.planet.slice(0, 2)} {row.bindus}
-                              </Text>
+                              <View key={row.planet} style={[styles.giverChip, { borderColor: colors.cardBorder }]}>
+                                <Text style={[styles.giverChipText, { color: colors.text }]} numberOfLines={1}>
+                                  {row.planet === 'Lagna' ? 'Lg' : row.planet.slice(0, 2)} {row.bindus}
+                                </Text>
+                              </View>
                             ))}
                           </View>
                         )}
@@ -1712,6 +1736,9 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         selectedHouse.planets.map((planet, idx) => {
                           const roles = houseInsight?.raw?.occupant_roles?.[planet.name] || [];
                           const classicalCondition = houseInsight?.planet_conditions?.[planet.name];
+                          const combustion = classicalCondition?.combustion;
+                          const isCombust = Boolean(combustion?.is_combust || planet.combust);
+                          const isNatalCombustion = combustion?.source_chart === 'D1' && houseInsight?.chart_id !== 'lagna';
                           const hasNeechaBhanga = Boolean(
                             planet.neecha_bhanga || classicalCondition?.neecha_bhanga
                           );
@@ -1738,7 +1765,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                                     </Text>
                                   </View>
                                 )}
-                                {planet.combust && (
+                                {isCombust && (
                                   <View
                                     style={[
                                       styles.retrogradeChip,
@@ -1746,7 +1773,9 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                                     ]}
                                   >
                                     <Text style={[styles.retrogradeChipText, { color: colors.text }]}>
-                                      {t('chartScreen.houseDrawer.combust', 'Combust')}
+                                      {isNatalCombustion
+                                        ? t('premiumUi.planetaryPositions.natalCombustionD1', 'Natal combustion (D1)')
+                                        : t('chartScreen.houseDrawer.combust', 'Combust')}
                                     </Text>
                                   </View>
                                 )}
@@ -1783,6 +1812,21 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                                   ? ` · ${t('chartScreen.houseDrawer.pada', { pada: planet.pada, defaultValue: 'Pada {{pada}}' })}`
                                   : ''}
                               </Text>
+                              {isCombust && combustion?.angular_distance != null ? (
+                                <Text style={[styles.planetDetails, { color: colors.warning }]}>
+                                  {t('premiumUi.planetaryPositions.combustionEvidence', {
+                                    distance: Number(combustion.angular_distance).toFixed(2),
+                                    threshold: Number(combustion.threshold).toFixed(0),
+                                    motion: combustion.motion === 'retrograde'
+                                      ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde')
+                                      : t('premiumUi.planetaryPositions.direct', 'Direct'),
+                                    status: isNatalCombustion
+                                      ? t('premiumUi.planetaryPositions.natalCombustionD1', 'Natal combustion (D1)')
+                                      : t('chartScreen.houseDrawer.combust', 'Combust'),
+                                    defaultValue: '{{distance}}° from Sun · {{threshold}}° limit · {{motion}} · {{status}}',
+                                  })}
+                                </Text>
+                              ) : null}
                               {hasNeechaBhanga ? (
                                 <View style={[styles.sheetStat, nestedCard]}>
                                   <Text style={[styles.sheetStatLabel, { color: colors.success }]}>
@@ -1890,7 +1934,11 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                               </View>
                               {houseInsight.lord_worksheet.combust ? (
                                 <View style={[styles.sheetChip, { backgroundColor: withAlpha(colors.warning, '22') }]}>
-                                  <Text style={[styles.sheetChipText, { color: colors.text }]}>{t('chartScreen.houseDrawer.combust', 'Combust')}</Text>
+                                  <Text style={[styles.sheetChipText, { color: colors.text }]}>
+                                    {houseInsight.lord_worksheet.combustion?.source_chart === 'D1' && houseInsight.chart_id !== 'lagna'
+                                      ? t('premiumUi.planetaryPositions.natalCombustionD1', 'Natal combustion (D1)')
+                                      : t('chartScreen.houseDrawer.combust', 'Combust')}
+                                  </Text>
                                 </View>
                               ) : null}
                               {houseInsight.lord_worksheet.neecha_bhanga ? (
@@ -1910,6 +1958,21 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                                 </View>
                               ) : null}
                             </View>
+                            {houseInsight.lord_worksheet.combust && houseInsight.lord_worksheet.combustion?.angular_distance != null ? (
+                              <Text style={[styles.planetDetails, { color: colors.warning }]}>
+                                {t('premiumUi.planetaryPositions.combustionEvidence', {
+                                  distance: Number(houseInsight.lord_worksheet.combustion.angular_distance).toFixed(2),
+                                  threshold: Number(houseInsight.lord_worksheet.combustion.threshold).toFixed(0),
+                                  motion: houseInsight.lord_worksheet.combustion.motion === 'retrograde'
+                                    ? t('premiumUi.planetaryPositions.retrograde', 'Retrograde')
+                                    : t('premiumUi.planetaryPositions.direct', 'Direct'),
+                                  status: houseInsight.lord_worksheet.combustion.source_chart === 'D1' && houseInsight.chart_id !== 'lagna'
+                                    ? t('premiumUi.planetaryPositions.natalCombustionD1', 'Natal combustion (D1)')
+                                    : t('chartScreen.houseDrawer.combust', 'Combust'),
+                                  defaultValue: '{{distance}}° from Sun · {{threshold}}° limit · {{motion}} · {{status}}',
+                                })}
+                              </Text>
+                            ) : null}
                             {houseInsight.lord_worksheet.shadbala_rupas != null ? (
                               <View style={[styles.sheetStat, nestedCard]}>
                                 <Text style={[styles.sheetStatLabel, { color: colors.textSecondary }]}>{t('chartScreen.houseDrawer.shadbala', 'Shadbala')}</Text>
@@ -2750,6 +2813,7 @@ const styles = StyleSheet.create({
   },
   ashtakavargaCard: {
     flex: 1,
+    minWidth: 0,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -2759,6 +2823,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+    flexShrink: 1,
   },
   ashtakavargaValue: {
     fontSize: 24,
@@ -2785,15 +2850,26 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     marginTop: 10,
+    width: '100%',
+    paddingBottom: 2,
   },
   giverChip: {
-    fontSize: 12,
-    fontWeight: '700',
+    width: '22%',
+    minWidth: 52,
+    minHeight: 38,
     borderWidth: 1,
-    borderRadius: 6,
+    borderRadius: 8,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
+  },
+  giverChipText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   mudakkuDetailGrid: {
     flexDirection: 'row',

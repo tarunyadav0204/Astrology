@@ -42,7 +42,7 @@ class PlanetAnalyzer(BaseCalculator):
         
         # Get calculated data
         self.dignities_data = self.dignities_calc.calculate_planetary_dignities()
-        self.yogi_data = self.yogi_calc.calculate_yogi_points(birth_data) if birth_data else {}
+        self.yogi_data = (self.yogi_calc.calculate_yogi_points(birth_data) or {}) if birth_data else {}
         # Get ascendant sign for badhaka calculation
         ascendant_sign = int(chart_data.get('ascendant', 0) / 30) if chart_data else 0
         self.badhaka_data = {
@@ -228,14 +228,14 @@ class PlanetAnalyzer(BaseCalculator):
         special_roles = []
         
         # Yogi/Avayogi analysis
-        is_yogi = self.yogi_data.get('yogi', {}).get('lord') == planet_name
-        is_avayogi = self.yogi_data.get('avayogi', {}).get('lord') == planet_name
+        is_yogi = (self.yogi_data.get('yogi') or {}).get('lord') == planet_name
+        is_avayogi = (self.yogi_data.get('avayogi') or {}).get('lord') == planet_name
         # A tithi can burn more than one rashi.  ``dagdha_rashi`` is retained
         # only as a legacy single-row alias, so consumers that classify a
         # planet must use the complete calculated list first.
         dagdha_lords = {
             row.get('lord')
-            for row in self.yogi_data.get('tithi_dagdha_rashis', [])
+            for row in (self.yogi_data.get('tithi_dagdha_rashis') or [])
             if isinstance(row, dict) and row.get('lord')
         }
         if not dagdha_lords:
@@ -243,7 +243,7 @@ class PlanetAnalyzer(BaseCalculator):
             if legacy_dagdha.get('lord'):
                 dagdha_lords.add(legacy_dagdha['lord'])
         is_dagdha = planet_name in dagdha_lords
-        is_tithi_shunya = self.yogi_data.get('tithi_shunya_rashi', {}).get('lord') == planet_name
+        is_tithi_shunya = (self.yogi_data.get('tithi_shunya_rashi') or {}).get('lord') == planet_name
         is_avayogi_tithi_shunya_benefic = is_avayogi and is_tithi_shunya
         placement_house = (self.chart_data.get('planets', {}).get(planet_name) or {}).get('house')
         resolved_avayogi_effect = (

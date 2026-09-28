@@ -1397,7 +1397,17 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                   const conditionChartData = currentChartType === 'transit'
                     ? cd
                     : (lagnaChartData || chartDataCacheRef.current.lagna || chartData || cd);
-                  navigation?.navigate('PlanetaryPositions', { chartData: cd, conditionChartData, birthData });
+                  const natalChartData = lagnaChartData
+                    || chartDataCacheRef.current.lagna
+                    || (currentChartType === 'lagna' ? cd : null);
+                  navigation?.navigate('PlanetaryPositions', {
+                    chartData: cd,
+                    conditionChartData,
+                    natalChartData,
+                    d9Chart: currentChartType === 'navamsa' ? cd : chartDataCacheRef.current.navamsa,
+                    chartType: currentChartType,
+                    birthData,
+                  });
                 }
               }}
             />
@@ -1476,7 +1486,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                   • {t('chartScreen.legendSigns', 'The small number inside each diamond is the zodiac sign number (1–12), not the house number.')}{'\n'}
                   • {t('chartScreen.legendPlanets', 'Planet symbols show where each planet sits in the chart.')}{'\n'}
                   • {t('chartScreen.legendRetro', '(R) after a planet means it is retrograde.')}{'\n'}
-                  • {t('premiumUi.planetaryPositions.chartLegendCombust', '(C) after a planet means it is combust, within its classical orb from the Sun.')}{'\n'}
+                  • {currentChartType !== 'lagna' && currentChartType !== 'transit'
+                    ? t('chartScreen.legendNatalCombustion', '(C) shows natal combustion calculated from the planet’s actual D1 distance from the Sun.')
+                    : t('premiumUi.planetaryPositions.chartLegendCombust', '(C) after a planet means it is combust, within its classical orb from the Sun.')}{'\n'}
                   • {t('chartScreen.legendExaltDebil', '↑ and ↓ indicate exalted or debilitated planets.')}{'\n'}
                   • {t('premiumUi.planetaryPositions.chartLegendNeechaBhanga', '(NB) means the planet meets a classical Neecha Bhanga condition. Open Yogas for the exact rule.')}{'\n'}
                   • {t('chartScreen.legendNakshatra', 'Turn on the eye icon to see exact degrees and nakshatra names under each planet.')}

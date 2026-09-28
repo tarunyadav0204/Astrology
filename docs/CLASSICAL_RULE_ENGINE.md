@@ -31,6 +31,7 @@ has been approved.
 |---|---:|---:|---:|---:|---|
 | BPHS | 3, Graha-guna-svarupa | 74 | 74 | 9 | Certified backend pack |
 | BPHS | 24, Effects of house lords | 145 | 145 | 144 placements + 1 control | Certified natal-judgment pack |
+| BPHS | 34, Yoga Karakas and lordships | 46 | 46 | 16 published rules | Certified dependency and natal-reading pack |
 
 Chapter 3 currently publishes deterministic evidence for:
 
@@ -50,6 +51,17 @@ exactly twelve: one for each house lord. Verse 145 is implemented as a mandatory
 interpretive control, so the response includes the relevant lord's dignity,
 combustion, motion, conjunctions and visible-graha aspects. It does not present
 the placement verse as an unconditional certainty.
+
+Chapter 34 publishes the general functional-lordship doctrine and all twelve
+ascendant-specific catalogues through the existing canonical functional-nature
+calculator. It keeps four ideas distinct: natural nature, functional role,
+single-planet Yoga Karaka ownership, and qualified yoga or Maraka statements in
+the Lagna-specific passage. Its fact compiler lets later chapters consume each
+role with its exact rule and verse provenance. The relationship rule tests only
+the relationships named in verses 11–12: exchange, conjunction, one lord in the
+other's sign, and full mutual aspect. The node rule applies verses 16–17 through
+occupied house, conjunction and the stated Kendra/Trikona lord contact; it does
+not invent independent node lordship or a universal node friendship table.
 
 The authenticated `POST /api/classical-natal-promise` endpoint remains intact
 for existing clients. New clients use `POST /api/classical-reading`, which
@@ -95,6 +107,7 @@ mobile chapter component is added.
   deduplication and life-area aggregation.
 - `backend/classical_rules/bphs/chapter_03.py`: Chapter 3 coverage and rules.
 - `backend/classical_rules/bphs/chapter_24.py`: 144 natal placement judgments and the verse 145 strength control.
+- `backend/classical_rules/bphs/chapter_34.py`: functional lordship, Yoga Karaka and twelve Lagna catalogues.
 - `backend/migrations/create_classical_rule_engine.sql`: versioned persistence model.
 
 The legacy `sutra_rules` table remains untouched for compatibility. It must not

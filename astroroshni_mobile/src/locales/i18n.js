@@ -48,6 +48,7 @@ import nakshatraCalendar from './nakshatra-calendar.json';
 import pitriShapaInfo from './pitri-shapa-info.json';
 import mangalDoshaInfo from './mangal-dosha-info.json';
 import matriShapaInfo from './matri-shapa-info.json';
+import chartSourceClarity from './chart-source-clarity.json';
 
 const INSTANT_MODE_ACTION_COPY = Object.freeze({
   english: 'Mode',
@@ -217,11 +218,30 @@ const normalizedPremiumUi = Object.fromEntries(
 Object.entries(normalizedPremiumUi).forEach(([language, copy]) => {
   const positionsCopy = planetaryPositions[language] || planetaryPositions.english;
   const natalPromiseCopy = classicalNatalPromise[language] || classicalNatalPromise.english;
+  const clarityCopy = chartSourceClarity[language] || chartSourceClarity.english;
   copy.planetaryPositions = {
     ...positionsCopy,
+    ...(clarityCopy.planetaryPositions || {}),
     tabs: { ...(positionsCopy.tabs || {}), promise: natalPromiseCopy.tab },
     natalPromise: natalPromiseCopy,
   };
+});
+
+[
+  [en, 'english'], [es, 'es'], [hi, 'hindi'], [tamil, 'tamil'], [te, 'telugu'], [gu, 'gujarati'],
+  [mr, 'marathi'], [de, 'german'], [fr, 'fr'], [ru, 'russian'], [zh, 'chinese'],
+].forEach(([baseCopy, language]) => {
+  const clarityCopy = chartSourceClarity[language] || chartSourceClarity.english;
+  baseCopy.chartScreen = baseCopy.chartScreen || {};
+  baseCopy.chartScreen.houseDrawer = {
+    ...(baseCopy.chartScreen.houseDrawer || {}),
+    ...(clarityCopy.houseDrawer || {}),
+    interpretation: {
+      ...(baseCopy.chartScreen.houseDrawer?.interpretation || {}),
+      ...(clarityCopy.houseDrawer?.interpretation || {}),
+    },
+  };
+  baseCopy.chartScreen.legendNatalCombustion = clarityCopy.legendNatalCombustion;
 });
 
 [

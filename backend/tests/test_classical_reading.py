@@ -44,19 +44,21 @@ def _raw_insight(insight_id="rule.a", dedupe_key="wealth.shared"):
 def test_registry_discovers_chapter_capabilities_without_central_chapter_switches():
     assert ("bphs", 3) in PACKS
     assert ("bphs", 24) in PACKS
-    assert [key for key, _ in iter_packs(reading_only=True)] == [("bphs", 24)]
+    assert ("bphs", 34) in PACKS
+    assert [key for key, _ in iter_packs(reading_only=True)] == [("bphs", 24), ("bphs", 34)]
 
 
-def test_corpus_reading_groups_chapter_24_into_twelve_stable_life_areas():
+def test_corpus_reading_groups_published_chapters_into_stable_life_areas():
     result = build_classical_reading(_chart())
     assert result["contract_version"] == READING_CONTRACT_VERSION
     assert result["area_count"] == 12
-    assert result["insight_count"] == 12
+    assert result["insight_count"] == 13
     assert result["fallback_used"] is False
     assert [area["house"] for area in result["areas"]] == list(range(1, 13))
     first = result["areas"][0]
     assert first["key"] == "house_1"
-    assert first["insights"][0]["sources"][0]["reference"] == "BPHS 24.4"
+    house_lord = next(row for row in first["insights"] if row["subject"]["key"] == "house_lord_placement")
+    assert house_lord["sources"][0]["reference"] == "BPHS 24.4"
     assert first["insights"][0]["contributions"][0]["evidence"]["summary"]["text"]
 
 

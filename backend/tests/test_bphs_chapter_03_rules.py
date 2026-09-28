@@ -104,7 +104,7 @@ def test_nodes_are_not_silently_added_to_bphs_friendship_rule():
 
 def test_registry_exposes_certified_packs_and_preserves_contract():
     packs = list_packs()
-    assert [(row["work_key"], row["chapter"]) for row in packs] == [("bphs", 3), ("bphs", 24)]
+    assert [(row["work_key"], row["chapter"]) for row in packs] == [("bphs", 3), ("bphs", 24), ("bphs", 34)]
     result = evaluate_pack("BPHS", 3, _chart())
     assert result["chapter"] == 3
     assert result["fallback_used"] is False

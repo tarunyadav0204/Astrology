@@ -39,7 +39,19 @@
     "classicalBasisCount": "Classical basis · {{count}} indications",
     "currentTopic": "Topic",
     "chooseTopic": "Choose a topic",
-    "allTopics": "All indications"
+    "allTopics": "All indications",
+    "subjects": {
+      "houseLordPlacement": "House lord placement",
+      "functionalPlanetaryRoles": "Planetary roles for this Lagna"
+    },
+    "functionalRoles": {
+      "title": "Planetary roles for {{lagna}} Lagna",
+      "summary": "For {{lagna}} Lagna, the chapter treats {{supportive}} as functionally supportive, {{adverse}} as adverse, and {{conditional}} as neutral or conditional.",
+      "yoga": "Yoga-giving conditions named for this Lagna: {{details}}.",
+      "qualifications": "The text adds these qualifications: {{details}}.",
+      "evidence": "BPHS Chapter 34 assigns functional roles from {{lagna}} Lagna and then gives a specific catalogue for this ascendant.",
+      "marakaControl": "A Maraka statement identifies a classical capacity under relevant conditions; it is not a standalone event or death prediction."
+    }
   },
   "hindi": {
     "tab": "जीवन",
@@ -81,7 +93,19 @@
     "classicalBasisCount": "शास्त्रीय आधार · {{count}} संकेत",
     "currentTopic": "विषय",
     "chooseTopic": "एक विषय चुनें",
-    "allTopics": "सभी संकेत"
+    "allTopics": "सभी संकेत",
+    "subjects": {
+      "houseLordPlacement": "भावेश की स्थिति",
+      "functionalPlanetaryRoles": "इस लग्न के लिए ग्रहों की भूमिकाएँ"
+    },
+    "functionalRoles": {
+      "title": "{{lagna}} लग्न के लिए ग्रहों की भूमिकाएँ",
+      "summary": "{{lagna}} लग्न के लिए यह अध्याय {{supportive}} को कार्यात्मक रूप से शुभ, {{adverse}} को प्रतिकूल और {{conditional}} को तटस्थ या शर्त-आधारित मानता है।",
+      "yoga": "इस लग्न के लिए बताए गए योगदायक कारण: {{details}}।",
+      "qualifications": "ग्रंथ ये विशेष शर्तें भी जोड़ता है: {{details}}।",
+      "evidence": "बृहत्पाराशर होराशास्त्र अध्याय 34 {{lagna}} लग्न से कार्यात्मक भूमिकाएँ निर्धारित करता है और फिर इस लग्न का विशेष वर्गीकरण देता है।",
+      "marakaControl": "मारक कथन संबंधित दशा और संबंधों में शास्त्रीय क्षमता बताता है; यह अपने आप किसी घटना या मृत्यु की भविष्यवाणी नहीं है।"
+    }
   },
   "es": {
     "tab": "Vida",
@@ -123,7 +147,19 @@
     "classicalBasisCount": "Base clásica · {{count}} indicaciones",
     "currentTopic": "Tema",
     "chooseTopic": "Elige un tema",
-    "allTopics": "Todas las indicaciones"
+    "allTopics": "Todas las indicaciones",
+    "subjects": {
+      "houseLordPlacement": "Posición del regente de la casa",
+      "functionalPlanetaryRoles": "Funciones planetarias para este Ascendente"
+    },
+    "functionalRoles": {
+      "title": "Funciones planetarias para el Ascendente {{lagna}}",
+      "summary": "Para el Ascendente {{lagna}}, el capítulo considera a {{supportive}} funcionalmente favorables, a {{adverse}} adversos y a {{conditional}} neutrales o condicionales.",
+      "yoga": "Condiciones que producen yoga para este Ascendente: {{details}}.",
+      "qualifications": "El texto añade estas salvedades: {{details}}.",
+      "evidence": "El capítulo 34 de BPHS asigna funciones desde el Ascendente {{lagna}} y ofrece después un catálogo específico para él.",
+      "marakaControl": "Una mención Maraka señala una capacidad clásica bajo condiciones pertinentes; por sí sola no predice un suceso ni la muerte."
+    }
   },
   "fr": {
     "tab": "Vie",
@@ -165,7 +201,19 @@
     "classicalBasisCount": "Base classique · {{count}} indications",
     "currentTopic": "Sujet",
     "chooseTopic": "Choisissez un sujet",
-    "allTopics": "Toutes les indications"
+    "allTopics": "Toutes les indications",
+    "subjects": {
+      "houseLordPlacement": "Position du maître de maison",
+      "functionalPlanetaryRoles": "Rôles planétaires pour cet Ascendant"
+    },
+    "functionalRoles": {
+      "title": "Rôles planétaires pour l’Ascendant {{lagna}}",
+      "summary": "Pour l’Ascendant {{lagna}}, le chapitre considère {{supportive}} comme fonctionnellement favorables, {{adverse}} comme défavorables et {{conditional}} comme neutres ou conditionnels.",
+      "yoga": "Conditions productrices de yoga indiquées pour cet Ascendant : {{details}}.",
+      "qualifications": "Le texte ajoute les nuances suivantes : {{details}}.",
+      "evidence": "Le chapitre 34 de BPHS attribue les rôles fonctionnels depuis l’Ascendant {{lagna}}, puis donne un catalogue propre à cet Ascendant.",
+      "marakaControl": "Une mention Maraka indique une capacité classique sous les conditions pertinentes ; elle ne prédit pas à elle seule un événement ni un décès."
+    }
   },
   "german": {
     "tab": "Leben",
@@ -207,7 +255,19 @@
     "classicalBasisCount": "Klassische Grundlage · {{count}} Hinweise",
     "currentTopic": "Thema",
     "chooseTopic": "Wähle ein Thema",
-    "allTopics": "Alle Hinweise"
+    "allTopics": "Alle Hinweise",
+    "subjects": {
+      "houseLordPlacement": "Stellung des Hausherrschers",
+      "functionalPlanetaryRoles": "Planetenrollen für diesen Aszendenten"
+    },
+    "functionalRoles": {
+      "title": "Planetenrollen für den Aszendenten {{lagna}}",
+      "summary": "Für den Aszendenten {{lagna}} gelten {{supportive}} als funktional förderlich, {{adverse}} als ungünstig und {{conditional}} als neutral oder bedingt.",
+      "yoga": "Für diesen Aszendenten genannte Yoga-Bedingungen: {{details}}.",
+      "qualifications": "Der Text ergänzt folgende Einschränkungen: {{details}}.",
+      "evidence": "BPHS Kapitel 34 bestimmt die funktionalen Rollen vom Aszendenten {{lagna}} aus und gibt anschließend einen eigenen Katalog dafür.",
+      "marakaControl": "Eine Maraka-Aussage bezeichnet eine klassische Fähigkeit unter passenden Bedingungen; sie ist für sich keine Ereignis- oder Todesprognose."
+    }
   },
   "russian": {
     "tab": "Жизнь",
@@ -249,7 +309,19 @@
     "classicalBasisCount": "Классическая основа · {{count}} указаний",
     "currentTopic": "Тема",
     "chooseTopic": "Выберите тему",
-    "allTopics": "Все указания"
+    "allTopics": "Все указания",
+    "subjects": {
+      "houseLordPlacement": "Положение управителя дома",
+      "functionalPlanetaryRoles": "Роли планет для этого Асцендента"
+    },
+    "functionalRoles": {
+      "title": "Роли планет для Асцендента {{lagna}}",
+      "summary": "Для Асцендента {{lagna}} глава считает {{supportive}} функционально благоприятными, {{adverse}} неблагоприятными, а {{conditional}} нейтральными или условными.",
+      "yoga": "Условия образования йоги для этого Асцендента: {{details}}.",
+      "qualifications": "Текст добавляет следующие уточнения: {{details}}.",
+      "evidence": "Глава 34 BPHS определяет функциональные роли от Асцендента {{lagna}} и затем приводит отдельный перечень для него.",
+      "marakaControl": "Указание Мараки обозначает классическую способность при соответствующих условиях; само по себе оно не предсказывает событие или смерть."
+    }
   },
   "chinese": {
     "tab": "人生",
@@ -291,7 +363,19 @@
     "classicalBasisCount": "古典依据 · {{count}}项指示",
     "currentTopic": "主题",
     "chooseTopic": "选择主题",
-    "allTopics": "全部指示"
+    "allTopics": "全部指示",
+    "subjects": {
+      "houseLordPlacement": "宫主落位",
+      "functionalPlanetaryRoles": "此上升星座的行星职能"
+    },
+    "functionalRoles": {
+      "title": "{{lagna}}上升的行星职能",
+      "summary": "对于{{lagna}}上升，本章将{{supportive}}视为职能吉星，将{{adverse}}视为职能不利星，并将{{conditional}}视为中性或有条件的行星。",
+      "yoga": "本上升所列的成瑜伽条件：{{details}}。",
+      "qualifications": "原文另加以下限定：{{details}}。",
+      "evidence": "《BPHS》第34章从{{lagna}}上升确定行星职能，并给出该上升的专门分类。",
+      "marakaControl": "Maraka表述只说明在相关条件下的古典能力；它本身并不预示某一事件或死亡。"
+    }
   },
   "tamil": {
     "tab": "வாழ்க்கை",
@@ -333,7 +417,19 @@
     "classicalBasisCount": "பாரம்பரிய ஆதாரம் · {{count}} குறிப்புகள்",
     "currentTopic": "தலைப்பு",
     "chooseTopic": "ஒரு தலைப்பைத் தேர்ந்தெடுக்கவும்",
-    "allTopics": "அனைத்து குறிப்புகள்"
+    "allTopics": "அனைத்து குறிப்புகள்",
+    "subjects": {
+      "houseLordPlacement": "பாவ அதிபதியின் இருப்பிடம்",
+      "functionalPlanetaryRoles": "இந்த லக்னத்திற்கான கிரகப் பங்குகள்"
+    },
+    "functionalRoles": {
+      "title": "{{lagna}} லக்னத்திற்கான கிரகப் பங்குகள்",
+      "summary": "{{lagna}} லக்னத்திற்கு {{supportive}} செயல்பாட்டு நன்மை தருபவை, {{adverse}} பாதகமானவை, {{conditional}} நடுநிலை அல்லது நிபந்தனைக்குட்பட்டவை என இந்த அத்தியாயம் கூறுகிறது.",
+      "yoga": "இந்த லக்னத்திற்கு கூறப்பட்ட யோக நிபந்தனைகள்: {{details}}.",
+      "qualifications": "நூல் சேர்க்கும் சிறப்பு நிபந்தனைகள்: {{details}}.",
+      "evidence": "BPHS அத்தியாயம் 34, {{lagna}} லக்னத்திலிருந்து செயல்பாட்டு பங்குகளை நிர்ணயித்து அந்த லக்னத்திற்கான தனிப்பட்ட பட்டியலை வழங்குகிறது.",
+      "marakaControl": "மாரகக் குறிப்பு உரிய நிபந்தனைகளில் உள்ள பாரம்பரிய திறனை மட்டும் குறிக்கிறது; அது தனியாக ஒரு நிகழ்வு அல்லது மரணக் கணிப்பு அல்ல."
+    }
   },
   "telugu": {
     "tab": "జీవితం",
@@ -375,7 +471,19 @@
     "classicalBasisCount": "శాస్త్రీయ ఆధారం · {{count}} సూచనలు",
     "currentTopic": "అంశం",
     "chooseTopic": "ఒక అంశాన్ని ఎంచుకోండి",
-    "allTopics": "అన్ని సూచనలు"
+    "allTopics": "అన్ని సూచనలు",
+    "subjects": {
+      "houseLordPlacement": "భావాధిపతి స్థానం",
+      "functionalPlanetaryRoles": "ఈ లగ్నానికి గ్రహాల పాత్రలు"
+    },
+    "functionalRoles": {
+      "title": "{{lagna}} లగ్నానికి గ్రహాల పాత్రలు",
+      "summary": "{{lagna}} లగ్నానికి {{supportive}} కార్యాత్మకంగా శుభమైనవి, {{adverse}} ప్రతికూలమైనవి, {{conditional}} తటస్థం లేదా షరతులతో కూడినవి అని ఈ అధ్యాయం చెబుతుంది.",
+      "yoga": "ఈ లగ్నానికి చెప్పిన యోగకారక పరిస్థితులు: {{details}}.",
+      "qualifications": "గ్రంథం చేర్చిన ప్రత్యేక షరతులు: {{details}}.",
+      "evidence": "BPHS 34వ అధ్యాయం {{lagna}} లగ్నం నుంచి కార్యాత్మక పాత్రలను నిర్ణయించి, ఈ లగ్నానికి ప్రత్యేక పట్టికను ఇస్తుంది.",
+      "marakaControl": "మారక వాక్యం సంబంధిత పరిస్థితుల్లోని శాస్త్రీయ సామర్థ్యాన్ని మాత్రమే సూచిస్తుంది; అది ఒక్కటే సంఘటన లేదా మరణ సూచన కాదు."
+    }
   },
   "gujarati": {
     "tab": "જીવન",
@@ -417,7 +525,19 @@
     "classicalBasisCount": "શાસ્ત્રીય આધાર · {{count}} સંકેતો",
     "currentTopic": "વિષય",
     "chooseTopic": "એક વિષય પસંદ કરો",
-    "allTopics": "બધા સંકેતો"
+    "allTopics": "બધા સંકેતો",
+    "subjects": {
+      "houseLordPlacement": "ભાવેશનું સ્થાન",
+      "functionalPlanetaryRoles": "આ લગ્ન માટે ગ્રહોની ભૂમિકાઓ"
+    },
+    "functionalRoles": {
+      "title": "{{lagna}} લગ્ન માટે ગ્રહોની ભૂમિકાઓ",
+      "summary": "{{lagna}} લગ્ન માટે આ અધ્યાય {{supportive}}ને કાર્યાત્મક રીતે શુભ, {{adverse}}ને પ્રતિકૂળ અને {{conditional}}ને તટસ્થ અથવા શરતી માને છે.",
+      "yoga": "આ લગ્ન માટે જણાવેલી યોગદાયક શરતો: {{details}}.",
+      "qualifications": "ગ્રંથ આ વિશેષ શરતો પણ ઉમેરે છે: {{details}}.",
+      "evidence": "BPHS અધ્યાય 34 {{lagna}} લગ્નથી કાર્યાત્મક ભૂમિકાઓ નક્કી કરે છે અને પછી આ લગ્ન માટે વિશિષ્ટ સૂચિ આપે છે.",
+      "marakaControl": "મારક ઉલ્લેખ સંબંધિત શરતોમાં શાસ્ત્રીય ક્ષમતા દર્શાવે છે; તે પોતે કોઈ ઘટના અથવા મૃત્યુની આગાહી નથી."
+    }
   },
   "marathi": {
     "tab": "जीवन",
@@ -459,6 +579,18 @@
     "classicalBasisCount": "शास्त्रीय आधार · {{count}} संकेत",
     "currentTopic": "विषय",
     "chooseTopic": "एक विषय निवडा",
-    "allTopics": "सर्व संकेत"
+    "allTopics": "सर्व संकेत",
+    "subjects": {
+      "houseLordPlacement": "भावेशाचे स्थान",
+      "functionalPlanetaryRoles": "या लग्नासाठी ग्रहांच्या भूमिका"
+    },
+    "functionalRoles": {
+      "title": "{{lagna}} लग्नासाठी ग्रहांच्या भूमिका",
+      "summary": "{{lagna}} लग्नासाठी हा अध्याय {{supportive}} यांना कार्यात्मक शुभ, {{adverse}} यांना प्रतिकूल आणि {{conditional}} यांना तटस्थ किंवा सशर्त मानतो.",
+      "yoga": "या लग्नासाठी सांगितलेल्या योगदायक अटी: {{details}}.",
+      "qualifications": "ग्रंथ पुढील विशेष अटी जोडतो: {{details}}.",
+      "evidence": "BPHS अध्याय 34 {{lagna}} लग्नावरून कार्यात्मक भूमिका ठरवतो आणि नंतर या लग्नासाठी स्वतंत्र सूची देतो.",
+      "marakaControl": "मारक विधान संबंधित परिस्थितीतली शास्त्रीय क्षमता दाखवते; ते स्वतःहून एखादी घटना किंवा मृत्यूचे भाकीत नाही."
+    }
   }
 }

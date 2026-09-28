@@ -1,0 +1,321 @@
+{
+  "english": {
+    "houseDrawer": {
+      "natalCondition": "Natal house condition",
+      "currentActivation": "Current activation",
+      "currentActivationActive": "Dasha or transit factors are currently emphasizing this natal house.",
+      "currentActivationQuiet": "No distinct Dasha or transit emphasis is currently strengthening this natal house.",
+      "interpretation": {
+        "strong": "In {{chart}}, the natal {{house}} house is {{condition}}. {{area}} has cleaner support in the birth chart.",
+        "pressured": "In {{chart}}, the natal {{house}} house shows both support and pressure. {{area}} can deliver, though its results need more effort and maturity.",
+        "stress": "In {{chart}}, the natal {{house}} house is under noticeable pressure. {{area}} needs greater care and stronger support from the rest of the birth chart.",
+        "balanced": "In {{chart}}, the natal {{house}} house is neither distinctly strong nor distinctly strained. {{area}} depends on how its lord, occupants and aspects work together."
+      },
+      "evidence": {
+        "lordShadbalaStrong": "{{planet}}, the house lord, has strong Shadbala at {{rupas}} rupas.",
+        "lordShadbalaWeak": "{{planet}}, the house lord, has weak Shadbala at {{rupas}} rupas.",
+        "residentShadbalaStrong": "Resident {{planet}} has strong Shadbala at {{rupas}} rupas.",
+        "residentShadbalaWeak": "Resident {{planet}} has weak Shadbala at {{rupas}} rupas.",
+        "argalaSupport": "Argala gives net support to this house.",
+        "argalaPressure": "Argala obstruction outweighs support to this house.",
+        "houseTypeSupport": "The {{types}} nature of this house is classically supportive.",
+        "houseTypePressure": "The {{types}} nature of this house is classically demanding."
+      }
+    },
+    "legendNatalCombustion": "(C) shows natal combustion calculated from the planet’s actual D1 distance from the Sun.",
+    "planetaryPositions": {
+      "natalCombustionD1": "Natal combustion (D1)",
+      "natalSolarDistanceD1": "Natal solar distance (D1)"
+    }
+  },
+  "hindi": {
+    "houseDrawer": {
+      "natalCondition": "जन्मकुंडली में भाव की स्थिति",
+      "currentActivation": "वर्तमान सक्रियता",
+      "currentActivationActive": "दशा या गोचर इस समय जन्मकुंडली के इस भाव को सक्रिय कर रहे हैं।",
+      "currentActivationQuiet": "इस समय कोई स्पष्ट दशा या गोचर इस जन्मभाव को विशेष बल नहीं दे रहा है।",
+      "interpretation": {
+        "strong": "{{chart}} में जन्मकुंडली का {{house}} भाव {{condition}} है। {{area}} को जन्मकुंडली में स्पष्ट सहारा मिलता है।",
+        "pressured": "{{chart}} में जन्मकुंडली के {{house}} भाव पर सहारा और दबाव दोनों हैं। {{area}} फल दे सकता है, पर अधिक प्रयास और परिपक्वता चाहिए।",
+        "stress": "{{chart}} में जन्मकुंडली का {{house}} भाव स्पष्ट दबाव में है। {{area}} को अधिक सावधानी और कुंडली के अन्य भागों से सहारे की आवश्यकता है।",
+        "balanced": "{{chart}} में जन्मकुंडली का {{house}} भाव न स्पष्ट रूप से मजबूत है, न बहुत दबाव में। {{area}} उसके स्वामी, ग्रहों और दृष्टियों के संयुक्त प्रभाव पर निर्भर है।"
+      },
+      "evidence": {
+        "lordShadbalaStrong": "भाव स्वामी {{planet}} का षड्बल {{rupas}} रूप है, जो मजबूत है।",
+        "lordShadbalaWeak": "भाव स्वामी {{planet}} का षड्बल {{rupas}} रूप है, जो कमजोर है।",
+        "residentShadbalaStrong": "इस भाव में स्थित {{planet}} का षड्बल {{rupas}} रूप है, जो मजबूत है।",
+        "residentShadbalaWeak": "इस भाव में स्थित {{planet}} का षड्बल {{rupas}} रूप है, जो कमजोर है।",
+        "argalaSupport": "अर्गला इस भाव को समग्र सहारा देती है।",
+        "argalaPressure": "अर्गला अवरोध इस भाव के सहारे से अधिक है।",
+        "houseTypeSupport": "इस भाव की {{types}} प्रकृति शास्त्रीय रूप से सहायक है।",
+        "houseTypePressure": "इस भाव की {{types}} प्रकृति शास्त्रीय रूप से चुनौतीपूर्ण है।"
+      }
+    },
+    "legendNatalCombustion": "(C) जन्मकुंडली की दग्ध अवस्था दिखाता है, जिसकी गणना D1 में सूर्य से ग्रह की वास्तविक दूरी से होती है।",
+    "planetaryPositions": {
+      "natalCombustionD1": "जन्म दग्ध अवस्था (D1)",
+      "natalSolarDistanceD1": "जन्मकालीन सूर्य दूरी (D1)"
+    }
+  },
+  "es": {
+    "houseDrawer": {
+      "natalCondition": "Condición natal de la casa",
+      "currentActivation": "Activación actual",
+      "currentActivationActive": "Los factores de dasha o tránsito están destacando actualmente esta casa natal.",
+      "currentActivationQuiet": "Ningún dasha o tránsito distintivo está reforzando actualmente esta casa natal.",
+      "interpretation": {
+        "strong": "En {{chart}}, la casa natal {{house}} está {{condition}}. {{area}} recibe un apoyo más claro en la carta natal.",
+        "pressured": "En {{chart}}, la casa natal {{house}} muestra apoyo y presión. {{area}} puede dar resultados, aunque requiere más esfuerzo y madurez.",
+        "stress": "En {{chart}}, la casa natal {{house}} está bajo una presión notable. {{area}} requiere más cuidado y apoyo del resto de la carta natal.",
+        "balanced": "En {{chart}}, la casa natal {{house}} no está claramente fuerte ni tensa. {{area}} depende de cómo actúen juntos su regente, ocupantes y aspectos."
+      },
+      "evidence": {
+        "lordShadbalaStrong": "{{planet}}, regente de la casa, tiene un Shadbala fuerte de {{rupas}} rupas.",
+        "lordShadbalaWeak": "{{planet}}, regente de la casa, tiene un Shadbala débil de {{rupas}} rupas.",
+        "residentShadbalaStrong": "El planeta residente {{planet}} tiene un Shadbala fuerte de {{rupas}} rupas.",
+        "residentShadbalaWeak": "El planeta residente {{planet}} tiene un Shadbala débil de {{rupas}} rupas.",
+        "argalaSupport": "Argala aporta apoyo neto a esta casa.",
+        "argalaPressure": "La obstrucción de Argala supera el apoyo a esta casa.",
+        "houseTypeSupport": "La naturaleza {{types}} de esta casa es clásicamente favorable.",
+        "houseTypePressure": "La naturaleza {{types}} de esta casa es clásicamente exigente."
+      }
+    },
+    "legendNatalCombustion": "(C) muestra la combustión natal calculada con la distancia real del planeta al Sol en D1.",
+    "planetaryPositions": {
+      "natalCombustionD1": "Combustión natal (D1)",
+      "natalSolarDistanceD1": "Distancia solar natal (D1)"
+    }
+  },
+  "fr": {
+    "houseDrawer": {
+      "natalCondition": "État natal de la maison",
+      "currentActivation": "Activation actuelle",
+      "currentActivationActive": "Des facteurs de dasha ou de transit mettent actuellement cette maison natale en relief.",
+      "currentActivationQuiet": "Aucun dasha ou transit distinct ne renforce actuellement cette maison natale.",
+      "interpretation": {
+        "strong": "Dans {{chart}}, la maison natale {{house}} est {{condition}}. {{area}} reçoit un soutien plus net dans le thème natal.",
+        "pressured": "Dans {{chart}}, la maison natale {{house}} montre soutien et pression. {{area}} peut porter ses fruits, avec davantage d’effort et de maturité.",
+        "stress": "Dans {{chart}}, la maison natale {{house}} subit une pression notable. {{area}} demande plus d’attention et le soutien du reste du thème natal.",
+        "balanced": "Dans {{chart}}, la maison natale {{house}} n’est ni nettement forte ni nettement tendue. {{area}} dépend de l’action conjointe de son maître, de ses occupants et de ses aspects."
+      },
+      "evidence": {
+        "lordShadbalaStrong": "{{planet}}, maître de la maison, possède un Shadbala fort de {{rupas}} rupas.",
+        "lordShadbalaWeak": "{{planet}}, maître de la maison, possède un Shadbala faible de {{rupas}} rupas.",
+        "residentShadbalaStrong": "La planète résidente {{planet}} possède un Shadbala fort de {{rupas}} rupas.",
+        "residentShadbalaWeak": "La planète résidente {{planet}} possède un Shadbala faible de {{rupas}} rupas.",
+        "argalaSupport": "L’Argala apporte un soutien net à cette maison.",
+        "argalaPressure": "L’obstruction d’Argala dépasse le soutien reçu par cette maison.",
+        "houseTypeSupport": "La nature {{types}} de cette maison est classiquement favorable.",
+        "houseTypePressure": "La nature {{types}} de cette maison est classiquement exigeante."
+      }
+    },
+    "legendNatalCombustion": "(C) indique la combustion natale calculée à partir de la distance réelle de la planète au Soleil en D1.",
+    "planetaryPositions": {
+      "natalCombustionD1": "Combustion natale (D1)",
+      "natalSolarDistanceD1": "Distance solaire natale (D1)"
+    }
+  },
+  "german": {
+    "houseDrawer": {
+      "natalCondition": "Nataler Hauszustand",
+      "currentActivation": "Aktuelle Aktivierung",
+      "currentActivationActive": "Dasha- oder Transitfaktoren betonen derzeit dieses Geburtshaus.",
+      "currentActivationQuiet": "Derzeit stärkt keine deutliche Dasha- oder Transitbetonung dieses Geburtshaus.",
+      "interpretation": {
+        "strong": "In {{chart}} ist das natale {{house}}. Haus {{condition}}. {{area}} erhält im Geburtshoroskop klarere Unterstützung.",
+        "pressured": "In {{chart}} zeigt das natale {{house}}. Haus Unterstützung und Druck. {{area}} kann Ergebnisse bringen, braucht aber mehr Einsatz und Reife.",
+        "stress": "In {{chart}} steht das natale {{house}}. Haus unter deutlichem Druck. {{area}} braucht mehr Sorgfalt und Unterstützung aus dem übrigen Geburtshoroskop.",
+        "balanced": "In {{chart}} ist das natale {{house}}. Haus weder deutlich stark noch deutlich belastet. {{area}} hängt vom Zusammenspiel von Herrscher, Bewohnern und Aspekten ab."
+      },
+      "evidence": {
+        "lordShadbalaStrong": "{{planet}}, der Hausherrscher, hat mit {{rupas}} Rupas starkes Shadbala.",
+        "lordShadbalaWeak": "{{planet}}, der Hausherrscher, hat mit {{rupas}} Rupas schwaches Shadbala.",
+        "residentShadbalaStrong": "Der Bewohner {{planet}} hat mit {{rupas}} Rupas starkes Shadbala.",
+        "residentShadbalaWeak": "Der Bewohner {{planet}} hat mit {{rupas}} Rupas schwaches Shadbala.",
+        "argalaSupport": "Argala unterstützt dieses Haus insgesamt.",
+        "argalaPressure": "Die Argala-Behinderung überwiegt die Unterstützung dieses Hauses.",
+        "houseTypeSupport": "Die {{types}}-Natur dieses Hauses wirkt klassisch unterstützend.",
+        "houseTypePressure": "Die {{types}}-Natur dieses Hauses gilt klassisch als anspruchsvoll."
+      }
+    },
+    "legendNatalCombustion": "(C) zeigt die natale Verbrennung, berechnet aus dem tatsächlichen Abstand des Planeten zur Sonne in D1.",
+    "planetaryPositions": {
+      "natalCombustionD1": "Natale Verbrennung (D1)",
+      "natalSolarDistanceD1": "Nataler Sonnenabstand (D1)"
+    }
+  },
+  "russian": {
+    "houseDrawer": {
+      "natalCondition": "Натальное состояние дома",
+      "currentActivation": "Текущая активация",
+      "currentActivationActive": "Факторы даши или транзита сейчас подчёркивают этот натальный дом.",
+      "currentActivationQuiet": "Сейчас нет выраженного влияния даши или транзита, усиливающего этот натальный дом.",
+      "interpretation": {
+        "strong": "В {{chart}} натальный {{house}} дом имеет состояние «{{condition}}». {{area}} получает более ясную поддержку в карте рождения.",
+        "pressured": "В {{chart}} натальный {{house}} дом показывает и поддержку, и давление. {{area}} может давать результаты, но требует больше усилий и зрелости.",
+        "stress": "В {{chart}} натальный {{house}} дом находится под заметным давлением. {{area}} требует большей осторожности и поддержки остальной карты рождения.",
+        "balanced": "В {{chart}} натальный {{house}} дом не является ни явно сильным, ни явно напряжённым. {{area}} зависит от совместной работы управителя, планет в доме и аспектов."
+      },
+      "evidence": {
+        "lordShadbalaStrong": "Управитель дома {{planet}} имеет сильную Шадбалу: {{rupas}} руп.",
+        "lordShadbalaWeak": "Управитель дома {{planet}} имеет слабую Шадбалу: {{rupas}} руп.",
+        "residentShadbalaStrong": "Находящаяся в доме планета {{planet}} имеет сильную Шадбалу: {{rupas}} руп.",
+        "residentShadbalaWeak": "Находящаяся в доме планета {{planet}} имеет слабую Шадбалу: {{rupas}} руп.",
+        "argalaSupport": "Аргала в целом поддерживает этот дом.",
+        "argalaPressure": "Препятствие Аргалы перевешивает поддержку этого дома.",
+        "houseTypeSupport": "Природа дома {{types}} классически считается поддерживающей.",
+        "houseTypePressure": "Природа дома {{types}} классически считается сложной."
+      }
+    },
+    "legendNatalCombustion": "(C) показывает натальное сожжение, рассчитанное по фактическому расстоянию планеты от Солнца в D1.",
+    "planetaryPositions": {
+      "natalCombustionD1": "Натальное сожжение (D1)",
+      "natalSolarDistanceD1": "Натальное расстояние до Солнца (D1)"
+    }
+  },
+  "chinese": {
+    "houseDrawer": {
+      "natalCondition": "本命宫位状态",
+      "currentActivation": "当前激活",
+      "currentActivationActive": "大运或行运因素目前正在强调这个本命宫位。",
+      "currentActivationQuiet": "目前没有明显的大运或行运力量加强这个本命宫位。",
+      "interpretation": {
+        "strong": "在{{chart}}中，本命第{{house}}宫为{{condition}}。{{area}}在本命盘中得到较清晰的支持。",
+        "pressured": "在{{chart}}中，本命第{{house}}宫同时有支持与压力。{{area}}可以产生结果，但需要更多努力与成熟。",
+        "stress": "在{{chart}}中，本命第{{house}}宫承受明显压力。{{area}}需要更多谨慎，也需要本命盘其他部分的支持。",
+        "balanced": "在{{chart}}中，本命第{{house}}宫既不明显强旺，也不明显受压。{{area}}取决于宫主、宫内行星和相位如何共同作用。"
+      },
+      "evidence": {
+        "lordShadbalaStrong": "宫主{{planet}}的六力为{{rupas}}鲁帕，属于强。",
+        "lordShadbalaWeak": "宫主{{planet}}的六力为{{rupas}}鲁帕，属于弱。",
+        "residentShadbalaStrong": "宫内行星{{planet}}的六力为{{rupas}}鲁帕，属于强。",
+        "residentShadbalaWeak": "宫内行星{{planet}}的六力为{{rupas}}鲁帕，属于弱。",
+        "argalaSupport": "Argala对这个宫位形成净支持。",
+        "argalaPressure": "Argala的阻碍超过了对这个宫位的支持。",
+        "houseTypeSupport": "这个宫位的{{types}}性质在经典中具有支持作用。",
+        "houseTypePressure": "这个宫位的{{types}}性质在经典中较具挑战。"
+      }
+    },
+    "legendNatalCombustion": "(C) 表示本命燃烧，按行星在D1中与太阳的实际距离计算。",
+    "planetaryPositions": {
+      "natalCombustionD1": "本命燃烧（D1）",
+      "natalSolarDistanceD1": "本命太阳距离（D1）"
+    }
+  },
+  "tamil": {
+    "houseDrawer": {
+      "natalCondition": "பிறப்பு ஜாதக பாவ நிலை",
+      "currentActivation": "தற்போதைய செயல்பாடு",
+      "currentActivationActive": "தசை அல்லது கோச்சார காரணிகள் தற்போது இந்தப் பிறப்பு ஜாதக பாவத்தை வலியுறுத்துகின்றன.",
+      "currentActivationQuiet": "தற்போது இந்தப் பிறப்பு ஜாதக பாவத்தை வலுப்படுத்தும் தனிப்பட்ட தசை அல்லது கோச்சார வலியுறுத்தல் இல்லை.",
+      "interpretation": {
+        "strong": "{{chart}} இல் பிறப்பு ஜாதகத்தின் {{house}}ஆம் பாவம் {{condition}} நிலையில் உள்ளது. {{area}} பிறப்பு ஜாதகத்தில் தெளிவான ஆதரவைப் பெறுகிறது.",
+        "pressured": "{{chart}} இல் பிறப்பு ஜாதகத்தின் {{house}}ஆம் பாவத்தில் ஆதரவும் அழுத்தமும் உள்ளன. {{area}} பலன் தரலாம்; அதிக முயற்சியும் முதிர்ச்சியும் தேவை.",
+        "stress": "{{chart}} இல் பிறப்பு ஜாதகத்தின் {{house}}ஆம் பாவம் குறிப்பிடத்தக்க அழுத்தத்தில் உள்ளது. {{area}}க்கு கூடுதல் கவனமும் ஜாதகத்தின் பிற பகுதிகளின் ஆதரவும் தேவை.",
+        "balanced": "{{chart}} இல் பிறப்பு ஜாதகத்தின் {{house}}ஆம் பாவம் தெளிவாக வலிமையாகவும் இல்லை, அழுத்தத்திலும் இல்லை. {{area}} அதன் அதிபதி, உள்ள கிரகங்கள் மற்றும் பார்வைகள் இணைந்து செயல்படுவதைக் கொண்டது."
+      },
+      "evidence": {
+        "lordShadbalaStrong": "பாவ அதிபதி {{planet}} {{rupas}} ரூப வலுவான ஷட்பலத்தைக் கொண்டுள்ளது.",
+        "lordShadbalaWeak": "பாவ அதிபதி {{planet}} {{rupas}} ரூப பலவீனமான ஷட்பலத்தைக் கொண்டுள்ளது.",
+        "residentShadbalaStrong": "இந்த பாவத்தில் உள்ள {{planet}} {{rupas}} ரூப வலுவான ஷட்பலத்தைக் கொண்டுள்ளது.",
+        "residentShadbalaWeak": "இந்த பாவத்தில் உள்ள {{planet}} {{rupas}} ரூப பலவீனமான ஷட்பலத்தைக் கொண்டுள்ளது.",
+        "argalaSupport": "அர்கலா இந்த பாவத்திற்கு மொத்த ஆதரவை அளிக்கிறது.",
+        "argalaPressure": "அர்கலா தடைகள் இந்த பாவத்தின் ஆதரவை விட அதிகம்.",
+        "houseTypeSupport": "இந்த பாவத்தின் {{types}} தன்மை சாஸ்திர ரீதியாக ஆதரவானது.",
+        "houseTypePressure": "இந்த பாவத்தின் {{types}} தன்மை சாஸ்திர ரீதியாக சவாலானது."
+      }
+    },
+    "legendNatalCombustion": "(C) என்பது D1 இல் சூரியனிலிருந்து கிரகத்தின் உண்மையான தூரத்தை வைத்து கணக்கிடப்பட்ட பிறப்பு அஸ்தங்கத நிலையைக் காட்டுகிறது.",
+    "planetaryPositions": {
+      "natalCombustionD1": "பிறப்பு அஸ்தங்கதம் (D1)",
+      "natalSolarDistanceD1": "பிறப்பு சூரிய தூரம் (D1)"
+    }
+  },
+  "telugu": {
+    "houseDrawer": {
+      "natalCondition": "జన్మ జాతక భావ స్థితి",
+      "currentActivation": "ప్రస్తుత క్రియాశీలత",
+      "currentActivationActive": "దశ లేదా గోచార అంశాలు ప్రస్తుతం ఈ జన్మ భావాన్ని ప్రధానంగా చేస్తున్నాయి.",
+      "currentActivationQuiet": "ప్రస్తుతం ఈ జన్మ భావాన్ని బలపరిచే ప్రత్యేక దశ లేదా గోచార ప్రభావం లేదు.",
+      "interpretation": {
+        "strong": "{{chart}}లో జన్మ జాతకంలోని {{house}}వ భావం {{condition}}గా ఉంది. {{area}}కు జన్మ జాతకంలో స్పష్టమైన మద్దతు ఉంది.",
+        "pressured": "{{chart}}లో జన్మ జాతకంలోని {{house}}వ భావానికి మద్దతు, ఒత్తిడి రెండూ ఉన్నాయి. {{area}} ఫలితాలు ఇవ్వగలదు, కానీ ఎక్కువ ప్రయత్నం మరియు పరిపక్వత అవసరం.",
+        "stress": "{{chart}}లో జన్మ జాతకంలోని {{house}}వ భావం గణనీయమైన ఒత్తిడిలో ఉంది. {{area}}కు ఎక్కువ జాగ్రత్త మరియు మిగతా జన్మ జాతకం నుంచి మద్దతు అవసరం.",
+        "balanced": "{{chart}}లో జన్మ జాతకంలోని {{house}}వ భావం స్పష్టంగా బలంగానూ లేదు, ఒత్తిడిలోనూ లేదు. {{area}} దాని అధిపతి, గ్రహాలు మరియు దృష్టులు కలిసి ఎలా పనిచేస్తాయో దానిపై ఆధారపడి ఉంటుంది."
+      },
+      "evidence": {
+        "lordShadbalaStrong": "భావాధిపతి {{planet}}కు {{rupas}} రూపల బలమైన షడ్బలం ఉంది.",
+        "lordShadbalaWeak": "భావాధిపతి {{planet}}కు {{rupas}} రూపల బలహీనమైన షడ్బలం ఉంది.",
+        "residentShadbalaStrong": "ఈ భావంలో ఉన్న {{planet}}కు {{rupas}} రూపల బలమైన షడ్బలం ఉంది.",
+        "residentShadbalaWeak": "ఈ భావంలో ఉన్న {{planet}}కు {{rupas}} రూపల బలహీనమైన షడ్బలం ఉంది.",
+        "argalaSupport": "అర్గళ ఈ భావానికి మొత్తంగా మద్దతు ఇస్తుంది.",
+        "argalaPressure": "అర్గళ అవరోధం ఈ భావానికి ఉన్న మద్దతును మించుతోంది.",
+        "houseTypeSupport": "ఈ భావం యొక్క {{types}} స్వభావం శాస్త్రీయంగా అనుకూలమైనది.",
+        "houseTypePressure": "ఈ భావం యొక్క {{types}} స్వభావం శాస్త్రీయంగా సవాలుతో కూడినది."
+      }
+    },
+    "legendNatalCombustion": "(C) D1లో సూర్యుని నుంచి గ్రహం యొక్క నిజమైన దూరంతో లెక్కించిన జన్మ అస్తంగత స్థితిని చూపిస్తుంది.",
+    "planetaryPositions": {
+      "natalCombustionD1": "జన్మ అస్తంగతం (D1)",
+      "natalSolarDistanceD1": "జన్మ సూర్య దూరం (D1)"
+    }
+  },
+  "gujarati": {
+    "houseDrawer": {
+      "natalCondition": "જન્મકુંડળીમાં ભાવની સ્થિતિ",
+      "currentActivation": "વર્તમાન સક્રિયતા",
+      "currentActivationActive": "દશા અથવા ગોચરના પરિબળો હાલમાં આ જન્મભાવને વિશેષ સક્રિય કરી રહ્યા છે.",
+      "currentActivationQuiet": "હાલમાં કોઈ સ્પષ્ટ દશા અથવા ગોચર આ જન્મભાવને વિશેષ બળ આપતું નથી.",
+      "interpretation": {
+        "strong": "{{chart}}માં જન્મકુંડળીનો {{house}}મો ભાવ {{condition}} છે. {{area}}ને જન્મકુંડળીમાં વધુ સ્પષ્ટ આધાર મળે છે.",
+        "pressured": "{{chart}}માં જન્મકુંડળીના {{house}}મા ભાવમાં આધાર અને દબાણ બંને છે. {{area}} પરિણામ આપી શકે છે, પરંતુ વધુ પ્રયત્ન અને પરિપક્વતા જોઈએ.",
+        "stress": "{{chart}}માં જન્મકુંડળીનો {{house}}મો ભાવ નોંધપાત્ર દબાણમાં છે. {{area}}ને વધુ કાળજી અને બાકીની જન્મકુંડળીના આધારની જરૂર છે.",
+        "balanced": "{{chart}}માં જન્મકુંડળીનો {{house}}મો ભાવ ન સ્પષ્ટ રીતે મજબૂત છે, ન ખાસ દબાણમાં. {{area}} તેના સ્વામી, ગ્રહો અને દૃષ્ટિઓ સાથે મળીને કેવી રીતે કામ કરે છે તેના પર આધારિત છે."
+      },
+      "evidence": {
+        "lordShadbalaStrong": "ભાવ સ્વામી {{planet}}નું ષડ્બળ {{rupas}} રૂપ છે, જે મજબૂત છે.",
+        "lordShadbalaWeak": "ભાવ સ્વામી {{planet}}નું ષડ્બળ {{rupas}} રૂપ છે, જે નબળું છે.",
+        "residentShadbalaStrong": "આ ભાવમાં રહેલા {{planet}}નું ષડ્બળ {{rupas}} રૂપ છે, જે મજબૂત છે.",
+        "residentShadbalaWeak": "આ ભાવમાં રહેલા {{planet}}નું ષડ્બળ {{rupas}} રૂપ છે, જે નબળું છે.",
+        "argalaSupport": "અર્ગલા આ ભાવને એકંદર આધાર આપે છે.",
+        "argalaPressure": "અર્ગલા અવરોધ આ ભાવના આધાર કરતાં વધારે છે.",
+        "houseTypeSupport": "આ ભાવની {{types}} પ્રકૃતિ શાસ્ત્રીય રીતે સહાયક છે.",
+        "houseTypePressure": "આ ભાવની {{types}} પ્રકૃતિ શાસ્ત્રીય રીતે પડકારજનક છે."
+      }
+    },
+    "legendNatalCombustion": "(C) D1માં સૂર્યથી ગ્રહના વાસ્તવિક અંતર પરથી ગણાયેલ જન્મકાલીન અસ્ત દર્શાવે છે.",
+    "planetaryPositions": {
+      "natalCombustionD1": "જન્મકાલીન અસ્ત (D1)",
+      "natalSolarDistanceD1": "જન્મકાલીન સૂર્ય અંતર (D1)"
+    }
+  },
+  "marathi": {
+    "houseDrawer": {
+      "natalCondition": "जन्मकुंडलीतील भावाची स्थिती",
+      "currentActivation": "सध्याची सक्रियता",
+      "currentActivationActive": "दशा किंवा गोचर घटक सध्या या जन्मभावाला विशेष सक्रिय करत आहेत.",
+      "currentActivationQuiet": "सध्या कोणतीही स्पष्ट दशा किंवा गोचर या जन्मभावाला विशेष बळ देत नाही.",
+      "interpretation": {
+        "strong": "{{chart}}मध्ये जन्मकुंडलीतील {{house}}वा भाव {{condition}} आहे. {{area}}ला जन्मकुंडलीत अधिक स्पष्ट आधार मिळतो.",
+        "pressured": "{{chart}}मध्ये जन्मकुंडलीतील {{house}}व्या भावात आधार आणि दबाव दोन्ही आहेत. {{area}} फल देऊ शकते, पण अधिक प्रयत्न आणि परिपक्वता आवश्यक आहे.",
+        "stress": "{{chart}}मध्ये जन्मकुंडलीतील {{house}}वा भाव लक्षणीय दबावात आहे. {{area}}ला अधिक काळजी आणि उर्वरित जन्मकुंडलीच्या आधाराची गरज आहे.",
+        "balanced": "{{chart}}मध्ये जन्मकुंडलीतील {{house}}वा भाव स्पष्टपणे मजबूतही नाही आणि तणावातही नाही. {{area}} त्याचा स्वामी, ग्रह आणि दृष्टी एकत्र कसे कार्य करतात यावर अवलंबून आहे."
+      },
+      "evidence": {
+        "lordShadbalaStrong": "भावस्वामी {{planet}}चे षड्बल {{rupas}} रूप असून ते मजबूत आहे.",
+        "lordShadbalaWeak": "भावस्वामी {{planet}}चे षड्बल {{rupas}} रूप असून ते कमकुवत आहे.",
+        "residentShadbalaStrong": "या भावातील {{planet}}चे षड्बल {{rupas}} रूप असून ते मजबूत आहे.",
+        "residentShadbalaWeak": "या भावातील {{planet}}चे षड्बल {{rupas}} रूप असून ते कमकुवत आहे.",
+        "argalaSupport": "अर्गला या भावाला एकूण आधार देते.",
+        "argalaPressure": "अर्गला अडथळा या भावाच्या आधारापेक्षा अधिक आहे.",
+        "houseTypeSupport": "या भावाची {{types}} प्रकृती शास्त्रीयदृष्ट्या सहाय्यक आहे.",
+        "houseTypePressure": "या भावाची {{types}} प्रकृती शास्त्रीयदृष्ट्या आव्हानात्मक आहे."
+      }
+    },
+    "legendNatalCombustion": "(C) D1मध्ये सूर्यापासून ग्रहाच्या प्रत्यक्ष अंतरावरून मोजलेली जन्मकालीन अस्त अवस्था दाखवते.",
+    "planetaryPositions": {
+      "natalCombustionD1": "जन्मकालीन अस्त (D1)",
+      "natalSolarDistanceD1": "जन्मकालीन सूर्य अंतर (D1)"
+    }
+  }
+}

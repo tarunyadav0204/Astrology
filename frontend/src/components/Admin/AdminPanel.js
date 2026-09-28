@@ -462,6 +462,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [homepageFomoEnabled, setHomepageFomoEnabled] = useState(false);
   const [homepageFomoUserAllowlist, setHomepageFomoUserAllowlist] = useState('');
   const [homepageFomoSaving, setHomepageFomoSaving] = useState(false);
+  const [classicalLifeTabEnabled, setClassicalLifeTabEnabled] = useState(false);
+  const [classicalLifeTabUserAllowlist, setClassicalLifeTabUserAllowlist] = useState('');
+  const [classicalLifeTabSaving, setClassicalLifeTabSaving] = useState(false);
   const [modernHomepageEnabled, setModernHomepageEnabled] = useState(false);
   const [modernHomepageSaving, setModernHomepageSaving] = useState(false);
   const [chatWorkerModeEnabled, setChatWorkerModeEnabled] = useState(false);
@@ -963,6 +966,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setChatSubjectGateUserAllowlist(data.chat_subject_gate_user_allowlist || '');
       setHomepageFomoEnabled(Boolean(data.homepage_fomo_enabled));
       setHomepageFomoUserAllowlist(data.homepage_fomo_user_allowlist || '');
+      setClassicalLifeTabEnabled(Boolean(data.classical_life_tab_enabled));
+      setClassicalLifeTabUserAllowlist(data.classical_life_tab_user_allowlist || '');
       const modernHomepageSetting = (data.settings || []).find((setting) => setting.key === 'modern_homepage_enabled');
       setModernHomepageEnabled(['1', 'true', 'on', 'yes'].includes(String(modernHomepageSetting?.value || '').toLowerCase()));
       setChatWorkerModeEnabled(Boolean(data.chat_worker_mode_enabled));
@@ -1595,6 +1600,51 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save homepage FOMO setting.');
     } finally {
       setHomepageFomoSaving(false);
+    }
+  };
+
+  const handleSaveClassicalLifeTabSettings = async () => {
+    const tokens = classicalLifeTabUserAllowlist.split(/[\s,]+/).filter(Boolean);
+    const invalidId = tokens.find((token) => !/^\d+$/.test(token) || Number(token) <= 0);
+    if (invalidId) {
+      alert(`Invalid user ID: ${invalidId}. Enter positive numeric IDs only.`);
+      return;
+    }
+    setClassicalLifeTabSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const [enabledRes, allowlistRes] = await Promise.all([
+        fetch('/api/admin/settings/classical_life_tab_enabled', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'classical_life_tab_enabled',
+            value: classicalLifeTabEnabled ? 'true' : 'false',
+            description: 'UI feature flag for the in-progress classical Life tab on Planetary Positions',
+          }),
+        }),
+        fetch('/api/admin/settings/classical_life_tab_user_allowlist', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'classical_life_tab_user_allowlist',
+            value: classicalLifeTabUserAllowlist,
+            description: 'Optional user IDs eligible for the classical Life tab. Empty = all users when enabled.',
+          }),
+        }),
+      ]);
+      if (!enabledRes.ok || !allowlistRes.ok) {
+        const enabledError = await enabledRes.json().catch(() => ({}));
+        const allowlistError = await allowlistRes.json().catch(() => ({}));
+        throw new Error(enabledError.detail || allowlistError.detail || 'Could not save Life tab settings');
+      }
+      alert(`Classical Life tab ${classicalLifeTabEnabled ? 'enabled' : 'disabled'}. Eligible users receive the change when feature settings refresh.`);
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving classical Life tab settings:', error);
+      alert(`Failed to save Life tab settings: ${error.message || 'check console'}`);
+    } finally {
+      setClassicalLifeTabSaving(false);
     }
   };
 
@@ -6702,6 +6752,49 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       disabled={homepageFomoSaving}
                     >
                       {homepageFomoSaving ? 'Saving…' : 'Save homepage FOMO flag'}
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-section">
+                  <h3>Classical Life tab</h3>
+                  <p className="settings-hint">
+                    Controls only the Life tab in Planetary Positions. The authenticated classical-reading APIs stay available so development and testing can continue.
+                  </p>
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <strong>Show Life tab</strong>
+                      <p>When off, the tab is hidden for everyone. When on with no IDs, it is visible to every signed-in user.</p>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={classicalLifeTabEnabled}
+                        onChange={(event) => setClassicalLifeTabEnabled(event.target.checked)}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div className="setting-info">
+                      <strong>Eligible user IDs</strong>
+                      <p>Comma, space, or line separated. Leave blank to show it to all users when the switch is on.</p>
+                    </div>
+                    <textarea
+                      value={classicalLifeTabUserAllowlist}
+                      onChange={(event) => setClassicalLifeTabUserAllowlist(event.target.value)}
+                      placeholder="e.g. 12, 45, 78"
+                      rows={3}
+                      style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                    />
+                  </div>
+                  <div className="form-buttons" style={{ marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      className="create-btn"
+                      onClick={handleSaveClassicalLifeTabSettings}
+                      disabled={classicalLifeTabSaving}
+                    >
+                      {classicalLifeTabSaving ? 'Saving…' : 'Save Life tab flag'}
                     </button>
                   </div>
                 </div>

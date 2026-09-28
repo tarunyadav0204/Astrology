@@ -57,18 +57,22 @@ export const signOccupied = (sign, label, font = 18) => {
   };
 };
 
-const fontSchedules = (count) => {
-  const stacked = (count >= 5
-    ? [[11, 8, 11], [10, 7, 10], [9, 7, 9]]
-    : count >= 3
-      ? [[12, 9, 12], [11, 8, 10], [10, 7, 10]]
-      : [[14, 10, 12], [12, 9, 11], [11, 8, 10]]
-  ).map(([symbolFont, degreeFont, ascFont]) => ({ symbolFont, degreeFont, ascFont, inline: false, short: false }));
-  if (count < 3) return stacked;
-  return stacked.concat([
-    { symbolFont: 9, degreeFont: 7, ascFont: 9, inline: true, short: false },
-    { symbolFont: 8, degreeFont: 7, ascFont: 8, inline: true, short: true },
-  ]);
+const fontSchedules = (planets) => {
+  const count = planets.length;
+  const longest = planets.reduce((max, planet) => Math.max(max, String(planet.symbol || '').length), 0);
+  const start = longest >= 9 ? 11 : count >= 5 ? 11 : count >= 3 ? 12 : 14;
+  const degreeFor = (symbolFont) => Math.max(6, Math.min(10, symbolFont - 3));
+  const schedules = [];
+  for (let symbolFont = start; symbolFont >= 8; symbolFont -= 1) {
+    schedules.push({ symbolFont, degreeFont: degreeFor(symbolFont), ascFont: symbolFont, inline: false, short: false });
+  }
+  for (let symbolFont = Math.min(start, 11); symbolFont >= 7; symbolFont -= 1) {
+    const degreeFont = Math.max(6, symbolFont - 2);
+    schedules.push({ symbolFont, degreeFont, ascFont: symbolFont, inline: false, short: true });
+    schedules.push({ symbolFont, degreeFont, ascFont: symbolFont, inline: true, short: false });
+    schedules.push({ symbolFont, degreeFont, ascFont: symbolFont, inline: true, short: true });
+  }
+  return schedules;
 };
 
 const blockMetrics = (symbol, degreeText, extras, symbolFont, degreeFont, showDegree, inline) => {
@@ -183,7 +187,8 @@ const tryLayout = (opts, fonts, minGap) => {
     blocked.push(spot.box);
   }
   const placed = [];
-  const rowGap = fonts.symbolFont + fonts.degreeFont + 10;
+  const rowGap = fonts.symbolFont + (fonts.inline ? 4 : fonts.degreeFont + 8);
+  const wide = planets.some((planet) => String(planet.symbol || '').length >= 8);
   planets.forEach((planet, index) => {
     const spec = blockMetrics(
       planet.symbol,
@@ -196,10 +201,15 @@ const tryLayout = (opts, fonts, minGap) => {
     );
     const prefer = planets.length === 1
       ? center
-      : {
-        x: center.x + (index % 2 ? 34 : -34),
-        y: center.y - rowGap * 0.35 + Math.floor(index / 2) * rowGap,
-      };
+      : wide
+        ? {
+          x: center.x,
+          y: center.y - ((planets.length - 1) * rowGap) / 2 + index * rowGap,
+        }
+        : {
+          x: center.x + (index % 2 ? 28 : -28),
+          y: center.y - rowGap * 0.35 + Math.floor(index / 2) * rowGap,
+        };
     const spot = packOne(candidates, polygon, blocked, spec, prefer, minGap);
     if (!spot) return;
     placed.push(spot);
@@ -218,14 +228,15 @@ const tryLayout = (opts, fonts, minGap) => {
 };
 
 export const layoutNatalHouse = (opts) => {
-  const schedules = fontSchedules(opts.planets.length);
-  let fallback = null;
+  const schedules = fontSchedules(opts.planets);
+  let best = null;
   for (const fonts of schedules) {
     const placed = tryLayout(opts, fonts, 2);
     if (placed) return placed;
-    fallback = tryLayout(opts, fonts, -999);
+    const loose = tryLayout(opts, fonts, -999);
+    if (loose && (!best || loose.minGap > best.minGap)) best = loose;
   }
-  return fallback || { planets: [], asc: null, occupied: [signOccupied(opts.sign, opts.signLabel)], minGap: 8, fonts: schedules[0] };
+  return best || { planets: [], asc: null, occupied: [signOccupied(opts.sign, opts.signLabel)], minGap: 8, fonts: schedules[0] };
 };
 
 export const boxesOverlap = (boxes) => {
