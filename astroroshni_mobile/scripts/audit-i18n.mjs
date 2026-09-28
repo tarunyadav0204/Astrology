@@ -10,6 +10,7 @@ const pitriShapaInfoCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'sr
 const mangalDoshaInfoCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/mangal-dosha-info.json'), 'utf8'));
 const matriShapaInfoCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/matri-shapa-info.json'), 'utf8'));
 const planetaryPositionsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/planetary-positions.json'), 'utf8'));
+const chartSourceClarityCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/chart-source-clarity.json'), 'utf8'));
 const planetResultDeliveryCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/planet-result-delivery.json'), 'utf8'));
 const shadbalaUiCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/shadbala-ui.json'), 'utf8'));
 const lifeAnalysisCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/life-analysis.json'), 'utf8'));
@@ -104,14 +105,21 @@ const flatten = (value, prefix = '', result = {}) => {
 const isPluralVariant = (key, englishKeySet) => /_(few|many|zero|two)$/.test(key)
   && englishKeySet.has(key.replace(/_(few|many|zero|two)$/, '_other'));
 
-const mergedPremiumCopy = Object.fromEntries(Object.entries(normalizedPremiumCopy).map(([language, copy]) => [
-  language,
-  {
-    ...copy,
-    homeRecommendations: homeRecommendationsCopy[language] || homeRecommendationsCopy.english,
-    planetaryPositions: planetaryPositionsCopy[language] || planetaryPositionsCopy.english,
-  },
-]));
+const mergedPremiumCopy = Object.fromEntries(Object.entries(normalizedPremiumCopy).map(([language, copy]) => {
+  const positionsCopy = planetaryPositionsCopy[language] || planetaryPositionsCopy.english;
+  const clarityCopy = chartSourceClarityCopy[language] || chartSourceClarityCopy.english;
+  return [
+    language,
+    {
+      ...copy,
+      homeRecommendations: homeRecommendationsCopy[language] || homeRecommendationsCopy.english,
+      planetaryPositions: {
+        ...positionsCopy,
+        ...(clarityCopy.planetaryPositions || {}),
+      },
+    },
+  ];
+}));
 const failures = [];
 const prashnaEnglish = flatten(prashnaCopy.english);
 const prashnaEnglishKeys = Object.keys(prashnaEnglish).sort();
