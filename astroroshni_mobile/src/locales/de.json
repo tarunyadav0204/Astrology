@@ -106,12 +106,12 @@
       "description": "Aktuelle Planetenstände"
     },
     "karkamsa": {
-      "name": "Karkamsa",
-      "description": "Spiritueller Pfad & Dharma"
+      "name": "Karakamsha",
+      "description": "D1 vom D9-Zeichen des Atmakaraka"
     },
     "swamsa": {
-      "name": "Swamsa",
-      "description": "Väterliche Abstammung & Ahnen"
+      "name": "Swamsha (D9)",
+      "description": "D9 vom D9-Zeichen des Atmakaraka"
     },
     "hora": {
       "name": "Hora (D2)",

@@ -1,22 +1,29 @@
-"""
-Jaimini Chart Calculator - Karkamsa and Swamsa Charts
+"""Reference charts based on the Atmakaraka's Navamsha sign.
 
-These are derivative charts used in Jaimini astrology that recast 
-divisional charts with Atmakaraka's position as the ascendant.
+The terminology is not uniform across Jaimini commentaries.  This calculator
+therefore declares the convention it uses and returns structural charts only:
 
-Classical References:
-- Jaimini Sutras by Maharishi Jaimini
-- Jaimini Upadesa Sutras
+* Karakamsha reference: D1 grahas counted from the AK's D9 sign.
+* Swamsha reference: D9 grahas counted from the AK's D9 sign.
+
+It does not turn the sign alone into a prediction.
 """
 
 from .base_calculator import BaseCalculator
 from .divisional_chart_calculator import DivisionalChartCalculator
+from .classical_jaimini import ClassicalJaiminiCalculator, JAIMINI_GRAHAS, SIGN_NAMES
 
 
 class JaiminiChartCalculator(BaseCalculator):
-    """Calculate Jaimini-specific derivative charts"""
+    """Calculate auditable D1 and D9 reference frames from the AK's D9 sign."""
+
+    SOURCE = "Jaimini Upadesa Sutras, Chapter 1, Pada 2 (Swamsha/Karakamsha section)"
+    TERMINOLOGY_NOTE = (
+        "This screen calls the D9 frame from the Atmakaraka's Navamsha sign Swamsha, "
+        "and the D1 frame from the same sign Karakamsha. Commentarial terminology varies."
+    )
     
-    def __init__(self, chart_data, atmakaraka_planet):
+    def __init__(self, chart_data, atmakaraka_planet=None, karaka_scheme="seven"):
         """
         Initialize with chart data and Atmakaraka planet
         
@@ -26,11 +33,28 @@ class JaiminiChartCalculator(BaseCalculator):
         """
         super().__init__(chart_data)
         self.atmakaraka_planet = atmakaraka_planet
+        if karaka_scheme not in {"seven", "eight"}:
+            raise ValueError("karaka_scheme must be 'seven' or 'eight'")
+        self.karaka_scheme = karaka_scheme
         self.divisional_calc = DivisionalChartCalculator(chart_data)
+
+    def _foundation(self):
+        d9_chart = self.divisional_calc.calculate_divisional_chart(9)['divisional_chart']
+        worksheet = ClassicalJaiminiCalculator(self.chart_data, d9_chart).calculate()
+        scheme = worksheet['karaka_schemes'][self.karaka_scheme]
+        calculated_atmakaraka = scheme['atmakaraka']
+        if self.atmakaraka_planet and self.atmakaraka_planet != calculated_atmakaraka:
+            raise ValueError(
+                f"Atmakaraka mismatch: received {self.atmakaraka_planet}, "
+                f"but the {self.karaka_scheme}-karaka calculation gives {calculated_atmakaraka}"
+            )
+        self.atmakaraka_planet = calculated_atmakaraka
+        reference = worksheet['svamsha_karakamsha'][self.karaka_scheme]
+        return d9_chart, scheme, reference
     
     def calculate_karkamsa_chart(self):
         """
-        Calculate Karkamsa Chart - PHYSICAL/MATERIAL dimension
+        Calculate the Karakamsha reference chart used by this application.
         
         Lagna: Atmakaraka's sign in D9
         Planets: D1 (Rashi) positions mapped to houses from Karkamsa lagna
@@ -38,14 +62,8 @@ class JaiminiChartCalculator(BaseCalculator):
         Returns:
             dict: Karkamsa chart with D1 planets relative to D9 AK sign
         """
-        # Step 1: Find Atmakaraka's D9 sign (this becomes the lagna)
-        d9_result = self.divisional_calc.calculate_divisional_chart(9)
-        d9_chart = d9_result['divisional_chart']
-        
-        if self.atmakaraka_planet not in d9_chart['planets']:
-            raise ValueError(f"Atmakaraka {self.atmakaraka_planet} not found in D9")
-        
-        karkamsa_sign = d9_chart['planets'][self.atmakaraka_planet]['sign']
+        d9_chart, scheme, reference = self._foundation()
+        karkamsa_sign = reference['sign_id']
 
         # Step 2: Map D1 planets to houses relative to Karkamsa lagna
         karkamsa_chart = self._recast_with_d1_planets(karkamsa_sign)
@@ -55,12 +73,21 @@ class JaiminiChartCalculator(BaseCalculator):
             'karkamsa_sign': karkamsa_sign,
             'atmakaraka': self.atmakaraka_planet,
             'atmakaraka_degree_in_d9': d9_chart['planets'][self.atmakaraka_planet]['degree'],
-            'significance': 'Physical reality and worldly achievements'
+            'karaka_scheme': self.karaka_scheme,
+            'karaka_assignment_unambiguous': scheme['is_unambiguous'],
+            'significance': "D1 grahas counted from the Atmakaraka's Navamsha sign",
+            'calculation_basis': {
+                'source': self.SOURCE,
+                'reference_sign': SIGN_NAMES[karkamsa_sign],
+                'reference_sign_id': karkamsa_sign,
+                'planetary_frame': 'D1',
+                'terminology_note': self.TERMINOLOGY_NOTE,
+            },
         }
     
     def calculate_swamsa_chart(self):
         """
-        Calculate Swamsa Chart - SOUL/SPIRITUAL dimension
+        Calculate the Swamsha reference chart used by this application.
         
         Lagna: Atmakaraka's sign in D9
         Planets: D9 (Navamsa) positions mapped to houses from Swamsa lagna
@@ -68,14 +95,8 @@ class JaiminiChartCalculator(BaseCalculator):
         Returns:
             dict: Swamsa chart with D9 planets relative to D9 AK sign
         """
-        # Step 1: Find Atmakaraka's D9 sign (this becomes the lagna)
-        d9_result = self.divisional_calc.calculate_divisional_chart(9)
-        d9_chart = d9_result['divisional_chart']
-        
-        if self.atmakaraka_planet not in d9_chart['planets']:
-            raise ValueError(f"Atmakaraka {self.atmakaraka_planet} not found in D9")
-        
-        swamsa_sign = d9_chart['planets'][self.atmakaraka_planet]['sign']
+        d9_chart, scheme, reference = self._foundation()
+        swamsa_sign = reference['sign_id']
 
         # Step 2: Map D9 planets to houses relative to Swamsa lagna
         swamsa_chart = self._recast_with_d9_planets(d9_chart, swamsa_sign)
@@ -85,14 +106,20 @@ class JaiminiChartCalculator(BaseCalculator):
             'swamsa_sign': swamsa_sign,
             'atmakaraka': self.atmakaraka_planet,
             'atmakaraka_degree_in_d9': d9_chart['planets'][self.atmakaraka_planet]['degree'],
-            'significance': "Soul's desire and spiritual evolution"
+            'karaka_scheme': self.karaka_scheme,
+            'karaka_assignment_unambiguous': scheme['is_unambiguous'],
+            'significance': "D9 grahas counted from the Atmakaraka's Navamsha sign",
+            'calculation_basis': {
+                'source': self.SOURCE,
+                'reference_sign': SIGN_NAMES[swamsa_sign],
+                'reference_sign_id': swamsa_sign,
+                'planetary_frame': 'D9',
+                'terminology_note': self.TERMINOLOGY_NOTE,
+            },
         }
     
     def _recast_with_d1_planets(self, karkamsa_sign):
         """Map D1 planets to houses from Karkamsa lagna"""
-        sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
-                     'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
-        
         chart = {
             'ascendant_sign': karkamsa_sign,
             'ascendant': karkamsa_sign * 30,
@@ -103,12 +130,14 @@ class JaiminiChartCalculator(BaseCalculator):
         }
         
         for planet, data in self.chart_data['planets'].items():
+            if planet not in JAIMINI_GRAHAS:
+                continue
             planet_sign = data['sign']
             house = ((planet_sign - karkamsa_sign) % 12) + 1
             chart['planets'][planet] = {
                 'sign': planet_sign,
-                'sign_name': sign_names[planet_sign],
-                'degree': data['degree'],
+                'sign_name': SIGN_NAMES[planet_sign],
+                'degree': data.get('degree', float(data['longitude']) % 30.0),
                 'longitude': data['longitude'],
                 'house': house,
                 'retrograde': data.get('retrograde', False)
@@ -118,9 +147,6 @@ class JaiminiChartCalculator(BaseCalculator):
     
     def _recast_with_d9_planets(self, d9_chart, swamsa_sign):
         """Map D9 planets to houses from Swamsa lagna"""
-        sign_names = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
-                     'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces']
-        
         chart = {
             'ascendant_sign': swamsa_sign,
             'ascendant': swamsa_sign * 30,
@@ -131,12 +157,14 @@ class JaiminiChartCalculator(BaseCalculator):
         }
         
         for planet, data in d9_chart['planets'].items():
+            if planet not in JAIMINI_GRAHAS:
+                continue
             planet_sign = data['sign']
             house = ((planet_sign - swamsa_sign) % 12) + 1
             chart['planets'][planet] = {
                 'sign': planet_sign,
-                'sign_name': sign_names[planet_sign],
-                'degree': data['degree'],
+                'sign_name': SIGN_NAMES[planet_sign],
+                'degree': data.get('degree', float(data['longitude']) % 30.0),
                 'longitude': data['longitude'],
                 'house': house,
                 'retrograde': data.get('retrograde', False)
@@ -154,21 +182,8 @@ class JaiminiChartCalculator(BaseCalculator):
         Returns:
             str: Classical interpretation
         """
-        interpretations = {
-            0: "Aries Karkamsa: Spiritual warrior, dharma through action, leadership in spiritual matters",
-            1: "Taurus Karkamsa: Material dharma, wealth through righteous means, stable spiritual path",
-            2: "Gemini Karkamsa: Intellectual dharma, teaching, communication of wisdom",
-            3: "Cancer Karkamsa: Emotional dharma, nurturing others, devotional path",
-            4: "Leo Karkamsa: Royal dharma, leadership in spiritual/religious matters, authority",
-            5: "Virgo Karkamsa: Service-oriented dharma, healing, analytical spiritual approach",
-            6: "Libra Karkamsa: Balanced dharma, justice, partnership in spiritual growth",
-            7: "Scorpio Karkamsa: Transformative dharma, occult knowledge, deep spiritual research",
-            8: "Sagittarius Karkamsa: Philosophical dharma, teaching higher wisdom, pilgrimage",
-            9: "Capricorn Karkamsa: Disciplined dharma, traditional spiritual practices, renunciation",
-            10: "Aquarius Karkamsa: Humanitarian dharma, unconventional spiritual path, service to masses",
-            11: "Pisces Karkamsa: Mystical dharma, meditation, liberation-oriented path"
-        }
-        return interpretations.get(karkamsa_sign, "Unknown Karkamsa sign")
+        sign_name = SIGN_NAMES[int(karkamsa_sign) % 12]
+        return f"Karakamsha reference: D1 grahas counted from {sign_name}, the Atmakaraka's D9 sign."
     
     def get_swamsa_interpretation(self, swamsa_sign):
         """
@@ -180,18 +195,5 @@ class JaiminiChartCalculator(BaseCalculator):
         Returns:
             str: Classical interpretation
         """
-        interpretations = {
-            0: "Aries Swamsa: Warrior lineage, independent ancestors, pioneering family karma",
-            1: "Taurus Swamsa: Wealthy lineage, stable family traditions, material inheritance",
-            2: "Gemini Swamsa: Intellectual lineage, communicative ancestors, versatile family",
-            3: "Cancer Swamsa: Nurturing lineage, emotional family bonds, protective ancestors",
-            4: "Leo Swamsa: Royal lineage, authoritative ancestors, leadership inheritance",
-            5: "Virgo Swamsa: Service-oriented lineage, analytical family, healing traditions",
-            6: "Libra Swamsa: Balanced lineage, diplomatic ancestors, partnership-focused family",
-            7: "Scorpio Swamsa: Transformative lineage, secretive family, occult inheritance",
-            8: "Sagittarius Swamsa: Philosophical lineage, religious ancestors, wisdom tradition",
-            9: "Capricorn Swamsa: Disciplined lineage, traditional family, structured inheritance",
-            10: "Aquarius Swamsa: Humanitarian lineage, unconventional ancestors, progressive family",
-            11: "Pisces Swamsa: Mystical lineage, spiritual ancestors, compassionate family karma"
-        }
-        return interpretations.get(swamsa_sign, "Unknown Swamsa sign")
+        sign_name = SIGN_NAMES[int(swamsa_sign) % 12]
+        return f"Swamsha reference: D9 grahas counted from {sign_name}, the Atmakaraka's D9 sign."

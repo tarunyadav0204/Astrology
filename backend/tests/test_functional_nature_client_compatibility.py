@@ -89,7 +89,15 @@ def test_positions_contract_is_the_single_source_for_mobile_tables_and_chart_bad
 
     calculator = PlanetaryDignitiesCalculator(displayed)
     dignities = calculator.calculate_planetary_dignities()
-    positions = calculator.calculate_position_tables(condition, dignities=dignities)
+    positions = calculator.calculate_position_tables(
+        condition,
+        dignities=dignities,
+        birth_data={
+            "date": "1990-01-01", "time": "12:00:00",
+            "latitude": 28.6139, "longitude": 77.2090,
+            "timezone": "Asia/Kolkata",
+        },
+    )
     mercury = next(row for row in positions["planets"] if row["name"] == "Mercury")
 
     assert mercury["dignity"]["key"] == "mt"
@@ -113,14 +121,55 @@ def test_positions_contract_is_the_single_source_for_mobile_tables_and_chart_bad
     assert mercury["boundary_proximity"]["rashi_degrees"] == 12.0
     assert mercury["navatara"]["key"] == "sadhaka"
     assert mercury["aspects"]["method"].startswith("Parashari")
+    # Geometry belongs to the chart being displayed. The separate condition
+    # chart may supply combustion/Neecha Bhanga, but must not replace the
+    # displayed chart's aspects or temporary friendships.
+    mercury_aspect = mercury["aspects"]["cast"][0]
+    assert mercury_aspect["target_sign"] == 11  # 7th from displayed Virgo
+    assert mercury_aspect["target_house"] == 9
     assert mercury["motion"]["key"] == "direct"
     assert len(positions["houses"]) == 12
+    third_house = positions["houses"][2]
+    assert third_house["classifications"] == ["upachaya", "apoklima"]
+    assert third_house["lord_state"]["name"] == "Mercury"
+    assert third_house["lord_state"]["dignity"]["key"] == "mt"
+    assert any(row["name"] == "Mercury" for row in third_house["occupant_details"])
+    assert all(
+        {"planet", "aspect_number", "from_house"} <= set(aspect)
+        for house in positions["houses"]
+        for aspect in house["aspects_received"]
+    )
+    assert third_house["bhava_chalit"]["status"] in {"available", "unavailable"}
     assert any(
         person["name"] == "Mercury"
         for row in positions["nakshatras"]
         if row["nakshatra"] == "Hasta"
         for person in row["people"]
     )
+    mercury_nakshatra = next(
+        row for row in positions["nakshatra_placements"] if row["name"] == "Mercury"
+    )
+    assert mercury_nakshatra["subject_type"] == "planet"
+    assert mercury_nakshatra["degree_in_nakshatra_dms"]["text"] == "8°00'00.00\""
+    assert mercury_nakshatra["pada_details"]["number"] == 3
+    assert mercury_nakshatra["pada_details"]["navamsa_sign_name"] == "Gemini"
+    assert mercury_nakshatra["nakshatra_metadata"]["deity"] == "Savitar"
+    assert mercury_nakshatra["nakshatra_metadata"]["nature_class"] == "kshipra"
+    assert mercury_nakshatra["nakshatra_lord_state"]["planet"] == "Moon"
+    assert mercury_nakshatra["nakshatra_lord_state"]["houses_owned"] == [1]
+    moon_nakshatra = next(
+        row for row in positions["nakshatra_placements"] if row["name"] == "Moon"
+    )
+    assert moon_nakshatra["vimshottari_birth_balance"]["starting_lord"] == "Saturn"
+    # The former grouped contract remains available and includes both field
+    # spellings used by legacy mobile clients.
+    grouped_mercury = next(
+        person
+        for row in positions["nakshatras"] if row["nakshatra"] == "Hasta"
+        for person in row["people"] if person["name"] == "Mercury"
+    )
+    assert grouped_mercury["retro"] == grouped_mercury["retrograde"]
+    assert positions["nakshatra_special_role_status"]["status"] == "available"
 
     attach_canonical_position_states(displayed)
     assert displayed["canonical_positions_version"] == "canonical-positions/2.0.0"

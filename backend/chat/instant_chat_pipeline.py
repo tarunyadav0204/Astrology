@@ -11660,12 +11660,13 @@ def _compact_wealth_foundation(
             chart_data,
             divisions.get("D9") if isinstance(divisions.get("D9"), dict) else {},
             "",
+            birth_data=birth_data,
         ).calculate_jaimini_points()
         result["special_lagnas"] = {
             "hora_lagna": points.get("hora_lagna") or {},
             "arudha_lagna": points.get("arudha_lagna") or {},
         }
-        availability["hora_lagna"] = bool(result["special_lagnas"]["hora_lagna"])
+        availability["hora_lagna"] = result["special_lagnas"]["hora_lagna"].get("available") is True
         availability["arudha_gains"] = bool(result["special_lagnas"]["arudha_lagna"])
     except Exception:
         logger.exception("Instant Wealth special-lagna calculation failed")

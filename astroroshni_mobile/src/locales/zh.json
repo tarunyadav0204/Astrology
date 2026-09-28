@@ -106,12 +106,12 @@
       "description": "当前行星位置"
     },
     "karkamsa": {
-      "name": "Karkamsa",
-      "description": "灵性路径与法 (Dharma)"
+      "name": "Karakamsha",
+      "description": "以 Atmakaraka 的 D9 星座为起点重排 D1"
     },
     "swamsa": {
-      "name": "Swamsa",
-      "description": "父系血统与祖先"
+      "name": "Swamsha（D9）",
+      "description": "以 Atmakaraka 的 D9 星座为起点重排 D9"
     },
     "hora": {
       "name": "二分盘 (D2)",

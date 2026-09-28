@@ -24,6 +24,14 @@ from calculators.classical_neecha_bhanga import calculate_classical_neecha_bhang
 from calculators.classical_combustion import attach_classical_combustion
 from calculators.planetary_dignities_calculator import attach_canonical_position_states
 from calculators.planet_result_delivery import attach_planet_result_delivery
+from calculators.classical_special_points import (
+    ClassicalSpecialPointsCalculator,
+    SpecialPointCalculationError,
+)
+from calculators.classical_jaimini import (
+    ClassicalJaiminiCalculator,
+    ClassicalJaiminiInputError,
+)
 from charts.house_insight_service import build_house_insight
 from charts.double_transit_service import (
     DoubleTransitCalculationError,
@@ -70,6 +78,23 @@ def _attach_classical_neecha_bhanga(chart_data: Dict[str, Any]) -> Dict[str, Any
     attach_classical_combustion(chart_data)
     attach_canonical_position_states(chart_data)
     return attach_planet_result_delivery(chart_data)
+
+
+def _refresh_exact_time_upagrahas(chart_data: Dict[str, Any], birth_data: Any, ayanamsha: str = 'lahiri') -> Dict[str, Any]:
+    """Upgrade cached charts without retaining old approximate Gulika/Mandi."""
+    if not isinstance(chart_data, dict) or chart_data.get('ascendant') is None:
+        return chart_data
+    planets = chart_data.get('planets') or {}
+    planets.pop('Gulika', None)
+    planets.pop('Mandi', None)
+    result = ChartCalculator({})._calculate_upagrahas(
+        birth_data,
+        chart_data['ascendant'],
+        planets,
+        ayanamsha,
+    )
+    chart_data['upagraha_calculation'] = result
+    return chart_data
 
 
 def _client_ip(request: Request) -> str:
@@ -508,6 +533,7 @@ async def calculate_chart_only(
             if cached_payload:
                 # Older cached charts predate the additive Neecha Bhanga fields.
                 # Enrich them on read so callers never receive a stale contract.
+                _refresh_exact_time_upagrahas(cached_payload, birth_data, ayanamsha)
                 return _attach_classical_neecha_bhanga(cached_payload)
 
         # Calculate chart
@@ -606,6 +632,7 @@ async def calculate_all_charts(
             if cached_payload:
                 cached_chart = cached_payload.get("chart_data") if isinstance(cached_payload, dict) else None
                 if isinstance(cached_chart, dict):
+                    _refresh_exact_time_upagrahas(cached_chart, birth_data)
                     _attach_classical_neecha_bhanga(cached_chart)
                 return cached_payload
         
@@ -940,6 +967,7 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
 
         if cached_chart_data:
             chart_data = _clone_payload(cached_chart_data)
+            _refresh_exact_time_upagrahas(chart_data, birth_data)
         else:
             from calculators.chart_calculator import ChartCalculator
             from calculators.divisional_chart_calculator import DivisionalChartCalculator
@@ -979,6 +1007,7 @@ async def calculate_jaimini_special_lagnas(request: dict, current_user: User = D
         chart_data = request.get('chart_data', {})
         d9_chart = request.get('d9_chart', {})
         atmakaraka = request.get('atmakaraka')
+        birth_data = request.get('birth_data')
         
         if not chart_data or not chart_data.get('planets'):
             raise HTTPException(status_code=400, detail="Chart data with planets required")
@@ -994,7 +1023,7 @@ async def calculate_jaimini_special_lagnas(request: dict, current_user: User = D
             div_calc = DivisionalChartCalculator(chart_data)
             d9_chart = div_calc.calculate_divisional_chart(9)
         
-        calculator = JaiminiPointCalculator(chart_data, d9_chart, atmakaraka)
+        calculator = JaiminiPointCalculator(chart_data, d9_chart, atmakaraka, birth_data=birth_data)
         jaimini_points = calculator.calculate_jaimini_points()
         
         return {
@@ -1004,6 +1033,33 @@ async def calculate_jaimini_special_lagnas(request: dict, current_user: User = D
     except Exception as e:
         logger.exception("error calculating jaimini lagnas")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/professional-jaimini")
+async def calculate_professional_jaimini(request: dict, current_user: User = Depends(get_current_user)):
+    """Return a classical Jaimini worksheet without changing legacy contracts."""
+    chart_data = request.get('chart_data') or {}
+    d9_chart = request.get('d9_chart') or {}
+    if not chart_data.get('planets') or chart_data.get('ascendant') is None:
+        raise HTTPException(status_code=400, detail='D1 chart with planets and ascendant is required')
+    try:
+        d9_payload = d9_chart.get('divisional_chart', d9_chart) if isinstance(d9_chart, dict) else {}
+        if not d9_payload.get('planets'):
+            d9_chart = DivisionalChartCalculator(chart_data).calculate_divisional_chart(9)
+        result = ClassicalJaiminiCalculator(chart_data, d9_chart).calculate()
+        return {'success': True, 'professional_jaimini': result}
+    except ClassicalJaiminiInputError as exc:
+        raise HTTPException(status_code=422, detail={
+            'message': str(exc),
+            'fallback_used': False,
+        })
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception('error calculating professional Jaimini worksheet')
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.post("/sniper-points")
 async def calculate_sniper_points(request: dict, current_user: User = Depends(get_current_user)):
@@ -1037,6 +1093,42 @@ async def calculate_sniper_points(request: dict, current_user: User = Depends(ge
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/professional-special-points")
+async def calculate_professional_special_points(request: dict, current_user: User = Depends(get_current_user)):
+    """Return sourced special points without changing existing chart contracts."""
+    chart_data = request.get('chart_data') or {}
+    birth_data = request.get('birth_data') or {}
+    d9_chart = request.get('d9_chart') or {}
+    ayanamsha = request.get('ayanamsha') or 'lahiri'
+    if not chart_data.get('planets') or chart_data.get('ascendant') is None:
+        raise HTTPException(status_code=400, detail='D1 chart with planets and ascendant is required')
+    if not birth_data:
+        raise HTTPException(status_code=400, detail='Birth data is required for time-derived points')
+    try:
+        d9_payload = d9_chart.get('divisional_chart', d9_chart) if isinstance(d9_chart, dict) else {}
+        if not d9_payload.get('planets'):
+            d9_chart = DivisionalChartCalculator(chart_data).calculate_divisional_chart(9)
+        result = ClassicalSpecialPointsCalculator(
+            chart_data,
+            birth_data,
+            d9_chart,
+            ayanamsha=ayanamsha,
+        ).calculate()
+        return {'success': True, 'professional_special_points': result}
+    except SpecialPointCalculationError as exc:
+        raise HTTPException(status_code=422, detail={
+            'message': str(exc),
+            'fallback_used': False,
+        })
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception('error calculating professional special points')
+        raise HTTPException(status_code=500, detail=str(exc))
 
 @router.post("/pushkara-analysis")
 async def calculate_pushkara_analysis(request: dict, current_user: User = Depends(get_current_user)):
@@ -1216,12 +1308,13 @@ async def calculate_karkamsa_chart(
     http_request: Request,
     current_user: Optional[User] = Depends(get_optional_user),
 ):
-    """Calculate Karkamsa chart (D9 recast with Atmakaraka's D9 sign as ascendant). Public for guest free charts."""
+    """Calculate the D1 Karakamsha reference from the Atmakaraka's D9 sign."""
     try:
         if current_user is None:
             _enforce_guest_chart_only_rate_limit(http_request)
         chart_data = request.get('chart_data', {})
         atmakaraka = request.get('atmakaraka')
+        karaka_scheme = request.get('karaka_scheme') or 'seven'
         
         if not chart_data or not chart_data.get('planets'):
             raise HTTPException(status_code=400, detail="Chart data with planets required")
@@ -1232,7 +1325,7 @@ async def calculate_karkamsa_chart(
         if isinstance(atmakaraka, dict):
             atmakaraka = atmakaraka.get('planet')
         
-        calculator = JaiminiChartCalculator(chart_data, atmakaraka)
+        calculator = JaiminiChartCalculator(chart_data, atmakaraka, karaka_scheme=karaka_scheme)
         karkamsa_result = calculator.calculate_karkamsa_chart()
         karkamsa_interpretation = calculator.get_karkamsa_interpretation(karkamsa_result['karkamsa_sign'])
         
@@ -1245,6 +1338,8 @@ async def calculate_karkamsa_chart(
         }
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail={"message": str(e), "fallback_used": False})
     except Exception as e:
         print(f"Error calculating Karkamsa chart: {e}")
         import traceback
@@ -1257,12 +1352,13 @@ async def calculate_swamsa_chart(
     http_request: Request,
     current_user: Optional[User] = Depends(get_optional_user),
 ):
-    """Calculate Swamsa chart (D12 recast with Atmakaraka's D12 sign as ascendant). Public for guest free charts."""
+    """Calculate the D9 Swamsha reference from the Atmakaraka's D9 sign."""
     try:
         if current_user is None:
             _enforce_guest_chart_only_rate_limit(http_request)
         chart_data = request.get('chart_data', {})
         atmakaraka = request.get('atmakaraka')
+        karaka_scheme = request.get('karaka_scheme') or 'seven'
         
         if not chart_data or not chart_data.get('planets'):
             raise HTTPException(status_code=400, detail="Chart data with planets required")
@@ -1273,7 +1369,7 @@ async def calculate_swamsa_chart(
         if isinstance(atmakaraka, dict):
             atmakaraka = atmakaraka.get('planet')
         
-        calculator = JaiminiChartCalculator(chart_data, atmakaraka)
+        calculator = JaiminiChartCalculator(chart_data, atmakaraka, karaka_scheme=karaka_scheme)
         swamsa_result = calculator.calculate_swamsa_chart()
         swamsa_interpretation = calculator.get_swamsa_interpretation(swamsa_result['swamsa_sign'])
         
@@ -1286,6 +1382,8 @@ async def calculate_swamsa_chart(
         }
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail={"message": str(e), "fallback_used": False})
     except Exception as e:
         print(f"Error calculating Swamsa chart: {e}")
         import traceback

@@ -5,8 +5,6 @@ import * as Sentry from '@sentry/react-native';
 import { API_BASE_URL, getEndpoint, API_TIMEOUT, DEBUG_API_REQUESTS, PAYMENT_SERVICE_BASE_URL } from '../utils/constants';
 import { buildQueryContext } from '../utils/queryContext';
 import { Alert } from 'react-native';
-import { calculateMudakkuLocal } from '../utils/mudakku';
-import { calculateGandantaLocal } from '../utils/gandanta';
 import { normalizeCalendarDateForApi } from '../utils/birthDateUtils';
 import i18n from '../locales/i18n';
 
@@ -947,57 +945,46 @@ export const chartAPI = {
       birth_data: birthData,
     }),
   
-  calculateJaiminiLagnas: (chartData, d9Chart, atmakaraka) =>
-    api.post(getEndpoint('/jaimini-special-lagnas'), { chart_data: chartData, d9_chart: d9Chart, atmakaraka }),
+  calculateJaiminiLagnas: (chartData, d9Chart, atmakaraka, birthData = null) =>
+    api.post(getEndpoint('/jaimini-special-lagnas'), { chart_data: chartData, d9_chart: d9Chart, atmakaraka, birth_data: birthData }),
+
+  calculateProfessionalJaimini: (chartData, d9Chart = {}) =>
+    api.post(getEndpoint('/professional-jaimini'), { chart_data: chartData, d9_chart: d9Chart }),
   
   calculateYogiPoints: (birthData) =>
     api.post(getEndpoint('/yogi-points'), { birth_data: birthData }),
   
   calculateSniperPoints: (chartData, d3Chart = {}, d9Chart = {}) =>
     api.post(getEndpoint('/sniper-points'), { chart_data: chartData, d3_chart: d3Chart, d9_chart: d9Chart }),
+
+  calculateProfessionalSpecialPoints: (chartData, birthData, d9Chart = {}, ayanamsha = 'lahiri') =>
+    api.post(getEndpoint('/professional-special-points'), {
+      chart_data: chartData,
+      birth_data: birthData,
+      d9_chart: d9Chart,
+      ayanamsha,
+    }),
   
   calculatePushkaraNavamsha: (chartData, d9Chart = {}) =>
     api.post(getEndpoint('/pushkara-analysis'), { chart_data: chartData, d9_chart: d9Chart }),
 
-  calculateMudakkuAnalysis: async (chartData) => {
-    try {
-      return await api.post(getEndpoint('/mudakku-analysis'), { chart_data: chartData });
-    } catch (error) {
-      if (error?.response?.status === 404 || !error?.response) {
-        const mudakku = calculateMudakkuLocal(chartData);
-        if (mudakku) {
-          return { data: { success: true, mudakku_analysis: mudakku }, status: 200 };
-        }
-      }
-      throw error;
-    }
-  },
+  calculateMudakkuAnalysis: (chartData) =>
+    api.post(getEndpoint('/mudakku-analysis'), { chart_data: chartData }),
 
-  calculateGandantaAnalysis: async (chartData) => {
-    try {
-      return await api.post(getEndpoint('/gandanta-analysis'), { chart_data: chartData });
-    } catch (error) {
-      if (error?.response?.status === 404 || !error?.response) {
-        const gandanta = calculateGandantaLocal(chartData);
-        if (gandanta) {
-          return { data: { success: true, gandanta_analysis: gandanta }, status: 200 };
-        }
-      }
-      throw error;
-    }
-  },
+  calculateGandantaAnalysis: (chartData) =>
+    api.post(getEndpoint('/gandanta-analysis'), { chart_data: chartData }),
   
-  calculateKarkamsaChart: (chartData, atmakaraka) =>
+  calculateKarkamsaChart: (chartData, atmakaraka, karakaScheme = 'seven') =>
     api.post(
       getEndpoint('/karkamsa-chart'),
-      { chart_data: chartData, atmakaraka },
+      { chart_data: chartData, atmakaraka, karaka_scheme: karakaScheme },
       BACKGROUND_REQUEST_CONFIG,
     ),
 
-  calculateSwamsaChart: (chartData, atmakaraka) =>
+  calculateSwamsaChart: (chartData, atmakaraka, karakaScheme = 'seven') =>
     api.post(
       getEndpoint('/swamsa-chart'),
-      { chart_data: chartData, atmakaraka },
+      { chart_data: chartData, atmakaraka, karaka_scheme: karakaScheme },
       BACKGROUND_REQUEST_CONFIG,
     ),
   

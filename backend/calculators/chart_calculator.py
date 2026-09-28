@@ -214,9 +214,16 @@ class ChartCalculator(BaseCalculator):
                 'sign_name': self.SIGN_NAMES[house_sign]
             })
         
-        # Calculate Gulika and Mandi using accurate sunrise/sunset
+        # Calculate Gulika and Mandi from the actual local day/night frame.
+        # Calculation failure is published explicitly; an approximate point is
+        # never inserted into an otherwise precise chart.
         upagraha_start = time.time()
-        self._calculate_upagrahas(jd, birth_data.latitude, birth_data.longitude, planets, ayanamsa, sid_mode)
+        upagraha_calculation = self._calculate_upagrahas(
+            birth_data,
+            ascendant_sidereal,
+            planets,
+            ayanamsha,
+        )
         upagraha_end = time.time()
         # print(f"[CALC] Upagraha calculation took {upagraha_end - upagraha_start:.3f}s")
         
@@ -257,6 +264,7 @@ class ChartCalculator(BaseCalculator):
             "ayanamsa": ayanamsa,
             "ascendant": ascendant_sidereal,
             "bhav_chalit": bhav_chalit,
+            "upagraha_calculation": upagraha_calculation,
         }
         attach_graha_drishti_to_chart(result)
         # Additive chart metadata: existing clients can ignore it, while every
@@ -348,70 +356,37 @@ class ChartCalculator(BaseCalculator):
                 'ascendant_sign_name': self.SIGN_NAMES[int(asc_sidereal / 30)]
             }
     
-    def _calculate_upagrahas(self, jd, lat, lon, planets, ayanamsa, sid_mode=swe.SIDM_LAHIRI):
-        """Calculate Gulika and Mandi based on actual sunrise/sunset (Dinamaan)"""
-        # Ensure geocentric mode and Lahiri ayanamsa for upagraha calculations
-        swe.set_topo(0, 0, 0)
-        swe.set_sid_mode(sid_mode)
+    def _calculate_upagrahas(self, birth_data, ascendant, planets, ayanamsha='lahiri'):
+        """Attach exact Gulika and declared Mandi convention without fallback."""
         try:
-            # Get sunrise and sunset for the day (single call)
-            sun_transit = swe.rise_trans(jd, swe.SUN, '', swe.FLG_SWIEPH, lon, lat, 0)
-            
-            sunrise_jd = sun_transit[1][0]  # Index 1 is Rise
-            sunset_jd = sun_transit[2][0]   # Index 2 is Set
-            
-            # Check if birth is day or night
-            is_day_birth = sunrise_jd <= jd < sunset_jd
-            
-            # Calculate day/night duration
-            day_duration = sunset_jd - sunrise_jd
-            night_duration = (sunrise_jd + 1.0) - sunset_jd
-            
-            current_duration = day_duration if is_day_birth else night_duration
-            part_length = current_duration / 8
-            
-            # Weekday mapping for Saturn's segment
-            weekday = int((jd + 1.5) % 7)
-            gulika_indices_day = {0: 6, 1: 5, 2: 4, 3: 3, 4: 2, 5: 1, 6: 0}
-            gulika_indices_night = {0: 2, 1: 1, 2: 0, 3: 6, 4: 5, 5: 4, 6: 3}
-            
-            if is_day_birth:
-                segment_index = gulika_indices_day[weekday]
-                start_time_jd = sunrise_jd + (segment_index * part_length)
-            else:
-                segment_index = gulika_indices_night[weekday]
-                start_time_jd = sunset_jd + (segment_index * part_length)
-            
-            # Calculate Gulika longitude at Saturn's segment start
-            houses_gulika = swe.houses(start_time_jd, lat, lon, b'P')
-            gulika_long = (houses_gulika[1][0] - ayanamsa - self.D1_CORRECTION) % 360
-            
-            # Mandi at middle of Saturn's segment
-            mandi_time_jd = start_time_jd + (part_length / 2)
-            houses_mandi = swe.houses(mandi_time_jd, lat, lon, b'P')
-            mandi_long = (houses_mandi[1][0] - ayanamsa - self.D1_CORRECTION) % 360
-            
-        except Exception:
-            # Fallback to approximate calculation if sunrise/sunset fails
-            weekday = int((jd + 1.5) % 7)
-            gulika_portions = [10.5, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0]
-            mandi_portions = [7.5, 15.0, 22.5, 6.0, 13.5, 21.0, 4.5]
-            
-            gulika_long = ((gulika_portions[weekday] * 15) - ayanamsa) % 360
-            mandi_long = ((mandi_portions[weekday] * 15) - ayanamsa) % 360
-            
-            if gulika_long < 0:
-                gulika_long += 360
-            if mandi_long < 0:
-                mandi_long += 360
-        
-        # Add to planets dict
-        for name, longitude in [('Gulika', gulika_long), ('Mandi', mandi_long)]:
-            planets[name] = {
-                'longitude': longitude,
-                'sign': int(longitude / 30),
-                'degree': longitude % 30,
-                'house': 1  # Will be calculated later
+            from .classical_special_points import ClassicalSpecialPointsCalculator
+
+            calculation = ClassicalSpecialPointsCalculator(
+                {'ascendant': ascendant, 'planets': planets},
+                birth_data,
+                ayanamsha=ayanamsha,
+            ).time_upagrahas()
+            by_name = {row['name']: row for row in calculation['points']}
+            for name in ('Gulika', 'Mandi'):
+                row = by_name[name]
+                planets[name] = {
+                    'longitude': row['longitude'],
+                    'sign': row['sign'],
+                    'sign_name': row['sign_name'],
+                    'degree': row['degree'],
+                    'house': row['house'],
+                    'nakshatra': row['nakshatra'],
+                    'nakshatra_lord': row['nakshatra_lord'],
+                    'pada': row['pada'],
+                    'calculation_method': row['point_moment'],
+                }
+            return {'success': True, **calculation}
+        except Exception as exc:
+            logger.exception('exact Gulika/Mandi calculation failed')
+            return {
+                'success': False,
+                'error': str(exc),
+                'fallback_used': False,
             }
     
     def get_baladi_avastha(self, planet_name: str, degree: float, sign: int) -> str:

@@ -665,6 +665,7 @@ class ChatContextBuilder:
             chart_data_original,
             d9_for_jaimini,
             atmakaraka_planet,
+            birth_data=birth_obj,
         )
         jaimini_points = jaimini_calc.calculate_jaimini_points()
         

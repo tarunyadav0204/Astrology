@@ -1,14 +1,9 @@
 from typing import Dict, Any
 from calculators.base_calculator import BaseCalculator
+from calculators.classical_mrityu_bhaga import evaluate_mrityu_bhaga
 
 class SniperPointsCalculator(BaseCalculator):
     """Calculator for Sniper Points - critical degrees that trigger sudden events"""
-    
-    # Classical Mrityu Bhaga - ONE universal degree per sign (BPHS/Phaladeepika)
-    MRITYU_BHAGA_DEGREES = {
-        0: 19, 1: 9, 2: 13, 3: 26, 4: 24, 5: 11,
-        6: 6, 7: 14, 8: 13, 9: 25, 10: 4, 11: 12
-    }
     
     def __init__(self, d1_chart: Dict, d3_chart: Dict, d9_chart: Dict):
         self.d1_chart = d1_chart
@@ -109,30 +104,35 @@ class SniperPointsCalculator(BaseCalculator):
             moon_long = planets['Moon']['longitude']
             rahu_long = planets['Rahu']['longitude']
             
-            # Calculate midpoint (Bhrigu Bindu)
-            # Handle the circular nature of zodiac (0-360 degrees)
-            diff = abs(rahu_long - moon_long)
-            
-            if diff > 180:
-                # Shorter arc goes the other way
-                if moon_long < rahu_long:
-                    bhrigu_bindu = (moon_long + (360 - diff) / 2) % 360
-                else:
-                    bhrigu_bindu = (rahu_long + (360 - diff) / 2) % 360
-            else:
-                # Direct midpoint
-                bhrigu_bindu = (moon_long + rahu_long) / 2
-            
-            # Normalize to 0-360
-            bhrigu_bindu = bhrigu_bindu % 360
+            # Midpoint on the shorter zodiacal arc.  A plain arithmetic mean
+            # fails across 0° Aries (for example, 350° and 10° must yield 0°).
+            signed_short_arc = ((rahu_long - moon_long + 540.0) % 360.0) - 180.0
+            bhrigu_bindu = (moon_long + (signed_short_arc / 2.0)) % 360.0
             
             bb_sign = int(bhrigu_bindu / 30)
             bb_degree = bhrigu_bindu % 30
             bb_lord = self.sign_lords[bb_sign]
             
-            # Get house placement
+            # Whole-sign house placement follows the sign distance from the
+            # ascendant sign.  Subtracting the ascendant's exact degree before
+            # dividing by 30 can incorrectly move the point into the previous
+            # house when it lies earlier within its sign.
             ascendant = self.d1_chart.get('ascendant', 0)
-            bb_house = int((bhrigu_bindu - ascendant) / 30) % 12 + 1
+            ascendant_sign = int(float(ascendant) % 360 / 30)
+            bb_house = ((bb_sign - ascendant_sign) % 12) + 1
+
+            nakshatra_span = 360.0 / 27.0
+            nakshatra_index = min(26, int(bhrigu_bindu / nakshatra_span))
+            degree_in_nakshatra = bhrigu_bindu - (nakshatra_index * nakshatra_span)
+            pada = min(4, int(degree_in_nakshatra / (nakshatra_span / 4.0)) + 1)
+            nakshatra_names = [
+                'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra',
+                'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni',
+                'Uttara Phalguni', 'Hasta', 'Chitra', 'Swati', 'Vishakha',
+                'Anuradha', 'Jyeshtha', 'Mula', 'Purva Ashadha', 'Uttara Ashadha',
+                'Shravana', 'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada',
+                'Uttara Bhadrapada', 'Revati',
+            ]
             
             # Calculate when slow-moving planets will transit this point
             transit_timing = self._calculate_bhrigu_bindu_transits(bhrigu_bindu, bb_sign)
@@ -144,6 +144,10 @@ class SniperPointsCalculator(BaseCalculator):
                 'degree': round(bb_degree, 2),
                 'house': bb_house,
                 'lord': bb_lord,
+                'nakshatra': nakshatra_names[nakshatra_index],
+                'pada': pada,
+                'degree_in_nakshatra': round(degree_in_nakshatra, 4),
+                'derivation': 'Shorter-arc midpoint between the natal Moon and Rahu',
                 'significance': 'Sensitive point for destiny and karmic events. Represents the soul\'s journey.',
                 'transit_watch': f"Watch when slow-moving planets (Saturn/Jupiter/Rahu) transit {self.sign_names[bb_sign]} near {bb_degree:.1f}°.",
                 'formatted': f"{self.sign_names[bb_sign]} {bb_degree:.2f}° (House {bb_house})",
@@ -312,51 +316,43 @@ class SniperPointsCalculator(BaseCalculator):
             }
     
     def calculate_mrityu_bhaga(self) -> Dict[str, Any]:
-        """Check if planets or Lagna fall on Death Degree (Mrityu Bhaga)"""
+        """Check the selected named classical Mrityu Bhaga table."""
         try:
             afflicted_points = []
-            
-            # Check Ascendant
-            asc_long = self.d1_chart.get('ascendant', 0)
-            asc_sign = int(asc_long / 30)
-            asc_deg = asc_long % 30
-            mb_deg = self.MRITYU_BHAGA_DEGREES[asc_sign]
-            orb = abs(asc_deg - mb_deg)
-            
-            if orb <= 1.0:
+            table_key = 'jataka_parijata_sarvartha_chintamani'
+            asc_result = evaluate_mrityu_bhaga('Ascendant', self.d1_chart.get('ascendant', 0), table_key=table_key)
+            if asc_result['is_mrityu_bhaga']:
                 afflicted_points.append({
-                    'point': 'Ascendant',
-                    'degree': round(asc_deg, 2),
-                    'mb_degree': mb_deg,
-                    'orb': round(orb, 2),
-                    'intensity': 'Critical' if orb <= 0.25 else 'High',
-                    'impact': 'Structural vulnerability in vitality and self-protection'
+                    **asc_result,
+                    'house': 1,
+                    'degree': round(asc_result['degree_in_sign'], 2),
+                    'mb_degree': asc_result['traditional_degree'],
+                    'orb': 0.0,
+                    'intensity': 'Within classical degree span',
                 })
-            
-            # Check Planets
+
             for planet, data in self.d1_chart.get('planets', {}).items():
-                p_sign = data.get('sign')
-                p_long = data.get('longitude', 0)
-                p_deg = p_long % 30
-                mb_deg = self.MRITYU_BHAGA_DEGREES[p_sign]
-                orb = abs(p_deg - mb_deg)
-                
-                if orb <= 1.0:
+                result = evaluate_mrityu_bhaga(planet, data.get('longitude', 0), table_key=table_key)
+                if result.get('is_mrityu_bhaga'):
                     afflicted_points.append({
+                        **result,
                         'planet': planet,
                         'house': data.get('house'),
-                        'degree': round(p_deg, 2),
-                        'mb_degree': mb_deg,
-                        'orb': round(orb, 2),
-                        'intensity': 'Critical' if orb <= 0.25 else 'Strong',
-                        'impact': 'Planet wounded - cannot protect house significations'
+                        'degree': round(result['degree_in_sign'], 2),
+                        'mb_degree': result['traditional_degree'],
+                        'orb': 0.0,
+                        'intensity': 'Within classical degree span',
                     })
-            
+
             return {
-                'point_name': 'Mrityu Bhaga (Death Degree)',
+                'point_name': 'Mrityu Bhaga',
                 'has_affliction': len(afflicted_points) > 0,
                 'afflicted_points': afflicted_points,
-                'source': 'BPHS/Phaladeepika'
+                'table_key': table_key,
+                'degree_semantics': 'An ordinal degree N means the span from N−1° up to N°.',
+                'source': 'Jataka Parijata and Sarvartha Chintamani traditional table',
+                'textual_variant': 'Phaladeepika gives a different Moon row; variants are not blended.',
+                'interpretation_scope': 'A sensitive natal degree; it is not a standalone prediction of death or disease.',
             }
         except Exception as e:
             return {'error': f'Mrityu Bhaga calculation failed: {e}'}

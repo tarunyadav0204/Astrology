@@ -105,9 +105,18 @@ NAKSHATRA_GANA = {
     27: "Deva",
 }
 
+# Traditional Ashtakoota Nadi grouping.  This is not a simple repeating
+# 1-2-3 cycle: the direction alternates across successive triads.
 NAKSHATRA_NADI = {
-    idx: ("Adya" if (idx - 1) % 3 == 0 else "Madhya" if (idx - 1) % 3 == 1 else "Antya")
-    for idx in range(1, 28)
+    1: "Adya", 2: "Madhya", 3: "Antya",
+    4: "Antya", 5: "Madhya", 6: "Adya",
+    7: "Adya", 8: "Madhya", 9: "Antya",
+    10: "Antya", 11: "Madhya", 12: "Adya",
+    13: "Adya", 14: "Madhya", 15: "Antya",
+    16: "Antya", 17: "Madhya", 18: "Adya",
+    19: "Adya", 20: "Madhya", 21: "Antya",
+    22: "Antya", 23: "Madhya", 24: "Adya",
+    25: "Adya", 26: "Madhya", 27: "Antya",
 }
 
 NAKSHATRA_YONI = {

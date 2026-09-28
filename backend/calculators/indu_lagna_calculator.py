@@ -156,6 +156,12 @@ class InduLagnaCalculator(BaseCalculator):
             "precision": "sign_only",
             "longitude_is_plotting_anchor": True,
             "exact_degree_available": False,
+            "calculation_basis": {
+                "tradition": "Uttara Kalamrita",
+                "reference": "Uttara Kalamrita 4.17",
+                "precision": "sign_only",
+                "fallback_used": False,
+            },
         }
 
     def _planet_rows_in_sign(self, sign_index: int) -> List[Dict[str, Any]]:
@@ -293,6 +299,12 @@ class InduLagnaCalculator(BaseCalculator):
             "second_from_indu": self._relative_house_analysis(indu_sign, 2),
             "eleventh_from_indu": self._relative_house_analysis(indu_sign, 11),
             "calculation": details,
+            "calculation_basis": {
+                "tradition": "Uttara Kalamrita",
+                "reference": "Uttara Kalamrita 4.17",
+                "precision": "sign_only",
+                "fallback_used": False,
+            },
             "interpretation_policy": {
                 "role": "prosperity manifestation support",
                 "requires_d1_d2_synthesis": True,

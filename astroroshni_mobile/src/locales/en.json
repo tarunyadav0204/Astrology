@@ -349,12 +349,12 @@
       "description": "Live Planetary Positions"
     },
     "karkamsa": {
-      "name": "Karkamsa",
-      "description": "Spiritual Path & Dharma"
+      "name": "Karakamsha",
+      "description": "D1 from the Atmakaraka’s D9 sign"
     },
     "swamsa": {
-      "name": "Swamsa",
-      "description": "Parental Lineage & Ancestry"
+      "name": "Swamsha (D9)",
+      "description": "D9 from the Atmakaraka’s D9 sign"
     },
     "hora": {
       "name": "Hora (D2)",

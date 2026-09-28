@@ -9,10 +9,12 @@ class JaiminiPointCalculator:
     4. Swamsa Lagna - The Ascendant of the Navamsa (D9)
     """
 
-    def __init__(self, d1_chart: Dict[str, Any], d9_chart: Dict[str, Any], atmakaraka_planet: str):
+    def __init__(self, d1_chart: Dict[str, Any], d9_chart: Dict[str, Any], atmakaraka_planet: str, birth_data=None, ayanamsha: str = 'lahiri'):
         self.d1_chart = d1_chart
         self.d9_chart = d9_chart
         self.atmakaraka = atmakaraka_planet
+        self.birth_data = birth_data
+        self.ayanamsha = ayanamsha
         self.planets_d1 = d1_chart.get('planets', {})
         self.planets_d9 = d9_chart.get('planets', {}) if 'planets' in d9_chart else d9_chart.get('divisional_chart', {}).get('planets', {})
         
@@ -35,15 +37,16 @@ class JaiminiPointCalculator:
         # 4. Karkamsa Lagna (KL) - Sign of Atmakaraka in D9
         kl_sign = self._calculate_karkamsa()
         
-        # 5. Swamsa Lagna - Ascendant of D9
-        swamsa_degree = self.d9_chart.get('ascendant', 0)
-        swamsa_sign = int(swamsa_degree / 30)
+        # 5. Swamsa reference - selected convention: AK's Navamsa sign.
+        # The legacy implementation incorrectly returned the D9 ascendant here,
+        # while the dedicated Swamsa chart was already recast from the AK's D9 sign.
+        swamsa_sign = kl_sign
         
-        # 6. Hora Lagna (HL) - Wealth indicator
-        hl_sign = self._calculate_hora_lagna()
-        
-        # 7. Ghatika Lagna (GL) - Power/Authority indicator
-        gl_sign = self._calculate_ghatika_lagna()
+        # BPHS Chapter 5 requires sunrise and birth-place inputs for these two
+        # points.  Never substitute the former Sun/Moon/Ascendant shortcuts.
+        time_lagnas = self._calculate_time_lagnas()
+        hora_lagna = time_lagnas.get('hora_lagna') or self._unavailable_time_lagna('Hora Lagna')
+        ghatika_lagna = time_lagnas.get('ghatika_lagna') or self._unavailable_time_lagna('Ghatika Lagna')
         
         return {
             "arudha_lagna": {
@@ -69,18 +72,11 @@ class JaiminiPointCalculator:
             "swamsa_lagna": {
                 "sign_id": swamsa_sign,
                 "sign_name": self._get_sign_name(swamsa_sign),
-                "description": "Soul's Internal Path (D9 Asc)"
+                "description": "D9 reference from the Atmakaraka's Navamsa sign",
+                "terminology_note": "Commentarial usage of Swamsha and Karakamsha varies."
             },
-            "hora_lagna": {
-                "sign_id": hl_sign,
-                "sign_name": self._get_sign_name(hl_sign),
-                "description": "Financial Strength (HL)"
-            },
-            "ghatika_lagna": {
-                "sign_id": gl_sign,
-                "sign_name": self._get_sign_name(gl_sign),
-                "description": "Authority & Rank (GL)"
-            }
+            "hora_lagna": hora_lagna,
+            "ghatika_lagna": ghatika_lagna,
         }
 
     def calculate_house_arudha(self, house_num: int) -> Dict[str, Any]:
@@ -152,23 +148,40 @@ class JaiminiPointCalculator:
         ak_data = self.planets_d9.get(self.atmakaraka, {})
         return ak_data.get('sign', 0)
     
-    def _calculate_hora_lagna(self) -> int:
-        """Calculate Hora Lagna - Wealth indicator based on Sun and Moon"""
-        sun_long = self.planets_d1.get('Sun', {}).get('longitude', 0)
-        moon_long = self.planets_d1.get('Moon', {}).get('longitude', 0)
-        
-        # Hora Lagna = (Sun + Moon - Ascendant) mod 360
-        hl_longitude = (sun_long + moon_long - self.asc_degree_d1) % 360
-        return int(hl_longitude / 30)
-    
-    def _calculate_ghatika_lagna(self) -> int:
-        """Calculate Ghatika Lagna - Power/Authority indicator"""
-        # Simplified calculation: Ascendant + (5 * Sun's longitude / 12)
-        sun_long = self.planets_d1.get('Sun', {}).get('longitude', 0)
-        
-        # Ghatika Lagna calculation based on sunrise time approximation
-        gl_longitude = (self.asc_degree_d1 + (5 * sun_long / 12)) % 360
-        return int(gl_longitude / 30)
+    @staticmethod
+    def _unavailable_time_lagna(name: str) -> Dict[str, Any]:
+        return {
+            'available': False,
+            'name': name,
+            'reason': 'Birth date, time, latitude, longitude and timezone are required for the BPHS sunrise calculation.',
+            'fallback_used': False,
+        }
+
+    def _calculate_time_lagnas(self) -> Dict[str, Any]:
+        """Use the canonical BPHS sunrise calculator when birth data is present."""
+        if not self.birth_data:
+            return {}
+        from .classical_special_points import ClassicalSpecialPointsCalculator
+        worksheet = ClassicalSpecialPointsCalculator(
+            self.d1_chart,
+            self.birth_data,
+            self.d9_chart,
+            ayanamsha=self.ayanamsha,
+        ).special_lagnas()
+        result = {}
+        for row in worksheet.get('points') or []:
+            if row.get('key') not in {'hora_lagna', 'ghatika_lagna'}:
+                continue
+            result[row['key']] = {
+                'available': True,
+                'sign_id': row['sign'],
+                'sign_name': row['sign_name'],
+                'longitude': row['longitude'],
+                'degree': row['degree'],
+                'description': row['name'],
+                'calculation_basis': row['calculation_basis'],
+            }
+        return result
 
     # -------------------------------------------------------------------------
     # UTILITIES

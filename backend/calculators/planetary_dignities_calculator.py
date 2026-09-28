@@ -2,6 +2,10 @@ from .base_calculator import BaseCalculator
 from .classical_combustion import calculate_chart_combustion
 from .classical_functional_nature import calculate_functional_nature
 from .classical_natural_nature import calculate_natural_nature
+from .nakshatra_remedy_calculator import NakshatraRemedyCalculator
+from .yogi_calculator import YogiCalculator
+from marriage_matching.constants import NAKSHATRA_GANA, NAKSHATRA_NADI, NAKSHATRA_YONI
+from vedic_predictions.config.nakshatra_data import NAKSHATRA_DATA
 from vedic_predictions.config.planetary_dignity import NATURAL_ENEMIES, NATURAL_FRIENDS
 
 
@@ -26,6 +30,18 @@ NAKSHATRA_LORDS = (
     'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury',
     'Ketu', 'Venus', 'Sun', 'Moon', 'Mars', 'Rahu', 'Jupiter', 'Saturn', 'Mercury',
 )
+NAKSHATRA_NATURE_CLASSES = (
+    'kshipra', 'ugra', 'mishra', 'dhruva', 'mridu', 'tikshna',
+    'chara', 'kshipra', 'tikshna', 'ugra', 'ugra', 'dhruva',
+    'kshipra', 'mridu', 'chara', 'mishra', 'mridu', 'tikshna',
+    'tikshna', 'ugra', 'dhruva', 'chara', 'chara', 'chara',
+    'ugra', 'dhruva', 'mridu',
+)
+PURUSHARTHAS = ('dharma', 'artha', 'kama', 'moksha')
+VIMSHOTTARI_YEARS = {
+    'Ketu': 7, 'Venus': 20, 'Sun': 6, 'Moon': 10, 'Mars': 7,
+    'Rahu': 18, 'Jupiter': 16, 'Saturn': 19, 'Mercury': 17,
+}
 PLANET_ORDER = ('Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi')
 TENANT_PLANETS = frozenset(('Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'))
 PLANET_ABBR = {
@@ -160,6 +176,65 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
         }
 
     @staticmethod
+    def _nakshatra_metadata(index):
+        """Stable chart-reference metadata; interpretation remains outside this table."""
+        number = int(index) + 1
+        catalog = NAKSHATRA_DATA.get(number) or {}
+        remedy = NakshatraRemedyCalculator.NAKSHATRA_DATA.get(NAKSHATRAS[index]) or {}
+        return {
+            'deity': catalog.get('deity') or remedy.get('devata'),
+            'symbol': catalog.get('symbol'),
+            'shakti': remedy.get('shakti'),
+            'nature_class': NAKSHATRA_NATURE_CLASSES[index],
+            'purushartha': PURUSHARTHAS[index % 4],
+            'gana': NAKSHATRA_GANA.get(number),
+            'nadi': NAKSHATRA_NADI.get(number),
+            'yoni': NAKSHATRA_YONI.get(number),
+            'sources': [
+                'Taittiriya Brahmana — Nakshatra deities',
+                'Brihat Samhita and the classical Muhurta tradition — Nakshatra action classes',
+                'Traditional Ashtakoota tables — Gana, Nadi and Yoni',
+            ],
+        }
+
+    @staticmethod
+    def _pada_details(nakshatra, longitude):
+        nak_span = 360.0 / 27.0
+        pada_span = nak_span / 4.0
+        degree_in_nakshatra = float(nakshatra['degree_in_nakshatra'])
+        pada = int(nakshatra['pada'])
+        start = (pada - 1) * pada_span
+        end = pada * pada_span
+        navamsa_sign = PlanetaryDignitiesCalculator._navamsa_sign(longitude)
+        return {
+            'number': pada,
+            'start_degree_in_nakshatra': round(start, 8),
+            'end_degree_in_nakshatra': round(end, 8),
+            'degree_in_pada': round(degree_in_nakshatra - start, 8),
+            'navamsa_sign': navamsa_sign,
+            'navamsa_sign_name': SIGN_NAMES[navamsa_sign],
+            'navamsa_lord': SIGN_LORDS[navamsa_sign],
+            'purushartha': PURUSHARTHAS[(pada - 1) % 4],
+        }
+
+    @staticmethod
+    def _vimshottari_birth_balance(nakshatra):
+        lord = nakshatra['lord']
+        span = 360.0 / 27.0
+        elapsed = max(0.0, min(1.0, float(nakshatra['degree_in_nakshatra']) / span))
+        total_years = VIMSHOTTARI_YEARS[lord]
+        remaining_years = total_years * (1.0 - elapsed)
+        return {
+            'starting_lord': lord,
+            'full_period_years': total_years,
+            'elapsed_fraction': round(elapsed, 10),
+            'remaining_fraction': round(1.0 - elapsed, 10),
+            'remaining_years': round(remaining_years, 8),
+            'remaining_days_approx': round(remaining_years * 365.25, 2),
+            'method': 'Vimshottari balance from the untraversed portion of the natal Moon Nakshatra',
+        }
+
+    @staticmethod
     def _natural_relationship(planet, other):
         if planet not in NATURAL_FRIENDS or other not in NATURAL_FRIENDS:
             return {'key': 'traditionDependent', 'labelKey': 'traditionDependent', 'label': 'Tradition-dependent'}
@@ -267,11 +342,16 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
         nak_span = 360.0 / 27.0
         within_nak = longitude % nak_span
         nak_distance = min(within_nak, nak_span - within_nak)
+        nak_index = min(26, int(longitude / nak_span))
         return {
             'rashi_degrees': round(rashi_distance, 6),
             'nakshatra_degrees': round(nak_distance, 6),
             'near_rashi_boundary': rashi_distance <= 1.0,
             'near_nakshatra_boundary': nak_distance <= 1.0,
+            'degrees_from_nakshatra_start': round(within_nak, 6),
+            'degrees_to_nakshatra_end': round(nak_span - within_nak, 6),
+            'previous_nakshatra': NAKSHATRAS[(nak_index - 1) % 27],
+            'next_nakshatra': NAKSHATRAS[(nak_index + 1) % 27],
         }
 
     @staticmethod
@@ -340,17 +420,27 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
                         'sign': int(p_data.get('sign', p_long / 30.0)) % 12,
                     }
 
+        display_rows = {}
+        for p_name, p_data in display_planets.items():
+            if isinstance(p_data, dict):
+                p_long = self._longitude_of(p_data)
+                if p_long is not None:
+                    display_rows[p_name] = {
+                        'data': p_data, 'longitude': p_long,
+                        'sign': int(p_data.get('sign', p_long / 30.0)) % 12,
+                    }
+
         def aspects_for(name, sign):
             cast = []
             for number in aspect_numbers.get(name, ()):
                 target_sign = (sign + number - 1) % 12
                 target_house = ((target_sign - lagna_sign) % 12) + 1
-                targets = [p for p, item in condition_rows.items()
+                targets = [p for p, item in display_rows.items()
                            if p != name and item['sign'] == target_sign]
                 cast.append({'aspect_number': number, 'target_sign': target_sign,
                              'target_house': target_house, 'planets': targets})
             received = []
-            for other, item in condition_rows.items():
+            for other, item in display_rows.items():
                 if other == name:
                     continue
                 hits = [n for n in aspect_numbers.get(other, ())
@@ -363,7 +453,7 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
 
         def conjunctions_for(name, longitude, sign):
             rows = []
-            for other, item in condition_rows.items():
+            for other, item in display_rows.items():
                 if other == name or item['sign'] != sign:
                     continue
                 rows.append({'planet': other,
@@ -374,8 +464,8 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
             natural = self._natural_relationship(name, other)
             if name == other:
                 return {'natural': natural, 'temporary': None, 'compound': natural}
-            first = condition_rows.get(name)
-            second = condition_rows.get(other)
+            first = display_rows.get(name)
+            second = display_rows.get(other)
             if not first or not second or natural.get('key') == 'traditionDependent':
                 return {'natural': natural, 'temporary': None,
                         'compound': {'key': 'traditionDependent', 'labelKey': 'traditionDependent', 'label': 'Tradition-dependent'}}
@@ -424,8 +514,8 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
             elif debilitation and sign == debilitation['sign']:
                 deep_point = {'type': 'debilitation', 'exact_degree': debilitation['degree'],
                               'distance_degrees': round(abs(degree - debilitation['degree']), 6)}
-            sign_dispositor = condition_rows.get(lord)
-            nak_dispositor = condition_rows.get(nakshatra['lord'])
+            sign_dispositor = display_rows.get(lord)
+            nak_dispositor = display_rows.get(nakshatra['lord'])
             def dispositor_summary(dispositor_name, item):
                 if not item:
                     return {'planet': dispositor_name, 'available': False}
@@ -454,6 +544,9 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
                 'nakshatra': nakshatra['name'],
                 'pada': nakshatra['pada'],
                 'degree_in_nakshatra': nakshatra['degree_in_nakshatra'],
+                'degree_in_nakshatra_dms': self._dms(nakshatra['degree_in_nakshatra']),
+                'pada_details': self._pada_details(nakshatra, longitude),
+                'nakshatra_metadata': self._nakshatra_metadata(nakshatra['index']),
                 'nakshatra_lord': nakshatra['lord'],
                 'nakshatra_lord_relationship': None if is_lagna else self._natural_relationship(name, nakshatra['lord']),
                 'retrograde': False if is_lagna or name in {'Rahu', 'Ketu'} else bool(data.get('retrograde')),
@@ -474,7 +567,7 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
                     'nakshatra': dispositor_summary(nakshatra['lord'], nak_dispositor),
                 },
                 'aspects': None if is_lagna else aspects_for(name, sign),
-                'conjunctions': [] if is_lagna else conjunctions_for(name, condition_longitude if condition_longitude is not None else longitude, condition_sign),
+                'conjunctions': [] if is_lagna else conjunctions_for(name, longitude, sign),
                 'baladi_avastha': None if is_lagna or name in {'Rahu', 'Ketu', 'Gulika', 'Mandi'} else self._baladi_avastha(degree, sign),
                 'deep_point': deep_point,
                 'motion': motion,
@@ -482,6 +575,7 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
                 'gandanta': self._gandanta(longitude),
                 'pushkara': None if is_lagna or name in {'Rahu', 'Ketu', 'Gulika', 'Mandi'} else self._pushkara(sign, degree),
                 'navatara': None if is_lagna or moon_nakshatra is None else self._navatara(nakshatra['index'], moon_nakshatra),
+                'vimshottari_birth_balance': self._vimshottari_birth_balance(nakshatra) if name == 'Moon' else None,
             }
 
         ascendant_row = row_for('Lagna', {'longitude': ascendant}, is_lagna=True) if ascendant is not None else None
@@ -502,13 +596,173 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
                 'combust': row['combust'],
             })
 
+        planet_rows_by_name = {row['name']: row for row in planet_rows}
+
+        def houses_owned_by(planet_name):
+            return [
+                house for house in range(1, 13)
+                if SIGN_LORDS[(lagna_sign + house - 1) % 12] == planet_name
+            ]
+
+        def nakshatra_lord_state_for(row):
+            lord_name = row['nakshatra_lord']
+            lord_row = planet_rows_by_name.get(lord_name)
+            if not lord_row:
+                return {'planet': lord_name, 'available': False, 'houses_owned': houses_owned_by(lord_name)}
+            dignity = dignities.get(lord_name) or {}
+            return {
+                'planet': lord_name,
+                'available': True,
+                'house': lord_row['house'],
+                'sign': lord_row['sign'],
+                'sign_name': lord_row['sign_name'],
+                'nakshatra': lord_row['nakshatra'],
+                'nakshatra_lord': lord_row['nakshatra_lord'],
+                'houses_owned': houses_owned_by(lord_name),
+                'dignity': lord_row['dignity'],
+                'retrograde': lord_row['retrograde'],
+                'combust': lord_row['combust'],
+                'neecha_bhanga': lord_row['neecha_bhanga'],
+                'vargottama': lord_row['vargottama'],
+                'natural_nature': dignity.get('natural_nature'),
+                'functional_nature': dignity.get('functional_nature'),
+                'friendships': lord_row.get('friendships'),
+                'motion': lord_row.get('motion'),
+                'conjunctions': lord_row.get('conjunctions') or [],
+                'aspects_received': ((lord_row.get('aspects') or {}).get('received') or []),
+                'friendship_with_subject': row.get('nakshatra_lord_relationship'),
+            }
+
+        nakshatra_placements = []
+        for row in ([ascendant_row] if ascendant_row else []) + [
+            item for item in planet_rows if item['name'] in TENANT_PLANETS
+        ]:
+            placement = dict(row)
+            placement['subject_type'] = 'lagna' if row['name'] == 'Lagna' else 'planet'
+            placement['nakshatra_lord_state'] = nakshatra_lord_state_for(row)
+            placement['special_roles'] = []
+            nakshatra_placements.append(placement)
+
+        yogi_role_status = {'status': 'unavailable', 'reason': 'natal_sun_moon_required'}
+        yogi_sun = self._longitude_of(condition_planets.get('Sun') or {})
+        yogi_moon = self._longitude_of(condition_planets.get('Moon') or {})
+        if yogi_sun is not None and yogi_moon is not None:
+            try:
+                calculated_yogi = YogiCalculator._calculate_from_longitudes(yogi_sun, yogi_moon)
+                yogi_point = calculated_yogi['yogi_point']
+                avayogi_point = calculated_yogi['avayogi_point']
+                yogi_details = YogiCalculator._nakshatra_details(yogi_point)
+                avayogi_details = YogiCalculator._nakshatra_details(avayogi_point)
+                role_planets = {
+                    'yogi': yogi_details['nakshatra_lord'],
+                    'duplicate_yogi': SIGN_LORDS[int(yogi_point / 30.0) % 12],
+                    'avayogi': avayogi_details['nakshatra_lord'],
+                }
+                for placement in nakshatra_placements:
+                    placement['special_roles'] = [
+                        role for role, planet in role_planets.items()
+                        if placement['name'] == planet
+                    ]
+                yogi_role_status = {
+                    'status': 'available',
+                    'calculation_basis': {
+                        'version': 'classical-yogi/2.0.0',
+                        'source': 'natal_chart_sidereal_longitudes',
+                        'yogi_formula': 'Sun + Moon + 93°20′',
+                        'avayogi_formula': 'Yogi point + 66°40′ (five nakshatras)',
+                    },
+                    'duplicate_yogi_avayogi_overlap': {
+                        'is_active': role_planets['duplicate_yogi'] == role_planets['avayogi'],
+                        'planet': role_planets['avayogi'] if role_planets['duplicate_yogi'] == role_planets['avayogi'] else None,
+                    },
+                }
+            except Exception as exc:
+                yogi_role_status = {'status': 'calculation_error', 'reason': str(exc)}
+
+        def house_classifications(house):
+            """Return overlapping classical house groups without grading them."""
+            groups = []
+            for key, houses in (
+                ('kendra', {1, 4, 7, 10}),
+                ('trikona', {1, 5, 9}),
+                ('dusthana', {6, 8, 12}),
+                ('upachaya', {3, 6, 10, 11}),
+                ('panapara', {2, 5, 8, 11}),
+                ('apoklima', {3, 6, 9, 12}),
+                ('maraka', {2, 7}),
+            ):
+                if house in houses:
+                    groups.append(key)
+            return groups
+
+        def professional_planet_state(row):
+            if not row:
+                return None
+            dignity = dignities.get(row['name']) or {}
+            return {
+                'name': row['name'],
+                'house': row['house'],
+                'sign': row['sign'],
+                'sign_name': row['sign_name'],
+                'nakshatra': row['nakshatra'],
+                'nakshatra_lord': row['nakshatra_lord'],
+                'dignity': row['dignity'],
+                'retrograde': row['retrograde'],
+                'combust': row['combust'],
+                'neecha_bhanga': row['neecha_bhanga'],
+                'vargottama': row['vargottama'],
+                'motion': row['motion'],
+                'friendships': row['friendships'],
+                'natural_nature': dignity.get('natural_nature'),
+                'functional_nature': dignity.get('functional_nature'),
+            }
+
+        received_by_house = {house: [] for house in range(1, 13)}
+        for planet_row in planet_rows:
+            for aspect in (planet_row.get('aspects') or {}).get('cast', []):
+                target_house = aspect.get('target_house')
+                if target_house not in received_by_house:
+                    continue
+                received_by_house[target_house].append({
+                    'planet': planet_row['name'],
+                    'aspect_number': aspect['aspect_number'],
+                    'from_house': planet_row['house'],
+                    'dignity': planet_row['dignity'],
+                    'retrograde': planet_row['retrograde'],
+                    'combust': planet_row['combust'],
+                    'natural_nature': (dignities.get(planet_row['name']) or {}).get('natural_nature'),
+                    'functional_nature': (dignities.get(planet_row['name']) or {}).get('functional_nature'),
+                })
+
+        bhava_chalit_available = any(
+            row.get('bhava_chalit_house') is not None for row in planet_rows
+            if row['name'] in TENANT_PLANETS
+        )
+        bhava_chalit_occupants = {house: [] for house in range(1, 13)}
+        bhava_chalit_changes = {house: [] for house in range(1, 13)}
+        if bhava_chalit_available:
+            for planet_row in planet_rows:
+                if planet_row['name'] not in TENANT_PLANETS:
+                    continue
+                rashi_house = planet_row['rashi_house']
+                chalit_house = planet_row.get('bhava_chalit_house') or rashi_house
+                bhava_chalit_occupants[chalit_house].append(planet_row['name'])
+                if rashi_house != chalit_house:
+                    change = {
+                        'planet': planet_row['name'],
+                        'rashi_house': rashi_house,
+                        'bhava_chalit_house': chalit_house,
+                    }
+                    bhava_chalit_changes[rashi_house].append(change)
+                    bhava_chalit_changes[chalit_house].append(change)
+
         house_rows = []
         for index in range(12):
             house = index + 1
             supplied_house = (chart.get('houses') or [{}] * 12)[index] if len(chart.get('houses') or []) > index else {}
             sign = int(supplied_house.get('sign', (lagna_sign + index) % 12)) % 12
             lord = SIGN_LORDS[sign]
-            lord_row = next((row for row in planet_rows if row['name'] == lord), None)
+            lord_row = planet_rows_by_name.get(lord)
             house_rows.append({
                 'house': house,
                 'sign': sign,
@@ -520,6 +774,21 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
                 'lord_dignity': lord_row['dignity'] if lord_row else None,
                 'lord_combust': lord_row['combust'] if lord_row else False,
                 'occupants': occupants[house],
+                # Additive professional fields. Existing lightweight fields
+                # above remain unchanged for older clients.
+                'classifications': house_classifications(house),
+                'lord_state': professional_planet_state(lord_row),
+                'occupant_details': [
+                    professional_planet_state(row)
+                    for row in planet_rows
+                    if row['name'] in TENANT_PLANETS and row['house'] == house
+                ],
+                'aspects_received': received_by_house[house],
+                'bhava_chalit': {
+                    'status': 'available' if bhava_chalit_available else 'unavailable',
+                    'occupants': bhava_chalit_occupants[house],
+                    'changes': bhava_chalit_changes[house],
+                },
             })
 
         grouped = {}
@@ -532,7 +801,8 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
             })
             group['people'].append({
                 'name': row['name'], 'pada': row['pada'],
-                'retrograde': row['retrograde'], 'combust': row['combust'],
+                'retrograde': row['retrograde'], 'retro': row['retrograde'],
+                'combust': row['combust'],
             })
 
         indu_lagna = None
@@ -559,12 +829,16 @@ class PlanetaryDignitiesCalculator(BaseCalculator):
                     second['graha_yuddha'] = war
 
         return {
+            # Keep the established contract version: this release only adds
+            # fields and the legacy tables remain byte-for-byte consumable.
             'schema_version': 'canonical-positions/2.0.0',
             'ayanamsha': 'Lahiri',
             'ascendant': ascendant_row,
             'planets': planet_rows,
             'houses': house_rows,
             'nakshatras': [grouped[index] for index in sorted(grouped)],
+            'nakshatra_placements': nakshatra_placements,
+            'nakshatra_special_role_status': yogi_role_status,
             'indu_lagna': indu_lagna,
             'graha_yuddha': wars,
         }

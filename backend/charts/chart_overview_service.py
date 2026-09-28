@@ -267,7 +267,7 @@ def _collect_special_marks(
             .get("planet")
         )
         if ak:
-            jaimini = JaiminiPointCalculator(natal, d9, ak).calculate_jaimini_points()
+            jaimini = JaiminiPointCalculator(natal, d9, ak, birth_data=birth_data).calculate_jaimini_points()
             for key, label, tone in (
                 ("arudha_lagna", "AL", "point"),
                 ("hora_lagna", "HL", "point"),

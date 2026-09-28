@@ -69,7 +69,7 @@ class JaiminiGateValidator:
         self.chara_dasha_calc = CharaDashaCalculator(chart_data)
         self.karaka_calc = CharaKarakaCalculator(chart_data)
         self.argala_calc = ArgalaCalculator(chart_data)
-        self.point_calc = JaiminiPointCalculator(chart_data, d9_chart, atmakaraka_planet)
+        self.point_calc = JaiminiPointCalculator(chart_data, d9_chart, atmakaraka_planet, birth_data=birth_data)
         
         # Pre-calculate Jaimini data
         self.karakas = self.karaka_calc.calculate_chara_karakas()['chara_karakas']

@@ -106,12 +106,12 @@
       "description": "Positions planétaires actuelles"
     },
     "karkamsa": {
-      "name": "Karkamsa",
-      "description": "Chemin spirituel et Dharma"
+      "name": "Karakamsha",
+      "description": "D1 depuis le signe D9 de l’Atmakaraka"
     },
     "swamsa": {
-      "name": "Swamsa",
-      "description": "Lignée parentale et Ancêtres"
+      "name": "Swamsha (D9)",
+      "description": "D9 depuis le signe D9 de l’Atmakaraka"
     },
     "hora": {
       "name": "Hora (D2)",

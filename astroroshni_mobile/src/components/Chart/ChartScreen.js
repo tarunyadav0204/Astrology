@@ -39,7 +39,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { getGrahaDrishtiToHouseSign } from '../../utils/grahaDrishti';
-import { calculateGandantaLocal, getGandantaHouseMatches } from '../../utils/gandanta';
+import { getGandantaHouseMatches } from '../../utils/gandanta';
 import {
   translateAshtakClassification,
   translateHouseInsightFactor,
@@ -63,7 +63,7 @@ const SIGN_NAMES = [
 const PLANET_NAMES = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'];
 
 const CHART_CODES = {
-  lagna: 'D1', navamsa: 'D9', transit: 'NOW', karkamsa: 'AK', swamsa: 'AL',
+  lagna: 'D1', navamsa: 'D9', transit: 'NOW', karkamsa: 'KA', swamsa: 'S9',
   hora: 'D2', drekkana: 'D3', chaturthamsa: 'D4', dashamsa: 'D10',
   dwadashamsa: 'D12', shodamsa: 'D16', vimsamsa: 'D20', chaturvimsamsa: 'D24',
   saptavimshamsa: 'D27', trimsamsa: 'D30', khavedamsa: 'D40',
@@ -779,7 +779,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
         }
       } catch (error) {
         console.log('[ChartScreen] gandanta analysis load failed', error?.message || String(error));
-        if (!cancelled) setGandantaAnalysis(calculateGandantaLocal(chartData));
+        if (!cancelled) setGandantaAnalysis(null);
       }
     };
 

@@ -55,12 +55,12 @@
       "description": "लाइव ग्रह स्थितियां"
     },
     "karkamsa": {
-      "name": "करकांश",
-      "description": "आध्यात्मिक पथ और धर्म"
+      "name": "कारकांश",
+      "description": "आत्मकारक की D9 राशि से D1"
     },
     "swamsa": {
-      "name": "स्वांश",
-      "description": "माता-पिता का वंश और पूर्वज"
+      "name": "स्वांश (D9)",
+      "description": "आत्मकारक की D9 राशि से D9"
     },
     "hora": {
       "name": "होरा (D2)",

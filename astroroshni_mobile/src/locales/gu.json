@@ -107,11 +107,11 @@
     },
     "karkamsa": {
       "name": "કારકાંશ",
-      "description": "આધ્યાત્મિક માર્ગ અને ધર્મ"
+      "description": "આત્મકારકની D9 રાશિથી D1"
     },
     "swamsa": {
-      "name": "સ્વાંશ",
-      "description": "પિતૃ વંશ અને પૂર્વજો"
+      "name": "સ્વાંશ (D9)",
+      "description": "આત્મકારકની D9 રાશિથી D9"
     },
     "hora": {
       "name": "હોરા (D2)",
