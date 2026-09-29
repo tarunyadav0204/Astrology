@@ -161,15 +161,20 @@ EOF
 cp "$DIST/expo-manifest.webmanifest" "$DIST/mobile/manifest.webmanifest"
 
 # Link manifest + Apple tags + SW registration + auto-update (iOS home screen included)
-python3 - <<'PY' "$DIST/expo-index.html" "$DIST/mobile"
-import pathlib, sys, re, json, time
+python3 - <<'PY' "$DIST/expo-index.html" "$DIST/mobile" "$0"
+import hashlib, pathlib, sys, re, json, time
 html_path = pathlib.Path(sys.argv[1])
 mobile_dir = pathlib.Path(sys.argv[2])
+postexport_path = pathlib.Path(sys.argv[3])
 html = html_path.read_text(encoding='utf-8')
 
-# Build id from hashed Expo bundle (changes every deploy) — fallback to timestamp.
+# Version the complete web release contract, including the generated shell logic.
+# A bundle-only id misses fixes made in this post-export script and leaves already
+# open PWAs unaware that their startup/update code changed.
 m = re.search(r'/index-([a-f0-9]+)\.js', html)
-build_id = m.group(1) if m else str(int(time.time()))
+bundle_id = m.group(1) if m else str(int(time.time()))
+postexport_hash = hashlib.sha256(postexport_path.read_bytes()).hexdigest()
+build_id = hashlib.sha256(f'{bundle_id}:{postexport_hash}'.encode()).hexdigest()[:32]
 
 head_bits = '''
 <link rel="manifest" href="/mobile/manifest.webmanifest" />
