@@ -8,6 +8,5 @@ from .evidence_builder import build_partner_evidence
 from .synthesizer import synthesize_partner_profile
 
 
-def build_partner_profile(chart_data: Dict[str, Any]) -> Dict[str, Any]:
-    return synthesize_partner_profile(build_partner_evidence(chart_data))
-
+def build_partner_profile(chart_data: Dict[str, Any], *, native_gender: str | None = None) -> Dict[str, Any]:
+    return synthesize_partner_profile(build_partner_evidence(chart_data, native_gender=native_gender))

@@ -98,7 +98,7 @@ def init_partner_portrait_tables() -> None:
                 charged_at TIMESTAMP,
                 refunded_at TIMESTAMP,
                 idempotency_key TEXT NOT NULL,
-                ruleset_version TEXT NOT NULL DEFAULT 'bphs-partner-portrait/1.0.0',
+                ruleset_version TEXT NOT NULL DEFAULT 'bphs-partner-portrait/1.1.0',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 started_at TIMESTAMP,
                 completed_at TIMESTAMP,
@@ -231,7 +231,7 @@ async def _run_generation(job_id: str, user_id: int, request_data: dict[str, Any
             # Supports jobs created by an older API build without trusting the
             # client-supplied presentation or region from that build.
             request_data.update(await derive_art_direction(birth))
-        profile = build_partner_profile(_calculate_chart(birth))
+        profile = build_partner_profile(_calculate_chart(birth), native_gender=str(birth.get("gender") or ""))
         if profile.get("portrait_readiness") != "ready":
             raise RuntimeError("The chart does not provide enough repeated visual testimony for a responsible portrait")
 
@@ -356,7 +356,7 @@ async def get_partner_portrait_config(current_user: User = Depends(get_current_u
     cost = credit_service.get_effective_cost(current_user.userid, base, "partner_portrait_cost")
     return {
         "cost": cost,
-        "ruleset_version": "bphs-partner-portrait/1.0.0",
+        "ruleset_version": "bphs-partner-portrait/1.1.0",
         "output": ["portrait", "full_body", "classical_profile", "source_trace"],
         "personalized_free_preview": False,
         "available": _configuration_error() is None,

@@ -141,7 +141,14 @@
       "curly_hair": "curly hair",
       "coarse_hair": "coarse hair",
       "noticeable_body_hair": "noticeable body hair",
-      "less_abundant_hair": "less abundant hair"
+      "less_abundant_hair": "less abundant hair",
+      "warm_reddish_brown_complexion": "warm reddish-brown complexion",
+      "fair_or_light_complexion": "fair or light complexion",
+      "warm_reddish_complexion": "warm reddish complexion",
+      "olive_or_dusky_complexion": "olive or dusky complexion",
+      "fair_or_light_golden_complexion": "fair or light golden complexion",
+      "brown_or_dusky_complexion": "brown or dusky complexion",
+      "dark_complexion": "dark complexion"
     },
     "channels": {
       "d1_seventh_sign": "D1 seventh-house sign",
@@ -154,7 +161,8 @@
       "d9_seventh_lord": "D9 seventh lord",
       "d9_d1_seventh_lord": "D1 seventh lord placed in D9",
       "darakaraka": "Darakaraka",
-      "venus": "Venus as relationship significator"
+      "venus": "Venus as relationship significator",
+      "spouse_karaka": "Classical spouse significator"
     },
     "unavailable": "Partner Portrait is temporarily unavailable. Please try again later.",
     "createAnother": "Create another possible look",
@@ -244,7 +252,8 @@
     "anotherLookCta": "Create another look · {{cost}} credits",
     "anotherLookFootnote": "Your current portrait stays saved. You will review the options before credits are used.",
     "loadingPrice": "Loading current credit price…",
-    "priceUnavailable": "The current credit price could not be loaded. Please try again."
+    "priceUnavailable": "The current credit price could not be loaded. Please try again.",
+    "complexionLabel": "Complexion: {{value}}"
   },
   "hindi": {
     "title": "साथी का चित्र",
@@ -388,7 +397,14 @@
       "curly_hair": "घुंघराले बाल",
       "coarse_hair": "मोटे बनावट वाले बाल",
       "noticeable_body_hair": "शरीर पर स्पष्ट बाल",
-      "less_abundant_hair": "कम घने बाल"
+      "less_abundant_hair": "कम घने बाल",
+      "warm_reddish_brown_complexion": "गरम लाल-भूरी रंगत",
+      "fair_or_light_complexion": "गोरी या हल्की रंगत",
+      "warm_reddish_complexion": "गरम लालिमा वाली रंगत",
+      "olive_or_dusky_complexion": "जैतूनी या सांवली रंगत",
+      "fair_or_light_golden_complexion": "गोरी या हल्की सुनहरी रंगत",
+      "brown_or_dusky_complexion": "भूरी या सांवली रंगत",
+      "dark_complexion": "गहरी रंगत"
     },
     "channels": {
       "d1_seventh_sign": "D1 सप्तम भाव राशि",
@@ -401,7 +417,8 @@
       "d9_seventh_lord": "D9 सप्तमेश",
       "d9_d1_seventh_lord": "D9 में D1 सप्तमेश की स्थिति",
       "darakaraka": "दारकारक",
-      "venus": "कारक शुक्र (संबंध)"
+      "venus": "कारक शुक्र (संबंध)",
+      "spouse_karaka": "शास्त्रीय जीवनसाथी कारक"
     },
     "unavailable": "साथी का चित्र अभी उपलब्ध नहीं है। कृपया कुछ समय बाद फिर प्रयास करें।",
     "createAnother": "एक और संभावित रूप बनाएँ",
@@ -491,7 +508,8 @@
     "anotherLookCta": "एक और रूप बनाएँ · {{cost}} क्रेडिट",
     "anotherLookFootnote": "आपका वर्तमान चित्र सुरक्षित रहेगा। क्रेडिट इस्तेमाल होने से पहले आप विकल्पों की समीक्षा करेंगे।",
     "loadingPrice": "मौजूदा क्रेडिट मूल्य लोड हो रहा है…",
-    "priceUnavailable": "मौजूदा क्रेडिट मूल्य लोड नहीं हो सका। कृपया फिर से प्रयास करें।"
+    "priceUnavailable": "मौजूदा क्रेडिट मूल्य लोड नहीं हो सका। कृपया फिर से प्रयास करें।",
+    "complexionLabel": "रंगत: {{value}}"
   },
   "spanish": {
     "title": "Retrato de pareja",
@@ -635,7 +653,14 @@
       "curly_hair": "cabello rizado",
       "coarse_hair": "cabello grueso",
       "noticeable_body_hair": "vello corporal visible",
-      "less_abundant_hair": "cabello menos abundante"
+      "less_abundant_hair": "cabello menos abundante",
+      "warm_reddish_brown_complexion": "tez cálida castaño rojiza",
+      "fair_or_light_complexion": "tez clara",
+      "warm_reddish_complexion": "tez cálida con matiz rojizo",
+      "olive_or_dusky_complexion": "tez oliva o morena",
+      "fair_or_light_golden_complexion": "tez clara o dorada suave",
+      "brown_or_dusky_complexion": "tez castaña o morena",
+      "dark_complexion": "tez oscura"
     },
     "channels": {
       "d1_seventh_sign": "Signo de casa 7 en D1",
@@ -648,7 +673,8 @@
       "d9_seventh_lord": "Regente de casa 7 en D9",
       "d9_d1_seventh_lord": "Regente de D1 en D9",
       "darakaraka": "Darakaraka",
-      "venus": "Venus como significador de relaciones"
+      "venus": "Venus como significador de relaciones",
+      "spouse_karaka": "Significador clásico del cónyuge"
     },
     "unavailable": "El retrato de pareja no está disponible temporalmente. Inténtalo de nuevo más tarde.",
     "createAnother": "Crear otro aspecto posible",
@@ -738,7 +764,8 @@
     "anotherLookCta": "Crear otro aspecto · {{cost}} créditos",
     "anotherLookFootnote": "Tu retrato actual seguirá guardado. Revisarás las opciones antes de utilizar los créditos.",
     "loadingPrice": "Cargando el precio actual en créditos…",
-    "priceUnavailable": "No se pudo cargar el precio actual en créditos. Inténtalo de nuevo."
+    "priceUnavailable": "No se pudo cargar el precio actual en créditos. Inténtalo de nuevo.",
+    "complexionLabel": "Tez: {{value}}"
   },
   "french": {
     "title": "Portrait du partenaire",
@@ -882,7 +909,14 @@
       "curly_hair": "cheveux bouclés",
       "coarse_hair": "cheveux épais et rêches",
       "noticeable_body_hair": "pilosité corporelle visible",
-      "less_abundant_hair": "cheveux moins abondants"
+      "less_abundant_hair": "cheveux moins abondants",
+      "warm_reddish_brown_complexion": "teint chaud brun-roux",
+      "fair_or_light_complexion": "teint clair",
+      "warm_reddish_complexion": "teint chaud aux nuances rouges",
+      "olive_or_dusky_complexion": "teint olive ou mat",
+      "fair_or_light_golden_complexion": "teint clair ou légèrement doré",
+      "brown_or_dusky_complexion": "teint brun ou mat",
+      "dark_complexion": "teint foncé"
     },
     "channels": {
       "d1_seventh_sign": "Signe de la maison 7 (D1)",
@@ -895,7 +929,8 @@
       "d9_seventh_lord": "Maître de maison 7 (D9)",
       "d9_d1_seventh_lord": "Maître de maison 7 (D1) en D9",
       "darakaraka": "Darakaraka",
-      "venus": "Vénus (significateur)"
+      "venus": "Vénus (significateur)",
+      "spouse_karaka": "Significateur classique du conjoint"
     },
     "unavailable": "Le portrait du partenaire est temporairement indisponible. Veuillez réessayer plus tard.",
     "createAnother": "Créer une autre apparence possible",
@@ -985,7 +1020,8 @@
     "anotherLookCta": "Créer une autre apparence · {{cost}} crédits",
     "anotherLookFootnote": "Votre portrait actuel reste enregistré. Vous vérifierez les options avant l’utilisation des crédits.",
     "loadingPrice": "Chargement du tarif actuel en crédits…",
-    "priceUnavailable": "Le tarif actuel en crédits n’a pas pu être chargé. Veuillez réessayer."
+    "priceUnavailable": "Le tarif actuel en crédits n’a pas pu être chargé. Veuillez réessayer.",
+    "complexionLabel": "Teint : {{value}}"
   },
   "german": {
     "title": "Partnerporträt",
@@ -1129,7 +1165,14 @@
       "curly_hair": "lockiges Haar",
       "coarse_hair": "kräftiges, grobes Haar",
       "noticeable_body_hair": "auffällige Körperbehaarung",
-      "less_abundant_hair": "weniger dichtes Haar"
+      "less_abundant_hair": "weniger dichtes Haar",
+      "warm_reddish_brown_complexion": "warmer rötlich-brauner Hautton",
+      "fair_or_light_complexion": "heller Hautton",
+      "warm_reddish_complexion": "warmer rötlicher Hautton",
+      "olive_or_dusky_complexion": "olivfarbener oder dunklerer Hautton",
+      "fair_or_light_golden_complexion": "heller oder leicht goldener Hautton",
+      "brown_or_dusky_complexion": "brauner oder dunklerer Hautton",
+      "dark_complexion": "dunkler Hautton"
     },
     "channels": {
       "d1_seventh_sign": "D1 Zeichen 7. Haus",
@@ -1142,7 +1185,8 @@
       "d9_seventh_lord": "D9 Herrscher 7. Haus",
       "d9_d1_seventh_lord": "D1 Herrscher 7. Haus in D9",
       "darakaraka": "Darakaraka",
-      "venus": "Venus als Signifikator"
+      "venus": "Venus als Signifikator",
+      "spouse_karaka": "Klassischer Ehepartner-Signifikator"
     },
     "unavailable": "Das Partnerporträt ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.",
     "createAnother": "Einen weiteren möglichen Look erstellen",
@@ -1232,7 +1276,8 @@
     "anotherLookCta": "Weiteren Look erstellen · {{cost}} Credits",
     "anotherLookFootnote": "Dein aktuelles Porträt bleibt gespeichert. Du prüfst die Optionen, bevor Credits verwendet werden.",
     "loadingPrice": "Aktueller Credit-Preis wird geladen…",
-    "priceUnavailable": "Der aktuelle Credit-Preis konnte nicht geladen werden. Bitte versuche es erneut."
+    "priceUnavailable": "Der aktuelle Credit-Preis konnte nicht geladen werden. Bitte versuche es erneut.",
+    "complexionLabel": "Hautton: {{value}}"
   },
   "russian": {
     "title": "Портрет партнёра",
@@ -1376,7 +1421,14 @@
       "curly_hair": "кудрявые волосы",
       "coarse_hair": "жёсткие волосы",
       "noticeable_body_hair": "заметные волосы на теле",
-      "less_abundant_hair": "менее густые волосы"
+      "less_abundant_hair": "менее густые волосы",
+      "warm_reddish_brown_complexion": "тёплый красновато-коричневый тон кожи",
+      "fair_or_light_complexion": "светлый тон кожи",
+      "warm_reddish_complexion": "тёплый красноватый тон кожи",
+      "olive_or_dusky_complexion": "оливковый или смуглый тон кожи",
+      "fair_or_light_golden_complexion": "светлый или слегка золотистый тон кожи",
+      "brown_or_dusky_complexion": "коричневый или смуглый тон кожи",
+      "dark_complexion": "тёмный тон кожи"
     },
     "channels": {
       "d1_seventh_sign": "Знак 7-го дома D1",
@@ -1389,7 +1441,8 @@
       "d9_seventh_lord": "Управитель 7-го дома D9",
       "d9_d1_seventh_lord": "Управитель 7-го дома D1 в D9",
       "darakaraka": "Дара-карака",
-      "venus": "Венера как сигнификатор отношений"
+      "venus": "Венера как сигнификатор отношений",
+      "spouse_karaka": "Классический сигнификатор супруга"
     },
     "unavailable": "Портрет партнёра временно недоступен. Повторите попытку позже.",
     "createAnother": "Создать ещё один возможный образ",
@@ -1479,7 +1532,8 @@
     "anotherLookCta": "Создать другой образ · {{cost}} кредитов",
     "anotherLookFootnote": "Текущий портрет останется сохранённым. Вы проверите параметры до списания кредитов.",
     "loadingPrice": "Загрузка текущей стоимости в кредитах…",
-    "priceUnavailable": "Не удалось загрузить текущую стоимость в кредитах. Попробуйте ещё раз."
+    "priceUnavailable": "Не удалось загрузить текущую стоимость в кредитах. Попробуйте ещё раз.",
+    "complexionLabel": "Тон кожи: {{value}}"
   },
   "chinese": {
     "title": "伴侣画像",
@@ -1623,7 +1677,14 @@
       "curly_hair": "卷发",
       "coarse_hair": "粗硬发质",
       "noticeable_body_hair": "体毛较明显",
-      "less_abundant_hair": "发量较少"
+      "less_abundant_hair": "发量较少",
+      "warm_reddish_brown_complexion": "暖红棕肤色",
+      "fair_or_light_complexion": "白皙或浅色肤色",
+      "warm_reddish_complexion": "暖红肤色",
+      "olive_or_dusky_complexion": "橄榄色或偏深肤色",
+      "fair_or_light_golden_complexion": "白皙或浅金色肤色",
+      "brown_or_dusky_complexion": "棕色或偏深肤色",
+      "dark_complexion": "深色肤色"
     },
     "channels": {
       "d1_seventh_sign": "D1 第七宫星座",
@@ -1636,7 +1697,8 @@
       "d9_seventh_lord": "D9 第七宫主星",
       "d9_d1_seventh_lord": "D1 七宫主在 D9 落位",
       "darakaraka": "配偶星 (Darakaraka)",
-      "venus": "金星 (关系征象星)"
+      "venus": "金星 (关系征象星)",
+      "spouse_karaka": "古典配偶征象星"
     },
     "unavailable": "伴侣画像暂时不可用，请稍后再试。",
     "createAnother": "生成另一种可能的样貌",
@@ -1726,7 +1788,8 @@
     "anotherLookCta": "生成另一种样貌 · {{cost}} 积分",
     "anotherLookFootnote": "当前画像会继续保存。使用积分前，你可以先查看选项。",
     "loadingPrice": "正在加载当前积分价格…",
-    "priceUnavailable": "无法加载当前积分价格，请重试。"
+    "priceUnavailable": "无法加载当前积分价格，请重试。",
+    "complexionLabel": "肤色：{{value}}"
   },
   "tamil": {
     "title": "துணைவர் உருவப்படம்",
@@ -1870,7 +1933,14 @@
       "curly_hair": "சுருள் முடி",
       "coarse_hair": "கரடுமுரடான முடி",
       "noticeable_body_hair": "தெளிவாகத் தெரியும் உடல் முடி",
-      "less_abundant_hair": "அடர்த்தி குறைந்த முடி"
+      "less_abundant_hair": "அடர்த்தி குறைந்த முடி",
+      "warm_reddish_brown_complexion": "வெப்பமான செம்பழுப்பு நிறம்",
+      "fair_or_light_complexion": "வெளிர் நிறம்",
+      "warm_reddish_complexion": "வெப்பமான சிவப்பு கலந்த நிறம்",
+      "olive_or_dusky_complexion": "ஆலிவ் அல்லது மாநிறம்",
+      "fair_or_light_golden_complexion": "வெளிர் அல்லது மென் பொன்னிறம்",
+      "brown_or_dusky_complexion": "பழுப்பு அல்லது மாநிறம்",
+      "dark_complexion": "கருமையான நிறம்"
     },
     "channels": {
       "d1_seventh_sign": "D1 ஏழாம் வீடு",
@@ -1883,7 +1953,8 @@
       "d9_seventh_lord": "D9 ஏழாம் அதிபதி",
       "d9_d1_seventh_lord": "D9-ல் D1 ஏழாம் அதிபதி",
       "darakaraka": "தாரகாரகன்",
-      "venus": "சுக்கிரன் (களத்திர காரகன்)"
+      "venus": "சுக்கிரன் (களத்திர காரகன்)",
+      "spouse_karaka": "பாரம்பரிய துணைவர் காரகன்"
     },
     "unavailable": "துணைவர் உருவப்படம் தற்போது கிடைக்கவில்லை. சிறிது நேரம் கழித்து மீண்டும் முயலவும்.",
     "createAnother": "மற்றொரு சாத்தியமான தோற்றத்தை உருவாக்கவும்",
@@ -1973,7 +2044,8 @@
     "anotherLookCta": "மற்றொரு தோற்றத்தை உருவாக்கு · {{cost}} கிரெடிட்கள்",
     "anotherLookFootnote": "தற்போதைய உருவப்படம் சேமிக்கப்பட்டே இருக்கும். கிரெடிட்கள் பயன்படுத்தப்படும் முன் விருப்பங்களை நீங்கள் பார்க்கலாம்.",
     "loadingPrice": "தற்போதைய கிரெடிட் விலை ஏற்றப்படுகிறது…",
-    "priceUnavailable": "தற்போதைய கிரெடிட் விலையை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
+    "priceUnavailable": "தற்போதைய கிரெடிட் விலையை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+    "complexionLabel": "நிறம்: {{value}}"
   },
   "telugu": {
     "title": "భాగస్వామి చిత్రం",
@@ -2117,7 +2189,14 @@
       "curly_hair": "గిరజాల జుట్టు",
       "coarse_hair": "ముతక జుట్టు",
       "noticeable_body_hair": "స్పష్టంగా కనిపించే శరీర వెంట్రుకలు",
-      "less_abundant_hair": "తక్కువ సాంద్రత గల జుట్టు"
+      "less_abundant_hair": "తక్కువ సాంద్రత గల జుట్టు",
+      "warm_reddish_brown_complexion": "వెచ్చని ఎరుపు-గోధుమ ఛాయ",
+      "fair_or_light_complexion": "తెలుపు లేదా లేత ఛాయ",
+      "warm_reddish_complexion": "వెచ్చని ఎరుపు ఛాయ",
+      "olive_or_dusky_complexion": "ఆలివ్ లేదా చామనచాయ",
+      "fair_or_light_golden_complexion": "తెలుపు లేదా లేత బంగారు ఛాయ",
+      "brown_or_dusky_complexion": "గోధుమ లేదా చామనచాయ",
+      "dark_complexion": "ముదురు ఛాయ"
     },
     "channels": {
       "d1_seventh_sign": "D1 సప్తమ రాశి",
@@ -2130,7 +2209,8 @@
       "d9_seventh_lord": "D9 సప్తమాధిపతి",
       "d9_d1_seventh_lord": "D9లో D1 సప్తమాధిపతి",
       "darakaraka": "దారకారకుడు",
-      "venus": "శుక్రుడు (వివాహ కారకుడు)"
+      "venus": "శుక్రుడు (వివాహ కారకుడు)",
+      "spouse_karaka": "శాస్త్రీయ జీవిత భాగస్వామి కారకుడు"
     },
     "unavailable": "భాగస్వామి చిత్రం ప్రస్తుతం అందుబాటులో లేదు. దయచేసి కొంతసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.",
     "createAnother": "మరో సంభావ్య రూపాన్ని రూపొందించండి",
@@ -2220,7 +2300,8 @@
     "anotherLookCta": "మరో రూపాన్ని రూపొందించు · {{cost}} క్రెడిట్లు",
     "anotherLookFootnote": "ప్రస్తుత చిత్రం సేవ్ అయి ఉంటుంది. క్రెడిట్లు ఉపయోగించే ముందు మీరు ఎంపికలను పరిశీలిస్తారు.",
     "loadingPrice": "ప్రస్తుత క్రెడిట్ ధర లోడ్ అవుతోంది…",
-    "priceUnavailable": "ప్రస్తుత క్రెడిట్ ధరను లోడ్ చేయలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి."
+    "priceUnavailable": "ప్రస్తుత క్రెడిట్ ధరను లోడ్ చేయలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి.",
+    "complexionLabel": "ఛాయ: {{value}}"
   },
   "gujarati": {
     "title": "જીવનસાથીનું ચિત્ર",
@@ -2364,7 +2445,14 @@
       "curly_hair": "વાંકડિયા વાળ",
       "coarse_hair": "બરછટ વાળ",
       "noticeable_body_hair": "સ્પષ્ટ શરીરના વાળ",
-      "less_abundant_hair": "ઓછા ઘન વાળ"
+      "less_abundant_hair": "ઓછા ઘન વાળ",
+      "warm_reddish_brown_complexion": "ઉષ્મ લાલાશ પડતો ભુરો વર્ણ",
+      "fair_or_light_complexion": "ગોરો અથવા હળવો વર્ણ",
+      "warm_reddish_complexion": "ઉષ્મ લાલાશ પડતો વર્ણ",
+      "olive_or_dusky_complexion": "ઓલિવ અથવા ઘઉંવર્ણી શ્યામ છાયા",
+      "fair_or_light_golden_complexion": "ગોરો અથવા હળવો સોનેરી વર્ણ",
+      "brown_or_dusky_complexion": "ભુરો અથવા શ્યામ વર્ણ",
+      "dark_complexion": "ઘેરો વર્ણ"
     },
     "channels": {
       "d1_seventh_sign": "D1 સાતમા ભાવની રાશિ",
@@ -2377,7 +2465,8 @@
       "d9_seventh_lord": "D9 સાતમા ભાવનો સ્વામી",
       "d9_d1_seventh_lord": "D9 માં D1 સાતમા ભાવનો સ્વામી",
       "darakaraka": "દારકારક",
-      "venus": "સંબંધ કારક શુક્ર"
+      "venus": "સંબંધ કારક શુક્ર",
+      "spouse_karaka": "શાસ્ત્રીય જીવનસાથી કારક"
     },
     "unavailable": "સાથીનું ચિત્ર હાલમાં ઉપલબ્ધ નથી. કૃપા કરીને થોડા સમય પછી ફરી પ્રયાસ કરો.",
     "createAnother": "બીજો સંભવિત દેખાવ બનાવો",
@@ -2467,7 +2556,8 @@
     "anotherLookCta": "બીજો દેખાવ બનાવો · {{cost}} ક્રેડિટ",
     "anotherLookFootnote": "તમારું હાલનું ચિત્ર સાચવેલું રહેશે. ક્રેડિટ વપરાય તે પહેલાં તમે વિકલ્પો તપાસશો.",
     "loadingPrice": "વર્તમાન ક્રેડિટ કિંમત લોડ થઈ રહી છે…",
-    "priceUnavailable": "વર્તમાન ક્રેડિટ કિંમત લોડ થઈ શકી નથી. કૃપા કરીને ફરી પ્રયાસ કરો."
+    "priceUnavailable": "વર્તમાન ક્રેડિટ કિંમત લોડ થઈ શકી નથી. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "complexionLabel": "વર્ણ: {{value}}"
   },
   "marathi": {
     "title": "जोडीदाराचे चित्र",
@@ -2611,7 +2701,14 @@
       "curly_hair": "कुरळे केस",
       "coarse_hair": "राठ केस",
       "noticeable_body_hair": "शरीरावर स्पष्ट केस",
-      "less_abundant_hair": "कमी दाट केस"
+      "less_abundant_hair": "कमी दाट केस",
+      "warm_reddish_brown_complexion": "उबदार तांबूस-तपकिरी वर्ण",
+      "fair_or_light_complexion": "गोरा किंवा फिकट वर्ण",
+      "warm_reddish_complexion": "उबदार तांबूस वर्ण",
+      "olive_or_dusky_complexion": "ऑलिव्ह किंवा सावळा वर्ण",
+      "fair_or_light_golden_complexion": "गोरा किंवा फिकट सोनेरी वर्ण",
+      "brown_or_dusky_complexion": "तपकिरी किंवा सावळा वर्ण",
+      "dark_complexion": "गडद वर्ण"
     },
     "channels": {
       "d1_seventh_sign": "D1 सप्तम राशी",
@@ -2624,7 +2721,8 @@
       "d9_seventh_lord": "D9 सप्तमेश",
       "d9_d1_seventh_lord": "D9 मधील D1 सप्तमेश",
       "darakaraka": "दारकारक",
-      "venus": "शुक्र (विवाह कारक)"
+      "venus": "शुक्र (विवाह कारक)",
+      "spouse_karaka": "शास्त्रीय जोडीदार कारक"
     },
     "unavailable": "जोडीदाराचे चित्र सध्या उपलब्ध नाही. कृपया काही वेळाने पुन्हा प्रयत्न करा.",
     "createAnother": "आणखी एक संभाव्य रूप तयार करा",
@@ -2714,6 +2812,7 @@
     "anotherLookCta": "आणखी एक रूप तयार करा · {{cost}} क्रेडिट",
     "anotherLookFootnote": "तुमचे सध्याचे चित्र जतन केलेले राहील. क्रेडिट वापरण्यापूर्वी तुम्ही पर्याय तपासाल.",
     "loadingPrice": "सध्याची क्रेडिट किंमत लोड होत आहे…",
-    "priceUnavailable": "सध्याची क्रेडिट किंमत लोड करता आली नाही. कृपया पुन्हा प्रयत्न करा."
+    "priceUnavailable": "सध्याची क्रेडिट किंमत लोड करता आली नाही. कृपया पुन्हा प्रयत्न करा.",
+    "complexionLabel": "वर्ण: {{value}}"
   }
 }

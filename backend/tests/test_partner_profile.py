@@ -47,6 +47,23 @@ def test_partner_profile_resolves_d1_d9_and_source_trace():
     assert all(row["source_id"] and row["verse"] for row in profile["factor_readings"])
 
 
+def test_classical_spouse_karaka_follows_native_gender():
+    chart = _chart()
+    female_profile = build_partner_profile(chart, native_gender="female")
+    male_profile = build_partner_profile(chart, native_gender="male")
+
+    assert female_profile["evidence"]["d1"]["spouse_karaka"]["planet"] == "Jupiter"
+    assert male_profile["evidence"]["d1"]["spouse_karaka"]["planet"] == "Venus"
+    assert any(
+        row["channel"] == "spouse_karaka" and row["factor"] == "Jupiter"
+        for row in female_profile["factor_readings"]
+    )
+    assert any(
+        row["channel"] == "spouse_karaka" and row["factor"] == "Venus"
+        for row in male_profile["factor_readings"]
+    )
+
+
 def test_partner_portrait_does_not_use_disputed_node_aspects():
     profile = build_partner_profile(_chart())
     assert "Rahu" not in profile["evidence"]["d1"]["seventh_house"]["aspecting_planets"]
@@ -74,6 +91,8 @@ def test_image_prompt_uses_resolved_traits_without_identity_claims():
     assert "European regional appearance" in prompt
     assert "Indian visual context" not in prompt
     assert "adult woman" in prompt
+    assert "complexion:" in prompt
+    assert "do not default a South Asian person to wheatish" in prompt
 
     body_prompt = build_full_body_prompt(
         profile,
@@ -85,6 +104,36 @@ def test_image_prompt_uses_resolved_traits_without_identity_claims():
     assert "including body build" in body_prompt
     assert "artistic completion" in body_prompt
     assert "European regional appearance" in body_prompt
+    assert "Preserve the reference portrait's complexion exactly" in body_prompt
+
+
+def test_complexion_is_classical_evidence_not_a_regional_default():
+    profile = {
+        "appearance": {
+            "complexion": {
+                "primary": {
+                    "value": "fair or light complexion",
+                    "confidence": "suggestive",
+                    "independent_repetitions": 1,
+                    "evidence": [{"source_id": "bphs.graha_forms", "verse": "3.16"}],
+                }
+            }
+        }
+    }
+    prompt = build_portrait_prompt(
+        profile,
+        presentation="feminine",
+        age_band="25-34",
+        clothing_style="contemporary",
+        visual_context="south_asian",
+    )
+
+    assert "complexion: fair or light complexion" in prompt
+    assert "South Asian regional appearance and setting" in prompt
+    assert "Regional context must never determine, darken, lighten, or override skin tone" in prompt
+    assert PLANET_RULES["Moon"]["appearance"]["complexion"] == "fair or light complexion"
+    assert PLANET_RULES["Moon"]["appearance_verses"]["complexion"] == "3.16"
+    assert PLANET_RULES["Jupiter"]["appearance_verses"]["complexion"] == "3.17"
 
 
 def test_explicit_classical_hair_signal_reaches_image_prompt_without_fake_repetition():

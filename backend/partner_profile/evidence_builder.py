@@ -103,7 +103,7 @@ def _aspecting(chart: Mapping[str, Any], house: int) -> list[str]:
         return []
 
 
-def build_partner_evidence(chart_data: Dict[str, Any]) -> Dict[str, Any]:
+def build_partner_evidence(chart_data: Dict[str, Any], *, native_gender: str | None = None) -> Dict[str, Any]:
     if not isinstance(chart_data, dict) or not _chart_planets(chart_data):
         raise ValueError("Calculated D1 chart is required")
 
@@ -125,6 +125,8 @@ def build_partner_evidence(chart_data: Dict[str, Any]) -> Dict[str, Any]:
     d9_seventh_lord = SIGN_LORDS[d9_seventh_sign_id]
     karakas = CharaKarakaCalculator(chart_data).calculate_chara_karakas()
     dk = ((karakas.get("chara_karakas") or {}).get("Darakaraka") or {}).get("planet")
+    normalized_gender = str(native_gender or "").strip().lower()
+    spouse_karaka = "Jupiter" if normalized_gender in {"female", "woman", "f", "girl"} else "Venus"
 
     d1_seventh_occupants = _occupants(chart_data, 7)
     d9_seventh_occupants = _occupants(d9, 7)
@@ -148,6 +150,7 @@ def build_partner_evidence(chart_data: Dict[str, Any]) -> Dict[str, Any]:
             "darakaraka": _planet_row(chart_data, str(dk or ""), d1_nak) if dk else {},
             "venus": _planet_row(chart_data, "Venus", d1_nak),
             "jupiter": _planet_row(chart_data, "Jupiter", d1_nak),
+            "spouse_karaka": _planet_row(chart_data, spouse_karaka, d1_nak),
         },
         "d9": {
             "seventh_house": {
@@ -168,6 +171,9 @@ def build_partner_evidence(chart_data: Dict[str, Any]) -> Dict[str, Any]:
             "zodiac": "Lahiri sidereal chart supplied by the canonical chart calculator",
             "houses": "Whole-sign houses from the calculated chart",
             "darakaraka": karakas.get("calculation_method"),
+            "spouse_karaka": (
+                "Jupiter for a husband in a female nativity; Venus for a wife in a male nativity"
+            ),
         },
         "evidence_complete": bool(seventh_lord and d9_seventh_lord and dk),
     }

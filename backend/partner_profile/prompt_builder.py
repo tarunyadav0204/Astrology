@@ -37,7 +37,12 @@ PRESENTATIONS = {"feminine": "adult woman", "masculine": "adult man"}
 
 def _resolved_traits(profile: Mapping[str, Any]) -> list[str]:
     traits: list[str] = []
-    for attribute, result in (profile.get("appearance") or {}).items():
+    appearance = profile.get("appearance") or {}
+    # Complexion needs an explicit instruction before regional context reaches
+    # the image model; otherwise it tends to invent one from regional priors.
+    ordered_attributes = sorted(appearance, key=lambda value: (value != "complexion", value))
+    for attribute in ordered_attributes:
+        result = appearance[attribute]
         primary = result.get("primary") if isinstance(result, dict) else None
         if not isinstance(primary, dict):
             continue
@@ -45,7 +50,7 @@ def _resolved_traits(profile: Mapping[str, Any]) -> list[str]:
         # Saturn (3.23, 3.27-29). A single direct spouse indicator is still
         # meaningful enough to constrain head hair; other visible attributes
         # continue to require repetition.
-        if primary.get("confidence") not in {"strong", "moderate"} and attribute not in {"hair", "head_hair"}:
+        if primary.get("confidence") not in {"strong", "moderate"} and attribute not in {"hair", "head_hair", "complexion"}:
             continue
         # Body-hair wording in BPHS describes Scorpio's form. It is retained in
         # the textual evidence, but a clothed portrait cannot represent it
@@ -74,8 +79,11 @@ def build_portrait_prompt(
     return (
         "Create a respectful photorealistic editorial portrait of one fictional adult. "
         f"The user explicitly selected an {person}. Apparent age: {age_band}. "
-        f"User-selected visual context: {context}. This is an art-direction choice, not an astrological inference. "
+        f"Birth-location-derived visual context: {context}. This sets regional visual context, not complexion. "
         f"Resolved visual archetype: {traits}. Clothing: {clothing}. "
+        "Treat regional context and complexion as independent instructions. Regional context must never determine, "
+        "darken, lighten, or override skin tone. In particular, do not default a South Asian person to wheatish, "
+        "medium-brown, or dark skin. Follow the resolved complexion exactly when it is supplied. "
         "Head and shoulders, natural expression, realistic anatomy, elegant neutral studio setting, "
         "premium magazine photography, no text, no symbols on the body. Do not add cultural or religious symbols "
         "unless required by the selected clothing direction. Do not infer caste, religion, disability, identity, "
@@ -96,7 +104,9 @@ def build_full_body_prompt(
     return (
         "Preserve the exact same fictional person's face, hair and identity from the input portrait. "
         f"Show a natural full-body standing view of the user-selected {person}. Apparent age: {age_band}. "
-        f"Keep the user-selected visual context: {context}. Resolved visual archetype, including body build: {traits}. "
+        f"Keep the birth-location-derived visual context: {context}. Resolved visual archetype, including body build: {traits}. "
+        "Preserve the reference portrait's complexion exactly. Regional context must never darken, lighten, or "
+        "override skin tone, and must not cause a default wheatish South Asian complexion. "
         f"Clothing: {clothing}. Realistic proportions, relaxed posture, premium editorial photography, "
         "a tasteful neutral interior appropriate to the selected regional context, "
         "no text, no astrological labels, no body exaggeration. Preserve natural scalp coverage and do not turn a "

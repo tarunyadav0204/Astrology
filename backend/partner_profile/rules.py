@@ -17,9 +17,9 @@ SOURCES: Dict[str, Dict[str, Any]] = {
     "bphs.graha_forms": {
         "work": "Brihat Parashara Hora Shastra",
         "chapter": 3,
-        "verses": "23-30",
+        "verses": "16-17, 23-30",
         "title": "Descriptions of the grahas",
-        "scope": "Classical physical form and disposition of the grahas",
+        "scope": "Classical complexion, physical form and disposition of the grahas",
         "url": "https://vedic-astro.s3.amazonaws.com/books/bhrihat_parasara_hora_shastra.pdf",
     },
     "bphs.rashi_forms": {
@@ -61,47 +61,57 @@ def _signals(**values: str) -> Dict[str, str]:
     return dict(values)
 
 
-# Deliberately conservative.  Only visual attributes stated by the source are
-# encoded.  Complexion/caste descriptors are excluded from image prompts.
+# Deliberately conservative. Only visual attributes stated by the source are
+# encoded. BPHS 3.16-17 explicitly describes the grahas' complexions, so those
+# are retained as complexion evidence. Caste descriptors remain excluded.
+# The English phrases below translate the source into plausible human skin
+# tones; they must not be replaced by a regional or ethnic default.
 PLANET_RULES: Dict[str, Dict[str, Any]] = {
     "Sun": {
-        "appearance": _signals(build="square and structured", face_shape="square", eyes="warm, honey-toned expression", head_hair="less abundant hair"),
+        "appearance": _signals(complexion="warm reddish-brown complexion", build="square and structured", face_shape="square", eyes="warm, honey-toned expression", head_hair="less abundant hair"),
+        "appearance_verses": {"complexion": "3.16"},
         "personality": ["clean and orderly", "intelligent", "self-possessed"],
         "source_id": "bphs.graha_forms",
         "verse": "3.23",
     },
     "Moon": {
-        "appearance": _signals(build="rounded and soft", face_shape="round", expression="pleasant and approachable"),
+        "appearance": _signals(complexion="fair or light complexion", build="rounded and soft", face_shape="round", expression="pleasant and approachable"),
+        "appearance_verses": {"complexion": "3.16"},
         "personality": ["receptive", "learned", "soft-spoken", "change-responsive"],
         "source_id": "bphs.graha_forms",
         "verse": "3.24",
     },
     "Mars": {
-        "appearance": _signals(build="lean and wiry", waist="slender", expression="direct and energetic"),
+        "appearance": _signals(complexion="warm reddish complexion", build="lean and wiry", waist="slender", expression="direct and energetic"),
+        "appearance_verses": {"complexion": "3.16"},
         "personality": ["active", "liberal", "decisive", "quick to react"],
         "source_id": "bphs.graha_forms",
         "verse": "3.25",
     },
     "Mercury": {
-        "appearance": _signals(build="well-proportioned and youthful", presence="attractive and animated"),
+        "appearance": _signals(complexion="olive or dusky complexion", build="well-proportioned and youthful", presence="attractive and animated"),
+        "appearance_verses": {"complexion": "3.16"},
         "personality": ["witty", "adaptable", "articulate", "playful"],
         "source_id": "bphs.graha_forms",
         "verse": "3.26",
     },
     "Jupiter": {
-        "appearance": _signals(build="broad or substantial", presence="warm and dignified", head_hair="golden-brown hair"),
+        "appearance": _signals(complexion="fair or light golden complexion", build="broad or substantial", presence="warm and dignified", head_hair="golden-brown hair"),
+        "appearance_verses": {"complexion": "3.17"},
         "personality": ["learned", "principled", "wise", "protective"],
         "source_id": "bphs.graha_forms",
         "verse": "3.27",
     },
     "Venus": {
-        "appearance": _signals(build="graceful and well-proportioned", eyes="pleasing and expressive", head_hair="curly hair", presence="polished and attractive"),
+        "appearance": _signals(complexion="brown or dusky complexion", build="graceful and well-proportioned", eyes="pleasing and expressive", head_hair="curly hair", presence="polished and attractive"),
+        "appearance_verses": {"complexion": "3.17"},
         "personality": ["refined", "creative", "affectionate", "socially graceful"],
         "source_id": "bphs.graha_forms",
         "verse": "3.28",
     },
     "Saturn": {
-        "appearance": _signals(build="lean and elongated", stature="taller or long-limbed", head_hair="coarse hair", presence="serious and restrained"),
+        "appearance": _signals(complexion="dark complexion", build="lean and elongated", stature="taller or long-limbed", head_hair="coarse hair", presence="serious and restrained"),
+        "appearance_verses": {"complexion": "3.17"},
         "personality": ["reserved", "patient", "deliberate", "enduring"],
         "source_id": "bphs.graha_forms",
         "verse": "3.29",

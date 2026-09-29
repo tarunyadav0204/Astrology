@@ -71,6 +71,7 @@ const PLACEMENT_SIGN_CHANNELS = new Set([
   'd9_d1_seventh_lord',
   'darakaraka',
   'venus',
+  'spouse_karaka',
 ]);
 const traitKey = (value = '') => value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
@@ -408,7 +409,7 @@ export default function PartnerPortraitScreen({ navigation }) {
   const assets = result?.assets || [];
   const appearance = Object.entries(result?.profile?.appearance || {})
     .map(([attribute, entry]) => ({ ...(entry?.primary || {}), attribute }))
-    .filter((entry) => entry?.confidence === 'strong' || entry?.confidence === 'moderate' || ['hair', 'head_hair'].includes(entry?.attribute));
+    .filter((entry) => entry?.confidence === 'strong' || entry?.confidence === 'moderate' || ['hair', 'head_hair', 'complexion'].includes(entry?.attribute));
   const personality = (result?.profile?.personality || []).filter((entry) => entry?.confidence !== 'suggestive');
   const factors = result?.profile?.chart_factors || {};
   const factorReadings = result?.profile?.factor_readings || [];
@@ -570,6 +571,8 @@ export default function PartnerPortraitScreen({ navigation }) {
                     ? copy('hairLabel', 'Hair: {{value}}', { value: copy(`traits.${traitKey(item.value)}`, item.value) })
                     : item.attribute === 'body_hair'
                     ? copy('bodyHairLabel', 'Body hair: {{value}}', { value: copy(`traits.${traitKey(item.value)}`, item.value) })
+                    : item.attribute === 'complexion'
+                    ? copy('complexionLabel', 'Complexion: {{value}}', { value: copy(`traits.${traitKey(item.value)}`, item.value) })
                     : copy(`traits.${traitKey(item.value)}`, item.value)}</Text>
                   <Text style={[styles.traitEvidence, { color: colors.textMuted || colors.textSecondary }]}>{evidenceLine(item)}</Text>
                 </View>

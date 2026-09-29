@@ -19,7 +19,7 @@ CHANNELS = {
     "d9_seventh_lord": {"weight": 2.5, "independence": "d9_lord"},
     "d9_d1_seventh_lord": {"weight": 2.5, "independence": "d9_d1_lord"},
     "darakaraka": {"weight": 2.0, "independence": "jaimini_dk"},
-    "venus": {"weight": 1.5, "independence": "venus_karaka"},
+    "spouse_karaka": {"weight": 1.5, "independence": "spouse_karaka"},
 }
 
 # Source translations often use different English phrases for the same broad
@@ -56,6 +56,13 @@ APPEARANCE_CONCEPTS = {
     "unusual or difficult to place": "distinctive_presence",
     "unusual or immediately distinctive": "distinctive_presence",
     "distinctive and self-contained": "distinctive_presence",
+    "fair or light complexion": "light_complexion",
+    "fair or light golden complexion": "light_complexion",
+    "warm reddish-brown complexion": "warm_complexion",
+    "warm reddish complexion": "warm_complexion",
+    "olive or dusky complexion": "dusky_complexion",
+    "brown or dusky complexion": "dusky_complexion",
+    "dark complexion": "dark_complexion",
 }
 
 
@@ -64,6 +71,8 @@ def _add_rule_signals(
 ) -> None:
     channel_meta = CHANNELS[channel]
     for attribute, value in (rule.get("appearance") or {}).items():
+        attribute_sources = rule.get("appearance_sources") or {}
+        attribute_verses = rule.get("appearance_verses") or {}
         ledger.append({
             "attribute": attribute,
             "value": value,
@@ -72,8 +81,8 @@ def _add_rule_signals(
             "independence": channel_meta["independence"],
             "channel": channel,
             "factor": factor,
-            "source_id": rule.get("source_id"),
-            "verse": rule.get("verse"),
+            "source_id": attribute_sources.get(attribute) or rule.get("source_id"),
+            "verse": attribute_verses.get(attribute) or rule.get("verse"),
         })
 
 
@@ -227,7 +236,7 @@ def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
     add_planet_and_placement_sign("d9_seventh_lord", d9.get("seventh_lord"))
     add_planet_and_placement_sign("d9_d1_seventh_lord", d9.get("d1_seventh_lord"))
     add_planet_and_placement_sign("darakaraka", d1.get("darakaraka"))
-    add_planet_and_placement_sign("venus", d1.get("venus"))
+    add_planet_and_placement_sign("spouse_karaka", d1.get("spouse_karaka") or d1.get("venus"))
 
     appearance = _rank_appearance(appearance_ledger)
     personality = _rank_personality(personality_ledger)
@@ -245,7 +254,7 @@ def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
     strong_visuals = sum(1 for value in appearance.values() if (value.get("primary") or {}).get("confidence") in {"strong", "moderate"})
     return {
         "schema_version": "partner-profile/v1",
-        "ruleset_version": "bphs-partner-portrait/1.0.0",
+        "ruleset_version": "bphs-partner-portrait/1.1.0",
         "scope": "A birth-chart-guided portrait of likely partner traits; not an exact photograph or identification of a specific person.",
         "appearance": appearance,
         "personality": personality,
