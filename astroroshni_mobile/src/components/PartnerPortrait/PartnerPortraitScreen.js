@@ -25,7 +25,9 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import PartnerPortraitShareModal from './PartnerPortraitShareModal';
 import { trackEvent } from '../../utils/analytics';
 
-const SAMPLE = require('../../../assets/partner-portrait/sample-example.jpg');
+const SAMPLE_MALE = require('../../../assets/partner-portrait/sample-example.jpg');
+const SAMPLE_FEMALE = require('../../../assets/partner-portrait/sample-woman-pair.jpg');
+const showsFemaleSample = (gender) => !['female', 'woman', 'f', 'girl'].includes(String(gender || '').trim().toLowerCase());
 const GENERATING_PREVIEW = require('../../../assets/partner-portrait/generating-preview.jpg');
 const AGE_BANDS = ['25-34', '35-44', '45-54', '55+'];
 const CLOTHING = [
@@ -537,10 +539,14 @@ export default function PartnerPortraitScreen({ navigation }) {
             <View style={[styles.imageGrid, wide && styles.imageGridWide]}>
               {assets.map((asset) => (
                 <View key={asset.kind} style={[styles.resultImageCard, card]}>
-                  <Image source={{ uri: asset.url }} style={styles.resultImage} resizeMode="cover" />
-                  <Text style={[styles.imageLabel, { color: colors.text }]}>
-                    {asset.kind === 'portrait' ? copy('portrait', 'Face portrait') : copy('fullBody', 'Full-body view')}
-                  </Text>
+                  <View style={[styles.resultFrame, asset.kind === 'portrait' ? styles.resultPortrait : styles.resultFullBody]}>
+                    <Image source={{ uri: asset.url }} style={styles.resultImage} resizeMode="contain" />
+                  </View>
+                  <View style={[styles.resultCaption, { backgroundColor: colors.surfaceRaised }]}>
+                    <Text style={[styles.imageLabel, { color: colors.text }]}>
+                      {asset.kind === 'portrait' ? copy('portrait', 'Face portrait') : copy('fullBody', 'Full-body view')}
+                    </Text>
+                  </View>
                 </View>
               ))}
             </View>
@@ -601,6 +607,23 @@ export default function PartnerPortraitScreen({ navigation }) {
                     style={[styles.factorReading, index > 0 && { borderTopColor: colors.cardBorder, borderTopWidth: 1 }]}
                   >
                     <Text style={[styles.factorHeading, { color: colors.text }]}>{factorHeading(reading)}</Text>
+                    {reading.withheld ? (
+                      <Text style={[styles.factorMeaning, { color: colors.textSecondary }]}>
+                        {copy(
+                          'withheldDebilitation',
+                          'Debilitated, and Phaladeepika 7.26–30 does not cancel it, so this graha’s ordinary appearance is not used.',
+                        )}
+                      </Text>
+                    ) : null}
+                    {reading.condition_state === 'debilitation_cancelled' ? (
+                      <Text style={[styles.factorMeaning, { color: colors.textSecondary }]}>
+                        {copy(
+                          'cancelledDebilitation',
+                          'Debilitation is cancelled by {{source}}, so this graha’s ordinary appearance is used.',
+                          { source: reading.neecha_bhanga_source || 'Phaladeepika 7.26-30' },
+                        )}
+                      </Text>
+                    ) : null}
                     {appearanceContributions.length ? (
                       <Text style={[styles.factorMeaning, { color: colors.textSecondary }]}> 
                         <Text style={[styles.factorLabel, { color: colors.text }]}>{copy('contributesAppearance', 'Appearance: ')}</Text>
@@ -743,12 +766,12 @@ export default function PartnerPortraitScreen({ navigation }) {
             </Text>
           </View>
         ) : (
-          <View style={wide ? styles.twoColumn : undefined}>
+          <View style={wide ? styles.twoColumn : styles.sampleStack}>
             <View style={wide ? styles.column : undefined}>
               <Text style={[styles.heroTitle, { color: colors.text }]}>{copy('subtitle', 'See the partner your birth chart describes')}</Text>
               <View style={[styles.sampleCard, card]}>
-                <View style={[styles.sampleImageFrame, { backgroundColor: colors.backgroundSecondary || colors.background }]}> 
-                  <Image source={SAMPLE} style={styles.sampleImage} resizeMode="contain" />
+                <View style={[styles.sampleImageFrame, { aspectRatio: 2112 / 1402, backgroundColor: colors.backgroundSecondary || colors.background }]}>
+                  <Image source={showsFemaleSample(birthData?.gender) ? SAMPLE_FEMALE : SAMPLE_MALE} style={styles.sampleImage} resizeMode="contain" />
                 </View>
                 <View style={styles.sampleCopy}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>{copy('sampleTitle', 'Sample Partner Portrait')}</Text>
@@ -889,6 +912,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 44, alignSelf: 'center', width: '100%', maxWidth: 1180 },
   contentWide: { padding: 28 },
   twoColumn: { flexDirection: 'row', gap: 20, alignItems: 'flex-start' },
+  sampleStack: { gap: 16 },
   column: { flex: 1, minWidth: 0 },
   heroTitle: { fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontSize: 30, lineHeight: 38, fontWeight: '700', marginBottom: 8 },
   scope: { fontSize: 14, marginBottom: 18 },
@@ -900,7 +924,7 @@ const styles = StyleSheet.create({
   shareCtaBody: { marginTop: 2, fontSize: 11, lineHeight: 15, opacity: 0.84 },
   card: { borderWidth: 1, borderRadius: 22, padding: 20, marginTop: 16 },
   sampleCard: { width: '100%', maxWidth: '100%', alignSelf: 'stretch', borderWidth: 1, borderRadius: 22, overflow: 'hidden', marginTop: 12 },
-  sampleImageFrame: { width: '100%', maxWidth: '100%', aspectRatio: 1122 / 1402, overflow: 'hidden' },
+  sampleImageFrame: { width: '100%', maxWidth: '100%', overflow: 'hidden' },
   sampleImage: { width: '100%', height: '100%', maxWidth: '100%' },
   sampleCopy: { padding: 18 },
   sectionTitle: { fontSize: 19, fontWeight: '800', lineHeight: 25, marginBottom: 8 },
@@ -908,7 +932,7 @@ const styles = StyleSheet.create({
   body: { fontSize: 15, lineHeight: 23 },
   divider: { height: 1, marginVertical: 18 },
   label: { fontSize: 14, fontWeight: '800', marginTop: 14, marginBottom: 9 },
-  fieldHelp: { fontSize: 13, lineHeight: 19, marginTop: -4, marginBottom: 9 },
+  fieldHelp: { fontSize: 13, lineHeight: 19, marginTop: 12, marginBottom: 4 },
   directionBox: { borderWidth: 1, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 8, gap: 2 },
   directionRow: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   directionLabel: { flex: 1, fontSize: 13, lineHeight: 18 },
@@ -940,7 +964,7 @@ const styles = StyleSheet.create({
   variationTitle: { fontSize: 19, lineHeight: 25, fontWeight: '900' },
   variationBody: { fontSize: 14, lineHeight: 21, marginTop: 7 },
   variationFootnote: { fontSize: 11, lineHeight: 17, marginTop: 9 },
-  variationNotice: { borderWidth: 1.5, borderRadius: 20, padding: 18, marginBottom: 2 },
+  variationNotice: { borderWidth: 1.5, borderRadius: 20, padding: 18 },
   variationNoticeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 8 },
   variationNoticeTitle: { flex: 1, fontSize: 18, lineHeight: 24, fontWeight: '800' },
   keepPortraitButton: { alignSelf: 'flex-start', minHeight: 42, borderWidth: 1, borderRadius: 14, marginTop: 14, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 7 },
@@ -971,10 +995,14 @@ const styles = StyleSheet.create({
   centerText: { fontSize: 15, lineHeight: 23, textAlign: 'center', maxWidth: 540 },
   error: { fontSize: 14, lineHeight: 21, marginTop: 14, fontWeight: '600' },
   imageGrid: { width: '100%', maxWidth: '100%', gap: 14 },
-  imageGridWide: { flexDirection: 'row' },
+  imageGridWide: { flexDirection: 'row', alignItems: 'flex-start' },
   resultImageCard: { flex: 1, minWidth: 0, maxWidth: '100%', borderWidth: 1, borderRadius: 22, overflow: 'hidden' },
-  resultImage: { width: '100%', aspectRatio: 3 / 4 },
-  imageLabel: { fontSize: 16, fontWeight: '800', padding: 14 },
+  resultFrame: { width: '100%', overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.04)' },
+  resultImage: { width: '100%', height: '100%' },
+  resultPortrait: { aspectRatio: 4 / 5 },
+  resultFullBody: { aspectRatio: 3 / 4 },
+  resultCaption: { flexShrink: 0, minHeight: 58, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  imageLabel: { fontSize: 16, lineHeight: 22, fontWeight: '800' },
   source: { fontSize: 14, lineHeight: 22, marginBottom: 6 },
   methodNote: { fontSize: 12, lineHeight: 19, marginTop: 12 },
 });

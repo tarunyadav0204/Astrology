@@ -477,8 +477,14 @@ export default function HomeScreen({
         const match = (response?.data?.items || []).find((item) => (
           Number(item.birth_chart_id) === chartId && item.status === 'completed'
         ));
-        const portrait = match?.data?.assets?.find((asset) => asset.kind === 'portrait') || match?.data?.assets?.[0];
-        setPartnerPortraitPreview(portrait?.url ? { url: portrait.url, jobId: match.job_id } : null);
+        const assets = match?.data?.assets || [];
+        const portrait = assets.find((asset) => asset.kind === 'portrait');
+        const fullBody = assets.find((asset) => asset.kind === 'full_body');
+        setPartnerPortraitPreview((portrait?.url || fullBody?.url) ? {
+          url: portrait?.url || '',
+          fullBodyUrl: fullBody?.url || '',
+          jobId: match.job_id,
+        } : null);
       })
       .catch(() => { if (!cancelled) setPartnerPortraitPreview(null); });
     return () => { cancelled = true; };
@@ -2297,6 +2303,7 @@ const loadHomeData = async (nativeData = null) => {
           onOpenPartnerPortrait={() => navigation.navigate('PartnerPortrait')}
           partnerPortraitCost={pricing.partner_portrait ?? 44}
           partnerPortraitPreview={partnerPortraitPreview}
+          partnerPortraitGender={displayData?.gender || ''}
           onOpenAscendant={() => setActiveInsight(getSignInsight('ascendant', chartData?.houses?.[0]?.sign))}
           onOpenMoon={() => setActiveInsight(getSignInsight('moon', chartData?.planets?.Moon?.sign))}
           onOpenSun={() => setActiveInsight(getSignInsight('sun', chartData?.planets?.Sun?.sign))}
@@ -2343,6 +2350,7 @@ const loadHomeData = async (nativeData = null) => {
           eventsCost={pricing.events ?? 100}
           partnerPortraitCost={pricing.partner_portrait ?? 44}
           partnerPortraitPreview={partnerPortraitPreview}
+          partnerPortraitGender={displayData?.gender || ''}
           paths={options}
           analyses={analysisOptions}
           onSelectPath={(item) => onOptionSelect(item)}

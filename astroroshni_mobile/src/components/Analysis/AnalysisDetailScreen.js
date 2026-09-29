@@ -1483,6 +1483,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                     compact
                     placement="marriage_analysis"
                     nativeName={birthData?.name}
+                    chartGender={birthData?.gender || ''}
                     cost={pricing?.partner_portrait ?? 44}
                     onPress={() => navigation.navigate('PartnerPortrait')}
                   />

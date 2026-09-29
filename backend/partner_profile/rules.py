@@ -54,6 +54,22 @@ SOURCES: Dict[str, Dict[str, Any]] = {
         "scope": "Defines the longitude-ranked Chara Karakas, including Stri/Dara Karaka",
         "url": "https://vedic-astro.s3.amazonaws.com/books/bhrihat_parasara_hora_shastra.pdf",
     },
+    "bphs.graha_states": {
+        "work": "Brihat Parashara Hora Shastra",
+        "chapter": 45,
+        "verses": "5-6",
+        "title": "Awakening, dreaming and sleeping states",
+        "scope": "A debilitated graha is sleeping and does not deliver its ordinary results",
+        "url": "https://www.siva.sh/brihat-parashara-hora-shastra/45/5",
+    },
+    "phaladeepika.neecha_bhanga": {
+        "work": "Phaladeepika",
+        "chapter": 7,
+        "verses": "26-30",
+        "title": "Neecha Bhanga Raja Yoga",
+        "scope": "The D1 cancellation rules shown on the chart. A matched rule lets the graha deliver its ordinary form.",
+        "url": "https://vedpuran.net/wp-content/uploads/2021/04/mantreswara_s__phaladeeplka.pdf",
+    },
 }
 
 

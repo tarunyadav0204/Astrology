@@ -66,10 +66,63 @@ APPEARANCE_CONCEPTS = {
 }
 
 
+def _planet_condition(row: Mapping[str, Any]) -> Dict[str, Any]:
+    """Qualify how clearly a graha can deliver its natural description.
+
+    The classics supply the dignity and cancellation conditions. The numeric
+    factors are an explicit resolver policy used only to rank competing
+    descriptions; they are not presented as classical points.
+    """
+    dignity = str(row.get("dignity") or "neutral").strip().lower()
+    neecha_bhanga = bool(row.get("neecha_bhanga"))
+    combust = bool(row.get("combust"))
+    # BPHS 45.5-6: debilitation is the sleeping state and the graha's ordinary
+    # results are nil. Phaladeepika 7.26-30, already decided by the chart
+    # screen, is the only cancellation that restores those results.
+    if dignity == "debilitated" and not neecha_bhanga:
+        dignity_factor = 0.0
+    else:
+        dignity_factor = {
+            "exalted": 1.20,
+            "moolatrikona": 1.12,
+            "own_sign": 1.08,
+            "favorable": 1.04,
+            "friendly": 1.04,
+            "neutral": 1.00,
+            "unfavorable": 0.85,
+            "enemy": 0.85,
+            "debilitated": 0.88,
+        }.get(dignity, 1.00)
+    combustion_factor = 0.80 if combust else 1.00
+    factor = dignity_factor * combustion_factor
+    if dignity == "debilitated" and neecha_bhanga:
+        state = "debilitation_cancelled"
+    elif dignity == "debilitated":
+        state = "debilitated"
+    elif combust:
+        state = "combust"
+    elif dignity in {"exalted", "moolatrikona", "own_sign", "favorable", "friendly"}:
+        state = "supported"
+    else:
+        state = "ordinary"
+    return {
+        "dignity": dignity,
+        "neecha_bhanga": neecha_bhanga,
+        "neecha_bhanga_rules": list(row.get("neecha_bhanga_rules") or []),
+        "neecha_bhanga_source": row.get("neecha_bhanga_source"),
+        "combust": combust,
+        "condition_state": state,
+        "condition_factor": round(factor, 4),
+    }
+
+
 def _add_rule_signals(
-    ledger: list[Dict[str, Any]], *, channel: str, factor: str, rule: Mapping[str, Any]
+    ledger: list[Dict[str, Any]], *, channel: str, factor: str, rule: Mapping[str, Any],
+    condition: Mapping[str, Any] | None = None,
 ) -> None:
     channel_meta = CHANNELS[channel]
+    condition = dict(condition or {})
+    condition_factor = float(condition.get("condition_factor") or 1.0)
     for attribute, value in (rule.get("appearance") or {}).items():
         attribute_sources = rule.get("appearance_sources") or {}
         attribute_verses = rule.get("appearance_verses") or {}
@@ -77,27 +130,56 @@ def _add_rule_signals(
             "attribute": attribute,
             "value": value,
             "concept": APPEARANCE_CONCEPTS.get(value, value),
-            "weight": channel_meta["weight"],
+            "weight": channel_meta["weight"] * condition_factor,
+            "base_weight": channel_meta["weight"],
             "independence": channel_meta["independence"],
             "channel": channel,
             "factor": factor,
             "source_id": attribute_sources.get(attribute) or rule.get("source_id"),
             "verse": attribute_verses.get(attribute) or rule.get("verse"),
+            **condition,
         })
 
 
-def _personality_signals(ledger: list[Dict[str, Any]], *, channel: str, factor: str, rule: Mapping[str, Any]) -> None:
+def _personality_signals(
+    ledger: list[Dict[str, Any]], *, channel: str, factor: str, rule: Mapping[str, Any],
+    condition: Mapping[str, Any] | None = None,
+) -> None:
     channel_meta = CHANNELS[channel]
+    condition = dict(condition or {})
+    condition_factor = float(condition.get("condition_factor") or 1.0)
     for value in (rule.get("personality") or rule.get("temperament") or []):
         ledger.append({
             "value": value,
-            "weight": channel_meta["weight"],
+            "weight": channel_meta["weight"] * condition_factor,
+            "base_weight": channel_meta["weight"],
             "independence": channel_meta["independence"],
             "channel": channel,
             "factor": factor,
             "source_id": rule.get("source_id"),
             "verse": rule.get("verse"),
+            **condition,
         })
+
+
+def _effective_repetitions(rows: Iterable[Dict[str, Any]]) -> float:
+    strongest_by_channel: dict[str, float] = {}
+    for row in rows:
+        independence = str(row["independence"])
+        strongest_by_channel[independence] = max(
+            strongest_by_channel.get(independence, 0.0),
+            min(1.0, float(row.get("condition_factor") or 1.0)),
+        )
+    return sum(strongest_by_channel.values())
+
+
+def _confidence(rows: Iterable[Dict[str, Any]]) -> str:
+    effective = _effective_repetitions(rows)
+    if effective >= 2.5:
+        return "strong"
+    if effective >= 1.5:
+        return "moderate"
+    return "suggestive"
 
 
 def _rank_appearance(ledger: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
@@ -109,8 +191,9 @@ def _rank_appearance(ledger: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         ranked = sorted(
             values.items(),
             key=lambda item: (
-                len({r["independence"] for r in item[1]}),
                 sum(float(r["weight"]) for r in item[1]),
+                _effective_repetitions(item[1]),
+                len({r["independence"] for r in item[1]}),
             ),
             reverse=True,
         )
@@ -123,8 +206,9 @@ def _rank_appearance(ledger: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             candidates.append({
                 "value": display_row["value"],
                 "concept": display_row.get("concept") or display_row["value"],
-                "confidence": "strong" if independent >= 3 else "moderate" if independent >= 2 else "suggestive",
+                "confidence": _confidence(evidence),
                 "independent_repetitions": independent,
+                "effective_repetitions": round(_effective_repetitions(evidence), 2),
                 "evidence": evidence,
             })
         if candidates:
@@ -141,14 +225,15 @@ def _rank_personality(ledger: Iterable[Dict[str, Any]]) -> list[Dict[str, Any]]:
         grouped[row["value"]].append(row)
     ranked = sorted(
         grouped.items(),
-        key=lambda item: (len({r["independence"] for r in item[1]}), sum(r["weight"] for r in item[1])),
+        key=lambda item: (sum(r["weight"] for r in item[1]), _effective_repetitions(item[1])),
         reverse=True,
     )
     return [
         {
             "trait": value,
-            "confidence": "strong" if len({r["independence"] for r in rows}) >= 3 else "moderate" if len({r["independence"] for r in rows}) >= 2 else "suggestive",
+            "confidence": _confidence(rows),
             "independent_repetitions": len({r["independence"] for r in rows}),
+            "effective_repetitions": round(_effective_repetitions(rows), 2),
             "evidence": rows,
         }
         for value, rows in ranked[:8]
@@ -178,6 +263,12 @@ def _factor_readings(
                 "personality": [],
                 "source_id": row.get("source_id"),
                 "verse": row.get("verse"),
+                "dignity": row.get("dignity"),
+                "neecha_bhanga": bool(row.get("neecha_bhanga")),
+                "neecha_bhanga_rules": list(row.get("neecha_bhanga_rules") or []),
+                "neecha_bhanga_source": row.get("neecha_bhanga_source"),
+                "combust": bool(row.get("combust")),
+                "condition_state": row.get("condition_state"),
             }
         return grouped[key]
 
@@ -195,9 +286,30 @@ def _factor_readings(
     return list(grouped.values())
 
 
+def _withheld_reading(channel: str, planet: str, condition: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "channel": channel,
+        "factor": planet,
+        "factor_type": "planet",
+        "appearance": [],
+        "personality": [],
+        "withheld": True,
+        "withheld_reason": "debilitated_without_neecha_bhanga",
+        "source_id": "bphs.graha_states",
+        "verse": "45.5-6",
+        "dignity": "debilitated",
+        "neecha_bhanga": False,
+        "neecha_bhanga_rules": [],
+        "neecha_bhanga_source": None,
+        "combust": bool(condition.get("combust")),
+        "condition_state": "debilitated",
+    }
+
+
 def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
     appearance_ledger: list[Dict[str, Any]] = []
     personality_ledger: list[Dict[str, Any]] = []
+    withheld: list[Dict[str, Any]] = []
     d1 = evidence.get("d1") if isinstance(evidence.get("d1"), dict) else {}
     d9 = evidence.get("d9") if isinstance(evidence.get("d9"), dict) else {}
 
@@ -214,8 +326,12 @@ def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
         planet = str(row.get("planet") or "")
         rule = PLANET_RULES.get(planet)
         if rule:
-            _add_rule_signals(appearance_ledger, channel=channel, factor=planet, rule=rule)
-            _personality_signals(personality_ledger, channel=channel, factor=planet, rule=rule)
+            condition = _planet_condition(row)
+            if condition["condition_state"] == "debilitated":
+                withheld.append(_withheld_reading(channel, planet, condition))
+                return
+            _add_rule_signals(appearance_ledger, channel=channel, factor=planet, rule=rule, condition=condition)
+            _personality_signals(personality_ledger, channel=channel, factor=planet, rule=rule, condition=condition)
 
     def add_planet_and_placement_sign(channel: str, row: Any) -> None:
         add_planet(channel, row)
@@ -240,9 +356,11 @@ def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
 
     appearance = _rank_appearance(appearance_ledger)
     personality = _rank_personality(personality_ledger)
-    factor_readings = _factor_readings(appearance_ledger, personality_ledger)
+    factor_readings = _factor_readings(appearance_ledger, personality_ledger) + withheld
     references = []
-    used_sources = {row.get("source_id") for row in appearance_ledger + personality_ledger if row.get("source_id")}
+    used_sources = {row.get("source_id") for row in appearance_ledger + personality_ledger + withheld if row.get("source_id")}
+    if any(row.get("neecha_bhanga") for row in appearance_ledger + personality_ledger):
+        used_sources.add("phaladeepika.neecha_bhanga")
     used_sources.add("bphs.seventh_house")
     used_sources.add("bphs.navamsa_scope")
     used_sources.add("bphs.chara_karakas")
@@ -254,7 +372,7 @@ def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
     strong_visuals = sum(1 for value in appearance.values() if (value.get("primary") or {}).get("confidence") in {"strong", "moderate"})
     return {
         "schema_version": "partner-profile/v1",
-        "ruleset_version": "bphs-partner-portrait/1.1.0",
+        "ruleset_version": "bphs-partner-portrait/1.3.0",
         "scope": "A birth-chart-guided portrait of likely partner traits; not an exact photograph or identification of a specific person.",
         "appearance": appearance,
         "personality": personality,
@@ -263,8 +381,9 @@ def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
         "references": references,
         "portrait_readiness": "ready" if strong_visuals >= 2 else "limited",
         "method_note": (
-            "The classical texts supply the rashi and graha descriptions. AstroRoshni's declared resolver ranks "
-            "them by spouse relevance and independent repetition; the numerical weights are an implementation "
-            "policy, not a verse from the classics."
+            "The classical texts supply the rashi and graha descriptions. A debilitated graha does not supply "
+            "its ordinary form unless Phaladeepika 7.26-30, the chart's Neecha Bhanga rules, cancel that "
+            "debilitation. AstroRoshni's declared resolver ranks the remaining descriptions by spouse relevance "
+            "and independent repetition; the numerical weights are an implementation policy, not a verse from the classics."
         ),
     }

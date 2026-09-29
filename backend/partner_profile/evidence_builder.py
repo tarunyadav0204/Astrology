@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, Mapping
 
 from calculators.aspect_calculator import AspectCalculator
+from calculators.base_calculator import BaseCalculator
 from calculators.chara_karaka_calculator import CharaKarakaCalculator
+from calculators.classical_neecha_bhanga import calculate_classical_neecha_bhanga
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from reports.context.shared_branch_context import build_nakshatra_context
 
@@ -56,7 +58,12 @@ def _ascendant_longitude(chart: Mapping[str, Any]) -> float | None:
     return None
 
 
-def _planet_row(chart: Mapping[str, Any], planet: str, nakshatras: Mapping[str, Any] | None = None) -> Dict[str, Any]:
+def _planet_row(
+    chart: Mapping[str, Any],
+    planet: str,
+    nakshatras: Mapping[str, Any] | None = None,
+    neecha_results: Mapping[str, Any] | None = None,
+) -> Dict[str, Any]:
     planets = _chart_planets(chart)
     raw = planets.get(planet) if isinstance(planets.get(planet), dict) else {}
     if not raw:
@@ -65,6 +72,24 @@ def _planet_row(chart: Mapping[str, Any], planet: str, nakshatras: Mapping[str, 
     if sign is None and raw.get("longitude") is not None:
         sign = int(float(raw["longitude"]) / 30) % 12
     nak = (nakshatras or {}).get(planet) if isinstance((nakshatras or {}).get(planet), dict) else {}
+    dignity = raw.get("dignity")
+    if not dignity and sign is not None and BaseCalculator.DEBILITATION_SIGNS.get(planet) == sign % 12:
+        dignity = "debilitated"
+    # D1 cancellation comes only from Phaladeepika 7.26-30, the same function
+    # the chart screen uses. D9 rows pass no results: the chart screen does
+    # not apply those rules to vargas, so a navamsa debilitation is not cancelled
+    # by a copied D1 flag.
+    neecha_bhanga = None
+    neecha_rules = None
+    neecha_source = None
+    if neecha_results is not None and planet in neecha_results:
+        nb = neecha_results[planet] or {}
+        neecha_bhanga = bool(nb.get("neecha_bhanga_present"))
+        if neecha_bhanga:
+            neecha_rules = [
+                item.get("rule_id") for item in (nb.get("conditions_met") or []) if item.get("rule_id")
+            ]
+            neecha_source = (nb.get("source") or {}).get("reference_label") or "Phaladeepika 7.26-30"
     return {
         key: value for key, value in {
             "planet": planet,
@@ -73,7 +98,10 @@ def _planet_row(chart: Mapping[str, Any], planet: str, nakshatras: Mapping[str, 
             "sign": SIGN_NAMES[sign % 12] if sign is not None else raw.get("sign_name"),
             "longitude": raw.get("longitude"),
             "degree_in_sign": round(float(raw.get("longitude")) % 30, 4) if raw.get("longitude") is not None else None,
-            "dignity": raw.get("dignity"),
+            "dignity": dignity,
+            "neecha_bhanga": neecha_bhanga,
+            "neecha_bhanga_rules": neecha_rules,
+            "neecha_bhanga_source": neecha_source,
             "retrograde": bool(raw.get("retrograde")) or None,
             "combust": bool(raw.get("combust")) or None,
             "nakshatra": nak.get("nakshatra_name") or nak.get("name") or nak.get("nakshatra"),
@@ -132,6 +160,11 @@ def build_partner_evidence(chart_data: Dict[str, Any], *, native_gender: str | N
     d9_seventh_occupants = _occupants(d9, 7)
     d1_seventh_aspectors = _aspecting(chart_data, 7)
     d9_seventh_aspectors = _aspecting(d9, 7)
+    neecha_results = calculate_classical_neecha_bhanga(chart_data)
+
+    def d1_row(planet: str) -> Dict[str, Any]:
+        return _planet_row(chart_data, planet, d1_nak, neecha_results)
+
     return {
         "schema_version": "partner-evidence/v1",
         "scope": "Static natal partner appearance and temperament. No timing or identification of a specific person.",
@@ -144,13 +177,13 @@ def build_partner_evidence(chart_data: Dict[str, Any], *, native_gender: str | N
                 "occupants": d1_seventh_occupants,
                 "aspecting_planets": d1_seventh_aspectors,
             },
-            "seventh_lord": _planet_row(chart_data, seventh_lord, d1_nak),
-            "seventh_house_occupants": [_planet_row(chart_data, p, d1_nak) for p in d1_seventh_occupants],
-            "seventh_house_aspectors": [_planet_row(chart_data, p, d1_nak) for p in d1_seventh_aspectors],
-            "darakaraka": _planet_row(chart_data, str(dk or ""), d1_nak) if dk else {},
-            "venus": _planet_row(chart_data, "Venus", d1_nak),
-            "jupiter": _planet_row(chart_data, "Jupiter", d1_nak),
-            "spouse_karaka": _planet_row(chart_data, spouse_karaka, d1_nak),
+            "seventh_lord": d1_row(seventh_lord),
+            "seventh_house_occupants": [d1_row(p) for p in d1_seventh_occupants],
+            "seventh_house_aspectors": [d1_row(p) for p in d1_seventh_aspectors],
+            "darakaraka": d1_row(str(dk or "")) if dk else {},
+            "venus": d1_row("Venus"),
+            "jupiter": d1_row("Jupiter"),
+            "spouse_karaka": d1_row(spouse_karaka),
         },
         "d9": {
             "seventh_house": {
@@ -171,6 +204,7 @@ def build_partner_evidence(chart_data: Dict[str, Any], *, native_gender: str | N
             "zodiac": "Lahiri sidereal chart supplied by the canonical chart calculator",
             "houses": "Whole-sign houses from the calculated chart",
             "darakaraka": karakas.get("calculation_method"),
+            "neecha_bhanga": "Phaladeepika 7.26-30 on D1, the same rules shown on the chart",
             "spouse_karaka": (
                 "Jupiter for a husband in a female nativity; Venus for a wife in a male nativity"
             ),

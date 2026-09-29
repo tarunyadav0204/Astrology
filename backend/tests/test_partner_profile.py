@@ -2,10 +2,12 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 from calculators.chart_calculator import ChartCalculator
+from partner_profile.evidence_builder import build_partner_evidence
 from partner_profile.prompt_builder import build_full_body_prompt, build_portrait_prompt
 from partner_profile.routes import _progress_stage
 from partner_profile.rules import PLANET_RULES, SIGN_RULES
 from partner_profile.service import build_partner_profile
+from partner_profile.synthesizer import synthesize_partner_profile
 
 
 def _chart():
@@ -196,6 +198,116 @@ def test_sun_hair_description_cannot_be_rendered_as_baldness():
     assert "hair" not in PLANET_RULES["Sun"]["appearance"]
     assert SIGN_RULES["Scorpio"]["appearance"]["body_hair"] == "noticeable body hair"
     assert "head_hair" not in SIGN_RULES["Scorpio"]["appearance"]
+
+
+def _jupiter_seventh_evidence(*, cancelled: bool) -> dict:
+    jupiter = {
+        "planet": "Jupiter",
+        "sign": "Capricorn",
+        "dignity": "debilitated",
+        "neecha_bhanga": cancelled,
+    }
+    if cancelled:
+        jupiter["neecha_bhanga_rules"] = ["PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_LAGNA"]
+        jupiter["neecha_bhanga_source"] = "Phaladeepika 7.26-30"
+    return {
+        "d1": {
+            "seventh_house": {"sign": "Capricorn"},
+            "seventh_house_occupants": [jupiter],
+            "seventh_lord": {"planet": "Saturn", "sign": "Aquarius", "dignity": "own_sign"},
+        },
+        "d9": {"seventh_house": {"sign": "Leo"}},
+    }
+
+
+def _appearance_factors(profile: dict, attribute: str) -> set[str]:
+    primary = ((profile.get("appearance") or {}).get(attribute) or {}).get("primary") or {}
+    return {row.get("factor") for row in primary.get("evidence") or []}
+
+
+def test_uncancelled_debilitation_does_not_supply_the_graha_form():
+    profile = synthesize_partner_profile(_jupiter_seventh_evidence(cancelled=False))
+
+    assert "Jupiter" not in _appearance_factors(profile, "complexion")
+    assert "Jupiter" not in _appearance_factors(profile, "head_hair")
+    assert all(row.get("factor") != "Jupiter" or row.get("withheld") for row in profile["factor_readings"])
+    withheld = [row for row in profile["factor_readings"] if row.get("withheld")]
+    assert withheld
+    assert withheld[0]["verse"] == "45.5-6"
+    assert any(
+        row["channel"] == "d1_seventh_sign" and row["factor"] == "Capricorn" and row["appearance"]
+        for row in profile["factor_readings"]
+    )
+    prompt = build_portrait_prompt(
+        profile, presentation="feminine", age_band="25-34", clothing_style="contemporary",
+    )
+    assert "fair or light golden complexion" not in prompt
+    assert "golden-brown hair" not in prompt
+
+
+def test_chart_screen_neecha_bhanga_restores_the_graha_form():
+    profile = synthesize_partner_profile(_jupiter_seventh_evidence(cancelled=True))
+
+    assert "Jupiter" in _appearance_factors(profile, "complexion")
+    jupiter = next(
+        row for row in profile["factor_readings"]
+        if row["factor"] == "Jupiter" and row["channel"] == "d1_occupant"
+    )
+    assert jupiter["condition_state"] == "debilitation_cancelled"
+    assert jupiter["neecha_bhanga_rules"] == ["PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_LAGNA"]
+    assert any(ref["source_id"] == "phaladeepika.neecha_bhanga" for ref in profile["references"])
+
+
+def test_uncancelled_debilitation_stays_false_and_is_not_copied_into_d9():
+    from calculators.classical_neecha_bhanga import calculate_classical_neecha_bhanga
+    from partner_profile.evidence_builder import _planet_row
+
+    asc = 11  # Pisces. Saturn is debilitated in Aries, and the known placement has no cancellation.
+    signs = {"Saturn": 0, "Mars": 0, "Moon": 11, "Sun": 0, "Venus": 1, "Mercury": 2, "Jupiter": 8}
+    planets = {
+        name: {"sign": sign, "house": ((sign - asc) % 12) + 1, "longitude": sign * 30 + 4}
+        for name, sign in signs.items()
+    }
+    planets["Saturn"]["neecha_bhanga"] = True  # a stale flag must not override the classical result
+    chart = {"ascendant": asc * 30 + 10, "planets": planets}
+    results = calculate_classical_neecha_bhanga(chart)
+    stamped = _planet_row(chart, "Saturn", neecha_results=results)
+    untouched = _planet_row(chart, "Saturn")
+
+    assert results["Saturn"]["neecha_bhanga_present"] is False
+    assert stamped["dignity"] == "debilitated"
+    assert stamped["neecha_bhanga"] is False
+    assert "neecha_bhanga_rules" not in stamped
+    assert "neecha_bhanga" not in untouched
+
+
+def test_d1_evidence_uses_the_chart_screen_neecha_bhanga_rules():
+    asc = 3  # Cancer, so the seventh house is Capricorn
+    signs = {
+        "Sun": 4, "Moon": 2, "Mars": 0, "Mercury": 2,
+        "Jupiter": 9, "Venus": 1, "Saturn": 10, "Rahu": 5, "Ketu": 11,
+    }
+    planets = {
+        name: {
+            "sign": sign,
+            "house": ((sign - asc) % 12) + 1,
+            "longitude": sign * 30 + 8 + index,
+            "dignity": "debilitated" if name == "Jupiter" else "neutral",
+        }
+        for index, (name, sign) in enumerate(signs.items())
+    }
+    chart = {
+        "ascendant": asc * 30 + 5,
+        "houses": [{"house_number": house, "sign": (asc + house - 1) % 12} for house in range(1, 13)],
+        "planets": planets,
+    }
+    evidence = build_partner_evidence(chart, native_gender="male")
+    jupiter = next(row for row in evidence["d1"]["seventh_house_occupants"] if row["planet"] == "Jupiter")
+
+    assert jupiter["dignity"] == "debilitated"
+    assert jupiter["neecha_bhanga"] is True
+    assert "PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_LAGNA" in jupiter["neecha_bhanga_rules"]
+    assert jupiter["neecha_bhanga_source"] == "Phaladeepika 7.26-30"
 
 
 def test_partner_portrait_progress_stages_follow_persisted_work():

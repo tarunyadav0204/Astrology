@@ -131,6 +131,7 @@ export default function PremiumTodayOverview({
   onOpenPartnerPortrait,
   partnerPortraitCost = 44,
   partnerPortraitPreview = null,
+  partnerPortraitGender = '',
   todayPredictions,
   onOpenAscendant,
   onOpenMoon,
@@ -437,6 +438,8 @@ export default function PremiumTodayOverview({
           cost={partnerPortraitCost}
           completed={Boolean(partnerPortraitPreview)}
           previewUrl={partnerPortraitPreview?.url}
+          imageAspect={4 / 5}
+          chartGender={partnerPortraitGender}
           onPress={onOpenPartnerPortrait}
         />
       ) : null}
@@ -609,6 +612,7 @@ export function PremiumExploreIntro({
   eventsCost = 100,
   partnerPortraitCost = 44,
   partnerPortraitPreview = null,
+  partnerPortraitGender = '',
   paths = [],
   analyses = [],
   onSelectPath,
@@ -648,7 +652,9 @@ export function PremiumExploreIntro({
         placement="explore"
         cost={partnerPortraitCost}
         completed={Boolean(partnerPortraitPreview)}
-        previewUrl={partnerPortraitPreview?.url}
+        previewUrl={partnerPortraitPreview?.fullBodyUrl || partnerPortraitPreview?.url}
+        imageAspect={partnerPortraitPreview?.fullBodyUrl ? 3 / 4 : 4 / 5}
+        chartGender={partnerPortraitGender}
         onPress={onOpenPartnerPortrait}
       />
       <View style={[styles.timingSpotlight, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
