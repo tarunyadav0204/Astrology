@@ -195,6 +195,35 @@ boot_guard = r'''
     var path = location.pathname || '';
     var suffix = (location.search || '') + (location.hash || '');
     var params = new URLSearchParams(location.search || '');
+    var restorePath = params.get('__ar_path') || '';
+    if (restorePath) {
+      try {
+        var restoredUrl = new URL(restorePath, location.origin);
+        if (restoredUrl.origin === location.origin &&
+            (restoredUrl.pathname === '/mobile' || restoredUrl.pathname.indexOf('/mobile/') === 0)) {
+          path = restoredUrl.pathname;
+          suffix = restoredUrl.search + restoredUrl.hash;
+          params = new URLSearchParams(restoredUrl.search || '');
+          history.replaceState(history.state, '', path + suffix);
+        }
+      } catch (_) {}
+    }
+    try {
+      sessionStorage.removeItem('ar_recovery_attempts');
+      if (params.has('__ar_path') || params.has('__ar_build') || params.has('__ar_reload') || params.has('__ar_recover')) {
+        params.delete('__ar_path');
+        params.delete('__ar_build');
+        params.delete('__ar_reload');
+        params.delete('__ar_recover');
+        var cleanedQuery = params.toString();
+        history.replaceState(
+          history.state,
+          '',
+          path + (cleanedQuery ? '?' + cleanedQuery : '') + (location.hash || '')
+        );
+        suffix = (cleanedQuery ? '?' + cleanedQuery : '') + (location.hash || '');
+      }
+    } catch (_) {}
     var hasContinuePath = /\/(?:mobile\/)?c\/[^/?#]+/i.test(path);
     if (params.get('c') || params.get('continue') || hasContinuePath) {
       sessionStorage.setItem('ar_pending_continue_url', path + suffix);
@@ -338,8 +367,18 @@ sw_bits = rf'''
       }});
       if (!response.ok) return false;
       var body = await response.text();
-      return body.indexOf('data-ar-shell="expo-web"') >= 0 &&
-        body.indexOf('window.__AR_WEB_BUILD__=' + JSON.stringify(targetBuild)) >= 0;
+      if (body.indexOf('data-ar-shell="expo-web"') < 0 ||
+          body.indexOf('window.__AR_WEB_BUILD__=' + JSON.stringify(targetBuild)) < 0) {{
+        return false;
+      }}
+      var scriptMatch = body.match(/<script[^>]+src=["']([^"']+\.js)["']/i);
+      if (!scriptMatch) return false;
+      var assetResponse = await fetch(scriptMatch[1] + (scriptMatch[1].indexOf('?') >= 0 ? '&' : '?') + '__ar_ready=' + Date.now(), {{
+        method: 'HEAD',
+        cache: 'no-store',
+        credentials: 'same-origin'
+      }});
+      return assetResponse.ok && /javascript/i.test(assetResponse.headers.get('content-type') || '');
     }} catch (_) {{
       return false;
     }}
@@ -353,15 +392,41 @@ sw_bits = rf'''
     if (targetBuild && !(await deployedShellIsReady(targetBuild))) return;
     try {{
       var guard = targetBuild || BUILD;
-      if (sessionStorage.getItem('ar_web_reloading') === guard) return;
-      sessionStorage.setItem('ar_web_reloading', guard);
+      var previous = {{}};
+      try {{ previous = JSON.parse(sessionStorage.getItem('ar_web_reloading') || '{{}}') || {{}}; }} catch (_) {{}}
+      var now = Date.now();
+      var attempts = previous.target === guard ? Number(previous.attempts || 0) + 1 : 1;
+      var elapsed = now - Number(previous.at || 0);
+      if (previous.target === guard && elapsed < 3500) {{
+        setTimeout(function () {{ reloadOnce(targetBuild); }}, Math.max(500, 3600 - elapsed));
+        return;
+      }}
+      if (attempts > 3) {{
+        sessionStorage.removeItem('ar_web_reloading');
+        return;
+      }}
+      sessionStorage.setItem('ar_web_reloading', JSON.stringify({{ target: guard, at: now, attempts: attempts }}));
+      var currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete('__ar_path');
+      currentUrl.searchParams.delete('__ar_build');
+      currentUrl.searchParams.delete('__ar_reload');
+      currentUrl.searchParams.delete('__ar_recover');
+      var restorePath = currentUrl.pathname + currentUrl.search + currentUrl.hash;
+      var reloadUrl = new URL('/mobile/', window.location.origin);
+      reloadUrl.searchParams.set('__ar_path', restorePath);
+      reloadUrl.searchParams.set('__ar_build', guard);
+      reloadUrl.searchParams.set('__ar_reload', String(now));
+      window.location.replace(reloadUrl.href);
+      return;
     }} catch (_) {{}}
     window.location.reload();
   }}
 
   function clearReloadGuard() {{
     try {{
-      if (sessionStorage.getItem('ar_web_reloading') === BUILD) {{
+      var previous = {{}};
+      try {{ previous = JSON.parse(sessionStorage.getItem('ar_web_reloading') || '{{}}') || {{}}; }} catch (_) {{}}
+      if (previous.target === BUILD) {{
         sessionStorage.removeItem('ar_web_reloading');
       }}
     }} catch (_) {{}}

@@ -26,7 +26,7 @@ from .prompt_builder import build_full_body_prompt, build_portrait_prompt
 from .service import build_partner_profile
 from .synthesizer import synthesize_partner_profile
 from .storage import PartnerPortraitStorage
-from .task_queue import enqueue_partner_portrait, task_secret, tasks_enabled
+from .task_queue import enqueue_partner_portrait, task_configuration_error, task_secret, tasks_enabled
 
 
 logger = logging.getLogger(__name__)
@@ -42,8 +42,10 @@ def _configuration_error() -> str | None:
         PartnerPortraitStorage()
     except RuntimeError as exc:
         return str(exc)
-    if environment in {"production", "prod"} and not tasks_enabled():
-        return "worker queue is not configured"
+    if environment in {"production", "prod"}:
+        queue_error = task_configuration_error()
+        if queue_error:
+            return queue_error
     return None
 
 

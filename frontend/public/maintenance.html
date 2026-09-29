@@ -172,13 +172,41 @@
       var status = document.getElementById('status');
       var retry = document.getElementById('retry');
       var sourceUrl = new URL(window.location.href);
+      var standalone = false;
+      try {
+        standalone = navigator.standalone === true ||
+          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      } catch (_) {}
       if (sourceUrl.pathname === '/maintenance.html') {
         var pendingContinueUrl = '';
         try { pendingContinueUrl = sessionStorage.getItem('ar_pending_continue_url') || ''; } catch (_) {}
-        sourceUrl = pendingContinueUrl ? new URL(pendingContinueUrl, window.location.origin) : new URL('/mobile/', window.location.origin);
+        sourceUrl = pendingContinueUrl
+          ? new URL(pendingContinueUrl, window.location.origin)
+          : new URL(standalone ? '/mobile/' : '/', window.location.origin);
+      }
+      if (standalone && sourceUrl.pathname.indexOf('/mobile') !== 0) {
+        sourceUrl.pathname = sourceUrl.pathname === '/'
+          ? '/mobile/'
+          : '/mobile' + sourceUrl.pathname;
       }
       sourceUrl.searchParams.delete('__ar_probe');
       sourceUrl.searchParams.delete('__ar_recover');
+      sourceUrl.searchParams.delete('__ar_build');
+      sourceUrl.searchParams.delete('__ar_reload');
+      var mobileShell = sourceUrl.pathname === '/mobile' || sourceUrl.pathname.indexOf('/mobile/') === 0;
+
+      async function shellAssetsReady(html, baseUrl) {
+        var match = html.match(/<script[^>]+src=["']([^"']+\.js)["']/i);
+        if (!match) return false;
+        try {
+          var assetUrl = new URL(match[1], baseUrl);
+          assetUrl.searchParams.set('__ar_probe', String(Date.now()));
+          var asset = await fetch(assetUrl.href, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin' });
+          return asset.ok && /javascript/i.test(asset.headers.get('content-type') || '');
+        } catch (_) {
+          return false;
+        }
+      }
 
       function schedule() {
         var delays = [700, 1400, 2600, 4800, 8000, 12000];
@@ -190,7 +218,7 @@
       async function probe() {
         clearTimeout(timer);
         status.textContent = failures ? 'Checking again…' : 'Checking the app…';
-        var probeUrl = new URL('/mobile/index.html', window.location.origin);
+        var probeUrl = new URL(mobileShell ? '/mobile/index.html' : '/index.html', window.location.origin);
         probeUrl.searchParams.set('__ar_probe', String(Date.now()));
         try {
           var response = await fetch(probeUrl.href, {
@@ -202,10 +230,25 @@
           var fallback = /name=["']ar-fallback["']|data-ar-fallback|We(?:’|')re updating AstroRoshni/i.test(html);
           var documentResponse = /<html[\s>]/i.test(html) && /<\/html>/i.test(html);
           var expoShell = /data-ar-shell=["']expo-web["']/i.test(html);
-          if (response.ok && documentResponse && expoShell && !fallback) {
+          var expectedShell = mobileShell ? expoShell : !expoShell;
+          if (response.ok && documentResponse && expectedShell && !fallback && await shellAssetsReady(html, probeUrl.href)) {
             status.textContent = 'Connected. Opening…';
-            var launchUrl = new URL(sourceUrl.href);
+            var originalPath = sourceUrl.pathname + sourceUrl.search + sourceUrl.hash;
+            var launchUrl = new URL(mobileShell ? '/mobile/' : '/', window.location.origin);
+            if (mobileShell && originalPath !== '/mobile/' && originalPath !== '/mobile') {
+              launchUrl.searchParams.set('__ar_path', originalPath);
+            }
             launchUrl.searchParams.set('__ar_recover', String(Date.now()));
+            try {
+              var attempts = Number(sessionStorage.getItem('ar_recovery_attempts') || 0) + 1;
+              sessionStorage.setItem('ar_recovery_attempts', String(attempts));
+              sessionStorage.removeItem('ar_web_reloading');
+              sessionStorage.removeItem('ar_web_update_pending');
+              if (attempts > 2) {
+                launchUrl = new URL(mobileShell ? '/mobile/' : '/', window.location.origin);
+                launchUrl.searchParams.set('__ar_recover', String(Date.now()));
+              }
+            } catch (_) {}
             window.location.replace(launchUrl.href);
             return;
           }

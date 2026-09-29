@@ -10,6 +10,39 @@ import os
 logger = logging.getLogger(__name__)
 
 
+def _task_settings() -> dict[str, str]:
+    return {
+        "project": (
+            os.getenv("PARTNER_PORTRAIT_TASKS_PROJECT")
+            or os.getenv("REPORT_TASKS_PROJECT")
+            or os.getenv("CHAT_TASKS_PROJECT")
+            or os.getenv("GOOGLE_CLOUD_PROJECT")
+            or os.getenv("GCP_PROJECT_ID")
+            or ""
+        ).strip(),
+        "location": (
+            os.getenv("PARTNER_PORTRAIT_TASKS_LOCATION")
+            or os.getenv("REPORT_TASKS_LOCATION")
+            or os.getenv("CHAT_TASKS_LOCATION")
+            or "asia-south1"
+        ).strip(),
+        "queue": (
+            os.getenv("PARTNER_PORTRAIT_TASKS_QUEUE")
+            or os.getenv("REPORT_TASKS_QUEUE")
+            or os.getenv("CHAT_TASKS_QUEUE")
+            or "partner-portrait-queue"
+        ).strip(),
+        "target": (
+            os.getenv("PARTNER_PORTRAIT_TASKS_TARGET_BASE_URL")
+            or os.getenv("REPORT_TASKS_TARGET_BASE_URL")
+            or os.getenv("CHAT_TASKS_TARGET_BASE_URL")
+            or os.getenv("PUBLIC_API_BASE_URL")
+            or "https://astroroshni.com"
+        ).strip().rstrip("/"),
+        "secret": task_secret(),
+    }
+
+
 def tasks_enabled() -> bool:
     return (os.getenv("PARTNER_PORTRAIT_TASKS_ENABLED") or "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -23,28 +56,25 @@ def task_secret() -> str:
     ).strip()
 
 
-def enqueue_partner_portrait(job_id: str) -> bool:
+def task_configuration_error() -> str | None:
     if not tasks_enabled():
+        return "worker queue is not enabled"
+    settings = _task_settings()
+    missing = [name for name, value in settings.items() if not value]
+    if missing:
+        return f"worker queue is missing: {', '.join(missing)}"
+    return None
+
+
+def enqueue_partner_portrait(job_id: str) -> bool:
+    if task_configuration_error() is not None:
         return False
-    project = (
-        os.getenv("PARTNER_PORTRAIT_TASKS_PROJECT")
-        or os.getenv("REPORT_TASKS_PROJECT")
-        or os.getenv("GOOGLE_CLOUD_PROJECT")
-        or os.getenv("GCP_PROJECT_ID")
-        or ""
-    ).strip()
-    location = (os.getenv("PARTNER_PORTRAIT_TASKS_LOCATION") or os.getenv("REPORT_TASKS_LOCATION") or "asia-south2").strip()
-    queue = (os.getenv("PARTNER_PORTRAIT_TASKS_QUEUE") or os.getenv("REPORT_TASKS_QUEUE") or "report-processing-queue").strip()
-    target = (
-        os.getenv("PARTNER_PORTRAIT_TASKS_TARGET_BASE_URL")
-        or os.getenv("REPORT_TASKS_TARGET_BASE_URL")
-        or os.getenv("PUBLIC_API_BASE_URL")
-        or "https://astroroshni.com"
-    ).strip().rstrip("/")
-    secret = task_secret()
-    if not all((project, location, queue, target, secret)):
-        logger.error("Partner Portrait task queue is enabled but incompletely configured")
-        return False
+    settings = _task_settings()
+    project = settings["project"]
+    location = settings["location"]
+    queue = settings["queue"]
+    target = settings["target"]
+    secret = settings["secret"]
     try:
         from google.cloud import tasks_v2
         from google.protobuf import duration_pb2
