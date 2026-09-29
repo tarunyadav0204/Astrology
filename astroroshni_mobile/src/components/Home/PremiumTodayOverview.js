@@ -8,6 +8,7 @@ import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 import { useTranslation } from 'react-i18next';
 import { buildKpHomeRecommendations } from '../../utils/kpHomeRecommendations';
 import ComingUpChartCard from './ComingUpChartCard';
+import PartnerPortraitPromoCard from '../PartnerPortrait/PartnerPortraitPromoCard';
 
 const LANGUAGE_LOCALES = { english: 'en-IN', hindi: 'hi-IN', es: 'es-ES', french: 'fr-FR', german: 'de-DE', russian: 'ru-RU', chinese: 'zh-CN', mandarin: 'zh-CN', tamil: 'ta-IN', telugu: 'te-IN', gujarati: 'gu-IN', marathi: 'mr-IN' };
 const formatToday = (language) => new Intl.DateTimeFormat(LANGUAGE_LOCALES[language] || 'en-IN', {
@@ -127,6 +128,9 @@ export default function PremiumTodayOverview({
   onAskRecommended,
   onOpenExplore,
   onOpenPrashna,
+  onOpenPartnerPortrait,
+  partnerPortraitCost = 44,
+  partnerPortraitPreview = null,
   todayPredictions,
   onOpenAscendant,
   onOpenMoon,
@@ -425,6 +429,18 @@ export default function PremiumTodayOverview({
         </TouchableOpacity>
       ) : null}
 
+      {hasChart && onOpenPartnerPortrait ? (
+        <PartnerPortraitPromoCard
+          compact
+          placement="today"
+          nativeName={name}
+          cost={partnerPortraitCost}
+          completed={Boolean(partnerPortraitPreview)}
+          previewUrl={partnerPortraitPreview?.url}
+          onPress={onOpenPartnerPortrait}
+        />
+      ) : null}
+
       {hasChart ? (
         <View style={[styles.bigThree, wideHeader && styles.bigThreeWide, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
           {[
@@ -587,9 +603,12 @@ export function PremiumExploreIntro({
   onOpenYearly,
   onOpenMonthly,
   onOpenPrashna,
+  onOpenPartnerPortrait,
   prashnaCost = 3,
   prashnaOriginalCost = null,
   eventsCost = 100,
+  partnerPortraitCost = 44,
+  partnerPortraitPreview = null,
   paths = [],
   analyses = [],
   onSelectPath,
@@ -625,6 +644,13 @@ export function PremiumExploreIntro({
         <Text style={[typography.title, styles.exploreHeroTitle, { color: colors.textInverse }]}>{t('premiumUi.home.exploreWith')}{`\n`}{t('premiumUi.home.purpose')}</Text>
         <Text style={[styles.exploreHeroBody, { color: colors.textInverseMuted }]}>{t('premiumUi.home.studioBody')}</Text>
       </View>
+      <PartnerPortraitPromoCard
+        placement="explore"
+        cost={partnerPortraitCost}
+        completed={Boolean(partnerPortraitPreview)}
+        previewUrl={partnerPortraitPreview?.url}
+        onPress={onOpenPartnerPortrait}
+      />
       <View style={[styles.timingSpotlight, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
         <View pointerEvents="none" style={styles.timingSpotlightGlow} />
         <View style={styles.timingSpotlightHeader}>

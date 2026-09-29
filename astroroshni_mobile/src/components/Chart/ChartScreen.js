@@ -1014,7 +1014,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
               <Ionicons name="arrow-back" size={20} color={colors.text} />
             </TouchableOpacity>
             <View style={styles.headerCenter}>
-              <Text style={[styles.chartName, { color: colors.text }]}>{chartTypes[currentChartIndex]?.name}</Text>
+              <Text style={[styles.chartName, { color: colors.text }]} numberOfLines={1}>{chartTypes[currentChartIndex]?.name}</Text>
               {birthData && (
                 <NativeSelectorChip
                   birthData={birthData}
@@ -2309,16 +2309,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerCenter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
+    gap: 8,
+    marginHorizontal: 8,
   },
   chartName: {
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
   },
   nativeChip: {
-    marginTop: 6,
+    // Keep the selector compact beside the title; hitSlop expands its touch area.
+    minHeight: 24,
+    maxWidth: '50%',
+    flexShrink: 1,
+    minWidth: 0,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },

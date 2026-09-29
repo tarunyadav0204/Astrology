@@ -465,6 +465,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [classicalLifeTabEnabled, setClassicalLifeTabEnabled] = useState(false);
   const [classicalLifeTabUserAllowlist, setClassicalLifeTabUserAllowlist] = useState('');
   const [classicalLifeTabSaving, setClassicalLifeTabSaving] = useState(false);
+  const [partnerPortraitUiEnabled, setPartnerPortraitUiEnabled] = useState(false);
+  const [partnerPortraitUiUserAllowlist, setPartnerPortraitUiUserAllowlist] = useState('');
+  const [partnerPortraitUiSaving, setPartnerPortraitUiSaving] = useState(false);
   const [modernHomepageEnabled, setModernHomepageEnabled] = useState(false);
   const [modernHomepageSaving, setModernHomepageSaving] = useState(false);
   const [chatWorkerModeEnabled, setChatWorkerModeEnabled] = useState(false);
@@ -968,6 +971,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setHomepageFomoUserAllowlist(data.homepage_fomo_user_allowlist || '');
       setClassicalLifeTabEnabled(Boolean(data.classical_life_tab_enabled));
       setClassicalLifeTabUserAllowlist(data.classical_life_tab_user_allowlist || '');
+      setPartnerPortraitUiEnabled(Boolean(data.partner_portrait_ui_enabled));
+      setPartnerPortraitUiUserAllowlist(data.partner_portrait_ui_user_allowlist || '');
       const modernHomepageSetting = (data.settings || []).find((setting) => setting.key === 'modern_homepage_enabled');
       setModernHomepageEnabled(['1', 'true', 'on', 'yes'].includes(String(modernHomepageSetting?.value || '').toLowerCase()));
       setChatWorkerModeEnabled(Boolean(data.chat_worker_mode_enabled));
@@ -1645,6 +1650,51 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert(`Failed to save Life tab settings: ${error.message || 'check console'}`);
     } finally {
       setClassicalLifeTabSaving(false);
+    }
+  };
+
+  const handleSavePartnerPortraitUiSettings = async () => {
+    const tokens = partnerPortraitUiUserAllowlist.split(/[\s,]+/).filter(Boolean);
+    const invalidId = tokens.find((token) => !/^\d+$/.test(token) || Number(token) <= 0);
+    if (invalidId) {
+      alert(`Invalid user ID: ${invalidId}. Enter positive numeric IDs only.`);
+      return;
+    }
+    setPartnerPortraitUiSaving(true);
+    try {
+      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
+      const [enabledRes, allowlistRes] = await Promise.all([
+        fetch('/api/admin/settings/partner_portrait_ui_enabled', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'partner_portrait_ui_enabled',
+            value: partnerPortraitUiEnabled ? 'true' : 'false',
+            description: 'UI feature flag for Partner Portrait discovery cards, menus, and screen',
+          }),
+        }),
+        fetch('/api/admin/settings/partner_portrait_ui_user_allowlist', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            key: 'partner_portrait_ui_user_allowlist',
+            value: partnerPortraitUiUserAllowlist,
+            description: 'Optional user IDs eligible for the Partner Portrait UI. Empty = all users when enabled.',
+          }),
+        }),
+      ]);
+      if (!enabledRes.ok || !allowlistRes.ok) {
+        const enabledError = await enabledRes.json().catch(() => ({}));
+        const allowlistError = await allowlistRes.json().catch(() => ({}));
+        throw new Error(enabledError.detail || allowlistError.detail || 'Could not save Partner Portrait settings');
+      }
+      alert(`Partner Portrait UI ${partnerPortraitUiEnabled ? 'enabled' : 'disabled'}. Eligible users receive the change when feature settings refresh.`);
+      fetchAdminSettings();
+    } catch (error) {
+      console.error('Error saving Partner Portrait UI settings:', error);
+      alert(`Failed to save Partner Portrait settings: ${error.message || 'check console'}`);
+    } finally {
+      setPartnerPortraitUiSaving(false);
     }
   };
 
@@ -6752,6 +6802,49 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                       disabled={homepageFomoSaving}
                     >
                       {homepageFomoSaving ? 'Saving…' : 'Save homepage FOMO flag'}
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-section">
+                  <h3>Partner Portrait</h3>
+                  <p className="settings-hint">
+                    Controls Partner Portrait cards, menu entries, and the Partner Portrait screen. The authenticated backend APIs remain available for development and testing.
+                  </p>
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <strong>Show Partner Portrait</strong>
+                      <p>When off, the feature is hidden for everyone. When on with no IDs, it is visible to every signed-in user.</p>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={partnerPortraitUiEnabled}
+                        onChange={(event) => setPartnerPortraitUiEnabled(event.target.checked)}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div className="setting-info">
+                      <strong>Eligible user IDs</strong>
+                      <p>Comma, space, or line separated. Leave blank to show it to all users when the switch is on.</p>
+                    </div>
+                    <textarea
+                      value={partnerPortraitUiUserAllowlist}
+                      onChange={(event) => setPartnerPortraitUiUserAllowlist(event.target.value)}
+                      placeholder="e.g. 12, 45, 78"
+                      rows={3}
+                      style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
+                    />
+                  </div>
+                  <div className="form-buttons" style={{ marginTop: '12px' }}>
+                    <button
+                      type="button"
+                      className="create-btn"
+                      onClick={handleSavePartnerPortraitUiSettings}
+                      disabled={partnerPortraitUiSaving}
+                    >
+                      {partnerPortraitUiSaving ? 'Saving…' : 'Save Partner Portrait flag'}
                     </button>
                   </div>
                 </div>

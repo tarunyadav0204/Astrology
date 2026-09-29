@@ -3450,6 +3450,7 @@ def _get_pricing_with_originals():
         ("ashtakavarga", "ashtakavarga_life_predictions_cost"),
         ("podcast", "podcast_cost"),
         ("prashna", "prashna_analysis_cost"),
+        ("partner_portrait", "partner_portrait_cost"),
     ]
     pricing = {}
     pricing_original = {}
@@ -3551,6 +3552,7 @@ _PRICING_KEYS_MAP = [
     ("ashtakavarga", "ashtakavarga_life_predictions_cost"),
     ("podcast", "podcast_cost"),
     ("prashna", "prashna_analysis_cost"),
+    ("partner_portrait", "partner_portrait_cost"),
 ]
 
 
@@ -3559,6 +3561,7 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
     """Authenticated: return user pricing quickly with one DB roundtrip for settings + one for subscription."""
     from utils.admin_settings import (
         classical_life_tab_enabled_for_user,
+        partner_portrait_ui_enabled_for_user,
         instant_chat_enabled_for_user,
         speech_chat_enabled_for_user,
         get_speech_tts_provider,
@@ -3616,8 +3619,13 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
     def _effective_from_setting(setting_key: str) -> tuple[int, int]:
         s = settings_map.get(setting_key)
         if not s:
-            original = 1
-            base_effective = 1
+            # Match CreditService.get_credit_setting(), which is also used by
+            # the feature endpoint that performs the actual deduction. Newly
+            # introduced admin settings can be absent briefly during rollout;
+            # substituting the legacy one-credit default here makes the UI
+            # advertise a different price from the amount charged.
+            original = credit_service.get_credit_setting_fallback(setting_key)
+            base_effective = original
         else:
             original = int(s["value"])
             d = s["discount"]
@@ -3663,6 +3671,7 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
         "chat_countdown_seconds": _get_chat_countdown_settings(),
         "features": {
             "classical_life_tab_enabled": classical_life_tab_enabled_for_user(current_user.userid),
+            "partner_portrait_enabled": partner_portrait_ui_enabled_for_user(current_user.userid),
             "instant_chat_enabled": instant_chat_enabled_for_user(current_user.userid),
             "speech_chat_enabled": speech_chat_enabled_for_user(current_user.userid),
             "speech_tts_provider": get_speech_tts_provider(),

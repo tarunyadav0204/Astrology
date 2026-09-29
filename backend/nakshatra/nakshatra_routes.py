@@ -117,7 +117,8 @@ async def get_nakshatra_year_by_month(
         raise HTTPException(status_code=500, detail=f"Error building nakshatra year calendar: {str(e)}")
 
 
-@router.get("/nakshatra/{nakshatra_name}/{year}")
+# Constrain matching so the literal /info endpoint is not treated as a year.
+@router.get("/nakshatra/{nakshatra_name}/{year:int}")
 async def get_nakshatra_year_data(
     nakshatra_name: str,
     year: int,

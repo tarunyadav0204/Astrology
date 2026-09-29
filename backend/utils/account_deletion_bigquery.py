@@ -190,6 +190,7 @@ def build_account_deletion_snapshot(conn, userid: int) -> Dict[str, Any]:
         ("birth_charts", "SELECT * FROM birth_charts WHERE userid = %s ORDER BY id", (userid,)),
         ("user_facts", "SELECT * FROM user_facts WHERE birth_chart_id IN (SELECT id FROM birth_charts WHERE userid = %s) ORDER BY id", (userid,)),
         ("event_timeline_jobs", "SELECT * FROM event_timeline_jobs WHERE user_id = %s ORDER BY created_at DESC", (userid,)),
+        ("partner_portrait_jobs", "SELECT * FROM partner_portrait_jobs WHERE user_id = %s ORDER BY created_at DESC", (userid,)),
         ("chat_sessions", "SELECT * FROM chat_sessions WHERE user_id = %s ORDER BY created_at DESC", (userid,)),
         ("conversation_state", f"SELECT * FROM conversation_state WHERE session_id IN ({session_subquery})", (userid,)),
         ("chat_messages", f"SELECT * FROM chat_messages WHERE session_id IN ({session_subquery}) ORDER BY timestamp, message_id", (userid,)),

@@ -24,7 +24,8 @@ export default function AnalysisHubScreen({ navigation }) {
   useAnalytics('AnalysisHubScreen');
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const { credits } = useCredits();
+  const { credits, pricingFeatures } = useCredits();
+  const partnerPortraitEnabled = Boolean(pricingFeatures?.partner_portrait_enabled);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(50));
   const [pricing, setPricing] = useState({});
@@ -98,6 +99,14 @@ export default function AnalysisHubScreen({ navigation }) {
         isFree: false,
       },
       {
+        id: 'partnerPortrait',
+        title: t('partnerPortrait.title', 'Partner Portrait'),
+        subtitle: t('partnerPortrait.subtitle', 'See the partner your birth chart describes'),
+        icon: '✨',
+        gradient: ['#7A173D', '#D5A64A'],
+        description: t('partnerPortrait.cardDescription', 'Explore their likely appearance and personality through a face and full-body portrait, with the chart reasons behind it.'),
+      },
+      {
         id: 'career',
         title: t('home.analysis.career.title'),
         subtitle: t('home.analysis.career.description'),
@@ -156,15 +165,17 @@ export default function AnalysisHubScreen({ navigation }) {
       }
     ];
     
-    return baseTypes.map(type => ({
+    return baseTypes
+      .filter((type) => type.id !== 'partnerPortrait' || partnerPortraitEnabled)
+      .map(type => ({
       ...type,
       cost: type.id === 'reports'
         ? (pricing.partnership_report ?? pricing.partnership ?? 9)
-        : (pricing[type.id] || 0),
+        : (type.id === 'partnerPortrait' ? (pricing.partner_portrait ?? 44) : (pricing[type.id] || 0)),
       originalCost: type.id === 'reports'
         ? (pricingOriginal.partnership_report ?? pricingOriginal.partnership ?? null)
-        : pricingOriginal[type.id],
-    }));
+        : (type.id === 'partnerPortrait' ? pricingOriginal.partner_portrait : pricingOriginal[type.id]),
+      }));
   };
 
   const handleAnalysisSelect = (analysisType) => {
@@ -174,6 +185,10 @@ export default function AnalysisHubScreen({ navigation }) {
     }
     if (analysisType.id === 'relationshipMatch') {
       navigation.navigate('RelationshipMatch');
+      return;
+    }
+    if (analysisType.id === 'partnerPortrait') {
+      navigation.navigate('PartnerPortrait');
       return;
     }
 

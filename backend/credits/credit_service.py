@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 # Most legacy settings intentionally retain the historical one-credit fallback.
 _CREDIT_SETTING_FALLBACKS = {
     "prashna_analysis_cost": 3,
+    "partner_portrait_cost": 44,
 }
 
 # Admin ledger feature filter: equality on reference_id (indexed), plus a
@@ -35,6 +36,9 @@ LEDGER_FEATURE_FILTERS = {
         {"reference_ids": ("partnership_analysis",)},
         {"reference_ids": ("chat_question",), "description_prefix": "Partnership"},
     ),
+    "partner_portrait": (
+        {"reference_ids": ("partner_portrait",)},
+    ),
 }
 
 _LEDGER_FEATURE_ALIASES = {
@@ -52,6 +56,7 @@ _LEDGER_FEATURE_ALIASES = {
     "partnership": "partnership_chat",
     "partnership_chat": "partnership_chat",
     "partnership_analysis": "partnership_chat",
+    "partner_portrait": "partner_portrait",
 }
 
 
@@ -62,7 +67,7 @@ def normalize_ledger_feature_filter(feature: Optional[str]) -> Optional[str]:
     mapped = _LEDGER_FEATURE_ALIASES.get(key)
     if mapped is None:
         raise ValueError(
-            "feature must be one of: standard_chat, live_chat, talk_to_tara, premium_chat, partnership_chat"
+            "feature must be one of: standard_chat, live_chat, talk_to_tara, premium_chat, partnership_chat, partner_portrait"
         )
     return mapped
 
@@ -557,6 +562,7 @@ class CreditService:
                 ("ashtakavarga_life_predictions_cost", 15, "Credits per Ashtakavarga life predictions (Dots of Destiny)"),
                 ("podcast_cost", 2, "Credits per podcast (listen to message as audio)"),
                 ("prashna_analysis_cost", 3, "Credits per classical Prashna question chart"),
+                ("partner_portrait_cost", 44, "Credits per AI Partner Portrait with face and full-body views"),
             ]
             for key, value, desc in defaults:
                 cur = execute(conn, "SELECT COUNT(*) FROM credit_settings WHERE setting_key = ?", (key,))
@@ -4036,6 +4042,10 @@ class CreditService:
         effective, _, _ = self.get_credit_setting_and_original(setting_key)
         return effective
 
+    def get_credit_setting_fallback(self, setting_key: str) -> int:
+        """Return the declared fallback used when an admin setting has not been seeded yet."""
+        return int(_CREDIT_SETTING_FALLBACKS.get(setting_key, 1))
+
     def get_credit_setting_and_original(self, setting_key: str) -> tuple:
         """Returns (effective_cost, original_value, discount_value). discount_value is None if no discount."""
         from db import get_conn, execute
@@ -4047,7 +4057,7 @@ class CreditService:
             )
             result = cursor.fetchone()
         if not result:
-            fallback = _CREDIT_SETTING_FALLBACKS.get(setting_key, 1)
+            fallback = self.get_credit_setting_fallback(setting_key)
             return (fallback, fallback, None)
         value = result[0]
         discount = result[1] if len(result) > 1 else None
@@ -4066,6 +4076,7 @@ class CreditService:
             "instant_chat_first_minute_cost": "Credits for the first minute of Instant Chat",
             "instant_chat_per_minute_cost": "Credits per following started minute of Instant Chat",
             "prashna_analysis_cost": "Credits per classical Prashna question chart",
+            "partner_portrait_cost": "Credits per AI Partner Portrait with face and full-body views",
         }
         description = descriptions.get(setting_key, setting_key.replace("_", " ").strip().capitalize())
         with get_conn() as conn:
@@ -4279,7 +4290,7 @@ class CreditService:
             'health_report_cost', 'janam_kundli_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
             'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost',
             'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost',
-            'prashna_analysis_cost'
+            'prashna_analysis_cost', 'partner_portrait_cost'
         )
         placeholders = ", ".join(["?"] * len(keys))
         with get_conn() as conn:
@@ -4411,6 +4422,24 @@ class CreditService:
                         "key": "prashna_analysis_cost",
                         "value": 3,
                         "description": "Credits per classical Prashna question chart",
+                        "discount": None,
+                    })
+                except Exception:
+                    pass
+            if not any(s["key"] == "partner_portrait_cost" for s in settings):
+                try:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (setting_key, setting_value, description)
+                        VALUES ('partner_portrait_cost', 44, 'Credits per AI Partner Portrait with face and full-body views')
+                        """,
+                    )
+                    conn.commit()
+                    settings.append({
+                        "key": "partner_portrait_cost",
+                        "value": 44,
+                        "description": "Credits per AI Partner Portrait with face and full-body views",
                         "discount": None,
                     })
                 except Exception:

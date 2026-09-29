@@ -38,6 +38,7 @@ import LongevityScreen from './src/components/Longevity/LongevityScreen';
 import HealthBlueprintScreen from './src/components/Health/HealthBlueprintScreen';
 import RelationshipMatchScreen from './src/components/Relationship/RelationshipMatchScreen';
 import ReportsStudioScreen from './src/components/Reports/ReportsStudioScreen';
+import PartnerPortraitScreen from './src/components/PartnerPortrait/PartnerPortraitScreen';
 import ReportViewerScreen from './src/components/Reports/ReportViewerScreen';
 import ReportHistoryScreen from './src/components/Reports/ReportHistoryScreen';
 import KarmaAnalysisScreen from './src/components/KarmaAnalysis/KarmaAnalysisScreen';
@@ -70,6 +71,7 @@ import PrashnaScreen from './src/components/Prashna/PrashnaScreen';
 import KPScreen from './src/screens/KPScreen';
 import SadeSatiScreen from './src/components/SadeSati/SadeSatiScreen';
 import NakshatraCalendarScreen from './src/components/NakshatraCalendar/NakshatraCalendarScreen';
+import NakshatraLibraryScreen from './src/components/NakshatraLibrary/NakshatraLibraryScreen';
 import NakshatraGuideScreen from './src/components/NakshatraGuide/NakshatraGuideScreen';
 import CosmicRingScreen from './src/components/CosmicRing/CosmicRingScreen';
 import MundaneHubScreen from './src/components/Chat/MundaneHubScreen';
@@ -346,8 +348,10 @@ const linking = {
       PanditHome: 'pandit',
       PanditPractice: 'pandit/practice',
       NakshatraCalendar: 'nakshatras',
+      NakshatraLibrary: 'nakshatra-library',
       NakshatraGuide: 'nakshatra-study',
       AnalysisHub: 'analysis',
+      PartnerPortrait: 'partner-portrait',
       ProfessionalAnalysis: 'charts/analysis',
       HealthBlueprint: 'charts/analysis/health',
       AshtakvargaStudy: 'charts/ashtakavarga/study',
@@ -1179,6 +1183,11 @@ export default function App() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="PartnerPortrait"
+            component={PartnerPortraitScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="ProfessionalAnalysis"
             component={ProfessionalAnalysisScreen}
             options={{ headerShown: false }}
@@ -1371,6 +1380,11 @@ export default function App() {
           <Stack.Screen 
             name="NakshatraCalendar"
             component={NakshatraCalendarScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="NakshatraLibrary"
+            component={NakshatraLibraryScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

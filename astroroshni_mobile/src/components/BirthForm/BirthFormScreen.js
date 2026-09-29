@@ -724,7 +724,11 @@ export default function BirthFormScreen({ navigation, route }) {
     submittingRef.current = false;
     setLoading(false);
     if (editProfile) {
-      navigation.navigate('SelectNative', { refreshAt: Date.now() });
+      if (returnTo) {
+        navigation.navigate(returnTo, { refreshAt: Date.now() });
+      } else {
+        navigation.navigate('SelectNative', { refreshAt: Date.now() });
+      }
     } else {
       navigation.replace(returnTo || 'Home');
     }

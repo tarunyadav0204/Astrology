@@ -15,6 +15,7 @@ const LEDGER_FEATURE_OPTIONS = [
   { value: 'talk_to_tara', label: 'Talk to Tara' },
   { value: 'premium_chat', label: 'Premium Chat' },
   { value: 'partnership_chat', label: 'Partnership Chat' },
+  { value: 'partner_portrait', label: 'Partner Portrait' },
 ];
 
 /** 1 credit = ₹1 until 2026-07-14; ₹2 per credit from 2026-07-15 (IST calendar date). */

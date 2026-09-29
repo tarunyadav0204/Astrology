@@ -92,6 +92,11 @@
             },
             {
               "scheme": "https",
+              "host": "astroroshni.com",
+              "pathPrefix": "/mobile/partner-portrait"
+            },
+            {
+              "scheme": "https",
               "host": "www.astroroshni.com",
               "pathPrefix": "/karma-analysis"
             },
@@ -124,6 +129,11 @@
               "scheme": "https",
               "host": "www.astroroshni.com",
               "pathPrefix": "/nakshatras"
+            },
+            {
+              "scheme": "https",
+              "host": "www.astroroshni.com",
+              "pathPrefix": "/mobile/partner-portrait"
             }
           ],
           "category": [

@@ -45,10 +45,12 @@ import eventTimelineSample from './event-timeline-sample.json';
 import healthBlueprint from './health-blueprint.json';
 import professionalAnalysis from './professional-analysis.json';
 import nakshatraCalendar from './nakshatra-calendar.json';
+import nakshatraLibrary from './nakshatra-library.json';
 import pitriShapaInfo from './pitri-shapa-info.json';
 import mangalDoshaInfo from './mangal-dosha-info.json';
 import matriShapaInfo from './matri-shapa-info.json';
 import chartSourceClarity from './chart-source-clarity.json';
+import partnerPortrait from './partner-portrait.json';
 
 const INSTANT_MODE_ACTION_COPY = Object.freeze({
   english: 'Mode',
@@ -359,6 +361,24 @@ Object.entries(normalizedPremiumUi).forEach(([language, copy]) => {
   [ru, nakshatraCalendar.russian], [zh, nakshatraCalendar.chinese],
 ].forEach(([baseCopy, copy]) => {
   baseCopy.nakshatraCalendar = copy;
+});
+
+[
+  [en, nakshatraLibrary.english], [es, nakshatraLibrary.spanish], [hi, nakshatraLibrary.hindi],
+  [tamil, nakshatraLibrary.tamil], [te, nakshatraLibrary.telugu], [gu, nakshatraLibrary.gujarati],
+  [mr, nakshatraLibrary.marathi], [de, nakshatraLibrary.german], [fr, nakshatraLibrary.french],
+  [ru, nakshatraLibrary.russian], [zh, nakshatraLibrary.chinese],
+].forEach(([baseCopy, copy]) => {
+  baseCopy.nakshatraLibrary = copy;
+});
+
+[
+  [en, partnerPortrait.english], [es, partnerPortrait.spanish], [hi, partnerPortrait.hindi],
+  [tamil, partnerPortrait.tamil], [te, partnerPortrait.telugu], [gu, partnerPortrait.gujarati],
+  [mr, partnerPortrait.marathi], [de, partnerPortrait.german], [fr, partnerPortrait.french],
+  [ru, partnerPortrait.russian], [zh, partnerPortrait.chinese],
+].forEach(([baseCopy, copy]) => {
+  baseCopy.partnerPortrait = copy;
 });
 
 i18n

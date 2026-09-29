@@ -897,6 +897,7 @@ export const chartAPI = {
         throw error;
       });
   },
+  getNakshatraInfo: (name) => api.get(getEndpoint(`/nakshatra/${encodeURIComponent(name)}/info`)),
   calculateYogi: (birthData) =>
     api.post(getEndpoint('/yogi-points'), { birth_data: birthData })
       .then(response => response.data?.yogi_points || response.data)
@@ -1396,6 +1397,20 @@ export const marriageAPI = {
     };
     return api.post(getEndpoint('/marriage/ai-insights'), requestData);
   },
+};
+
+export const partnerPortraitAPI = {
+  getConfig: () => api.get(getEndpoint('/partner-portrait/config')),
+  getDirection: (chartId) => api.get(getEndpoint(`/partner-portrait/direction/${encodeURIComponent(chartId)}`)),
+  generate: (payload) => api.post(getEndpoint('/partner-portrait/generate'), payload),
+  getStatus: (jobId) => api.get(getEndpoint(`/partner-portrait/status/${encodeURIComponent(jobId)}`), {
+    params: { _status_check: Date.now() },
+    // The unique query parameter plus the API's no-store response prevents
+    // caching. Avoid a Cache-Control request header here because browsers can
+    // turn it into an unnecessary CORS preflight on every three-second poll.
+    timeout: 15000,
+  }),
+  getHistory: () => api.get(getEndpoint('/partner-portrait/history')),
 };
 
 export const relationshipAPI = {

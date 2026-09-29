@@ -131,8 +131,8 @@ export default function ChartsHubScreen({ navigation, route }) {
 
           {showChartHeader ? (
             <>
-              <View style={styles.headerCenter}>
-                <Text style={[styles.chartTitle, wide && styles.chartTitleTablet, { color: colors.textInverse }]} numberOfLines={1}>
+              <View style={[styles.headerCenter, styles.chartHeaderInline]}>
+                <Text style={[styles.chartTitle, wide && styles.chartTitleTablet, styles.inlineChartTitle, { color: colors.textInverse }]} numberOfLines={1}>
                   {chartHeader.chartName}
                 </Text>
                 {(chartHeader.birthData || birthData) ? (
@@ -140,7 +140,7 @@ export default function ChartsHubScreen({ navigation, route }) {
                     birthData={chartHeader.birthData || birthData}
                     onPress={() => navigation.navigate('SelectNative', { returnTo: 'ChartsHub' })}
                     maxLength={14}
-                    style={[styles.nativeChip, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
+                    style={[styles.nativeChip, styles.inlineNativeChip, { backgroundColor: colors.cosmicRaised, borderColor: colors.cosmicLine }]}
                     textStyle={[styles.nativeChipText, wide && styles.nativeChipTextTablet, { color: colors.textInverseMuted }]}
                     iconColor={colors.textInverseMuted}
                     showIcon={false}
@@ -340,10 +340,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  chartHeaderInline: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  inlineChartTitle: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  inlineNativeChip: {
+    marginTop: 0,
+    maxWidth: '50%',
+    flexShrink: 1,
+    minWidth: 0,
+  },
   chartTitleTablet: {
     fontSize: 28,
   },
   nativeChip: {
+    // The shared chip defaults to 44px; this secondary header row is compact.
+    // NativeSelectorChip's vertical hitSlop preserves the larger touch area.
+    minHeight: 24,
     marginTop: 2,
     paddingHorizontal: 8,
     paddingVertical: 2,

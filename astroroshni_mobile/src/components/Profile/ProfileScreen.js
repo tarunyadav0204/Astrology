@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
-  StatusBar,
   Alert,
   Modal,
   Linking,
@@ -16,6 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import FocusedStatusBar from '../Common/FocusedStatusBar';
 import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import Svg, { Rect, Line, Polygon } from 'react-native-svg';
 import { COLORS, LANGUAGES } from '../../utils/constants';
@@ -469,12 +469,8 @@ export default function ProfileScreen({ navigation, route }) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} />
-      <LinearGradient
-        colors={colors.homeGradient || [colors.background, colors.backgroundSecondary, colors.background]}
-        style={styles.gradient}
-      >
-        <SafeAreaView style={styles.safeArea}>
+      <FocusedStatusBar backgroundColor={colors.headerSurface} barStyle="light-content" />
+      <SafeAreaView edges={['top']} style={{ backgroundColor: colors.headerSurface }}>
           <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cosmicLine }]}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: colors.cosmicRaised }]}>
               <Ionicons name="arrow-back" size={22} color={colors.textInverse} />
@@ -490,7 +486,11 @@ export default function ProfileScreen({ navigation, route }) {
               <Ionicons name="create-outline" size={19} color={colors.textInverse} />
             </TouchableOpacity>
           </View>
-
+      </SafeAreaView>
+      <LinearGradient
+        colors={colors.homeGradient || [colors.background, colors.backgroundSecondary, colors.background]}
+        style={styles.gradient}
+      >
           <GHScrollView
             ref={profileScrollRef}
             style={styles.scrollView}
@@ -1002,7 +1002,6 @@ export default function ProfileScreen({ navigation, route }) {
 
             <View style={styles.bottomSpacer} />
           </GHScrollView>
-        </SafeAreaView>
       </LinearGradient>
 
       <Modal
@@ -1166,7 +1165,6 @@ export default function ProfileScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
-  safeArea: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth },
   backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 24, fontWeight: '600' },

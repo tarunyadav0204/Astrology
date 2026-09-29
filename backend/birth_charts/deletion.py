@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Optional
 
 from db import execute
+from partner_profile.deletion import delete_partner_portraits
 
 
 def delete_birth_chart_dependencies(conn, chart_id: int, userid: Optional[int] = None) -> None:
@@ -16,6 +17,7 @@ def delete_birth_chart_dependencies(conn, chart_id: int, userid: Optional[int] =
     execute(conn, "DELETE FROM event_timeline_jobs WHERE birth_chart_id = %s", (chart_id,))
     execute(conn, "DELETE FROM user_facts WHERE birth_chart_id = %s", (chart_id,))
     execute(conn, "DELETE FROM physical_traits_cache WHERE birth_chart_id = %s", (chart_id,))
+    delete_partner_portraits(conn, user_id=userid, chart_id=chart_id)
 
     if userid is not None:
         execute(

@@ -28,6 +28,7 @@ import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { useAuthGate } from '../../auth/AuthGateContext';
 import AnalysisCreditModal from './AnalysisCreditModal';
 import { useTranslation } from 'react-i18next';
+import PartnerPortraitPromoCard from '../PartnerPortrait/PartnerPortraitPromoCard';
 
 const SAVED_ANALYSIS_ENDPOINTS = {
   career: '/career/check-cache',
@@ -61,7 +62,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   useAnalytics(analyticsScreenName);
   const { theme, colors } = useTheme();
   const isDark = theme === 'dark';
-  const { credits, fetchBalance } = useCredits();
+  const { credits, pricing, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
   const [cost, setCost] = useState(costFromParams ?? 0);
   const [originalCost, setOriginalCost] = useState(
@@ -1476,6 +1477,16 @@ export default function AnalysisDetailScreen({ route, navigation }) {
                     <Text style={[styles.quickAnswerText, { color: colors.textSecondary }]}>{formatTextWithBold(analysisResult.quick_answer, false, analysisResult.terms, analysisResult.glossary)}</Text>
                   </View>
                 </View>
+
+                {analysisType === 'marriage' ? (
+                  <PartnerPortraitPromoCard
+                    compact
+                    placement="marriage_analysis"
+                    nativeName={birthData?.name}
+                    cost={pricing?.partner_portrait ?? 44}
+                    onPress={() => navigation.navigate('PartnerPortrait')}
+                  />
+                ) : null}
 
                 {analysisResult.detailed_analysis && Array.isArray(analysisResult.detailed_analysis) && (
                   <View style={styles.detailedSection}>

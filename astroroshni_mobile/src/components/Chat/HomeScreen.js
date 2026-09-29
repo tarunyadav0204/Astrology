@@ -27,7 +27,7 @@ import {
   getEndpoint,
 } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
-import { chartAPI, panchangAPI, predictionAPI } from '../../services/api';
+import { chartAPI, panchangAPI, predictionAPI, partnerPortraitAPI } from '../../services/api';
 import { BiometricTeaserCard } from '../BiometricTeaserCard';
 import { PhysicalTraitsModal } from '../PhysicalTraitsModal';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
@@ -385,7 +385,8 @@ export default function HomeScreen({
       ? ['#FFFFFF', '#FFFFFF', '#FAFAFA']
       : ['rgba(255, 255, 255, 0.98)', 'rgba(255, 247, 237, 0.95)', 'rgba(255, 237, 213, 0.92)'];
   const isIOS = Platform.OS === 'ios';
-  const { freeQuestionAvailable, pricing, pricingOriginal, fetchPricing } = useCredits();
+  const { freeQuestionAvailable, pricing, pricingOriginal, pricingFeatures, fetchPricing } = useCredits();
+  const partnerPortraitEnabled = Boolean(pricingFeatures?.partner_portrait_enabled);
   const { requireAuthForPaid, isGuest } = useAuthGate();
   const [showFirstQuestionFreeModal, setShowFirstQuestionFreeModal] = useState(false);
   const [showMonthlyWelcomeModal, setShowMonthlyWelcomeModal] = useState(false);
@@ -443,6 +444,7 @@ export default function HomeScreen({
   const [physicalTraits, setPhysicalTraits] = useState([]);
 
   const [currentNativeData, setCurrentNativeData] = useState(null);
+  const [partnerPortraitPreview, setPartnerPortraitPreview] = useState(null);
   const [showTraitsModal, setShowTraitsModal] = useState(false);
   const [hasFeedback, setHasFeedback] = useState(false);
   const [activeInsight, setActiveInsight] = useState(null);
@@ -460,6 +462,34 @@ export default function HomeScreen({
   const lastBlogFetchAtRef = useRef(0);
   const homeLoadInFlightRef = useRef(null);
   const lastChartDataFingerprintRef = useRef('');
+
+  useEffect(() => {
+    const selected = currentNativeData || birthData;
+    const chartId = Number(selected?.birth_chart_id || selected?.id || 0);
+    if (!partnerPortraitEnabled || !chartId || isGuest) {
+      setPartnerPortraitPreview(null);
+      return undefined;
+    }
+    let cancelled = false;
+    partnerPortraitAPI.getHistory()
+      .then((response) => {
+        if (cancelled) return;
+        const match = (response?.data?.items || []).find((item) => (
+          Number(item.birth_chart_id) === chartId && item.status === 'completed'
+        ));
+        const portrait = match?.data?.assets?.find((asset) => asset.kind === 'portrait') || match?.data?.assets?.[0];
+        setPartnerPortraitPreview(portrait?.url ? { url: portrait.url, jobId: match.job_id } : null);
+      })
+      .catch(() => { if (!cancelled) setPartnerPortraitPreview(null); });
+    return () => { cancelled = true; };
+  }, [
+    birthData?.id,
+    birthData?.birth_chart_id,
+    currentNativeData?.id,
+    currentNativeData?.birth_chart_id,
+    isGuest,
+    partnerPortraitEnabled,
+  ]);
 
   const getHomeLoadFingerprint = useCallback((nativeData, targetDate) => {
     return `${getBirthChartFingerprint(nativeData)}:${targetDate}`;
@@ -1762,7 +1792,8 @@ const loadHomeData = async (nativeData = null) => {
     }
   ];
 
-  const analysisOptions = isIOS ? [
+  const analysisOptions = (isIOS ? [
+    { id: 'partnerPortrait', title: t('partnerPortrait.title', 'Partner Portrait'), icon: '✨', description: t('partnerPortrait.cardDescription', 'See likely appearance and personality through a chart-guided portrait.'), gradient: ['#7A173D', '#D5A64A'], cost: pricing.partner_portrait ?? 44, originalCost: pricingOriginal.partner_portrait },
     { id: 'karma', title: t('home.analysis.karmaIosTitle', 'Karma Patterns'), icon: '🕉️', description: t('home.analysis.karmaIosDescription', 'Explore repeating themes and life lessons in the chart'), gradient: ['#334155', '#64748B'], cost: pricing.karma ?? 25, originalCost: pricingOriginal.karma },
     { id: 'career', title: t('home.analysis.careerIosTitle', 'Career Study'), icon: '💼', description: t('home.analysis.careerIosDescription', 'Review work style, direction, and strengths to build on'), gradient: ['#1D4ED8', '#2563EB'], cost: pricing.career ?? 12, originalCost: pricingOriginal.career },
     { id: 'wealth', title: t('home.analysis.wealthIosTitle', 'Resources & Earnings'), icon: '💰', description: t('home.analysis.wealthIosDescription', 'Study money flow, resources, and practical support patterns'), gradient: ['#0F766E', '#14B8A6'], cost: pricing.wealth ?? 5, originalCost: pricingOriginal.wealth },
@@ -1785,6 +1816,7 @@ const loadHomeData = async (nativeData = null) => {
     { id: 'financial', title: t('home.analysis.financialIosTitle', 'Market Context'), icon: '💹', description: t('home.analysis.financialIosDescription', 'Study sector rhythm and broader market context'), gradient: ['#047857', '#10B981'], cost: 0, originalCost: null },
     { id: 'childbirth', title: t('home.analysis.childbirthIosTitle', 'Family Timing'), icon: '🤱', description: t('home.analysis.childbirthIosDescription', 'Review supportive timing for family planning and delivery'), gradient: ['#BE185D', '#EC4899'], cost: pricing.childbirth ?? 8, originalCost: pricingOriginal.childbirth },
   ] : [
+    { id: 'partnerPortrait', title: t('partnerPortrait.title', 'Partner Portrait'), icon: '✨', description: t('partnerPortrait.cardDescription', 'See likely appearance and personality through a chart-guided portrait.'), gradient: ['#7A173D', '#D5A64A'], cost: pricing.partner_portrait ?? 44, originalCost: pricingOriginal.partner_portrait },
     {
       id: 'karma',
       title: t('home.analysis.karma.title', 'Past Life Karma'),
@@ -1814,7 +1846,7 @@ const loadHomeData = async (nativeData = null) => {
     { id: 'trading', title: t('home.analysis.trading.title', 'Trading Study'), icon: '📈', description: isIOS ? 'Market timing and sector context' : t('home.analysis.trading.description', 'Market timing and sector context'), gradient: ['#FFD700', '#FF8C00'], cost: pricing.trading ?? 5, originalCost: pricingOriginal.trading },
     { id: 'financial', title: t('home.analysis.financial.title', 'Market Astrology'), icon: '💹', description: isIOS ? 'Sector timing and market context' : t('home.analysis.financial.description', 'Sector forecasts & investment timing'), gradient: ['#10b981', '#059669'], cost: 0, originalCost: null },
     { id: 'childbirth', title: t('home.analysis.childbirth.title', 'Childbirth Planner'), icon: '🤱', description: t('home.analysis.childbirth.description', 'Auspicious dates for delivery'), gradient: ['#FF69B4', '#FF1493'], cost: pricing.childbirth ?? 8, originalCost: pricingOriginal.childbirth },
-  ];
+  ]).filter((item) => item.id !== 'partnerPortrait' || partnerPortraitEnabled);
 
   const TickerItem = ({ icon, label, value, color, showInfoIcon }) => (
     <View style={styles.tickerItem}>
@@ -2262,6 +2294,9 @@ const loadHomeData = async (nativeData = null) => {
           })}
           onOpenExplore={showExploreSurface}
           onOpenPrashna={() => navigation.navigate('Prashna')}
+          onOpenPartnerPortrait={() => navigation.navigate('PartnerPortrait')}
+          partnerPortraitCost={pricing.partner_portrait ?? 44}
+          partnerPortraitPreview={partnerPortraitPreview}
           onOpenAscendant={() => setActiveInsight(getSignInsight('ascendant', chartData?.houses?.[0]?.sign))}
           onOpenMoon={() => setActiveInsight(getSignInsight('moon', chartData?.planets?.Moon?.sign))}
           onOpenSun={() => setActiveInsight(getSignInsight('sun', chartData?.planets?.Sun?.sign))}
@@ -2302,9 +2337,12 @@ const loadHomeData = async (nativeData = null) => {
           onOpenYearly={() => onOptionSelect({ action: 'events', readingMode: 'yearly' })}
           onOpenMonthly={() => onOptionSelect({ action: 'events', readingMode: 'monthly' })}
           onOpenPrashna={() => navigation.navigate('Prashna')}
+          onOpenPartnerPortrait={() => navigation.navigate('PartnerPortrait')}
           prashnaCost={pricing.prashna ?? 3}
           prashnaOriginalCost={pricingOriginal.prashna}
           eventsCost={pricing.events ?? 100}
+          partnerPortraitCost={pricing.partner_portrait ?? 44}
+          partnerPortraitPreview={partnerPortraitPreview}
           paths={options}
           analyses={analysisOptions}
           onSelectPath={(item) => onOptionSelect(item)}
@@ -2327,6 +2365,10 @@ const loadHomeData = async (nativeData = null) => {
             }
             if (item.id === 'childbirth') {
               onOptionSelect({ action: 'analysis', type: 'childbirth', cost: item.cost });
+              return;
+            }
+            if (item.id === 'partnerPortrait') {
+              navigation.navigate('PartnerPortrait');
               return;
             }
             onOptionSelect({ action: 'analysis', type: item.id, cost: item.cost });

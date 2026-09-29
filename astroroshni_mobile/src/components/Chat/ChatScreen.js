@@ -8379,6 +8379,11 @@ export default function ChatScreen({ navigation, route }) {
                           navigation.navigate('BirthForm', { returnTo: 'Home' });
                         },
                       })}
+                      {pricingFeatures?.partner_portrait_enabled ? renderDrawerMenuRow({
+                        icon: 'sparkles-outline',
+                        label: t('partnerPortrait.title', 'Partner Portrait'),
+                        action: () => navigation.navigate('PartnerPortrait'),
+                      }) : null}
                       {renderDrawerMenuRow({
                         icon: 'time-outline',
                         label: t('quickActions.dasha'),
@@ -8529,6 +8534,29 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
+                  {pricingFeatures?.partner_portrait_enabled ? <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
+                      closeMenuDrawer(() => navigation.navigate('PartnerPortrait'));
+                    }}
+                  >
+                    <LinearGradient
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={menuAccentIconGradient}
+                          style={styles.menuIconGradient}
+                        >
+                          <Ionicons name="sparkles-outline" size={19} color={colors.selectionText} />
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('partnerPortrait.title', 'Partner Portrait')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                    </LinearGradient>
+                  </TouchableOpacity> : null}
+
                   <Text style={[styles.drawerSectionLabel, styles.drawerSectionLabelSpaced, { color: colors.primary }]}>{t('premiumUi.chatScreen.vedicToolkit')}</Text>
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
@@ -8645,6 +8673,29 @@ export default function ChatScreen({ navigation, route }) {
                         </LinearGradient>
                       </View>
                       <Text style={[styles.menuText, { color: colors.text }]}>{t('nakshatraCalendar.title', 'Nakshatra Calendar')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
+                      closeMenuDrawer(() => navigation.navigate('NakshatraLibrary'));
+                    }}
+                  >
+                    <LinearGradient
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={menuAccentIconGradient}
+                          style={styles.menuIconGradient}
+                        >
+                          <Ionicons name="book-outline" size={19} color={colors.selectionText} />
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('nakshatraLibrary.title', 'Nakshatras')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>

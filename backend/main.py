@@ -79,6 +79,7 @@ from festivals.routes import router as festivals_router
 from chat_history.routes import router as chat_history_router, init_chat_tables
 from chat_history.admin_routes import router as chat_admin_router
 from engagement_suggestions.routes import router as engagement_suggestions_router
+from partner_profile.routes import router as partner_portrait_router
 try:
     from activity.admin_routes import router as activity_admin_router
     _activity_admin_available = True
@@ -1061,6 +1062,7 @@ app.include_router(festivals_router, prefix="/api")
 app.include_router(chat_history_router, prefix="/api")
 app.include_router(chat_admin_router, prefix="/api")
 app.include_router(engagement_suggestions_router, prefix="/api")
+app.include_router(partner_portrait_router, prefix="/api")
 if _activity_admin_available and activity_admin_router:
     app.include_router(activity_admin_router, prefix="/api")
 if _activity_mobile_available and activity_mobile_router:
@@ -2082,6 +2084,10 @@ def _hard_delete_user_tx(conn, userid: int) -> None:
     The BigQuery backup is uploaded before this transaction opens.
     """
     session_subquery = "SELECT session_id FROM chat_sessions WHERE user_id = %s"
+
+    from partner_profile.deletion import delete_partner_portraits
+
+    delete_partner_portraits(conn, user_id=userid)
 
     execute(conn, "DELETE FROM event_timeline_jobs WHERE user_id = %s", (userid,))
     execute(conn, "DELETE FROM podcast_history WHERE userid = %s", (userid,))
