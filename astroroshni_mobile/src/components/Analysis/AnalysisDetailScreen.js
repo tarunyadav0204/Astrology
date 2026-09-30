@@ -88,6 +88,8 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const savedFetchRef = useRef(false);
   const openSaved = route.params?.openSaved === true;
   const linkedChartId = Number(route.params?.birthChartId) > 0 ? Number(route.params.birthChartId) : null;
+  const returnTo = route.params?.returnTo;
+  const returnParams = route.params?.returnParams || {};
   const localizedAnalysisTitle = t(`home.analysis.${analysisType}.title`, title);
   const displayTitle = localizedAnalysisTitle;
   const uiText = {
@@ -115,6 +117,18 @@ export default function AnalysisDetailScreen({ route, navigation }) {
     getCredits: t('lifeAnalysisFlow.getCredits'),
     close: t('common.close'),
     cancel: t('common.cancel'),
+  };
+
+  const handleBack = () => {
+    if (returnTo) {
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate(returnTo, returnParams);
+      }
+      return;
+    }
+    navigation.navigate('Home', { resetToGreeting: true });
   };
 
   useEffect(() => {
@@ -200,7 +214,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
       useNativeDriver: true,
     }).start();
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      navigation.navigate('Home', { resetToGreeting: true });
+      handleBack();
       return true;
     });
     return () => backHandler.remove();
@@ -1246,7 +1260,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
           <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cardBorder }]}>
             <TouchableOpacity 
               style={[styles.backButton, { backgroundColor: 'rgba(255,255,255,0.09)', borderColor: colors.cardBorder }]}
-              onPress={() => navigation.navigate('Home', { resetToGreeting: true })}
+              onPress={handleBack}
             >
               <Ionicons name="arrow-back" size={22} color={colors.textInverse} />
             </TouchableOpacity>

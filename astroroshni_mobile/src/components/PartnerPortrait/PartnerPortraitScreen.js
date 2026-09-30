@@ -754,6 +754,20 @@ export default function PartnerPortraitScreen({ navigation }) {
               <TouchableOpacity
                 style={[styles.nextStepRow, { borderColor: colors.cardBorder }]}
                 onPress={() => navigation.navigate('Home', {
+                  startPartnership: true,
+                  partnershipNativeChart: birthData,
+                })}
+              >
+                <View style={[styles.nextStepIcon, { backgroundColor: colors.accentSoft || colors.background }]}><Ionicons name="people-circle-outline" size={22} color={colors.primary} /></View>
+                <View style={styles.nextStepCopy}>
+                  <Text style={[styles.nextStepTitle, { color: colors.text }]}>{copy('partnershipChatTitle', 'Analyse both charts with Tara')}</Text>
+                  <Text style={[styles.nextStepBody, { color: colors.textSecondary }]}>{copy('partnershipChatBody', 'Choose the other person’s chart and ask about your compatibility, strengths, challenges and relationship.')}</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={18} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.nextStepRow, { borderColor: colors.cardBorder }]}
+                onPress={() => navigation.navigate('Home', {
                   startChat: true,
                   initialMessage: copy('askTaraQuestion', 'What does my birth chart say about my future partner’s personality and our relationship dynamic?'),
                 })}
@@ -771,6 +785,7 @@ export default function PartnerPortraitScreen({ navigation }) {
                   analysisType: 'marriage',
                   title: copy('marriageAnalysisTitle', 'Marriage and relationship analysis'),
                   cost: pricing?.marriage || 0,
+                  returnTo: 'PartnerPortrait',
                 })}
               >
                 <View style={[styles.nextStepIcon, { backgroundColor: colors.accentSoft || colors.background }]}><Ionicons name="heart-outline" size={21} color={colors.primary} /></View>

@@ -1800,6 +1800,7 @@ export default function ChatScreen({ navigation, route }) {
   const [savedCharts, setSavedCharts] = useState([]);
   const [showPartnershipModal, setShowPartnershipModal] = useState(false);
   const [partnershipModalCost, setPartnershipModalCost] = useState(2);
+  const partnershipEntryNativeRef = useRef(null);
   const [showMundaneModal, setShowMundaneModal] = useState(false);
   const [mundaneModalCost, setMundaneModalCost] = useState(1);
 
@@ -2460,6 +2461,18 @@ export default function ChatScreen({ navigation, route }) {
       setTimeout(() => {
         partnershipPrefillInProgressRef.current = false;
       }, 120);
+    }
+
+    // Entry from Partner Portrait: reuse Ask Tara's existing two-chart
+    // partnership flow and carry the portrait's native into the first slot.
+    if (route.params?.startPartnership) {
+      partnershipEntryNativeRef.current = route.params?.partnershipNativeChart || null;
+      navigation.setParams({
+        startPartnership: undefined,
+        partnershipNativeChart: undefined,
+      });
+      setPartnershipModalCost((partnershipCost != null && partnershipCost > 0) ? partnershipCost : 0);
+      setShowPartnershipModal(true);
     }
 
     // Handle mundane mode param
@@ -3257,19 +3270,21 @@ export default function ChatScreen({ navigation, route }) {
   }
 
   const confirmPartnershipMode = () => {
+    const entryNative = partnershipEntryNativeRef.current;
+    partnershipEntryNativeRef.current = null;
     loadSavedCharts(); // Refresh charts when starting partnership mode
     setShowPartnershipModal(false);
     setPartnershipMode(true);
     setIsInstantAnalysis(false);
     setIsPremiumAnalysis(false); // No premium in partnership
     setShowModeSelector(false);
-    setPartnershipStep(0);
+    setPartnershipStep(entryNative ? 1 : 0);
     setPartnershipSubStep(0);
     setPartnershipRelation('');
     setIsTypingOtherRelation(false);
     setOtherRelationText('');
     setNativeSearchQuery('');
-    setNativeChart(null);
+    setNativeChart(entryNative);
     setPartnerChart(null);
     setShowGreeting(false);
     setShowMenu(false);
@@ -9561,7 +9576,10 @@ export default function ChatScreen({ navigation, route }) {
       />
       <ConfirmCreditsModal
         visible={showPartnershipModal}
-        onClose={() => setShowPartnershipModal(false)}
+        onClose={() => {
+          partnershipEntryNativeRef.current = null;
+          setShowPartnershipModal(false);
+        }}
         onConfirm={confirmPartnershipMode}
         title={t('premiumUi.chatScreen.partnershipMode')}
         description={Platform.OS === 'ios'
