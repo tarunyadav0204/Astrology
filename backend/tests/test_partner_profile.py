@@ -225,15 +225,40 @@ def _appearance_factors(profile: dict, attribute: str) -> set[str]:
     return {row.get("factor") for row in primary.get("evidence") or []}
 
 
-def test_uncancelled_debilitation_does_not_supply_the_graha_form():
+def _all_appearance_factors(profile: dict, attribute: str) -> set[str]:
+    result = (profile.get("appearance") or {}).get(attribute) or {}
+    candidates = [result.get("primary") or {}, *(result.get("alternatives") or [])]
+    return {
+        row.get("factor")
+        for candidate in candidates
+        for row in candidate.get("evidence") or []
+    }
+
+
+def test_uncancelled_debilitation_keeps_graha_form_at_reduced_weight():
     profile = synthesize_partner_profile(_jupiter_seventh_evidence(cancelled=False))
 
-    assert "Jupiter" not in _appearance_factors(profile, "complexion")
-    assert "Jupiter" not in _appearance_factors(profile, "head_hair")
-    assert all(row.get("factor") != "Jupiter" or row.get("withheld") for row in profile["factor_readings"])
-    withheld = [row for row in profile["factor_readings"] if row.get("withheld")]
-    assert withheld
-    assert withheld[0]["verse"] == "45.5-6"
+    complexion = profile["appearance"]["complexion"]
+    assert complexion["primary"]["value"] == "dark complexion"
+    assert any(
+        any(row["factor"] == "Jupiter" for row in candidate["evidence"])
+        for candidate in complexion["alternatives"]
+    )
+    assert "Jupiter" in _all_appearance_factors(profile, "head_hair")
+    jupiter = next(
+        row for row in profile["factor_readings"]
+        if row["factor"] == "Jupiter" and row["channel"] == "d1_occupant"
+    )
+    assert jupiter["condition_state"] == "debilitated"
+    complexion_candidates = [
+        profile["appearance"]["complexion"]["primary"],
+        *profile["appearance"]["complexion"]["alternatives"],
+    ]
+    jupiter_evidence = next(
+        row for candidate in complexion_candidates for row in candidate["evidence"]
+        if row["factor"] == "Jupiter"
+    )
+    assert jupiter_evidence["condition_factor"] == 0.55
     assert any(
         row["channel"] == "d1_seventh_sign" and row["factor"] == "Capricorn" and row["appearance"]
         for row in profile["factor_readings"]
@@ -243,18 +268,39 @@ def test_uncancelled_debilitation_does_not_supply_the_graha_form():
     )
     assert "fair or light golden complexion" not in prompt
     assert "golden-brown hair" not in prompt
+    summary = profile["resolved_summary"]
+    assert summary["appearance"]
+    assert summary["personality"]
+    assert summary["dominant_factors"]
+    complexion_resolution = next(
+        row for row in summary["conflicts_resolved"] if row["attribute"] == "complexion"
+    )
+    assert complexion_resolution["selected"] == "dark complexion"
+    assert complexion_resolution["alternative"] == "fair or light golden complexion"
+    assert "Saturn" in complexion_resolution["selected_factors"]
+    assert "Jupiter" in complexion_resolution["alternative_factors"]
 
 
-def test_chart_screen_neecha_bhanga_restores_the_graha_form():
+def test_chart_screen_neecha_bhanga_mitigates_without_overriding_stronger_form():
     profile = synthesize_partner_profile(_jupiter_seventh_evidence(cancelled=True))
 
-    assert "Jupiter" in _appearance_factors(profile, "complexion")
+    assert "Jupiter" in _all_appearance_factors(profile, "complexion")
+    assert profile["appearance"]["complexion"]["primary"]["value"] == "dark complexion"
     jupiter = next(
         row for row in profile["factor_readings"]
         if row["factor"] == "Jupiter" and row["channel"] == "d1_occupant"
     )
     assert jupiter["condition_state"] == "debilitation_cancelled"
     assert jupiter["neecha_bhanga_rules"] == ["PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_LAGNA"]
+    candidates = [
+        profile["appearance"]["complexion"]["primary"],
+        *profile["appearance"]["complexion"]["alternatives"],
+    ]
+    evidence = next(
+        row for candidate in candidates for row in candidate["evidence"]
+        if row["factor"] == "Jupiter"
+    )
+    assert evidence["condition_factor"] == 0.8
     assert any(ref["source_id"] == "phaladeepika.neecha_bhanga" for ref in profile["references"])
 
 
@@ -281,10 +327,10 @@ def test_uncancelled_debilitation_stays_false_and_is_not_copied_into_d9():
     assert "neecha_bhanga" not in untouched
 
 
-def test_d1_evidence_uses_the_chart_screen_neecha_bhanga_rules():
+def test_d1_evidence_records_kendra_cancellation_without_erasing_debilitation():
     asc = 3  # Cancer, so the seventh house is Capricorn
     signs = {
-        "Sun": 4, "Moon": 2, "Mars": 0, "Mercury": 2,
+        "Sun": 4, "Moon": 2, "Mars": 1, "Mercury": 2,
         "Jupiter": 9, "Venus": 1, "Saturn": 10, "Rahu": 5, "Ketu": 11,
     }
     planets = {
@@ -307,7 +353,7 @@ def test_d1_evidence_uses_the_chart_screen_neecha_bhanga_rules():
     assert jupiter["dignity"] == "debilitated"
     assert jupiter["neecha_bhanga"] is True
     assert "PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_LAGNA" in jupiter["neecha_bhanga_rules"]
-    assert jupiter["neecha_bhanga_source"] == "Phaladeepika 7.26-30"
+    assert jupiter["dignity"] == "debilitated"
 
 
 def test_partner_portrait_progress_stages_follow_persisted_work():

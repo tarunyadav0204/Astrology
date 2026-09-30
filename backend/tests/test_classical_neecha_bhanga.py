@@ -72,10 +72,15 @@ def test_phaladeepika_7_28_dispositor_aspects_debilitated_planet():
     assert "PD_7_28_DEBILITATED_PLANET_ASPECTED_BY_SIGN_LORD" in rules
 
 
-def test_phaladeepika_7_30_debilitated_planet_itself_in_kendra():
+def test_debilitated_planet_in_kendra_matches_fifth_classical_formulation():
     chart = _chart({"Jupiter": 9})
-    rules = _rule_ids(calculate_classical_neecha_bhanga(chart), "Jupiter")
-    assert "PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_LAGNA" in rules
+    jupiter = calculate_classical_neecha_bhanga(chart)["Jupiter"]
+    assert "PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_LAGNA" in jupiter["matched_rule_ids"]
+    matched = next(
+        row for row in jupiter["conditions_met"]
+        if row["rule_id"] == "PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_LAGNA"
+    )
+    assert matched["reference"] == "Phaladeepika 7.26-30 commentary"
 
 
 def test_conjunction_with_dispositor_is_not_invented_as_verse_7_28_aspect():

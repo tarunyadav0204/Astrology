@@ -25,6 +25,7 @@ const homeRecommendationsCopy = JSON.parse(fs.readFileSync(path.join(projectRoot
 const themeDiscoveryCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/theme-discovery.json'), 'utf8'));
 const ashtakavargaStudyCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/ashtakavarga-study.json'), 'utf8'));
 const prashnaCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/prashna-v2.json'), 'utf8'));
+const partnerPortraitCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/partner-portrait.json'), 'utf8'));
 const chatScreenSource = {
   english: 'marathi', hindi: 'hindi', es: 'es', fr: 'fr', german: 'english', russian: 'german',
   chinese: 'russian', tamil: 'chinese', telugu: 'tamil', gujarati: 'telugu', marathi: 'gujarati',
@@ -91,6 +92,8 @@ const protectedFiles = [
   'src/components/Auth/screens/ForgotPasswordScreen.js',
   'src/components/Ashtakvarga/AshtakvargaStudyScreen.js',
   'src/components/CreditModal.js',
+  'src/components/PartnerPortrait/PartnerPortraitScreen.js',
+  'src/components/PartnerPortrait/PartnerPortraitPromoCard.js',
 ];
 
 const flatten = (value, prefix = '', result = {}) => {
@@ -134,6 +137,21 @@ Object.entries(prashnaCopy).forEach(([language, copy]) => {
   prashnaEnglishKeys.forEach((key) => {
     if (key in localized && interpolationTokens(prashnaEnglish[key]).join('|') !== interpolationTokens(localized[key]).join('|')) {
       failures.push(`prashna/${language}: interpolation mismatch in ${key}`);
+    }
+  });
+});
+const partnerPortraitEnglish = flatten(partnerPortraitCopy.english);
+const partnerPortraitEnglishKeys = Object.keys(partnerPortraitEnglish).sort();
+const partnerPortraitKeySet = new Set(partnerPortraitEnglishKeys);
+Object.entries(partnerPortraitCopy).forEach(([language, copy]) => {
+  const localized = flatten(copy);
+  const missing = partnerPortraitEnglishKeys.filter((key) => !(key in localized) || !String(localized[key] || '').trim());
+  const extra = Object.keys(localized).filter((key) => !partnerPortraitKeySet.has(key));
+  if (missing.length) failures.push(`partner-portrait/${language}: missing ${missing.join(', ')}`);
+  if (extra.length) failures.push(`partner-portrait/${language}: unexpected ${extra.join(', ')}`);
+  partnerPortraitEnglishKeys.forEach((key) => {
+    if (key in localized && interpolationTokens(partnerPortraitEnglish[key]).join('|') !== interpolationTokens(localized[key]).join('|')) {
+      failures.push(`partner-portrait/${language}: interpolation mismatch in ${key}`);
     }
   });
 });
@@ -398,4 +416,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`i18n audit passed: ${englishKeys.length} premium keys, ${prashnaEnglishKeys.length} Prashna keys, ${lifeAnalysisEnglishKeys.length + lifeAnalysisPdfEnglishKeys.length} Life Analysis keys, ${ashtakavargaStudyEnglishKeys.length} Ashtakavarga Study keys, ${historyUiEnglishKeys.length + historyDetailEnglishKeys.length} history keys, ${knowledgeSupportEnglishKeys.length} knowledge/support keys, ${accountNotificationsEnglishKeys.length} notification keys, and ${chatControlEnglishKeys.length} chat-control keys across ${Object.keys(premiumCopy).length} languages; ${protectedFiles.length} screens protected.`);
+console.log(`i18n audit passed: ${englishKeys.length} premium keys, ${prashnaEnglishKeys.length} Prashna keys, ${partnerPortraitEnglishKeys.length} Partner Portrait keys, ${lifeAnalysisEnglishKeys.length + lifeAnalysisPdfEnglishKeys.length} Life Analysis keys, ${ashtakavargaStudyEnglishKeys.length} Ashtakavarga Study keys, ${historyUiEnglishKeys.length + historyDetailEnglishKeys.length} history keys, ${knowledgeSupportEnglishKeys.length} knowledge/support keys, ${accountNotificationsEnglishKeys.length} notification keys, and ${chatControlEnglishKeys.length} chat-control keys across ${Object.keys(premiumCopy).length} languages; ${protectedFiles.length} screens protected.`);

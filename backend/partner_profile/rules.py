@@ -59,7 +59,7 @@ SOURCES: Dict[str, Dict[str, Any]] = {
         "chapter": 45,
         "verses": "5-6",
         "title": "Awakening, dreaming and sleeping states",
-        "scope": "A debilitated graha is sleeping and does not deliver its ordinary results",
+        "scope": "A debilitated graha is in the sleeping state and its capacity to deliver results is weakened",
         "url": "https://www.siva.sh/brihat-parashara-hora-shastra/45/5",
     },
     "phaladeepika.neecha_bhanga": {
@@ -67,7 +67,7 @@ SOURCES: Dict[str, Dict[str, Any]] = {
         "chapter": 7,
         "verses": "26-30",
         "title": "Neecha Bhanga Raja Yoga",
-        "scope": "The D1 cancellation rules shown on the chart. A matched rule lets the graha deliver its ordinary form.",
+        "scope": "The D1 cancellation rules shown on the chart; the portrait resolver mitigates debilitation when a rule matches without treating the graha as exalted.",
         "url": "https://vedpuran.net/wp-content/uploads/2021/04/mantreswara_s__phaladeeplka.pdf",
     },
 }

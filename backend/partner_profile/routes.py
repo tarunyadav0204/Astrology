@@ -24,7 +24,7 @@ from .image_provider import GooglePartnerPortraitProvider, partner_portrait_prov
 from .art_direction import derive_art_direction
 from .prompt_builder import build_full_body_prompt, build_portrait_prompt
 from .service import build_partner_profile
-from .synthesizer import synthesize_partner_profile
+from .synthesizer import RULESET_VERSION, synthesize_partner_profile
 from .storage import PartnerPortraitStorage
 from .task_queue import enqueue_partner_portrait, task_configuration_error, task_secret, tasks_enabled
 
@@ -84,7 +84,7 @@ def init_partner_portrait_tables() -> None:
     with get_conn() as conn:
         execute(
             conn,
-            """
+            f"""
             CREATE TABLE IF NOT EXISTS partner_portrait_jobs (
                 job_id TEXT PRIMARY KEY,
                 user_id INTEGER NOT NULL,
@@ -98,7 +98,7 @@ def init_partner_portrait_tables() -> None:
                 charged_at TIMESTAMP,
                 refunded_at TIMESTAMP,
                 idempotency_key TEXT NOT NULL,
-                ruleset_version TEXT NOT NULL DEFAULT 'bphs-partner-portrait/1.2.0',
+                ruleset_version TEXT NOT NULL DEFAULT '{RULESET_VERSION}',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 started_at TIMESTAMP,
                 completed_at TIMESTAMP,
@@ -147,11 +147,14 @@ def _public_result(profile: dict[str, Any], assets: list[dict[str, str]]) -> dic
     storage = PartnerPortraitStorage()
     public_assets = [{**asset, "url": storage.display_uri(asset["stored_uri"])} for asset in assets]
     factor_readings = profile.get("factor_readings")
+    resolved_summary = profile.get("resolved_summary")
     # Results created before factor readings were added still contain their
     # complete evidence packet. Enrich them when read so an existing paid
     # portrait gains the explanation without requiring another purchase.
-    if not factor_readings and isinstance(profile.get("evidence"), dict):
-        factor_readings = synthesize_partner_profile(profile["evidence"]).get("factor_readings")
+    if (not factor_readings or not resolved_summary) and isinstance(profile.get("evidence"), dict):
+        enriched = synthesize_partner_profile(profile["evidence"])
+        factor_readings = factor_readings or enriched.get("factor_readings")
+        resolved_summary = resolved_summary or enriched.get("resolved_summary")
     safe_profile = {
         "schema_version": profile.get("schema_version"),
         "ruleset_version": profile.get("ruleset_version"),
@@ -159,6 +162,7 @@ def _public_result(profile: dict[str, Any], assets: list[dict[str, str]]) -> dic
         "appearance": profile.get("appearance"),
         "personality": profile.get("personality"),
         "factor_readings": factor_readings,
+        "resolved_summary": resolved_summary,
         "references": profile.get("references"),
         "method_note": profile.get("method_note"),
         "generation": profile.get("generation"),
@@ -250,8 +254,8 @@ async def _run_generation(job_id: str, user_id: int, request_data: dict[str, Any
         with get_conn() as conn:
             execute(
                 conn,
-                "UPDATE partner_portrait_jobs SET profile_json=%s WHERE job_id=%s AND user_id=%s",
-                (json.dumps(profile), job_id, user_id),
+                "UPDATE partner_portrait_jobs SET profile_json=%s, ruleset_version=%s WHERE job_id=%s AND user_id=%s",
+                (json.dumps(profile), profile["ruleset_version"], job_id, user_id),
             )
             conn.commit()
         storage = PartnerPortraitStorage()
@@ -304,9 +308,12 @@ async def _run_generation(job_id: str, user_id: int, request_data: dict[str, Any
             cur = execute(
                 conn,
                 """UPDATE partner_portrait_jobs
-                   SET status=%s, profile_json=%s, assets_json=%s, completed_at=%s
+                   SET status=%s, profile_json=%s, assets_json=%s, ruleset_version=%s, completed_at=%s
                    WHERE job_id=%s AND user_id=%s""",
-                ("completed", json.dumps(profile), json.dumps(assets), datetime.now(), job_id, user_id),
+                (
+                    "completed", json.dumps(profile), json.dumps(assets), profile["ruleset_version"],
+                    datetime.now(), job_id, user_id,
+                ),
             )
             conn.commit()
         if getattr(cur, "rowcount", 0) == 0:
@@ -356,7 +363,7 @@ async def get_partner_portrait_config(current_user: User = Depends(get_current_u
     cost = credit_service.get_effective_cost(current_user.userid, base, "partner_portrait_cost")
     return {
         "cost": cost,
-        "ruleset_version": "bphs-partner-portrait/1.2.0",
+        "ruleset_version": RULESET_VERSION,
         "output": ["portrait", "full_body", "classical_profile", "source_trace"],
         "personalized_free_preview": False,
         "available": _configuration_error() is None,
@@ -426,9 +433,12 @@ async def start_partner_portrait(
         execute(
             conn,
             """INSERT INTO partner_portrait_jobs
-               (job_id,user_id,birth_chart_id,status,request_json,credit_cost,idempotency_key)
-               VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-            (job_id, current_user.userid, request.birth_chart_id, "pending", json.dumps(request_data), cost, request.idempotency_key),
+               (job_id,user_id,birth_chart_id,status,request_json,credit_cost,idempotency_key,ruleset_version)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (
+                job_id, current_user.userid, request.birth_chart_id, "pending",
+                json.dumps(request_data), cost, request.idempotency_key, RULESET_VERSION,
+            ),
         )
         conn.commit()
     charged = credit_service.spend_credits(

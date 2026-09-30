@@ -121,6 +121,9 @@ export default function PartnerPortraitScreen({ navigation }) {
   const [workingStartedAt, setWorkingStartedAt] = useState(null);
   const [lastCheckedAt, setLastCheckedAt] = useState(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [selectedAssetKind, setSelectedAssetKind] = useState('portrait');
+  const [whyExpanded, setWhyExpanded] = useState(false);
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
   const [workingClock, setWorkingClock] = useState(Date.now());
   const pollRef = useRef(null);
   const activeJobIdRef = useRef(null);
@@ -415,6 +418,23 @@ export default function PartnerPortraitScreen({ navigation }) {
   const personality = (result?.profile?.personality || []).filter((entry) => entry?.confidence !== 'suggestive');
   const factors = result?.profile?.chart_factors || {};
   const factorReadings = result?.profile?.factor_readings || [];
+  const resolvedSummary = result?.profile?.resolved_summary || {};
+  const summaryAppearance = (resolvedSummary.appearance || appearance)
+    .filter((entry) => entry?.confidence === 'strong' || entry?.confidence === 'moderate' || ['hair', 'head_hair', 'complexion'].includes(entry?.attribute));
+  const summaryPersonality = (resolvedSummary.personality || personality).slice(0, 4);
+  const dominantFactors = resolvedSummary.dominant_factors?.length
+    ? resolvedSummary.dominant_factors
+    : factorReadings
+      .filter((reading) => !reading.withheld && ((reading.appearance || []).length || (reading.personality || []).length))
+      .map((reading) => ({
+        factor: reading.factor,
+        factor_type: reading.factor_type,
+        appearance: reading.appearance || [],
+        personality: reading.personality || [],
+      }))
+      .slice(0, 3);
+  const secondaryFactors = resolvedSummary.secondary_factors || [];
+  const resolvedConflicts = resolvedSummary.conflicts_resolved || [];
   const artDirection = result?.profile?.art_direction || {};
   const elapsedSeconds = workingStartedAt ? Math.max(0, Math.floor((workingClock - workingStartedAt) / 1000)) : 0;
   const checkedSeconds = lastCheckedAt ? Math.max(0, Math.floor((workingClock - lastCheckedAt) / 1000)) : null;
@@ -476,27 +496,27 @@ export default function PartnerPortraitScreen({ navigation }) {
     ...personality.slice(0, 2).map((item) => localizedTrait(item.trait)),
   ].filter((value, index, values) => value && values.indexOf(value) === index).slice(0, 3);
   const portraitAsset = assets.find((asset) => asset.kind === 'portrait') || assets[0];
+  const selectedAsset = assets.find((asset) => asset.kind === selectedAssetKind) || portraitAsset;
 
-  const evidenceLine = (item) => {
-    const evidence = item?.evidence || [];
-    const seen = new Set();
-    return evidence
-      .filter((entry) => {
-        const key = `${entry.channel}-${entry.factor}-${entry.verse}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .map((entry) => {
-        const factor = localPlanet(entry.factor) === entry.factor ? localSign(entry.factor) : localPlanet(entry.factor);
-        return `${copy(`channels.${entry.channel}`, entry.channel)}: ${factor} · BPHS ${entry.verse}`;
-      })
-      .join('  •  ');
+  const summaryTrait = (item) => {
+    const value = localizedTrait(item.value || item.trait);
+    if (['hair', 'head_hair'].includes(item.attribute)) return copy('hairLabel', 'Hair: {{value}}', { value });
+    if (item.attribute === 'body_hair') return copy('bodyHairLabel', 'Body hair: {{value}}', { value });
+    if (item.attribute === 'complexion') return copy('complexionLabel', 'Complexion: {{value}}', { value });
+    return value;
+  };
+
+  const factorContribution = (factor) => {
+    const values = [
+      ...(factor.appearance || []).map((item) => localizedTrait(item.value)),
+      ...(factor.personality || []).map(localizedTrait),
+    ].filter((value, index, list) => value && list.indexOf(value) === index);
+    return values.slice(0, 4).join(' · ');
   };
 
   if (featureAccess !== true) {
     return (
-      <SafeAreaView style={[styles.screen, styles.accessLoading, { backgroundColor: colors.background }]}> 
+      <SafeAreaView style={[styles.screen, styles.accessLoading, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
@@ -526,7 +546,8 @@ export default function PartnerPortraitScreen({ navigation }) {
       <ScrollView contentContainerStyle={[styles.content, wide && styles.contentWide]} showsVerticalScrollIndicator={false}>
         {status === 'completed' ? (
           <>
-            <Text style={[styles.heroTitle, { color: colors.text }]}>{copy('subtitle', 'See the partner your birth chart describes')}</Text>
+            <Text style={[styles.resultEyebrow, { color: colors.primary }]}>{copy('resultEyebrow', 'YOUR KUNDALI, BROUGHT TO LIFE')}</Text>
+            <Text style={[styles.heroTitle, { color: colors.text }]}>{copy('resultHeroTitle', 'Meet the person your Kundali describes')}</Text>
             <Text style={[styles.scope, { color: colors.textSecondary }]}>{copy('symbolic', 'Inspired by your birth chart · not an exact photograph')}</Text>
             {artDirection.presentation && artDirection.visual_context ? (
               <Text style={[styles.selectionSummary, { color: colors.textSecondary }]}>
@@ -536,21 +557,31 @@ export default function PartnerPortraitScreen({ navigation }) {
                 })}
               </Text>
             ) : null}
-            <View style={[styles.imageGrid, wide && styles.imageGridWide]}>
-              {assets.map((asset) => (
-                <View key={asset.kind} style={[styles.resultImageCard, card]}>
-                  <View style={[styles.resultFrame, asset.kind === 'portrait' ? styles.resultPortrait : styles.resultFullBody]}>
-                    <Image source={{ uri: asset.url }} style={styles.resultImage} resizeMode="contain" />
-                  </View>
-                  <View style={[styles.resultCaption, { backgroundColor: colors.surfaceRaised }]}>
-                    <Text style={[styles.imageLabel, { color: colors.text }]}>
-                      {asset.kind === 'portrait' ? copy('portrait', 'Face portrait') : copy('fullBody', 'Full-body view')}
-                    </Text>
-                  </View>
-                </View>
-              ))}
+            {assets.length > 1 ? (
+              <View style={[styles.assetTabs, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+                {assets.map((asset) => {
+                  const active = selectedAsset?.kind === asset.kind;
+                  return (
+                    <TouchableOpacity
+                      key={asset.kind}
+                      onPress={() => setSelectedAssetKind(asset.kind)}
+                      style={[styles.assetTab, active && { backgroundColor: colors.primary }]}
+                    >
+                      <Ionicons name={asset.kind === 'portrait' ? 'person-outline' : 'body-outline'} size={17} color={active ? colors.onPrimary : colors.textSecondary} />
+                      <Text style={[styles.assetTabText, { color: active ? colors.onPrimary : colors.textSecondary }]}>
+                        {asset.kind === 'portrait' ? copy('portrait', 'Face portrait') : copy('fullBody', 'Full-body view')}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : null}
+            <View style={[styles.resultHeroCard, card]}>
+              <View style={[styles.resultHeroFrame, selectedAsset?.kind === 'full_body' ? styles.resultFullBody : styles.resultPortrait]}>
+                <Image source={{ uri: selectedAsset?.url }} style={styles.resultImage} resizeMode="contain" />
+              </View>
             </View>
-            <Text style={[styles.artNote, { color: colors.textSecondary }]}> 
+            <Text style={[styles.artNote, { color: colors.textSecondary }]}>
               {copy('artNote', 'The listed traits come from the chart. Partner gender follows the saved chart, regional appearance follows the birth location, and unspecified visual details are artistic choices.')}
             </Text>
             {portraitAsset?.url ? (
@@ -569,32 +600,73 @@ export default function PartnerPortraitScreen({ navigation }) {
                 <Ionicons name="arrow-forward" size={18} color={colors.onPrimary} />
               </TouchableOpacity>
             ) : null}
+            <View style={[styles.glanceCard, { backgroundColor: colors.surfaceInverse, borderColor: colors.cardBorder }]}>
+              <Text style={[styles.glanceEyebrow, { color: colors.accent }]}>{copy('atGlanceEyebrow', 'YOUR PARTNER AT A GLANCE')}</Text>
+              <Text style={[styles.glanceTitle, { color: colors.onSurfaceInverse || colors.textInverse }]}>{copy('atGlanceTitle', 'The strongest qualities in your chart')}</Text>
+              <View style={styles.glanceColumns}>
+                <View style={styles.glanceColumn}>
+                  <Text style={[styles.glanceLabel, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>{copy('atGlanceAppearance', 'Appearance')}</Text>
+                  {summaryAppearance.slice(0, 5).map((item, index) => (
+                    <View key={`${item.attribute}-${item.value}-${index}`} style={styles.glanceTraitRow}>
+                      <Ionicons name="sparkles" size={13} color={colors.accent} />
+                      <Text style={[styles.glanceTrait, { color: colors.onSurfaceInverse || colors.textInverse }]}>{summaryTrait(item)}</Text>
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.glanceColumn}>
+                  <Text style={[styles.glanceLabel, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>{copy('atGlancePersonality', 'Personality')}</Text>
+                  {summaryPersonality.map((item, index) => (
+                    <View key={`${item.trait}-${index}`} style={styles.glanceTraitRow}>
+                      <Ionicons name="sparkles" size={13} color={colors.accent} />
+                      <Text style={[styles.glanceTrait, { color: colors.onSurfaceInverse || colors.textInverse }]}>{localizedTrait(item.trait)}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+
             <View style={[styles.card, card]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>{copy('appearance', 'Appearance indications')}</Text>
-              {appearance.map((item, index) => (
-                <View key={`${item.value}-${index}`} style={styles.traitRow}>
-                  <Text style={[styles.traitValue, { color: colors.text }]}>• {['hair', 'head_hair'].includes(item.attribute)
-                    ? copy('hairLabel', 'Hair: {{value}}', { value: copy(`traits.${traitKey(item.value)}`, item.value) })
-                    : item.attribute === 'body_hair'
-                    ? copy('bodyHairLabel', 'Body hair: {{value}}', { value: copy(`traits.${traitKey(item.value)}`, item.value) })
-                    : item.attribute === 'complexion'
-                    ? copy('complexionLabel', 'Complexion: {{value}}', { value: copy(`traits.${traitKey(item.value)}`, item.value) })
-                    : copy(`traits.${traitKey(item.value)}`, item.value)}</Text>
-                  <Text style={[styles.traitEvidence, { color: colors.textMuted || colors.textSecondary }]}>{evidenceLine(item)}</Text>
+              <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>{copy('resolvedEyebrow', 'HOW TARA SHAPED THE PORTRAIT')}</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{copy('resolvedTitle', 'One clear interpretation of the strongest indications')}</Text>
+              <Text style={[styles.factorIntro, { color: colors.textSecondary }]}>{copy('resolvedIntro', 'Tara compared every indication, gave priority to repeated and stronger testimony, and used one resolved direction for each visible trait.')}</Text>
+              {dominantFactors.map((factor, index) => (
+                <View key={`${factor.factor}-${index}`} style={[styles.influenceRow, index > 0 && { borderTopColor: colors.cardBorder, borderTopWidth: 1 }]}>
+                  <View style={[styles.influenceRank, { backgroundColor: colors.accentSoft || colors.background }]}>
+                    <Text style={[styles.influenceRankText, { color: colors.onAccent || colors.primary }]}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.influenceCopy}>
+                    <Text style={[styles.influenceTitle, { color: colors.text }]}>{factorName(factor)}</Text>
+                    <Text style={[styles.influenceBody, { color: colors.textSecondary }]}>{factorContribution(factor)}</Text>
+                  </View>
+                </View>
+              ))}
+              {secondaryFactors.length ? (
+                <View style={[styles.supportingStrip, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
+                  <Text style={[styles.supportingLabel, { color: colors.textSecondary }]}>{copy('supportingInfluences', 'Supporting influences')}</Text>
+                  <Text style={[styles.supportingValues, { color: colors.text }]}>{secondaryFactors.map(factorName).join(' · ')}</Text>
+                </View>
+              ) : null}
+              {resolvedConflicts.slice(0, 2).map((resolution) => (
+                <View key={resolution.attribute} style={[styles.resolutionNote, { borderLeftColor: colors.primary }]}>
+                  <Text style={[styles.resolutionTitle, { color: colors.text }]}>{copy('conflictResolved', 'How a mixed indication was resolved')}</Text>
+                  <Text style={[styles.resolutionBody, { color: colors.textSecondary }]}>{copy(
+                    'conflictResolutionBody',
+                    '{{selected}} had stronger or more repeated support than {{alternative}}, so it guided the portrait.',
+                    { selected: localizedTrait(resolution.selected), alternative: localizedTrait(resolution.alternative) },
+                  )}</Text>
                 </View>
               ))}
             </View>
+
             <View style={[styles.card, card]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>{copy('personality', 'Personality indications')}</Text>
-              {personality.map((item) => (
-                <View key={item.trait} style={styles.traitRow}>
-                  <Text style={[styles.traitValue, { color: colors.text }]}>• {copy(`traits.${traitKey(item.trait)}`, item.trait)}</Text>
-                  <Text style={[styles.traitEvidence, { color: colors.textMuted || colors.textSecondary }]}>{evidenceLine(item)}</Text>
+              <TouchableOpacity style={styles.accordionHeader} onPress={() => setWhyExpanded((value) => !value)}>
+                <View style={styles.accordionTitleCopy}>
+                  <Text style={[styles.sectionTitle, styles.accordionTitle, { color: colors.text }]}>{copy('why', 'Why your chart shows this')}</Text>
+                  <Text style={[styles.accordionHint, { color: colors.textSecondary }]}>{copy('whyCollapsedHint', 'See which planets and signs shaped the portrait')}</Text>
                 </View>
-              ))}
-            </View>
-            <View style={[styles.card, card]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>{copy('why', 'Why the chart shows this')}</Text>
+                <Ionicons name={whyExpanded ? 'chevron-up' : 'chevron-down'} size={22} color={colors.primary} />
+              </TouchableOpacity>
+              {whyExpanded ? <>
               <Text style={[styles.factorIntro, { color: colors.textSecondary }]}>
                 {copy('whyIntro', 'Each factor below contributes specific qualities described in BPHS.')}
               </Text>
@@ -615,28 +687,36 @@ export default function PartnerPortraitScreen({ navigation }) {
                         )}
                       </Text>
                     ) : null}
+                    {reading.condition_state === 'debilitated' && !reading.withheld ? (
+                      <Text style={[styles.factorMeaning, { color: colors.textSecondary }]}>
+                        {copy(
+                          'weakenedDebilitation',
+                          'Debilitated, so this graha remains relevant but its contribution is given less prominence.',
+                        )}
+                      </Text>
+                    ) : null}
                     {reading.condition_state === 'debilitation_cancelled' ? (
                       <Text style={[styles.factorMeaning, { color: colors.textSecondary }]}>
                         {copy(
                           'cancelledDebilitation',
-                          'Debilitation is cancelled by {{source}}, so this graha’s ordinary appearance is used.',
+                          'A classical Neecha Bhanga condition is present ({{source}}), so the debilitation is mitigated, not reversed.',
                           { source: reading.neecha_bhanga_source || 'Phaladeepika 7.26-30' },
                         )}
                       </Text>
                     ) : null}
                     {appearanceContributions.length ? (
-                      <Text style={[styles.factorMeaning, { color: colors.textSecondary }]}> 
+                      <Text style={[styles.factorMeaning, { color: colors.textSecondary }]}>
                         <Text style={[styles.factorLabel, { color: colors.text }]}>{copy('contributesAppearance', 'Appearance: ')}</Text>
                         {appearanceContributions.join(' · ')}
                       </Text>
                     ) : null}
                     {natureContributions.length ? (
-                      <Text style={[styles.factorMeaning, { color: colors.textSecondary }]}> 
+                      <Text style={[styles.factorMeaning, { color: colors.textSecondary }]}>
                         <Text style={[styles.factorLabel, { color: colors.text }]}>{copy('contributesNature', 'Nature: ')}</Text>
                         {natureContributions.join(' · ')}
                       </Text>
                     ) : null}
-                    <Text style={[styles.factorReference, { color: colors.primary }]}> 
+                    <Text style={[styles.factorReference, { color: colors.primary }]}>
                       {copy('bphsReference', 'BPHS {{verse}}', { verse: reading.verse })}
                     </Text>
                   </View>
@@ -644,12 +724,20 @@ export default function PartnerPortraitScreen({ navigation }) {
               }) : factorLines.map((line) => (
                 <Text key={line} style={[styles.bullet, { color: colors.textSecondary }]}>• {line}</Text>
               ))}
+              </> : null}
             </View>
             <View style={[styles.card, card]}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>{copy('sources', 'Classical basis')}</Text>
+              <TouchableOpacity style={styles.accordionHeader} onPress={() => setSourcesExpanded((value) => !value)}>
+                <View style={styles.accordionTitleCopy}>
+                  <Text style={[styles.sectionTitle, styles.accordionTitle, { color: colors.text }]}>{copy('sources', 'Classical basis')}</Text>
+                  <Text style={[styles.accordionHint, { color: colors.textSecondary }]}>{copy('sourcesCollapsedHint', 'Read the BPHS and Phaladeepika references')}</Text>
+                </View>
+                <Ionicons name={sourcesExpanded ? 'chevron-up' : 'chevron-down'} size={22} color={colors.primary} />
+              </TouchableOpacity>
+              {sourcesExpanded ? <>
               {(result?.profile?.references || []).map((source) => (
                 <TouchableOpacity key={source.source_id} onPress={() => source.url && Linking.openURL(source.url)}>
-                  <Text style={[styles.source, { color: colors.primary }]}> 
+                  <Text style={[styles.source, { color: colors.primary }]}>
                     {source.work} · {copy('chapterVerses', 'Chapter {{chapter}}, verses {{verses}}', source)} ↗
                   </Text>
                 </TouchableOpacity>
@@ -657,15 +745,58 @@ export default function PartnerPortraitScreen({ navigation }) {
               <Text style={[styles.methodNote, { color: colors.textMuted || colors.textSecondary }]}>
                 {copy('methodNote', 'Classical descriptions are ranked by spouse relevance and independent repetition. The ranking is AstroRoshni’s declared method; it is not presented as a verse from the classics.')}
               </Text>
+              </> : null}
             </View>
-            <View style={[styles.variationCard, card]}> 
-              <View style={[styles.variationIcon, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}> 
+
+            <View style={[styles.card, card]}>
+              <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>{copy('continueEyebrow', 'CONTINUE THE DISCOVERY')}</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>{copy('continueTitle', 'Go beyond the portrait')}</Text>
+              <TouchableOpacity
+                style={[styles.nextStepRow, { borderColor: colors.cardBorder }]}
+                onPress={() => navigation.navigate('Home', {
+                  startChat: true,
+                  initialMessage: copy('askTaraQuestion', 'What does my birth chart say about my future partner’s personality and our relationship dynamic?'),
+                })}
+              >
+                <View style={[styles.nextStepIcon, { backgroundColor: colors.accentSoft || colors.background }]}><Ionicons name="chatbubbles-outline" size={21} color={colors.primary} /></View>
+                <View style={styles.nextStepCopy}>
+                  <Text style={[styles.nextStepTitle, { color: colors.text }]}>{copy('askTaraTitle', 'Ask Tara about your partner')}</Text>
+                  <Text style={[styles.nextStepBody, { color: colors.textSecondary }]}>{copy('askTaraBody', 'Explore personality, relationship dynamics and the questions this portrait raises.')}</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={18} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.nextStepRow, { borderColor: colors.cardBorder }]}
+                onPress={() => navigation.navigate('AnalysisDetail', {
+                  analysisType: 'marriage',
+                  title: copy('marriageAnalysisTitle', 'Marriage and relationship analysis'),
+                  cost: pricing?.marriage || 0,
+                })}
+              >
+                <View style={[styles.nextStepIcon, { backgroundColor: colors.accentSoft || colors.background }]}><Ionicons name="heart-outline" size={21} color={colors.primary} /></View>
+                <View style={styles.nextStepCopy}>
+                  <Text style={[styles.nextStepTitle, { color: colors.text }]}>{copy('marriageAnalysisTitle', 'Marriage and relationship analysis')}</Text>
+                  <Text style={[styles.nextStepBody, { color: colors.textSecondary }]}>{copy('marriageAnalysisBody', 'Study your relationship promise, partner indications and important periods.')}</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={18} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.nextStepRow, { borderColor: colors.cardBorder }]} onPress={() => navigation.navigate('RelationshipMatch')}>
+                <View style={[styles.nextStepIcon, { backgroundColor: colors.accentSoft || colors.background }]}><Ionicons name="people-outline" size={21} color={colors.primary} /></View>
+                <View style={styles.nextStepCopy}>
+                  <Text style={[styles.nextStepTitle, { color: colors.text }]}>{copy('compatibilityTitle', 'Compare with someone you know')}</Text>
+                  <Text style={[styles.nextStepBody, { color: colors.textSecondary }]}>{copy('compatibilityBody', 'When you have both birth charts, examine compatibility using the two real charts.')}</Text>
+                </View>
+                <Ionicons name="arrow-forward" size={18} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+            <View style={[styles.variationCard, card]}>
+              <View style={[styles.variationIcon, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
                 <Ionicons name="images-outline" size={22} color={colors.primary} />
               </View>
-              <Text style={[styles.variationTitle, { color: colors.text }]}> 
+              <Text style={[styles.variationTitle, { color: colors.text }]}>
                 {copy('anotherLookTitle', 'Want to explore another possible look?')}
               </Text>
-              <Text style={[styles.variationBody, { color: colors.textSecondary }]}> 
+              <Text style={[styles.variationBody, { color: colors.textSecondary }]}>
                 {copy('anotherLookBody', 'The same chart indications can produce more than one visual interpretation. Create a different face and matching full-body portrait using the same astrological profile.')}
               </Text>
               <TouchableOpacity
@@ -673,26 +804,26 @@ export default function PartnerPortraitScreen({ navigation }) {
                 style={[styles.secondaryCta, { borderColor: colors.primary, opacity: cost == null ? 0.55 : 1 }]}
                 onPress={() => { setCreatingVariation(true); setError(null); setStatus('setup'); }}
               >
-                <Text style={[styles.secondaryCtaText, { color: colors.primary }]}> 
+                <Text style={[styles.secondaryCtaText, { color: colors.primary }]}>
                   {cost == null
                     ? copy('loadingPrice', 'Loading current credit price…')
                     : copy('anotherLookCta', 'Create another look · {{cost}} credits', { cost })}
                 </Text>
                 <Ionicons name="arrow-forward" size={17} color={colors.primary} />
               </TouchableOpacity>
-              <Text style={[styles.variationFootnote, { color: colors.textMuted || colors.textSecondary }]}> 
+              <Text style={[styles.variationFootnote, { color: colors.textMuted || colors.textSecondary }]}>
                 {copy('anotherLookFootnote', 'Your current portrait stays saved. You will review the options before credits are used.')}
               </Text>
             </View>
           </>
         ) : status === 'working' ? (
           <View style={[styles.workingCard, card]}>
-            <View style={[styles.workingIcon, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}> 
+            <View style={[styles.workingIcon, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
             <Text style={[styles.workingEyebrow, { color: colors.primary }]}>{copy('workingActive', 'CREATION IN PROGRESS')}</Text>
             <Text style={[styles.workingTitle, { color: colors.text }]}>{copy('working', 'Creating your Partner Portrait')}</Text>
-            <View style={[styles.generatingPreview, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}> 
+            <View style={[styles.generatingPreview, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
               <Image source={GENERATING_PREVIEW} style={styles.generatingPreviewImage} resizeMode="cover" />
               <Animated.View style={[styles.generatingPulse, { backgroundColor: colors.surfaceRaised, opacity: previewPulse }]} />
               <View style={styles.generatingPreviewContent}>
@@ -702,7 +833,7 @@ export default function PartnerPortraitScreen({ navigation }) {
                 </View>
               </View>
             </View>
-            <View style={[styles.currentStage, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}> 
+            <View style={[styles.currentStage, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
               <Ionicons name={currentProgress.icon} size={24} color={colors.primary} />
               <View style={styles.currentStageCopy}>
                 <Text style={[styles.currentStageTitle, { color: colors.text }]}>{currentProgress.title}</Text>
@@ -746,7 +877,7 @@ export default function PartnerPortraitScreen({ navigation }) {
                 );
               })}
             </View>
-            <View style={[styles.liveStatus, { borderTopColor: colors.cardBorder }]}> 
+            <View style={[styles.liveStatus, { borderTopColor: colors.cardBorder }]}>
               <View style={[styles.liveDot, { backgroundColor: colors.primary }]} />
               <Text style={[styles.liveText, { color: colors.textSecondary }]}>
                 {checkedSeconds === null
@@ -768,28 +899,47 @@ export default function PartnerPortraitScreen({ navigation }) {
         ) : (
           <View style={wide ? styles.twoColumn : styles.sampleStack}>
             <View style={wide ? styles.column : undefined}>
+              <Text style={[styles.resultEyebrow, { color: colors.primary }]}>{copy('resultEyebrow', 'YOUR KUNDALI, BROUGHT TO LIFE')}</Text>
               <Text style={[styles.heroTitle, { color: colors.text }]}>{copy('subtitle', 'See the partner your birth chart describes')}</Text>
-              <View style={[styles.sampleCard, card]}>
+              <Text style={[styles.sampleLead, { color: colors.textSecondary }]}>{copy('honestBody', 'A birth chart cannot reveal an exact face or identify a specific person. Your portrait brings the strongest repeated appearance traits in your chart to life.')}</Text>
+              <View style={[styles.sampleHeroCard, card]}>
                 <View style={[styles.sampleImageFrame, { aspectRatio: 2112 / 1402, backgroundColor: colors.backgroundSecondary || colors.background }]}>
                   <Image source={showsFemaleSample(birthData?.gender) ? SAMPLE_FEMALE : SAMPLE_MALE} style={styles.sampleImage} resizeMode="contain" />
+                  <View style={styles.sampleWatermark}>
+                    <Ionicons name="sparkles" size={13} color="#FFF8EB" />
+                    <Text style={styles.sampleWatermarkText}>{copy('sampleWatermark', 'SAMPLE')}</Text>
+                  </View>
                 </View>
                 <View style={styles.sampleCopy}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>{copy('sampleTitle', 'Sample Partner Portrait')}</Text>
                   <Text style={[styles.body, { color: colors.textSecondary }]}>{copy('sampleBody', 'This fixed example shows the face and full-body views you receive. It is not calculated from your chart.')}</Text>
                 </View>
               </View>
+
               <View style={[styles.card, card]}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>{copy('methodTitle', 'How your portrait is created')}</Text>
-                <Text style={[styles.body, { color: colors.textSecondary }]}>{copy('methodBody', 'We compare several classical indicators of a partner’s appearance and personality. Only qualities that repeat across the chart guide the portrait.')}</Text>
-                <View style={[styles.divider, { backgroundColor: colors.cardBorder }]} />
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>{copy('honestTitle', 'What to expect')}</Text>
-                <Text style={[styles.body, { color: colors.textSecondary }]}>{copy('honestBody', 'A birth chart cannot reveal an exact face or identify a specific person. Your portrait brings the strongest repeated appearance traits in your chart to life.')}</Text>
+                <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>{copy('includes', 'Your purchase includes')}</Text>
+                <View style={styles.benefitGrid}>
+                  {[
+                    ['person-outline', 'includeFace'],
+                    ['body-outline', 'includeBody'],
+                    ['heart-outline', 'includeProfile'],
+                    ['library-outline', 'includeSources'],
+                  ].map(([icon, key]) => (
+                    <View key={key} style={[styles.benefitTile, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
+                      <View style={[styles.benefitIcon, { backgroundColor: colors.accentSoft || colors.surfaceMuted }]}>
+                        <Ionicons name={icon} size={20} color={colors.onAccent || colors.primary} />
+                      </View>
+                      <Text style={[styles.benefitText, { color: colors.text }]}>{copy(key, key)}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
+
             </View>
 
             <View style={wide ? styles.column : undefined}>
               {creatingVariation && result ? (
-                <View style={[styles.variationNotice, { backgroundColor: colors.surfaceRaised, borderColor: colors.primary }]}> 
+                <View style={[styles.variationNotice, { backgroundColor: colors.surfaceRaised, borderColor: colors.primary }]}>
                   <View style={styles.variationNoticeTitleRow}>
                     <Ionicons name="images-outline" size={22} color={colors.primary} />
                     <Text style={[styles.variationNoticeTitle, { color: colors.text }]}>{copy('variationTitle', 'Create another possible look')}</Text>
@@ -806,11 +956,11 @@ export default function PartnerPortraitScreen({ navigation }) {
                   </TouchableOpacity>
                 </View>
               ) : null}
-              <View style={[styles.card, card]}>
+              <View style={[styles.card, styles.setupCard, card]}>
                 <Text style={[styles.sectionEyebrow, { color: colors.primary }]}>{copy('forChart', 'Reading for')} {birthData?.name || ''}</Text>
-                <Text style={[styles.label, { color: colors.text }]}>{copy('derivedDirection', 'Determined from the birth chart')}</Text>
+                <Text style={[styles.setupTitle, { color: colors.text }]}>{copy('derivedDirection', 'Determined from the birth chart')}</Text>
                 {directionLoading ? <ActivityIndicator size="small" color={colors.primary} /> : direction ? (
-                  <View style={[styles.directionBox, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}> 
+                  <View style={[styles.directionBox, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
                     <View style={styles.directionRow}>
                       <Text style={[styles.directionLabel, { color: colors.textSecondary }]}>{copy('partnerGender', 'Partner gender')}</Text>
                       <Text style={[styles.directionValue, { color: colors.text }]}>{copy(direction.presentation, direction.presentation)}</Text>
@@ -825,11 +975,11 @@ export default function PartnerPortraitScreen({ navigation }) {
                     </View>
                   </View>
                 ) : null}
-                <Text style={[styles.fieldHelp, { color: colors.textSecondary }]}>
+                <Text style={[styles.fieldHelp, styles.derivedHelp, { color: colors.textSecondary }]}>
                   {copy('derivedHelp', 'Partner gender follows the saved chart gender. Regional appearance is selected from the birth coordinates.')}
                 </Text>
                 {directionIssue === 'GENDER_REQUIRED' ? (
-                  <View style={[styles.missingFieldCard, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}> 
+                  <View style={[styles.missingFieldCard, { backgroundColor: colors.background, borderColor: colors.cardBorder }]}>
                     <View style={styles.missingFieldCopy}>
                       <Text style={[styles.missingFieldTitle, { color: colors.text }]}>{copy('genderRequiredTitle', 'Gender is missing from this chart')}</Text>
                       <Text style={[styles.fieldHelp, { color: colors.textSecondary }]}>{copy('genderRequiredBody', 'Add the native’s gender to determine the partner portrait correctly.')}</Text>
@@ -846,45 +996,45 @@ export default function PartnerPortraitScreen({ navigation }) {
                     </TouchableOpacity>
                   </View>
                 ) : null}
-                <Text style={[styles.label, { color: colors.text }]}>{copy('age', 'Apparent age')}</Text>
+                <View style={[styles.setupDivider, { backgroundColor: colors.cardBorder }]} />
+                <Text style={[styles.preferenceLabel, { color: colors.text }]}>{copy('age', 'Apparent age')}</Text>
                 <ChoiceRow options={AGE_BANDS} value={ageBand} onChange={setAgeBand} colors={colors} />
-                <Text style={[styles.label, { color: colors.text }]}>{copy('clothing', 'Clothing style')}</Text>
+                <Text style={[styles.preferenceLabel, { color: colors.text }]}>{copy('clothing', 'Clothing style')}</Text>
                 <ChoiceRow options={CLOTHING.map(([value, key]) => [value, copy(key, key)])} value={clothingStyle} onChange={setClothingStyle} colors={colors} />
+                {!available ? (
+                  <Text style={[styles.error, { color: colors.error || '#b42318' }]}>
+                    {copy('unavailable', 'Partner Portrait is temporarily unavailable. Please try again later.')}
+                  </Text>
+                ) : null}
+                {error ? <Text style={[styles.error, { color: colors.error || '#b42318' }]}>{error}</Text> : null}
+                <TouchableOpacity
+                  disabled={!available || cost == null || directionLoading || !direction}
+                  style={[styles.cta, styles.setupCta, { backgroundColor: colors.primary, opacity: available && cost != null && !directionLoading && direction ? 1 : 0.55 }]}
+                  onPress={generate}
+                >
+                  <Text style={[styles.ctaText, { color: colors.onPrimary }]}>
+                    {!available
+                      ? copy('unavailableShort', 'Temporarily unavailable')
+                      : cost == null
+                      ? copy('loadingPrice', 'Loading current credit price…')
+                      : directionLoading
+                      ? copy('resolvingDirection', 'Checking birth chart details…')
+                      : !direction
+                      ? copy('directionUnavailable', 'Birth chart details required')
+                      : credits >= cost
+                      ? creatingVariation
+                        ? copy('generateVariation', `Create another possible look · ${cost} credits`, { cost })
+                        : copy('generate', `Create my Partner Portrait · ${cost} credits`, { cost })
+                      : copy('needCredits', `Get ${Math.max(0, cost - credits)} more credits`, { count: Math.max(0, cost - credits) })}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={20} color={colors.onPrimary} />
+                </TouchableOpacity>
               </View>
-              <View style={[styles.card, card]}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>{copy('includes', 'Your purchase includes')}</Text>
-                {['includeFace', 'includeBody', 'includeProfile', 'includeSources'].map((key) => (
-                  <Text key={key} style={[styles.bullet, { color: colors.textSecondary }]}>✓ {copy(key, key)}</Text>
-                ))}
+              <View style={[styles.sampleMethodCard, { backgroundColor: colors.surfaceInverse, borderColor: colors.cardBorder }]}>
+                <Text style={[styles.glanceEyebrow, { color: colors.accent }]}>{copy('methodTitle', 'How your portrait is created')}</Text>
+                <Text style={[styles.sampleMethodTitle, { color: colors.onSurfaceInverse || colors.textInverse }]}>{copy('atGlanceTitle', 'The strongest qualities in your chart')}</Text>
+                <Text style={[styles.sampleMethodBody, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>{copy('methodBody', 'We compare several classical indicators of a partner’s appearance and personality. Only qualities that repeat across the chart guide the portrait.')}</Text>
               </View>
-              {!available ? (
-                <Text style={[styles.error, { color: colors.error || '#b42318' }]}>
-                  {copy('unavailable', 'Partner Portrait is temporarily unavailable. Please try again later.')}
-                </Text>
-              ) : null}
-              {error ? <Text style={[styles.error, { color: colors.error || '#b42318' }]}>{error}</Text> : null}
-              <TouchableOpacity
-                disabled={!available || cost == null || directionLoading || !direction}
-                style={[styles.cta, { backgroundColor: colors.primary, opacity: available && cost != null && !directionLoading && direction ? 1 : 0.55 }]}
-                onPress={status === 'failed' ? generate : generate}
-              >
-                <Text style={[styles.ctaText, { color: colors.onPrimary }]}>
-                  {!available
-                    ? copy('unavailableShort', 'Temporarily unavailable')
-                    : cost == null
-                    ? copy('loadingPrice', 'Loading current credit price…')
-                    : directionLoading
-                    ? copy('resolvingDirection', 'Checking birth chart details…')
-                    : !direction
-                    ? copy('directionUnavailable', 'Birth chart details required')
-                    : credits >= cost
-                    ? creatingVariation
-                      ? copy('generateVariation', `Create another possible look · ${cost} credits`, { cost })
-                      : copy('generate', `Create my Partner Portrait · ${cost} credits`, { cost })
-                    : copy('needCredits', `Get ${Math.max(0, cost - credits)} more credits`, { count: Math.max(0, cost - credits) })}
-                </Text>
-                <Ionicons name="arrow-forward" size={20} color={colors.onPrimary} />
-              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -915,6 +1065,8 @@ const styles = StyleSheet.create({
   sampleStack: { gap: 16 },
   column: { flex: 1, minWidth: 0 },
   heroTitle: { fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontSize: 30, lineHeight: 38, fontWeight: '700', marginBottom: 8 },
+  sampleLead: { fontSize: 15, lineHeight: 22, marginBottom: 16, maxWidth: 680 },
+  resultEyebrow: { fontSize: 11, lineHeight: 16, fontWeight: '900', letterSpacing: 1.6, marginBottom: 7 },
   scope: { fontSize: 14, marginBottom: 18 },
   selectionSummary: { fontSize: 14, fontWeight: '700', marginTop: -10, marginBottom: 18 },
   artNote: { fontSize: 13, lineHeight: 20, marginTop: 12, marginBottom: 2 },
@@ -922,16 +1074,45 @@ const styles = StyleSheet.create({
   shareCtaCopy: { flex: 1 },
   shareCtaTitle: { fontSize: 15, lineHeight: 20, fontWeight: '900' },
   shareCtaBody: { marginTop: 2, fontSize: 11, lineHeight: 15, opacity: 0.84 },
+  assetTabs: { alignSelf: 'center', width: '100%', maxWidth: 720, minHeight: 48, borderWidth: 1, borderRadius: 16, padding: 4, flexDirection: 'row', gap: 4, marginBottom: 10 },
+  assetTab: { flex: 1, minHeight: 40, borderRadius: 12, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  assetTabText: { fontSize: 13, lineHeight: 18, fontWeight: '800' },
+  resultHeroCard: { width: '100%', maxWidth: 720, alignSelf: 'center', borderWidth: 1, borderRadius: 28, overflow: 'hidden' },
+  resultHeroFrame: { width: '100%', overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.035)' },
   card: { borderWidth: 1, borderRadius: 22, padding: 20, marginTop: 16 },
   sampleCard: { width: '100%', maxWidth: '100%', alignSelf: 'stretch', borderWidth: 1, borderRadius: 22, overflow: 'hidden', marginTop: 12 },
-  sampleImageFrame: { width: '100%', maxWidth: '100%', overflow: 'hidden' },
+  sampleHeroCard: { width: '100%', maxWidth: '100%', alignSelf: 'stretch', borderWidth: 1, borderRadius: 26, overflow: 'hidden' },
+  sampleImageFrame: { width: '100%', maxWidth: '100%', overflow: 'hidden', position: 'relative' },
   sampleImage: { width: '100%', height: '100%', maxWidth: '100%' },
   sampleCopy: { padding: 18 },
+  sampleWatermark: { position: 'absolute', top: 14, right: 14, minHeight: 31, borderRadius: 16, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(45, 12, 28, 0.82)' },
+  sampleWatermarkText: { color: '#FFF8EB', fontSize: 10, lineHeight: 15, fontWeight: '900', letterSpacing: 1.2 },
+  benefitGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  benefitTile: { width: '48%', flexGrow: 1, minHeight: 112, borderWidth: 1, borderRadius: 17, padding: 14, justifyContent: 'space-between', gap: 12 },
+  benefitIcon: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  benefitText: { fontSize: 14, lineHeight: 19, fontWeight: '800' },
+  sampleMethodCard: { borderWidth: 1, borderRadius: 24, padding: 22, marginTop: 16 },
+  sampleMethodTitle: { fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontSize: 22, lineHeight: 29, fontWeight: '800', marginBottom: 9 },
+  sampleMethodBody: { fontSize: 14, lineHeight: 22 },
   sectionTitle: { fontSize: 19, fontWeight: '800', lineHeight: 25, marginBottom: 8 },
   sectionEyebrow: { fontSize: 13, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 },
+  glanceCard: { borderWidth: 1, borderRadius: 26, padding: 22, marginTop: 18 },
+  glanceEyebrow: { fontSize: 11, lineHeight: 16, fontWeight: '900', letterSpacing: 1.5, marginBottom: 7 },
+  glanceTitle: { fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontSize: 23, lineHeight: 30, fontWeight: '800', marginBottom: 20 },
+  glanceColumns: { flexDirection: 'row', flexWrap: 'wrap', gap: 22 },
+  glanceColumn: { flex: 1, minWidth: 240, gap: 9 },
+  glanceLabel: { fontSize: 11, lineHeight: 16, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 2 },
+  glanceTraitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  glanceTrait: { flex: 1, fontSize: 15, lineHeight: 21, fontWeight: '700' },
   body: { fontSize: 15, lineHeight: 23 },
   divider: { height: 1, marginVertical: 18 },
   label: { fontSize: 14, fontWeight: '800', marginTop: 14, marginBottom: 9 },
+  setupCard: { overflow: 'hidden' },
+  setupTitle: { fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontSize: 23, lineHeight: 30, fontWeight: '800', marginTop: -7, marginBottom: 14 },
+  derivedHelp: { marginTop: 13 },
+  setupDivider: { height: 1, marginTop: 19, marginBottom: 2 },
+  preferenceLabel: { fontSize: 14, lineHeight: 20, fontWeight: '900', marginTop: 16, marginBottom: 9 },
+  setupCta: { marginTop: 22 },
   fieldHelp: { fontSize: 13, lineHeight: 19, marginTop: 12, marginBottom: 4 },
   directionBox: { borderWidth: 1, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 8, gap: 2 },
   directionRow: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
@@ -955,6 +1136,27 @@ const styles = StyleSheet.create({
   factorMeaning: { fontSize: 14, lineHeight: 21, marginTop: 2 },
   factorLabel: { fontWeight: '800' },
   factorReference: { fontSize: 12, lineHeight: 18, fontWeight: '700', marginTop: 6 },
+  influenceRow: { minHeight: 72, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  influenceRank: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  influenceRankText: { fontSize: 13, fontWeight: '900' },
+  influenceCopy: { flex: 1 },
+  influenceTitle: { fontSize: 16, lineHeight: 22, fontWeight: '900' },
+  influenceBody: { fontSize: 13, lineHeight: 19, marginTop: 2 },
+  supportingStrip: { borderWidth: 1, borderRadius: 15, padding: 14, marginTop: 10 },
+  supportingLabel: { fontSize: 11, lineHeight: 16, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.7 },
+  supportingValues: { fontSize: 14, lineHeight: 20, fontWeight: '800', marginTop: 4 },
+  resolutionNote: { borderLeftWidth: 3, paddingLeft: 13, marginTop: 17 },
+  resolutionTitle: { fontSize: 14, lineHeight: 20, fontWeight: '900' },
+  resolutionBody: { fontSize: 13, lineHeight: 20, marginTop: 3 },
+  accordionHeader: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  accordionTitleCopy: { flex: 1 },
+  accordionTitle: { marginBottom: 2 },
+  accordionHint: { fontSize: 13, lineHeight: 18 },
+  nextStepRow: { minHeight: 78, borderWidth: 1, borderRadius: 17, padding: 13, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 },
+  nextStepIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  nextStepCopy: { flex: 1 },
+  nextStepTitle: { fontSize: 15, lineHeight: 21, fontWeight: '900' },
+  nextStepBody: { fontSize: 12, lineHeight: 18, marginTop: 2 },
   cta: { minHeight: 58, borderRadius: 18, marginTop: 18, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   ctaText: { fontSize: 16, fontWeight: '900', textAlign: 'center' },
   secondaryCta: { minHeight: 52, borderWidth: 1.5, borderRadius: 17, marginTop: 16, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },

@@ -218,13 +218,16 @@ def calculate_classical_neecha_bhanga(chart: Dict[str, Any]) -> Dict[str, Dict[s
                 )
             )
 
-        # 7.30: the debilitated planet itself is angular from Lagna or Moon.
+        # The fifth cancellation formulation recorded in the Kapoor edition's
+        # commentary to 7.26-30: the debilitated planet itself is angular from
+        # Lagna or Moon. Keep it explicitly identified so it is not confused
+        # with the separate sign-lord conditions in the translated verses.
         for reference, reference_house in (("Lagna", 1), ("Moon", moon_house)):
             if _is_kendra(reference_house, planet_house):
                 conditions.append(
                     _condition(
                         f"PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_{reference.upper()}",
-                        "7.30",
+                        "7.26-30 commentary",
                         f"The debilitated {planet} is in House {planet_house}, a Kendra from {reference}.",
                         (planet,),
                         (planet_house,),
@@ -241,8 +244,8 @@ def calculate_classical_neecha_bhanga(chart: Dict[str, Any]) -> Dict[str, Dict[s
             ("PD_7_29_EXALTATION_SIGN_LORD_KENDRA_FROM_MOON", "Phaladeepika 7.29", moon_house is not None),
             ("PD_7_27_LORDS_IN_MUTUAL_KENDRAS", "Phaladeepika 7.27", True),
             ("PD_7_28_DEBILITATED_PLANET_ASPECTED_BY_SIGN_LORD", "Phaladeepika 7.28", True),
-            ("PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_LAGNA", "Phaladeepika 7.30", True),
-            ("PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_MOON", "Phaladeepika 7.30", moon_house is not None),
+            ("PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_LAGNA", "Phaladeepika 7.26-30 commentary", True),
+            ("PD_7_30_DEBILITATED_PLANET_KENDRA_FROM_MOON", "Phaladeepika 7.26-30 commentary", moon_house is not None),
         ]
         rules_evaluated = [
             {
