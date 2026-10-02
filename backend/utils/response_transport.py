@@ -104,3 +104,18 @@ def strip_internal_evidence_markers(text: str, *, provisional: bool = False) -> 
     visible = re.sub(r"\s+([,.;:!?।])", r"\1", visible)
     visible = re.sub(r"[ \t]{2,}", " ", visible)
     return visible.strip()
+
+
+def visible_instant_stream_text(text: str) -> str:
+    """Hide composer metadata, including a sentinel split across token chunks."""
+    visible = str(text or "")
+    sentinels = ("NEXT_ACTION_META:", "PREDICTION_ANCHOR_META:", "FAQ_META:")
+    for sentinel in sentinels:
+        visible = visible.split(sentinel, 1)[0]
+    # Metadata is a trailing line. Hold even its first character until it can
+    # be distinguished from an ordinary line; this never delays the whole reply.
+    lines = visible.rsplit("\n", 1)
+    tail = lines[-1].strip()
+    if tail and any(sentinel.startswith(tail) for sentinel in sentinels):
+        visible = lines[0] if len(lines) > 1 else ""
+    return strip_internal_evidence_markers(visible, provisional=True).rstrip()

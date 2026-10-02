@@ -68,7 +68,12 @@ function hasAuthToken() {
 const rootElement = document.getElementById('root');
 const prerendered = rootElement?.hasChildNodes();
 const tokenPresent = hasAuthToken();
-const themedApp = <ThemeProvider><App /></ThemeProvider>;
+const timingProbe = process.env.NODE_ENV === 'development' && new URLSearchParams(window.location.search).get('instantChatProbe') === '1';
+const TimingProbe = process.env.NODE_ENV === 'development'
+  ? React.lazy(() => import('./dev/InstantChatTimingProbe')) : null;
+const themedApp = <ThemeProvider>{timingProbe
+  ? <React.Suspense fallback={<p>Loading timing probe…</p>}><TimingProbe /></React.Suspense>
+  : <App />}</ThemeProvider>;
 
 if (prerendered && !tokenPresent) {
   // Crawlers / logged-out: static HTML matches first paint when App starts with loading=false (see App.js).

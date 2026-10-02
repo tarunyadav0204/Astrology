@@ -131,6 +131,7 @@ def generate_content_rest_v1beta_result(
     system_prompt: Optional[str] = None,
     response_mime_type: Optional[str] = None,
     timeout_s: float = 120,
+    cached_content_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Modern Gemini generateContent transport used by latency-sensitive calls.
 
@@ -156,6 +157,8 @@ def generate_content_rest_v1beta_result(
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": generation_config,
     }
+    if str(cached_content_name or "").strip():
+        body["cachedContent"] = str(cached_content_name).strip()
     if str(system_prompt or "").strip():
         body["systemInstruction"] = {"parts": [{"text": str(system_prompt).strip()}]}
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{mid}:generateContent"
@@ -189,6 +192,77 @@ def generate_content_rest_v1beta_result(
         usage["input_tokens"] - usage["cached_tokens"],
     )
     return {"text": text, "usage": usage, "transport": "genai_rest"}
+
+
+async def generate_content_rest_v1beta_async_result(
+    model_name: str,
+    prompt: str,
+    api_key: str,
+    thinking_level: Optional[str] = None,
+    system_prompt: Optional[str] = None,
+    response_mime_type: Optional[str] = None,
+    timeout_s: float = 120,
+    cached_content_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Cancellable async Gemini transport for latency-sensitive request paths.
+
+    A synchronous ``requests`` call running in ``asyncio.to_thread`` continues
+    after its awaiting task is cancelled.  Live intent routing has a hard
+    deadline, so it must use an async socket that is closed on cancellation.
+    """
+    import httpx
+
+    mid = _normalize_model_id_for_rest(model_name)
+    generation_config: Dict[str, Any] = {
+        "temperature": 0,
+        "topP": 0.95,
+        "topK": 40,
+    }
+    normalized_level = str(thinking_level or "").strip().lower()
+    if normalized_level and _model_supports_gemini3_thinking_level(mid):
+        generation_config["thinkingConfig"] = {"thinkingLevel": normalized_level}
+    if str(response_mime_type or "").strip():
+        generation_config["responseMimeType"] = str(response_mime_type).strip()
+    body: Dict[str, Any] = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": generation_config,
+    }
+    if str(cached_content_name or "").strip():
+        body["cachedContent"] = str(cached_content_name).strip()
+    if str(system_prompt or "").strip():
+        body["systemInstruction"] = {"parts": [{"text": str(system_prompt).strip()}]}
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{mid}:generateContent"
+    timeout = httpx.Timeout(max(3.0, float(timeout_s or 120)))
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post(
+            url,
+            headers={"x-goog-api-key": api_key},
+            json=body,
+        )
+    if not response.is_success:
+        try:
+            detail = response.json()
+        except Exception:
+            detail = response.text
+        raise RuntimeError(f"Gemini REST {response.status_code}: {detail}")
+    data = response.json()
+    if data.get("promptFeedback", {}).get("blockReason"):
+        raise RuntimeError(f"Prompt blocked: {data.get('promptFeedback')}")
+    text = _extract_text_from_generate_content_json(data)
+    if not text:
+        raise RuntimeError("Empty candidates/parts in Gemini REST response")
+    usage_meta = data.get("usageMetadata") or {}
+    usage = {
+        "input_tokens": int(usage_meta.get("promptTokenCount") or 0),
+        "output_tokens": int(usage_meta.get("candidatesTokenCount") or 0),
+        "cached_tokens": int(usage_meta.get("cachedContentTokenCount") or 0),
+        "total_tokens": int(usage_meta.get("totalTokenCount") or 0),
+    }
+    usage["non_cached_input_tokens"] = max(
+        0, usage["input_tokens"] - usage["cached_tokens"]
+    )
+    return {"text": text, "usage": usage, "transport": "genai_rest_async"}
 
 
 def generate_content_rest_v1beta_stream_result(
@@ -310,6 +384,105 @@ def generate_content_rest_v1beta_stream_result(
         usage["input_tokens"] - usage["cached_tokens"],
     )
     return {"text": text, "usage": usage, "transport": "genai_rest_stream"}
+
+
+async def generate_content_rest_v1beta_async_stream_result(
+    model_name: str,
+    prompt: str,
+    api_key: str,
+    thinking_level: Optional[str] = None,
+    system_prompt: Optional[str] = None,
+    on_text_delta: Optional[Callable[[str, str], None]] = None,
+    timeout_s: float = 120,
+) -> Dict[str, Any]:
+    """Cancellable Gemini SSE transport for user-visible live answers."""
+    import httpx
+
+    mid = _normalize_model_id_for_rest(model_name)
+    generation_config: Dict[str, Any] = {
+        "temperature": 0,
+        "topP": 0.95,
+        "topK": 40,
+    }
+    normalized_level = str(thinking_level or "").strip().lower()
+    if normalized_level and _model_supports_gemini3_thinking_level(mid):
+        generation_config["thinkingConfig"] = {"thinkingLevel": normalized_level}
+    body: Dict[str, Any] = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": generation_config,
+    }
+    if str(system_prompt or "").strip():
+        body["systemInstruction"] = {"parts": [{"text": str(system_prompt).strip()}]}
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{mid}:streamGenerateContent"
+    timeout = httpx.Timeout(max(3.0, float(timeout_s or 120)))
+    chunks: List[str] = []
+    usage_meta: Dict[str, Any] = {}
+    prompt_feedback: Dict[str, Any] = {}
+    malformed_event_count = 0
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        async with client.stream(
+            "POST",
+            url,
+            params={"alt": "sse"},
+            headers={"x-goog-api-key": api_key},
+            json=body,
+        ) as response:
+            if not response.is_success:
+                detail = (await response.aread()).decode("utf-8", errors="replace")
+                raise RuntimeError(f"Gemini REST stream {response.status_code}: {detail}")
+            async for raw_line in response.aiter_lines():
+                line = str(raw_line or "").strip()
+                if not line or not line.startswith("data:"):
+                    continue
+                payload = line[5:].strip()
+                if not payload or payload == "[DONE]":
+                    continue
+                try:
+                    data = json.loads(payload)
+                except json.JSONDecodeError:
+                    malformed_event_count += 1
+                    logger.warning("Ignoring malformed Gemini SSE event: %r", payload[:240])
+                    continue
+                prompt_feedback = data.get("promptFeedback") or prompt_feedback
+                usage_meta = data.get("usageMetadata") or usage_meta
+                visible_parts: List[str] = []
+                for candidate in data.get("candidates") or []:
+                    for part in ((candidate.get("content") or {}).get("parts") or []):
+                        if part.get("thought"):
+                            continue
+                        if part.get("text") is not None:
+                            visible_parts.append(str(part.get("text")))
+                delta = "".join(visible_parts)
+                if not delta:
+                    continue
+                chunks.append(delta)
+                if on_text_delta is not None:
+                    try:
+                        await asyncio.to_thread(on_text_delta, delta, "".join(chunks))
+                    except Exception:
+                        logger.warning("Gemini stream progress callback failed", exc_info=True)
+
+    if prompt_feedback.get("blockReason"):
+        raise RuntimeError(f"Prompt blocked: {prompt_feedback}")
+    if malformed_event_count:
+        raise RuntimeError(
+            f"Gemini stream contained {malformed_event_count} malformed SSE event(s)"
+        )
+    text = "".join(chunks).strip()
+    if not text:
+        raise RuntimeError("Empty candidates/parts in Gemini REST stream response")
+    usage = {
+        "input_tokens": int(usage_meta.get("promptTokenCount") or 0),
+        "output_tokens": int(usage_meta.get("candidatesTokenCount") or 0),
+        "cached_tokens": int(usage_meta.get("cachedContentTokenCount") or 0),
+        "total_tokens": int(usage_meta.get("totalTokenCount") or 0),
+    }
+    usage["non_cached_input_tokens"] = max(
+        0, usage["input_tokens"] - usage["cached_tokens"]
+    )
+    return {"text": text, "usage": usage, "transport": "genai_rest_async_stream"}
 
 
 class _SimpleTextResponse:
@@ -878,18 +1051,31 @@ class GeminiChatAnalyzer:
                     api_key = os.getenv("GEMINI_API_KEY") or ""
                     if not api_key:
                         raise ValueError("GEMINI_API_KEY environment variable not set")
-                    rest_fn = (
-                        generate_content_rest_v1beta_stream_result
-                        if stream_callback is not None
-                        else generate_content_rest_v1beta_result
-                    )
-                    rest_args = [model_name, prompt, api_key, gemini_thinking_level, system_prompt]
                     if stream_callback is not None:
-                        rest_args.append(stream_callback)
-                    rest_result = await asyncio.wait_for(
-                        asyncio.to_thread(rest_fn, *rest_args),
-                        timeout=timeout_s,
-                    )
+                        rest_result = await asyncio.wait_for(
+                            generate_content_rest_v1beta_async_stream_result(
+                                model_name,
+                                prompt,
+                                api_key,
+                                gemini_thinking_level,
+                                system_prompt,
+                                stream_callback,
+                                timeout_s,
+                            ),
+                            timeout=timeout_s,
+                        )
+                    else:
+                        rest_result = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                generate_content_rest_v1beta_result,
+                                model_name,
+                                prompt,
+                                api_key,
+                                gemini_thinking_level,
+                                system_prompt,
+                            ),
+                            timeout=timeout_s,
+                        )
                     response_text = str(rest_result.get("text") or "").strip()
                     token_usage = dict(rest_result.get("usage") or token_usage)
                 else:

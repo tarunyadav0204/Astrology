@@ -1,3 +1,4 @@
+import { applyInstantProgress, buildImmediateChartPreview, mergeChartContext } from '../../utils/instantProgress';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
@@ -142,49 +143,51 @@ function clampComposerHeight(contentHeight) {
   return Math.min(COMPOSER_MAX_HEIGHT, Math.max(COMPOSER_MIN_HEIGHT, raw));
 }
 
-const shouldPaceInstantAnswer = ({ chatTier, messageType, content } = {}) => {
-  const tier = String(chatTier || '').toLowerCase();
-  const mt = String(messageType || 'answer').toLowerCase();
-  if (tier !== 'instant') return false;
-  if (mt === 'clarification' || mt === 'native_gate') return false;
-  return String(content || '').trim().length > 0;
+const shouldPaceInstantAnswer = ({ chatTier, messageType } = {}) => {
+  if (String(chatTier || '').toLowerCase() !== 'instant') return false;
+  const type = String(messageType || 'answer').toLowerCase();
+  return type !== 'clarification' && type !== 'native_gate';
 };
 
-const splitInstantReply = (content, maxPieceLength = 95) => {
+const splitInstantReply = (content) => {
   const normalized = String(content || '').replace(/\r\n/g, '\n').trim();
   if (!normalized) return [];
-  const sentences = normalized
-    .split(/\n{2,}/u)
-    .flatMap((paragraph) => paragraph.match(/[^.!?।！？]+(?:[.!?।！？]+|$)/gu) || [paragraph])
-    .map((part) => part.trim())
-    .filter(Boolean);
+  const paragraphs = normalized.split(/\n{2,}/u).map((part) => part.trim()).filter(Boolean);
+  if (paragraphs.length > 1) return paragraphs;
+
+  const lines = normalized.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (lines.length > 2) {
+    const pieces = [];
+    for (let index = 0; index < lines.length; index += 3) {
+      pieces.push(lines.slice(index, index + 3).join('\n'));
+    }
+    return pieces;
+  }
+
+  const sentences = normalized.match(/[^.!?।！？]+(?:[.!?।！？]+|$)/gu) || [normalized];
   const pieces = [];
+  let buffer = '';
+  let count = 0;
   sentences.forEach((sentence) => {
-    if (sentence.length <= maxPieceLength) {
-      pieces.push(sentence);
+    const next = sentence.trim();
+    if (!next) return;
+    const candidate = buffer ? `${buffer} ${next}` : next;
+    if (buffer && (count >= 2 || candidate.length > 420)) {
+      pieces.push(buffer);
+      buffer = next;
+      count = 1;
       return;
     }
-    const clauses = (sentence.match(/[^,;:]+(?:[,;:]|$)/gu) || [sentence])
-      .map((part) => part.trim())
-      .filter(Boolean);
-    let buffer = '';
-    clauses.forEach((clause) => {
-      const candidate = buffer ? `${buffer} ${clause}` : clause;
-      if (buffer && candidate.length > maxPieceLength) {
-        pieces.push(buffer);
-        buffer = clause;
-      } else {
-        buffer = candidate;
-      }
-    });
-    if (buffer) pieces.push(buffer);
+    buffer = candidate;
+    count += 1;
   });
+  if (buffer) pieces.push(buffer);
   return pieces.length ? pieces : [normalized];
 };
 
 const getInstantReplyPieceDelay = (piece) => Math.max(
-  1400,
-  Math.min(2700, 850 + String(piece || '').length * 18),
+  1700,
+  Math.min(3400, 1100 + String(piece || '').length * 8),
 );
 const parseChatHttpError = (error) => {
   const message = String(error?.message || '');
@@ -813,6 +816,8 @@ export default function ChatScreen({ navigation, route }) {
   const instantRevealActiveRef = useRef(new Set());
   /** Instant assistant message_id → live WebSocket. Polling remains the recovery/final-authority path. */
   const instantStreamSocketsRef = useRef(new Map());
+  /** Message ids for which real provider text has already reached the UI. */
+  const instantStreamContentRef = useRef(new Set());
   const [staticSuggestions, setStaticSuggestions] = useState(DEFAULT_CHAT_SUGGESTIONS);
   const [engagementSuggestions, setEngagementSuggestions] = useState([]);
   const [engagementSuggestionScope, setEngagementSuggestionScope] = useState('');
@@ -1019,6 +1024,7 @@ export default function ChatScreen({ navigation, route }) {
       }
     });
     instantStreamSocketsRef.current.clear();
+    instantStreamContentRef.current.clear();
   }, []);
 
   const [showEventPeriods, setShowEventPeriods] = useState(false);
@@ -2281,6 +2287,11 @@ export default function ChatScreen({ navigation, route }) {
       const { chartAPI } = require('../../services/api');
       const response = await chartAPI.calculateChartOnly(formattedData);
       setChartData(response.data);
+      const preview = buildImmediateChartPreview(response.data, t('chat.calculatedContext', 'Selected chart · Calculated'));
+      if (preview) setMessagesWithStorage(prev => prev.map(msg =>
+        msg.chatTier === 'instant' && msg.contextChartKey === chatPersonStorageKey(birth) && !msg.instantPreview
+          ? applyInstantProgress(msg, { preview }) : msg
+      ));
 
     } catch (error) {
       console.error('Error loading chart data:', error);
@@ -2818,7 +2829,9 @@ export default function ChatScreen({ navigation, route }) {
     return [];
   };
 
-  // Override setMessages to also save to storage
+  // Publish UI updates without serializing the full history inside React's
+  // state updater. On web AsyncStorage uses synchronous localStorage, which
+  // otherwise blocks every streamed chunk (and repeats quota failures).
   const setMessagesWithStorage = (messagesOrUpdater) => {
     setMessages(prev => {
       const newMessagesRaw = typeof messagesOrUpdater === 'function' ? messagesOrUpdater(prev) : messagesOrUpdater;
@@ -2826,16 +2839,17 @@ export default function ChatScreen({ navigation, route }) {
       if (newMessagesRaw === prev) {
         return prev;
       }
-      const newMessages = sortMessagesForDisplay(newMessagesRaw);
-      // Get current person ID from birthData if currentPersonId is null
-      const personId = currentPersonId || chatPersonStorageKey(birthData);
-      // Save to storage
-      if (personId) {
-        saveMessagesToStorage(newMessages, personId);
-      }
-      return newMessages;
+      return sortMessagesForDisplay(newMessagesRaw);
     });
   };
+
+  useEffect(() => {
+    if (loading || isTyping || messages.some(msg => msg.instantStreaming)) return undefined;
+    const personId = currentPersonId || chatPersonStorageKey(birthData);
+    if (!personId || !messages.length) return undefined;
+    const timer = setTimeout(() => saveMessagesToStorage(messages, personId), 300);
+    return () => clearTimeout(timer);
+  }, [messages, currentPersonId, birthData, loading, isTyping]);
 
   // Today already calculates and caches the selected chart's KP activations.
   // Instant reuses that exact day/chart cache so its greeting is personal with
@@ -4410,6 +4424,7 @@ export default function ChatScreen({ navigation, route }) {
       }
     });
     instantStreamSocketsRef.current.clear();
+    instantStreamContentRef.current.clear();
     nativeSwitchInProgressRef.current = true;
     keepChatOpenAfterNativeSelectRef.current = true;
     startFreshSessionAfterNativeSelectRef.current = true;
@@ -4694,9 +4709,31 @@ export default function ChatScreen({ navigation, route }) {
         return;
       }
 
+      if (payload?.type === 'preview') {
+        setMessagesWithStorage((prev) => prev.map((msg) => (
+          String(msg.messageId || '') === mid || msg.id === processingMessageId
+            ? applyInstantProgress(msg, { preview: payload.preview })
+            : msg
+        )));
+        return;
+      }
+
       if (payload?.type === 'content_delta') {
-        // Hold the fast socket payload. Instant UI reveals the completed
-        // answer in typing-sized pieces from the status-complete path.
+        const content = String(payload.content || '');
+        if (!content.trim()) return;
+        instantStreamContentRef.current.add(mid);
+        setMessagesWithStorage((prev) => prev.map((msg) => (
+          String(msg.messageId || '') === mid || msg.id === processingMessageId
+            ? applyInstantProgress(msg, {
+                content,
+                replace: Boolean(payload.replace),
+              })
+            : msg
+        )));
+        setIsTyping(false);
+        if (stickMessagesToBottomRef.current) {
+          requestAnimationFrame(() => scrollToBottomReliably(false));
+        }
         return;
       }
 
@@ -4743,6 +4780,7 @@ export default function ChatScreen({ navigation, route }) {
       (processingMessageId ? messageTierByIdRef.current[processingMessageId] : '') ||
       '';
     const fallbackTier = String(processingMessage?.chatTier || rememberedTier || '').trim().toLowerCase();
+    const statusPollIntervalMs = fallbackTier === 'instant' ? 350 : 1500;
     const expectedWaitSeconds = Number(processingMessage?.expectedWaitSeconds) > 0
       ? Number(processingMessage.expectedWaitSeconds)
       : fallbackTier === 'premium'
@@ -4852,6 +4890,7 @@ export default function ChatScreen({ navigation, route }) {
                   ? {
                       ...msg,
                       content: paceContent ? (msg.content || '') : finalContent,
+                      instantPreview: mergeChartContext(msg.instantPreview, status.instant_preview),
                       isTyping: paceContent,
                       instantStreaming: false,
                       terms: status.terms || [],
@@ -4961,6 +5000,12 @@ export default function ChatScreen({ navigation, route }) {
             content: status.content,
           });
           const revealKey = String(messageId || '');
+          if (isInstantTierResponse && instantStreamContentRef.current.has(revealKey)) {
+            instantStreamContentRef.current.delete(revealKey);
+            showFinalMessage();
+            finishPoll();
+            return;
+          }
           if (paceReply && !instantRevealActiveRef.current.has(revealKey)) {
             showFinalMessage({ paceContent: true });
             revealInstantReply(
@@ -4997,9 +5042,10 @@ export default function ChatScreen({ navigation, route }) {
         }
 
         if (status.status === 'failed') {
+          instantStreamContentRef.current.delete(String(messageId));
           setMessagesWithStorage(prev => prev.map(msg =>
             msg.messageId === messageId
-              ? { ...msg, content: status.error_message || 'Analysis failed. Please try again.', isTyping: false }
+              ? { ...msg, content: status.error_message || 'Analysis failed. Please try again.', isTyping: false, instantStreaming: false }
               : msg
           ));
           setLoading(false);
@@ -5033,7 +5079,17 @@ export default function ChatScreen({ navigation, route }) {
                 ''
               ).trim().toLowerCase();
               if (messageTier === 'instant') {
-                return msg;
+                const partialContent = String(status.partial_content || '');
+                const progressed = applyInstantProgress(msg, {
+                  partial_content: partialContent,
+                  preview: status.instant_preview,
+                  replace: true,
+                });
+                if (partialContent.trim()) {
+                  instantStreamContentRef.current.add(String(messageId));
+                }
+                if (progressed !== msg) changed = true;
+                return progressed;
               }
 
               const nextMessageId = msg.messageId || messageId;
@@ -5093,6 +5149,9 @@ export default function ChatScreen({ navigation, route }) {
             });
             return changed ? next : prev;
           });
+          if (String(status.partial_content || '').trim() && fallbackTier === 'instant') {
+            setIsTyping(false);
+          }
           if (shouldScrollForContentGrowth) {
             setTimeout(() => {
               maybeScrollMessagesToEnd(false);
@@ -5102,12 +5161,12 @@ export default function ChatScreen({ navigation, route }) {
           pollCount++;
           if (shouldKeepPolling()) {
             // Use InteractionManager to ensure polling isn't blocked by UI updates
-            const nextPollTime = new Date(Date.now() + 1500).toISOString();
+            const nextPollTime = new Date(Date.now() + statusPollIntervalMs).toISOString();
             console.log(`⏰ [POLL SCHEDULE] Next poll for messageId: ${messageId} scheduled at: ${nextPollTime}`);
             setTimeout(() => {
               if (!isPollActive()) return;
               poll();
-            }, 1500);
+            }, statusPollIntervalMs);
           } else {
             // console.log(`⏰ [POLL TIMEOUT] messageId: ${messageId} exceeded wait budget (${countdownBudgetSeconds}s + ${graceSeconds}s)`);
             // Timeout - show restart option
@@ -5117,6 +5176,7 @@ export default function ChatScreen({ navigation, route }) {
                     ...msg,
                     content: 'Analysis is taking longer than expected. The system is still working on your request.',
                     isTyping: false,
+                    instantStreaming: false,
                     showRestartButton: true
                   }
                 : msg
@@ -5165,6 +5225,7 @@ export default function ChatScreen({ navigation, route }) {
                     ...msg,
                     content: 'Analysis is taking longer than expected. The system is still working on your request.',
                     isTyping: false,
+                    instantStreaming: false,
                     showRestartButton: true
                   }
                 : msg
@@ -5522,6 +5583,7 @@ export default function ChatScreen({ navigation, route }) {
                     messageId: assistantMessageId,
                     content: result.content || '',
                     isTyping: false,
+                    instantStreaming: false,
                     chatTier: serverTier || msg.chatTier,
                     threadMode: serverTier || msg.threadMode || msg.chatTier,
                     message_type: result.message_type,
@@ -5816,46 +5878,33 @@ export default function ChatScreen({ navigation, route }) {
   ];
 
   const renderInstantTypingIndicator = () => {
-    const isDark = theme === 'dark';
     const lineIndex = Math.min(
       Math.max(instantLoaderWordCount - 1, 0),
       INSTANT_LOADER_LINES.length - 1,
     );
-    const typedLines = [{
-      key: INSTANT_LOADER_LINES[lineIndex],
-      text: t(INSTANT_LOADER_LINES[lineIndex], INSTANT_LOADER_FALLBACKS[lineIndex]),
-      isComplete: true,
-    }];
+    const currentLine = t(
+      INSTANT_LOADER_LINES[lineIndex],
+      INSTANT_LOADER_FALLBACKS[lineIndex],
+    );
     const isTakingLonger = instantLoaderWordCount >= INSTANT_LOADER_MAX_WORDS;
+
     return (
       <View
-        style={[
-          styles.instantTypingBubble,
-          {
-            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(249, 115, 22, 0.10)',
-            borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(249, 115, 22, 0.18)',
-          },
-        ]}
+        style={[styles.instantTypingBubble, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={currentLine}
       >
-        {typedLines.map((line, index) => {
-          return (
-            <Text
-              key={line.key}
-              style={[
-                styles.instantTypingLabel,
-                index > 0 && styles.instantTypingLabelSpaced,
-                { color: colors.text },
-              ]}
-            >
-              {line.text}
-            </Text>
-          );
-        })}
+        <View style={styles.instantTypingMainRow}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={[styles.instantTypingLabel, { color: colors.text }]}>{currentLine}</Text>
+        </View>
         {isTakingLonger ? (
           <View style={styles.instantTakingLongerRow}>
-            <ActivityIndicator size="small" color={colors.primary} />
             <Text style={[styles.instantTakingLongerText, { color: colors.textSecondary }]}>
-              {t('chat.instantLoader.takingLonger', 'This is taking a little longer. I am still working on your answer...')}
+              {t(
+                'chat.instantLoader.takingLonger',
+                'This is taking a little longer. I am still working on your answer...',
+              )}
             </Text>
           </View>
         ) : null}
@@ -5943,6 +5992,7 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const sendMessage = async (messageText = inputText, sendOptions = {}) => {
+    const instantStartedAt = Date.now();
     const pendingFomoContext =
       pendingFomoQueryContextRef.current &&
       typeof pendingFomoQueryContextRef.current === 'object'
@@ -6129,7 +6179,14 @@ export default function ChatScreen({ navigation, route }) {
       failedQuestion: messageText,
       subjectGateOverride,
       expectedFreeQuestion: useFreeQuestion,
+      contextChartKey: chatPersonStorageKey(birthData),
+      instantStartedAt,
     };
+    if (outgoingTier === 'instant') {
+      Object.assign(processingMessage, applyInstantProgress(processingMessage, {
+        preview: buildImmediateChartPreview(chartData, t('chat.calculatedContext', 'Selected chart · Calculated')),
+      }));
+    }
     rememberMessageTier(processingMessageId, outgoingTier);
 
     setMessagesWithStorage(prev => {
@@ -10235,7 +10292,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     maxWidth: '82%',
   },
+  instantTypingMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   instantTypingLabel: {
+    flexShrink: 1,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '500',

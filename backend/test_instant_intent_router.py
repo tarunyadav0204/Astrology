@@ -4,6 +4,8 @@ import os
 import sys
 import types
 
+import pytest
+
 _BACKEND = os.path.dirname(os.path.abspath(__file__))
 if _BACKEND not in sys.path:
     sys.path.insert(0, _BACKEND)
@@ -263,10 +265,14 @@ class _TimeoutThenSuccessRouter(_TestRouter):
         return await super()._generate_instant_content(prompt, model_name, timeout_s)
 
 
-def test_instant_intent_model_uses_admin_selected_instant_model(monkeypatch):
-    monkeypatch.setattr(intent_router_module, "get_instant_chat_model", lambda: "deepseek-chat")
+def test_instant_intent_model_defaults_to_dedicated_gemini_router(monkeypatch):
+    monkeypatch.setattr(
+        intent_router_module,
+        "get_instant_chat_llm_provider",
+        lambda: intent_router_module.CHAT_LLM_GEMINI,
+    )
     router = IntentRouter.__new__(IntentRouter)
-    assert router._get_instant_model_name() == "deepseek-chat"
+    assert router._get_instant_model_name() == "models/gemini-3.1-flash-lite"
 
 
 def test_instant_intent_generation_uses_deepseek_when_selected(monkeypatch):
@@ -307,7 +313,7 @@ def test_instant_intent_generation_uses_deepseek_when_selected(monkeypatch):
     assert request_args["extra_body"] == {"thinking": {"type": "disabled"}}
 
 
-def test_instant_router_retries_builtin_timeout_with_empty_message(monkeypatch):
+def test_semantic_v2_does_not_repeat_a_timed_out_request(monkeypatch):
     payload = _with_dialogue_state(
         {
             "status": "READY",
@@ -323,17 +329,181 @@ def test_instant_router_retries_builtin_timeout_with_empty_message(monkeypatch):
     router = _TimeoutThenSuccessRouter(payload)
     monkeypatch.setattr(intent_router_module.asyncio, "sleep", lambda *_: _async_noop())
 
+    with pytest.raises(TimeoutError):
+        asyncio.run(
+            router.classify_instant_intent(
+                "How is my career overall?",
+                [],
+                language="english",
+            )
+        )
+
+    assert router.attempts == 1
+
+
+def test_legacy_router_can_retry_a_builtin_timeout(monkeypatch):
+    payload = _with_dialogue_state(
+        {
+            "status": "READY",
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "answer_mode": "topic_reading",
+            "extracted_context": {},
+            "context_type": "birth",
+            "category": "career",
+            "needs_transits": False,
+            "divisional_charts": ["D1", "D10"],
+        }
+    )
+    router = _TimeoutThenSuccessRouter(payload)
+    monkeypatch.setenv("INSTANT_INTENT_ROUTER_SEMANTIC_V2", "0")
+    monkeypatch.setattr(intent_router_module.asyncio, "sleep", lambda *_: _async_noop())
+
+    result = asyncio.run(
+        router.classify_instant_intent("How is my career overall?", [], language="english")
+    )
+
+    assert router.attempts == 2
+    assert result["status"] == "READY"
+
+
+def test_semantic_v2_compiles_multilingual_llm_frame_without_text_routing(monkeypatch):
+    payload = _with_dialogue_state(
+        {
+            "status": "READY",
+            "route_action": "answer",
+            "turn_relation": "new_request",
+            "response_language": "hindi",
+            "response_script": "deva",
+            "mode": "LIFESPAN_EVENT_TIMING",
+            "answer_mode": "event_prediction",
+            "category": "career",
+            "career_subtype": "promotion",
+            "target_subject_key": "self",
+            "target_subject_keys": ["self"],
+            "semantic_timeframe": {"kind": "open_future"},
+            "temporal_intent": {
+                "event_state": "not_started",
+                "expected_cadence": "months_to_year",
+                "process_scale": "life_event",
+                "explicit_timeframe": False,
+                "reason": "",
+            },
+            "question_parts": [
+                {
+                    "part_id": "p1",
+                    "life_domain": "career",
+                    "event_profile": "promotion",
+                    "subject": "self",
+                    "timeframe": {"kind": "open_future"},
+                    "confidence": "high",
+                }
+            ],
+            "extracted_context": {},
+        }
+    )
+    router = _TestRouter(payload)
+
     result = asyncio.run(
         router.classify_instant_intent(
-            "How is my career overall?",
+            "मेरी पदोन्नति कब होगी?",
             [],
             language="english",
         )
     )
 
-    assert router.attempts == 2
-    assert result["status"] == "READY"
-    assert result["category"] == "career"
+    assert result["planning_source"] == "deterministic_v1"
+    assert result["response_language"] == "hindi"
+    assert result["career_subtype"] == "promotion"
+    assert result["needs_transits"] is True
+    assert "D10" in result["divisional_charts"]
+    assert [
+        row["kind"] for row in result["evidence_plan"]["evidence_needs"]
+    ] == [
+        "natal_topic_foundation",
+        "future_dasha_event_windows",
+        "transit_event_windows",
+    ]
+    sent_prompt = router._fake_model.prompts[0]
+    assert "मेरी पदोन्नति कब होगी?" in sent_prompt
+    assert '"needs_transits"' not in sent_prompt
+    assert '"divisional_charts"' not in sent_prompt
+    assert '"evidence_plan"' not in sent_prompt
+
+
+def test_compound_plan_structurally_forces_clarification_without_calculation():
+    router = IntentRouter.__new__(IntentRouter)
+    result = router._finalize_instant_router_result(
+        {
+            "status": "READY",
+            "route_action": "answer",
+            "mode": "COMPOUND_PLAN",
+            "answer_mode": "compound_plan",
+            "category": "career",
+            "career_subtype": "career_fit",
+            "marriage_subtype": "general",
+            "clarification_question": "¿Cuál pregunta quieres responder primero?",
+            "clarification_choices": [
+                {"label": "Matrimonio", "submit_text": "¿Cuándo me casaré?"},
+                {"label": "Carrera", "submit_text": "¿Qué carrera me conviene más?"},
+            ],
+        },
+        current_year=2026,
+        normalized_query_context=None,
+    )
+
+    assert result["status"] == "CLARIFY"
+    assert result["route_action"] == "clarify"
+    assert result["mode"] == "ANALYZE_TOPIC_POTENTIAL"
+    assert result["category"] == "general"
+    assert result["needs_transits"] is False
+    assert result["divisional_charts"] == []
+    assert "career_subtype" not in result
+    assert "marriage_subtype" not in result
+    assert len(result["clarification_choices"]) == 2
+
+
+def test_missing_multilingual_clarification_is_repaired_by_llm():
+    invalid = _with_dialogue_state(
+        {
+            "status": "READY",
+            "route_action": "answer",
+            "mode": "COMPOUND_PLAN",
+            "answer_mode": "compound_plan",
+            "category": "general",
+            "response_language": "spanish",
+            "response_script": "latn",
+        }
+    )
+    repaired = _with_dialogue_state(
+        {
+            "status": "CLARIFY",
+            "route_action": "clarify",
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "answer_mode": "compound_plan",
+            "category": "general",
+            "response_language": "spanish",
+            "response_script": "latn",
+            "clarification_question": "¿Cuál pregunta quieres responder primero?",
+            "clarification_choices": [
+                {"label": "Matrimonio", "submit_text": "¿Cuándo me casaré?"},
+                {"label": "Carrera", "submit_text": "¿Qué carrera me conviene más?"},
+            ],
+        }
+    )
+    router = _TestRouter([invalid, repaired])
+
+    result = asyncio.run(
+        router.classify_instant_intent(
+            "¿Cuándo me casaré y qué carrera me conviene más?",
+            [],
+            language="english",
+        )
+    )
+
+    assert len(router._fake_model.prompts) == 2
+    assert result["status"] == "CLARIFY"
+    assert result["clarification_question"].startswith("¿Cuál")
+    assert len(result["clarification_choices"]) == 2
 
 
 async def _async_noop():

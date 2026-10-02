@@ -41,54 +41,51 @@ export function buildInstantTypingLines(wordCount) {
 /** Pause after the server answer arrives, so the first sentence does not pop in instantly. */
 export const INSTANT_REPLY_FIRST_PIECE_MS = 0;
 
-export function shouldPaceInstantAnswer({ chatTier, messageType, content } = {}) {
-    const tier = String(chatTier || '').toLowerCase();
-    const mt = String(messageType || 'answer').toLowerCase();
-    if (tier !== 'instant') return false;
-    if (mt === 'clarification' || mt === 'native_gate') return false;
-    return String(content || '').trim().length > 0;
+export function shouldPaceInstantAnswer({ chatTier, messageType } = {}) {
+    if (String(chatTier || '').toLowerCase() !== 'instant') return false;
+    const type = String(messageType || 'answer').toLowerCase();
+    return type !== 'clarification' && type !== 'native_gate';
 }
 
-/** Split a completed instant answer into readable conversational beats. */
-export function splitInstantReply(content, maxPieceLength = 95) {
+/** Reveal a completed instant answer a paragraph, or a few lines, at a time. */
+export function splitInstantReply(content) {
     const normalized = String(content || '').replace(/\r\n/g, '\n').trim();
     if (!normalized) return [];
 
-    const sentences = normalized
-        .split(/\n{2,}/u)
-        .flatMap((paragraph) => paragraph.match(/[^.!?।！？]+(?:[.!?।！？]+|$)/gu) || [paragraph])
-        .map((part) => part.trim())
-        .filter(Boolean);
-    const pieces = [];
+    const paragraphs = normalized.split(/\n{2,}/u).map((part) => part.trim()).filter(Boolean);
+    if (paragraphs.length > 1) return paragraphs;
 
+    const lines = normalized.split('\n').map((line) => line.trim()).filter(Boolean);
+    if (lines.length > 2) {
+        const pieces = [];
+        for (let index = 0; index < lines.length; index += 3) {
+            pieces.push(lines.slice(index, index + 3).join('\n'));
+        }
+        return pieces;
+    }
+
+    const sentences = normalized.match(/[^.!?।！？]+(?:[.!?।！？]+|$)/gu) || [normalized];
+    const pieces = [];
+    let buffer = '';
+    let count = 0;
     sentences.forEach((sentence) => {
-        if (sentence.length <= maxPieceLength) {
-            pieces.push(sentence);
+        const next = sentence.trim();
+        if (!next) return;
+        const candidate = buffer ? `${buffer} ${next}` : next;
+        if (buffer && (count >= 2 || candidate.length > 420)) {
+            pieces.push(buffer);
+            buffer = next;
+            count = 1;
             return;
         }
-        const clauses = (sentence.match(/[^,;:]+(?:[,;:]|$)/gu) || [sentence])
-            .map((part) => part.trim())
-            .filter(Boolean);
-        let buffer = '';
-        clauses.forEach((clause) => {
-            const candidate = buffer ? `${buffer} ${clause}` : clause;
-            if (buffer && candidate.length > maxPieceLength) {
-                pieces.push(buffer);
-                buffer = clause;
-            } else {
-                buffer = candidate;
-            }
-        });
-        if (buffer) pieces.push(buffer);
+        buffer = candidate;
+        count += 1;
     });
-
+    if (buffer) pieces.push(buffer);
     return pieces.length ? pieces : [normalized];
 }
 
 export function getInstantReplyPieceDelay(piece) {
     const length = String(piece || '').length;
-    // Keep the conversational one-piece-at-a-time effect without making a
-    // completed answer feel artificially slow. Typical lines now advance in
-    // roughly 0.6–1.1 seconds instead of 1.4–2.7 seconds.
-    return Math.max(550, Math.min(1100, 360 + length * 8));
+    return Math.max(1700, Math.min(3400, 1100 + length * 8));
 }

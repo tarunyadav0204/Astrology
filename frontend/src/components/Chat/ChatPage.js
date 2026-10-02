@@ -1,3 +1,4 @@
+import { applyInstantProgress, buildImmediateChartPreview, mergeChartContext } from '../../utils/instantProgress';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import MessageList from './MessageList';
@@ -1705,6 +1706,7 @@ const ChatPage = ({ onLogin }) => {
                                     ? {
                                         ...m,
                                         ...completedFields,
+                                        instantPreview: mergeChartContext(m.instantPreview, status.instant_preview),
                                         content: visibleContent,
                                         isProcessing: false,
                                         isTyping: false,
@@ -1747,6 +1749,7 @@ const ChatPage = ({ onLogin }) => {
                                     content: status.error_message || 'Analysis failed. Please try again.',
                                     isProcessing: false,
                                     isTyping: false,
+                                    instantStreaming: false,
                                     showRestartButton: true,
                                 }
                                 : m
@@ -1762,7 +1765,15 @@ const ChatPage = ({ onLogin }) => {
                         prev.map((m) => {
                             if (m.processingClientId !== processingClientId) return m;
                             if (String(m.chatTier || '').toLowerCase() === 'instant') {
-                                return { ...m, isProcessing: true, isTyping: true };
+                                // Polling still reports `processing` until the first
+                                // real answer arrives. Preserve the visible wait state;
+                                // calculated preview metadata must not dismiss it.
+                                return {
+                                    ...m,
+                                    isProcessing: true,
+                                    isTyping: true,
+                                    instantStreaming: false,
+                                };
                             }
                             if (Array.isArray(loadingList) && loadingList.length > 0) {
                                 const next = loadingList[Math.floor(Math.random() * loadingList.length)];
@@ -1795,6 +1806,7 @@ const ChatPage = ({ onLogin }) => {
                                         content: 'Analysis is taking longer than expected. Please try again later.',
                                         isProcessing: false,
                                         isTyping: false,
+                                        instantStreaming: false,
                                         showRestartButton: true,
                                     }
                                     : m
@@ -1874,9 +1886,8 @@ const ChatPage = ({ onLogin }) => {
             } catch (_) {
                 return;
             }
-            if (payload.type === 'content_delta') {
-                // Hold the fast socket payload. Instant UI reveals the completed
-                // answer in typing-sized pieces from the completion path.
+            if (payload.type === 'content_delta' || payload.type === 'preview') {
+                // Chart facts stay out of the reply. The answer is paced in after it is complete.
                 return;
             }
             if (payload.type === 'completed') {
@@ -1910,13 +1921,6 @@ const ChatPage = ({ onLogin }) => {
     const handleSendMessageChatV2 = async (message, options = {}) => {
         if (!birthData) return;
 
-        let currentSessionId = options?.instant_chat_session_id || chatV2SessionId;
-        if (!currentSessionId) {
-            currentSessionId = await createChatV2Session();
-            if (!currentSessionId) return;
-            setChatV2SessionId(currentSessionId);
-        }
-
         const userMessageId = Date.now();
         setMessages(prev => [
             ...prev,
@@ -1924,21 +1928,7 @@ const ChatPage = ({ onLogin }) => {
         ]);
         setIsLoading(true);
 
-        let chartDataForMessage = personalChartData;
-        if (!chartDataForMessage) {
-            try {
-                const calcNorm = normalizeBirthDetailsForChat(birthData);
-                if (calcNorm && Number.isFinite(calcNorm.latitude) && Number.isFinite(calcNorm.longitude)) {
-                    chartDataForMessage = await apiService.calculateChartOnly({
-                        ...birthData,
-                        ...calcNorm,
-                    });
-                    setPersonalChartData(chartDataForMessage);
-                }
-            } catch (e) {
-                console.warn('[ChatPage] Could not calculate chart for processing bubble:', e);
-            }
-        }
+        const chartDataForMessage = personalChartData;
 
         const processingClientId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const useFreeQuestion = !isPartnershipMode && !isMundaneMode && freeQuestionAvailable;
@@ -1968,7 +1958,36 @@ const ChatPage = ({ onLogin }) => {
             autoSpeakReply: false,
         };
 
+        if (useInstantChat) {
+            Object.assign(processingMessage, applyInstantProgress(processingMessage, {
+                preview: buildImmediateChartPreview(chartDataForMessage),
+            }));
+        }
         setMessages(prev => [...prev, processingMessage]);
+
+        // Cold chart preparation runs alongside the request, never before the
+        // user's message/processing row has appeared.
+        if (!chartDataForMessage) {
+            const normalized = normalizeBirthDetailsForChat(birthData);
+            if (normalized) apiService.calculateChartOnly({ ...birthData, ...normalized }).then(chart => {
+                const preview = buildImmediateChartPreview(chart);
+                if (preview) setMessages(prev => prev.map(m => m.processingClientId === processingClientId
+                    ? (useInstantChat ? applyInstantProgress(m, { preview }) : { ...m, chartData: chart }) : m));
+            }).catch(() => {});
+        }
+        let currentSessionId = options?.instant_chat_session_id || chatV2SessionId;
+        if (!currentSessionId) {
+            currentSessionId = await createChatV2Session();
+            if (!currentSessionId) {
+                setIsLoading(false);
+                setMessages(prev => prev.map(m => m.processingClientId === processingClientId
+                    ? { ...m, content: 'Could not start chat. Please try again.', isTyping: false, isProcessing: false, instantStreaming: false }
+                    : m));
+                return;
+            }
+            setChatV2SessionId(currentSessionId);
+        }
+
 
         const token = localStorage.getItem('token');
         const partnershipBirth = isPartnershipMode && wizardPrimaryChart ? wizardPrimaryChart : birthData;

@@ -20358,6 +20358,7 @@ async def generate_instant_chat_response(
     speech_mode: bool = False,
     response_style: str = "simple",
     stream_callback: Optional[Callable[[str, str], None]] = None,
+    preview_callback: Optional[Callable[[Dict[str, Any]], bool]] = None,
 ) -> Dict[str, Any]:
     intent = apply_timeline_intent_guard(intent)
     # Some Wealth subtypes are more specific than the broad Wealth category.
@@ -20543,6 +20544,18 @@ async def generate_instant_chat_response(
             instant_v2_packet_error = f"{type(exc).__name__}: {exc}"
             logger.exception("instant_v2_packet_build_failed")
     _finish_local_stage("calculations_and_evidence", calculations_started)
+    instant_preview = None
+    if preview_callback is not None and not speech_mode and _env_flag("INSTANT_CHAT_PREVIEW_ENABLED", True):
+        # No additional inference call. Only publish after routing and graph
+        # adjudication; failure to checkpoint must never affect the answer.
+        try:
+            from instant_chat_v2.preview import build_instant_preview
+            candidate = build_instant_preview(instant_v2_packet, intent)
+            if candidate and preview_callback(candidate):
+                instant_preview = candidate
+                stage_timings_ms["first_preview"] = round((time.perf_counter() - pipeline_started) * 1000, 1)
+        except Exception:
+            logger.warning("instant preview unavailable", exc_info=True)
     prompt_context = instant_context
     if instant_v2_packet:
         prompt_context = _build_instant_composer_context(instant_context, instant_v2_packet)
@@ -21966,6 +21979,7 @@ REJECTED ANSWER:
     return {
         "success": True,
         "response": response_content,
+        "instant_preview": instant_preview,
         "prediction_anchor_meta": prediction_anchor_meta,
         "event_timing_verdict": event_timing_verdict,
         "suppress_remedy_cta": suppress_remedy_cta,

@@ -19,6 +19,7 @@ import PodcastLanguageModal from './PodcastLanguageModal';
 import PodcastGenerationExperience from './PodcastGenerationExperience';
 import { buildInstantTypingLines, INSTANT_LOADER_TAKING_LONGER } from '../../constants/instantChatLoader';
 import { buildReadableEvidence, buildRoutingSummary } from '../../utils/instantEvidence';
+import { autoWrapGlossaryTermsInHtml, buildGlossaryTooltipHtml } from '../../utils/chatGlossary';
 
 const premiumPodcastReadyKeys = new Set();
 const PODCAST_READY_TOAST = 'Podcast ready — tap to listen';
@@ -1566,28 +1567,16 @@ const MessageBubble = ({
                 const resolved = getGlossaryDefinition(glossary, termId);
                 if (resolved && resolved.definition != null && String(resolved.definition).trim() !== '') {
                     termCount++;
-                    const defEsc = String(resolved.definition).replace(/"/g, '&quot;');
-                    const dataKey = resolved.key.replace(/"/g, '&quot;');
-                    return `<span class="tooltip-wrapper" data-term="${dataKey}" data-definition="${defEsc}" style="color: #e91e63; font-weight: bold; cursor: pointer; border-bottom: 1px dotted #e91e63;"><span class="term-tooltip">${termText}</span></span>`;
+                    return buildGlossaryTooltipHtml(termText, resolved.key, resolved.definition);
                 }
                 return termText;
             });
 
             // Auto-wrap plain-text mentions when the model did not emit <term> tags (longer phrases first)
             if (termCount === 0) {
-                const sortedKeys = Object.keys(glossary).sort((a, b) => b.length - a.length);
-                sortedKeys.forEach((termKey) => {
-                    const defRaw = glossary[termKey];
-                    if (defRaw == null || String(defRaw).trim() === '') return;
-                    const definition = String(defRaw).replace(/"/g, '&quot;');
-                    const dataKey = termKey.replace(/"/g, '&quot;');
-                    const escaped = termKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const termPattern = new RegExp(`\\b(${escaped})\\b`, 'gi');
-                    formatted = formatted.replace(termPattern, (match) => {
-                        termCount++;
-                        return `<span class="tooltip-wrapper" data-term="${dataKey}" data-definition="${definition}" style="color: #e91e63; font-weight: bold; cursor: pointer; border-bottom: 1px dotted #e91e63;"><span class="term-tooltip">${match}</span></span>`;
-                    });
-                });
+                const wrapped = autoWrapGlossaryTermsInHtml(formatted, glossary);
+                formatted = wrapped.html;
+                termCount += wrapped.count;
             }
         }
         
@@ -1702,12 +1691,12 @@ const MessageBubble = ({
         return (
             <div className={`message-bubble message-bubble--instant${isStructuredChoice ? ' message-bubble--timeline' : ''} ${message.role} ${message.isTyping || message.isProcessing ? 'typing' : ''}`}>
                 <div className="message-content message-content--instant">
-                    <div className="instant-chat-copy">
+                    <div className="instant-chat-copy" data-source="llm" dir="auto">
                         {(message.isTyping || message.isProcessing) && instantTypingState ? (
-                            <>
+                            <div aria-live="polite">
                                 <span className="instant-chat-thinking">Tara is thinking</span>
                                 <span className="instant-chat-dots" aria-label="Tara is typing"><i /><i /><i /></span>
-                            </>
+                            </div>
                         ) : (
                             paragraphs.map((paragraph, index) => <p key={`${index}-${paragraph.slice(0, 18)}`}>{paragraph}</p>)
                         )}

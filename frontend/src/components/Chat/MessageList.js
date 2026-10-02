@@ -5,7 +5,7 @@ import FeedbackComponent from './FeedbackComponent';
 /** Skip rows that would render only a timestamp (empty bubble body). */
 function messageRowShouldRender(message) {
     if (!message) return false;
-    if (message.isTyping || message.isProcessing) return true;
+    if (message.isTyping || message.isProcessing || message.instantPreview?.rows?.length) return true;
     const content = message.content != null ? String(message.content).trim() : '';
     const loading = message.loadingMessage != null ? String(message.loadingMessage).trim() : '';
     if (content || loading) return true;

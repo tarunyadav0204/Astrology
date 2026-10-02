@@ -136,3 +136,54 @@ def test_disabled_response_validation_streams_without_running_fact_validator(mon
     assert "Never emit text enclosed in double square brackets" in analyzer.prompts[0]
     enforcement = result["instant_evidence_debug"]["contract_enforcement"]
     assert enforcement["response_validation_enabled"] is False
+
+
+def test_chart_context_is_published_before_generation_and_never_added_to_answer(monkeypatch):
+    from instant_chat_v2.preview import build_instant_preview
+    events = []
+    packet = {
+        "query_plan": {"category": "career", "answer_mode": "timing_window", "target_subject": {"key": "self"},
+                       "time_scope": {"as_of": "2026-10-01"}},
+        "verdict": {"direction": "conditional"},
+        "answer_spec": {"max_words": 120},
+        "evidence_ledger": {"records": [{"kind": "current_dasha", "evidence_id": "ev-001", "value": {
+            "as_of": "2026-10-01", "levels": [{"level": "mahadasha", "planet": "Saturn"}]}}]},
+        "verification": {"passed": True},
+    }
+    intent = {"category": "career", "answer_mode": "timing_window", "target_subject_key": "self",
+              "response_language": "english", "response_script": "latn"}
+    preview = build_instant_preview(packet, intent)
+    assert preview
+
+    class Analyzer(_FakeAnalyzer):
+        async def generate_text_from_prompt(self, prompt, **kwargs):
+            events.append("generation")
+            assert events == ["preview", "generation"]
+            assert "ALREADY DISPLAYED CALCULATED OPENING" not in prompt
+            return await super().generate_text_from_prompt(prompt, **kwargs)
+
+    monkeypatch.setattr(pipeline, "_build_instant_context", lambda **kwargs: {
+        "birth_summary": {"name": "Test"}, "intent_summary": {"category": "career"}, "normalized_evidence": {},
+    })
+    monkeypatch.setattr(pipeline, "build_instant_v2_packet", lambda **kwargs: packet)
+    monkeypatch.setattr(pipeline, "apply_live_graph_policy", lambda current, **kwargs: current)
+    monkeypatch.setattr(pipeline, "finalize_instant_v2_packet", lambda current, **kwargs: current)
+    monkeypatch.setattr(pipeline, "get_instant_chat_llm_provider", lambda: "gemini")
+    monkeypatch.setattr(pipeline, "get_instant_chat_model", lambda: "models/test")
+    monkeypatch.setattr(pipeline, "is_instant_response_validation_enabled", lambda: False)
+
+    def publish(value):
+        assert value == preview
+        events.append("preview")
+        return True
+
+    analyzer = Analyzer()
+    result = asyncio.run(pipeline.generate_instant_chat_response(
+        analyzer, question="How is my career?", birth_data={"name": "Test"}, intent=intent,
+        history=[], preview_callback=publish,
+    ))
+    assert analyzer.generate_calls == 1
+    assert result["instant_preview"] == preview
+    assert result["response"].startswith("Your career improves")
+    assert preview["content"] not in result["response"]
+    assert "first_preview" in result["timing"]["instant_stage_timings_ms"]

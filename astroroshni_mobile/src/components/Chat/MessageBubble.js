@@ -280,7 +280,7 @@ function MessageBubble({
   // (that looked like the long answer bouncing between sections while reading).
   const entryIdForAnim = String(message?.messageId || message?.id || message?.clientRequestId || '');
   const entryAlreadyPlayed =
-    Boolean(entryIdForAnim) && messageBubbleEntryPlayedIds.has(entryIdForAnim);
+    message.instantStreaming || (Boolean(entryIdForAnim) && messageBubbleEntryPlayedIds.has(entryIdForAnim));
   const fadeAnim = useRef(new Animated.Value(entryAlreadyPlayed ? 1 : 0)).current;
   const slideAnim = useRef(new Animated.Value(entryAlreadyPlayed ? 0 : 50)).current;
   const isPartnership = partnership || message.partnership_mode;
@@ -462,7 +462,7 @@ function MessageBubble({
 
   useEffect(() => {
     const entryId = String(message?.messageId || message?.id || message?.clientRequestId || '');
-    if (entryId && messageBubbleEntryPlayedIds.has(entryId)) {
+    if (message.instantStreaming || (entryId && messageBubbleEntryPlayedIds.has(entryId))) {
       fadeAnim.setValue(1);
       slideAnim.setValue(0);
       return undefined;
@@ -1831,6 +1831,15 @@ function MessageBubble({
         : '';
 
   useEffect(() => {
+    if (!__DEV__ || !isInstantChatMessage || !message.instantStartedAt || !contentStr) return;
+    const frame = requestAnimationFrame(() => console.info('[InstantChatTiming]', JSON.stringify({
+      phase: 'answer-frame', elapsedMs: Date.now() - message.instantStartedAt,
+      characters: contentStr.length, streaming: Boolean(message.instantStreaming),
+    })));
+    return () => cancelAnimationFrame(frame);
+  }, [contentStr, isInstantChatMessage, message.instantStartedAt, message.instantStreaming]);
+
+  useEffect(() => {
     if (isInstantChatMessage) return;
     if (message.role !== 'assistant' || message.isTyping || message.isProcessing) return;
     if (isClarification || isNativeGate) return;
@@ -1989,7 +1998,8 @@ function MessageBubble({
     }, [canBlurFreeDetail, detailUnlocked, credits, refreshCredits, message.messageId, message.id]),
   );
 
-  // Loading rows use LoadingBubble (isTyping), not MessageBubble — skip empty assistant rows safely.
+  // Calculated context is visible before the first LLM token. Do not discard
+  // that message just because its answer is still empty.
   if (!contentStr.trim()) {
     return null;
   }
@@ -2001,8 +2011,8 @@ function MessageBubble({
     ? String(freeSplit.detail || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 280)
     : '';
 
-  const formattedContent = formatContent(displayContent);
-  const renderedElements = renderFormattedText(formattedContent);
+  const formattedContent = isInstantChatMessage ? '' : formatContent(displayContent);
+  const renderedElements = isInstantChatMessage ? [] : renderFormattedText(formattedContent);
 
   // Instant consultation is intentionally a conversation, not a report card.
   // Keep the payload readable but remove formatting chrome generated for the
@@ -2044,7 +2054,7 @@ function MessageBubble({
             },
           ]}
         >
-          <Text style={[styles.instantMessageText, { color: colors.text }]}>
+          <Text style={[styles.instantMessageText, { color: colors.text, writingDirection: message.responseDirection || 'auto' }]}>
             {instantPlainContent}
           </Text>
           {message.instantStreaming ? (

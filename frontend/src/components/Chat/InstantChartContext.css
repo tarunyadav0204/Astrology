@@ -1,0 +1,7 @@
+.instant-chart-context { margin-bottom: 14px; padding: 10px 12px; border-inline-start: 2px solid var(--color-brand, #dd9042); background: rgba(128,128,128,.06); border-radius: 6px; }
+.instant-chart-context-title { font-size: 11px; font-weight: 600; opacity: .7; margin-bottom: 7px; }
+.instant-chart-context-row { font-size: 13px; line-height: 1.65; animation: instant-context-arrive 160ms ease-out; }
+.instant-chart-context-date { display: block; margin-top: 4px; font-size: 10px; opacity: .6; }
+.instant-answer-label { font-size: 11px; opacity: .65; margin-bottom: 7px; }
+@keyframes instant-context-arrive { from { opacity: .3; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .instant-chart-context-row { animation: none; } }

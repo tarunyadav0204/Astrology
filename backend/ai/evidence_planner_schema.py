@@ -67,6 +67,7 @@ EVENT_PROFILES = {
     "appearance_glow_up",
     "property_purchase",
     "foreign_travel",
+    "visa",
     "relocation",
     "business_start",
     "debt_resolution",

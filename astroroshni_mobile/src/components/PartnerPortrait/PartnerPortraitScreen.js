@@ -5,7 +5,6 @@ import {
   Image,
   Linking,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
@@ -103,6 +103,7 @@ export default function PartnerPortraitScreen({ navigation }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { credits, pricing, fetchBalance, fetchPricing } = useCredits();
   const [birthData, setBirthData] = useState(null);
   const [direction, setDirection] = useState(null);
@@ -523,27 +524,41 @@ export default function PartnerPortraitScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cardBorder }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-          <Ionicons name="arrow-back" size={23} color={colors.textInverse} />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.textInverse }]}>{copy('title', 'Partner Portrait')}</Text>
-          <NativeSelectorChip
-            birthData={birthData}
-            onPress={() => navigation.navigate('SelectNative', { returnTo: 'PartnerPortrait' })}
-            showIcon={false}
-            style={styles.nativeChip}
-            textStyle={{ color: colors.textInverseMuted }}
-          />
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={{ backgroundColor: colors.headerSurface }}>
+        <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cardBorder }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+            <Ionicons name="arrow-back" size={23} color={colors.textInverse} />
+          </TouchableOpacity>
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: colors.textInverse }]}>{copy('title', 'Partner Portrait')}</Text>
+            <NativeSelectorChip
+              birthData={birthData}
+              onPress={() => navigation.navigate('SelectNative', { returnTo: 'PartnerPortrait' })}
+              showIcon={false}
+              style={styles.nativeChip}
+              textStyle={{ color: colors.textInverseMuted }}
+            />
+          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('Credits')} style={styles.creditChip}>
+            <Text style={[styles.creditText, { color: colors.textInverse }]}>✦ {credits}</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('Credits')} style={styles.creditChip}>
-          <Text style={[styles.creditText, { color: colors.textInverse }]}>✦ {credits}</Text>
-        </TouchableOpacity>
-      </View>
+      </SafeAreaView>
 
-      <ScrollView contentContainerStyle={[styles.content, wide && styles.contentWide]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ backgroundColor: colors.background }}
+        contentContainerStyle={[
+          styles.content,
+          wide && styles.contentWide,
+          {
+            paddingLeft: (wide ? 28 : 16) + insets.left,
+            paddingRight: (wide ? 28 : 16) + insets.right,
+            paddingBottom: Math.max(44, insets.bottom + 28),
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {status === 'completed' ? (
           <>
             <Text style={[styles.resultEyebrow, { color: colors.primary }]}>{copy('resultEyebrow', 'YOUR KUNDALI, BROUGHT TO LIFE')}</Text>
@@ -1060,7 +1075,7 @@ export default function PartnerPortraitScreen({ navigation }) {
         portraitUrl={portraitAsset?.url}
         traits={shareTraits}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

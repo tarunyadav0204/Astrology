@@ -3,6 +3,9 @@ Chat History API Routes
 """
 from __future__ import annotations
 
+from instant_chat_v2.preview import read_instant_preview
+from utils.response_transport import visible_instant_stream_text
+
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query, Header, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from datetime import datetime, timedelta
@@ -770,6 +773,7 @@ async def stream_message_status(websocket: WebSocket, message_id: int):
         return
 
     last_content = ""
+    last_preview = None
     last_heartbeat = time.monotonic()
     started = time.monotonic()
     try:
@@ -779,7 +783,7 @@ async def stream_message_status(websocket: WebSocket, message_id: int):
                 cur = execute(
                     conn,
                     """
-                        SELECT cm.status, cm.content, cm.error_message, cs.user_id
+                        SELECT cm.status, cm.content, cm.error_message, cs.user_id, cm.engagement_updates
                         FROM chat_messages cm
                         JOIN chat_sessions cs ON cs.session_id = cm.session_id
                         WHERE cm.message_id = %s
@@ -791,12 +795,16 @@ async def stream_message_status(websocket: WebSocket, message_id: int):
                 await websocket.send_json({"type": "error", "error": "Message not found"})
                 await websocket.close(code=4404)
                 return
-            status, content, error_message, owner_user_id = row
+            status, content, error_message, owner_user_id, preview_updates = row
             if int(owner_user_id) != int(current_user.userid):
                 await websocket.send_json({"type": "error", "error": "Access denied"})
                 await websocket.close(code=4403)
                 return
 
+            preview = read_instant_preview(preview_updates)
+            if status == "processing" and preview and preview != last_preview:
+                await websocket.send_json({"type": "preview", "message_id": message_id, "preview": preview})
+                last_preview = preview
             current_content = str(content or "")
             if current_content != last_content:
                 is_append = current_content.startswith(last_content)
@@ -2942,7 +2950,8 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
             task_enqueued_at,
         )
         
-        response = {"status": status, "message_type": message_type or "answer"}
+        response = {"status": status, "message_type": message_type or "answer",
+                    "instant_preview": read_instant_preview(engagement_updates)}
         wait_side_payload = None
         with get_conn() as conn:
             wait_side_payload = _fetch_wait_side_payload(conn, message_id)
@@ -4613,7 +4622,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
         if is_instant_chat:
             llm_start = time.time()
-            instant_stream_state = {"last_flush": 0.0, "last_text": ""}
+            instant_stream_state = {"last_flush": 0.0, "last_text": "", "preview": None}
             try:
                 stream_reveal_interval = max(
                     0.05,
@@ -4629,13 +4638,30 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             except (TypeError, ValueError):
                 stream_reveal_chars = 44
 
+            def _persist_instant_preview(preview: Dict[str, Any]) -> bool:
+                # Separate from content: a preview alone is not a recovered or
+                # billable answer when generation fails. The existing durable
+                # wait-update column supports polling/reconnect across workers.
+                with get_conn() as preview_conn:
+                    cur = execute(
+                        preview_conn,
+                        "UPDATE chat_messages SET engagement_updates = %s WHERE message_id = %s AND status = %s",
+                        (json.dumps([preview], ensure_ascii=False), message_id, "processing"),
+                    )
+                    preview_conn.commit()
+                    if cur.rowcount != 1:
+                        return False
+                instant_stream_state["preview"] = preview
+                _chat_log_event("instant_preview_ready", message_id=message_id, language=preview["language"])
+                return True
+
             def _persist_instant_stream_delta(_delta: str, full_text: str) -> None:
                 """Checkpoint visible provider text without finalizing or billing the turn."""
                 # Repair at the streaming boundary. Waiting for final response
                 # cleanup lets mojibake reach WebSocket clients and durable
                 # processing checkpoints first.
-                visible_text = sanitize_text(_repair_common_utf8_mojibake(full_text))
-                if not visible_text:
+                visible_text = visible_instant_stream_text(sanitize_text(_repair_common_utf8_mojibake(full_text)))
+                if not visible_text or visible_text == instant_stream_state["last_text"]:
                     return
                 # Provider adapters already publish appropriately sized live
                 # chunks.  Artificial sleeps here used to block DeepSeek's
@@ -4673,6 +4699,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 speech_mode=bool(is_speech_chat),
                 response_style=response_style,
                 stream_callback=_persist_instant_stream_delta,
+                preview_callback=_persist_instant_preview,
             )
             graph_fallback_error = result.get("graph_fallback_error")
             if isinstance(graph_fallback_error, dict) and graph_fallback_error:
@@ -4921,6 +4948,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             summary_image = result.get("summary_image")
                         except Exception:
                             logger.exception("locational_map_attach_on_save_failed message_id=%s", message_id)
+
+                    if is_instant_chat and result.get("instant_preview"):
+                        answer_gate_metadata = dict(answer_gate_metadata or {})
+                        answer_gate_metadata["instant_preview"] = result["instant_preview"]
 
                     if is_instant_chat and isinstance(result.get("instant_evidence_debug"), dict):
                         answer_gate_metadata = dict(answer_gate_metadata or {})
