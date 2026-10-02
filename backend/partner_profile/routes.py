@@ -61,6 +61,44 @@ def _job_exists(job_id: str, user_id: int) -> bool:
         return bool(cur.fetchone())
 
 
+def _require_admin(current_user: User) -> None:
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+
+def _asset_for_kind(assets_json: Any, kind: str) -> dict[str, Any]:
+    try:
+        assets = json.loads(assets_json) if isinstance(assets_json, str) else (assets_json or [])
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=404, detail="Partner Portrait asset not found") from exc
+    asset = next(
+        (item for item in assets if isinstance(item, dict) and item.get("kind") == kind),
+        None,
+    )
+    if not asset or not asset.get("stored_uri"):
+        raise HTTPException(status_code=404, detail="Partner Portrait asset not found")
+    return asset
+
+
+def _private_asset_response(job_id: str, kind: str, assets_json: Any) -> Response:
+    asset = _asset_for_kind(assets_json, kind)
+    try:
+        content, content_type, stored_name = PartnerPortraitStorage().read(asset["stored_uri"])
+    except (OSError, ValueError, TypeError) as exc:
+        logger.warning("Unable to read Partner Portrait asset job_id=%s kind=%s: %s", job_id, kind, exc)
+        raise HTTPException(status_code=404, detail="Partner Portrait asset not found") from exc
+    suffix = Path(stored_name).suffix or ".webp"
+    filename = f"astroroshni-partner-{kind.replace('_', '-')}{suffix}"
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "private, max-age=300",
+        },
+    )
+
+
 class GeneratePartnerPortraitRequest(BaseModel):
     birth_chart_id: int = Field(gt=0)
     # Accepted only so already-released clients keep working. The backend always
@@ -673,6 +711,109 @@ async def get_partner_portrait_history(current_user: User = Depends(get_current_
     return {"items": items}
 
 
+@router.get("/admin/job/{job_id}")
+async def get_partner_portrait_admin_job(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Show the paid result and source chart to an authenticated administrator."""
+    _require_admin(current_user)
+    init_partner_portrait_tables()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            """SELECT user_id,birth_chart_id,status,request_json,assets_json,error_message,
+                      credit_cost,charged_at,refunded_at,ruleset_version,created_at,started_at,completed_at
+               FROM partner_portrait_jobs WHERE job_id=%s""",
+            (job_id,),
+        )
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Partner Portrait job not found")
+
+    request_data: dict[str, Any] = {}
+    if row[3]:
+        try:
+            parsed_request = json.loads(row[3]) if isinstance(row[3], str) else row[3]
+            if isinstance(parsed_request, dict):
+                request_data = parsed_request
+        except (TypeError, ValueError, json.JSONDecodeError):
+            logger.warning("Invalid Partner Portrait request JSON job_id=%s", job_id)
+    try:
+        chart = _load_birth_data(int(row[0]), int(row[1]))
+    except ValueError:
+        chart = None
+    chart_matches_generated_version: bool | None = None
+    stored_fingerprint = str(request_data.get("chart_fingerprint") or "").strip()
+    if chart and stored_fingerprint:
+        chart_matches_generated_version = hmac.compare_digest(
+            stored_fingerprint,
+            _portrait_chart_fingerprint(chart),
+        )
+
+    asset_kinds: list[str] = []
+    if row[4]:
+        try:
+            parsed_assets = json.loads(row[4]) if isinstance(row[4], str) else row[4]
+            asset_kinds = [
+                item["kind"]
+                for item in (parsed_assets or [])
+                if isinstance(item, dict) and item.get("kind") in {"portrait", "full_body"} and item.get("stored_uri")
+            ]
+        except (TypeError, ValueError, json.JSONDecodeError):
+            logger.warning("Invalid Partner Portrait assets JSON job_id=%s", job_id)
+
+    return {
+        "job_id": job_id,
+        "user_id": int(row[0]),
+        "birth_chart_id": int(row[1]),
+        "status": row[2],
+        "error": row[5],
+        "credit_cost": row[6],
+        "charged_at": row[7],
+        "refunded_at": row[8],
+        "ruleset_version": row[9],
+        "created_at": row[10],
+        "started_at": row[11],
+        "completed_at": row[12],
+        "chart": chart,
+        "chart_matches_generated_version": chart_matches_generated_version,
+        "generation": {
+            key: request_data.get(key)
+            for key in ("presentation", "age_band", "visual_context", "country_name", "country_code", "clothing_style")
+            if request_data.get(key) is not None
+        },
+        "assets": [
+            {
+                "kind": kind,
+                "url": f"/api/partner-portrait/admin/job/{job_id}/asset/{kind}",
+            }
+            for kind in asset_kinds
+        ],
+    }
+
+
+@router.get("/admin/job/{job_id}/asset/{kind}")
+async def get_partner_portrait_admin_asset(
+    job_id: str,
+    kind: Literal["portrait", "full_body"],
+    current_user: User = Depends(get_current_user),
+):
+    """Stream a private generated image to an authenticated administrator."""
+    _require_admin(current_user)
+    init_partner_portrait_tables()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT status,assets_json FROM partner_portrait_jobs WHERE job_id=%s",
+            (job_id,),
+        )
+        row = cur.fetchone()
+    if not row or row[0] != "completed" or not row[1]:
+        raise HTTPException(status_code=404, detail="Partner Portrait asset not found")
+    return _private_asset_response(job_id, kind, row[1])
+
+
 @router.get("/asset/{job_id}/{kind}")
 async def get_partner_portrait_asset(
     job_id: str,
@@ -695,24 +836,4 @@ async def get_partner_portrait_asset(
         row = cur.fetchone()
     if not row or row[0] != "completed" or not row[1]:
         raise HTTPException(status_code=404, detail="Partner Portrait asset not found")
-    try:
-        assets = json.loads(row[1])
-        asset = next((item for item in assets if item.get("kind") == kind), None)
-        if not asset or not asset.get("stored_uri"):
-            raise HTTPException(status_code=404, detail="Partner Portrait asset not found")
-        content, content_type, stored_name = PartnerPortraitStorage().read(asset["stored_uri"])
-    except HTTPException:
-        raise
-    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
-        logger.warning("Unable to read Partner Portrait asset job_id=%s kind=%s: %s", job_id, kind, exc)
-        raise HTTPException(status_code=404, detail="Partner Portrait asset not found") from exc
-    suffix = Path(stored_name).suffix or ".webp"
-    filename = f"astroroshni-partner-{kind.replace('_', '-')}{suffix}"
-    return Response(
-        content=content,
-        media_type=content_type,
-        headers={
-            "Content-Disposition": f'inline; filename="{filename}"',
-            "Cache-Control": "private, max-age=300",
-        },
-    )
+    return _private_asset_response(job_id, kind, row[1])

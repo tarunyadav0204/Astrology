@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+
+from auth import User
 from calculators.chart_calculator import ChartCalculator
 from partner_profile.evidence_builder import build_partner_evidence
 from partner_profile.prompt_builder import build_full_body_prompt, build_portrait_prompt
@@ -9,6 +13,7 @@ from partner_profile.routes import (
     _legacy_evidence_signature,
     _portrait_chart_fingerprint,
     _progress_stage,
+    _require_admin,
 )
 from partner_profile.rules import PLANET_RULES, SIGN_RULES
 from partner_profile.service import build_partner_profile
@@ -37,6 +42,13 @@ def _birth(gender="male"):
         "longitude": 75.8174505,
         "gender": gender,
     }
+
+
+def test_partner_portrait_admin_view_rejects_non_admin_users():
+    with pytest.raises(HTTPException) as denied:
+        _require_admin(User(userid=12, name="User", phone="100", role="user"))
+    assert denied.value.status_code == 403
+    _require_admin(User(userid=1, name="Admin", phone="101", role="admin"))
 
 
 def test_partner_portrait_fingerprint_changes_when_chart_inputs_or_gender_change():

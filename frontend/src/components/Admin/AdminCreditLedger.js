@@ -8,6 +8,24 @@ const USER_LEDGER_LIMIT = 1500;
 const ACTION_MENU_WIDTH = 260;
 const PAGE_SIZE = 100;
 
+function ledgerMetadata(row) {
+  if (row?.metadata && typeof row.metadata === 'object') return row.metadata;
+  if (typeof row?.metadata === 'string') {
+    try {
+      const parsed = JSON.parse(row.metadata);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+  return {};
+}
+
+function partnerPortraitJobId(row) {
+  if (row?.source !== 'feature_usage' || row?.reference_id !== 'partner_portrait') return null;
+  return ledgerMetadata(row).job_id || null;
+}
+
 const LEDGER_FEATURE_OPTIONS = [
   { value: '', label: 'All features' },
   { value: 'standard_chat', label: 'Standard Chat' },
@@ -122,6 +140,8 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
   const [actionMenu, setActionMenu] = useState(null);
   /** Modal: filtered full-user ledger from admin API. */
   const [userBreakdown, setUserBreakdown] = useState(null);
+  /** Admin-only generated portraits and the source birth chart for a ledger row. */
+  const [portraitDetail, setPortraitDetail] = useState(null);
   const menuContainerRef = useRef(null);
   const menuDropdownRef = useRef(null);
   const ledgerContentRef = useRef(null);
@@ -310,6 +330,30 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
     return () => document.removeEventListener('keydown', onKey);
   }, [userBreakdown]);
 
+  const closePortraitDetail = useCallback(() => {
+    setPortraitDetail((current) => {
+      (current?.assets || []).forEach((asset) => {
+        if (asset.objectUrl) URL.revokeObjectURL(asset.objectUrl);
+      });
+      return null;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!portraitDetail) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') closePortraitDetail();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [portraitDetail, closePortraitDetail]);
+
+  useEffect(() => () => {
+    (portraitDetail?.assets || []).forEach((asset) => {
+      if (asset.objectUrl) URL.revokeObjectURL(asset.objectUrl);
+    });
+  }, [portraitDetail]);
+
   const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -349,6 +393,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
         partnership_analysis: 'Partnership Analysis',
         karma_analysis: 'Karma Analysis',
         mundane_chat: 'Mundane Chat',
+        partner_portrait: 'Partner Portrait',
       };
       return names[referenceId] || referenceId || 'Feature';
     }
@@ -409,6 +454,45 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
       dateFrom: searchFromDate,
       dateTo: searchToDate,
     });
+  };
+
+  const openPartnerPortrait = async (tx) => {
+    const jobId = partnerPortraitJobId(tx);
+    if (!jobId) return;
+    closeActionMenu();
+    setPortraitDetail({ jobId, loading: true, error: null, data: null, assets: [] });
+    try {
+      const response = await fetch(`/api/partner-portrait/admin/job/${encodeURIComponent(jobId)}`, {
+        headers: getAdminAuthHeaders(),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || 'Could not load this portrait job');
+
+      const assetResults = await Promise.allSettled((body.assets || []).map(async (asset) => {
+        const assetResponse = await fetch(asset.url, { headers: getAdminAuthHeaders() });
+        if (!assetResponse.ok) throw new Error(`Could not load the ${asset.kind.replace('_', ' ')} image`);
+        const blob = await assetResponse.blob();
+        return { ...asset, objectUrl: URL.createObjectURL(blob) };
+      }));
+      const assets = assetResults.filter((result) => result.status === 'fulfilled').map((result) => result.value);
+      const assetErrors = assetResults
+        .filter((result) => result.status === 'rejected')
+        .map((result) => result.reason?.message || 'An image could not be loaded');
+      setPortraitDetail({
+        jobId,
+        loading: false,
+        error: null,
+        data: body,
+        assets,
+        assetWarning: assetErrors.join(' · ') || null,
+      });
+    } catch (error) {
+      setPortraitDetail((current) => ({
+        ...(current || { jobId, assets: [] }),
+        loading: false,
+        error: error?.message || 'Could not load this portrait job',
+      }));
+    }
   };
 
   const toggleRowMenu = (tx, e) => {
@@ -803,6 +887,18 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
             zIndex: 1600,
           }}
         >
+          {partnerPortraitJobId(menuContextTx) ? (
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                className="ledger-action-menu-item ledger-action-menu-item--portrait"
+                onClick={() => openPartnerPortrait(menuContextTx)}
+              >
+                View generated portrait
+              </button>
+            </li>
+          ) : null}
           <li role="none">
             <button
               type="button"
@@ -905,6 +1001,105 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {portraitDetail ? (
+        <div
+          className="ledger-user-modal-backdrop"
+          role="presentation"
+          onClick={closePortraitDetail}
+        >
+          <div
+            className="ledger-user-modal ledger-portrait-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ledger-portrait-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ledger-user-modal-header">
+              <h2 id="ledger-portrait-modal-title">Partner Portrait result</h2>
+              <p className="ledger-user-modal-sub">Admin-only view · Job {portraitDetail.jobId}</p>
+              <button type="button" className="ledger-user-modal-close" onClick={closePortraitDetail}>
+                Close
+              </button>
+            </div>
+            {portraitDetail.loading ? (
+              <div className="loading">Loading private portrait and birth chart…</div>
+            ) : portraitDetail.error ? (
+              <div className="search-error">{portraitDetail.error}</div>
+            ) : (
+              <div className="ledger-portrait-modal-body">
+                {portraitDetail.assetWarning ? (
+                  <p className="ledger-portrait-job-error">{portraitDetail.assetWarning}</p>
+                ) : null}
+                {portraitDetail.assets.length ? (
+                  <section className="ledger-portrait-images" aria-label="Generated images">
+                    {portraitDetail.assets.map((asset) => (
+                      <figure key={asset.kind}>
+                        <img src={asset.objectUrl} alt={`Generated partner ${asset.kind.replace('_', ' ')}`} />
+                        <figcaption>{asset.kind === 'full_body' ? 'Full-body portrait' : 'Face portrait'}</figcaption>
+                      </figure>
+                    ))}
+                  </section>
+                ) : (
+                  <p className="ledger-portrait-empty">
+                    No image is stored for this {portraitDetail.data?.status || 'job'}.
+                  </p>
+                )}
+
+                <section className="ledger-portrait-summary">
+                  <h3>Generation</h3>
+                  <dl>
+                    <div><dt>Status</dt><dd>{portraitDetail.data?.status || '—'}</dd></div>
+                    <div><dt>Credits</dt><dd>{portraitDetail.data?.credit_cost ?? '—'}</dd></div>
+                    <div><dt>Created</dt><dd>{portraitDetail.data?.created_at ? formatDate(portraitDetail.data.created_at) : '—'}</dd></div>
+                    <div><dt>Completed</dt><dd>{portraitDetail.data?.completed_at ? formatDate(portraitDetail.data.completed_at) : '—'}</dd></div>
+                    <div><dt>User ID</dt><dd>{portraitDetail.data?.user_id ?? '—'}</dd></div>
+                    <div><dt>Chart ID</dt><dd>{portraitDetail.data?.birth_chart_id ?? '—'}</dd></div>
+                  </dl>
+                  {portraitDetail.data?.error ? <p className="ledger-portrait-job-error">{portraitDetail.data.error}</p> : null}
+                </section>
+
+                <section className="ledger-portrait-summary">
+                  <h3>Birth chart linked to this portrait</h3>
+                  {portraitDetail.data?.chart_matches_generated_version === false ? (
+                    <p className="ledger-portrait-chart-warning">
+                      This saved chart was edited after the portrait was generated. The details below are its current values;
+                      the generated image remains attached to the earlier chart version.
+                    </p>
+                  ) : null}
+                  {portraitDetail.data?.chart ? (
+                    <dl>
+                      <div><dt>Native</dt><dd>{portraitDetail.data.chart.name || '—'}</dd></div>
+                      <div><dt>Gender</dt><dd>{portraitDetail.data.chart.gender || '—'}</dd></div>
+                      <div><dt>Date of birth</dt><dd>{portraitDetail.data.chart.date || '—'}</dd></div>
+                      <div><dt>Time of birth</dt><dd>{portraitDetail.data.chart.time || '—'}</dd></div>
+                      <div className="ledger-portrait-wide"><dt>Place</dt><dd>{portraitDetail.data.chart.place || '—'}</dd></div>
+                      <div><dt>Timezone</dt><dd>{portraitDetail.data.chart.timezone || '—'}</dd></div>
+                      <div><dt>Coordinates</dt><dd>{portraitDetail.data.chart.latitude}, {portraitDetail.data.chart.longitude}</dd></div>
+                    </dl>
+                  ) : (
+                    <p className="ledger-portrait-empty">The source chart has since been deleted.</p>
+                  )}
+                </section>
+
+                {portraitDetail.data?.generation && Object.keys(portraitDetail.data.generation).length ? (
+                  <section className="ledger-portrait-summary">
+                    <h3>Image direction</h3>
+                    <dl>
+                      {Object.entries(portraitDetail.data.generation).map(([key, value]) => (
+                        <div key={key}>
+                          <dt>{key.replaceAll('_', ' ')}</dt>
+                          <dd>{String(value).replaceAll('_', ' ')}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </section>
+                ) : null}
               </div>
             )}
           </div>
