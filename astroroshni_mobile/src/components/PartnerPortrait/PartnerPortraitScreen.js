@@ -76,6 +76,17 @@ const PLACEMENT_SIGN_CHANNELS = new Set([
   'spouse_karaka',
 ]);
 const traitKey = (value = '') => value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+const exactChartTime = (value) => {
+  const raw = String(value || '').trim();
+  return (raw.includes('T') ? raw.split('T')[1] : raw).slice(0, 8);
+};
+const chartVersionKey = (chart = {}) => JSON.stringify({
+  date: String(chart?.date || '').split('T')[0],
+  time: exactChartTime(chart?.time),
+  latitude: Number(Number(chart?.latitude).toFixed(6)),
+  longitude: Number(Number(chart?.longitude).toFixed(6)),
+  gender: String(chart?.gender || '').trim().toLowerCase(),
+});
 
 const ChoiceRow = ({ options, value, onChange, colors }) => (
   <View style={styles.choiceRow}>
@@ -129,6 +140,7 @@ export default function PartnerPortraitScreen({ navigation }) {
   const pollRef = useRef(null);
   const activeJobIdRef = useRef(null);
   const selectedChartIdRef = useRef(0);
+  const selectedChartVersionRef = useRef('');
   const previewPulse = useRef(new Animated.Value(0.08)).current;
   const wide = width >= 760;
   // The feature config and the generation route both resolve this value from
@@ -179,7 +191,10 @@ export default function PartnerPortraitScreen({ navigation }) {
       return;
     }
     const selectedId = Number(selected?.birth_chart_id || selected?.id || 0);
-    if (selectedChartIdRef.current && selectedId && selectedChartIdRef.current !== selectedId) {
+    const nextVersion = chartVersionKey(selected);
+    if (selectedChartIdRef.current && selectedId && (
+      selectedChartIdRef.current !== selectedId || selectedChartVersionRef.current !== nextVersion
+    )) {
       stopPolling();
       activeJobIdRef.current = null;
       setResult(null);
@@ -190,6 +205,7 @@ export default function PartnerPortraitScreen({ navigation }) {
       setStatus('setup');
     }
     selectedChartIdRef.current = selectedId;
+    selectedChartVersionRef.current = nextVersion;
     setBirthData(selected);
     await loadDirection(selectedId);
   }, [loadDirection, navigation, stopPolling]);
@@ -268,6 +284,14 @@ export default function PartnerPortraitScreen({ navigation }) {
     const response = await partnerPortraitAPI.getStatus(id);
     const payload = response?.data || {};
     setLastCheckedAt(Date.now());
+    if (payload.chart_matches_current_version === false) {
+      stopPolling();
+      activeJobIdRef.current = null;
+      setResult(null);
+      setCreatingVariation(false);
+      setStatus('setup');
+      return;
+    }
     if (payload.progress_stage || payload.status === 'processing') {
       // `processing` means the background worker has claimed the request.
       // Chart preparation is a short prerequisite inside that worker; do not
@@ -327,7 +351,9 @@ export default function PartnerPortraitScreen({ navigation }) {
       try {
         const response = await partnerPortraitAPI.getHistory();
         if (cancelled) return;
-        const chartItems = (response?.data?.items || []).filter((item) => Number(item.birth_chart_id) === selectedChartId);
+        const chartItems = (response?.data?.items || []).filter((item) => (
+          Number(item.birth_chart_id) === selectedChartId && item.matches_current_chart !== false
+        ));
         const active = chartItems.find((item) => item.status === 'pending' || item.status === 'processing');
         const latestCompleted = chartItems.find((item) => item.status === 'completed');
         if (active) {

@@ -267,6 +267,42 @@ export const apiService = {
     return response.data;
   },
 
+  getPartnerPortraitConfig: async () => {
+    const response = await apiClient.get(getEndpoint('/partner-portrait/config'));
+    return response.data;
+  },
+
+  getPartnerPortraitDirection: async (birthChartId) => {
+    const response = await apiClient.get(`${getEndpoint('/partner-portrait/direction')}/${birthChartId}`);
+    return response.data;
+  },
+
+  generatePartnerPortrait: async (payload) => {
+    const response = await apiClient.post(getEndpoint('/partner-portrait/generate'), payload);
+    return response.data;
+  },
+
+  getPartnerPortraitStatus: async (jobId) => {
+    const response = await apiClient.get(`${getEndpoint('/partner-portrait/status')}/${jobId}`, {
+      params: { _t: Date.now() },
+      timeout: 30000,
+    });
+    return response.data;
+  },
+
+  getPartnerPortraitHistory: async () => {
+    const response = await apiClient.get(getEndpoint('/partner-portrait/history'));
+    return response.data;
+  },
+
+  getPartnerPortraitAsset: async (jobId, kind) => {
+    const response = await apiClient.get(`${getEndpoint('/partner-portrait/asset')}/${encodeURIComponent(jobId)}/${encodeURIComponent(kind)}`, {
+      responseType: 'blob',
+      timeout: 30000,
+    });
+    return response.data;
+  },
+
   getActivationExplorer: async ({ birthChartId, birthData, asOf, horizonDays = 90, trace = true }) => {
     const response = await apiClient.post(getEndpoint('/prediction-engine/activation-explorer'), {
       birth_chart_id: birthChartId || null,

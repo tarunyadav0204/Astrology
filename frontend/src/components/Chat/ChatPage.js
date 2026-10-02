@@ -595,6 +595,24 @@ const ChatPage = ({ onLogin }) => {
             setPendingFollowUpQueryContext(null);
         }
     };
+
+    // Partner Portrait can hand the user directly into the existing two-chart
+    // partnership flow. Consume the route state once so Back/Forward and a
+    // refresh cannot restart the wizard unexpectedly.
+    useEffect(() => {
+        if (!location.state?.startPartnership) return;
+        const suppliedChart = location.state?.birthData;
+        navigate(location.pathname, { replace: true, state: {} });
+        resetThreadForWizard('partnership');
+        setWizardMode('partnership');
+        setWizardStep(1);
+        setWizardPartnershipStep(1);
+        const primary = suppliedChart && isBirthChartReadyForChat(suppliedChart) ? suppliedChart : birthData;
+        if (primary && isBirthChartReadyForChat(primary)) {
+            setWizardPrimaryChart(primary);
+            setWizardPartnershipStep(2);
+        }
+    }, [birthData, location.pathname, location.state, navigate]);
     /** Set when navigating from analysis follow-up chips; consumed when single-chart chat is ready. */
     const analysisChatIntentRef = useRef(null);
 

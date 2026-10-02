@@ -9,6 +9,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Response
@@ -27,6 +28,7 @@ from .service import build_partner_profile
 from .synthesizer import RULESET_VERSION, synthesize_partner_profile
 from .storage import PartnerPortraitStorage
 from .task_queue import enqueue_partner_portrait, task_configuration_error, task_secret, tasks_enabled
+from .evidence_builder import build_partner_evidence
 
 
 logger = logging.getLogger(__name__)
@@ -143,6 +145,51 @@ def _calculate_chart(birth: dict[str, Any]) -> dict[str, Any]:
     return ChartCalculator({}).calculate_chart(SimpleNamespace(**birth), node_type="mean", ayanamsha="lahiri")
 
 
+def _portrait_chart_fingerprint(birth: dict[str, Any]) -> str:
+    """Identity of every saved-chart field that can change this product."""
+    from utils.birth_hash import birth_hash_from_birth_details_dict
+
+    birth_hash = birth_hash_from_birth_details_dict(birth)
+    gender = str(birth.get("gender") or "").strip().lower()
+    raw_time = str(birth.get("time") or "").strip()
+    exact_time = raw_time.split("T", 1)[-1][:8]
+    material = json.dumps(
+        {"birth_hash": birth_hash, "exact_time": exact_time, "gender": gender},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def _legacy_evidence_signature(evidence: Any) -> str | None:
+    """Compare pre-fingerprint portraits by the classical evidence that made them."""
+    if not isinstance(evidence, dict):
+        return None
+    relevant = {"d1": evidence.get("d1"), "d9": evidence.get("d9")}
+    if not isinstance(relevant["d1"], dict) or not isinstance(relevant["d9"], dict):
+        return None
+    encoded = json.dumps(relevant, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _job_matches_current_chart(
+    request_data: dict[str, Any],
+    profile: dict[str, Any] | None,
+    current_birth: dict[str, Any],
+    *,
+    current_evidence_signature: str | None = None,
+) -> bool:
+    stored = str(request_data.get("chart_fingerprint") or "").strip()
+    if stored:
+        return hmac.compare_digest(stored, _portrait_chart_fingerprint(current_birth))
+    if not profile:
+        # A legacy pending job will calculate from the latest saved chart when
+        # its worker starts. Keeping it attached avoids a duplicate purchase.
+        return True
+    stored_signature = _legacy_evidence_signature(profile.get("evidence"))
+    return bool(stored_signature and current_evidence_signature and hmac.compare_digest(stored_signature, current_evidence_signature))
+
+
 def _public_result(profile: dict[str, Any], assets: list[dict[str, str]]) -> dict[str, Any]:
     storage = PartnerPortraitStorage()
     public_assets = [{**asset, "url": storage.display_uri(asset["stored_uri"])} for asset in assets]
@@ -231,6 +278,14 @@ async def _run_generation(job_id: str, user_id: int, request_data: dict[str, Any
         if getattr(cur, "rowcount", 0) == 0:
             return
         birth = _load_birth_data(user_id, int(request_data["birth_chart_id"]))
+        request_data["chart_fingerprint"] = _portrait_chart_fingerprint(birth)
+        with get_conn() as conn:
+            execute(
+                conn,
+                "UPDATE partner_portrait_jobs SET request_json=%s WHERE job_id=%s AND user_id=%s",
+                (json.dumps(request_data), job_id, user_id),
+            )
+            conn.commit()
         if request_data.get("source") != "birth_chart_gender_and_coordinates":
             # Supports jobs created by an older API build without trusting the
             # client-supplied presentation or region from that build.
@@ -411,6 +466,7 @@ async def start_partner_portrait(
     try:
         birth = _load_birth_data(current_user.userid, request.birth_chart_id)
         request_data.update(await derive_art_direction(birth))
+        request_data["chart_fingerprint"] = _portrait_chart_fingerprint(birth)
     except ValueError as exc:
         status_code = 404 if str(exc) == "Birth chart not found" else 422
         if status_code == 404:
@@ -526,7 +582,8 @@ async def get_partner_portrait_status(
     with get_conn() as conn:
         cur = execute(
             conn,
-            """SELECT status,profile_json,assets_json,error_message,credit_cost,refunded_at,completed_at,started_at
+            """SELECT status,profile_json,assets_json,error_message,credit_cost,refunded_at,completed_at,started_at,
+                      birth_chart_id,request_json
                FROM partner_portrait_jobs WHERE job_id=%s AND user_id=%s""",
             (job_id, current_user.userid),
         )
@@ -539,6 +596,21 @@ async def get_partner_portrait_status(
         "cost": row[4],
         "progress_stage": _progress_stage(row[0], row[1], row[2], row[7]),
     }
+    try:
+        current_birth = _load_birth_data(current_user.userid, int(row[8]))
+        request_data = json.loads(row[9])
+        profile = json.loads(row[1]) if row[1] else None
+        current_signature = None
+        if profile and not request_data.get("chart_fingerprint"):
+            current_evidence = build_partner_evidence(
+                _calculate_chart(current_birth), native_gender=str(current_birth.get("gender") or "")
+            )
+            current_signature = _legacy_evidence_signature(current_evidence)
+        result["chart_matches_current_version"] = _job_matches_current_chart(
+            request_data, profile, current_birth, current_evidence_signature=current_signature
+        )
+    except (ValueError, TypeError, json.JSONDecodeError):
+        result["chart_matches_current_version"] = False
     if row[7]:
         result["started_at"] = row[7]
     if row[0] == "completed":
@@ -563,13 +635,84 @@ async def get_partner_portrait_history(current_user: User = Depends(get_current_
         )
         rows = cur.fetchall() or []
     items = []
+    current_chart_cache: dict[int, tuple[dict[str, Any] | None, str | None]] = {}
     for row in rows:
         req = json.loads(row[3])
-        data = _public_result(json.loads(row[4]), json.loads(row[5])) if row[2] == "completed" and row[4] and row[5] else None
+        profile = json.loads(row[4]) if row[4] else None
+        data = _public_result(profile, json.loads(row[5])) if row[2] == "completed" and profile and row[5] else None
+        chart_id = int(row[1])
+        if chart_id not in current_chart_cache:
+            try:
+                current_birth = _load_birth_data(current_user.userid, chart_id)
+                current_signature = None
+                if not req.get("chart_fingerprint"):
+                    current_evidence = build_partner_evidence(
+                        _calculate_chart(current_birth), native_gender=str(current_birth.get("gender") or "")
+                    )
+                    current_signature = _legacy_evidence_signature(current_evidence)
+                current_chart_cache[chart_id] = (current_birth, current_signature)
+            except (ValueError, TypeError):
+                current_chart_cache[chart_id] = (None, None)
+        current_birth, current_signature = current_chart_cache[chart_id]
+        if current_birth and not req.get("chart_fingerprint") and current_signature is None:
+            current_evidence = build_partner_evidence(
+                _calculate_chart(current_birth), native_gender=str(current_birth.get("gender") or "")
+            )
+            current_signature = _legacy_evidence_signature(current_evidence)
+            current_chart_cache[chart_id] = (current_birth, current_signature)
+        matches_current = bool(current_birth) and _job_matches_current_chart(
+            req, profile, current_birth, current_evidence_signature=current_signature
+        )
         items.append({
             "job_id": row[0], "birth_chart_id": row[1], "status": row[2],
             "presentation": req.get("presentation"), "visual_context": req.get("visual_context", "global_mixed"),
             "created_at": row[6], "completed_at": row[7],
+            "matches_current_chart": matches_current,
             "thumbnail_url": next((a["url"] for a in data["assets"] if a["kind"] == "portrait"), None) if data else None,
         })
     return {"items": items}
+
+
+@router.get("/asset/{job_id}/{kind}")
+async def get_partner_portrait_asset(
+    job_id: str,
+    kind: Literal["portrait", "full_body"],
+    current_user: User = Depends(get_current_user),
+):
+    """Return one paid portrait through the authenticated API.
+
+    Browser share/download actions cannot attach the bearer token to a plain
+    storage link. Serving the private bytes here keeps ownership enforcement
+    intact and avoids expired signed URLs opening as blank tabs.
+    """
+    init_partner_portrait_tables()
+    with get_conn() as conn:
+        cur = execute(
+            conn,
+            "SELECT status,assets_json FROM partner_portrait_jobs WHERE job_id=%s AND user_id=%s",
+            (job_id, current_user.userid),
+        )
+        row = cur.fetchone()
+    if not row or row[0] != "completed" or not row[1]:
+        raise HTTPException(status_code=404, detail="Partner Portrait asset not found")
+    try:
+        assets = json.loads(row[1])
+        asset = next((item for item in assets if item.get("kind") == kind), None)
+        if not asset or not asset.get("stored_uri"):
+            raise HTTPException(status_code=404, detail="Partner Portrait asset not found")
+        content, content_type, stored_name = PartnerPortraitStorage().read(asset["stored_uri"])
+    except HTTPException:
+        raise
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        logger.warning("Unable to read Partner Portrait asset job_id=%s kind=%s: %s", job_id, kind, exc)
+        raise HTTPException(status_code=404, detail="Partner Portrait asset not found") from exc
+    suffix = Path(stored_name).suffix or ".webp"
+    filename = f"astroroshni-partner-{kind.replace('_', '-')}{suffix}"
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+            "Cache-Control": "private, max-age=300",
+        },
+    )

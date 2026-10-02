@@ -38,6 +38,8 @@ export const CreditProvider = ({ children }) => {
     const [instantChatEnabled, setInstantChatEnabled] = useState(true);
     const [speechChatEnabled, setSpeechChatEnabled] = useState(true);
     const [speechTtsProvider, setSpeechTtsProvider] = useState(null);
+    const [features, setFeatures] = useState({});
+    const [partnerPortraitCost, setPartnerPortraitCost] = useState(44);
 
     const fetchBalance = useCallback(async () => {
         try {
@@ -145,6 +147,7 @@ export const CreditProvider = ({ children }) => {
             if (pricing.career != null) setCareerCost(Number(pricing.career) || 12);
             if (pricing.progeny != null) setProgenyCost(Number(pricing.progeny) || 15);
             if (pricing.events != null) setEventsCost(Number(pricing.events) || 100);
+            if (pricing.partner_portrait != null) setPartnerPortraitCost(Number(pricing.partner_portrait) || 44);
 
             const chatNum = pricing.chat != null ? Number(pricing.chat) || 1 : null;
             let resolvedInstant = null;
@@ -180,6 +183,7 @@ export const CreditProvider = ({ children }) => {
             }
 
             if (features && typeof features === 'object') {
+                setFeatures(features);
                 setInstantChatEnabled(features.instant_chat_enabled !== false);
                 setSpeechChatEnabled(features.speech_chat_enabled !== false);
                 setSpeechTtsProvider(features.speech_tts_provider === 'google' ? 'google' : 'local');
@@ -282,6 +286,8 @@ export const CreditProvider = ({ children }) => {
             instantChatEnabled,
             speechChatEnabled,
             speechTtsProvider,
+            features,
+            partnerPortraitCost,
             loading,
             fetchBalance,
             fetchCosts,

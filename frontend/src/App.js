@@ -151,6 +151,7 @@ const AboutUs = lazy(() => import('./components/About/AboutUs'));
 const Calendar2026 = lazy(() => import('./components/Calendar2026/Calendar2026'));
 const AstroVastuTool = lazy(() => import('./components/AstroVastu/AstroVastuTool'));
 const KundliMatchingPage = lazy(() => import('./components/MarriageAnalysis/KundliMatchingPage'));
+const PartnerPortraitPage = lazy(() => import('./components/PartnerPortrait/PartnerPortraitPage'));
 const ReportsStudioPage = lazy(() => import('./components/Reports/ReportsStudioPage'));
 const EventsTimelinePage = lazy(() => import('./components/Events/EventsTimelinePage'));
 const AshtakavargaSeoPage = lazy(() => import('./components/Ashtakavarga/AshtakavargaSeoPage'));
@@ -834,6 +835,27 @@ function App() {
                   authView={authView}
                   setAuthView={setAuthView}
                   description="Sign in to add your saved birth chart and run your personalised marriage analysis."
+                  onAuthenticated={handleLogin}
+                />
+              </>
+            } />
+            <Route path="/partner-portrait" element={
+              <>
+                <PartnerPortraitPage
+                  user={user}
+                  onLogout={user ? handleLogout : undefined}
+                  onAdminClick={user ? handleAdminClick : undefined}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to create and keep the partner portrait described by your saved Kundli."
                   onAuthenticated={handleLogin}
                 />
               </>

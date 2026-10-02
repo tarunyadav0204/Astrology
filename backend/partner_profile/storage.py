@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import mimetypes
 import os
 import shutil
 from datetime import timedelta
@@ -59,6 +60,18 @@ class PartnerPortraitStorage:
             blob = self._gcs_client().bucket(bucket_name).blob(object_name)
             return blob.generate_signed_url(expiration=timedelta(hours=1), method="GET", version="v4")
         return self.provider_input_uri(stored_uri)
+
+    def read(self, stored_uri: str) -> tuple[bytes, str, str]:
+        """Read a private portrait for an authenticated application response."""
+        if stored_uri.startswith("gs://"):
+            bucket_name, object_name = stored_uri[5:].split("/", 1)
+            blob = self._gcs_client().bucket(bucket_name).blob(object_name)
+            content = blob.download_as_bytes()
+            content_type = blob.content_type or mimetypes.guess_type(object_name)[0] or "application/octet-stream"
+            return content, content_type, Path(object_name).name
+        path = Path(stored_uri.removeprefix("file://"))
+        content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        return path.read_bytes(), content_type, path.name
 
     def delete(self, stored_uri: str) -> None:
         """Delete one generated asset from private storage.

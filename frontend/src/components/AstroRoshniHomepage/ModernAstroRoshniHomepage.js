@@ -3,6 +3,9 @@ import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
 import { SEO_CONFIG, buildHomeAccuracyProofStructuredData } from '../../config/seo.config';
 import { useAstrology } from '../../context/AstrologyContext';
+import { useCredits } from '../../context/CreditContext';
+import partnerPortraitSample from '../../assets/partner-portrait/sample-woman-pair.jpg';
+import partnerPortraitMaleSample from '../../assets/partner-portrait/sample-example.jpg';
 import KpTodayHome from '../Home/KpTodayHome';
 import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import LiveTransitRing from './LiveTransitRing';
@@ -207,6 +210,11 @@ const ModernAstroRoshniHomepage = ({
 }) => {
   const navigate = useNavigate();
   const { birthData } = useAstrology();
+  const { features, partnerPortraitCost } = useCredits();
+  const showPartnerPortrait = Boolean(user && features?.partner_portrait_enabled);
+  const partnerSample = ['female', 'woman', 'f', 'girl'].includes(String(birthData?.gender || '').trim().toLowerCase())
+    ? partnerPortraitMaleSample
+    : partnerPortraitSample;
   const [focusKey, setFocusKey] = useState('career');
   const [methodIndex, setMethodIndex] = useState(0);
   const [latestArticles, setLatestArticles] = useState([]);
@@ -491,14 +499,23 @@ const ModernAstroRoshniHomepage = ({
         </section>
 
         <section className="mh-chapter mh-discover" id="discover">
-          <div className="mh-discover__feature mh-discover__karma">
+          {showPartnerPortrait ? <div className="mh-discover__feature mh-discover__portrait">
+            <img src={partnerSample} alt="" aria-hidden="true" />
+            <div>
+              <p className="mh-eyebrow"><span></span> New · Created from your Kundli</p>
+              <h2>Meet the person<br /><em>your chart describes.</em></h2>
+              <p>Create face and full-body portraits, then discover the appearance, personality and classical chart logic that shaped them.</p>
+              <ul><li>Two original portraits</li><li>Appearance and personality synthesis</li><li>Classical factors and references</li></ul>
+              <button className="mh-primary-button" type="button" onClick={() => navigate('/partner-portrait')}>Create my partner&rsquo;s portrait · {partnerPortraitCost} credits <span aria-hidden>↗</span></button>
+            </div>
+          </div> : <div className="mh-discover__feature mh-discover__karma">
             <div className="mh-karma-mark" aria-hidden><span>R</span><b>K</b><i></i></div>
             <p className="mh-eyebrow"><span></span> Patterns beneath the present</p>
             <h2>Past-life karma,<br /><em>made practical.</em></h2>
             <p>Explore inherited patterns through Rahu–Ketu, the 12th house and deeper divisional-chart themes—then connect them to choices you can make now.</p>
             <ul><li>Karmic strengths and inherited patterns</li><li>Lessons repeating in the present</li><li>Practical reflection and remedies</li></ul>
             <button className="mh-primary-button" type="button" onClick={() => requireAccount('/karma-analysis')}>Explore past-life karma <span aria-hidden>↗</span></button>
-          </div>
+          </div>}
           <div className="mh-discover__calendar">
             <div className="mh-section-heading">
               <p className="mh-eyebrow"><span></span> Lunar knowledge</p>

@@ -3489,6 +3489,7 @@ def _get_chat_countdown_settings() -> Dict[str, int]:
 async def get_analysis_pricing():
     """Same source as deduction: all analysis costs from credit_settings. pricing = effective; pricing_original = only when discount set (for strikethrough). Unauthenticated; base/admin pricing."""
     from utils.admin_settings import (
+        partner_portrait_ui_enabled_for_user,
         is_instant_chat_enabled,
         is_speech_chat_enabled,
         get_speech_tts_provider,
@@ -3503,6 +3504,10 @@ async def get_analysis_pricing():
         "pricing": pricing,
         "chat_countdown_seconds": _get_chat_countdown_settings(),
         "features": {
+            # Anonymous visitors can discover the web experience only when the
+            # global flag is on and the allowlist is empty. An allowlisted
+            # rollout remains invisible until that user signs in.
+            "partner_portrait_enabled": partner_portrait_ui_enabled_for_user(None),
             "instant_chat_enabled": is_instant_chat_enabled(),
             "speech_chat_enabled": is_speech_chat_enabled(),
             "speech_tts_provider": get_speech_tts_provider(),

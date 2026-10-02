@@ -4,9 +4,15 @@ from types import SimpleNamespace
 from calculators.chart_calculator import ChartCalculator
 from partner_profile.evidence_builder import build_partner_evidence
 from partner_profile.prompt_builder import build_full_body_prompt, build_portrait_prompt
-from partner_profile.routes import _progress_stage
+from partner_profile.routes import (
+    _job_matches_current_chart,
+    _legacy_evidence_signature,
+    _portrait_chart_fingerprint,
+    _progress_stage,
+)
 from partner_profile.rules import PLANET_RULES, SIGN_RULES
 from partner_profile.service import build_partner_profile
+from partner_profile.storage import PartnerPortraitStorage
 from partner_profile.synthesizer import synthesize_partner_profile
 
 
@@ -21,6 +27,59 @@ def _chart():
         place="Hisar, Haryana, India",
     )
     return ChartCalculator({}).calculate_chart(birth)
+
+
+def _birth(gender="male"):
+    return {
+        "date": "1980-04-02",
+        "time": "14:55:00",
+        "latitude": 29.2396596,
+        "longitude": 75.8174505,
+        "gender": gender,
+    }
+
+
+def test_partner_portrait_fingerprint_changes_when_chart_inputs_or_gender_change():
+    original = _birth()
+    assert _portrait_chart_fingerprint(original) != _portrait_chart_fingerprint({**original, "time": "14:55:30"})
+    assert _portrait_chart_fingerprint(original) != _portrait_chart_fingerprint({**original, "time": "14:56:00"})
+    assert _portrait_chart_fingerprint(original) != _portrait_chart_fingerprint({**original, "gender": "female"})
+    assert _job_matches_current_chart(
+        {"chart_fingerprint": _portrait_chart_fingerprint(original)}, None, original
+    ) is True
+    assert _job_matches_current_chart(
+        {"chart_fingerprint": _portrait_chart_fingerprint(original)}, None, {**original, "time": "14:56:00"}
+    ) is False
+
+
+def test_partner_portrait_private_asset_can_be_read_for_authenticated_delivery(tmp_path, monkeypatch):
+    monkeypatch.delenv("PARTNER_PORTRAIT_GCS_BUCKET", raising=False)
+    monkeypatch.setenv("PARTNER_PORTRAIT_LOCAL_DIR", str(tmp_path))
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    storage = PartnerPortraitStorage()
+    stored_uri = storage.save(
+        user_id=12,
+        job_id="job-test",
+        kind="portrait",
+        content=b"image-bytes",
+        content_type="image/jpeg",
+    )
+    content, content_type, filename = storage.read(stored_uri)
+    assert content == b"image-bytes"
+    assert content_type == "image/jpeg"
+    assert filename == "portrait.jpg"
+
+
+def test_legacy_partner_portrait_matches_only_when_classical_evidence_still_matches():
+    evidence = build_partner_evidence(_chart(), native_gender="male")
+    signature = _legacy_evidence_signature(evidence)
+    assert signature
+    assert _job_matches_current_chart(
+        {}, {"evidence": evidence}, _birth(), current_evidence_signature=signature
+    ) is True
+    assert _job_matches_current_chart(
+        {}, {"evidence": evidence}, _birth(), current_evidence_signature="different"
+    ) is False
 
 
 def test_partner_profile_resolves_d1_d9_and_source_trace():

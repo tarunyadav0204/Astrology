@@ -29,7 +29,8 @@ const ModernNavigationHeader = ({
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { birthData } = useAstrology();
-  const { credits, loading: creditsLoading } = useCredits();
+  const { credits, loading: creditsLoading, features } = useCredits();
+  const partnerPortraitEnabled = Boolean(user && features?.partner_portrait_enabled);
   const { theme, themes, setTheme } = useTheme();
   const accountMenuRef = useRef(null);
   const themeMenuRef = useRef(null);
@@ -157,6 +158,7 @@ const ModernNavigationHeader = ({
                 <a href={sectionHref('discover')} onClick={onHomeClick ? goSection('discover') : undefined}><span>Discover overview</span><small>Explore AstroRoshni</small></a>
                 <Link to="/ai-kundli-generator" onClick={goSiteRoute('/ai-kundli-generator')}><span>Create Kundli</span><small>Calculate and save your Vedic chart</small></Link>
                 <Link to="/horoscope/daily" onClick={goSiteRoute('/horoscope/daily')}><span>Horoscope</span><small>Daily to yearly Sun-sign forecasts</small></Link>
+                {partnerPortraitEnabled && <Link to="/partner-portrait" onClick={goSiteRoute('/partner-portrait')}><span>Partner Portrait</span><small>Meet the person your Kundli describes</small></Link>}
               </div>
             </details>
             <details className="mh-nav-menu" ref={learnMenuRef}>
@@ -254,6 +256,7 @@ const ModernNavigationHeader = ({
               <a href={sectionHref('discover')} onClick={onHomeClick ? goSection('discover') : undefined}>Discover overview</a>
               <Link to="/ai-kundli-generator" onClick={goSiteRoute('/ai-kundli-generator')}>Create Kundli</Link>
               <Link to="/horoscope/daily" onClick={goSiteRoute('/horoscope/daily')}>Horoscope</Link>
+              {partnerPortraitEnabled && <Link to="/partner-portrait" onClick={goSiteRoute('/partner-portrait')}>Partner Portrait</Link>}
               <span className="mh-mobile-menu__label">Learn</span>
               <a href={sectionHref('journal')} onClick={onHomeClick ? goSection('journal') : undefined}>Learning overview</a>
               <Link to="/beginners-guide" onClick={goSiteRoute('/beginners-guide')}>Beginner’s guide</Link>
