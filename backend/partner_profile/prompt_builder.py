@@ -64,6 +64,15 @@ def _resolved_traits(profile: Mapping[str, Any]) -> list[str]:
                 "not bald, balding, shaved, or visibly hairless"
             )
             continue
+        if attribute in {"hair", "head_hair"} and value == "coarse hair":
+            # BPHS 3.29 describes Saturn's hair texture as coarse; it does not
+            # state that the hair is dense or abundant. Image models otherwise
+            # tend to turn "coarse" into a thick, luxuriant hairstyle.
+            traits.append(
+                "head hair: coarse-textured or slightly wiry hair with ordinary natural coverage; "
+                "density is unspecified, so do not make it unusually thick, dense, or luxuriant"
+            )
+            continue
         traits.append(f"{attribute.replace('_', ' ')}: {value}")
     return traits[:8]
 

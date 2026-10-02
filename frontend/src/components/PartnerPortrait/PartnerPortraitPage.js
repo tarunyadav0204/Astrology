@@ -25,6 +25,51 @@ const PROGRESS = [
 const PROGRESS_RANK = { queued: 0, reading_chart: 0, creating_portrait: 1, creating_full_body: 2, ready: 3 };
 
 const words = (value = '') => String(value).replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+const appearanceWords = (item) => {
+  if (!item || typeof item !== 'object') return words(item);
+  const value = words(item.value || item.trait || item.label || '');
+  const attribute = words(item.attribute || '');
+  return attribute && value ? `${attribute}: ${value}` : value || attribute;
+};
+const personalityWords = (item) => {
+  if (!item || typeof item !== 'object') return words(item);
+  return words(item.trait || item.value || item.label || '');
+};
+const consolidatedFactorReadings = (readings = []) => {
+  const grouped = new Map();
+  readings.forEach((reading) => {
+    const key = `${reading?.factor_type || 'factor'}:${reading?.factor || ''}`;
+    if (!reading?.factor) return;
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        factor: reading.factor,
+        factor_type: reading.factor_type,
+        channels: [],
+        appearance: [],
+        personality: [],
+        references: [],
+      });
+    }
+    const entry = grouped.get(key);
+    if (reading.channel && !entry.channels.includes(reading.channel)) entry.channels.push(reading.channel);
+    (reading.appearance || []).forEach((item) => {
+      const label = appearanceWords(item);
+      if (label && !entry.appearance.includes(label)) entry.appearance.push(label);
+    });
+    (reading.personality || []).forEach((item) => {
+      const label = personalityWords(item);
+      if (label && !entry.personality.includes(label)) entry.personality.push(label);
+    });
+    const references = reading.references?.length
+      ? reading.references
+      : [{ source_id: reading.source_id, verse: reading.verse }];
+    references.forEach((reference) => {
+      const label = reference?.verse || reference?.source_id;
+      if (label && !entry.references.includes(label)) entry.references.push(label);
+    });
+  });
+  return [...grouped.values()];
+};
 const chartId = (chart) => Number(chart?.birth_chart_id || chart?.id || 0);
 const partnerIsFeminine = (gender) => !['female', 'woman', 'f', 'girl'].includes(String(gender || '').trim().toLowerCase());
 const errorDetail = (error) => {
@@ -101,6 +146,10 @@ function ResultExperience({ result, jobId, cost, onAnother, onPartnership, onAsk
   const appearance = summary.appearance || [];
   const personality = summary.personality || [];
   const factors = summary.dominant_factors || [];
+  const factorReadings = useMemo(
+    () => consolidatedFactorReadings(profile.factor_readings || []),
+    [profile.factor_readings],
+  );
   useEffect(() => () => {
     if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
@@ -205,14 +254,13 @@ function ResultExperience({ result, jobId, cost, onAnother, onPartnership, onAsk
       <div className="pp-result-lower-grid">
       <section className="pp-evidence">
         <div className="pp-section-heading"><p className="pp-kicker">Why Tara created this portrait</p><h2>The chart factors behind the result</h2></div>
-        {(profile.factor_readings || []).map((reading, index) => (
-          <details className="pp-details" key={`${reading.channel}-${reading.factor}-${index}`}>
-            <summary><span><b>{reading.factor}</b><small>{words(reading.channel)}</small></span><i>＋</i></summary>
+        {factorReadings.map((reading) => (
+          <details className="pp-details" key={`${reading.factor_type}-${reading.factor}`}>
+            <summary><span><b>{reading.factor}</b><small>{reading.channels.map(words).join(' · ')}</small></span><i>＋</i></summary>
             <div>
-              {reading.appearance?.length > 0 && <p><strong>Appearance:</strong> {reading.appearance.map(words).join(', ')}</p>}
-              {reading.personality?.length > 0 && <p><strong>Personality:</strong> {reading.personality.map(words).join(', ')}</p>}
-              {reading.rationale && <p>{reading.rationale}</p>}
-              {(reading.verse || reading.source_id) && <small className="pp-source">{reading.verse || reading.source_id}</small>}
+              {reading.appearance.length > 0 && <p><strong>Appearance:</strong> {reading.appearance.join(', ')}</p>}
+              {reading.personality.length > 0 && <p><strong>Personality:</strong> {reading.personality.join(', ')}</p>}
+              {reading.references.length > 0 && <small className="pp-source">{reading.references.join(' · ')}</small>}
             </div>
           </details>
         ))}

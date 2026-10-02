@@ -28,7 +28,9 @@ import { generatePageSEO } from '../../config/seo.config';
 import { apiService } from '../../services/apiService';
 import './ChartsDashasWorkspacePage.css';
 
-const MOBILE_DESK_MQ = '(max-width: 900px)';
+// The four-chart workstation needs genuine desktop width. Tablet portrait and
+// compact landscape use the focused hub instead of shrinking the workstation.
+const MOBILE_DESK_MQ = '(max-width: 1180px)';
 const PARASHARI_PROFILE_KEY = 'astroroshni_parashari_view_profile_v1';
 const DEFAULT_PARASHARI_PROFILE = { ayanamsha: 'lahiri', node_type: 'mean' };
 
@@ -112,6 +114,11 @@ const SIGN_NAMES = [
   'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
 ];
 
+const HOUSE_AREAS = [
+  'Self', 'Wealth', 'Skills', 'Home', 'Children', 'Health',
+  'Partner', 'Change', 'Fortune', 'Career', 'Gains', 'Release',
+];
+
 function buildHouseSelection(chartData, houseNumber, chartId = 'lagna') {
   const lagnaSign = chartData?.houses?.[0]?.sign
     ?? (typeof chartData?.ascendant === 'number'
@@ -164,6 +171,7 @@ const ChartsDashasWorkspacePage = ({
   const [activationError, setActivationError] = useState(null);
   const [showChartActivations, setShowChartActivations] = useState(true);
   const [analysisTab, setAnalysisTab] = useState('positions');
+  const [analysisExpanded, setAnalysisExpanded] = useState(false);
   const [activationsFocus, setActivationsFocus] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
   const [houseSelection, setHouseSelection] = useState(null);
@@ -207,8 +215,20 @@ const ChartsDashasWorkspacePage = ({
   };
 
   useEffect(() => {
-    if (isMobileDesk) setActivationsFocus(false);
+    if (isMobileDesk) {
+      setActivationsFocus(false);
+      setAnalysisExpanded(false);
+    }
   }, [isMobileDesk]);
+
+  useEffect(() => {
+    if (!analysisExpanded) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setAnalysisExpanded(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [analysisExpanded]);
 
   const selectedDivisionalChart = useMemo(() => {
     if (typeof selectedDx === 'string') {
@@ -583,6 +603,7 @@ const ChartsDashasWorkspacePage = ({
                   showFooterHint={false}
                   embedInDashboard
                   deskMode
+                  inlinePlanetDetails
                   onHouseSelect={handleHouseSelect}
                   selectedHouseNumber={houseSelection?.houseNumber}
                   activationHouseStates={visibleActivationHouseStates}
@@ -609,6 +630,7 @@ const ChartsDashasWorkspacePage = ({
                   showFooterHint={false}
                   embedInDashboard
                   deskMode
+                  inlinePlanetDetails
                   onHouseSelect={handleHouseSelect}
                   selectedHouseNumber={houseSelection?.houseNumber}
                   calculationProfile={viewProfile}
@@ -636,6 +658,7 @@ const ChartsDashasWorkspacePage = ({
                     showFooterHint={false}
                     embedInDashboard
                     deskMode
+                    inlinePlanetDetails
                     onHouseSelect={handleHouseSelect}
                     selectedHouseNumber={houseSelection?.houseNumber}
                     calculationProfile={viewProfile}
@@ -663,6 +686,7 @@ const ChartsDashasWorkspacePage = ({
                   showFooterHint={false}
                   embedInDashboard
                   deskMode
+                  inlinePlanetDetails
                   onHouseSelect={handleHouseSelect}
                   selectedHouseNumber={houseSelection?.houseNumber}
                   activationHouseStates={visibleActivationHouseStates}
@@ -700,7 +724,21 @@ const ChartsDashasWorkspacePage = ({
                 />
               </section>
             ) : (
-              <section className="parashari-desk-panel parashari-desk-panel--analysis" aria-label="Analysis dock">
+              <>
+              {analysisExpanded ? (
+                <button
+                  type="button"
+                  className="parashari-desk-analysis__backdrop"
+                  onClick={() => setAnalysisExpanded(false)}
+                  aria-label="Close expanded analysis"
+                />
+              ) : null}
+              <section
+                className={`parashari-desk-panel parashari-desk-panel--analysis${analysisExpanded ? ' is-expanded' : ''}`}
+                aria-label="Analysis dock"
+                role={analysisExpanded ? 'dialog' : undefined}
+                aria-modal={analysisExpanded ? 'true' : undefined}
+              >
                 <div className="parashari-desk-analysis__chrome">
                   <DeskStrengthStrip
                     birthData={birthData}
@@ -768,17 +806,62 @@ const ChartsDashasWorkspacePage = ({
                         Aspects
                       </button>
                     </div>
+                    <button
+                      type="button"
+                      className="parashari-desk-analysis__expand"
+                      onClick={() => setAnalysisExpanded((current) => !current)}
+                      aria-label={analysisExpanded ? 'Restore compact analysis panel' : 'Expand analysis panel'}
+                      title={analysisExpanded ? 'Restore compact panel' : 'Open in a larger view'}
+                    >
+                      {analysisExpanded ? (
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M9 3v6H3M15 21v-6h6M9 9 3 3M15 15l6 6" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M8 3H3v5M16 21h5v-5M3 8l6-6M21 16l-6 6" />
+                        </svg>
+                      )}
+                    </button>
                   </header>
                 </div>
                 <div className="parashari-desk-analysis__body" role="tabpanel">
                   {analysisTab === 'house' ? (
-                    <DeskHouseInsight
-                      birthData={birthData}
-                      chartData={chartData}
-                      selection={houseSelection}
-                      asOfDate={asOfDate}
-                      chartId={houseSelection?.chartId || 'lagna'}
-                    />
+                    <>
+                      {analysisExpanded ? (
+                        <div className="parashari-desk-analysis__house-picker" role="group" aria-label="Select a D1 house">
+                          <span className="parashari-desk-analysis__house-picker-label">D1 house</span>
+                          <div className="parashari-desk-analysis__house-chips">
+                            {Array.from({ length: 12 }, (_, index) => {
+                              const houseNumber = index + 1;
+                              const selection = buildHouseSelection(chartData, houseNumber, 'lagna');
+                              const selected = houseSelection?.chartId === 'lagna' && houseSelection?.houseNumber === houseNumber;
+                              return (
+                                <button
+                                  type="button"
+                                  key={houseNumber}
+                                  className={selected ? 'is-active' : ''}
+                                  aria-pressed={selected}
+                                  onClick={() => handleHouseSelect(selection)}
+                                  title={`House ${houseNumber} · ${selection.signName} · ${HOUSE_AREAS[index]}`}
+                                >
+                                  <strong>H{houseNumber}</strong>
+                                  <span>{HOUSE_AREAS[index]}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+                      <DeskHouseInsight
+                        birthData={birthData}
+                        chartData={chartData}
+                        selection={houseSelection}
+                        asOfDate={asOfDate}
+                        chartId={houseSelection?.chartId || 'lagna'}
+                        expanded={analysisExpanded}
+                      />
+                    </>
                   ) : analysisTab === 'positions' ? (
                     <DeskPositionsTable chartData={chartData} birthData={birthData} />
                   ) : analysisTab === 'yogas' ? (
@@ -792,6 +875,7 @@ const ChartsDashasWorkspacePage = ({
                   )}
                 </div>
               </section>
+              </>
             )}
           </div>
         </div>

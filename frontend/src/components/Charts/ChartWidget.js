@@ -11,6 +11,34 @@ import './ChartMaximizedModal.css';
 import './ChartToolModal.css';
 import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
 
+const EyeIcon = ({ hidden = false }) => (
+  <svg
+    aria-hidden="true"
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {hidden ? (
+      <>
+        <path d="M3 3l18 18" />
+        <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" />
+        <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c5.5 0 9.5 5.2 9.5 8a7.9 7.9 0 0 1-2 3.6" />
+        <path d="M6.6 6.7C4 8.4 2.5 10.7 2.5 12c0 2.8 4 8 9.5 8a10 10 0 0 0 4.1-.9" />
+      </>
+    ) : (
+      <>
+        <path d="M2.5 12S6 5 12 5s9.5 7 9.5 7S18 19 12 19 2.5 12 2.5 12Z" />
+        <circle cx="12" cy="12" r="3" />
+      </>
+    )}
+  </svg>
+);
+
 const ChartWidget = ({
   title,
   chartType,
@@ -33,13 +61,17 @@ const ChartWidget = ({
   chartStyle: controlledChartStyle,
   onChartStyleChange = null,
   calculationProfile = null,
+  /** Charts Hub treatment: details visible initially, eye toggle, no duplicate hover card. */
+  inlinePlanetDetails = false,
 }) => {
   const [internalChartStyle, setInternalChartStyle] = useState(defaultStyle || 'north');
   const chartStyle = controlledChartStyle ?? internalChartStyle;
   const [showAshtakavarga, setShowAshtakavarga] = useState(false);
   const supportsAshtakavarga = chartType === 'lagna' || chartType === 'transit';
   const [showMaximized, setShowMaximized] = useState(false);
-  const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(!deskMode);
+  const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(
+    inlinePlanetDetails || !deskMode
+  );
   const [showSpecialPoints, setShowSpecialPoints] = useState(false);
   const [specialPointsData, setSpecialPointsData] = useState(null);
   const [showPlanetaryDignities, setShowPlanetaryDignities] = useState(false);
@@ -433,6 +465,29 @@ const ChartWidget = ({
               gap: 4,
             }}
           >
+            {inlinePlanetDetails ? <button
+              type="button"
+              onClick={() => setShowDegreeNakshatra((visible) => !visible)}
+              aria-label={showDegreeNakshatra ? 'Hide planet degrees and nakshatras' : 'Show planet degrees and nakshatras'}
+              aria-pressed={showDegreeNakshatra}
+              title={showDegreeNakshatra ? 'Hide planet degrees and nakshatras' : 'Show planet degrees and nakshatras'}
+              style={{
+                width: 24,
+                height: 24,
+                padding: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(255,255,255,0.92)',
+                color: showDegreeNakshatra ? 'var(--color-brand, #7a173d)' : '#666',
+                border: `1px solid ${showDegreeNakshatra ? 'var(--color-brand, #7a173d)' : '#ddd'}`,
+                borderRadius: '4px',
+                cursor: 'pointer',
+                lineHeight: 1,
+              }}
+            >
+              <EyeIcon hidden={!showDegreeNakshatra} />
+            </button> : null}
             <StyleToggle onClick={toggleStyle} title="North / South Indian">
               {chartStyle === 'north' ? 'N' : 'S'}
             </StyleToggle>
@@ -479,6 +534,7 @@ const ChartWidget = ({
             highlightedPlanets={highlightedPlanets}
             highlightedHouseNumbers={highlightedHouseNumbers}
             activationHouseStates={activationHouseStates}
+            showPlanetHoverDetails={!inlinePlanetDetails}
           />
         ) : (
           <SouthIndianChart 
@@ -494,6 +550,7 @@ const ChartWidget = ({
             highlightedPlanets={highlightedPlanets}
             highlightedHouseNumbers={highlightedHouseNumbers}
             activationHouseStates={activationHouseStates}
+            showPlanetHoverDetails={!inlinePlanetDetails}
           />
         )}
       </ChartContainer>
@@ -1087,6 +1144,7 @@ const ChartWidget = ({
                     showDegreeNakshatra={showDegreeNakshatra}
                     chartRefHighlight={chartRefHighlight}
                     showFooterHint={showFooterHint}
+                    showPlanetHoverDetails={!inlinePlanetDetails}
                   />
                 </div>
               ) : (
@@ -1099,6 +1157,7 @@ const ChartWidget = ({
                     showDegreeNakshatra={showDegreeNakshatra}
                     chartRefHighlight={chartRefHighlight}
                     showFooterHint={showFooterHint}
+                    showPlanetHoverDetails={!inlinePlanetDetails}
                   />
                 </div>
               )}

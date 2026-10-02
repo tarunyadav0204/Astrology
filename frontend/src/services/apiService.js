@@ -844,6 +844,15 @@ export const apiService = {
     return response.data;
   },
 
+  getChartAshtakavarga: async ({ birthData, chartType = 'lagna', transitDate }) => {
+    const response = await apiClient.post(getEndpoint('/calculate-ashtakavarga'), {
+      birth_data: apiService._chartInsightBirth(birthData),
+      chart_type: chartType,
+      transit_date: transitDate || new Date().toISOString().split('T')[0],
+    });
+    return response.data;
+  },
+
   getChartOverview: async ({ birthData, chartId = 'lagna', transitDate }) => {
     const response = await apiClient.post(getEndpoint('/chart-overview'), {
       birth_data: apiService._chartInsightBirth(birthData),

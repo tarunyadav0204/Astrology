@@ -66,21 +66,37 @@ export const getTopTrianglePlanetPosition = (houseNumber, planetIndex, totalPlan
 // Falling through to the generic 5+ layout lets the final item cross the
 // diagonal into the neighbouring house.
 export const getSideTrianglePlanetPosition = (houseNumber, planetIndex, totalPlanets) => {
-  if (![3, 5, 9, 11].includes(houseNumber) || totalPlanets < 2) return null;
+  if (![3, 5, 9, 11].includes(houseNumber) || totalPlanets < 1) return null;
 
   const isLeft = houseNumber === 3 || houseNumber === 5;
   const isLower = houseNumber === 5 || houseNumber === 9;
   // Keep the complete label group (symbol plus its two detail lines) clear of
   // both diagonals.  The previous x=35/y=48 anchor put the symbol itself on
   // the upper diagonal even though its centre was technically inside.
-  const startY = isLower ? 260 : 60;
-  const endY = isLower ? 340 : 145;
+  const startY = totalPlanets === 1 ? (isLower ? 300 : 100) : (isLower ? 260 : 60);
+  const endY = totalPlanets === 1 ? startY : (isLower ? 340 : 145);
   const spacing = totalPlanets > 1 ? (endY - startY) / (totalPlanets - 1) : 0;
 
   return {
     x: isLeft ? 25 : 375,
     y: startY + (planetIndex * spacing),
   };
+};
+
+export const getPlanetTypography = (totalPlanets) => {
+  if (totalPlanets <= 1) {
+    return { symbolSize: 17, detailSize: 10, symbolOffset: -9, detailOffsets: [5, 17] };
+  }
+  if (totalPlanets === 2) {
+    return { symbolSize: 16, detailSize: 9.5, symbolOffset: -9, detailOffsets: [5, 17] };
+  }
+  if (totalPlanets === 3) {
+    return { symbolSize: 14, detailSize: 8.5, symbolOffset: -8, detailOffsets: [4, 14] };
+  }
+  if (totalPlanets === 4) {
+    return { symbolSize: 12, detailSize: 7.5, symbolOffset: -7, detailOffsets: [3, 12] };
+  }
+  return { symbolSize: 10, detailSize: 6.5, symbolOffset: -6, detailOffsets: [3, 11] };
 };
 
 // Keep sign numbers in the open part of each North Indian chart compartment.
@@ -162,6 +178,7 @@ const NorthIndianChart = ({
   highlightedHouseNumbers = null,
   /** Current Parashari activation state keyed by natal house number. */
   activationHouseStates = null,
+  showPlanetHoverDetails = true,
 }) => {
   const { signs, planets } = CHART_CONFIG;
   const chartId = resolveChartId(chartType, division);
@@ -823,8 +840,6 @@ const NorthIndianChart = ({
             {/* Planets */}
             {planetsInHouse.map((planet, pIndex) => {
               const totalPlanets = planetsInHouse.length;
-              const isDenseHouse = totalPlanets >= 2;
-              const isVeryDenseHouse = totalPlanets >= 3;
               let planetX, planetY;
               const topTrianglePosition = getTopTrianglePlanetPosition(houseNumber, pIndex, totalPlanets);
               const sideTrianglePosition = getSideTrianglePlanetPosition(houseNumber, pIndex, totalPlanets);
@@ -872,9 +887,15 @@ const NorthIndianChart = ({
                   } else if (houseNumber === 4) {
                     planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
                     planetY = houseData.center.y + 5 + (row * rowSpacing);
-                  } else if ([6, 7, 8].includes(houseNumber)) {
+                  } else if ([6, 8].includes(houseNumber)) {
                     planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y + 25 + (row * rowSpacing);
+                    // The sign number occupies the upper tip of these bottom
+                    // triangles. Start the first planet row below that lane;
+                    // a second row still finishes within the 400px viewBox.
+                    planetY = houseData.center.y + 20 + (row * 35);
+                  } else if (houseNumber === 7) {
+                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
+                    planetY = houseData.center.y + 15 + (row * 35);
                   } else if (houseNumber === 10) {
                     planetX = houseData.center.x + 15 + (col === 0 ? -spacing : spacing);
                     planetY = houseData.center.y - 25 + (row * rowSpacing);
@@ -910,11 +931,12 @@ const NorthIndianChart = ({
                   planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
                 }
               }
-              const tooltipText = `${planet.name}: ${formatDegreeDMS(parseFloat(planet.degree))} in ${planet.nakshatra}`;
-              const symbolFontSize = isVeryDenseHouse ? '10' : isDenseHouse ? '12' : '15';
-              const detailFontSize = isVeryDenseHouse ? '6.5' : isDenseHouse ? '8' : '10';
-              const detailLine1Y = planetY + (isDenseHouse ? 3 : 8);
-              const detailLine2Y = planetY + (isDenseHouse ? 11 : 19);
+              const typography = getPlanetTypography(totalPlanets);
+              const symbolFontSize = String(typography.symbolSize);
+              const detailFontSize = String(typography.detailSize);
+              const symbolY = planetY + typography.symbolOffset;
+              const detailLine1Y = planetY + typography.detailOffsets[0];
+              const detailLine2Y = planetY + typography.detailOffsets[1];
               const compactDegree = formatDegreeCompact(parseFloat(planet.degree));
               const compactNakshatra = planet.shortNakshatra;
               const aspectingPlanet = aspectsHighlight.show && aspectsHighlight.aspectingPlanets?.find(p => p.name === planet.name);
@@ -956,22 +978,27 @@ const NorthIndianChart = ({
                   ) : null}
                   {/* Planet symbol */}
                   <text x={planetX} 
-                        y={planetY - 8} 
+                        y={symbolY}
                         fontSize={symbolFontSize} 
                         fill={highlightedPlanetSet?.has(planet.name.toLowerCase()) ? '#9f1239' : getPlanetColor(planet)}
                         fontWeight="900"
                         textAnchor="middle"
                         style={{ cursor: 'pointer' }}
-                      onMouseEnter={(e) => {
+                      onMouseEnter={showPlanetHoverDetails ? (() => {
                         if (isTouchDevice) return;
                         const isRightSide = [8, 9, 10, 11, 12].includes(houseNumber);
                         const offsetX = isRightSide ? -120 : 10;
-                        setTooltip({ show: true, x: planetX + offsetX, y: planetY - 30, text: tooltipText });
-                      }}
-                      onMouseLeave={() => {
+                        setTooltip({
+                          show: true,
+                          x: planetX + offsetX,
+                          y: planetY - 30,
+                          text: `${planet.name}: ${formatDegreeDMS(parseFloat(planet.degree))} in ${planet.nakshatra}`,
+                        });
+                      }) : undefined}
+                      onMouseLeave={showPlanetHoverDetails ? (() => {
                         if (isTouchDevice) return;
                         setTooltip({ show: false, x: 0, y: 0, text: '' });
-                      }}
+                      }) : undefined}
                       onClick={(e) => handleRashiClick(e, rashiIndex, houseNumber)}
                       onTouchStart={(e) => {
                         setIsTouchDevice(true);
@@ -1015,7 +1042,7 @@ const NorthIndianChart = ({
       })}
       </svg>
       
-      {tooltip.show && (
+      {showPlanetHoverDetails && tooltip.show && (
         <div style={{
           position: 'absolute',
           left: tooltip.x,

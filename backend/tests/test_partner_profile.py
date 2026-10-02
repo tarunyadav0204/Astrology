@@ -271,6 +271,33 @@ def test_sun_hair_description_cannot_be_rendered_as_baldness():
     assert "head_hair" not in SIGN_RULES["Scorpio"]["appearance"]
 
 
+def test_saturn_coarse_hair_does_not_become_dense_hair():
+    profile = {
+        "appearance": {
+            "head_hair": {
+                "primary": {
+                    "value": "coarse hair",
+                    "confidence": "strong",
+                    "independent_repetitions": 3,
+                    "evidence": [{"source_id": "bphs.graha_forms", "verse": "3.29"}],
+                }
+            }
+        }
+    }
+    prompt = build_portrait_prompt(
+        profile,
+        presentation="masculine",
+        age_band="25-34",
+        clothing_style="contemporary",
+        visual_context="south_asian",
+    )
+
+    assert "coarse-textured or slightly wiry hair" in prompt
+    assert "density is unspecified" in prompt
+    assert "do not make it unusually thick, dense, or luxuriant" in prompt
+    assert PLANET_RULES["Saturn"]["appearance"]["head_hair"] == "coarse hair"
+
+
 def _jupiter_seventh_evidence(*, cancelled: bool) -> dict:
     jupiter = {
         "planet": "Jupiter",

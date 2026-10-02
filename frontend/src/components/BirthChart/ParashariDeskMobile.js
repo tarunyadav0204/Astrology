@@ -343,6 +343,7 @@ export default function ParashariDeskMobile({
                 showFooterHint={false}
                 embedInDashboard
                 deskMode
+                inlinePlanetDetails
                 onHouseSelect={handleHouseSelect}
                 selectedHouseNumber={houseSelection?.houseNumber}
                 activationHouseStates={

@@ -23,6 +23,7 @@ const SouthIndianChart = ({
   highlightedPlanets = null,
   highlightedHouseNumbers = null,
   activationHouseStates = null,
+  showPlanetHoverDetails = true,
 }) => {
   const { signs, planets } = CHART_CONFIG;
   const chartId = resolveChartId(chartType, division);
@@ -680,7 +681,7 @@ const SouthIndianChart = ({
                       )}
                       {(() => {
                         const isLit = highlightedPlanetSet?.has(planet.name.toLowerCase());
-                        const fontPx = totalPlanets > 4 ? 8 : totalPlanets > 2 ? 10 : totalPlanets > 1 ? 12 : 14;
+                        const fontPx = totalPlanets > 4 ? 10 : totalPlanets > 3 ? 11 : totalPlanets > 2 ? 12 : totalPlanets > 1 ? 14 : 16;
                         if (!isLit) return null;
                         return (
                           <rect
@@ -698,24 +699,24 @@ const SouthIndianChart = ({
                       {/* Planet symbol */}
                       <text x={planetX} 
                             y={planetY - 8} 
-                            fontSize={totalPlanets > 4 ? "8" : totalPlanets > 2 ? "10" : totalPlanets > 1 ? "12" : "14"} 
+                            fontSize={totalPlanets > 4 ? "10" : totalPlanets > 3 ? "11" : totalPlanets > 2 ? "12" : totalPlanets > 1 ? "14" : "16"}
                             fill={highlightedPlanetSet?.has(planet.name.toLowerCase()) ? '#9f1239' : getPlanetColor(planet)}
                             fontWeight="900"
                             textAnchor="middle"
                             style={{ cursor: 'pointer' }}
-                          onMouseEnter={(e) => {
+                          onMouseEnter={showPlanetHoverDetails ? (() => {
                             if (isTouchDevice) return;
                             const tooltipText = `${planet.name}: ${formatDegreeDMS(parseFloat(planet.degree))} in ${planet.nakshatra}`;
                             const isRightSide = pos.x >= 150;
                             const offsetX = isRightSide ? -120 : 10;
-                            const fontSize = totalPlanets > 4 ? 7 : totalPlanets > 2 ? 9 : totalPlanets > 1 ? 10 : 13;
+                            const fontSize = totalPlanets > 4 ? 8 : totalPlanets > 3 ? 9 : totalPlanets > 2 ? 10 : totalPlanets > 1 ? 11 : 14;
                             const offsetY = fontSize + 2;
                             setTooltip({ show: true, x: planetX + offsetX, y: planetY - offsetY, text: tooltipText });
-                          }}
-                          onMouseLeave={() => {
+                          }) : undefined}
+                          onMouseLeave={showPlanetHoverDetails ? (() => {
                             if (isTouchDevice) return;
                             setTooltip({ show: false, x: 0, y: 0, text: '' });
-                          }}
+                          }) : undefined}
                           onClick={(e) => handleRashiClick(e, pos.sign, houseNumber)}
                           onTouchStart={(e) => {
                             setIsTouchDevice(true);
@@ -728,7 +729,7 @@ const SouthIndianChart = ({
                       {showDegreeNakshatra && (
                         <text x={planetX} 
                               y={planetY + 8} 
-                              fontSize={totalPlanets > 4 ? "6" : totalPlanets > 2 ? "7" : totalPlanets > 1 ? "8" : "9"} 
+                              fontSize={totalPlanets > 4 ? "6.5" : totalPlanets > 3 ? "7" : totalPlanets > 2 ? "8" : totalPlanets > 1 ? "9" : "10"}
                               fill="var(--color-chart-text-muted, var(--color-text-muted))"
                               fontWeight="500"
                               textAnchor="middle"
@@ -748,7 +749,7 @@ const SouthIndianChart = ({
       })}
       </svg>
       
-      {tooltip.show && (
+      {showPlanetHoverDetails && tooltip.show && (
         <div style={{
           position: 'absolute',
           left: tooltip.x,

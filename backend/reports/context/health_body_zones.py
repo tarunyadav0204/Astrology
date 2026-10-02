@@ -12,6 +12,8 @@ import re
 import unicodedata
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
+from calculators.house_correspondences import HOUSE_BODY
+
 SIGN_NAMES = [
     "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
@@ -34,25 +36,6 @@ SIGN_BODY: Dict[int, Dict[str, Any]] = {
     9: {"zones": ["knees", "bones", "joints", "teeth"], "tone": "knees / skeletal stiffness"},
     10: {"zones": ["calves", "ankles", "circulation", "nerves"], "tone": "calf-ankle circulation / nerve tone"},
     11: {"zones": ["feet", "toes", "lymph", "sleep"], "tone": "feet / lymph / recovery sleep"},
-}
-
-# House Kalapurusha (by house number, independent of sign)
-HOUSE_BODY: Dict[int, Dict[str, Any]] = {
-    1: {"zones": ["head", "brain", "vitality", "overall body"], "role": "constitution / vitality"},
-    2: {"zones": ["face", "mouth", "teeth", "throat", "sinuses"], "role": "intake / face-throat"},
-    3: {"zones": ["shoulders", "arms", "hands", "lungs"], "role": "arms / breath effort"},
-    4: {"zones": ["chest", "heart", "lungs", "digestion comfort"], "role": "chest / emotional gut"},
-    5: {"zones": ["stomach", "spine", "heart region"], "role": "stomach / spine"},
-    6: {"zones": ["abdomen", "immunity", "acute illness sites"], "role": "disease / immunity / accidents"},
-    7: {"zones": ["kidneys", "lower back", "partner-stress body"], "role": "balance / lumbar"},
-    8: {
-        "zones": ["anus", "rectum", "pelvis", "excretory organs", "reproductive organs"],
-        "role": "chronic / surgery / sudden events",
-    },
-    9: {"zones": ["hips", "thighs", "liver", "long journeys risk"], "role": "thighs / fortune / travel body"},
-    10: {"zones": ["knees", "bones", "joints", "career strain body"], "role": "knees / structure"},
-    11: {"zones": ["calves", "ankles", "circulation"], "role": "circulation / gains body"},
-    12: {"zones": ["feet", "sleep", "hospitalization / recovery beds"], "role": "feet / rest / hospitalization"},
 }
 
 PLANET_KARAKA: Dict[str, Dict[str, Any]] = {

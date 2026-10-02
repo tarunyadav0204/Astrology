@@ -29,6 +29,8 @@ def test_natal_chart_for_shadbala_includes_required_vargas():
 def test_build_house_insight_includes_worksheets():
     insight = build_house_insight(SAMPLE_BIRTH, house_num=1, chart_id="lagna")
     assert insight["house_num"] == 1
+    assert insight["body_parts"] == insight["sign_body_parts"]
+    assert insight["house_body_parts"] == ["head"]
     assert insight["verdict"]
     assert insight["support_factors"] or insight["stress_factors"]
     assert insight["raw"]["classical_grade"]

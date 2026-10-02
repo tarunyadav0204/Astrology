@@ -1,4 +1,5 @@
 from .base_calculator import BaseCalculator
+from .house_correspondences import classical_house_body_parts, classical_sign_body_parts
 
 class HouseAnalyzer(BaseCalculator):
     """Comprehensive house analyzer - reusable for any house analysis"""
@@ -115,6 +116,11 @@ class HouseAnalyzer(BaseCalculator):
             'house_sign_name': self.get_sign_name(house_sign),
             'house_lord': house_lord,
             'significance': self.HOUSE_SIGNIFICANCES[house_number],
+            # Preserve body_parts for the newly introduced response contract,
+            # but make it the sign anatomy used in bhava × rashi synthesis.
+            'body_parts': classical_sign_body_parts(house_sign),
+            'sign_body_parts': classical_sign_body_parts(house_sign),
+            'house_body_parts': classical_house_body_parts(house_number),
             'house_types': house_types
         }
     

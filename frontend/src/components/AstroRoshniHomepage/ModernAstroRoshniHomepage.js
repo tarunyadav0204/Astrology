@@ -219,6 +219,7 @@ const ModernAstroRoshniHomepage = ({
   const [methodIndex, setMethodIndex] = useState(0);
   const [latestArticles, setLatestArticles] = useState([]);
   const [verifiedTestimonials, setVerifiedTestimonials] = useState([]);
+  const [showIosInstallGuide, setShowIosInstallGuide] = useState(false);
   const selectedFocus = useMemo(
     () => FOCUS_AREAS.find((area) => area.key === focusKey) || FOCUS_AREAS[0],
     [focusKey]
@@ -229,6 +230,34 @@ const ModernAstroRoshniHomepage = ({
     document.body.classList.add('modern-homepage-active');
     return () => document.body.classList.remove('modern-homepage-active');
   }, []);
+
+  useLayoutEffect(() => {
+    if (!['#mobile-app', '#begin'].includes(window.location.hash)) return undefined;
+    let secondFrame;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        document.getElementById('mobile-app')?.scrollIntoView({ block: 'start', behavior: 'auto' });
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showIosInstallGuide) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setShowIosInstallGuide(false);
+    };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [showIosInstallGuide]);
 
   useLayoutEffect(() => {
     const page = document.querySelector('.mh-page');
@@ -615,37 +644,93 @@ const ModernAstroRoshniHomepage = ({
           </div>
         </section>
 
-        <section className="mh-chapter mh-app" id="begin">
-          <div className="mh-app__copy">
-            <p className="mh-eyebrow"><span></span> AstroRoshni for Android</p>
+        <section className="mh-chapter mh-app" id="mobile-app">
+          <header className="mh-app__heading">
+            <p className="mh-eyebrow"><span></span> AstroRoshni on your phone</p>
             <h2>Your sky,<br /><em>always with you.</em></h2>
-            <p>Carry your chart, personalized timelines and Tara conversations wherever life happens.</p>
-            <ul>
-              <li><span>01</span> Complete saved birth chart</li>
-              <li><span>02</span> Personal transit notifications</li>
-              <li><span>03</span> Chart-aware conversations with Tara</li>
-            </ul>
-            <a className="mh-store-button" href={SEO_CONFIG.mobileApp.playStoreUrl} target="_blank" rel="noopener noreferrer" aria-label="Get AstroRoshni on Google Play">
-              <span className="mh-store-button__icon" aria-hidden>▶</span>
-              <span className="mh-store-button__copy"><span>GET IT ON</span><strong>Google Play</strong></span>
-            </a>
-          </div>
-          <div className="mh-app__visual">
-            <div className="mh-phone-glow" aria-hidden></div>
-            <div className="mh-app-device">
+            <p>Choose your device below. Android installs from Google Play. On iPhone and iPad, AstroRoshni is added directly from Safari.</p>
+          </header>
+
+          <article className="mh-platform-card mh-platform-card--android">
+            <div className="mh-platform-card__body">
+              <p className="mh-platform-card__label"><span aria-hidden>▶</span> Android</p>
+              <h3>Install from Google Play</h3>
+              <p>Download the Android app and sign in to keep your charts, readings and Tara conversations with you.</p>
+              <ul>
+                <li><span>01</span> Download from Google Play</li>
+                <li><span>02</span> Sign in with your AstroRoshni account</li>
+                <li><span>03</span> Access saved charts and notifications</li>
+              </ul>
+              <a className="mh-store-button" href={SEO_CONFIG.mobileApp.playStoreUrl} target="_blank" rel="noopener noreferrer" aria-label="Get AstroRoshni on Google Play">
+                <span className="mh-store-button__icon" aria-hidden>▶</span>
+                <span className="mh-store-button__copy"><span>GET IT ON</span><strong>Google Play</strong></span>
+              </a>
+            </div>
+            <div className="mh-platform-card__device" aria-hidden="true">
               <span className="mh-app-device__speaker" aria-hidden></span>
               <picture>
                 <source srcSet="/images/AstroRoshni_Home.webp" type="image/webp" />
-                <img src="/images/AstroRoshni_Home.png" alt="AstroRoshni mobile app homepage in the new theme" width="1280" height="2856" loading="lazy" />
+                <img src="/images/AstroRoshni_Home.png" alt="" width="1280" height="2856" loading="lazy" />
               </picture>
             </div>
-          </div>
-          <div className="mh-final-cta">
-            <span>Ready when you are</span>
-            <h3>Ask the question<br />that matters.</h3>
-            <button className="mh-primary-button" type="button" onClick={askTara}>Begin with Tara <span aria-hidden>↗</span></button>
-          </div>
+          </article>
+
+          <article className="mh-platform-card mh-platform-card--ios">
+            <div className="mh-platform-card__body">
+              <p className="mh-platform-card__label"><span className="mh-platform-card__apple" aria-hidden></span> iPhone &amp; iPad</p>
+              <h3>Add from Safari</h3>
+              <p>There is no App Store download. Add AstroRoshni to your Home Screen once, then open it like any other app.</p>
+              <ol className="mh-platform-install-steps">
+                <li><b>1</b><span>Open <a className="mh-mobile-site-link" href="/mobile/">astroroshni.com/mobile/</a> in Safari</span></li>
+                <li><b>2</b><span>Tap the <strong>Share</strong> button</span></li>
+                <li><b>3</b><span>Choose <strong>Add to Home Screen</strong>, then tap Add</span></li>
+              </ol>
+              <div className="mh-platform-card__actions">
+                <button className="mh-store-button mh-store-button--ios" type="button" onClick={() => setShowIosInstallGuide(true)} aria-haspopup="dialog">
+                  <span className="mh-store-button__icon" aria-hidden>▶</span>
+                  <span className="mh-store-button__copy"><span>IPHONE &amp; IPAD</span><strong>Watch install guide</strong></span>
+                </button>
+                <a className="mh-ios-open-link" href="/mobile/">Open mobile site <span aria-hidden>↗</span></a>
+              </div>
+              <small>Use Apple Safari so the “Add to Home Screen” option is available.</small>
+            </div>
+            <button className="mh-platform-card__video" type="button" onClick={() => setShowIosInstallGuide(true)} aria-label="Watch the iPhone and iPad installation guide">
+              <img src="/mobile/astroroshni-ios-app-thumbnail.png" alt="Preview of the AstroRoshni mobile app" loading="lazy" />
+              <span aria-hidden>▶</span>
+              <strong>Watch guide</strong>
+            </button>
+          </article>
         </section>
+
+        {showIosInstallGuide && (
+          <div className="mh-ios-modal" role="presentation" onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowIosInstallGuide(false);
+          }}>
+            <section className="mh-ios-dialog" role="dialog" aria-modal="true" aria-labelledby="mh-ios-title">
+              <button className="mh-ios-dialog__close" type="button" onClick={() => setShowIosInstallGuide(false)} aria-label="Close iPhone installation guide">×</button>
+              <div className="mh-ios-dialog__media">
+                <video controls playsInline muted preload="metadata" poster="/mobile/astroroshni-ios-app-thumbnail.png">
+                  <source src="/mobile/astroroshni-ios-install-guide.mp4" type="video/mp4" />
+                  Your browser does not support this video.
+                </video>
+                <span>Quick installation guide</span>
+              </div>
+              <div className="mh-ios-dialog__content">
+                <p className="mh-eyebrow"><span></span> iPhone &amp; iPad</p>
+                <h2 id="mh-ios-title">Add AstroRoshni to your Home Screen</h2>
+                <p className="mh-ios-dialog__lead">AstroRoshni opens like an app on iPhone and iPad. No App Store download is needed.</p>
+                <ol className="mh-ios-steps">
+                  <li><b>1</b><div><strong>Open AstroRoshni in Safari</strong><small>Visit <a className="mh-mobile-site-link" href="/mobile/">astroroshni.com/mobile/</a> in Apple Safari.</small></div></li>
+                  <li><b>2</b><div><strong>Tap the Share button</strong><small>Look for the square with the upward arrow.</small></div></li>
+                  <li><b>3</b><div><strong>Choose “Add to Home Screen”</strong><small>Scroll down in the Share menu if it is not immediately visible.</small></div></li>
+                  <li><b>4</b><div><strong>Tap Add</strong><small>If shown, keep “Open as Web App” enabled.</small></div></li>
+                </ol>
+                <a className="mh-ios-dialog__open" href="/mobile/">Open AstroRoshni Mobile <span aria-hidden>→</span></a>
+                <small className="mh-ios-dialog__note">Use Safari for the Add to Home Screen option.</small>
+              </div>
+            </section>
+          </div>
+        )}
 
         <section className="mh-faq" id="faq" aria-labelledby="mh-faq-title">
           <div className="mh-faq__heading">
