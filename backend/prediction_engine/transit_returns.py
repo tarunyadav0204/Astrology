@@ -2,7 +2,7 @@
 
 Daily transit states are used only to screen for a crossing.  Every returned
 timestamp and orb boundary is recalculated with the bundled Swiss Ephemeris
-data file in Lahiri sidereal mode.  A failed data-file calculation is an
+data file under the request's sidereal standard (Lahiri by default). A failed data-file calculation is an
 explicit prediction calculation error; it is never replaced with Moshier.
 """
 
@@ -10,17 +10,16 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-import threading
 from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import swisseph as swe
 
 from .contracts import PredictionWindow
 from .errors import PredictionCalculationError
+from calculators.chart_calculator import resolve_ayanamsha_mode, _SWISSEPH_CHART_LOCK
 
 
 EXACT_NATAL_RETURN_ORB_DEGREES = 1.0
-_EPHEMERIS_LOCK = threading.RLock()
 _EPHEMERIS_DIR = Path(__file__).resolve().parent.parent / "ephe"
 _REQUIRED_EPHEMERIS_FILES = (
     _EPHEMERIS_DIR / "sepl_18.se1",
@@ -77,8 +76,17 @@ def _signed_delta(first: float, second: float) -> float:
     return ((float(second) - float(first) + 180.0) % 360.0) - 180.0
 
 
-def _strict_planet_state(at: datetime, planet: str) -> Tuple[float, float]:
-    planet_id = _PLANET_IDS.get(planet)
+def _strict_planet_state(
+    at: datetime,
+    planet: str,
+    *,
+    ayanamsha: str = "lahiri",
+    node_type: str = "mean",
+) -> Tuple[float, float]:
+    if planet in {"Rahu", "Ketu"}:
+        planet_id = swe.TRUE_NODE if node_type == "true" else swe.MEAN_NODE
+    else:
+        planet_id = _PLANET_IDS.get(planet)
     if planet_id is None:
         raise PredictionCalculationError(
             f"Exact natal return does not support planet: {planet}"
@@ -91,20 +99,25 @@ def _strict_planet_state(at: datetime, planet: str) -> Tuple[float, float]:
         + at.microsecond / 3_600_000_000.0
     )
     try:
-        with _EPHEMERIS_LOCK:
-            missing = [path.name for path in _REQUIRED_EPHEMERIS_FILES if not path.is_file()]
-            if missing:
-                raise PredictionCalculationError(
-                    "Required Swiss Ephemeris data is unavailable: " + ", ".join(missing)
+        with _SWISSEPH_CHART_LOCK:
+            try:
+                missing = [path.name for path in _REQUIRED_EPHEMERIS_FILES if not path.is_file()]
+                if missing:
+                    raise PredictionCalculationError(
+                        "Required Swiss Ephemeris data is unavailable: " + ", ".join(missing)
+                    )
+                swe.set_ephe_path(str(_EPHEMERIS_DIR))
+                _, sid_mode = resolve_ayanamsha_mode(ayanamsha)
+                swe.set_sid_mode(sid_mode)
+                values, return_flags = swe.calc_ut(
+                    swe.julday(at.year, at.month, at.day, hour),
+                    planet_id,
+                    swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH,
                 )
-            swe.set_ephe_path(str(_EPHEMERIS_DIR))
-            swe.set_sid_mode(swe.SIDM_LAHIRI)
-            values, return_flags = swe.calc_ut(
-                swe.julday(at.year, at.month, at.day, hour),
-                planet_id,
-                swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH,
-            )
-            if not return_flags & swe.FLG_SWIEPH or return_flags & swe.FLG_MOSEPH:
+                invalid_ephemeris = not return_flags & swe.FLG_SWIEPH or return_flags & swe.FLG_MOSEPH
+            finally:
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
+            if invalid_ephemeris:
                 raise PredictionCalculationError(
                     f"Swiss data-file mode was unavailable for {planet} at {at.isoformat()}"
                 )

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from auth import get_current_user
 from calculators.yoga_calculator import YogaCalculator
@@ -15,6 +15,8 @@ class YogaRequest(BaseModel):
     longitude: Optional[float] = None
     timezone: Optional[str] = None
     gender: Optional[str] = None
+    chart_data: Optional[Dict[str, Any]] = None
+    calculation_profile: Optional[Dict[str, str]] = None
 
 router = APIRouter(prefix="/yogas", tags=["yogas"])
 
@@ -37,8 +39,15 @@ async def get_yogas(request: YogaRequest, current_user = Depends(get_current_use
             gender=request.gender
         )
 
-        chart_calculator = ChartCalculator({})
-        chart_data = chart_calculator.calculate_chart(birth_data)
+        chart_data = request.chart_data
+        if not chart_data:
+            profile = request.calculation_profile or {}
+            chart_calculator = ChartCalculator({})
+            chart_data = chart_calculator.calculate_chart(
+                birth_data,
+                node_type=profile.get('node_type', 'mean'),
+                ayanamsha=profile.get('ayanamsha', 'lahiri'),
+            )
 
         yoga_calculator = YogaCalculator(birth_data, chart_data)
         yogas = yoga_calculator.calculate_all_yogas()

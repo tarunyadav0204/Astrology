@@ -366,6 +366,7 @@ def _now_block(
     birth_data: Dict[str, Any],
     natal: Dict[str, Any],
     transit_date: Optional[str],
+    calculation_profile: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     current_date = None
     if transit_date:
@@ -374,7 +375,9 @@ def _now_block(
         except ValueError:
             current_date = None
     dashas = _safe_call(
-        lambda: DashaCalculator().calculate_current_dashas(birth_data, current_date=current_date),
+        lambda: DashaCalculator(
+            ayanamsha=(calculation_profile or {}).get("ayanamsha", "lahiri")
+        ).calculate_current_dashas(birth_data, current_date=current_date),
         {},
     ) or {}
     md = (dashas.get("mahadasha") or {}).get("planet")
@@ -395,6 +398,8 @@ def _now_block(
         transit_raw = TransitCalculator({}).calculate_transits(
             _birth_obj(birth_data),
             transit_date or datetime.now().strftime("%Y-%m-%d"),
+            ayanamsha=(calculation_profile or {}).get("ayanamsha", "lahiri"),
+            node_type=(calculation_profile or {}).get("node_type", "mean"),
         )
         transit_chart = _normalize_transit_chart_data(transit_raw)
         for planet, data in (transit_chart.get("planets") or {}).items():
@@ -448,9 +453,15 @@ def build_chart_overview(
     birth_data: Dict[str, Any],
     chart_id: str = "lagna",
     transit_date: Optional[str] = None,
+    calculation_profile: Optional[Dict[str, str]] = None,
+    supplied_natal_chart: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     birth_obj = _birth_obj(birth_data)
-    natal = _natal_chart_for_shadbala(birth_obj)
+    natal = _natal_chart_for_shadbala(
+        birth_obj,
+        calculation_profile,
+        supplied_natal_chart,
+    )
     analyzer = HouseAnalyzer(natal, birth_obj, shadbala_chart_data=natal)
     dignities = PlanetaryDignitiesCalculator(natal).calculate_planetary_dignities()
     shadbala = getattr(analyzer.planet_analyzer, "shadbala_data", {}) or {}
@@ -470,6 +481,7 @@ def build_chart_overview(
             shadbala_chart_data=natal,
             analyzer=analyzer,
             include_worksheets=False,
+            calculation_profile=calculation_profile,
         )
         verdict = insight.get("verdict") or {}
         timing = insight.get("timing_verdict") or {}
@@ -515,7 +527,12 @@ def build_chart_overview(
     for row in houses:
         row["marks"] = marks_by_house.get(row["house"]) or []
 
-    now = _now_block(birth_data=birth_data, natal=natal, transit_date=transit_date)
+    now = _now_block(
+        birth_data=birth_data,
+        natal=natal,
+        transit_date=transit_date,
+        calculation_profile=calculation_profile,
+    )
     pillars = [
         item for item in (
             _build_pillar(role="Lagna lord", planet=lagna_lord, chart=natal, dignities=dignities, shadbala=shadbala)

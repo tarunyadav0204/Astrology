@@ -69,7 +69,7 @@ function fmtPoint(point) {
  * Compact special-points readout for the Parashari desk.
  * variant: "strip" (toolbar) | "panel" (fills leftover dasha width)
  */
-const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
+const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip', calculationProfile = null }) => {
   const [yogi, setYogi] = useState(null);
   const [badhaka, setBadhaka] = useState(null);
   const [sniper, setSniper] = useState(null);
@@ -92,10 +92,10 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
     (async () => {
       try {
         const [yogiRes, badhakaRes, sniperRes, d9Res, ganRes, mudakkuRes] = await Promise.all([
-          apiService.calculateYogi(birthData),
+          apiService.calculateYogi(birthData, chartData),
           apiService.calculateBadhakaMaraka(chartData).catch(() => null),
           apiService.calculateSniperPoints(chartData).catch(() => null),
-          apiService.calculateDivisionalChart(birthData, 9).catch(() => null),
+          apiService.calculateDivisionalChart(birthData, 9, calculationProfile).catch(() => null),
           apiService.calculateGandantaAnalysis(chartData).catch(() => null),
           apiService.calculateMudakkuAnalysis(chartData).catch(() => null),
         ]);
@@ -122,7 +122,7 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
     return () => {
       cancelled = true;
     };
-  }, [birthData, chartData]);
+  }, [birthData, chartData, calculationProfile]);
 
   const items = useMemo(() => {
     const list = [];
@@ -144,16 +144,21 @@ const DeskSpecialPoints = ({ birthData, chartData, variant = 'strip' }) => {
       });
     }
     if (analysis?.maraka?.lords?.length) {
-      const lords = analysis.maraka.lords.map((l) => {
-        if (typeof l === 'string') return planetAbbr(l);
-        return planetAbbr(l.planet || l.lord || l.name);
-      });
-      list.push({
-        key: 'maraka',
-        label: 'Maraka',
-        value: lords.filter(Boolean).join(' · '),
-        tone: 'maraka',
-      });
+      const primaryLords = [...new Set(analysis.maraka.lords
+        .filter((lord) => typeof lord === 'string' || lord?.type === 'primary')
+        .map((lord) => (typeof lord === 'string'
+          ? planetAbbr(lord)
+          : planetAbbr(lord.planet || lord.lord || lord.name)))
+        .filter(Boolean))];
+      if (primaryLords.length) {
+        list.push({
+          key: 'maraka',
+          label: 'Maraka',
+          value: primaryLords.join(' · '),
+          tone: 'maraka',
+          title: 'Primary Maraka lords of Houses 2 and 7',
+        });
+      }
     }
     if (analysis?.rasi_type) {
       list.push({ key: 'rasi', label: 'Rasi', value: analysis.rasi_type, tone: 'rasi' });

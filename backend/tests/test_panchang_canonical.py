@@ -36,6 +36,22 @@ def test_birth_reference_is_preserved_through_compatibility_facade():
     assert canonical['karana']['name'] == legacy['karana']['name']
 
 
+def test_birth_panchang_honours_an_explicit_dashboard_ayanamsha():
+    birth = {
+        'date': '1980-04-02',
+        'time': '14:55:00',
+        'latitude': 29.15,
+        'longitude': 75.72,
+        'timezone': 'Asia/Kolkata',
+    }
+    lahiri = PanchangCalculator().calculate_birth_panchang(birth)
+    raman = PanchangCalculator('raman').calculate_birth_panchang(birth)
+
+    assert 'calculation_profile' not in lahiri
+    assert 'calculation_profile' not in raman
+    assert abs(lahiri['ayanamsa'] - raman['ayanamsa']) > 0.1
+
+
 def test_iso_datetime_date_is_normalized_for_daily_and_birth_panchang():
     iso_date = '2006-04-15T04:26:51.191Z'
     calculator = PanchangCalculator()

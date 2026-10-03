@@ -24,7 +24,7 @@ function shortWeekday(name) {
 /**
  * Compact janma pañcāṅga strip for the Parashari desk (birth moment).
  */
-export default function DeskBirthPanchang({ birthData }) {
+export default function DeskBirthPanchang({ birthData, calculationProfile }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
@@ -36,7 +36,7 @@ export default function DeskBirthPanchang({ birthData }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiService.calculateBirthPanchang(birthData);
+        const res = await apiService.calculateBirthPanchang(birthData, calculationProfile);
         if (!cancelled) {
           setData(res);
           setError(null);
@@ -51,7 +51,7 @@ export default function DeskBirthPanchang({ birthData }) {
     return () => {
       cancelled = true;
     };
-  }, [birthData]);
+  }, [birthData, calculationProfile]);
 
   const items = useMemo(() => {
     if (!data) return [];

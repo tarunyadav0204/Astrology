@@ -135,8 +135,17 @@ def _attach_shadbala_vargas(natal_chart: Dict[str, Any]) -> Dict[str, Any]:
     return natal_chart
 
 
-def _natal_chart_for_shadbala(birth_obj: SimpleNamespace) -> Dict[str, Any]:
-    natal_chart = ChartCalculator({}).calculate_chart(birth_obj)
+def _natal_chart_for_shadbala(
+    birth_obj: SimpleNamespace,
+    calculation_profile: Optional[Dict[str, str]] = None,
+    supplied_natal_chart: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    profile = calculation_profile or {}
+    natal_chart = supplied_natal_chart or ChartCalculator({}).calculate_chart(
+        birth_obj,
+        node_type=profile.get("node_type", "mean"),
+        ayanamsha=profile.get("ayanamsha", "lahiri"),
+    )
     return _attach_shadbala_vargas(natal_chart)
 
 
@@ -428,12 +437,13 @@ def _collect_house_factors(
     shadbala_chart_data: Optional[Dict[str, Any]] = None,
     analyzer: Optional[HouseAnalyzer] = None,
     include_worksheets: bool = True,
+    calculation_profile: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     birth_obj = _birth_obj(birth_data)
     natal_for_shadbala = shadbala_chart_data or (
         _attach_shadbala_vargas(chart_data)
         if chart_id == "lagna"
-        else _natal_chart_for_shadbala(birth_obj)
+        else _natal_chart_for_shadbala(birth_obj, calculation_profile)
     )
     analyzer = analyzer or HouseAnalyzer(chart_data, birth_obj, shadbala_chart_data=natal_for_shadbala)
     analysis = analyzer.analyze_house(house_num)
@@ -1058,7 +1068,9 @@ def _collect_house_factors(
         pass
 
     try:
-        dasha_calc = DashaCalculator()
+        dasha_calc = DashaCalculator(
+            ayanamsha=(calculation_profile or {}).get("ayanamsha", "lahiri")
+        )
         dashas = dasha_calc.calculate_current_dashas(
             birth_data,
             current_date=datetime.strptime(transit_date, "%Y-%m-%d") if transit_date else None,
@@ -1098,6 +1110,8 @@ def _collect_house_factors(
             transit_chart = TransitCalculator({}).calculate_transits(
                 birth_obj,
                 transit_date or datetime.now().strftime("%Y-%m-%d"),
+                ayanamsha=(calculation_profile or {}).get("ayanamsha", "lahiri"),
+                node_type=(calculation_profile or {}).get("node_type", "mean"),
             )
             target_sign = house_sign
             transit_hits = []
@@ -1236,14 +1250,22 @@ def build_house_insight(
     house_num: int,
     chart_id: str = "lagna",
     transit_date: Optional[str] = None,
+    calculation_profile: Optional[Dict[str, str]] = None,
+    supplied_natal_chart: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     birth_obj = _birth_obj(birth_data)
-    natal_chart = _natal_chart_for_shadbala(birth_obj)
+    natal_chart = _natal_chart_for_shadbala(
+        birth_obj,
+        calculation_profile,
+        supplied_natal_chart,
+    )
 
     if chart_id == "transit":
         transit_raw = TransitCalculator({}).calculate_transits(
             birth_obj,
             transit_date or datetime.now().strftime("%Y-%m-%d"),
+            ayanamsha=(calculation_profile or {}).get("ayanamsha", "lahiri"),
+            node_type=(calculation_profile or {}).get("node_type", "mean"),
         )
         chart_data = _normalize_transit_chart_data(transit_raw)
     else:
@@ -1261,6 +1283,7 @@ def build_house_insight(
         chart_id=chart_id,
         transit_date=transit_date,
         shadbala_chart_data=natal_chart,
+        calculation_profile=calculation_profile,
     )
 
 

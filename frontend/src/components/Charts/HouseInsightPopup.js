@@ -50,6 +50,7 @@ function HouseInsightPopup({
   planetsInHouse = [],
   onMakeAscendant,
   transitDate,
+  calculationProfile = null,
 }) {
   const navigate = useNavigate();
   const [insight, setInsight] = useState(null);
@@ -77,7 +78,14 @@ function HouseInsightPopup({
     setLoading(true);
     setError('');
     apiService
-      .getHouseInsight({ birthData, houseNum: houseNumber, chartId, transitDate })
+      .getHouseInsight({
+        birthData,
+        houseNum: houseNumber,
+        chartId,
+        transitDate,
+        calculationProfile,
+        chartData: chartId === 'lagna' ? chartData : null,
+      })
       .then((data) => {
         if (!cancelled) setInsight(data);
       })
@@ -93,7 +101,7 @@ function HouseInsightPopup({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, birthData, houseNumber, chartId, transitDate]);
+  }, [isOpen, birthData, houseNumber, chartId, transitDate, calculationProfile, chartData]);
 
   useEffect(() => {
     if (!isOpen || !chartData) {

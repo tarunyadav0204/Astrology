@@ -56,6 +56,17 @@
   flex-shrink: 0;
 }
 
+.desk-dasha__as-of {
+  padding: 0.12rem 0.38rem;
+  border: 1px solid var(--dd-line);
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  color: var(--dd-muted);
+  font-size: 0.61rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .desk-dasha__remain {
   font-size: 0.68rem;
   font-weight: 700;

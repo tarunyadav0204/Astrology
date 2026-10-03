@@ -134,9 +134,11 @@ def _dasha_rows(
     birth: BirthChartInput,
     start: date,
     end: date,
+    *,
+    ayanamsha: str = "lahiri",
 ) -> List[Dict[str, str]]:
     try:
-        rows = DashaCalculator().get_dasha_periods_for_range(
+        rows = DashaCalculator(ayanamsha=ayanamsha).get_dasha_periods_for_range(
             birth.to_calculator_dict(),
             _as_datetime(start),
             _as_datetime(end),
@@ -393,13 +395,16 @@ def _build_windows(
     chart: Dict[str, Any],
     start: date,
     end: date,
+    *,
+    ayanamsha: str = "lahiri",
+    node_type: str = "mean",
 ) -> Tuple[
     List[PredictionWindow],
     Dict[str, Dict[str, Dict[str, Any]]],
     Dict[str, Dict[str, Dict[str, Any]]],
 ]:
-    dasha_rows = _dasha_rows(birth, start, end)
-    transit_calculator = RealTransitCalculator()
+    dasha_rows = _dasha_rows(birth, start, end, ayanamsha=ayanamsha)
+    transit_calculator = RealTransitCalculator(ayanamsha=ayanamsha, node_type=node_type)
     windows: List[PredictionWindow] = []
     states_by_signature: Dict[str, Dict[str, Dict[str, Any]]] = {}
     daily_states: Dict[str, Dict[str, Dict[str, Any]]] = {}
@@ -483,13 +488,19 @@ def build_calculation_context(
     end: date,
     *,
     include_exact_transit_returns: bool = False,
+    calculation_profile: Dict[str, str] | None = None,
 ) -> CalculationContext:
     from .natal_promise import build_natal_promises
-    from .transit_returns import build_exact_natal_return_passes
+    from .transit_returns import build_exact_natal_return_passes, _strict_planet_state
 
+    profile = calculation_profile or {}
+    ayanamsha = str(profile.get("ayanamsha") or "lahiri")
+    node_type = str(profile.get("node_type") or "mean")
     try:
         chart = ChartCalculator({}).calculate_chart(
-            SimpleNamespace(**birth.to_calculator_dict())
+            SimpleNamespace(**birth.to_calculator_dict()),
+            ayanamsha=ayanamsha,
+            node_type=node_type,
         )
         _validate_chart(chart)
         yogi_points = YogiCalculator(chart).calculate_yogi_points(birth.to_calculator_dict())
@@ -508,9 +519,28 @@ def build_calculation_context(
     except Exception as exc:
         raise PredictionCalculationError("Natal Parashari context calculation failed") from exc
 
-    windows, states_by_signature, daily_states = _build_windows(birth, chart, start, end)
+    windows, states_by_signature, daily_states = _build_windows(
+        birth,
+        chart,
+        start,
+        end,
+        ayanamsha=ayanamsha,
+        node_type=node_type,
+    )
     transit_return_passes = (
-        build_exact_natal_return_passes(chart, windows, daily_states, start, end)
+        build_exact_natal_return_passes(
+            chart,
+            windows,
+            daily_states,
+            start,
+            end,
+            state_at=lambda at, planet: _strict_planet_state(
+                at,
+                planet,
+                ayanamsha=ayanamsha,
+                node_type=node_type,
+            ),
+        )
         if include_exact_transit_returns
         else {}
     )

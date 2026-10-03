@@ -1,8 +1,9 @@
 """Exact, isolated Jupiter–Saturn double-transit interval calculator.
 
 The calculator is deliberately independent from chat/prediction pipelines.  It
-uses Swiss Ephemeris with Lahiri ayanamsa, whole-sign houses and canonical
-Parashari graha drishti.  It never substitutes guessed positions on failure.
+uses Swiss Ephemeris with the dashboard's declared ayanamsha, whole-sign houses
+and canonical Parashari graha drishti. It never substitutes guessed positions
+on failure.
 """
 
 from __future__ import annotations
@@ -11,12 +12,12 @@ from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 import math
 from pathlib import Path
-import threading
 from typing import Any, Dict, Iterable, List, Tuple
 
 import swisseph as swe
 
 from calculators.vedic_graha_drishti import GRAHA_HOUSE_ASPECTS
+from calculators.chart_calculator import resolve_ayanamsha_mode, _SWISSEPH_CHART_LOCK
 
 
 SIGN_NAMES = (
@@ -41,7 +42,6 @@ HOUSE_THEMES = {
     11: ("Gains & networks", "income gains, fulfilment, organisations, patrons, friendships and ambitions"),
     12: ("Release & foreign matters", "expenses, foreign residence, retreat, institutions, sleep and closure"),
 }
-_EPHEMERIS_LOCK = threading.RLock()
 _EPHEMERIS_DIR = Path(__file__).resolve().parent.parent / "ephe"
 _REQUIRED_PLANET_FILE = _EPHEMERIS_DIR / "sepl_18.se1"
 _EPHEMERIS_START = datetime(1800, 1, 1, tzinfo=timezone.utc)
@@ -65,29 +65,34 @@ def _utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-def _planet_state(at: datetime, planet: str) -> Tuple[float, float]:
+def _planet_state(at: datetime, planet: str, ayanamsha: str = "lahiri") -> Tuple[float, float]:
     planet_id = {"Jupiter": swe.JUPITER, "Saturn": swe.SATURN}.get(planet)
     if planet_id is None:
         raise DoubleTransitInputError(f"Unsupported double-transit planet: {planet}")
     at = _utc(at)
     hour = at.hour + at.minute / 60.0 + at.second / 3600.0 + at.microsecond / 3_600_000_000.0
     try:
-        with _EPHEMERIS_LOCK:
-            if not _REQUIRED_PLANET_FILE.is_file():
-                raise DoubleTransitCalculationError(
-                    f"Required Swiss Ephemeris data file is unavailable: {_REQUIRED_PLANET_FILE.name}"
+        with _SWISSEPH_CHART_LOCK:
+            try:
+                if not _REQUIRED_PLANET_FILE.is_file():
+                    raise DoubleTransitCalculationError(
+                        f"Required Swiss Ephemeris data file is unavailable: {_REQUIRED_PLANET_FILE.name}"
+                    )
+                # Swiss Ephemeris configuration is process-global. Set and verify it
+                # inside the same lock as every calculation so another calculator
+                # cannot silently switch this request to the analytic fallback.
+                swe.set_ephe_path(str(_EPHEMERIS_DIR))
+                _, sid_mode = resolve_ayanamsha_mode(ayanamsha)
+                swe.set_sid_mode(sid_mode)
+                values, return_flags = swe.calc_ut(
+                    swe.julday(at.year, at.month, at.day, hour),
+                    planet_id,
+                    swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH,
                 )
-            # Swiss Ephemeris configuration is process-global. Set and verify it
-            # inside the same lock as every calculation so another calculator
-            # cannot silently switch this request to the analytic fallback.
-            swe.set_ephe_path(str(_EPHEMERIS_DIR))
-            swe.set_sid_mode(swe.SIDM_LAHIRI)
-            values, return_flags = swe.calc_ut(
-                swe.julday(at.year, at.month, at.day, hour),
-                planet_id,
-                swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH,
-            )
-            if not return_flags & swe.FLG_SWIEPH or return_flags & swe.FLG_MOSEPH:
+                invalid_ephemeris = not return_flags & swe.FLG_SWIEPH or return_flags & swe.FLG_MOSEPH
+            finally:
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
+            if invalid_ephemeris:
                 raise DoubleTransitCalculationError(
                     f"Swiss Ephemeris data-file mode was not available for {planet} at {at.isoformat()}"
                 )
@@ -102,11 +107,11 @@ def _planet_state(at: datetime, planet: str) -> Tuple[float, float]:
     return float(values[0]) % 360.0, float(values[3])
 
 
-def _sign(at: datetime, planet: str) -> int:
-    return int(_planet_state(at, planet)[0] / 30.0)
+def _sign(at: datetime, planet: str, ayanamsha: str = "lahiri") -> int:
+    return int(_planet_state(at, planet, ayanamsha)[0] / 30.0)
 
 
-def _screen_sign(at: datetime, planet: str) -> int:
+def _screen_sign(at: datetime, planet: str, ayanamsha: str = "lahiri") -> int:
     """Cheaply locate candidate ingress days; never supplies result positions.
 
     Jupiter and Saturn cannot traverse an entire sign in one day. Moshier is
@@ -117,23 +122,27 @@ def _screen_sign(at: datetime, planet: str) -> int:
     planet_id = {"Jupiter": swe.JUPITER, "Saturn": swe.SATURN}[planet]
     at = _utc(at)
     hour = at.hour + at.minute / 60.0 + at.second / 3600.0
-    with _EPHEMERIS_LOCK:
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
-        values, return_flags = swe.calc_ut(
-            swe.julday(at.year, at.month, at.day, hour),
-            planet_id,
-            swe.FLG_SIDEREAL | swe.FLG_MOSEPH,
-        )
+    with _SWISSEPH_CHART_LOCK:
+        try:
+            _, sid_mode = resolve_ayanamsha_mode(ayanamsha)
+            swe.set_sid_mode(sid_mode)
+            values, return_flags = swe.calc_ut(
+                swe.julday(at.year, at.month, at.day, hour),
+                planet_id,
+                swe.FLG_SIDEREAL | swe.FLG_MOSEPH,
+            )
+        finally:
+            swe.set_sid_mode(swe.SIDM_LAHIRI)
     if not return_flags & swe.FLG_MOSEPH or not values:
         raise DoubleTransitCalculationError(f"Ingress screening failed for {planet} at {at.isoformat()}")
     return int((float(values[0]) % 360.0) / 30.0)
 
 
-def _refine_boundary(lo: datetime, hi: datetime, planet: str, old_sign: int) -> datetime:
+def _refine_boundary(lo: datetime, hi: datetime, planet: str, old_sign: int, ayanamsha: str = "lahiri") -> datetime:
     """Bisect a detected sign change to within one second."""
     while hi - lo > timedelta(seconds=1):
         mid = lo + (hi - lo) / 2
-        if _sign(mid, planet) == old_sign:
+        if _sign(mid, planet, ayanamsha) == old_sign:
             lo = mid
         else:
             hi = mid
@@ -141,32 +150,32 @@ def _refine_boundary(lo: datetime, hi: datetime, planet: str, old_sign: int) -> 
 
 
 @lru_cache(maxsize=96)
-def _decade_segments(planet: str, decade_start: int) -> Tuple[Tuple[str, str, int, bool], ...]:
+def _decade_segments(planet: str, decade_start: int, ayanamsha: str = "lahiri") -> Tuple[Tuple[str, str, int, bool], ...]:
     """Cache ephemeris-derived sign intervals in reusable ten-year blocks."""
     start = datetime(decade_start, 1, 1, tzinfo=timezone.utc)
     end = datetime(decade_start + 10, 1, 1, tzinfo=timezone.utc)
     cursor = start
     segment_start = start
-    previous_sign = _sign(start, planet)
-    previous_screen_sign = _screen_sign(start, planet)
+    previous_sign = _sign(start, planet, ayanamsha)
+    previous_screen_sign = _screen_sign(start, planet, ayanamsha)
     rows: List[Tuple[str, str, int, bool]] = []
 
     while cursor < end:
         nxt = min(cursor + timedelta(days=1), end)
-        next_screen_sign = _screen_sign(nxt, planet)
+        next_screen_sign = _screen_sign(nxt, planet, ayanamsha)
         if next_screen_sign != previous_screen_sign:
             # Bracket by an extra day so a sub-arcsecond screening difference
             # can never move the verified Swiss ingress outside the interval.
             bracket_lo = max(segment_start, cursor - timedelta(days=1))
             bracket_hi = min(end, nxt + timedelta(days=1))
-            verified_old_sign = _sign(bracket_lo, planet)
-            verified_new_sign = _sign(bracket_hi, planet)
+            verified_old_sign = _sign(bracket_lo, planet, ayanamsha)
+            verified_new_sign = _sign(bracket_hi, planet, ayanamsha)
             if verified_new_sign != verified_old_sign:
-                boundary = _refine_boundary(bracket_lo, bracket_hi, planet, verified_old_sign)
+                boundary = _refine_boundary(bracket_lo, bracket_hi, planet, verified_old_sign, ayanamsha)
                 midpoint = segment_start + (boundary - segment_start) / 2
                 rows.append((
                     segment_start.isoformat(), boundary.isoformat(), previous_sign,
-                    _planet_state(midpoint, planet)[1] < 0,
+                    _planet_state(midpoint, planet, ayanamsha)[1] < 0,
                 ))
                 segment_start = boundary
                 previous_sign = verified_new_sign
@@ -176,17 +185,17 @@ def _decade_segments(planet: str, decade_start: int) -> Tuple[Tuple[str, str, in
     midpoint = segment_start + (end - segment_start) / 2
     rows.append((
         segment_start.isoformat(), end.isoformat(), previous_sign,
-        _planet_state(midpoint, planet)[1] < 0,
+        _planet_state(midpoint, planet, ayanamsha)[1] < 0,
     ))
     return tuple(rows)
 
 
-def _segments(planet: str, start: datetime, end: datetime) -> List[Dict[str, Any]]:
+def _segments(planet: str, start: datetime, end: datetime, ayanamsha: str = "lahiri") -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     first_decade = (start.year // 10) * 10
     last_decade = (end.year // 10) * 10
     for decade in range(first_decade, last_decade + 1, 10):
-        for raw_start, raw_end, sign, retrograde in _decade_segments(planet, decade):
+        for raw_start, raw_end, sign, retrograde in _decade_segments(planet, decade, ayanamsha):
             seg_start = datetime.fromisoformat(raw_start)
             seg_end = datetime.fromisoformat(raw_end)
             clipped_start = max(start, seg_start)
@@ -268,6 +277,7 @@ def calculate_double_transits(
     end: datetime,
     *,
     include_aspect_only: bool = True,
+    ayanamsha: str = "lahiri",
 ) -> Dict[str, Any]:
     start, end = _utc(start), _utc(end)
     if end <= start:
@@ -286,8 +296,14 @@ def calculate_double_transits(
         house: _natal_context(chart_data, asc_sign, house)
         for house in range(1, 13)
     }
-    jupiter_segments = _segments("Jupiter", start, end)
-    saturn_segments = _segments("Saturn", start, end)
+    # Preserve the original three-argument internal call contract for the
+    # legacy Lahiri path. Profile-aware callers opt into the fourth argument.
+    if ayanamsha == "lahiri":
+        jupiter_segments = _segments("Jupiter", start, end)
+        saturn_segments = _segments("Saturn", start, end)
+    else:
+        jupiter_segments = _segments("Jupiter", start, end, ayanamsha)
+        saturn_segments = _segments("Saturn", start, end, ayanamsha)
     windows: List[Dict[str, Any]] = []
 
     j = s = 0

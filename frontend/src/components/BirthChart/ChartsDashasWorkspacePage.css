@@ -192,26 +192,202 @@
 .parashari-desk-body {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 0.45rem;
   padding: 0.45rem 0.5rem 0.5rem;
   overflow: hidden;
 }
 
-/* Shared as-of + Dx — outside chart cells so all four stay equal */
-.parashari-desk-tools {
+.parashari-time-nav {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 24%, var(--pd-line));
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--color-brand) 7%, var(--pd-panel)), var(--pd-panel) 36%);
+  box-shadow: var(--shadow-sm);
+}
+
+.parashari-time-nav.is-away-from-now {
+  border-color: color-mix(in srgb, var(--color-warning) 48%, var(--pd-line));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--color-warning) 11%, var(--pd-panel)), var(--pd-panel) 42%);
+}
+
+.parashari-time-nav__identity {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.55rem 0.65rem;
+  gap: 0.45rem;
+  min-width: 12.5rem;
+}
+
+.parashari-time-nav__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-brand);
+  color: var(--color-on-brand);
+  font-size: 1rem;
+}
+
+.parashari-time-nav__identity > div {
+  display: grid;
+  gap: 0.05rem;
+}
+
+.parashari-time-nav__identity strong {
+  color: var(--pd-ink);
+  font-size: 0.75rem;
+  font-weight: 850;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.parashari-time-nav__identity small {
+  color: var(--pd-muted);
+  font-size: 0.61rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.parashari-time-nav__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.parashari-time-nav__controls::-webkit-scrollbar {
+  display: none;
+}
+
+.parashari-time-nav__controls > div {
+  flex-wrap: nowrap;
+}
+
+.parashari-time-nav__controls button,
+.parashari-time-nav__controls input[type='time'] {
+  min-height: 30px;
+  white-space: nowrap;
+}
+
+.parashari-time-nav__controls button {
+  font-size: 0.66rem;
+  font-weight: 750;
+}
+
+.parashari-time-nav__state {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  min-width: 0;
+  color: var(--color-warning);
+  font-size: 0.64rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.parashari-time-nav__state .is-current {
+  color: var(--color-success);
+}
+
+.parashari-time-nav__state button {
+  min-height: 26px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, var(--pd-line));
+  border-radius: var(--radius-pill);
+  padding: 0.1rem 0.45rem;
+  background: var(--pd-panel);
+  color: var(--color-warning);
+  font: inherit;
+  cursor: pointer;
+}
+
+@media (max-width: 1500px) {
+  .parashari-time-nav {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .parashari-time-nav__state {
+    grid-column: 1 / -1;
+    justify-content: center;
+    min-height: 18px;
+    margin-top: -0.2rem;
+  }
+}
+
+/* Shared as-of + Dx — outside chart cells so all four stay equal */
+.parashari-desk-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.24rem;
   min-height: 34px;
-  padding: 0.2rem 0.45rem;
+  padding: 0.22rem 0.45rem 0.3rem;
   border: 1px solid var(--pd-line);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--color-surface) 94%, transparent);
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(12px);
   overflow: hidden;
+}
+
+.parashari-desk-tools__settings,
+.parashari-desk-tools__foundations,
+.parashari-desk-tools__foundation-content {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.parashari-desk-tools__settings {
+  gap: 0.55rem;
+}
+
+.parashari-desk-tools__settings .chart-act-key {
+  margin-left: auto;
+}
+
+.parashari-desk-tools__foundations,
+.parashari-desk-tools__meta {
+  border-top: 1px solid var(--pd-line);
+  padding-top: 0.24rem;
+}
+
+.parashari-desk-tools__foundation-content {
+  flex: 1 1 auto;
+  gap: 0.55rem;
+  overflow: hidden;
+}
+
+.parashari-desk-tools__foundation-content .desk-bp--strip {
+  flex: 0 1 auto;
+  border-left: 0;
+  padding-left: 0;
+}
+
+.parashari-desk-tools__foundation-content .desk-sp--strip {
+  flex: 1 1 auto;
+}
+
+.parashari-desk-tools__category {
+  flex: 0 0 5.8rem;
+  color: var(--pd-muted);
+  font-size: 0.55rem;
+  font-weight: 850;
+  letter-spacing: 0.095em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .parashari-desk-tools__clock,
@@ -341,19 +517,30 @@
 }
 
 .parashari-desk-tools__meta {
-  display: flex;
+  display: grid;
+  grid-template-columns:
+    5.8rem
+    minmax(0, 1.15fr)
+    minmax(0, 0.85fr)
+    minmax(0, 1.15fr);
   align-items: center;
-  flex-wrap: wrap;
   gap: 0.4rem 0.65rem;
-  flex: 1 1 100%;
+  width: 100%;
   min-width: 0;
+  overflow: hidden;
   border-top: 1px solid var(--pd-line);
-  padding-top: 0.3rem;
+  padding-top: 0.24rem;
   margin-top: 0.05rem;
 }
 
+.parashari-desk-tools__meta > .parashari-desk-tools__category {
+  width: 5.8rem;
+}
+
 .parashari-desk-tools__meta .desk-cond--strip {
-  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
   border-top: 0;
   padding-top: 0;
   margin-top: 0;
@@ -361,9 +548,17 @@
 
 .parashari-desk-tools__meta .desk-lag--strip,
 .parashari-desk-tools__meta .desk-ck--strip {
-  flex: 0 1 auto;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
   border-left: 1px solid var(--pd-line);
   padding-left: 0.55rem;
+}
+
+.parashari-desk-tools__meta :is(.desk-cond__chips, .desk-lag__chips, .desk-ck__chips) {
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
 }
 
 .parashari-desk-pills__jaimini.is-active {
@@ -377,8 +572,12 @@
   display: grid;
   /* Equal chart cells on top; dasha + analysis dock below */
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 1.05fr) minmax(0, 1fr);
-  gap: 0.45rem;
+  grid-template-rows:
+    minmax(0, var(--pd-chart-row, 54fr))
+    12px
+    minmax(0, var(--pd-lower-row, 46fr));
+  column-gap: 0.45rem;
+  row-gap: 0;
   overflow: hidden;
 }
 
@@ -400,15 +599,79 @@
 .parashari-desk-panel--transit { grid-column: 4; grid-row: 1; }
 .parashari-desk-panel--dasha {
   grid-column: 1 / 4;
-  grid-row: 2;
+  grid-row: 3;
   grid-template-rows: minmax(0, 1fr);
   padding: 0.35rem 0.4rem 0.4rem;
 }
 
 .parashari-desk-panel--analysis {
   grid-column: 4;
-  grid-row: 2;
+  grid-row: 3;
   grid-template-rows: auto minmax(0, 1fr);
+}
+
+.parashari-desk-splitter {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--pd-muted);
+  cursor: row-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.parashari-desk-splitter::before,
+.parashari-desk-splitter::after {
+  content: '';
+  height: 1px;
+  flex: 1 1 auto;
+  background: var(--pd-line);
+}
+
+.parashari-desk-splitter span {
+  width: 34px;
+  height: 4px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-brand) 50%, var(--pd-line));
+}
+
+.parashari-desk-splitter em {
+  position: absolute;
+  left: 50%;
+  bottom: calc(50% + 7px);
+  translate: -50% 0;
+  padding: 0.08rem 0.35rem;
+  border: 1px solid var(--pd-line);
+  border-radius: var(--radius-pill);
+  background: var(--pd-panel);
+  box-shadow: var(--shadow-sm);
+  font-size: 0.52rem;
+  font-style: normal;
+  font-weight: 750;
+  line-height: 1.2;
+  opacity: 1;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.parashari-desk-splitter:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-brand) 55%, transparent);
+  outline-offset: -2px;
+}
+
+body.is-resizing-parashari-workspace,
+body.is-resizing-parashari-workspace * {
+  cursor: row-resize !important;
+  user-select: none !important;
 }
 
 /*
@@ -417,7 +680,10 @@
  */
 .parashari-desk-grid--act-focus {
   grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.35fr);
-  grid-template-rows: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-rows:
+    minmax(0, var(--pd-chart-row, 54fr))
+    12px
+    minmax(0, var(--pd-lower-row, 46fr));
 }
 
 .parashari-desk-grid--act-focus .parashari-desk-panel--d1 {
@@ -437,12 +703,16 @@
 
 .parashari-desk-grid--act-focus .parashari-desk-panel--dasha {
   grid-column: 1 / 4;
-  grid-row: 2;
+  grid-row: 3;
+}
+
+.parashari-desk-grid--act-focus .parashari-desk-splitter {
+  grid-column: 1 / 4;
 }
 
 .parashari-desk-grid--act-focus .parashari-desk-panel--activations {
   grid-column: 4;
-  grid-row: 1 / 3;
+  grid-row: 1 / 4;
   grid-template-rows: minmax(0, 1fr);
   padding: 0;
 }
@@ -826,6 +1096,8 @@
 }
 
 .parashari-desk-panel__head {
+  position: relative;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -836,11 +1108,232 @@
   min-height: 24px;
 }
 
+.parashari-desk-panel--div {
+  overflow: visible;
+}
+
+.parashari-desk-panel--div > .parashari-desk-chart {
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.parashari-compare-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.parashari-compare-picker__label {
+  color: var(--pd-muted);
+  font-size: 0.54rem;
+  font-weight: 850;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.parashari-compare-picker__trigger {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  min-width: 0;
+  min-height: 24px;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 30%, var(--pd-line));
+  border-radius: 6px;
+  padding: 0.12rem 0.38rem;
+  background: color-mix(in srgb, var(--color-brand) 5%, var(--pd-panel));
+  color: var(--pd-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.parashari-compare-picker__trigger strong {
+  color: var(--color-brand);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+
+.parashari-compare-picker__trigger span {
+  max-width: 8rem;
+  overflow: hidden;
+  color: var(--pd-muted);
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parashari-compare-picker__trigger b {
+  color: var(--color-brand);
+  font-size: 0.72rem;
+}
+
+.parashari-compare-picker__menu {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  z-index: 30;
+  width: min(44rem, calc(100vw - 2rem));
+  max-height: min(70vh, 35rem);
+  overflow-y: auto;
+  padding: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 24%, var(--pd-line));
+  border-radius: var(--radius-md);
+  background: var(--pd-panel);
+  box-shadow: 0 16px 42px color-mix(in srgb, var(--color-text) 22%, transparent);
+}
+
+.parashari-compare-picker__menu > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 0.15rem 0.5rem;
+  border-bottom: 1px solid var(--pd-line);
+}
+
+.parashari-compare-picker__menu > header > div {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.parashari-compare-picker__menu > header strong {
+  color: var(--pd-ink);
+  font-size: 0.82rem;
+}
+
+.parashari-compare-picker__menu > header span {
+  color: var(--pd-muted);
+  font-size: 0.62rem;
+}
+
+.parashari-compare-picker__menu > header button {
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1px solid var(--pd-line);
+  border-radius: 50%;
+  background: var(--color-surface-muted);
+  color: var(--pd-ink);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.parashari-compare-picker__menu section {
+  margin-top: 0.6rem;
+}
+
+.parashari-compare-picker__menu h3 {
+  margin: 0 0 0.32rem;
+  color: var(--pd-muted);
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.parashari-compare-picker__options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.parashari-compare-picker__options > button {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.08rem 0.4rem;
+  border: 1px solid var(--pd-line);
+  border-radius: 8px;
+  padding: 0.42rem 0.5rem;
+  background: var(--color-surface-muted);
+  color: var(--pd-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.parashari-compare-picker__options > button:hover,
+.parashari-compare-picker__options > button:focus-visible,
+.parashari-compare-picker__options > button.is-active {
+  border-color: color-mix(in srgb, var(--color-brand) 45%, var(--pd-line));
+  background: color-mix(in srgb, var(--color-brand) 8%, var(--pd-panel));
+  outline: 0;
+}
+
+.parashari-compare-picker__options > button > strong {
+  grid-row: 1 / 3;
+  align-self: center;
+  color: var(--color-brand);
+  font-size: 0.74rem;
+}
+
+.parashari-compare-picker__options > button > span {
+  overflow: hidden;
+  font-size: 0.67rem;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parashari-compare-picker__options > button > small {
+  overflow: hidden;
+  color: var(--pd-muted);
+  font-size: 0.56rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parashari-compare-picker__options--special {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .parashari-desk-panel__titles {
   display: flex;
   align-items: baseline;
   gap: 0.35rem;
   min-width: 0;
+}
+
+.parashari-desk-panel__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.parashari-desk-panel__chart-controls {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.parashari-desk-panel__chart-controls .chart-desk-mini-bar {
+  position: static !important;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem !important;
+}
+
+.parashari-desk-panel__chart-controls .chart-desk-mini-bar > button {
+  width: 1.35rem !important;
+  min-width: 1.35rem !important;
+  height: 1.35rem !important;
+  min-height: 1.35rem !important;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.32rem !important;
+  background: var(--pd-panel) !important;
+  box-shadow: none !important;
 }
 
 .parashari-desk-panel__head h2 {
@@ -939,6 +1432,10 @@
 .parashari-desk-chart svg [fill="#9f1239"] { fill: var(--color-brand) !important; }
 
 @media (max-width: 1280px) {
+  .parashari-desk-splitter {
+    display: none;
+  }
+
   .parashari-desk-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: repeat(2, minmax(0, 0.85fr)) minmax(0, 0.95fr) minmax(0, 0.85fr);

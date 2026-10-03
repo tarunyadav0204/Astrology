@@ -72,7 +72,7 @@ export default function DeskKarakasPanel({ birthData, chartData, onOpenTool }) {
         return {
           ...meta,
           planet: info.planet,
-          value: `${planetAbbr(info.planet)}${house ? ` · H${house}` : ''}`,
+          value: planetAbbr(info.planet),
           title: [
             meta.key,
             info.title,

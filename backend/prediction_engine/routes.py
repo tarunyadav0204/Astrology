@@ -90,6 +90,7 @@ class ActivationExplorerRequest(BaseModel):
     maximum_candidates: int = Field(default=100, ge=1, le=100)
     trace: bool = True
     language: str = "en"
+    calculation_profile: Optional[Dict[str, str]] = None
 
     @model_validator(mode="after")
     def require_chart_source(self):
@@ -105,6 +106,7 @@ class EventWindowRequest(BaseModel):
     year: int = Field(ge=1900, le=2200)
     include_developing: bool = False
     focus_houses: Optional[List[int]] = None
+    calculation_profile: Optional[Dict[str, str]] = None
 
     @model_validator(mode="after")
     def validate_request(self):
@@ -214,6 +216,7 @@ def _generate_activation_dossier(payload: ActivationExplorerRequest, chart: Dict
             trace=payload.trace,
             exploration_mode=True,
             language=payload.language,
+            calculation_profile=payload.calculation_profile,
         ),
         include_exact_transit_returns=True,
     )
@@ -225,6 +228,8 @@ def _generate_activation_dossier(payload: ActivationExplorerRequest, chart: Dict
         "time": birth.time,
         "place": birth.place,
     }
+    if payload.calculation_profile:
+        response["calculation_profile"] = dict(payload.calculation_profile)
     return response
 
 
@@ -281,6 +286,7 @@ def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, 
         birth.birth_chart_id, birth.date, birth.time, birth.latitude, birth.longitude,
         str(birth.timezone), payload.year, payload.event_key, payload.include_developing,
         tuple(payload.focus_houses or ()),
+        tuple(sorted((payload.calculation_profile or {}).items())),
     )
     now = time.monotonic()
     with _event_window_cache_lock:
@@ -299,6 +305,7 @@ def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, 
         trace=False,
         exploration_mode=True,
         subjects=("self",),
+        calculation_profile=payload.calculation_profile,
     )
     # Build strict ephemeris/dasha state once.  Both the house ledger and the
     # higher-level event resolver consume the same immutable context.
@@ -307,6 +314,7 @@ def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, 
         start,
         end,
         include_exact_transit_returns=True,
+        calculation_profile=payload.calculation_profile,
     )
     result = PredictionService().generate_from_context(request, calculation)
     response = EventWindowEngine().resolve(
@@ -329,6 +337,8 @@ def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, 
         },
         "cache_hit": False,
     })
+    if payload.calculation_profile:
+        response["calculation_profile"] = dict(payload.calculation_profile)
     with _event_window_cache_lock:
         if len(_event_window_cache) >= _EVENT_WINDOW_CACHE_MAXIMUM:
             oldest_key = min(_event_window_cache, key=lambda key: _event_window_cache[key][0])

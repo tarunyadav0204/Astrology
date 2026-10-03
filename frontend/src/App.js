@@ -116,6 +116,7 @@ const ChartSelector = lazy(() => import('./components/ChartSelector/ChartSelecto
 const BirthFormModal = lazy(() => import('./components/BirthForm/BirthFormModal'));
 const BirthChartCreationPage = lazy(() => import('./components/BirthChart/BirthChartCreationPage'));
 const ChartsDashasWorkspacePage = lazy(() => import('./components/BirthChart/ChartsDashasWorkspacePage'));
+const ClassicalLifePage = lazy(() => import('./components/BirthChart/ClassicalLifePage'));
 const ActivationExplorerPage = lazy(() => import('./components/BirthChart/ActivationExplorerPage'));
 const BirthTimeRectificationPage = lazy(() => import('./components/BirthChart/BirthTimeRectificationPage'));
 const KPDeskPage = lazy(() => import('./components/KP/KPDeskPage'));
@@ -730,6 +731,17 @@ function App() {
                   onAuthenticated={handleLogin}
                 />
               </>
+            } />
+            <Route path="/life-reading" element={
+              <ClassicalLifePage
+                user={user}
+                onLogout={user ? handleLogout : undefined}
+                onAdminClick={user ? handleAdminClick : undefined}
+                onLogin={() => {
+                  setAuthView('login');
+                  setShowLoginModal(true);
+                }}
+              />
             } />
             <Route path="/charts-dashas/activations" element={
               <>

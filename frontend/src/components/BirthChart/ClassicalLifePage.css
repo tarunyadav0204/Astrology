@@ -1,0 +1,15 @@
+.classical-life-page { min-height: 100vh; color: var(--color-text); background: var(--color-canvas, #f6efe6); }
+.classical-life-page__hero { padding: clamp(2rem, 6vw, 5.5rem) clamp(1rem, 6vw, 6rem); display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(12rem, 18rem); align-items: start; gap: clamp(1rem, 4vw, 4rem); color: var(--color-on-surface-inverse, #fff8ee); background: var(--color-surface-inverse, #2b0b19); }
+.classical-life-page__hero > button { min-height: 2.4rem; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 999px; color: inherit; background: transparent; cursor: pointer; }
+.classical-life-page__hero span { color: var(--color-accent-soft, #e8cf8d); font-size: .7rem; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+.classical-life-page__hero h1 { margin: .7rem 0; font-family: var(--font-display, Georgia, serif); font-size: clamp(2.5rem, 6vw, 5.6rem); font-weight: 400; line-height: .92; letter-spacing: -.04em; }
+.classical-life-page__hero h1 em { color: var(--color-accent-soft, #e8cf8d); font-weight: 400; }
+.classical-life-page__hero p { max-width: 42rem; color: color-mix(in srgb, currentColor 72%, transparent); line-height: 1.65; }
+.classical-life-page__hero aside { padding: 1rem; display: grid; gap: .35rem; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 1rem; background: color-mix(in srgb, currentColor 6%, transparent); }
+.classical-life-page__hero aside small { opacity: .7; text-transform: uppercase; }
+.classical-life-page__hero aside strong { font-family: var(--font-display, Georgia, serif); font-size: 1.3rem; }
+.classical-life-page__hero aside button { margin-top: .5rem; padding: .55rem .7rem; border: 0; border-radius: .6rem; color: var(--color-surface-inverse, #2b0b19); background: var(--color-accent-soft, #e8cf8d); font-weight: 750; cursor: pointer; }
+.classical-life-page__content { width: min(92rem, 100%); margin: 0 auto; padding: clamp(1rem, 3vw, 2.5rem); }
+.classical-life-page__gate { min-height: 22rem; display: grid; place-content: center; justify-items: center; text-align: center; }
+.classical-life-page__gate button { min-height: 2.7rem; padding: 0 1rem; border: 0; border-radius: .7rem; color: var(--color-on-brand); background: var(--color-brand); font: inherit; font-weight: 800; }
+@media (max-width: 800px) { .classical-life-page__hero { grid-template-columns: 1fr; padding-top: 1.25rem; } .classical-life-page__hero > button { justify-self: start; padding: 0 .8rem; } .classical-life-page__hero aside { width: 100%; } }

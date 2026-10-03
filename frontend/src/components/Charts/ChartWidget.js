@@ -63,6 +63,8 @@ const ChartWidget = ({
   calculationProfile = null,
   /** Charts Hub treatment: details visible initially, eye toggle, no duplicate hover card. */
   inlinePlanetDetails = false,
+  /** Optional host in a surrounding dashboard header for the compact chart controls. */
+  deskControlsHostId = null,
 }) => {
   const [internalChartStyle, setInternalChartStyle] = useState(defaultStyle || 'north');
   const chartStyle = controlledChartStyle ?? internalChartStyle;
@@ -79,6 +81,15 @@ const ChartWidget = ({
   const [showCharaKarakas, setShowCharaKarakas] = useState(false);
   const [charaKarakasData, setCharaKarakasData] = useState(null);
   const [showShadbala, setShowShadbala] = useState(false);
+  const [deskControlsHost, setDeskControlsHost] = useState(null);
+
+  useEffect(() => {
+    if (!deskControlsHostId || typeof document === 'undefined') {
+      setDeskControlsHost(null);
+      return;
+    }
+    setDeskControlsHost(document.getElementById(deskControlsHostId));
+  }, [deskControlsHostId]);
 
   // Update chart style when defaultStyle prop changes
   useEffect(() => {
@@ -296,6 +307,66 @@ const ChartWidget = ({
     }
   };
   
+  const deskControls = deskMode ? (
+    <div
+      className="chart-desk-mini-bar"
+      style={{
+        position: 'absolute',
+        top: 2,
+        right: 2,
+        zIndex: 5,
+        display: 'flex',
+        gap: 4,
+      }}
+    >
+      {inlinePlanetDetails ? <button
+        type="button"
+        onClick={() => setShowDegreeNakshatra((visible) => !visible)}
+        aria-label={showDegreeNakshatra ? 'Hide planet degrees and nakshatras' : 'Show planet degrees and nakshatras'}
+        aria-pressed={showDegreeNakshatra}
+        title={showDegreeNakshatra ? 'Hide planet degrees and nakshatras' : 'Show planet degrees and nakshatras'}
+        style={{
+          width: 24,
+          height: 24,
+          padding: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(255,255,255,0.92)',
+          color: showDegreeNakshatra ? 'var(--color-brand, #7a173d)' : '#666',
+          border: `1px solid ${showDegreeNakshatra ? 'var(--color-brand, #7a173d)' : '#ddd'}`,
+          borderRadius: '4px',
+          cursor: 'pointer',
+          lineHeight: 1,
+        }}
+      >
+        <EyeIcon hidden={!showDegreeNakshatra} />
+      </button> : null}
+      <StyleToggle onClick={toggleStyle} title="North / South Indian">
+        {chartStyle === 'north' ? 'N' : 'S'}
+      </StyleToggle>
+      {!isMobile && (
+        <button
+          type="button"
+          onClick={() => setShowMaximized(true)}
+          style={{
+            padding: '2px 6px',
+            fontSize: '10px',
+            background: 'rgba(255,255,255,0.9)',
+            color: '#666',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            lineHeight: 1.2,
+          }}
+          title="Maximize chart"
+        >
+          ⛶
+        </button>
+      )}
+    </div>
+  ) : null;
+
   return (
     <WidgetContainer $embedInDashboard={embedInDashboard} $deskMode={deskMode}>
       {!deskMode ? (
@@ -453,65 +524,9 @@ const ChartWidget = ({
       ) : null}
       
       <ChartContainer $embedInDashboard={embedInDashboard} $deskMode={deskMode} style={deskMode ? { position: 'relative' } : undefined}>
-        {deskMode ? (
-          <div
-            className="chart-desk-mini-bar"
-            style={{
-              position: 'absolute',
-              top: 2,
-              right: 2,
-              zIndex: 5,
-              display: 'flex',
-              gap: 4,
-            }}
-          >
-            {inlinePlanetDetails ? <button
-              type="button"
-              onClick={() => setShowDegreeNakshatra((visible) => !visible)}
-              aria-label={showDegreeNakshatra ? 'Hide planet degrees and nakshatras' : 'Show planet degrees and nakshatras'}
-              aria-pressed={showDegreeNakshatra}
-              title={showDegreeNakshatra ? 'Hide planet degrees and nakshatras' : 'Show planet degrees and nakshatras'}
-              style={{
-                width: 24,
-                height: 24,
-                padding: 0,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'rgba(255,255,255,0.92)',
-                color: showDegreeNakshatra ? 'var(--color-brand, #7a173d)' : '#666',
-                border: `1px solid ${showDegreeNakshatra ? 'var(--color-brand, #7a173d)' : '#ddd'}`,
-                borderRadius: '4px',
-                cursor: 'pointer',
-                lineHeight: 1,
-              }}
-            >
-              <EyeIcon hidden={!showDegreeNakshatra} />
-            </button> : null}
-            <StyleToggle onClick={toggleStyle} title="North / South Indian">
-              {chartStyle === 'north' ? 'N' : 'S'}
-            </StyleToggle>
-            {!isMobile && (
-              <button
-                type="button"
-                onClick={() => setShowMaximized(true)}
-                style={{
-                  padding: '2px 6px',
-                  fontSize: '10px',
-                  background: 'rgba(255,255,255,0.9)',
-                  color: '#666',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  lineHeight: 1.2,
-                }}
-                title="Maximize chart"
-              >
-                ⛶
-              </button>
-            )}
-          </div>
-        ) : null}
+        {deskMode && (!deskControlsHostId || deskControlsHost)
+          ? (deskControlsHost ? createPortal(deskControls, deskControlsHost) : deskControls)
+          : null}
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', color: '#666' }}>
             Calculating divisional chart...

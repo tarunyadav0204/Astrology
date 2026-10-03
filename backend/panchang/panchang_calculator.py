@@ -4,15 +4,34 @@ import math
 from utils.timezone_service import parse_timezone_offset
 from utils.timezone_service import get_timezone_from_coordinates
 from utils.calendar_date import parse_calendar_date_y_m_d
+from calculators.chart_calculator import resolve_ayanamsha_mode, _SWISSEPH_CHART_LOCK
 
 
 class PanchangCalculator:
-    def __init__(self):
-        # Initialize Swiss Ephemeris with Lahiri Ayanamsa for accurate Vedic calculations
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
+    def __init__(self, ayanamsha='lahiri'):
+        # Lahiri remains the application default. The professional chart desk
+        # may opt into another supported standard without changing chat calls.
+        self.ayanamsha, self._sid_mode = resolve_ayanamsha_mode(ayanamsha)
         self._tz_offset_hours = 0.0
 
-    def calculate_panchang(self, date_str, latitude=0.0, longitude=0.0, timezone=None, time_str=None, reference="sunrise"):
+    def calculate_panchang(self, date_str, latitude=0.0, longitude=0.0, timezone=None, time_str=None, reference="sunrise", ayanamsha=None):
+        """Calculate panchang atomically under the requested sidereal standard."""
+        _, sid_mode = resolve_ayanamsha_mode(ayanamsha or self.ayanamsha)
+        with _SWISSEPH_CHART_LOCK:
+            try:
+                swe.set_sid_mode(sid_mode)
+                return self._calculate_panchang_unlocked(
+                    date_str,
+                    latitude,
+                    longitude,
+                    timezone,
+                    time_str,
+                    reference,
+                )
+            finally:
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+    def _calculate_panchang_unlocked(self, date_str, latitude=0.0, longitude=0.0, timezone=None, time_str=None, reference="sunrise"):
         """
         Calculate complete Panchang for given date and location.
 
@@ -116,6 +135,20 @@ class PanchangCalculator:
         )
 
     def get_local_sunrise_sunset(self, date_str, latitude, longitude, timezone=None):
+        """Calculate rise/set details without leaking the selected sidereal mode."""
+        with _SWISSEPH_CHART_LOCK:
+            try:
+                swe.set_sid_mode(self._sid_mode)
+                return self._get_local_sunrise_sunset_unlocked(
+                    date_str,
+                    latitude,
+                    longitude,
+                    timezone,
+                )
+            finally:
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+    def _get_local_sunrise_sunset_unlocked(self, date_str, latitude, longitude, timezone=None):
         """Return location-aware solar/lunar rise-set and standard daily windows."""
         if not timezone:
             timezone = get_timezone_from_coordinates(float(latitude), float(longitude), for_date=date_str)

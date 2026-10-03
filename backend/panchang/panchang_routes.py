@@ -31,6 +31,7 @@ class InauspiciousTimesRequest(BaseModel):
 
 class BirthPanchangRequest(BaseModel):
     birth_data: dict
+    calculation_profile: Optional[dict] = None
 
 
 def _format_anga_response(basic_panchang: dict) -> dict:
@@ -160,12 +161,20 @@ async def calculate_birth_panchang(request: BirthPanchangRequest):
         birth_data = request.birth_data or {}
         if birth_data.get('latitude') is None or birth_data.get('longitude') is None:
             raise HTTPException(status_code=422, detail="Missing latitude or longitude in birth_data")
-        basic = panchang_calc.calculate_birth_panchang(birth_data)
-        return {
+        profile = request.calculation_profile or {}
+        calculator = PanchangCalculator(ayanamsha=profile.get('ayanamsha', 'lahiri'))
+        basic = calculator.calculate_birth_panchang(birth_data)
+        result = {
             **_format_anga_response(basic),
             'reference': 'birth_moment',
             'ayanamsa': basic.get('ayanamsa'),
         }
+        if request.calculation_profile:
+            result['calculation_profile'] = {
+                'ayanamsha': calculator.ayanamsha,
+                'node_type': profile.get('node_type', 'mean'),
+            }
+        return result
     except HTTPException:
         raise
     except ValueError as e:

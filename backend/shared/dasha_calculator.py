@@ -9,9 +9,11 @@ from dateutil.relativedelta import relativedelta
 from typing import Dict, Any, List, Optional
 from math import ceil
 from utils.timezone_service import parse_timezone_offset
+from calculators.chart_calculator import resolve_ayanamsha_mode, _SWISSEPH_CHART_LOCK
 
 class DashaCalculator:
-    def __init__(self):
+    def __init__(self, ayanamsha: str = 'lahiri'):
+        self.ayanamsha_key, self.sid_mode = resolve_ayanamsha_mode(ayanamsha)
         # Dasha periods in years
         self.DASHA_PERIODS = {
             'Ketu': 7, 'Venus': 20, 'Sun': 6, 'Moon': 10, 'Mars': 7,
@@ -310,12 +312,15 @@ class DashaCalculator:
             # Use geocentric mode (same as chart calculator)
             swe.set_topo(0, 0, 0)  # Reset to geocentric (center of Earth)
             
-            # Use Indian Government Standard Lahiri ayanamsa for Drik alignment
-            swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
-            
-            # Use same flags as chart calculator
+            # The dashboard may explicitly select another sidereal reference.
+            # Lahiri remains the constructor default for chat and every legacy caller.
             flags = swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH
-            moon_result = swe.calc_ut(jd, swe.MOON, flags)
+            with _SWISSEPH_CHART_LOCK:
+                try:
+                    swe.set_sid_mode(self.sid_mode, 0, 0)
+                    moon_result = swe.calc_ut(jd, swe.MOON, flags)
+                finally:
+                    swe.set_sid_mode(swe.SIDM_LAHIRI)
             moon_pos = moon_result[0][0]
             
             # Calculate nakshatra and lord

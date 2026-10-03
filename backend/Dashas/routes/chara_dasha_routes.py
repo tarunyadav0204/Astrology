@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict
 from datetime import datetime
 import sys
 import os
@@ -20,6 +20,7 @@ class BirthData(BaseModel):
     latitude: float
     longitude: float
     place: Optional[str] = None
+    calculation_profile: Optional[Dict[str, str]] = None
     
     @property
     def timezone(self):
@@ -37,7 +38,12 @@ async def calculate_chara_dasha(birth_data: BirthData):
         from types import SimpleNamespace
         birth_obj = SimpleNamespace(**birth_data.dict())
         chart_calc = ChartCalculator({})
-        chart_data = chart_calc.calculate_chart(birth_obj)
+        profile = birth_data.calculation_profile or {}
+        chart_data = chart_calc.calculate_chart(
+            birth_obj,
+            node_type=profile.get('node_type', 'mean'),
+            ayanamsha=profile.get('ayanamsha', 'lahiri'),
+        )
         
         # Calculate Chara Dasha
         chara_calc = CharaDashaCalculator(chart_data)
@@ -63,6 +69,7 @@ class AntardashaRequest(BaseModel):
     longitude: float
     place: Optional[str] = None
     maha_sign_id: int
+    calculation_profile: Optional[Dict[str, str]] = None
     
     @property
     def timezone(self):
@@ -81,12 +88,17 @@ async def calculate_chara_antardasha(request: AntardashaRequest):
         print(f"Maha sign ID: {request.maha_sign_id}")
         
         from types import SimpleNamespace
-        birth_dict = request.dict(exclude={'maha_sign_id'})
+        birth_dict = request.dict(exclude={'maha_sign_id', 'calculation_profile'})
         print(f"Birth dict: {birth_dict}")
         
         birth_obj = SimpleNamespace(**birth_dict)
         chart_calc = ChartCalculator({})
-        chart_data = chart_calc.calculate_chart(birth_obj)
+        profile = request.calculation_profile or {}
+        chart_data = chart_calc.calculate_chart(
+            birth_obj,
+            node_type=profile.get('node_type', 'mean'),
+            ayanamsha=profile.get('ayanamsha', 'lahiri'),
+        )
         
         # Calculate full Chara Dasha
         chara_calc = CharaDashaCalculator(chart_data)

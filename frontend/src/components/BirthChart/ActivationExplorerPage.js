@@ -6,6 +6,24 @@ import { useAstrology } from '../../context/AstrologyContext';
 import { apiService } from '../../services/apiService';
 import './ActivationExplorerPage.css';
 
+const PARASHARI_PROFILE_KEY = 'astroroshni_parashari_view_profile_v1';
+const SUPPORTED_AYANAMSHAS = new Set([
+  'lahiri', 'raman', 'krishnamurti', 'yukteshwar', 'true_chitra',
+  'true_revati', 'true_pushya', 'jn_bhasin', 'kp_291', 'lahiri_1940', 'lahiri_icrc',
+]);
+
+function loadCalculationProfile() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(PARASHARI_PROFILE_KEY) || '{}');
+    return {
+      ayanamsha: SUPPORTED_AYANAMSHAS.has(saved.ayanamsha) ? saved.ayanamsha : 'lahiri',
+      node_type: saved.node_type === 'true' ? 'true' : 'mean',
+    };
+  } catch (_) {
+    return { ayanamsha: 'lahiri', node_type: 'mean' };
+  }
+}
+
 const HOUSE_LABELS = {
   1: 'Self, body and direction',
   2: 'Savings, family, speech and face/mouth',
@@ -222,6 +240,7 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
   const [error, setError] = useState('');
   const [showOutcomeReasons, setShowOutcomeReasons] = useState(false);
   const [activeTab, setActiveTab] = useState('houses');
+  const calculationProfile = useMemo(loadCalculationProfile, []);
   const hasChart = Boolean(birthData && chartData);
 
   const loadExplorer = useCallback(async () => {
@@ -235,6 +254,7 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
         asOf,
         horizonDays,
         trace: false,
+        calculationProfile,
       });
       setResult(data);
       setSelectedWindowStart(null);
@@ -248,7 +268,7 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
     } finally {
       setLoading(false);
     }
-  }, [asOf, birthData, horizonDays, user]);
+  }, [asOf, birthData, calculationProfile, horizonDays, user]);
 
   useEffect(() => {
     loadExplorer();

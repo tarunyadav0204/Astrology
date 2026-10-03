@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import swisseph as swe
 
 from .ashtakavarga import AshtakavargaCalculator, NAKSHATRA_NAMES, SIGN_NAMES
+from .chart_calculator import resolve_ayanamsha_mode, _SWISSEPH_CHART_LOCK
 
 
 TRANSIT_PLANET_IDS = {
@@ -19,11 +20,12 @@ KAKSHYA_SIZE = 30.0 / 8.0
 class AshtakavargaTransitCalculator(AshtakavargaCalculator):
     """Enhanced Ashtakavarga calculator with transit integration"""
     
-    def __init__(self, birth_data, chart_data, reduction_profile='pvr_narasimha_rao'):
+    def __init__(self, birth_data, chart_data, reduction_profile='pvr_narasimha_rao', ayanamsha='lahiri'):
         # Ashtakavarga transit judgment is always made against the fixed natal
         # BAV/SAV/Prastara. Transit positions are inputs to that natal ledger;
         # they do not generate a replacement "transit SAV".
         super().__init__(birth_data, chart_data, reduction_profile=reduction_profile)
+        self.ayanamsha_key, self.sid_mode = resolve_ayanamsha_mode(ayanamsha)
 
     @staticmethod
     def _parse_moment(value):
@@ -40,12 +42,16 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
         return swe.julday(moment.year, moment.month, moment.day, hour)
 
     def _transit_position(self, planet, moment):
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
-        values = swe.calc_ut(
-            self._julian_day(moment),
-            TRANSIT_PLANET_IDS[planet],
-            swe.FLG_SIDEREAL | swe.FLG_SPEED,
-        )[0]
+        with _SWISSEPH_CHART_LOCK:
+            try:
+                swe.set_sid_mode(self.sid_mode)
+                values = swe.calc_ut(
+                    self._julian_day(moment),
+                    TRANSIT_PLANET_IDS[planet],
+                    swe.FLG_SIDEREAL | swe.FLG_SPEED,
+                )[0]
+            finally:
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
         longitude = float(values[0]) % 360.0
         speed = float(values[3])
         sign_id = int(longitude // 30) % 12
@@ -253,11 +259,12 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
         planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
         
         for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6]):
-            # Set Lahiri Ayanamsa for accurate Vedic calculations
-
-            swe.set_sid_mode(swe.SIDM_LAHIRI)
-
-            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
+            with _SWISSEPH_CHART_LOCK:
+                try:
+                    swe.set_sid_mode(self.sid_mode)
+                    pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
+                finally:
+                    swe.set_sid_mode(swe.SIDM_LAHIRI)
             transit_planets[planet_names[i]] = {
                 'sign': int(pos[0] / 30),
                 'longitude': pos[0]
@@ -282,7 +289,12 @@ class AshtakavargaTransitCalculator(AshtakavargaCalculator):
         planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
         
         for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6]):
-            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
+            with _SWISSEPH_CHART_LOCK:
+                try:
+                    swe.set_sid_mode(self.sid_mode)
+                    pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL)[0]
+                finally:
+                    swe.set_sid_mode(swe.SIDM_LAHIRI)
             transit_planets[planet_names[i]] = {
                 'sign': int(pos[0] / 30),
                 'longitude': pos[0]

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict
 from datetime import datetime
 from calculators.yogini_dasha_calculator import YoginiDashaCalculator
 from calculators.chart_calculator import ChartCalculator
@@ -14,6 +14,7 @@ class YoginiDashaRequest(BaseModel):
     longitude: float
     years: Optional[int] = 5
     target_date: Optional[str] = None
+    calculation_profile: Optional[Dict[str, str]] = None
     
     @property
     def timezone(self):
@@ -38,7 +39,12 @@ async def get_yogini_dasha(request: YoginiDashaRequest):
         )
         
         chart_calc = ChartCalculator({})
-        chart_data = chart_calc.calculate_chart(birth_obj)
+        profile = request.calculation_profile or {}
+        chart_data = chart_calc.calculate_chart(
+            birth_obj,
+            node_type=profile.get('node_type', 'mean'),
+            ayanamsha=profile.get('ayanamsha', 'lahiri'),
+        )
         moon_lon = chart_data['planets']['Moon']['longitude']
         
         # Initialize Yogini calculator

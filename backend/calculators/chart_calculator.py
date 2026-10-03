@@ -17,6 +17,13 @@ AYANAMSHA_MODES = {
     'raman': swe.SIDM_RAMAN,
     'krishnamurti': swe.SIDM_KRISHNAMURTI,
     'yukteshwar': swe.SIDM_YUKTESHWAR,
+    'true_chitra': swe.SIDM_TRUE_CITRA,
+    'true_revati': swe.SIDM_TRUE_REVATI,
+    'true_pushya': swe.SIDM_TRUE_PUSHYA,
+    'jn_bhasin': swe.SIDM_JN_BHASIN,
+    'kp_291': swe.SIDM_KRISHNAMURTI_VP291,
+    'lahiri_1940': swe.SIDM_LAHIRI_1940,
+    'lahiri_icrc': swe.SIDM_LAHIRI_ICRC,
 }
 
 
@@ -48,12 +55,17 @@ class ChartCalculator(BaseCalculator):
             raise ValueError(f"Unsupported lunar node type: {node_type}")
         ayanamsha_key, sid_mode = resolve_ayanamsha_mode(ayanamsha)
         with _SWISSEPH_CHART_LOCK:
-            return self._calculate_chart_unlocked(
-                birth_data,
-                node_type=node_key,
-                ayanamsha=ayanamsha_key,
-                sid_mode=sid_mode,
-            )
+            try:
+                return self._calculate_chart_unlocked(
+                    birth_data,
+                    node_type=node_key,
+                    ayanamsha=ayanamsha_key,
+                    sid_mode=sid_mode,
+                )
+            finally:
+                # Keep legacy/chat calculators that still assume the process
+                # default from inheriting a dashboard-only viewing standard.
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
 
     def _calculate_chart_unlocked(self, birth_data, node_type='mean', ayanamsha='lahiri', sid_mode=swe.SIDM_LAHIRI):
         """Calculate birth chart with planetary positions and houses"""

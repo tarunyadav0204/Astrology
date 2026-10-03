@@ -678,6 +678,7 @@ export default function DeskActivationsPanel({
   error,
   birthData,
   chartData,
+  calculationProfile,
   asOfDate,
   onJumpToDate,
   onOpenFull,
@@ -816,6 +817,7 @@ export default function DeskActivationsPanel({
         year: Number(eventYear),
         includeDeveloping,
         focusHouses: eventKey === 'custom' ? customHouses : null,
+        calculationProfile,
       });
       setEventResult(data);
     } catch (err) {
@@ -1566,6 +1568,7 @@ export default function DeskActivationsPanel({
           <DeskDoubleTransitBrowser
             birthData={birthData}
             chartData={chartData}
+            calculationProfile={calculationProfile}
             onJumpToDate={layout === 'mobile' ? undefined : onJumpToDate}
           />
         ) : null}

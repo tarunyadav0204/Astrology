@@ -281,7 +281,7 @@ function normalizeKalachakra(data, asOf) {
   };
 }
 
-async function normalizeChara(data, birthData, asOf) {
+async function normalizeChara(data, birthData, asOf, calculationProfile = null) {
   const periods = data?.periods || [];
   const mahaRows = periods.map((d) =>
     row(d.sign_name, d.start_date, d.end_date, inRange(d.start_date, d.end_date, asOf))
@@ -294,7 +294,11 @@ async function normalizeChara(data, birthData, asOf) {
     let subs = current.sub_periods;
     if (!subs) {
       try {
-        const payload = { ...birthPayload(birthData), maha_sign_id: current.sign_id };
+        const payload = {
+          ...birthPayload(birthData),
+          maha_sign_id: current.sign_id,
+          calculation_profile: calculationProfile,
+        };
         const response = await fetch('/api/chara-dasha/antardasha', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -328,6 +332,7 @@ async function normalizeChara(data, birthData, asOf) {
 const DeskDashaPanel = ({
   birthData,
   chartData,
+  calculationProfile = null,
   asOfDate,
   onJumpToDate,
   system,
@@ -368,14 +373,14 @@ const DeskDashaPanel = ({
     try {
       let next = null;
       if (activeSystem === 'vimshottari') {
-        const data = await apiService.calculateCascadingDashas(birthData, target);
+        const data = await apiService.calculateCascadingDashas(birthData, target, calculationProfile);
         if (signal?.aborted) return;
         next = normalizeVimshottari(data, asOfMoment);
       } else if (activeSystem === 'yogini') {
         const response = await fetch('/api/yogini-dasha', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...payload, years: 5, target_date: targetDay }),
+          body: JSON.stringify({ ...payload, years: 5, target_date: targetDay, calculation_profile: calculationProfile }),
           signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -386,7 +391,7 @@ const DeskDashaPanel = ({
         const response = await fetch('/api/calculate-kalchakra-dasha', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ birth_data: payload, target_date: targetDay }),
+          body: JSON.stringify({ birth_data: payload, target_date: targetDay, calculation_profile: calculationProfile }),
           signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -397,13 +402,13 @@ const DeskDashaPanel = ({
         const response = await fetch('/api/chara-dasha/calculate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ ...payload, calculation_profile: calculationProfile }),
           signal,
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (data.status !== 'success') throw new Error(data.error || 'Chara failed');
-        next = await normalizeChara(data, birthData, asOfMoment);
+        next = await normalizeChara(data, birthData, asOfMoment, calculationProfile);
       }
       if (!signal?.aborted) setView(next);
     } catch (err) {
@@ -415,7 +420,7 @@ const DeskDashaPanel = ({
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [birthData, asOfKey, asOfDate, activeSystem]);
+  }, [birthData, asOfKey, asOfDate, activeSystem, calculationProfile]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -478,6 +483,9 @@ const DeskDashaPanel = ({
           ) : null}
         </div>
         <div className="desk-dasha__right">
+          <span className="desk-dasha__as-of">
+            As of {asOfDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </span>
           {path[0] ? (
             <span className="desk-dasha__remain">{remainingLabel(path[0].end, asOfDate)}</span>
           ) : null}
@@ -561,7 +569,7 @@ const DeskDashaPanel = ({
             ))}
           </div>
           {!isMobile && levels.length <= 2 && chartData ? (
-            <DeskSpecialPoints birthData={birthData} chartData={chartData} variant="panel" />
+            <DeskSpecialPoints birthData={birthData} chartData={chartData} variant="panel" calculationProfile={calculationProfile} />
           ) : null}
         </div>
       )}

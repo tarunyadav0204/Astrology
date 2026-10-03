@@ -139,7 +139,7 @@ function DoubleTransitCard({ window, onSelect }) {
   );
 }
 
-export default function DeskDoubleTransitBrowser({ birthData, chartData, onJumpToDate }) {
+export default function DeskDoubleTransitBrowser({ birthData, chartData, calculationProfile, onJumpToDate }) {
   const currentYear = new Date().getFullYear();
   const birthYear = birthYearFrom(birthData?.date);
   const chartFingerprint = [
@@ -199,6 +199,7 @@ export default function DeskDoubleTransitBrowser({ birthData, chartData, onJumpT
         startDate: from === birthYear ? isoDay(birthData.date) : `${from}-01-01`,
         endDate: `${to}-12-31`,
         includeAspectOnly: true,
+        calculationProfile,
       });
       if (!signal?.cancelled && requestId === requestIdRef.current) setResult(data);
     } catch (requestError) {
@@ -209,7 +210,7 @@ export default function DeskDoubleTransitBrowser({ birthData, chartData, onJumpT
     } finally {
       if (!signal?.cancelled && requestId === requestIdRef.current) setLoading(false);
     }
-  }, [birthData?.date, birthYear, chartData, endYear, startYear]);
+  }, [birthData?.date, birthYear, calculationProfile, chartData, endYear, startYear]);
 
   useEffect(() => {
     const signal = { cancelled: false };
@@ -220,7 +221,7 @@ export default function DeskDoubleTransitBrowser({ birthData, chartData, onJumpT
     calculate(signal, { from: initialStart, to: initialEnd });
     return () => { signal.cancelled = true; };
   // Recalculate only when the native/chart changes, not while editing year fields.
-  }, [chartFingerprint]);
+  }, [calculationProfile, chartFingerprint]);
 
   const windows = useMemo(() => {
     const now = new Date().toISOString();

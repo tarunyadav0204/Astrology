@@ -8,6 +8,7 @@ import DeskDashaPanel from './DeskDashaPanel';
 import DeskActivationsPanel from './DeskActivationsPanel';
 import DeskHouseInsight from './DeskHouseInsight';
 import DeskPositionsTable from './DeskPositionsTable';
+import ClassicalLifeReading from './ClassicalLifeReading';
 import DeskYogasPanel from './DeskYogasPanel';
 import DeskFriendshipPanel from './DeskFriendshipPanel';
 import DeskHouseLordsPanel from './DeskHouseLordsPanel';
@@ -28,7 +29,7 @@ const HUB_TABS = [
   { id: 'more', label: 'More' },
 ];
 
-const MORE_TABS = [
+const BASE_MORE_TABS = [
   { id: 'house', label: 'House', icon: '⌂' },
   { id: 'positions', label: 'Pos', icon: '☷' },
   { id: 'yogas', label: 'Yogas', icon: '✦' },
@@ -53,7 +54,7 @@ function formatAsOfIso(date) {
   return `${y}-${m}-${d}`;
 }
 
-function buildHouseSelection(chartData, houseNumber, chartId = 'lagna') {
+function buildHouseSelection(effectiveChartData, houseNumber, chartId = 'lagna') {
   const lagnaSign = chartData?.houses?.[0]?.sign
     ?? (typeof chartData?.ascendant === 'number'
       ? Math.floor((((chartData.ascendant % 360) + 360) % 360) / 30)
@@ -118,8 +119,13 @@ export default function ParashariDeskMobile({
   calculationProfile,
   onCalculationProfileChange,
   calculationProfileLoading,
+  lifeTabEnabled = false,
 }) {
   const navigate = useNavigate();
+  const effectiveChartData = viewChartData || chartData;
+  const moreTabs = useMemo(() => lifeTabEnabled
+    ? [...BASE_MORE_TABS.slice(0, 2), { id: 'life', label: 'Life', icon: '◇' }, ...BASE_MORE_TABS.slice(2)]
+    : BASE_MORE_TABS, [lifeTabEnabled]);
   const requestedHubTab = HUB_TABS.some((tab) => tab.id === initialHubTab)
     ? initialHubTab
     : 'chart';
@@ -273,8 +279,15 @@ export default function ParashariDeskMobile({
           >
             <option value="lahiri">Lahiri</option>
             <option value="raman">Raman</option>
-            <option value="krishnamurti">Krishnamurti</option>
+            <option value="krishnamurti">Krishnamurti ayanamsha</option>
             <option value="yukteshwar">Yukteshwar</option>
+            <option value="true_chitra">True Chitra</option>
+            <option value="true_revati">True Revati</option>
+            <option value="true_pushya">Pushya Paksha (True Pushya)</option>
+            <option value="jn_bhasin">J. N. Bhasin</option>
+            <option value="kp_291">KP 291 ayanamsha</option>
+            <option value="lahiri_1940">Lahiri 1940</option>
+            <option value="lahiri_icrc">Lahiri ICRC</option>
           </select>
           <select
             value={calculationProfile?.node_type || 'mean'}
@@ -385,13 +398,13 @@ export default function ParashariDeskMobile({
             </button>
             {metaOpen ? (
               <div className="pdm__meta">
-                <DeskBirthPanchang birthData={birthData} />
-                <DeskSpecialPoints birthData={birthData} chartData={chartData} variant="strip" />
-                <DeskConditionStrip birthData={birthData} chartData={chartData} />
-                <DeskSpecialLagnas birthData={birthData} chartData={chartData} />
+                <DeskBirthPanchang birthData={birthData} calculationProfile={calculationProfile} />
+                <DeskSpecialPoints birthData={birthData} chartData={effectiveChartData} variant="strip" calculationProfile={calculationProfile} />
+                <DeskConditionStrip birthData={birthData} chartData={effectiveChartData} calculationProfile={calculationProfile} />
+                <DeskSpecialLagnas birthData={birthData} chartData={effectiveChartData} />
                 <DeskKarakasPanel
                   birthData={birthData}
-                  chartData={chartData}
+                  chartData={effectiveChartData}
                   onOpenTool={onOpenTool}
                 />
               </div>
@@ -435,7 +448,8 @@ export default function ParashariDeskMobile({
           <section className="pdm__pane pdm__pane--dasha">
             <DeskDashaPanel
               birthData={birthData}
-              chartData={chartData}
+              chartData={viewChartData || chartData}
+              calculationProfile={calculationProfile}
               asOfDate={asOfDate}
               onJumpToDate={onAsOfChange}
               system={dashaSystem}
@@ -452,7 +466,8 @@ export default function ParashariDeskMobile({
               loading={activationLoading}
               error={activationError}
               birthData={birthData}
-              chartData={chartData}
+              chartData={effectiveChartData}
+              calculationProfile={calculationProfile}
               asOfDate={asOfDate}
               onJumpToDate={onAsOfChange}
               onLensChange={setActivationLens}
@@ -466,7 +481,7 @@ export default function ParashariDeskMobile({
           <section className="pdm__pane pdm__pane--more">
             <DeskStrengthStrip
               birthData={birthData}
-              chartData={chartData}
+              chartData={effectiveChartData}
               onOpenTool={(toolId) => {
                 if (toolId === 'ashtakavarga') {
                   navigate('/tools/ashtakavarga');
@@ -482,7 +497,8 @@ export default function ParashariDeskMobile({
                   {housePicker}
                   <DeskHouseInsight
                     birthData={birthData}
-                    chartData={chartData}
+                    chartData={effectiveChartData}
+                    calculationProfile={calculationProfile}
                     selection={houseSelection}
                     asOfDate={asOfDate}
                     chartId={houseSelection?.chartId || 'lagna'}
@@ -500,28 +516,31 @@ export default function ParashariDeskMobile({
                   />
                 </>
               ) : analysisTab === 'positions' ? (
-                <DeskPositionsTable chartData={chartData} birthData={birthData} />
+                <DeskPositionsTable chartData={effectiveChartData} birthData={birthData} />
+              ) : analysisTab === 'life' && lifeTabEnabled ? (
+                <ClassicalLifeReading birthData={birthData} chartData={effectiveChartData} variant="compact" />
               ) : analysisTab === 'yogas' ? (
-                <DeskYogasPanel birthData={birthData} />
+                <DeskYogasPanel birthData={birthData} chartData={effectiveChartData} calculationProfile={calculationProfile} />
               ) : analysisTab === 'friends' ? (
-                <DeskFriendshipPanel chartData={chartData} />
+                <DeskFriendshipPanel chartData={effectiveChartData} />
               ) : analysisTab === 'lords' ? (
-                <DeskHouseLordsPanel chartData={chartData} />
+                <DeskHouseLordsPanel chartData={effectiveChartData} />
               ) : analysisTab === 'aspects' ? (
-                <DeskAspectsPanel chartData={chartData} />
+                <DeskAspectsPanel chartData={effectiveChartData} />
               ) : (
                 <div className="pdm__meta pdm__meta--overview">
-                  <DeskBirthPanchang birthData={birthData} />
-                  <DeskSpecialPoints birthData={birthData} chartData={chartData} variant="strip" />
+                  <DeskBirthPanchang birthData={birthData} calculationProfile={calculationProfile} />
+                  <DeskSpecialPoints birthData={birthData} chartData={effectiveChartData} variant="strip" calculationProfile={calculationProfile} />
                   <DeskConditionStrip
                     birthData={birthData}
-                    chartData={chartData}
+                    chartData={effectiveChartData}
                     label="Planetary conditions"
+                    calculationProfile={calculationProfile}
                   />
-                  <DeskSpecialLagnas birthData={birthData} chartData={chartData} />
+                  <DeskSpecialLagnas birthData={birthData} chartData={effectiveChartData} />
                   <DeskKarakasPanel
                     birthData={birthData}
-                    chartData={chartData}
+                    chartData={effectiveChartData}
                     onOpenTool={onOpenTool}
                   />
                 </div>
@@ -530,7 +549,7 @@ export default function ParashariDeskMobile({
 
             <nav className="pdm__more-nav" aria-label="Analysis browser">
               <div ref={moreNavRef} className="pdm__more-tabs" role="tablist" aria-label="Analysis">
-                {MORE_TABS.map((tab) => {
+                {moreTabs.map((tab) => {
                   const isActive = analysisTab === tab.id;
                   return (
                     <button
@@ -560,6 +579,8 @@ export default function ParashariDeskMobile({
         isOpen={overviewOpen}
         onClose={() => setOverviewOpen(false)}
         birthData={birthData}
+        calculationProfile={calculationProfile}
+        chartData={effectiveChartData}
         transitDate={formatAsOfIso(asOfDate)}
         onOpenHouse={openHouseFromOverview}
         onOpenYogas={() => {
@@ -579,6 +600,7 @@ export default function ParashariDeskMobile({
         birthData={birthData}
         chartId={houseSelection?.chartId || 'lagna'}
         transitDate={formatAsOfIso(asOfDate)}
+        calculationProfile={calculationProfile}
         planetsInHouse={occupantsForHouse(viewChartData || chartData, houseSelection?.houseNumber)}
       />
     </div>

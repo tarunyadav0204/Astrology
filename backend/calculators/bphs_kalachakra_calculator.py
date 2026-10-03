@@ -2,21 +2,19 @@
 import swisseph as swe
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Tuple
+from .chart_calculator import resolve_ayanamsha_mode, _SWISSEPH_CHART_LOCK
 
 class BPHSKalachakraCalculator:
     """
     Authentic BPHS Kalachakra Dasha Calculator - Sign-Based System
-    - Uses Lahiri sidereal (swe.set_sid_mode(swe.SIDM_LAHIRI))
+    - Uses the declared dashboard sidereal standard (Lahiri by default)
     - Implements proper Rashi (Sign) dasha with Gatis (jumps)
     - Based on BPHS Chapters 46-47 with authentic Amsa sequences
     - Cycle years calculated from sign years for internal consistency
     """
 
-    def __init__(self):
-        try:
-            swe.set_sid_mode(swe.SIDM_LAHIRI)
-        except:
-            pass
+    def __init__(self, ayanamsha: str = 'lahiri'):
+        self.ayanamsha_key, self.sid_mode = resolve_ayanamsha_mode(ayanamsha)
         
         # CORRECT: Sign years (not planetary years)
         self.SIGN_YEARS = {
@@ -155,7 +153,12 @@ class BPHSKalachakraCalculator:
         return swe.julday(Y, M, D, ut_hour + mm/60.0 + ss/3600.0)
 
     def _moon_longitude_sidereal(self, jd: float) -> float:
-        pos, flag = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)
+        with _SWISSEPH_CHART_LOCK:
+            try:
+                swe.set_sid_mode(self.sid_mode)
+                pos, flag = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)
+            finally:
+                swe.set_sid_mode(swe.SIDM_LAHIRI)
         return float(pos[0]) % 360.0
 
     def _nakshatra_pada(self, longitude: float) -> Dict[str, Any]:

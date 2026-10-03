@@ -141,6 +141,9 @@ class PredictionRequest:
     life_context: Optional[LifeContext] = None
     exploration_mode: bool = False
     language: str = "en"
+    # Optional only for the astrologer chart desk.  The default keeps all
+    # existing prediction/chat consumers on their established Lahiri profile.
+    calculation_profile: Optional[Dict[str, str]] = None
 
     def __post_init__(self) -> None:
         if not 1 <= self.horizon_days <= 366:

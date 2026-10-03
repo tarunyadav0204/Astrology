@@ -3563,81 +3563,18 @@ async def get_public_current_sky():
 @app.post("/api/calculate-transits")
 async def calculate_transits(request: TransitRequest):
     from calculators.chart_calculator import resolve_ayanamsha_mode
+    from calculators.transit_calculator import TransitCalculator
     profile = request.calculation_profile or {}
-    ayanamsha_key, sid_mode = resolve_ayanamsha_mode(profile.get('ayanamsha', 'lahiri'))
+    ayanamsha_key, _ = resolve_ayanamsha_mode(profile.get('ayanamsha', 'lahiri'))
     node_type = str(profile.get('node_type', 'mean') or 'mean').strip().lower()
     if node_type not in {'mean', 'true'}:
         raise HTTPException(status_code=400, detail="node_type must be 'mean' or 'true'")
-    swe.set_sid_mode(sid_mode)
-    ty, tm, td = parse_calendar_date_y_m_d(request.transit_date)
-    jd = swe.julday(ty, tm, td, 12.0)
-    
-    # Calculate transit planetary positions
-    planets = {}
-    planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
-    
-    for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):  # Swiss Ephemeris planet numbers
-        if planet <= 6:  # Regular planets
-            # CRITICAL: Add FLG_SWIEPH for high-precision Swiss Ephemeris (not Moshier)
-            pos = swe.calc_ut(jd, planet, swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH)
-        else:  # Lunar nodes follow the Parashari viewer profile when explicitly supplied.
-            node_flag = swe.TRUE_NODE if node_type == 'true' else swe.MEAN_NODE
-            pos = swe.calc_ut(jd, node_flag, swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH)
-        
-        pos_array = pos[0]
-        longitude = pos_array[0]
-        
-        # Use index 3 for speed (standard Swiss Ephemeris)
-        speed = pos_array[3] if len(pos_array) > 3 else 0.0
-        
-        if planet == 12:  # Ketu - add 180 degrees to Rahu
-            longitude = (longitude + 180) % 360
-        
-        is_retrograde = speed < 0 if planet <= 6 else False
-        
-        planets[planet_names[i]] = {
-            'longitude': longitude,
-            'sign': int(longitude / 30),
-            'degree': longitude % 30,
-            'retrograde': is_retrograde
-        }
-    
-    # Calculate birth chart houses for transit display
-    birth_data = request.birth_data
-    time_parts = birth_data.time.split(':')
-    hour = float(time_parts[0]) + float(time_parts[1])/60
-    
-    tz_offset = parse_timezone_offset(
-        birth_data.timezone,
-        birth_data.latitude,
-        birth_data.longitude
+    response = TransitCalculator({}).calculate_transits(
+        request.birth_data,
+        request.transit_date,
+        ayanamsha=ayanamsha_key,
+        node_type=node_type,
     )
-    
-    utc_hour = hour - tz_offset
-    by, bm, bd = parse_calendar_date_y_m_d(birth_data.date)
-    birth_jd = swe.julday(by, bm, bd, utc_hour)
-    
-    birth_houses_data = swe.houses(birth_jd, birth_data.latitude, birth_data.longitude, b'P')
-    birth_ayanamsa = swe.get_ayanamsa_ut(birth_jd)
-    birth_ascendant_tropical = birth_houses_data[1][0]
-    birth_ascendant_sidereal = (birth_ascendant_tropical - birth_ayanamsa) % 360
-    
-    ascendant_sign = int(birth_ascendant_sidereal / 30)
-    houses = []
-    for i in range(12):
-        house_sign = (ascendant_sign + i) % 12
-        house_longitude = (house_sign * 30) + (birth_ascendant_sidereal % 30)
-        houses.append({
-            'longitude': house_longitude % 360,
-            'sign': house_sign
-        })
-    
-    response = {
-        "planets": planets,
-        "houses": houses,
-        "ayanamsa": birth_ayanamsa,
-        "ascendant": birth_ascendant_sidereal,
-    }
     if request.calculation_profile:
         response["calculation_profile"] = {"ayanamsha": ayanamsha_key, "node_type": node_type}
     return response
@@ -3830,6 +3767,7 @@ async def calculate_cascading_dashas(request: dict):
     started_at = time.time()
     try:
         from shared.dasha_calculator import DashaCalculator
+        from calculators.chart_calculator import resolve_ayanamsha_mode
         
         birth_data = BirthData(**request['birth_data'])
         # Noon as-of: date navigators send YYYY-MM-DD; midnight misses mid-day period starts
@@ -3837,6 +3775,13 @@ async def calculate_cascading_dashas(request: dict):
         target_date = DashaCalculator.parse_as_of_datetime(
             request.get('target_date', datetime.now().strftime('%Y-%m-%d'))
         )
+        calculation_profile = request.get('calculation_profile') or {}
+        ayanamsha_key, _ = resolve_ayanamsha_mode(
+            calculation_profile.get('ayanamsha', 'lahiri')
+        )
+        node_type = str(calculation_profile.get('node_type', 'mean') or 'mean').lower()
+        if node_type not in {'mean', 'true'}:
+            raise ValueError("node_type must be 'mean' or 'true'")
     except Exception as e:
         logger.warning("cascading dasha input validation failed: %s", e)
         return {
@@ -3859,7 +3804,7 @@ async def calculate_cascading_dashas(request: dict):
         'timezone': birth_data.timezone
     }
     
-    calculator = DashaCalculator()
+    calculator = DashaCalculator(ayanamsha=ayanamsha_key)
     
     current_dashas = await asyncio.to_thread(
         calculator.calculate_current_dashas,
@@ -3900,6 +3845,11 @@ async def calculate_cascading_dashas(request: dict):
         },
         'as_of': target_date.strftime('%Y-%m-%d'),
     }
+    if request.get('calculation_profile'):
+        result['calculation_profile'] = {
+            'ayanamsha': ayanamsha_key,
+            'node_type': node_type,
+        }
     
     if current_maha:
         # Use DashaCalculator list helpers (same YEAR_LEN math as chat) — not the old
@@ -4105,9 +4055,18 @@ async def calculate_ashtakavarga(
         debug_trace = bool(request.get('debug_trace', False))
         debug_trace_planet = str(request.get('debug_trace_planet') or 'Moon')
 
-        from calculators.chart_calculator import ChartCalculator
+        from calculators.chart_calculator import ChartCalculator, resolve_ayanamsha_mode
         chart_calculator = ChartCalculator({})
-        natal_chart_data = chart_calculator.calculate_chart(birth_data, 'mean')
+        calculation_profile = request.get('calculation_profile') or {}
+        ayanamsha_key, _ = resolve_ayanamsha_mode(
+            calculation_profile.get('ayanamsha', 'lahiri')
+        )
+        node_type = str(calculation_profile.get('node_type', 'mean') or 'mean').lower()
+        natal_chart_data = chart_calculator.calculate_chart(
+            birth_data,
+            node_type=node_type,
+            ayanamsha=ayanamsha_key,
+        )
         display_chart_data = natal_chart_data
         classical_transit = None
 
@@ -4120,7 +4079,15 @@ async def calculate_ashtakavarga(
                 transit_date = transit_date.split('T')[0]
             transit_request = TransitRequest(
                 birth_data=birth_data,
-                transit_date=transit_date
+                transit_date=transit_date,
+                calculation_profile=(
+                    {
+                        'ayanamsha': ayanamsha_key,
+                        'node_type': node_type,
+                    }
+                    if request.get('calculation_profile')
+                    else None
+                ),
             )
             transit_chart_data = await calculate_transits(transit_request)
             display_chart_data = {
@@ -4140,6 +4107,7 @@ async def calculate_ashtakavarga(
                 birth_data,
                 natal_chart_data,
                 reduction_profile=reduction_profile,
+                ayanamsha=ayanamsha_key,
             ).calculate_classical_transit_analysis(transit_date, request.get('window_days', 30))
 
         sarva = calculator.calculate_sarvashtakavarga()
@@ -4172,8 +4140,13 @@ async def calculate_ashtakavarga(
             "chart_data": display_chart_data,
             "natal_chart_data": natal_chart_data,
             "classical_transit": classical_transit,
-            "chart_ashtakavarga": chart_ashtakavarga  # Formatted for chart widget
+            "chart_ashtakavarga": chart_ashtakavarga,  # Formatted for chart widget
         }
+        if request.get('calculation_profile'):
+            response_payload["calculation_profile"] = {
+                "ayanamsha": ayanamsha_key,
+                "node_type": node_type,
+            }
         if debug_trace:
             response_payload["debug_trace"] = calculator.calculate_individual_ashtakavarga_trace(debug_trace_planet)
         return response_payload
@@ -6158,12 +6131,11 @@ async def calculate_kalchakra_dasha(request: dict):
             from datetime import datetime as dt
             target_date = dt.strptime(request['target_date'], '%Y-%m-%d')
         
-        # Initialize Swiss Ephemeris first
-        import swisseph as swe
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
-        
         # Initialize calculator and compute
-        calculator = BPHSKalachakraCalculator()
+        calculation_profile = request.get('calculation_profile') or {}
+        calculator = BPHSKalachakraCalculator(
+            ayanamsha=calculation_profile.get('ayanamsha', 'lahiri')
+        )
         kalchakra_data = calculator.calculate_kalchakra_dasha(birth_dict, target_date)
         
         if 'error' in kalchakra_data:

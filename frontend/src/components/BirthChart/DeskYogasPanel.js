@@ -118,10 +118,10 @@ function RulesModal({ type, raw, onClose }) {
   </div></section></div>, document.body);
 }
 
-export default function DeskYogasPanel({ birthData }) {
+export default function DeskYogasPanel({ birthData, chartData = null, calculationProfile = null }) {
   const [raw, setRaw] = useState(null); const [loading, setLoading] = useState(false); const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState('yogas'); const [expanded, setExpanded] = useState(new Set()); const [modal, setModal] = useState(null);
-  useEffect(() => { if (!birthData?.date || !birthData?.time) { setRaw(null); return undefined; } let cancelled = false; setLoading(true); setError(''); apiService.getYogas(birthData).then((data) => { if (!cancelled) { setRaw(data?.yogas || data || null); setExpanded(new Set()); } }).catch((err) => { if (!cancelled) { setRaw(null); setError(err?.response?.data?.detail || err.message || 'Failed to load yogas and doshas'); } }).finally(() => { if (!cancelled) setLoading(false); }); return () => { cancelled = true; }; }, [birthData]);
+  useEffect(() => { if (!birthData?.date || !birthData?.time) { setRaw(null); return undefined; } let cancelled = false; setLoading(true); setError(''); apiService.getYogas(birthData, chartData, calculationProfile).then((data) => { if (!cancelled) { setRaw(data?.yogas || data || null); setExpanded(new Set()); } }).catch((err) => { if (!cancelled) { setRaw(null); setError(err?.response?.data?.detail || err.message || 'Failed to load yogas and doshas'); } }).finally(() => { if (!cancelled) setLoading(false); }); return () => { cancelled = true; }; }, [birthData, chartData, calculationProfile]);
   const yogaCategories = useMemo(() => buildYogaCategories(raw), [raw]); const doshaCategories = useMemo(() => buildDoshaCategories(raw), [raw]);
   const categories = activeSection === 'doshas' ? doshaCategories : yogaCategories; const total = categories.reduce((sum, category) => sum + category.items.length, 0);
   useEffect(() => { if (categories.length && !expanded.size) setExpanded(new Set([categories[0].key])); }, [categories, expanded.size]);

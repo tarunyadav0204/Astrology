@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import SEOHead from '../SEO/SEOHead';
@@ -11,6 +11,7 @@ import DeskConditionStrip from './DeskConditionStrip';
 import DeskSpecialLagnas from './DeskSpecialLagnas';
 import DeskKarakasPanel from './DeskKarakasPanel';
 import DeskPositionsTable from './DeskPositionsTable';
+import ClassicalLifeReading from './ClassicalLifeReading';
 import DeskYogasPanel from './DeskYogasPanel';
 import DeskFriendshipPanel from './DeskFriendshipPanel';
 import DeskHouseLordsPanel from './DeskHouseLordsPanel';
@@ -24,6 +25,7 @@ import ChartActivationKey from './ChartActivationKey';
 import ChartOverviewPopup from '../Charts/ChartOverviewPopup';
 import HouseInsightPopup from '../Charts/HouseInsightPopup';
 import { useAstrology } from '../../context/AstrologyContext';
+import { useCredits } from '../../context/CreditContext';
 import { generatePageSEO } from '../../config/seo.config';
 import { apiService } from '../../services/apiService';
 import './ChartsDashasWorkspacePage.css';
@@ -32,14 +34,47 @@ import './ChartsDashasWorkspacePage.css';
 // compact landscape use the focused hub instead of shrinking the workstation.
 const MOBILE_DESK_MQ = '(max-width: 1180px)';
 const PARASHARI_PROFILE_KEY = 'astroroshni_parashari_view_profile_v1';
+const PARASHARI_SPLIT_KEY = 'astroroshni_parashari_desk_split_v1';
+const PARASHARI_COMPARE_CHART_KEY = 'astroroshni_parashari_compare_chart_v1';
+const DEFAULT_CHART_ROW_PERCENT = 54;
+const MIN_CHART_ROW_PERCENT = 30;
+const MAX_CHART_ROW_PERCENT = 76;
 const DEFAULT_PARASHARI_PROFILE = { ayanamsha: 'lahiri', node_type: 'mean' };
+const AYANAMSHA_OPTIONS = [
+  ['lahiri', 'Lahiri'],
+  ['raman', 'Raman'],
+  ['krishnamurti', 'Krishnamurti ayanamsha'],
+  ['yukteshwar', 'Yukteshwar'],
+  ['true_chitra', 'True Chitra'],
+  ['true_revati', 'True Revati'],
+  ['true_pushya', 'Pushya Paksha (True Pushya)'],
+  ['jn_bhasin', 'J. N. Bhasin'],
+  ['kp_291', 'KP 291 ayanamsha'],
+  ['lahiri_1940', 'Lahiri 1940'],
+  ['lahiri_icrc', 'Lahiri ICRC'],
+];
+const SUPPORTED_AYANAMSHAS = new Set(AYANAMSHA_OPTIONS.map(([value]) => value));
+
+function clampChartRowPercent(value) {
+  return Math.min(MAX_CHART_ROW_PERCENT, Math.max(MIN_CHART_ROW_PERCENT, value));
+}
+
+function loadChartRowPercent() {
+  if (typeof window === 'undefined') return DEFAULT_CHART_ROW_PERCENT;
+  const savedValue = window.localStorage.getItem(PARASHARI_SPLIT_KEY);
+  if (savedValue === null) return DEFAULT_CHART_ROW_PERCENT;
+  const saved = Number(savedValue);
+  return Number.isFinite(saved)
+    ? clampChartRowPercent(saved)
+    : DEFAULT_CHART_ROW_PERCENT;
+}
 
 function loadParashariProfile() {
   if (typeof window === 'undefined') return DEFAULT_PARASHARI_PROFILE;
   try {
     const saved = JSON.parse(window.localStorage.getItem(PARASHARI_PROFILE_KEY) || '{}');
     return {
-      ayanamsha: ['lahiri', 'raman', 'krishnamurti', 'yukteshwar'].includes(saved.ayanamsha)
+      ayanamsha: SUPPORTED_AYANAMSHAS.has(saved.ayanamsha)
         ? saved.ayanamsha
         : 'lahiri',
       node_type: saved.node_type === 'true' ? 'true' : 'mean',
@@ -69,28 +104,42 @@ function useMobileDesk() {
 }
 
 const DIVISIONAL_CHART_OPTIONS = [
-  { value: 2, shortLabel: 'D2', label: 'Hora' },
-  { value: 3, shortLabel: 'D3', label: 'Drekkana' },
-  { value: 4, shortLabel: 'D4', label: 'Chaturthamsa' },
-  { value: 7, shortLabel: 'D7', label: 'Saptamsa' },
-  { value: 9, shortLabel: 'D9', label: 'Navamsa' },
-  { value: 10, shortLabel: 'D10', label: 'Dasamsa' },
-  { value: 12, shortLabel: 'D12', label: 'Dwadasamsa' },
-  { value: 16, shortLabel: 'D16', label: 'Shodasamsa' },
-  { value: 20, shortLabel: 'D20', label: 'Vimshamsa' },
-  { value: 24, shortLabel: 'D24', label: 'Chaturvimshamsa' },
-  { value: 27, shortLabel: 'D27', label: 'Saptavimshamsa' },
-  { value: 30, shortLabel: 'D30', label: 'Trimshamsa' },
-  { value: 40, shortLabel: 'D40', label: 'Khavedamsa' },
-  { value: 45, shortLabel: 'D45', label: 'Akshavedamsa' },
-  { value: 60, shortLabel: 'D60', label: 'Shashtyamsa' },
+  { value: 2, shortLabel: 'D2', label: 'Hora', purpose: 'Wealth and resources' },
+  { value: 3, shortLabel: 'D3', label: 'Drekkana', purpose: 'Siblings, courage and vitality' },
+  { value: 4, shortLabel: 'D4', label: 'Chaturthamsa', purpose: 'Home, property and fortune' },
+  { value: 7, shortLabel: 'D7', label: 'Saptamsa', purpose: 'Children and lineage' },
+  { value: 9, shortLabel: 'D9', label: 'Navamsa', purpose: 'Marriage and dharma' },
+  { value: 10, shortLabel: 'D10', label: 'Dasamsa', purpose: 'Career, status and professional work' },
+  { value: 12, shortLabel: 'D12', label: 'Dwadasamsa', purpose: 'Parents and ancestry' },
+  { value: 16, shortLabel: 'D16', label: 'Shodasamsa', purpose: 'Vehicles, comforts and happiness' },
+  { value: 20, shortLabel: 'D20', label: 'Vimshamsa', purpose: 'Spiritual practice and worship' },
+  { value: 24, shortLabel: 'D24', label: 'Chaturvimshamsa', purpose: 'Education and learning' },
+  { value: 27, shortLabel: 'D27', label: 'Saptavimshamsa', purpose: 'Strengths and weaknesses' },
+  { value: 30, shortLabel: 'D30', label: 'Trimshamsa', purpose: 'Misfortune and vulnerabilities' },
+  { value: 40, shortLabel: 'D40', label: 'Khavedamsa', purpose: 'Maternal legacy and auspiciousness' },
+  { value: 45, shortLabel: 'D45', label: 'Akshavedamsa', purpose: 'Paternal legacy and character' },
+  { value: 60, shortLabel: 'D60', label: 'Shashtyamsa', purpose: 'Deep karmic pattern' },
 ];
 
 const SPECIAL_CHART_OPTIONS = [
-  { value: 'bhav_chalit', shortLabel: 'BC', label: 'Bhava Chalit' },
-  { value: 'karkamsa', shortLabel: 'Ka', label: 'Kārkāṁśa' },
-  { value: 'swamsa', shortLabel: 'Sw', label: 'Swāṁśa' },
+  { value: 'bhav_chalit', shortLabel: 'BC', label: 'Bhava Chalit', purpose: 'House-cusp adjusted placements' },
+  { value: 'karkamsa', shortLabel: 'Ka', label: 'Kārkāṁśa', purpose: 'Atmakaraka in Navamsa' },
+  { value: 'swamsa', shortLabel: 'Sw', label: 'Swāṁśa', purpose: 'Navamsa Lagna as the first house' },
 ];
+
+const COMPARE_CHART_OPTIONS = DIVISIONAL_CHART_OPTIONS.filter((option) => option.value !== 9);
+const FREQUENT_COMPARE_VALUES = new Set([2, 3, 4, 7, 10, 12]);
+const COMPARE_CHART_VALUES = new Set([
+  ...COMPARE_CHART_OPTIONS.map((option) => option.value),
+  ...SPECIAL_CHART_OPTIONS.map((option) => option.value),
+]);
+
+function loadCompareChart() {
+  if (typeof window === 'undefined') return 10;
+  const saved = window.localStorage.getItem(PARASHARI_COMPARE_CHART_KEY);
+  const normalized = saved && /^\d+$/.test(saved) ? Number(saved) : saved;
+  return COMPARE_CHART_VALUES.has(normalized) ? normalized : 10;
+}
 
 const STRENGTH_TOOLS = [
   { id: 'shadbala', label: 'SB', title: 'Shadbala' },
@@ -109,6 +158,16 @@ function formatAsOfIso(date) {
   return `${y}-${m}-${d}`;
 }
 
+function formatWorkspaceDate(date, options = {}) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    ...options,
+  });
+}
+
 const SIGN_NAMES = [
   'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
   'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
@@ -119,7 +178,7 @@ const HOUSE_AREAS = [
   'Partner', 'Change', 'Fortune', 'Career', 'Gains', 'Release',
 ];
 
-function buildHouseSelection(chartData, houseNumber, chartId = 'lagna') {
+function buildHouseSelection(renderedChartData, houseNumber, chartId = 'lagna') {
   const lagnaSign = chartData?.houses?.[0]?.sign
     ?? (typeof chartData?.ascendant === 'number'
       ? Math.floor((((chartData.ascendant % 360) + 360) % 360) / 30)
@@ -159,12 +218,15 @@ const ChartsDashasWorkspacePage = ({
   const [searchParams] = useSearchParams();
   const isMobileDesk = useMobileDesk();
   const { birthData, chartData, setBirthData } = useAstrology();
+  const { features } = useCredits();
+  const lifeTabEnabled = Boolean(features?.classical_life_tab_enabled);
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [birthModalTab, setBirthModalTab] = useState('saved');
   /** One shared as-of clock for transit + dashas + activations */
   const [asOfDate, setAsOfDate] = useState(new Date());
   /** number (D2–D60) or 'karkamsa' | 'swamsa' */
-  const [selectedDx, setSelectedDx] = useState(10);
+  const [selectedDx, setSelectedDx] = useState(loadCompareChart);
+  const [comparePickerOpen, setComparePickerOpen] = useState(false);
   const [dashaSystem, setDashaSystem] = useState('vimshottari');
   const [activationLedger, setActivationLedger] = useState(null);
   const [activationLoading, setActivationLoading] = useState(false);
@@ -178,37 +240,124 @@ const ChartsDashasWorkspacePage = ({
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [houseSheetOpen, setHouseSheetOpen] = useState(false);
   const [viewProfile, setViewProfile] = useState(loadParashariProfile);
+  const [appliedViewProfile, setAppliedViewProfile] = useState(DEFAULT_PARASHARI_PROFILE);
   const [viewChartData, setViewChartData] = useState(null);
+  const [viewChartBirthKey, setViewChartBirthKey] = useState('');
   const [viewProfileLoading, setViewProfileLoading] = useState(false);
+  const [chartRowPercent, setChartRowPercent] = useState(loadChartRowPercent);
+  const workspaceGridRef = useRef(null);
+  const comparePickerRef = useRef(null);
   const seoData = generatePageSEO('chartsDashasWorkspace', { path: '/charts-dashas' });
   const hasChart = Boolean(birthData && chartData);
+  const isViewingNow = Math.abs(asOfDate.getTime() - Date.now()) < 5 * 60 * 1000;
+  const workspaceDateLabel = formatWorkspaceDate(asOfDate);
+  const currentBirthKey = [
+    birthData?.chart_id || birthData?.birth_chart_id || birthData?.id || '',
+    birthData?.date || '', birthData?.time || '', birthData?.latitude ?? '', birthData?.longitude ?? '',
+  ].join('|');
 
   useEffect(() => {
     window.localStorage.setItem(PARASHARI_PROFILE_KEY, JSON.stringify(viewProfile));
   }, [viewProfile]);
 
   useEffect(() => {
+    window.localStorage.setItem(PARASHARI_SPLIT_KEY, String(chartRowPercent));
+  }, [chartRowPercent]);
+
+  useEffect(() => {
+    if (COMPARE_CHART_VALUES.has(selectedDx)) {
+      window.localStorage.setItem(PARASHARI_COMPARE_CHART_KEY, String(selectedDx));
+    }
+  }, [selectedDx]);
+
+  useEffect(() => {
+    if (!comparePickerOpen) return undefined;
+    const closeWhenOutside = (event) => {
+      if (!comparePickerRef.current?.contains(event.target)) setComparePickerOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setComparePickerOpen(false);
+    };
+    document.addEventListener('pointerdown', closeWhenOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeWhenOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [comparePickerOpen]);
+
+  useEffect(() => () => {
+    document.body.classList.remove('is-resizing-parashari-workspace');
+  }, []);
+
+  const resizeWorkspaceFromPointer = (clientY) => {
+    const rect = workspaceGridRef.current?.getBoundingClientRect();
+    if (!rect?.height) return;
+    setChartRowPercent(clampChartRowPercent(((clientY - rect.top) / rect.height) * 100));
+  };
+
+  const handleWorkspaceResizeStart = (event) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    document.body.classList.add('is-resizing-parashari-workspace');
+    resizeWorkspaceFromPointer(event.clientY);
+  };
+
+  const handleWorkspaceResizeMove = (event) => {
+    if (!event.currentTarget.hasPointerCapture?.(event.pointerId)) return;
+    resizeWorkspaceFromPointer(event.clientY);
+  };
+
+  const handleWorkspaceResizeEnd = (event) => {
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    document.body.classList.remove('is-resizing-parashari-workspace');
+  };
+
+  const handleWorkspaceResizeKey = (event) => {
+    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === 'Home') setChartRowPercent(MIN_CHART_ROW_PERCENT);
+    else if (event.key === 'End') setChartRowPercent(MAX_CHART_ROW_PERCENT);
+    else setChartRowPercent((current) => clampChartRowPercent(
+      current + (event.key === 'ArrowDown' ? 3 : -3),
+    ));
+  };
+
+  useEffect(() => {
+    if (!lifeTabEnabled && analysisTab === 'life') setAnalysisTab('positions');
+  }, [analysisTab, lifeTabEnabled]);
+
+  useEffect(() => {
     let cancelled = false;
     if (!birthData || !chartData) {
       setViewChartData(null);
+      setViewChartBirthKey('');
+      setAppliedViewProfile(DEFAULT_PARASHARI_PROFILE);
       return () => { cancelled = true; };
     }
     setViewProfileLoading(true);
     apiService.calculateChartOnly(birthData, viewProfile.node_type, viewProfile)
       .then((data) => {
-        if (!cancelled) setViewChartData(data);
+        if (!cancelled) {
+          setViewChartData(data);
+          setViewChartBirthKey(currentBirthKey);
+          setAppliedViewProfile(viewProfile);
+        }
       })
       .catch((error) => {
         console.error('Failed to load Parashari viewing profile:', error);
-        if (!cancelled) setViewChartData(chartData);
       })
       .finally(() => {
         if (!cancelled) setViewProfileLoading(false);
       });
     return () => { cancelled = true; };
-  }, [birthData, chartData, viewProfile]);
+  }, [birthData, chartData, currentBirthKey, viewProfile]);
 
-  const renderedChartData = viewChartData || chartData;
+  const hasAppliedChart = Boolean(viewChartData && viewChartBirthKey === currentBirthKey);
+  const renderedChartData = hasAppliedChart ? viewChartData : chartData;
+  const effectiveViewProfile = hasAppliedChart ? appliedViewProfile : DEFAULT_PARASHARI_PROFILE;
 
   const updateViewProfile = (field, value) => {
     setViewProfile((current) => ({ ...current, [field]: value }));
@@ -218,8 +367,11 @@ const ChartsDashasWorkspacePage = ({
     if (isMobileDesk) {
       setActivationsFocus(false);
       setAnalysisExpanded(false);
+    } else if (selectedDx === 9) {
+      // D9 already has a fixed desktop panel; keep the third panel useful for comparison.
+      setSelectedDx(10);
     }
-  }, [isMobileDesk]);
+  }, [isMobileDesk, selectedDx]);
 
   useEffect(() => {
     if (!analysisExpanded) return undefined;
@@ -258,6 +410,7 @@ const ChartsDashasWorkspacePage = ({
       asOf,
       horizonDays: 180,
       trace: false,
+      calculationProfile: effectiveViewProfile,
     }).then((data) => {
       if (!cancelled) {
         setActivationLedger(data);
@@ -276,7 +429,7 @@ const ChartsDashasWorkspacePage = ({
       }
     });
     return () => { cancelled = true; };
-  }, [birthData, chartData, user, asOfDate]);
+  }, [birthData, chartData, user, asOfDate, effectiveViewProfile]);
 
   const activationNowCount = useMemo(() => {
     const rows = activationLedger?.house_activations || [];
@@ -461,9 +614,9 @@ const ChartsDashasWorkspacePage = ({
       ) : isMobileDesk ? (
         <ParashariDeskMobile
           birthData={birthData}
-          chartData={chartData}
+          chartData={renderedChartData}
           viewChartData={renderedChartData}
-          calculationProfile={viewProfile}
+          calculationProfile={effectiveViewProfile}
           onCalculationProfileChange={updateViewProfile}
           calculationProfileLoading={viewProfileLoading}
           asOfDate={asOfDate}
@@ -490,35 +643,72 @@ const ChartsDashasWorkspacePage = ({
           onOpenTool={setActiveTool}
           onChangeNative={() => openBirthModal('saved')}
           initialHubTab={searchParams.get('tab')}
+          lifeTabEnabled={lifeTabEnabled}
         />
       ) : (
         <div className="parashari-desk-body">
           {/* Shared tools — keeps all four chart cells equal */}
           <div className={`parashari-desk-tools${activationsFocus ? ' is-act-focus' : ''}`}>
-            <div className="parashari-view-profile" aria-label="Chart viewing standard">
-              <span>Chart standard</span>
-              <select
-                value={viewProfile.ayanamsha}
-                onChange={(event) => updateViewProfile('ayanamsha', event.target.value)}
-                aria-label="Ayanamsha"
-              >
-                <option value="lahiri">Lahiri</option>
-                <option value="raman">Raman</option>
-                <option value="krishnamurti">Krishnamurti</option>
-                <option value="yukteshwar">Yukteshwar</option>
-              </select>
-              <select
-                value={viewProfile.node_type}
-                onChange={(event) => updateViewProfile('node_type', event.target.value)}
-                aria-label="Rahu and Ketu calculation"
-              >
-                <option value="mean">Mean nodes</option>
-                <option value="true">True nodes</option>
-              </select>
-              {viewProfileLoading ? <i aria-label="Updating chart">Updating…</i> : null}
+            <div className="parashari-desk-tools__settings">
+              <span className="parashari-desk-tools__category">Viewing</span>
+              <div className="parashari-view-profile" aria-label="Chart viewing standard">
+                <span>Calculation standard</span>
+                <select
+                  value={viewProfile.ayanamsha}
+                  onChange={(event) => updateViewProfile('ayanamsha', event.target.value)}
+                  aria-label="Ayanamsha"
+                >
+                  {AYANAMSHA_OPTIONS.map(([value, label]) => (
+                    <option value={value} key={value}>{label}</option>
+                  ))}
+                </select>
+                <select
+                  value={viewProfile.node_type}
+                  onChange={(event) => updateViewProfile('node_type', event.target.value)}
+                  aria-label="Rahu and Ketu calculation"
+                >
+                  <option value="mean">Mean nodes</option>
+                  <option value="true">True nodes</option>
+                </select>
+                {viewProfileLoading ? <i aria-label="Updating chart">Updating…</i> : null}
+              </div>
+              <ChartActivationKey
+                enabled={showChartActivations}
+                onToggle={setShowChartActivations}
+                loading={activationLoading}
+              />
             </div>
-            <div className="parashari-desk-tools__clock" aria-label="As-of date for transit and dashas">
-              <span className="parashari-desk-tools__label">As-of</span>
+            <div className="parashari-desk-tools__foundations">
+              <span className="parashari-desk-tools__category">Birth &amp; reference</span>
+              <div className="parashari-desk-tools__foundation-content">
+                <DeskBirthPanchang birthData={birthData} calculationProfile={effectiveViewProfile} />
+                <DeskSpecialPoints birthData={birthData} chartData={renderedChartData} variant="strip" calculationProfile={effectiveViewProfile} />
+              </div>
+            </div>
+            <div className="parashari-desk-tools__meta">
+              <span className="parashari-desk-tools__category">Chart roles</span>
+              <DeskConditionStrip birthData={birthData} chartData={renderedChartData} calculationProfile={effectiveViewProfile} />
+              <DeskSpecialLagnas birthData={birthData} chartData={renderedChartData} />
+              <DeskKarakasPanel
+                birthData={birthData}
+                chartData={renderedChartData}
+                onOpenTool={setActiveTool}
+              />
+            </div>
+          </div>
+
+          <section
+            className={`parashari-time-nav${isViewingNow ? '' : ' is-away-from-now'}`}
+            aria-label="Time navigator for transit, dashas and activations"
+          >
+            <div className="parashari-time-nav__identity">
+              <span className="parashari-time-nav__icon" aria-hidden="true">◷</span>
+              <div>
+                <strong>Time navigator</strong>
+                <small>Controls Transit, Dashas and Activations</small>
+              </div>
+            </div>
+            <div className="parashari-time-nav__controls">
               <TransitControls
                 date={asOfDate}
                 onChange={setAsOfDate}
@@ -527,71 +717,41 @@ const ChartsDashasWorkspacePage = ({
                 textColor="var(--color-text)"
                 primaryColor="var(--color-brand)"
                 showTime
+                descriptiveNavigation
               />
             </div>
-            <ChartActivationKey
-              enabled={showChartActivations}
-              onToggle={setShowChartActivations}
-              loading={activationLoading}
-            />
-            <button type="button" className="parashari-desk-overview-cta" onClick={openOverview}>
-              Read this chart
-            </button>
-            {!activationsFocus ? (
-              <div className="parashari-desk-tools__divs" aria-label="Divisional chart">
-                <span className="parashari-desk-tools__label">
-                  {selectedDivisionalChart.shortLabel}
-                </span>
-                <div className="parashari-desk-pills">
-                  {DIVISIONAL_CHART_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={selectedDx === option.value ? 'is-active' : ''}
-                      onClick={() => setSelectedDx(option.value)}
-                      title={option.label}
-                    >
-                      {option.shortLabel}
-                    </button>
-                  ))}
-                  <span className="parashari-desk-pills__sep" aria-hidden="true" />
-                  {SPECIAL_CHART_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`parashari-desk-pills__jaimini${selectedDx === option.value ? ' is-active' : ''}`}
-                      onClick={() => setSelectedDx(option.value)}
-                      title={option.label}
-                    >
-                      {option.shortLabel}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            <DeskBirthPanchang birthData={birthData} />
-            <DeskSpecialPoints birthData={birthData} chartData={chartData} variant="strip" />
-            <div className="parashari-desk-tools__meta">
-              <DeskConditionStrip birthData={birthData} chartData={chartData} />
-              <DeskSpecialLagnas birthData={birthData} chartData={chartData} />
-              <DeskKarakasPanel
-                birthData={birthData}
-                chartData={chartData}
-                onOpenTool={setActiveTool}
-              />
+            <div className="parashari-time-nav__state" aria-live="polite">
+              {isViewingNow ? (
+                <span className="is-current">Viewing now</span>
+              ) : (
+                <>
+                  <span>Viewing {workspaceDateLabel}</span>
+                  <button type="button" onClick={() => setAsOfDate(new Date())}>Return to today</button>
+                </>
+              )}
             </div>
-          </div>
+          </section>
 
-          <div className={`parashari-desk-grid${activationsFocus ? ' parashari-desk-grid--act-focus' : ''}`}>
+          <div
+            ref={workspaceGridRef}
+            className={`parashari-desk-grid${activationsFocus ? ' parashari-desk-grid--act-focus' : ''}`}
+            style={{
+              '--pd-chart-row': `${chartRowPercent}fr`,
+              '--pd-lower-row': `${100 - chartRowPercent}fr`,
+            }}
+          >
             <section className="parashari-desk-panel parashari-desk-panel--d1">
               <header className="parashari-desk-panel__head">
                 <div className="parashari-desk-panel__titles">
                   <h2>D1</h2>
                   <span>Lagna</span>
                 </div>
-                <button type="button" className="parashari-desk-panel__cta" onClick={openOverview}>
-                  Read this chart
-                </button>
+                <div className="parashari-desk-panel__actions">
+                  <button type="button" className="parashari-desk-panel__cta" onClick={openOverview}>
+                    Read this chart
+                  </button>
+                  <div id="parashari-d1-chart-controls" className="parashari-desk-panel__chart-controls" />
+                </div>
               </header>
               <div className="parashari-desk-chart">
                 <ChartWidget
@@ -604,10 +764,11 @@ const ChartsDashasWorkspacePage = ({
                   embedInDashboard
                   deskMode
                   inlinePlanetDetails
+                  deskControlsHostId="parashari-d1-chart-controls"
                   onHouseSelect={handleHouseSelect}
                   selectedHouseNumber={houseSelection?.houseNumber}
                   activationHouseStates={visibleActivationHouseStates}
-                  calculationProfile={viewProfile}
+                  calculationProfile={effectiveViewProfile}
                 />
               </div>
             </section>
@@ -618,7 +779,10 @@ const ChartsDashasWorkspacePage = ({
                   <h2>D9</h2>
                   <span>Navamsa</span>
                 </div>
-                <em className="parashari-desk-panel__hint">Click a house for insight dock</em>
+                <div className="parashari-desk-panel__actions">
+                  <em className="parashari-desk-panel__hint">Click a house for insight dock</em>
+                  <div id="parashari-d9-chart-controls" className="parashari-desk-panel__chart-controls" />
+                </div>
               </header>
               <div className="parashari-desk-chart">
                 <ChartWidget
@@ -631,9 +795,10 @@ const ChartsDashasWorkspacePage = ({
                   embedInDashboard
                   deskMode
                   inlinePlanetDetails
+                  deskControlsHostId="parashari-d9-chart-controls"
                   onHouseSelect={handleHouseSelect}
                   selectedHouseNumber={houseSelection?.houseNumber}
-                  calculationProfile={viewProfile}
+                  calculationProfile={effectiveViewProfile}
                 />
               </div>
             </section>
@@ -641,11 +806,95 @@ const ChartsDashasWorkspacePage = ({
             {!activationsFocus ? (
               <section className="parashari-desk-panel parashari-desk-panel--div">
                 <header className="parashari-desk-panel__head">
-                  <div className="parashari-desk-panel__titles">
-                    <h2>{selectedDivisionalChart.shortLabel}</h2>
-                    <span>{selectedDivisionalChart.label}</span>
+                  <div className="parashari-compare-picker" ref={comparePickerRef}>
+                    <span className="parashari-compare-picker__label">Compare chart</span>
+                    <button
+                      type="button"
+                      className="parashari-compare-picker__trigger"
+                      aria-haspopup="dialog"
+                      aria-expanded={comparePickerOpen}
+                      onClick={() => setComparePickerOpen((open) => !open)}
+                    >
+                      <strong>{selectedDivisionalChart.shortLabel}</strong>
+                      <span>{selectedDivisionalChart.label}</span>
+                      <b aria-hidden="true">⌄</b>
+                    </button>
+                    {comparePickerOpen ? (
+                      <div className="parashari-compare-picker__menu" role="dialog" aria-label="Choose comparison chart">
+                        <header>
+                          <div>
+                            <strong>Choose comparison chart</strong>
+                            <span>D1, D9 and Transit remain fixed</span>
+                          </div>
+                          <button type="button" onClick={() => setComparePickerOpen(false)} aria-label="Close chart selector">×</button>
+                        </header>
+                        <section>
+                          <h3>Frequently used</h3>
+                          <div className="parashari-compare-picker__options">
+                            {COMPARE_CHART_OPTIONS.filter((option) => FREQUENT_COMPARE_VALUES.has(option.value)).map((option) => (
+                              <button
+                                type="button"
+                                key={option.value}
+                                className={selectedDx === option.value ? 'is-active' : ''}
+                                onClick={() => {
+                                  setSelectedDx(option.value);
+                                  setComparePickerOpen(false);
+                                }}
+                              >
+                                <strong>{option.shortLabel}</strong>
+                                <span>{option.label}</span>
+                                <small>{option.purpose}</small>
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                        <section>
+                          <h3>Other Vargas</h3>
+                          <div className="parashari-compare-picker__options">
+                            {COMPARE_CHART_OPTIONS.filter((option) => !FREQUENT_COMPARE_VALUES.has(option.value)).map((option) => (
+                              <button
+                                type="button"
+                                key={option.value}
+                                className={selectedDx === option.value ? 'is-active' : ''}
+                                onClick={() => {
+                                  setSelectedDx(option.value);
+                                  setComparePickerOpen(false);
+                                }}
+                              >
+                                <strong>{option.shortLabel}</strong>
+                                <span>{option.label}</span>
+                                <small>{option.purpose}</small>
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                        <section>
+                          <h3>Special charts</h3>
+                          <div className="parashari-compare-picker__options parashari-compare-picker__options--special">
+                            {SPECIAL_CHART_OPTIONS.map((option) => (
+                              <button
+                                type="button"
+                                key={option.value}
+                                className={selectedDx === option.value ? 'is-active' : ''}
+                                onClick={() => {
+                                  setSelectedDx(option.value);
+                                  setComparePickerOpen(false);
+                                }}
+                              >
+                                <strong>{option.shortLabel}</strong>
+                                <span>{option.label}</span>
+                                <small>{option.purpose}</small>
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                      </div>
+                    ) : null}
                   </div>
-                  <em className="parashari-desk-panel__hint">Click a house for insight dock</em>
+                  <div className="parashari-desk-panel__actions">
+                    <em className="parashari-desk-panel__hint">Click a house for insight dock</em>
+                    <div id="parashari-dx-chart-controls" className="parashari-desk-panel__chart-controls" />
+                  </div>
                 </header>
                 <div className="parashari-desk-chart">
                   <ChartWidget
@@ -659,9 +908,10 @@ const ChartsDashasWorkspacePage = ({
                     embedInDashboard
                     deskMode
                     inlinePlanetDetails
+                    deskControlsHostId="parashari-dx-chart-controls"
                     onHouseSelect={handleHouseSelect}
                     selectedHouseNumber={houseSelection?.houseNumber}
-                    calculationProfile={viewProfile}
+                    calculationProfile={effectiveViewProfile}
                   />
                 </div>
               </section>
@@ -671,9 +921,12 @@ const ChartsDashasWorkspacePage = ({
               <header className="parashari-desk-panel__head">
                 <div className="parashari-desk-panel__titles">
                   <h2>Transit</h2>
-                  <span>As-of sky</span>
+                  <span>As-of sky · {workspaceDateLabel}</span>
                 </div>
-                <em className="parashari-desk-panel__hint">Click a house for insight dock</em>
+                <div className="parashari-desk-panel__actions">
+                  <em className="parashari-desk-panel__hint">Click a house for insight dock</em>
+                  <div id="parashari-transit-chart-controls" className="parashari-desk-panel__chart-controls" />
+                </div>
               </header>
               <div className="parashari-desk-chart">
                 <ChartWidget
@@ -687,18 +940,42 @@ const ChartsDashasWorkspacePage = ({
                   embedInDashboard
                   deskMode
                   inlinePlanetDetails
+                  deskControlsHostId="parashari-transit-chart-controls"
                   onHouseSelect={handleHouseSelect}
                   selectedHouseNumber={houseSelection?.houseNumber}
                   activationHouseStates={visibleActivationHouseStates}
-                  calculationProfile={viewProfile}
+                  calculationProfile={effectiveViewProfile}
                 />
               </div>
             </section>
 
+            <div
+              className="parashari-desk-splitter"
+              role="separator"
+              aria-label="Resize charts and lower workbench"
+              aria-orientation="horizontal"
+              aria-valuemin={MIN_CHART_ROW_PERCENT}
+              aria-valuemax={MAX_CHART_ROW_PERCENT}
+              aria-valuenow={Math.round(chartRowPercent)}
+              tabIndex={0}
+              onPointerDown={handleWorkspaceResizeStart}
+              onPointerMove={handleWorkspaceResizeMove}
+              onPointerUp={handleWorkspaceResizeEnd}
+              onPointerCancel={handleWorkspaceResizeEnd}
+              onLostPointerCapture={handleWorkspaceResizeEnd}
+              onKeyDown={handleWorkspaceResizeKey}
+              onDoubleClick={() => setChartRowPercent(DEFAULT_CHART_ROW_PERCENT)}
+              title="Drag to resize charts and workbench. Double-click to reset."
+            >
+              <span aria-hidden="true" />
+              <em>Drag to resize</em>
+            </div>
+
             <section className="parashari-desk-panel parashari-desk-panel--dasha">
               <DeskDashaPanel
                 birthData={birthData}
-                chartData={chartData}
+                chartData={renderedChartData}
+                calculationProfile={effectiveViewProfile}
                 asOfDate={asOfDate}
                 onJumpToDate={setAsOfDate}
                 system={dashaSystem}
@@ -716,7 +993,8 @@ const ChartsDashasWorkspacePage = ({
                   loading={activationLoading}
                   error={activationError}
                   birthData={birthData}
-                  chartData={chartData}
+                  chartData={renderedChartData}
+                  calculationProfile={effectiveViewProfile}
                   asOfDate={asOfDate}
                   onJumpToDate={setAsOfDate}
                   layout="focus"
@@ -742,7 +1020,7 @@ const ChartsDashasWorkspacePage = ({
                 <div className="parashari-desk-analysis__chrome">
                   <DeskStrengthStrip
                     birthData={birthData}
-                    chartData={chartData}
+                    chartData={renderedChartData}
                     onOpenTool={setActiveTool}
                   />
                   <header className="parashari-desk-analysis__head">
@@ -766,6 +1044,17 @@ const ChartsDashasWorkspacePage = ({
                       >
                         Positions
                       </button>
+                      {lifeTabEnabled ? (
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={analysisTab === 'life'}
+                          className={analysisTab === 'life' ? 'is-active' : ''}
+                          onClick={() => setAnalysisTab('life')}
+                        >
+                          Life
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         role="tab"
@@ -834,7 +1123,7 @@ const ChartsDashasWorkspacePage = ({
                           <div className="parashari-desk-analysis__house-chips">
                             {Array.from({ length: 12 }, (_, index) => {
                               const houseNumber = index + 1;
-                              const selection = buildHouseSelection(chartData, houseNumber, 'lagna');
+                              const selection = buildHouseSelection(renderedChartData, houseNumber, 'lagna');
                               const selected = houseSelection?.chartId === 'lagna' && houseSelection?.houseNumber === houseNumber;
                               return (
                                 <button
@@ -855,23 +1144,30 @@ const ChartsDashasWorkspacePage = ({
                       ) : null}
                       <DeskHouseInsight
                         birthData={birthData}
-                        chartData={chartData}
+                        chartData={renderedChartData}
                         selection={houseSelection}
                         asOfDate={asOfDate}
                         chartId={houseSelection?.chartId || 'lagna'}
                         expanded={analysisExpanded}
+                        calculationProfile={effectiveViewProfile}
                       />
                     </>
                   ) : analysisTab === 'positions' ? (
-                    <DeskPositionsTable chartData={chartData} birthData={birthData} />
+                    <DeskPositionsTable chartData={renderedChartData} birthData={birthData} />
+                  ) : analysisTab === 'life' && lifeTabEnabled ? (
+                    <ClassicalLifeReading
+                      birthData={birthData}
+                      chartData={renderedChartData}
+                      variant={analysisExpanded ? 'expanded' : 'compact'}
+                    />
                   ) : analysisTab === 'yogas' ? (
-                    <DeskYogasPanel birthData={birthData} />
+                    <DeskYogasPanel birthData={birthData} chartData={renderedChartData} calculationProfile={effectiveViewProfile} />
                   ) : analysisTab === 'friends' ? (
-                    <DeskFriendshipPanel chartData={chartData} />
+                    <DeskFriendshipPanel chartData={renderedChartData} />
                   ) : analysisTab === 'lords' ? (
-                    <DeskHouseLordsPanel chartData={chartData} />
+                    <DeskHouseLordsPanel chartData={renderedChartData} />
                   ) : (
-                    <DeskAspectsPanel chartData={chartData} />
+                    <DeskAspectsPanel chartData={renderedChartData} />
                   )}
                 </div>
               </section>
@@ -903,6 +1199,8 @@ const ChartsDashasWorkspacePage = ({
             onClose={() => setOverviewOpen(false)}
             birthData={birthData}
             transitDate={formatAsOfIso(asOfDate)}
+            calculationProfile={effectiveViewProfile}
+            chartData={renderedChartData}
             onOpenHouse={openHouseFromOverview}
             onOpenYogas={() => {
               setOverviewOpen(false);
@@ -919,6 +1217,7 @@ const ChartsDashasWorkspacePage = ({
             birthData={birthData}
             chartId="lagna"
             transitDate={formatAsOfIso(asOfDate)}
+            calculationProfile={effectiveViewProfile}
             planetsInHouse={occupantsForHouse(renderedChartData, houseSelection?.houseNumber)}
           />
         </>
@@ -927,7 +1226,7 @@ const ChartsDashasWorkspacePage = ({
       {hasChart ? (
         <DeskToolModals
           birthData={birthData}
-          chartData={chartData}
+          chartData={renderedChartData}
           activeTool={activeTool}
           onClose={() => setActiveTool(null)}
         />

@@ -24,6 +24,8 @@ function ChartOverviewPopup({
   transitDate,
   onOpenHouse,
   onOpenYogas,
+  calculationProfile = null,
+  chartData = null,
 }) {
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -40,7 +42,7 @@ function ChartOverviewPopup({
     setLoading(true);
     setError('');
     apiService
-      .getChartOverview({ birthData, chartId, transitDate })
+      .getChartOverview({ birthData, chartId, transitDate, calculationProfile, chartData })
       .then((data) => {
         if (!cancelled) setOverview(data);
       })
@@ -56,7 +58,7 @@ function ChartOverviewPopup({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, birthData, chartId, transitDate]);
+  }, [isOpen, birthData, chartId, transitDate, calculationProfile, chartData]);
 
   if (!isOpen) return null;
 

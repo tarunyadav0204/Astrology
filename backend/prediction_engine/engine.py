@@ -1085,12 +1085,21 @@ class PredictionEngine:
             locale=request.language,
         )
 
+        runtime_conventions = dict(profile.conventions.__dict__)
+        if request.calculation_profile:
+            runtime_conventions["ayanamsha"] = str(
+                request.calculation_profile.get("ayanamsha") or "lahiri"
+            )
+            runtime_conventions["node_model"] = str(
+                request.calculation_profile.get("node_type") or "mean"
+            )
+
         signature_payload = {
             "engine": ENGINE_VERSION,
             "schema": SCHEMA_VERSION,
             "profile": profile.key,
             "profile_version": profile.version,
-            "conventions": profile.conventions.__dict__,
+            "conventions": runtime_conventions,
             "providers": self.registry.versions(profile.provider_ids),
             "subject_registry_version": SUBJECT_REGISTRY_VERSION,
             "house_signification_registry_version": HOUSE_SIGNIFICATION_REGISTRY_VERSION,
@@ -1139,7 +1148,7 @@ class PredictionEngine:
                     "eligible_before_deduplication": len(eligible),
                     "eligible_activation_windows": len(eligible),
                     "provider_versions": self.registry.versions(profile.provider_ids),
-                    "conventions": profile.conventions.__dict__,
+                    "conventions": runtime_conventions,
                     "house_activation_policy_version": self.house_activation_engine.version,
                     "chart_manifestation_resolver_version": self.chart_manifestation_resolver.version,
                     "chart_manifestations": len(chart_manifestations),

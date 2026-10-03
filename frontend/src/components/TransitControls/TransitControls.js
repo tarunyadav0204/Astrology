@@ -35,6 +35,8 @@ const TransitControls = ({
   primaryColor,
   /** When true, show HH:MM and ±H — used by Parashari desk shared clock */
   showTime = false,
+  /** Use explicit Day / Month / Year labels in prominent timeline surfaces. */
+  descriptiveNavigation = false,
 }) => {
   const dateInputRef = useRef(null);
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
@@ -165,7 +167,17 @@ const TransitControls = ({
       ) : null}
 
       <ButtonGroup>
-        {isMobile ? (
+        {descriptiveNavigation ? (
+          <>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'year')}>← Year</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'month')}>← Month</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'day')}>← Day</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={resetToToday} primary>Today</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('add', 'day')}>Day →</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('add', 'month')}>Month →</NavButton>
+            <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('add', 'year')}>Year →</NavButton>
+          </>
+        ) : isMobile ? (
           <>
             {showTime ? (
               <NavButton $variant={variant} $textColor={textColor} onClick={() => handleDateChange('sub', 'hour')}>‹H</NavButton>

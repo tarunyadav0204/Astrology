@@ -1,15 +1,20 @@
 import swisseph as swe
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
+from utils.calendar_date import parse_calendar_date_y_m_d
 from utils.timezone_service import parse_timezone_offset
+from .chart_calculator import resolve_ayanamsha_mode, _SWISSEPH_CHART_LOCK
 
 from .vedic_graha_drishti import DEFAULT_ASPECTS, GRAHA_HOUSE_ASPECTS
 
 class RealTransitCalculator:
     """Real astronomical transit calculations using Swiss Ephemeris"""
     
-    def __init__(self):
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
+    def __init__(self, ayanamsha: str = 'lahiri', node_type: str = 'mean'):
+        self.ayanamsha_key, self.sid_mode = resolve_ayanamsha_mode(ayanamsha)
+        self.node_type = str(node_type or 'mean').strip().lower()
+        if self.node_type not in {'mean', 'true'}:
+            raise ValueError(f"Unsupported lunar node type: {node_type}")
         
         # Nakshatra names
         self.nakshatra_names = [
@@ -27,7 +32,8 @@ class RealTransitCalculator:
             'Sun': swe.SUN, 'Moon': swe.MOON, 'Mars': swe.MARS,
             'Mercury': swe.MERCURY, 'Jupiter': swe.JUPITER,
             'Venus': swe.VENUS, 'Saturn': swe.SATURN,
-            'Rahu': swe.MEAN_NODE, 'Ketu': swe.MEAN_NODE
+            'Rahu': swe.TRUE_NODE if self.node_type == 'true' else swe.MEAN_NODE,
+            'Ketu': swe.TRUE_NODE if self.node_type == 'true' else swe.MEAN_NODE,
         }
 
     def get_planet_state(self, date: datetime, planet: str) -> Dict:
@@ -50,11 +56,16 @@ class RealTransitCalculator:
                 else date.hour + date.minute / 60.0 + date.second / 3600.0
             )
             jd = swe.julday(date.year, date.month, date.day, decimal_hour)
-            result = swe.calc_ut(
-                jd,
-                planet_num,
-                swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH,
-            )
+            with _SWISSEPH_CHART_LOCK:
+                try:
+                    swe.set_sid_mode(self.sid_mode)
+                    result = swe.calc_ut(
+                        jd,
+                        planet_num,
+                        swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH,
+                    )
+                finally:
+                    swe.set_sid_mode(swe.SIDM_LAHIRI)
         except Exception as exc:
             raise RuntimeError(
                 f"Swiss Ephemeris transit calculation failed for {planet} on {date.date()}"
@@ -325,43 +336,45 @@ class RealTransitCalculator:
             tz_offset = parse_timezone_offset(
                 birth_data.get('timezone', ''),
                 birth_data.get('latitude'),
-                birth_data.get('longitude')
+                birth_data.get('longitude'),
+                for_date=birth_data.get('date'),
             )
             
             # print(f"     Timezone offset: {tz_offset} hours")
 
             
             utc_hour = hour - tz_offset
-            jd = swe.julday(
-                int(birth_data['date'].split('-')[0]),
-                int(birth_data['date'].split('-')[1]),
-                int(birth_data['date'].split('-')[2]),
-                utc_hour
-            )
-            
-            # Calculate ascendant
-            houses_data = swe.houses(jd, birth_data['latitude'], birth_data['longitude'], b'P')
-            ayanamsa = swe.get_ayanamsa_ut(jd)
-            ascendant_tropical = houses_data[1][0]
-            ascendant_sidereal = (ascendant_tropical - ayanamsa) % 360
-            
-            positions = {
-                'ascendant_longitude': ascendant_sidereal
-            }
-            
-            # Calculate planetary positions
-            planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
-            
-            for planet_name in planet_names:
-                planet_num = self.planet_numbers[planet_name]
-                pos = swe.calc_ut(jd, planet_num, swe.FLG_SIDEREAL)
-                longitude = pos[0][0]
-                
-                positions[planet_name] = {
-                    'longitude': longitude,
-                    'sign': int(longitude / 30),
-                    'degree': longitude % 30
-                }
+            year, month, day = parse_calendar_date_y_m_d(birth_data['date'])
+            jd = swe.julday(year, month, day, utc_hour)
+
+            with _SWISSEPH_CHART_LOCK:
+                try:
+                    swe.set_sid_mode(self.sid_mode)
+                    # Calculate ascendant
+                    houses_data = swe.houses(jd, birth_data['latitude'], birth_data['longitude'], b'P')
+                    ayanamsa = swe.get_ayanamsa_ut(jd)
+                    ascendant_tropical = houses_data[1][0]
+                    ascendant_sidereal = (ascendant_tropical - ayanamsa) % 360
+
+                    positions = {
+                        'ascendant_longitude': ascendant_sidereal
+                    }
+
+                    # Calculate planetary positions
+                    planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn']
+
+                    for planet_name in planet_names:
+                        planet_num = self.planet_numbers[planet_name]
+                        pos = swe.calc_ut(jd, planet_num, swe.FLG_SIDEREAL)
+                        longitude = pos[0][0]
+
+                        positions[planet_name] = {
+                            'longitude': longitude,
+                            'sign': int(longitude / 30),
+                            'degree': longitude % 30
+                        }
+                finally:
+                    swe.set_sid_mode(swe.SIDM_LAHIRI)
             
             # print(f"     Successfully calculated {len(positions)} positions")
             return positions

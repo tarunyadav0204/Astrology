@@ -99,7 +99,7 @@ function parseGandanta(payload) {
 /**
  * Compact planetary-condition strip: combust, R, VG, yuddha, baladi, Gandanta.
  */
-export default function DeskConditionStrip({ birthData, chartData, label = 'Cond' }) {
+export default function DeskConditionStrip({ birthData, chartData, label = 'Cond', calculationProfile = null }) {
   const [d9, setD9] = useState(null);
   const [gandanta, setGandanta] = useState({ byPlanet: {}, lagna: null });
 
@@ -109,7 +109,7 @@ export default function DeskConditionStrip({ birthData, chartData, label = 'Cond
       return undefined;
     }
     let cancelled = false;
-    apiService.calculateDivisionalChart(birthData, 9)
+    apiService.calculateDivisionalChart(birthData, 9, calculationProfile)
       .then((res) => {
         if (!cancelled) setD9(res?.divisional_chart || res || null);
       })
@@ -117,7 +117,7 @@ export default function DeskConditionStrip({ birthData, chartData, label = 'Cond
         if (!cancelled) setD9(null);
       });
     return () => { cancelled = true; };
-  }, [birthData, chartData]);
+  }, [birthData, chartData, calculationProfile]);
 
   useEffect(() => {
     if (!chartData?.planets) {

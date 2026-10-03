@@ -69,6 +69,7 @@ class PredictionService:
             request.as_of,
             horizon_end,
             include_exact_transit_returns=include_exact_transit_returns,
+            calculation_profile=request.calculation_profile,
         )
         return self.generate_from_context(request, calculation)
 

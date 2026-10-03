@@ -333,12 +333,16 @@ class HouseInsightRequest(BaseModel):
     house_num: int
     chart_id: str = "lagna"
     transit_date: Optional[str] = None
+    calculation_profile: Optional[Dict[str, str]] = None
+    chart_data: Optional[Dict[str, Any]] = None
 
 
 class ChartOverviewRequest(BaseModel):
     birth_data: Dict[str, Any]
     chart_id: str = "lagna"
     transit_date: Optional[str] = None
+    calculation_profile: Optional[Dict[str, str]] = None
+    chart_data: Optional[Dict[str, Any]] = None
 
 
 def _birth_hash_from_dict(birth_data: Dict[str, Any]) -> Optional[str]:
@@ -582,6 +586,8 @@ async def chart_house_insight(
             house_num=request.house_num,
             chart_id=request.chart_id,
             transit_date=request.transit_date,
+            calculation_profile=request.calculation_profile,
+            supplied_natal_chart=request.chart_data,
         )
     except HTTPException:
         raise
@@ -606,6 +612,8 @@ async def chart_overview(
             birth_data=request.birth_data,
             chart_id=request.chart_id,
             transit_date=request.transit_date,
+            calculation_profile=request.calculation_profile,
+            supplied_natal_chart=request.chart_data,
         )
     except HTTPException:
         raise
@@ -1237,7 +1245,7 @@ async def calculate_yogi_points(request: dict, current_user: User = Depends(get_
         if not birth_data:
             raise HTTPException(status_code=400, detail="Birth data required")
         
-        calculator = YogiCalculator({})
+        calculator = YogiCalculator(request.get('chart_data') or {})
         yogi_points = calculator.calculate_yogi_points(birth_data)
         
         return {
@@ -1343,6 +1351,7 @@ async def calculate_double_transit_browser(
             start,
             inclusive_end + timedelta(days=1),
             include_aspect_only=bool(request.get("include_aspect_only", True)),
+            ayanamsha=(request.get("calculation_profile") or {}).get("ayanamsha", "lahiri"),
         )
         return {"success": True, **result}
     except DoubleTransitInputError as exc:

@@ -116,6 +116,15 @@ apiClient.interceptors.response.use(
 );
 
 export const apiService = {
+  calculateClassicalReading: async (chartData, birthData = null, areaKeys = null) => {
+    const response = await apiClient.post(getEndpoint('/classical-reading'), {
+      chart_data: chartData,
+      birth_data: birthData,
+      ...(Array.isArray(areaKeys) ? { area_keys: areaKeys } : {}),
+    });
+    return response.data;
+  },
+
   calculateLongevity: async ({ birthData, chartData, horizonYears = 12, subject = 'self', ashtakavargaProfile = 'pvr_narasimha_rao' }) => {
     const response = await apiClient.post(getEndpoint('/longevity/calculate'), {
       birth_data: birthData,
@@ -216,7 +225,7 @@ export const apiService = {
   },
 
   /** Vimshottari hierarchy for a date (maha → prana); used by chat header chips. */
-  calculateCascadingDashas: async (birthData, targetDateStr) => {
+  calculateCascadingDashas: async (birthData, targetDateStr, calculationProfile = null) => {
     const rawDate = birthData?.date != null ? String(birthData.date) : '';
     const dateStr = rawDate.includes('T') ? rawDate.split('T')[0] : rawDate;
     let timeStr = birthData?.time != null ? String(birthData.time) : '';
@@ -244,6 +253,7 @@ export const apiService = {
     const response = await apiClient.post(getEndpoint('/calculate-cascading-dashas'), {
       birth_data: payload,
       target_date: target,
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
     });
     return response.data;
   },
@@ -303,7 +313,7 @@ export const apiService = {
     return response.data;
   },
 
-  getActivationExplorer: async ({ birthChartId, birthData, asOf, horizonDays = 90, trace = true }) => {
+  getActivationExplorer: async ({ birthChartId, birthData, asOf, horizonDays = 90, trace = true, calculationProfile = null }) => {
     const response = await apiClient.post(getEndpoint('/prediction-engine/activation-explorer'), {
       birth_chart_id: birthChartId || null,
       birth_data: birthChartId ? null : birthData,
@@ -311,11 +321,12 @@ export const apiService = {
       horizon_days: horizonDays,
       maximum_candidates: 100,
       trace,
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
     });
     return response.data;
   },
 
-  getEventWindows: async ({ birthChartId, birthData, eventKey, year, includeDeveloping = false, focusHouses = null }) => {
+  getEventWindows: async ({ birthChartId, birthData, eventKey, year, includeDeveloping = false, focusHouses = null, calculationProfile = null }) => {
     const response = await apiClient.post(getEndpoint('/prediction-engine/event-windows'), {
       birth_chart_id: birthChartId || null,
       birth_data: birthChartId ? null : birthData,
@@ -323,6 +334,7 @@ export const apiService = {
       year,
       include_developing: includeDeveloping,
       focus_houses: eventKey === 'custom' ? (focusHouses || []) : null,
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
     });
     return response.data;
   },
@@ -389,9 +401,10 @@ export const apiService = {
     return response.data;
   },
   
-  calculateYogi: async (birthData) => {
+  calculateYogi: async (birthData, chartData = null) => {
     const response = await apiClient.post(getEndpoint('/yogi-points'), {
-      birth_data: birthData
+      birth_data: birthData,
+      ...(chartData ? { chart_data: chartData } : {}),
     });
     // Backend returns { success, yogi_points }
     return response.data?.yogi_points || response.data;
@@ -403,9 +416,10 @@ export const apiService = {
   },
 
   /** Janma pañcāṅga at birth moment (tithi, vāra, nakṣatra, yoga, karaṇa). */
-  calculateBirthPanchang: async (birthData) => {
+  calculateBirthPanchang: async (birthData, calculationProfile = null) => {
     const response = await apiClient.post(getEndpoint('/panchang/calculate-birth-panchang'), {
       birth_data: birthData,
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
     });
     return response.data;
   },
@@ -834,30 +848,35 @@ export const apiService = {
     };
   },
 
-  getHouseInsight: async ({ birthData, houseNum, chartId = 'lagna', transitDate }) => {
+  getHouseInsight: async ({ birthData, houseNum, chartId = 'lagna', transitDate, calculationProfile = null, chartData = null }) => {
     const response = await apiClient.post(getEndpoint('/chart-house-insight'), {
       birth_data: apiService._chartInsightBirth(birthData),
       house_num: houseNum,
       chart_id: chartId,
       transit_date: transitDate || new Date().toISOString().split('T')[0],
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
+      ...(chartData ? { chart_data: chartData } : {}),
     });
     return response.data;
   },
 
-  getChartAshtakavarga: async ({ birthData, chartType = 'lagna', transitDate }) => {
+  getChartAshtakavarga: async ({ birthData, chartType = 'lagna', transitDate, calculationProfile = null }) => {
     const response = await apiClient.post(getEndpoint('/calculate-ashtakavarga'), {
       birth_data: apiService._chartInsightBirth(birthData),
       chart_type: chartType,
       transit_date: transitDate || new Date().toISOString().split('T')[0],
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
     });
     return response.data;
   },
 
-  getChartOverview: async ({ birthData, chartId = 'lagna', transitDate }) => {
+  getChartOverview: async ({ birthData, chartId = 'lagna', transitDate, calculationProfile = null, chartData = null }) => {
     const response = await apiClient.post(getEndpoint('/chart-overview'), {
       birth_data: apiService._chartInsightBirth(birthData),
       chart_id: chartId,
       transit_date: transitDate || new Date().toISOString().split('T')[0],
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
+      ...(chartData ? { chart_data: chartData } : {}),
     });
     return response.data;
   },
@@ -867,12 +886,13 @@ export const apiService = {
     return response.data;
   },
 
-  getDoubleTransits: async ({ chartData, startDate, endDate, includeAspectOnly = true }) => {
+  getDoubleTransits: async ({ chartData, startDate, endDate, includeAspectOnly = true, calculationProfile = null }) => {
     const response = await apiClient.post(getEndpoint('/double-transits'), {
       chart_data: chartData,
       start_date: startDate,
       end_date: endDate,
       include_aspect_only: includeAspectOnly,
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
     });
     return response.data;
   },
@@ -882,7 +902,7 @@ export const apiService = {
     return response.data;
   },
 
-  getYogas: async (birthData) => {
+  getYogas: async (birthData, chartData = null, calculationProfile = null) => {
     const dateStr = String(birthData?.date || '').includes('T')
       ? String(birthData.date).split('T')[0]
       : birthData?.date;
@@ -898,6 +918,8 @@ export const apiService = {
       longitude: birthData?.longitude != null ? parseFloat(birthData.longitude) : undefined,
       timezone: birthData?.timezone,
       gender: birthData?.gender,
+      chart_data: chartData || undefined,
+      calculation_profile: calculationProfile || undefined,
     });
     return response.data;
   },

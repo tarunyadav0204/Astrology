@@ -119,6 +119,7 @@ export default function DeskHouseInsight({
   asOfDate,
   chartId = 'lagna',
   expanded = false,
+  calculationProfile = null,
   emptyTitle = 'Click a house on D1 / D9 / Dx / Transit',
   emptyHint = 'Lord · occupants · Ashtakavarga · drishti · verdict',
   emptyAction = null,
@@ -161,9 +162,16 @@ export default function DeskHouseInsight({
     setLoading(true);
     setError('');
     const transitDate = formatAsOfDate(asOfDate);
-    const requests = [apiService.getHouseInsight({ birthData, houseNum: houseNumber, chartId: activeChartId, transitDate })];
+    const requests = [apiService.getHouseInsight({
+      birthData,
+      houseNum: houseNumber,
+      chartId: activeChartId,
+      transitDate,
+      calculationProfile,
+      chartData: activeChartId === 'lagna' ? chartData : null,
+    })];
     if (activeChartId === 'lagna' || activeChartId === 'transit') {
-      requests.push(apiService.getChartAshtakavarga({ birthData, chartType: activeChartId, transitDate }).catch(() => null));
+      requests.push(apiService.getChartAshtakavarga({ birthData, chartType: activeChartId, transitDate, calculationProfile }).catch(() => null));
     }
     Promise.all(requests).then(([data, ashtakavarga]) => {
       if (!cancelled) {
@@ -187,7 +195,7 @@ export default function DeskHouseInsight({
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [birthData, houseNumber, activeChartId, asOfDate, rashiIndex, local?.lord]);
+  }, [birthData, houseNumber, activeChartId, asOfDate, rashiIndex, local?.lord, chartData, calculationProfile]);
 
   if (!houseNumber) {
     return <div className="desk-hi desk-hi--empty"><p>{emptyTitle}</p><span>{emptyHint}</span>{emptyAction}</div>;
