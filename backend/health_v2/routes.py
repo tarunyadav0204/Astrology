@@ -46,7 +46,7 @@ async def natal_blueprint(
         divisions = (
             {
                 f"D{division}": calculate_divisional_chart(chart, division)["divisional_chart"]
-                for division in (3, 9, 12)
+                for division in (3, 9, 12, 30)
             }
             if has_longitudes else {}
         )
@@ -82,7 +82,7 @@ async def timing_heatmap(
             raise ValueError("planetary longitudes are required for transit contacts")
         divisions = {
             f"D{division}": calculate_divisional_chart(chart, division)["divisional_chart"]
-            for division in (3, 9, 12)
+            for division in (3, 9, 12, 30)
         }
         blueprint = NatalHealthBlueprintEngine(
             chart, divisions, gender=request.birth_data.get("gender")

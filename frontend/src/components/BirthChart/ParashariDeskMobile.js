@@ -20,9 +20,11 @@ import DeskConditionStrip from './DeskConditionStrip';
 import DeskSpecialLagnas from './DeskSpecialLagnas';
 import DeskKarakasPanel from './DeskKarakasPanel';
 import ChartActivationKey from './ChartActivationKey';
+import DeskTopicSelector from './DeskTopicSelector';
+import DeskTopicLens from './DeskTopicLens';
 import './ParashariDeskMobile.css';
 
-const HUB_TABS = [
+const BASE_HUB_TABS = [
   { id: 'chart', label: 'Chart' },
   { id: 'dasha', label: 'Dasha' },
   { id: 'act', label: 'Act' },
@@ -55,11 +57,11 @@ function formatAsOfIso(date) {
 }
 
 function buildHouseSelection(effectiveChartData, houseNumber, chartId = 'lagna') {
-  const lagnaSign = chartData?.houses?.[0]?.sign
-    ?? (typeof chartData?.ascendant === 'number'
-      ? Math.floor((((chartData.ascendant % 360) + 360) % 360) / 30)
+  const lagnaSign = effectiveChartData?.houses?.[0]?.sign
+    ?? (typeof effectiveChartData?.ascendant === 'number'
+      ? Math.floor((((effectiveChartData.ascendant % 360) + 360) % 360) / 30)
       : 0);
-  const rashiIndex = chartData?.houses?.[houseNumber - 1]?.sign
+  const rashiIndex = effectiveChartData?.houses?.[houseNumber - 1]?.sign
     ?? ((Number(lagnaSign) + houseNumber - 1) % 12);
   return {
     houseNumber,
@@ -120,13 +122,18 @@ export default function ParashariDeskMobile({
   onCalculationProfileChange,
   calculationProfileLoading,
   lifeTabEnabled = false,
+  topicId = 'whole_chart',
+  onTopicChange,
 }) {
   const navigate = useNavigate();
   const effectiveChartData = viewChartData || chartData;
+  const hubTabs = useMemo(() => topicId === 'whole_chart'
+    ? BASE_HUB_TABS
+    : [BASE_HUB_TABS[0], { id: 'study', label: 'Study' }, ...BASE_HUB_TABS.slice(1)], [topicId]);
   const moreTabs = useMemo(() => lifeTabEnabled
     ? [...BASE_MORE_TABS.slice(0, 2), { id: 'life', label: 'Life', icon: '◇' }, ...BASE_MORE_TABS.slice(2)]
     : BASE_MORE_TABS, [lifeTabEnabled]);
-  const requestedHubTab = HUB_TABS.some((tab) => tab.id === initialHubTab)
+  const requestedHubTab = hubTabs.some((tab) => tab.id === initialHubTab)
     ? initialHubTab
     : 'chart';
   const [hubTab, setHubTab] = useState(requestedHubTab);
@@ -141,6 +148,13 @@ export default function ParashariDeskMobile({
   useEffect(() => {
     setHubTab(requestedHubTab);
   }, [requestedHubTab]);
+
+  useEffect(() => {
+    setHubTab((current) => {
+      if (topicId !== 'whole_chart') return 'study';
+      return current === 'study' ? 'chart' : current;
+    });
+  }, [topicId]);
 
   useEffect(() => {
     if (hubTab !== 'act') setActivationLens('timeline');
@@ -300,8 +314,10 @@ export default function ParashariDeskMobile({
           {calculationProfileLoading ? <i>Updating…</i> : null}
         </div>
 
-        <nav className="pdm__hub" aria-label="Desk sections">
-          {HUB_TABS.map((tab) => (
+        <DeskTopicSelector value={topicId} onChange={onTopicChange} compact />
+
+        <nav className="pdm__hub" aria-label="Desk sections" style={{ gridTemplateColumns: `repeat(${hubTabs.length}, 1fr)` }}>
+          {hubTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -441,6 +457,24 @@ export default function ParashariDeskMobile({
                 })}
               </div>
             </nav>
+          </section>
+        ) : null}
+
+        {hubTab === 'study' && topicId !== 'whole_chart' ? (
+          <section className="pdm__pane pdm__pane--study">
+            <DeskTopicLens
+              topicId={topicId}
+              birthData={birthData}
+              chartData={effectiveChartData}
+              asOfDate={asOfDate}
+              calculationProfile={calculationProfile}
+              onInspectDate={(date) => {
+                onAsOfChange?.(date);
+                setHubTab('chart');
+                setChartPill('transit');
+              }}
+              compact
+            />
           </section>
         ) : null}
 

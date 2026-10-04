@@ -102,6 +102,13 @@ def test_capricorn_in_sixth_preserves_knee_region_in_final_vulnerabilities():
         for zone in row["body_zones"]
     }
     assert "knees" in anatomy
+    knee = next(
+        row for row in result["vulnerabilities"]
+        if row["stable_id"] == "health.anatomy.knees"
+    )
+    assert "sixth_house_sign" in knee["primary_medical_factors"]
+    assert knee["standing_weight"] > 0
+    assert knee["confluence_count"] > 0
 
 
 def test_scorpio_in_sixth_preserves_anorectal_pelvic_region_in_final_vulnerabilities():

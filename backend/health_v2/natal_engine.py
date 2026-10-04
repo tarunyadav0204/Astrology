@@ -9,12 +9,13 @@ from typing import Any, Dict, Iterable
 from reports.context.health_body_zones import compute_health_body_zone_map
 
 from .constitutional_strength_engine import ConstitutionalStrengthEngine
+from .divisional_confirmation_engine import D30HealthConfirmationEngine
 from .medical_karaka_engine import calculate_medical_karaka_patterns, calculate_menstrual_cycle_assessment
 from .registry import CONDITION_PATTERN_KEYS, classify_zones
 
 
-ENGINE_VERSION = "health-natal-blueprint/2.6.0-preview"
-METHODOLOGY_VERSION = "natal-first-confluence/1.5.0"
+ENGINE_VERSION = "health-natal-blueprint/2.7.0-preview"
+METHODOLOGY_VERSION = "natal-first-confluence/1.6.0"
 SIGN_LORDS = {
     0: "Mars", 1: "Venus", 2: "Mercury", 3: "Moon", 4: "Sun", 5: "Mercury",
     6: "Venus", 7: "Mars", 8: "Jupiter", 9: "Saturn", 10: "Saturn", 11: "Jupiter",
@@ -83,7 +84,7 @@ class NatalHealthBlueprintEngine:
         raw = compute_health_body_zone_map(
             self.chart,
             current_dashas=None,
-            divisional_charts=None,
+            divisional_charts=self.divisional_charts,
             planet_conditions=planet_conditions,
             requested_category="constitutional",
         )
@@ -100,6 +101,14 @@ class NatalHealthBlueprintEngine:
         condition_patterns = list(raw.get("event_patterns") or []) + karaka_patterns
         conditions = self._condition_vulnerabilities(condition_patterns, planet_conditions)
         vulnerabilities = self._merge_vulnerabilities(anatomy + conditions)
+        d30_confirmation = D30HealthConfirmationEngine(
+            self.chart, self.divisional_charts.get("D30")
+        ).calculate(vulnerabilities)
+        for vulnerability in vulnerabilities:
+            vulnerability["d30_confirmation"] = (
+                d30_confirmation.get("finding_confirmations", {}).get(vulnerability["stable_id"])
+                or {"status": "unavailable", "pressure_factors": [], "protective_factors": []}
+            )
         resilience = constitutional.get("overall_resilience") or {}
         for vulnerability in vulnerabilities:
             vulnerability["constitutional_modifier"] = {
@@ -131,6 +140,7 @@ class NatalHealthBlueprintEngine:
                 "special_lunar_factors_are_secondary_only": True,
                 "rahu_ketu_special_aspects_used": False,
                 "female_specific_analysis_requires_profile_gender": True,
+                "d30_confirmation_only": True,
             },
             "vitality_foundation": self._vitality_foundation(medical_profile),
             "constitutional_protection": constitutional,
@@ -140,6 +150,7 @@ class NatalHealthBlueprintEngine:
             } if menstrual_cycle else None,
             "sixth_house_chain": raw.get("sixth_house_chain") or {},
             "vulnerabilities": vulnerabilities,
+            "divisional_health_confirmation": {"D30": d30_confirmation},
             "eligible_vulnerability_ids": eligible,
             "protective_factors": list(dict.fromkeys(
                 _list(medical_profile.get("protective_factors"))
@@ -157,7 +168,7 @@ class NatalHealthBlueprintEngine:
             "limitations": [
                 "This preview describes classical astrological susceptibility, not a medical diagnosis.",
                 "Dasha and transit timing are intentionally excluded from the natal blueprint.",
-                "Health divisional confirmation will be added only after each divisional calculation and interpretive rule is source-reviewed.",
+                "D30 qualifies severity, intervention pressure and recovery support; it cannot introduce a new body area, condition or timing period.",
             ],
         }
 
@@ -203,14 +214,14 @@ class NatalHealthBlueprintEngine:
             qualifiers = self._finding_qualifiers(delivery)
             results.append({
                 "stable_id": f"health.anatomy.{slug}",
-                "label": f"{zone[:1].upper() + zone[1:]} anatomical vulnerability",
+                "label": f"{zone[:1].upper() + zone[1:]} may need extra care",
                 "system": systems[0] if len(systems) == 1 else "multi_system",
                 "possible_systems": systems,
                 "possible_family_labels": family_labels,
                 "claim_type": "anatomical_vulnerability",
                 "description": (
-                    f"The sixth-house anatomical chain repeatedly points to {zone}. "
-                    "This establishes a body-area susceptibility, not a specific disease."
+                    f"Several sixth-house body-area indicators point to {zone}. "
+                    "This shows an area that may need care; it does not indicate a specific disease."
                 ),
                 "body_zones": [zone],
                 "mechanisms": _list(row.get("mechanisms")),
@@ -222,6 +233,13 @@ class NatalHealthBlueprintEngine:
                 "capacity_modifiers": qualifiers["capacity"],
                 "delivery_balance": qualifiers["balance"],
                 "source_pattern_ids": [],
+                # Preserve the anatomical provenance produced by the shared
+                # body-zone engine.  Timing needs this to distinguish, for
+                # example, Capricorn in H6 (knees) from the sixth lord's sign
+                # or nakshatra (different body areas).
+                "primary_medical_factors": list(primary_factors),
+                "confluence_count": int(row.get("confluence_count") or 0),
+                "standing_weight": int(row.get("standing_weight") or 0),
                 "source_planets": source_planets,
                 "timing_planets": source_planets,
                 "timing_houses": [6],

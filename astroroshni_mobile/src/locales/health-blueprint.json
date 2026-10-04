@@ -31,6 +31,7 @@
       "basisTitle": "Sixth-house basis"
     },
     "calculated": "Areas that may need extra care",
+    "bodyAreaNeedsCare": "{{area}} may need extra care",
     "noVulnerabilities": "No area has enough repeated chart support yet. A weak clue has not been presented as an illness.",
     "grades": {
       "strong": "Strong classical indication",
@@ -358,6 +359,9 @@
       },
       "dashaFacts": {
         "direct": "directly signifies this natal susceptibility",
+        "joinedCarrier": "is joined to {{planet}}, which carries this pattern",
+        "nodeDispositorCarrier": "acts through sign lord {{lord}}, joined to {{planet}}",
+        "nodeNakshatraCarrier": "acts through nakshatra lord {{lord}}, linked with {{planet}}",
         "occupies": "occupies natal House {{house}}",
         "rules": "rules relevant House(s) {{houses}}",
         "aspects": "aspects relevant House(s) {{houses}}"
@@ -416,6 +420,7 @@
       "whyThisPeriod": "Why this period is active",
       "strongerWithinWindow": "Stronger phases inside this period",
       "sunPhase": "Sun strengthens the activation during {{range}}.",
+      "activeDashaContact": "Active dasha planets make an exact natal contact during {{range}}.",
       "moonPeak": "Moon briefly concentrates the already active pattern on {{date}}.",
       "windowClaimNote": "This is a period of stronger astrological activation of a natal susceptibility. It does not mean an illness is present every day and is not a diagnosis.",
       "conditionLinkNoOverlap": "{{condition}} is shown because its natal pattern is tied to {{planets}} and {{natalHouses}}. The three-level dasha chain activates {{dashaHouses}}, while a sustained transit directly activates the planets carrying that natal pattern. This is why the period is linked to this concern rather than to an unrelated health topic.",
@@ -611,6 +616,7 @@
       "basisTitle": "छठे भाव का आधार"
     },
     "calculated": "जिन क्षेत्रों पर अधिक ध्यान दें",
+    "bodyAreaNeedsCare": "{{area}} पर अधिक ध्यान देने की आवश्यकता हो सकती है",
     "noVulnerabilities": "अभी किसी क्षेत्र के लिए पर्याप्त बार-बार मिलने वाले संकेत नहीं हैं। कमजोर संकेत को बीमारी नहीं कहा गया है।",
     "grades": {
       "strong": "मजबूत शास्त्रीय संकेत",
@@ -938,6 +944,9 @@
       },
       "dashaFacts": {
         "direct": "इस जन्मकालीन संवेदनशीलता का सीधा कारक है",
+        "joinedCarrier": "इस पैटर्न के कारक {{planet}} के साथ स्थित है",
+        "nodeDispositorCarrier": "राशि स्वामी {{lord}} के माध्यम से फल देता है, जो {{planet}} के साथ स्थित है",
+        "nodeNakshatraCarrier": "नक्षत्र स्वामी {{lord}} के माध्यम से फल देता है, जो {{planet}} से जुड़ा है",
         "occupies": "जन्मकुंडली के भाव {{house}} में स्थित है",
         "rules": "संबंधित भाव {{houses}} का स्वामी है",
         "aspects": "संबंधित भाव {{houses}} पर दृष्टि डालता है"
@@ -996,6 +1005,7 @@
       "whyThisPeriod": "यह अवधि सक्रिय क्यों है",
       "strongerWithinWindow": "इस अवधि के भीतर अधिक सक्रिय चरण",
       "sunPhase": "{{range}} में सूर्य सक्रियता बढ़ाता है।",
+      "activeDashaContact": "{{range}} में सक्रिय दशा ग्रह जन्मकालीन स्थिति से सटीक संपर्क बनाते हैं।",
       "moonPeak": "{{date}} को चंद्रमा पहले से सक्रिय स्वरूप को थोड़े समय के लिए तीव्र करता है।",
       "windowClaimNote": "यह जन्मजात संवेदनशीलता की अधिक ज्योतिषीय सक्रियता की अवधि है। इसका अर्थ हर दिन बीमारी होना नहीं है और यह निदान नहीं है।",
       "conditionLinkNoOverlap": "{{condition}} इसलिए दिखाया गया है क्योंकि इसका जन्मजात स्वरूप {{planets}} और {{natalHouses}} से जुड़ा है। तीन-स्तरीय दशा क्रम {{dashaHouses}} को सक्रिय करती हैं और स्थायी गोचर इस जन्मजात स्वरूप को धारण करने वाले ग्रहों को सीधे सक्रिय करता है। इसलिए यह अवधि किसी असंबंधित स्वास्थ्य विषय के बजाय इसी विषय से जुड़ती है।",
@@ -1191,6 +1201,7 @@
       "basisTitle": "Base de la sexta casa"
     },
     "calculated": "Áreas que pueden necesitar más cuidado",
+    "bodyAreaNeedsCare": "{{area}} puede necesitar más cuidado",
     "noVulnerabilities": "Ningún área tiene todavía suficiente apoyo repetido en la carta. Una señal débil no se presenta como enfermedad.",
     "grades": {
       "strong": "Indicación clásica fuerte",
@@ -1518,6 +1529,9 @@
       },
       "dashaFacts": {
         "direct": "significa directamente esta susceptibilidad natal",
+        "joinedCarrier": "está unido a {{planet}}, que porta este patrón",
+        "nodeDispositorCarrier": "actúa mediante el regente del signo {{lord}}, unido a {{planet}}",
+        "nodeNakshatraCarrier": "actúa mediante el regente del nakshatra {{lord}}, vinculado con {{planet}}",
         "occupies": "ocupa la Casa natal {{house}}",
         "rules": "rige las Casas relevantes {{houses}}",
         "aspects": "aspecta las Casas relevantes {{houses}}"
@@ -1576,6 +1590,7 @@
       "whyThisPeriod": "Por qué este periodo está activo",
       "strongerWithinWindow": "Fases más intensas dentro de este periodo",
       "sunPhase": "El Sol refuerza la activación durante {{range}}.",
+      "activeDashaContact": "Los planetas de dasha activos forman un contacto natal exacto durante {{range}}.",
       "moonPeak": "La Luna concentra brevemente el patrón ya activo el {{date}}.",
       "windowClaimNote": "Es un periodo de mayor activación astrológica de una susceptibilidad natal. No significa que haya enfermedad todos los días ni es un diagnóstico.",
       "conditionLinkNoOverlap": "Se muestra {{condition}} porque su patrón natal está ligado a {{planets}} y {{natalHouses}}. La cadena de dasha de tres niveles activa {{dashaHouses}}, mientras un tránsito sostenido activa directamente los planetas que contienen ese patrón natal. Por eso el periodo se vincula con este tema y no con otro asunto de salud.",
@@ -1771,6 +1786,7 @@
       "basisTitle": "Base de la sixième maison"
     },
     "calculated": "Zones pouvant demander plus d'attention",
+    "bodyAreaNeedsCare": "{{area}} peut demander plus d’attention",
     "noVulnerabilities": "Aucune zone ne reçoit encore assez d'indices répétés. Un indice faible n'est pas présenté comme une maladie.",
     "grades": {
       "strong": "Indication classique forte",
@@ -2098,6 +2114,9 @@
       },
       "dashaFacts": {
         "direct": "signifie directement cette sensibilité natale",
+        "joinedCarrier": "est conjoint à {{planet}}, qui porte ce schéma",
+        "nodeDispositorCarrier": "agit par le maître du signe {{lord}}, conjoint à {{planet}}",
+        "nodeNakshatraCarrier": "agit par le maître du nakshatra {{lord}}, lié à {{planet}}",
         "occupies": "occupe la Maison natale {{house}}",
         "rules": "gouverne les Maisons concernées {{houses}}",
         "aspects": "aspecte les Maisons concernées {{houses}}"
@@ -2156,6 +2175,7 @@
       "whyThisPeriod": "Pourquoi cette période est active",
       "strongerWithinWindow": "Phases plus fortes dans cette période",
       "sunPhase": "Le Soleil renforce l’activation pendant {{range}}.",
+      "activeDashaContact": "Les planètes de dasha actives forment un contact natal exact pendant {{range}}.",
       "moonPeak": "La Lune concentre brièvement le schéma déjà actif le {{date}}.",
       "windowClaimNote": "Il s’agit d’une période d’activation astrologique accrue d’une sensibilité natale. Cela ne signifie pas qu’une maladie est présente chaque jour et ce n’est pas un diagnostic.",
       "conditionLinkNoOverlap": "{{condition}} est indiqué parce que son schéma natal est lié à {{planets}} et {{natalHouses}}. La chaîne de dasha à trois niveaux active {{dashaHouses}}, tandis qu’un transit durable active directement les planètes portant ce schéma natal. C’est pourquoi cette période se rapporte à ce sujet précis plutôt qu’à un autre thème de santé.",
@@ -2351,6 +2371,7 @@
       "basisTitle": "Grundlage des sechsten Hauses"
     },
     "calculated": "Bereiche, die mehr Aufmerksamkeit brauchen können",
+    "bodyAreaNeedsCare": "{{area}} kann mehr Aufmerksamkeit benötigen",
     "noVulnerabilities": "Noch hat kein Bereich genügend wiederholte Hinweise. Ein schwacher Hinweis wird nicht als Krankheit dargestellt.",
     "grades": {
       "strong": "Starker klassischer Hinweis",
@@ -2678,6 +2699,9 @@
       },
       "dashaFacts": {
         "direct": "steht unmittelbar für diese Radixanfälligkeit",
+        "joinedCarrier": "steht mit {{planet}} zusammen, dem Träger dieses Musters",
+        "nodeDispositorCarrier": "wirkt über den Zeichenherrscher {{lord}}, der mit {{planet}} zusammensteht",
+        "nodeNakshatraCarrier": "wirkt über den Nakshatra-Herrscher {{lord}}, der mit {{planet}} verbunden ist",
         "occupies": "steht im Radix in Haus {{house}}",
         "rules": "regiert die relevanten Häuser {{houses}}",
         "aspects": "aspektiert die relevanten Häuser {{houses}}"
@@ -2736,6 +2760,7 @@
       "whyThisPeriod": "Warum diese Phase aktiv ist",
       "strongerWithinWindow": "Stärkere Abschnitte in dieser Phase",
       "sunPhase": "Die Sonne verstärkt die Aktivierung während {{range}}.",
+      "activeDashaContact": "Aktive Dasha-Planeten bilden während {{range}} einen exakten Radixkontakt.",
       "moonPeak": "Der Mond bündelt das bereits aktive Muster kurz am {{date}}.",
       "windowClaimNote": "Dies ist eine Phase stärkerer astrologischer Aktivierung einer natalen Empfindlichkeit. Sie bedeutet keine tägliche Erkrankung und ist keine Diagnose.",
       "conditionLinkNoOverlap": "{{condition}} wird gezeigt, weil das natale Muster mit {{planets}} und {{natalHouses}} verbunden ist. Die dreistufige Dasha-Kette aktiviert {{dashaHouses}}, während ein anhaltender Transit die Träger dieses natalen Musters direkt aktiviert. Deshalb gehört die Phase zu diesem Gesundheitsthema und nicht zu einem unverbundenen Thema.",
@@ -2931,6 +2956,7 @@
       "basisTitle": "Основа шестого дома"
     },
     "calculated": "Области, которым может требоваться внимание",
+    "bodyAreaNeedsCare": "Область «{{area}}» может требовать дополнительного внимания",
     "noVulnerabilities": "Пока ни одна область не получила достаточно повторяющихся указаний. Слабый признак не выдается за болезнь.",
     "grades": {
       "strong": "Сильный классический показатель",
@@ -3258,6 +3284,9 @@
       },
       "dashaFacts": {
         "direct": "непосредственно обозначает эту натальную уязвимость",
+        "joinedCarrier": "соединён с {{planet}}, носителем этого показателя",
+        "nodeDispositorCarrier": "действует через управителя знака {{lord}}, соединённого с {{planet}}",
+        "nodeNakshatraCarrier": "действует через управителя накшатры {{lord}}, связанного с {{planet}}",
         "occupies": "находится в натальном Доме {{house}}",
         "rules": "управляет связанными Домами {{houses}}",
         "aspects": "аспектирует связанные Дома {{houses}}"
@@ -3316,6 +3345,7 @@
       "whyThisPeriod": "Почему этот период активен",
       "strongerWithinWindow": "Более сильные фазы внутри периода",
       "sunPhase": "Солнце усиливает активацию в период {{range}}.",
+      "activeDashaContact": "Активные планеты даши образуют точный натальный контакт в период {{range}}.",
       "moonPeak": "Луна кратко усиливает уже активную схему {{date}}.",
       "windowClaimNote": "Это период усиленной астрологической активации натальной чувствительности. Он не означает наличие болезни каждый день и не является диагнозом.",
       "conditionLinkNoOverlap": "{{condition}} показано потому, что натальная схема связана с {{planets}} и {{natalHouses}}. Трёхуровневая цепочка даш активирует {{dashaHouses}}, а длительный транзит напрямую активирует планеты-носители этой схемы. Поэтому период связан именно с этой темой здоровья, а не с посторонней.",
@@ -3511,6 +3541,7 @@
       "basisTitle": "第六宫依据"
     },
     "calculated": "可能需要多加关注的部位",
+    "bodyAreaNeedsCare": "{{area}}可能需要多加关注",
     "noVulnerabilities": "目前没有任何部位得到足够多的重复支持。微弱提示不会被说成疾病。",
     "grades": {
       "strong": "强烈的经典征象",
@@ -3838,6 +3869,9 @@
       },
       "dashaFacts": {
         "direct": "直接代表这一出生盘敏感倾向",
+        "joinedCarrier": "与承载此倾向的{{planet}}同宫",
+        "nodeDispositorCarrier": "通过星座主{{lord}}发挥作用；该星与{{planet}}同宫",
+        "nodeNakshatraCarrier": "通过宿主{{lord}}发挥作用；该星与{{planet}}相连",
         "occupies": "位于出生盘第{{house}}宫",
         "rules": "主宰相关宫位{{houses}}",
         "aspects": "照见相关宫位{{houses}}"
@@ -3896,6 +3930,7 @@
       "whyThisPeriod": "为什么这一时期活跃",
       "strongerWithinWindow": "此时期内更强的阶段",
       "sunPhase": "太阳在{{range}}期间加强激活。",
+      "activeDashaContact": "运行中的大运层级行星在{{range}}期间形成精确的本命接触。",
       "moonPeak": "月亮在{{date}}短暂集中已经活跃的模式。",
       "windowClaimNote": "这是本命敏感点在占星意义上更强的激活期，并不表示每天都有疾病，也不是医学诊断。",
       "conditionLinkNoOverlap": "之所以显示{{condition}}，是因为其本命模式与{{planets}}和{{natalHouses}}相连。三层大运链激活{{dashaHouses}}，持续行运又直接激活承载该本命模式的行星。因此这一时期指向该健康主题，而非无关问题。",
@@ -4091,6 +4126,7 @@
       "basisTitle": "ஆறாம் பாவ அடிப்படை"
     },
     "calculated": "கூடுதல் கவனம் தேவைப்படக்கூடிய பகுதிகள்",
+    "bodyAreaNeedsCare": "{{area}} பகுதிக்கு கூடுதல் கவனம் தேவைப்படலாம்",
     "noVulnerabilities": "எந்தப் பகுதிக்கும் இன்னும் போதுமான மீண்டும் தோன்றும் ஆதாரம் இல்லை. பலவீனமான குறிப்பு நோயாகக் காட்டப்படவில்லை.",
     "grades": {
       "strong": "வலுவான பாரம்பரிய குறிப்பு",
@@ -4418,6 +4454,9 @@
       },
       "dashaFacts": {
         "direct": "இந்த பிறப்பு உணர்திறனை நேரடியாகக் குறிக்கிறது",
+        "joinedCarrier": "இந்த அமைப்பை ஏந்தும் {{planet}} உடன் இணைந்துள்ளது",
+        "nodeDispositorCarrier": "{{planet}} உடன் இணைந்துள்ள ராசி அதிபதி {{lord}} மூலம் செயல்படுகிறது",
+        "nodeNakshatraCarrier": "{{planet}} உடன் தொடர்புடைய நட்சத்திர அதிபதி {{lord}} மூலம் செயல்படுகிறது",
         "occupies": "பிறப்பு பாவம் {{house}}-ல் உள்ளது",
         "rules": "தொடர்புடைய {{houses}} பாவங்களை ஆள்கிறது",
         "aspects": "தொடர்புடைய {{houses}} பாவங்களைப் பார்க்கிறது"
@@ -4476,6 +4515,7 @@
       "whyThisPeriod": "இந்த காலம் ஏன் செயல்படுகிறது",
       "strongerWithinWindow": "இந்த காலத்திற்குள் வலுவான கட்டங்கள்",
       "sunPhase": "{{range}} காலத்தில் சூரியன் இயக்கத்தை வலுப்படுத்துகிறது.",
+      "activeDashaContact": "{{range}} காலத்தில் செயலிலுள்ள தசா கிரகங்கள் துல்லியமான பிறப்பு தொடர்பை உருவாக்குகின்றன.",
       "moonPeak": "{{date}} அன்று சந்திரன் ஏற்கனவே செயல்படும் அமைப்பை குறுகிய நேரம் தீவிரப்படுத்துகிறது.",
       "windowClaimNote": "இது பிறப்பு உணர்திறனின் அதிக ஜோதிட இயக்கக் காலம். தினமும் நோய் உள்ளது என்று பொருளல்ல; இது நோயறிதலும் அல்ல.",
       "conditionLinkNoOverlap": "{{condition}} காட்டப்படுவது அதன் பிறப்பு அமைப்பு {{planets}} மற்றும் {{natalHouses}} உடன் இணைந்திருப்பதால். மூன்று நிலை தசை தொடர் {{dashaHouses}}-ஐ இயக்குகின்றன; நீடித்த கோச்சாரம் அந்த பிறப்பு அமைப்பைத் தாங்கும் கிரகங்களை நேரடியாக இயக்குகிறது. அதனால் இந்த காலம் தொடர்பில்லாத வேறு ஆரோக்கிய விஷயத்தை விட இதனுடன் இணைகிறது.",
@@ -4671,6 +4711,7 @@
       "basisTitle": "ఆరవ భావ ఆధారం"
     },
     "calculated": "ఎక్కువ శ్రద్ధ అవసరమయ్యే ప్రాంతాలు",
+    "bodyAreaNeedsCare": "{{area}} ప్రాంతానికి మరింత శ్రద్ధ అవసరం కావచ్చు",
     "noVulnerabilities": "ఏ ప్రాంతానికీ ఇంకా తగినన్ని పునరావృత చార్ట్ సూచనలు లేవు. బలహీన సూచనను వ్యాధిగా చూపలేదు.",
     "grades": {
       "strong": "బలమైన శాస్త్రీయ సూచన",
@@ -4998,6 +5039,9 @@
       },
       "dashaFacts": {
         "direct": "ఈ జన్మ సున్నితత్వాన్ని నేరుగా సూచిస్తుంది",
+        "joinedCarrier": "ఈ నమూనాను మోసే {{planet}}తో కలిసి ఉంది",
+        "nodeDispositorCarrier": "{{planet}}తో కలిసి ఉన్న రాశి అధిపతి {{lord}} ద్వారా పనిచేస్తుంది",
+        "nodeNakshatraCarrier": "{{planet}}తో సంబంధం ఉన్న నక్షత్ర అధిపతి {{lord}} ద్వారా పనిచేస్తుంది",
         "occupies": "జన్మ భావం {{house}}లో ఉంది",
         "rules": "సంబంధిత {{houses}} భావాలకు అధిపతి",
         "aspects": "సంబంధిత {{houses}} భావాలను దృష్టి చేస్తుంది"
@@ -5056,6 +5100,7 @@
       "whyThisPeriod": "ఈ కాలం ఎందుకు సక్రియం",
       "strongerWithinWindow": "ఈ కాలంలోని బలమైన దశలు",
       "sunPhase": "{{range}} సమయంలో సూర్యుడు సక్రియతను బలపరుస్తాడు.",
+      "activeDashaContact": "{{range}} సమయంలో క్రియాశీల దశా గ్రహాలు ఖచ్చితమైన జన్మ సంబంధాన్ని ఏర్పరుస్తాయి.",
       "moonPeak": "{{date}}న చంద్రుడు ఇప్పటికే సక్రియమైన నమూనాను కొద్దిసేపు కేంద్రీకరిస్తాడు.",
       "windowClaimNote": "ఇది జన్మ సున్నితత్వం మరింత జ్యోతిష్యపరంగా సక్రియమయ్యే కాలం. ప్రతిరోజూ వ్యాధి ఉందని కాదు; ఇది నిర్ధారణ కాదు.",
       "conditionLinkNoOverlap": "{{condition}} చూపబడటానికి కారణం దాని జన్మ నమూనా {{planets}} మరియు {{natalHouses}}తో అనుసంధానమై ఉండటం. మూడు స్థాయి దశా క్రమం {{dashaHouses}}ను సక్రియం చేస్తాయి; దీర్ఘ గోచారం ఆ జన్మ నమూనాను మోసే గ్రహాలను నేరుగా సక్రియం చేస్తుంది. అందుకే ఈ కాలం సంబంధం లేని ఆరోగ్య విషయానికి కాకుండా దీనికే అనుసంధానమవుతుంది.",
@@ -5251,6 +5296,7 @@
       "basisTitle": "છઠ્ઠા ભાવનો આધાર"
     },
     "calculated": "જે વિસ્તારોને વધુ કાળજી જોઈએ",
+    "bodyAreaNeedsCare": "{{area}}ને વધુ કાળજીની જરૂર પડી શકે છે",
     "noVulnerabilities": "હજી કોઈ વિસ્તાર માટે પૂરતા વારંવારના કુંડળી સંકેતો નથી. નબળા સંકેતને રોગ તરીકે બતાવ્યો નથી.",
     "grades": {
       "strong": "મજબૂત શાસ્ત્રીય સંકેત",
@@ -5578,6 +5624,9 @@
       },
       "dashaFacts": {
         "direct": "આ જન્મકાલીન સંવેદનશીલતાનો સીધો કારક છે",
+        "joinedCarrier": "આ પેટર્નના કારક {{planet}} સાથે સ્થિત છે",
+        "nodeDispositorCarrier": "{{planet}} સાથે સ્થિત રાશિ સ્વામી {{lord}} દ્વારા ફળ આપે છે",
+        "nodeNakshatraCarrier": "{{planet}} સાથે જોડાયેલા નક્ષત્ર સ્વામી {{lord}} દ્વારા ફળ આપે છે",
         "occupies": "જન્મકુંડળીના ભાવ {{house}}માં સ્થિત છે",
         "rules": "સંબંધિત ભાવ {{houses}}નો સ્વામી છે",
         "aspects": "સંબંધિત ભાવ {{houses}} પર દૃષ્ટિ કરે છે"
@@ -5636,6 +5685,7 @@
       "whyThisPeriod": "આ સમયગાળો કેમ સક્રિય છે",
       "strongerWithinWindow": "આ સમયગાળાના વધુ પ્રબળ તબક્કા",
       "sunPhase": "{{range}} દરમિયાન સૂર્ય સક્રિયતા વધારે છે.",
+      "activeDashaContact": "{{range}} દરમિયાન સક્રિય દશા ગ્રહો ચોક્કસ જન્મકાલીન સંપર્ક બનાવે છે.",
       "moonPeak": "{{date}}ના રોજ ચંદ્ર પહેલેથી સક્રિય રચનાને થોડા સમય માટે વધુ કેન્દ્રિત કરે છે.",
       "windowClaimNote": "આ જન્મજાત સંવેદનશીલતાના વધુ જ્યોતિષીય સક્રિયકરણનો સમય છે. તેનો અર્થ દરરોજ રોગ હોવો નથી અને આ નિદાન નથી.",
       "conditionLinkNoOverlap": "{{condition}} એટલા માટે બતાવવામાં આવે છે કે તેની જન્મજાત રચના {{planets}} અને {{natalHouses}} સાથે જોડાયેલી છે. ત્રણ-સ્તરની દશા કડી {{dashaHouses}}ને સક્રિય કરે છે અને લાંબો ગોચર આ જન્મજાત રચનાને ધારણ કરતા ગ્રહોને સીધા સક્રિય કરે છે. તેથી આ સમયગાળો અસંબંધિત આરોગ્ય વિષયને બદલે આ જ વિષય સાથે જોડાય છે.",
@@ -5831,6 +5881,7 @@
       "basisTitle": "सहाव्या भावाचा आधार"
     },
     "calculated": "ज्या भागांना अधिक लक्ष लागू शकते",
+    "bodyAreaNeedsCare": "{{area}} भागाला अधिक लक्ष द्यावे लागू शकते",
     "noVulnerabilities": "अजून कोणत्याही भागासाठी पुरेसे वारंवार कुंडली संकेत नाहीत. कमकुवत संकेताला आजार म्हणून दाखवलेले नाही.",
     "grades": {
       "strong": "मजबूत शास्त्रीय संकेत",
@@ -6158,6 +6209,9 @@
       },
       "dashaFacts": {
         "direct": "या जन्मकालीन संवेदनशीलतेचा थेट कारक आहे",
+        "joinedCarrier": "या पॅटर्नचा कारक {{planet}} याच्यासोबत स्थित आहे",
+        "nodeDispositorCarrier": "{{planet}} याच्यासोबत असलेल्या राशी स्वामी {{lord}} मार्फत फल देते",
+        "nodeNakshatraCarrier": "{{planet}} याच्याशी जोडलेल्या नक्षत्र स्वामी {{lord}} मार्फत फल देते",
         "occupies": "जन्मकुंडलीतील भाव {{house}}मध्ये स्थित आहे",
         "rules": "संबंधित भाव {{houses}}चा स्वामी आहे",
         "aspects": "संबंधित भाव {{houses}}वर दृष्टी टाकतो"
@@ -6216,6 +6270,7 @@
       "whyThisPeriod": "हा कालखंड सक्रिय का आहे",
       "strongerWithinWindow": "या कालखंडातील अधिक तीव्र टप्पे",
       "sunPhase": "{{range}} दरम्यान सूर्य सक्रियता वाढवतो.",
+      "activeDashaContact": "{{range}} दरम्यान सक्रिय दशा ग्रह अचूक जन्मकालीन संपर्क तयार करतात.",
       "moonPeak": "{{date}} रोजी चंद्र आधीच सक्रिय असलेली रचना थोड्या काळासाठी तीव्र करतो.",
       "windowClaimNote": "हा जन्मजात संवेदनशीलतेच्या अधिक ज्योतिषीय सक्रियतेचा कालखंड आहे. याचा अर्थ दररोज आजार असणे असा नाही आणि हे निदान नाही.",
       "conditionLinkNoOverlap": "{{condition}} दाखवले आहे कारण त्याची जन्मकुंडलीतील रचना {{planets}} आणि {{natalHouses}}शी जोडलेली आहे. तीन-स्तरीय दशा क्रम {{dashaHouses}} सक्रिय करतात आणि दीर्घ गोचर ही जन्मजात रचना धारण करणाऱ्या ग्रहांना थेट सक्रिय करते. म्हणून हा कालखंड असंबंधित आरोग्य विषयाऐवजी याच विषयाशी जोडला जातो.",

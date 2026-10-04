@@ -1138,7 +1138,6 @@ export default function DeskActivationsPanel({
         <div className="desk-act__lenses" role="tablist" aria-label="Activation lens">
           {[
             { id: 'timeline', label: 'Timeline', icon: '↝' },
-            { id: 'focus', label: 'Focus', icon: '◎' },
             { id: 'map', label: 'Map', icon: '▦' },
             { id: 'double', label: 'Double Transit', mobileLabel: 'Double', icon: '♃♄' },
           ].map((item) => (

@@ -447,7 +447,7 @@ export default function ActivationExplorerScreen({ navigation, route }) {
           ) : null}
 
           <View style={[styles.viewTabs, { backgroundColor: ui.surfaceMuted, borderColor: ui.border }]}>
-            {[['houses', 'Houses'], ['manifestations', 'Themes'], ['focus', 'Focus'], ['double', 'Double']].map(([key, label]) => <TouchableOpacity key={key} onPress={() => setActiveTab(key)} style={[styles.viewTab, activeTab === key && { backgroundColor: colors.selectionSurface }]}><Text style={[styles.viewTabText, { color: activeTab === key ? colors.selectionText : colors.textSecondary }]}>{label}</Text></TouchableOpacity>)}
+            {[['houses', 'Houses'], ['manifestations', 'Themes'], ['focus', 'Windows'], ['double', 'Double']].map(([key, label]) => <TouchableOpacity key={key} onPress={() => setActiveTab(key)} style={[styles.viewTab, activeTab === key && { backgroundColor: colors.selectionSurface }]}><Text style={[styles.viewTabText, { color: activeTab === key ? colors.selectionText : colors.textSecondary }]}>{label}</Text></TouchableOpacity>)}
           </View>
 
           {activeTab === 'double' ? (

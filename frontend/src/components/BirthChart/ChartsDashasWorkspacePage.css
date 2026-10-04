@@ -20,6 +20,7 @@
   color: var(--pd-ink);
   font-family: var(--font-body);
   box-sizing: border-box;
+  position: relative;
 }
 
 /* Phone hub — ChartsHub-style ParashariDeskMobile takes over */

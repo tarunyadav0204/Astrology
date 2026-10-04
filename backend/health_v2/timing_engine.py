@@ -3,7 +3,9 @@
 The engine never creates a health topic.  It times only findings already
 established by :class:`NatalHealthBlueprintEngine`. Mahadasha, Antardasha and
 Pratyantardasha establish permission, sustained sidereal transits confirm the
-window, the Sun can strengthen a phase, and the Moon can mark a brief peak.
+window, and a Sun contact or an exact contact within the active dasha chain can
+concentrate it.  The Moon may refine a day inside that concentration; it does
+not create a peak by itself.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from utils.timezone_service import parse_timezone_offset
 PLANETS = ("Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu")
 SAMPLE_HOURS = (0, 6, 12, 18)
 LEVELS = ("mahadasha", "antardasha", "pratyantardasha")
+REFINEMENT_LEVELS = ("sookshma", "prana")
 LEVEL_WEIGHT = {"mahadasha": 2, "antardasha": 3, "pratyantardasha": 4}
 # Nodes use conjunction/opposition only.  Their 5th/9th aspects are deliberately
 # excluded because those aspects are not consistent across classical lineages.
@@ -34,6 +37,13 @@ ORB = {"Moon": 2.0, "Sun": 1.5, "Mercury": 1.5, "Venus": 1.5, "Mars": 2.0,
        "Jupiter": 2.0, "Saturn": 2.0, "Rahu": 2.0, "Ketu": 2.0}
 TRANSIT_WEIGHT = {"Moon": 1, "Sun": 2, "Mercury": 2, "Venus": 2, "Mars": 3,
                   "Jupiter": 3, "Saturn": 3, "Rahu": 3, "Ketu": 3}
+HEALTH_MANIFESTATION_HOUSES = {1, 8, 12}
+STRUCTURAL_PLANETS = {"Mars", "Jupiter", "Saturn", "Rahu", "Ketu"}
+TRANSIT_BRIDGE_ORB = {"Mars": 4.0, "Jupiter": 5.0, "Saturn": 5.0, "Rahu": 3.0, "Ketu": 3.0}
+SIGN_LORDS = {
+    0: "Mars", 1: "Venus", 2: "Mercury", 3: "Moon", 4: "Sun", 5: "Mercury",
+    6: "Venus", 7: "Mars", 8: "Jupiter", 9: "Saturn", 10: "Saturn", 11: "Jupiter",
+}
 
 
 def _angle_distance(value: float, target: float) -> float:
@@ -114,9 +124,11 @@ class HealthTimingHeatmapEngine:
                     result["sample_local_time"] = f"{hour:02d}:00"
                     current_best = candidates_by_finding.get(str(result["finding_id"]))
                     if current_best is None or (
-                        result["heat_level"], result["evidence_score"]
+                        result["heat_level"], -self._fast_trigger_exactness(result),
+                        result["evidence_score"],
                     ) > (
-                        current_best["heat_level"], current_best["evidence_score"]
+                        current_best["heat_level"], -self._fast_trigger_exactness(current_best),
+                        current_best["evidence_score"],
                     ):
                         candidates_by_finding[str(result["finding_id"])] = result
             candidates = list(candidates_by_finding.values())
@@ -138,14 +150,19 @@ class HealthTimingHeatmapEngine:
                 "details": candidates,
             })
         windows = self._build_windows(output)
+        period_groups = self._group_overlapping_windows(windows)
+        public_windows = [
+            {key: value for key, value in window.items() if key != "_daily_details"}
+            for window in windows
+        ]
         return {
             "schema_version": "health.timing_windows.v2",
-            "method": "natal_finding_then_three_level_dasha_then_sustained_transit_with_sun_moon_refinement",
+            "method": "natal_finding_then_three_level_dasha_then_sustained_transit_with_bounded_fast_trigger_refinement",
             "start_date": start_date.isoformat(),
             "end_date": (start_date + timedelta(days=days - 1)).isoformat(),
             "days": output,
-            "windows": windows,
-            "period_groups": self._group_overlapping_windows(windows),
+            "windows": public_windows,
+            "period_groups": period_groups,
             "sensitive_day_count": sensitive,
             "legend": {
                 "0": "no_distinct_activation", "1": "mild", "2": "notable",
@@ -157,8 +174,13 @@ class HealthTimingHeatmapEngine:
                 "timing_cannot_create_vulnerability": True,
                 "node_fifth_ninth_aspects_used": False,
                 "sun_moon_are_triggers_not_standalone_diagnosis": True,
+                "moon_alone_cannot_create_peak": True,
+                "active_dasha_lord_direct_transit_can_concentrate_window": True,
+                "active_dasha_chain_exact_contact_can_concentrate_window": True,
                 "dasha_levels_used": list(LEVELS),
                 "sookshma_prana_used": False,
+                "sookshma_prana_permission_used": False,
+                "sookshma_prana_refinement_used": True,
             },
         }
 
@@ -177,6 +199,61 @@ class HealthTimingHeatmapEngine:
             previous = current
         ranges.append({"start_date": start.isoformat(), "end_date": previous.isoformat()})
         return ranges
+
+    @staticmethod
+    def _concentration_ranges(
+        sun_dates: List[str],
+        sun_basis: str | None,
+        active_dasha_transit_dates: List[str],
+    ) -> List[Dict[str, Any]]:
+        """Merge concentration dates without losing simultaneous trigger types."""
+        bases_by_date: Dict[date, set[str]] = {}
+        if sun_basis:
+            for value in sun_dates:
+                bases_by_date.setdefault(date.fromisoformat(value), set()).add(sun_basis)
+        for value in active_dasha_transit_dates:
+            bases_by_date.setdefault(date.fromisoformat(value), set()).add(
+                "active_dasha_chain_exact_contact"
+            )
+        if not bases_by_date:
+            return []
+        priority = {
+            "anatomical_specificity_and_sun": 0,
+            "sun": 1,
+            "active_dasha_chain_exact_contact": 2,
+        }
+        ordered = sorted(bases_by_date)
+        output = []
+        start = previous = ordered[0]
+        current_bases = tuple(sorted(bases_by_date[start], key=lambda value: priority.get(value, 9)))
+        for current in ordered[1:]:
+            next_bases = tuple(sorted(bases_by_date[current], key=lambda value: priority.get(value, 9)))
+            if current != previous + timedelta(days=1) or next_bases != current_bases:
+                output.append({
+                    "start_date": start.isoformat(),
+                    "end_date": previous.isoformat(),
+                    "basis": current_bases[0],
+                    "bases": list(current_bases),
+                })
+                start = current
+                current_bases = next_bases
+            previous = current
+        output.append({
+            "start_date": start.isoformat(),
+            "end_date": previous.isoformat(),
+            "basis": current_bases[0],
+            "bases": list(current_bases),
+        })
+        return output
+
+    @staticmethod
+    def _fast_trigger_exactness(detail: Dict[str, Any]) -> float:
+        summary = detail.get("activation_summary") or {}
+        triggers = (
+            list(summary.get("sun_triggers") or [])
+            + list(summary.get("active_dasha_transit_triggers") or [])
+        )
+        return min((float(row.get("orb") or 99.0) for row in triggers), default=99.0)
 
     def _build_windows(self, days: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Merge consecutive activations of the same natal finding.
@@ -202,11 +279,19 @@ class HealthTimingHeatmapEngine:
             for group in groups:
                 representative_date, representative = max(
                     group,
-                    key=lambda item: (item[1]["heat_level"], item[1]["evidence_score"]),
+                    key=lambda item: (
+                        item[1]["heat_level"],
+                        -self._fast_trigger_exactness(item[1]),
+                        item[1]["evidence_score"],
+                    ),
                 )
                 sun_dates = [
                     current.isoformat() for current, detail in group
                     if detail.get("activation_summary", {}).get("sun_triggers")
+                ]
+                active_dasha_transit_dates = [
+                    current.isoformat() for current, detail in group
+                    if detail.get("activation_summary", {}).get("active_dasha_transit_triggers")
                 ]
                 moon_observations = []
                 for current, detail in group:
@@ -217,6 +302,28 @@ class HealthTimingHeatmapEngine:
                             min(float(row.get("orb") or 99.0) for row in triggers),
                         ))
                 moon_dates = self._closest_dates_per_pass(moon_observations)
+                anatomical_sun_dates = [
+                    current.isoformat() for current, detail in group
+                    if detail.get("score_components", {}).get("anatomical_specificity", 0) > 0
+                    and detail.get("activation_summary", {}).get("sun_triggers")
+                ]
+                sun_concentration_dates = anatomical_sun_dates or sun_dates
+                sun_basis = (
+                    "anatomical_specificity_and_sun" if anatomical_sun_dates else
+                    "sun" if sun_dates else None
+                )
+                key_concentration_phases = self._concentration_ranges(
+                    sun_concentration_dates, sun_basis, active_dasha_transit_dates
+                )
+                concentration_bases = {
+                    basis
+                    for phase in key_concentration_phases
+                    for basis in phase.get("bases") or [phase["basis"]]
+                }
+                key_concentration_basis = (
+                    next(iter(concentration_bases)) if len(concentration_bases) == 1 else
+                    "multiple" if concentration_bases else None
+                )
                 windows.append({
                     "finding_id": finding_id,
                     "stable_id": finding_id,
@@ -228,15 +335,60 @@ class HealthTimingHeatmapEngine:
                     "end_date": group[-1][0].isoformat(),
                     "active_day_count": len(group),
                     "activation_level": max(detail["heat_level"] for _, detail in group),
+                    "evidence_score": max(detail["evidence_score"] for _, detail in group),
                     "judgment": representative.get("judgment"),
                     "phase": "active_window",
                     "sun_phases": self._date_ranges(sun_dates),
+                    "active_dasha_transit_phases": self._date_ranges(active_dasha_transit_dates),
                     "moon_peak_dates": moon_dates,
+                    "key_concentration_phases": key_concentration_phases,
+                    "key_concentration_basis": key_concentration_basis,
+                    "lower_dasha_phases": self._lower_dasha_phases(group),
                     "representative_date": representative_date.isoformat(),
                     "detail": representative,
+                    "_daily_details": [
+                        {"date": current.isoformat(), "detail": detail}
+                        for current, detail in group
+                    ],
                 })
-        windows.sort(key=lambda row: (row["start_date"], -row["activation_level"], row["finding_id"]))
+        windows.sort(key=lambda row: (
+            row["start_date"], -row["activation_level"], -row["evidence_score"], row["finding_id"]
+        ))
         return windows
+
+    def _lower_dasha_phases(
+        self,
+        group: List[tuple[date, Dict[str, Any]]],
+    ) -> List[Dict[str, Any]]:
+        observations: Dict[tuple[str, str], List[str]] = {}
+        for current, detail in group:
+            mechanism_houses = set(
+                (detail.get("activation_summary") or {})
+                .get("condition_link", {})
+                .get("natal_houses", [])
+            )
+            for row in detail.get("refinement_dasha_chain") or []:
+                # Sookshma may describe the shorter background within the
+                # permitted MD/AD/PD window.  Prana is retained only when it
+                # directly repeats the finding or occupies its mechanism
+                # house; otherwise the UI becomes a list of every Prana.
+                is_decisive_prana = bool(
+                    row.get("direct_finding_planet")
+                    or row.get("natal_house") in mechanism_houses
+                    or row.get("associated_finding_planets")
+                    or row.get("dispositor_finding_planets")
+                    or row.get("nakshatra_lord_finding_planets")
+                )
+                if row.get("matched") and (row.get("level") == "sookshma" or is_decisive_prana):
+                    observations.setdefault((row["level"], row["planet"]), []).append(current.isoformat())
+        output = []
+        for (level, planet), values in observations.items():
+            for period in self._date_ranges(values):
+                output.append({"level": level, "planet": planet, **period})
+        refinement_order = {"sookshma": 0, "prana": 1}
+        return sorted(output, key=lambda row: (
+            row["start_date"], refinement_order.get(row["level"], 9), row["planet"]
+        ))
 
     @staticmethod
     def _closest_dates_per_pass(observations: List[tuple[date, float]]) -> List[str]:
@@ -255,39 +407,162 @@ class HealthTimingHeatmapEngine:
         return sorted(value.isoformat() for value, _ in sorted(closest, key=lambda item: item[1])[:3])
 
     @staticmethod
-    def _group_overlapping_windows(windows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Collect findings that truly share dates into one user-facing period.
+    def _window_for_segment(
+        window: Dict[str, Any],
+        start: date,
+        end: date,
+    ) -> Dict[str, Any]:
+        """Create a period-local view of a longer finding window."""
+        observations = [
+            row for row in window.get("_daily_details") or []
+            if start <= date.fromisoformat(row["date"]) <= end
+        ]
+        segment = {
+            key: value for key, value in window.items()
+            if key != "_daily_details"
+        }
+        segment["start_date"] = start.isoformat()
+        segment["end_date"] = end.isoformat()
+        segment["active_day_count"] = len(observations)
+        if observations:
+            representative = max(
+                observations,
+                key=lambda row: (
+                    row["detail"].get("score_components", {}).get("anatomical_specificity", 0),
+                    row["detail"]["heat_level"],
+                    -HealthTimingHeatmapEngine._fast_trigger_exactness(row["detail"]),
+                    row["detail"]["evidence_score"],
+                    row["date"],
+                ),
+            )
+            segment["representative_date"] = representative["date"]
+            segment["detail"] = representative["detail"]
+            segment["activation_level"] = max(row["detail"]["heat_level"] for row in observations)
+            segment["evidence_score"] = max(row["detail"]["evidence_score"] for row in observations)
 
-        Use a common intersection rather than transitive overlap. Otherwise a
-        chain of partly overlapping windows can incorrectly turn a whole year
-        into one period.
+        def clipped_phases(key: str) -> List[Dict[str, Any]]:
+            phases = []
+            for phase in window.get(key) or []:
+                phase_start = max(start, date.fromisoformat(phase["start_date"]))
+                phase_end = min(end, date.fromisoformat(phase["end_date"]))
+                if phase_start <= phase_end:
+                    phases.append({**phase, "start_date": phase_start.isoformat(), "end_date": phase_end.isoformat()})
+            return phases
+
+        for key in (
+            "sun_phases", "active_dasha_transit_phases",
+            "lower_dasha_phases", "key_concentration_phases",
+        ):
+            segment[key] = clipped_phases(key)
+        segment["moon_peak_dates"] = [
+            value for value in window.get("moon_peak_dates") or []
+            if start <= date.fromisoformat(value) <= end
+        ]
+        return segment
+
+    @staticmethod
+    def _group_overlapping_windows(windows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Split the range whenever the set of active findings changes.
+
+        A finding may therefore appear in several adjacent user-facing
+        periods. This is intentional: assigning a long window only to its
+        first overlap group made it disappear from later dates even though the
+        underlying finding remained active.
         """
+        if not windows:
+            return []
+        boundaries = {
+            date.fromisoformat(window["start_date"])
+            for window in windows
+        } | {
+            date.fromisoformat(window["end_date"]) + timedelta(days=1)
+            for window in windows
+        }
+        for window in windows:
+            for phase in window.get("key_concentration_phases") or []:
+                boundaries.add(date.fromisoformat(phase["start_date"]))
+                boundaries.add(date.fromisoformat(phase["end_date"]) + timedelta(days=1))
+        ordered = sorted(boundaries)
         groups: List[Dict[str, Any]] = []
-        for window in sorted(windows, key=lambda row: (row["start_date"], row["end_date"])):
-            start = date.fromisoformat(window["start_date"])
-            end = date.fromisoformat(window["end_date"])
-            if not groups or start > date.fromisoformat(groups[-1]["common_end_date"]):
-                groups.append({
-                    "group_id": f"{window['start_date']}:{window['finding_id']}",
-                    "start_date": window["start_date"],
-                    "end_date": window["end_date"],
-                    "activation_level": window["activation_level"],
-                    "windows": [window],
-                    "common_end_date": window["end_date"],
-                })
+        for index in range(len(ordered) - 1):
+            start = ordered[index]
+            end = ordered[index + 1] - timedelta(days=1)
+            active = [
+                window for window in windows
+                if date.fromisoformat(window["start_date"]) <= start
+                and date.fromisoformat(window["end_date"]) >= end
+            ]
+            if not active:
                 continue
-            group = groups[-1]
-            group["windows"].append(window)
-            group["activation_level"] = max(group["activation_level"], window["activation_level"])
-            if start > date.fromisoformat(group["start_date"]):
-                group["start_date"] = window["start_date"]
-            if end < date.fromisoformat(group["common_end_date"]):
-                group["common_end_date"] = window["end_date"]
-                group["end_date"] = window["end_date"]
+            def concentration_priority(window: Dict[str, Any]) -> int:
+                overlaps_segment = any(
+                    date.fromisoformat(phase["start_date"]) <= end
+                    and date.fromisoformat(phase["end_date"]) >= start
+                    for phase in window.get("key_concentration_phases") or []
+                )
+                if not overlaps_segment:
+                    return 0
+                overlapping_bases = {
+                    basis
+                    for phase in window.get("key_concentration_phases") or []
+                    if date.fromisoformat(phase["start_date"]) <= end
+                    and date.fromisoformat(phase["end_date"]) >= start
+                    for basis in phase.get("bases") or [phase.get("basis")]
+                }
+                return 2 if overlapping_bases & {
+                    "anatomical_specificity_and_sun", "sun",
+                } else 1
+
+            active.sort(key=lambda row: (
+                -concentration_priority(row),
+                -row["activation_level"],
+                -row.get("evidence_score", 0),
+                row["finding_id"],
+            ))
+            segment_windows = [
+                HealthTimingHeatmapEngine._window_for_segment(window, start, end)
+                for window in active
+            ]
+            signature = tuple(row["finding_id"] for row in segment_windows)
+            concentration_signature = tuple(
+                (
+                    row["finding_id"],
+                    tuple(sorted({
+                        basis
+                        for phase in row.get("key_concentration_phases") or []
+                        for basis in phase.get("bases") or [phase.get("basis")]
+                        if basis
+                    })),
+                )
+                for row in segment_windows
+            )
+            merge_signature = (signature, concentration_signature)
+            if (
+                groups
+                and groups[-1]["merge_signature"] == merge_signature
+                and date.fromisoformat(groups[-1]["end_date"]) + timedelta(days=1) == start
+            ):
+                merged_start = date.fromisoformat(groups[-1]["start_date"])
+                groups[-1]["end_date"] = end.isoformat()
+                groups[-1]["windows"] = [
+                    HealthTimingHeatmapEngine._window_for_segment(window, merged_start, end)
+                    for window in active
+                ]
+                groups[-1]["activation_level"] = max(
+                    row["activation_level"] for row in groups[-1]["windows"]
+                )
+                continue
+            groups.append({
+                "group_id": f"{start.isoformat()}:{':'.join(signature)}",
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+                "activation_level": max(row["activation_level"] for row in segment_windows),
+                "windows": segment_windows,
+                "finding_count": len(segment_windows),
+                "merge_signature": merge_signature,
+            })
         for group in groups:
-            group.pop("common_end_date", None)
-            group["windows"].sort(key=lambda row: (-row["activation_level"], row["finding_id"]))
-            group["finding_count"] = len(group["windows"])
+            group.pop("merge_signature", None)
         return groups
 
     def _transit_moment(self, local_moment: datetime) -> datetime:
@@ -335,18 +610,86 @@ class HealthTimingHeatmapEngine:
                         continue
                     mechanism_houses.add(house)
                     house_basis.setdefault(house, []).append(str(text))
-        houses = set(mechanism_houses)
+        houses = set(mechanism_houses) | set(carrier_houses) | HEALTH_MANIFESTATION_HOUSES
         return {
             "planets": planets,
             "houses": houses,
             "carrier_houses": carrier_houses,
             "mechanism_houses": mechanism_houses,
+            "manifestation_houses": set(HEALTH_MANIFESTATION_HOUSES),
             "house_basis": house_basis,
         }
 
-    def _dasha_chain(self, dashas: Dict[str, Any], signature: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _same_natal_sign(self, first: str, second: str) -> bool:
+        """Classical sign association used for dasha-result delivery."""
+        first_row, second_row = _planet(self.chart, first), _planet(self.chart, second)
+        try:
+            return int(first_row.get("sign")) % 12 == int(second_row.get("sign")) % 12
+        except (TypeError, ValueError):
+            return bool(
+                first_row.get("house")
+                and first_row.get("house") == second_row.get("house")
+            )
+
+    def _finding_carrier_links(
+        self,
+        planet: str,
+        signature: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Return auditable natal links from a dasha lord to the finding.
+
+        Direct house/lordship links remain in ``_dasha_chain``.  This helper
+        covers two classical delivery paths that the earlier timing gate
+        omitted: a dasha lord joined to a finding planet, and a node acting
+        through its sign lord.  The node's nakshatra lord is exposed as a
+        lower-period refinement link, but is not allowed to replace MD/AD/PD
+        permission on its own.
+        """
+        finding_planets = set(signature["planets"])
+        associated = sorted(
+            target for target in finding_planets
+            if target != planet and self._same_natal_sign(planet, target)
+        )
+        output: Dict[str, Any] = {
+            "associated_finding_planets": associated,
+            "dispositor": None,
+            "dispositor_finding_planets": [],
+            "nakshatra_lord": None,
+            "nakshatra_lord_finding_planets": [],
+        }
+        if planet not in {"Rahu", "Ketu"}:
+            return output
+
+        try:
+            sign = int(_planet(self.chart, planet).get("sign")) % 12
+        except (TypeError, ValueError):
+            sign = None
+        dispositor = SIGN_LORDS.get(sign) if sign is not None else None
+        output["dispositor"] = dispositor
+        if dispositor:
+            output["dispositor_finding_planets"] = sorted(
+                target for target in finding_planets
+                if dispositor == target or self._same_natal_sign(dispositor, target)
+            )
+
+        condition = self.conditions.get(planet) or {}
+        nakshatra_lord = (condition.get("nakshatra_context") or {}).get("lord")
+        output["nakshatra_lord"] = nakshatra_lord
+        if nakshatra_lord:
+            output["nakshatra_lord_finding_planets"] = sorted(
+                target for target in finding_planets
+                if nakshatra_lord == target or self._same_natal_sign(nakshatra_lord, target)
+            )
+        return output
+
+    def _dasha_chain(
+        self,
+        dashas: Dict[str, Any],
+        signature: Dict[str, Any],
+        levels: tuple[str, ...] = LEVELS,
+    ) -> List[Dict[str, Any]]:
         chain = []
-        for level in LEVELS:
+        for level in levels:
             period = dashas.get(level) or {}
             planet = _period_planet(period)
             condition = self.conditions.get(planet) or {}
@@ -354,8 +697,18 @@ class HealthTimingHeatmapEngine:
             ruled = {int(value) for value in (functional.get("ruled_houses") or [])}
             natal_house = condition.get("house")
             reasons = []
+            carrier_links = self._finding_carrier_links(planet, signature)
             if planet in signature["planets"]:
                 reasons.append("finding_planet")
+            if carrier_links["associated_finding_planets"]:
+                reasons.append("joined_finding_planet")
+            if carrier_links["dispositor_finding_planets"]:
+                reasons.append("node_dispositor_carries_finding")
+            # Nakshatra delivery is a refinement only.  It explains why a
+            # Sookshma/Prana lord concentrates an already-permitted period,
+            # but cannot open the three-level window by itself.
+            if level in REFINEMENT_LEVELS and carrier_links["nakshatra_lord_finding_planets"]:
+                reasons.append("node_nakshatra_lord_carries_finding")
             if natal_house in signature["mechanism_houses"]:
                 reasons.append("occupies_relevant_house")
             connected = sorted(ruled & signature["mechanism_houses"])
@@ -372,6 +725,12 @@ class HealthTimingHeatmapEngine:
                         aspected_houses.add(target)
             if aspected_houses:
                 reasons.append("aspects_relevant_house")
+            manifestation_houses = set()
+            if natal_house in signature["manifestation_houses"]:
+                manifestation_houses.add(int(natal_house))
+            manifestation_houses.update(ruled & signature["manifestation_houses"])
+            primary_match = bool(reasons)
+            manifestation_match = bool(manifestation_houses)
             modifiers = condition.get("finding_modifiers") or {}
             pressure = len(modifiers.get("pressure") or [])
             support = len(modifiers.get("support") or [])
@@ -380,23 +739,34 @@ class HealthTimingHeatmapEngine:
                 "planet": planet,
                 "start": _date_string(period.get("start")) if isinstance(period, dict) else None,
                 "end": _date_string(period.get("end")) if isinstance(period, dict) else None,
-                "matched": bool(reasons),
+                "matched": primary_match or manifestation_match,
+                "match_scope": (
+                    "finding" if primary_match else "health_manifestation" if manifestation_match else "none"
+                ),
                 "reasons": reasons,
+                "manifestation_houses": sorted(manifestation_houses),
                 "direct_finding_planet": planet in signature["planets"],
                 "natal_house": natal_house,
                 "connected_houses": connected,
                 "aspected_relevant_houses": sorted(aspected_houses),
+                **carrier_links,
                 "delivery": "mixed" if pressure and support else "pressure" if pressure else "support" if support else "neutral",
             })
         return chain
 
-    def _transit_contacts(self, states: Dict[str, Dict[str, Any]], signature: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _transit_contacts(
+        self,
+        states: Dict[str, Dict[str, Any]],
+        signature: Dict[str, Any],
+        carrier_planets: set[str] | None = None,
+    ) -> List[Dict[str, Any]]:
         contacts = []
+        natal_targets = set(signature["planets"]) | set(carrier_planets or set())
         for transit_planet, state in states.items():
             transit_longitude = state.get("longitude")
             if transit_longitude is None:
                 continue
-            for natal_planet in sorted(signature["planets"]):
+            for natal_planet in sorted(natal_targets):
                 natal_longitude = _planet_longitude(self.chart, natal_planet)
                 if natal_longitude is None:
                     continue
@@ -428,9 +798,58 @@ class HealthTimingHeatmapEngine:
                         "support" if transit_planet in {"Jupiter", "Venus"} else "trigger"
                     ),
                     "returns_to_own_natal_position": transit_planet == natal_planet,
+                    "contact_scope": (
+                        "direct_finding_planet"
+                        if natal_planet in signature["planets"] else "active_dasha_carrier"
+                    ),
                 })
         contacts.sort(key=lambda row: (row["orb"], -TRANSIT_WEIGHT[row["transit_planet"]]))
         return contacts
+
+    def _transit_bridges(
+        self,
+        states: Dict[str, Dict[str, Any]],
+        contacts: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Find a structural transit acting through a Sun/Moon natal trigger.
+
+        Example: the Sun crosses natal Saturn while transiting Saturn aspects
+        that Sun. The luminary supplies the exact trigger; the slow planet
+        supplies the sustained structural pressure. This is kept distinct from
+        a direct transit-to-natal contact so the evidence remains auditable.
+        """
+        bridges = []
+        luminary_contacts = [row for row in contacts if row["transit_planet"] in {"Sun", "Moon"}]
+        for trigger in luminary_contacts:
+            luminary = trigger["transit_planet"]
+            luminary_longitude = (states.get(luminary) or {}).get("longitude")
+            if luminary_longitude is None:
+                continue
+            for planet in STRUCTURAL_PLANETS:
+                longitude = (states.get(planet) or {}).get("longitude")
+                if longitude is None:
+                    continue
+                best = None
+                for angle in ASPECT_ANGLES[planet]:
+                    separation = _angle_distance(
+                        float(luminary_longitude),
+                        (float(longitude) + angle) % 360.0,
+                    )
+                    if separation <= TRANSIT_BRIDGE_ORB[planet] and (best is None or separation < best[1]):
+                        best = (angle, separation)
+                if best is None:
+                    continue
+                bridges.append({
+                    "structural_planet": planet,
+                    "trigger_planet": luminary,
+                    "natal_planet": trigger["natal_planet"],
+                    "aspect_angle": best[0],
+                    "aspect_number": int(best[0] / 30) + 1,
+                    "orb": round(best[1], 3),
+                    "trigger_orb": trigger["orb"],
+                })
+        bridges.sort(key=lambda row: (row["orb"], row["trigger_orb"], row["structural_planet"]))
+        return bridges
 
     def _transit_house(self, longitude: float) -> int:
         try:
@@ -485,6 +904,7 @@ class HealthTimingHeatmapEngine:
         house_activations: List[Dict[str, Any]],
         contacts: List[Dict[str, Any]],
         signature: Dict[str, Any],
+        transit_bridges: List[Dict[str, Any]] | None = None,
     ) -> Dict[str, Any]:
         dasha_by_house: Dict[int, List[Dict[str, Any]]] = {}
         for row in chain:
@@ -537,6 +957,7 @@ class HealthTimingHeatmapEngine:
             "sun_triggers": [row for row in contacts if row["transit_planet"] == "Sun"],
             "moon_triggers": [row for row in contacts if row["transit_planet"] == "Moon"],
             "decisive_contacts": contacts[:4],
+            "structural_bridges": list(transit_bridges or [])[:4],
         }
 
     def _judge_vulnerability(
@@ -549,44 +970,112 @@ class HealthTimingHeatmapEngine:
         if not signature["planets"]:
             return None
         chain = self._dasha_chain(dashas, signature)
+        refinement_chain = self._dasha_chain(dashas, signature, REFINEMENT_LEVELS)
         matched = [row for row in chain if row["matched"]]
-        # The practical window must be carried by the Pratyantardasha and at
-        # least one enclosing level. Sookshma and Prana are intentionally not
-        # calculated or scored.
-        has_enclosing_permission = any(row["matched"] for row in chain[:2])
+        # A finding-specific MD/AD establishes the natal topic. PD may repeat
+        # that finding directly or open a classical health-manifestation house
+        # (H1/H8/H12). Sookshma and Prana remain excluded from permission.
+        has_enclosing_permission = any(
+            row["matched"] and row.get("match_scope") == "finding" for row in chain[:2]
+        )
         has_pratyantardasha_permission = bool(chain[2]["matched"])
+        # An authored organ/system susceptibility must be identified by one
+        # of its own condition planets in MD/AD/PD. A broad house connection
+        # (for example Saturn aspecting H4) can confirm timing, but must not by
+        # itself turn every Moon/Mercury condition that mentions H4 into an
+        # active illness. Anatomical findings use their explicit anatomical
+        # carrier (normally the sixth lord) and are handled by the ordinary
+        # finding-permission rule above.
+        is_named_condition = finding.get("claim_type") == "named_classical_susceptibility"
+        has_direct_condition_carrier = any(
+            row.get("direct_finding_planet") for row in chain
+        )
         if not (has_enclosing_permission and has_pratyantardasha_permission):
             return None
-        contacts = self._transit_contacts(states, signature)
+        if is_named_condition and not has_direct_condition_carrier:
+            return None
+        # Transits must be able to reach the active delivery chain, not only
+        # the single planet that authored the natal anatomy finding.  Example:
+        # an active Mercury joined to the sixth lord, or Rahu acting through a
+        # dispositor joined to that lord, is a real carrier of the same natal
+        # promise.  Broad health-house matches alone are deliberately excluded.
+        carrier_planets = {
+            row["planet"] for row in chain + refinement_chain
+            if row.get("match_scope") == "finding"
+        }
+        contacts = self._transit_contacts(states, signature, carrier_planets)
         all_house_activations = self._transit_house_activations(states, signature)
-        structural_planets = {"Mars", "Jupiter", "Saturn", "Rahu", "Ketu"}
         active_dasha_planets = {row["planet"] for row in chain if row["matched"]}
+        active_refinement_planets = {
+            row["planet"] for row in refinement_chain if row["matched"]
+        }
         structural_contacts = [
             row for row in contacts
-            if row["transit_planet"] in structural_planets
+            if row["transit_planet"] in STRUCTURAL_PLANETS
             and (
                 row["transit_planet"] in active_dasha_planets
                 or row["natal_planet"] in active_dasha_planets
             )
         ]
-        # A sign/house occupation can last months or years and is background
-        # context, not a bounded timing window. Require an exact structural
-        # contact to a natal planet carrying this susceptibility.
-        if not structural_contacts:
+        # Phaladeepika XX.34-38 treats the transit of the operating dasha or
+        # bhukti lord as a distinct fructification factor.  Keep only a direct
+        # contact with that same planet's natal position here.  A generic
+        # transit through one of the finding's houses is confirmation, not a
+        # bounded concentration.
+        active_dasha_transit_contacts = [
+            row for row in contacts
+            if row.get("transit_planet") in active_dasha_planets
+            and row.get("transit_planet") in {"Sun", "Mars", "Mercury", "Venus"}
+            and (
+                row.get("returns_to_own_natal_position")
+                or row.get("natal_planet") in active_dasha_planets | active_refinement_planets
+            )
+        ]
+        structural_mechanism_activations = [
+            row for row in all_house_activations
+            if row["transit_planet"] in STRUCTURAL_PLANETS
+            and row["target_house"] in signature["mechanism_houses"]
+        ]
+        transit_bridges = self._transit_bridges(states, contacts)
+        structural_confirmation_planets = {
+            row["transit_planet"] for row in structural_contacts
+        } | {
+            row["transit_planet"] for row in structural_mechanism_activations
+        } | {
+            row["structural_planet"] for row in transit_bridges
+        }
+        # One exact structural contact is sufficient. Without it, require two
+        # independent structural planets repeating the finding's mechanism;
+        # a slow occupation of a generic health house alone is only context.
+        if not structural_contacts and len(structural_confirmation_planets) < 2:
             return None
         luminary_contacts = [row for row in contacts if row["transit_planet"] in {"Sun", "Moon"}]
         dasha_score = sum(LEVEL_WEIGHT[row["level"]] for row in matched)
-        retained_contacts = luminary_contacts[:2] + structural_contacts[:3]
+        retained_contacts = []
+        retained_contact_keys = set()
+        for row in luminary_contacts[:2] + active_dasha_transit_contacts[:2] + structural_contacts[:3]:
+            key = (
+                row.get("transit_planet"), row.get("natal_planet"),
+                row.get("aspect_angle"), row.get("orb"),
+            )
+            if key not in retained_contact_keys:
+                retained_contact_keys.add(key)
+                retained_contacts.append(row)
+        refinement_planets = {
+            row["planet"] for row in refinement_chain if row.get("matched")
+        }
         explanatory_planets = {
             row["transit_planet"] for row in retained_contacts
-        }
+        } | structural_confirmation_planets | refinement_planets
         house_activations = [
             row for row in all_house_activations
             if row["transit_planet"] in explanatory_planets
         ]
         activation_summary = self._activation_summary(
-            chain, house_activations, retained_contacts, signature
+            chain, house_activations, retained_contacts, signature, transit_bridges
         )
+        activation_summary["active_dasha_transit_triggers"] = active_dasha_transit_contacts[:4]
+        activation_summary["carrier_planets"] = sorted(carrier_planets)
         activation_summary["condition_link"] = {
             "finding_id": finding.get("stable_id"),
             "label": finding.get("label"),
@@ -598,21 +1087,51 @@ class HealthTimingHeatmapEngine:
             "transit_repeated_houses": activation_summary["transit_houses"],
             "confirmed_houses": activation_summary["confirmed_houses"],
         }
-        structural_planet_count = len({
-            row["transit_planet"] for row in structural_contacts
-        })
+        activation_summary["lower_dasha_refinement"] = [
+            row for row in refinement_chain if row.get("matched")
+        ]
+        activation_summary["refinement_transit_activations"] = [
+            row for row in house_activations
+            if row["transit_planet"] in refinement_planets
+            and row["target_house"] in signature["manifestation_houses"]
+            and row["mode"] == "occupation"
+        ]
+        primary_medical_factors = set(finding.get("primary_medical_factors") or [])
+        specificity_reasons = []
+        for row in refinement_chain:
+            if not row.get("matched"):
+                continue
+            repeats_sixth_sign = (
+                row.get("natal_house") == 6
+                and "sixth_house_sign" in primary_medical_factors
+            )
+            if repeats_sixth_sign:
+                specificity_reasons.append(
+                    f"{row['level']} {row['planet']} occupies natal House 6 and repeats the same sign-based body area"
+                )
+            elif row.get("direct_finding_planet"):
+                specificity_reasons.append(
+                    f"{row['level']} {row['planet']} directly carries this natal finding"
+                )
+        specificity_reasons = list(dict.fromkeys(specificity_reasons))
+        activation_summary["specificity_reasons"] = specificity_reasons
+        structural_planet_count = len(structural_confirmation_planets)
         luminary_planets = {
             row["transit_planet"] for row in luminary_contacts
         }
         transit_score = min(6, structural_planet_count * 2) + sum(
             TRANSIT_WEIGHT[planet] for planet in luminary_planets
         )
-        score = dasha_score + transit_score
+        active_dasha_transit_score = min(2, len(active_dasha_transit_contacts) * 2)
+        transit_score += active_dasha_transit_score
+        refinement_score = sum(1 for row in refinement_chain if row.get("matched"))
+        specificity_score = min(3, len(specificity_reasons) * 2)
+        score = dasha_score + transit_score + refinement_score + specificity_score
         has_sun_trigger = "Sun" in luminary_planets
-        has_moon_trigger = "Moon" in luminary_planets
-        if score >= 12 and has_moon_trigger:
+        has_active_dasha_transit_trigger = bool(active_dasha_transit_contacts)
+        if score >= 12 and has_sun_trigger:
             heat = 4
-        elif score >= 10 and has_sun_trigger:
+        elif score >= 10 and (has_sun_trigger or has_active_dasha_transit_trigger):
             heat = 3
         elif score >= 8:
             heat = 2
@@ -629,14 +1148,116 @@ class HealthTimingHeatmapEngine:
         finding_id = str(finding.get("stable_id") or "")
         is_surgery_finding = "surgery" in finding_id
         short_dasha = {chain[2]["planet"]} if chain[2]["matched"] else set()
-        has_mars_trigger = any(row["transit_planet"] == "Mars" for row in retained_contacts)
+        has_mars_trigger = "Mars" in structural_confirmation_planets
+        mars_carrier_activated_by_dasha = bool(
+            "Mars" in signature["planets"]
+            and any(
+                row.get("direct_finding_planet")
+                or "Mars" in (row.get("associated_finding_planets") or [])
+                or "Mars" in (row.get("dispositor_finding_planets") or [])
+                for row in chain if row.get("matched")
+            )
+        )
         has_intervention_house = any(
-            set(row.get("connected_houses") or []) & {8, 12}
+            (set(row.get("connected_houses") or []) | set(row.get("manifestation_houses") or [])) & {8, 12}
             for row in chain if row["matched"]
         )
         surgery_gate_passed = bool(
             is_surgery_finding and "Mars" in short_dasha and has_mars_trigger and has_intervention_house
         )
+        intervention_gate_passed = bool(
+            not is_surgery_finding
+            and has_intervention_house
+            and (
+                (has_mars_trigger and len(structural_confirmation_planets) >= 2)
+                or (
+                    mars_carrier_activated_by_dasha
+                    and bool(structural_confirmation_planets)
+                    and has_active_dasha_transit_trigger
+                )
+            )
+        )
+        d30_chart = (
+            (self.blueprint.get("divisional_health_confirmation") or {}).get("D30") or {}
+        )
+        finding_d30 = finding.get("d30_confirmation") or {}
+        dasha_delivered_planets = {
+            row.get("planet") for row in chain + refinement_chain if row.get("matched")
+        }
+        for row in chain + refinement_chain:
+            if not row.get("matched"):
+                continue
+            dasha_delivered_planets.update(row.get("associated_finding_planets") or [])
+            dasha_delivered_planets.update(row.get("dispositor_finding_planets") or [])
+            dasha_delivered_planets.update(row.get("nakshatra_lord_finding_planets") or [])
+        dasha_delivered_planets.discard(None)
+        active_d30_anatomical_links = [
+            row for row in (finding_d30.get("anatomical_links") or [])
+            if row.get("planet") in dasha_delivered_planets
+        ]
+        active_d30_intervention_markers = [
+            row for row in (d30_chart.get("intervention_markers") or [])
+            if (
+                (not row.get("planet") and not row.get("planets"))
+                or row.get("planet") in dasha_delivered_planets
+                or set(row.get("planets") or []) & dasha_delivered_planets
+            )
+        ]
+        d30_intervention_confirmed = bool(
+            active_d30_intervention_markers
+            and (intervention_gate_passed or surgery_gate_passed)
+        )
+        d30_pressure_repeated = finding_d30.get("status") in {
+            "pressure_repeated", "pressure_with_protection",
+        }
+        d30_anatomy_repeated = bool(active_d30_anatomical_links)
+        d30_confirmation_score = min(
+            2,
+            int(d30_anatomy_repeated)
+            + int(d30_pressure_repeated or d30_intervention_confirmed),
+        )
+        score += d30_confirmation_score
+        if score >= 12 and has_sun_trigger:
+            heat = 4
+        elif score >= 10 and (has_sun_trigger or has_active_dasha_transit_trigger):
+            heat = 3
+        elif score >= 8:
+            heat = 2
+        else:
+            heat = 1
+        if finding_d30.get("protective_factors") and judgment == "sensitive_with_limited_support":
+            judgment = "sensitive_with_recovery_support"
+        def distinct_d30_factors(*collections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            output: List[Dict[str, Any]] = []
+            seen: set[str] = set()
+            for collection in collections:
+                for factor in collection:
+                    key = str(factor.get("meaning") or factor)
+                    if key not in seen:
+                        seen.add(key)
+                        output.append(factor)
+            return output
+
+        active_d30 = {
+            "available": bool(d30_chart.get("available")),
+            "finding_status": finding_d30.get("status"),
+            "anatomical_links": active_d30_anatomical_links,
+            "anatomical_link_activated": d30_anatomy_repeated,
+            "pressure_factors": distinct_d30_factors(
+                list(finding_d30.get("pressure_factors") or []),
+                list(d30_chart.get("pressure_factors") or []),
+            ),
+            "protective_factors": distinct_d30_factors(
+                list(finding_d30.get("protective_factors") or []),
+                list(d30_chart.get("protective_factors") or []),
+            ),
+            "intervention_confirmed": d30_intervention_confirmed,
+            "intervention_markers": (
+                active_d30_intervention_markers
+                if d30_intervention_confirmed else []
+            ),
+            "role": "severity_and_manifestation_confirmation_only",
+        }
         return {
             "finding_id": finding.get("stable_id"),
             "stable_id": finding.get("stable_id"),
@@ -646,11 +1267,16 @@ class HealthTimingHeatmapEngine:
             "body_zones": list(finding.get("body_zones") or []),
             "natal_grade": finding.get("evidence_grade") or finding.get("support_grade"),
             "heat_level": heat,
-            "phase": "peak" if has_moon_trigger else "heightened" if has_sun_trigger else "active_window",
+            "phase": (
+                "peak" if heat == 4 and has_sun_trigger else
+                "heightened" if has_sun_trigger or has_active_dasha_transit_trigger else
+                "active_window"
+            ),
             "judgment": judgment,
             "manifestation_scope": (
                 "surgery_attention" if surgery_gate_passed else
                 "body_system_activation" if is_surgery_finding else
+                "treatment_or_intervention_attention" if intervention_gate_passed else
                 "finding_activation"
             ),
             "surgery_gate": {
@@ -660,12 +1286,32 @@ class HealthTimingHeatmapEngine:
                 "mars_transit_contact": has_mars_trigger,
                 "intervention_house_connection": has_intervention_house,
             },
+            "intervention_gate": {
+                "passed": intervention_gate_passed,
+                "mars_transit_activation": has_mars_trigger,
+                "mars_carrier_activated_by_dasha": mars_carrier_activated_by_dasha,
+                "intervention_house_connection": has_intervention_house,
+                "independent_structural_confirmations": len(structural_confirmation_planets),
+            },
             "evidence_score": score,
-            "score_components": {"dasha": dasha_score, "transit": transit_score},
+            "score_components": {
+                "dasha": dasha_score,
+                "transit": transit_score,
+                "active_dasha_lord_transit": active_dasha_transit_score,
+                "lower_dasha_refinement": refinement_score,
+                "anatomical_specificity": specificity_score,
+                "d30_confirmation": d30_confirmation_score,
+            },
+            "condition_timing_gate": {
+                "requires_direct_md_ad_pd_carrier": is_named_condition,
+                "direct_md_ad_pd_carrier_present": has_direct_condition_carrier,
+            },
             "dasha_chain": chain,
+            "refinement_dasha_chain": refinement_chain,
             "transit_contacts": retained_contacts,
             "transit_house_activations": house_activations[:10],
             "activation_summary": activation_summary,
+            "d30_confirmation": active_d30,
             "natal_reasons": list(finding.get("supporting_rules") or [])[:5],
             "protective_factors": list(finding.get("protective_rules") or [])[:5],
             "pressure_factors": list(finding.get("contradicting_rules") or [])[:5],

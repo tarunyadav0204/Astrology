@@ -339,6 +339,37 @@ export const apiService = {
     return response.data;
   },
 
+  getParashariTopics: async () => {
+    const response = await apiClient.get(getEndpoint('/parashari/topics'));
+    return response.data;
+  },
+
+  getParashariTopicJudgment: async ({ topicId, birthChartId, birthData, chartData, asOf, calculationProfile = null }) => {
+    const response = await apiClient.post(getEndpoint('/parashari/topic-judgment'), {
+      topic_id: topicId,
+      birth_chart_id: birthChartId || null,
+      birth_data: birthChartId ? null : birthData,
+      chart_data: chartData || null,
+      as_of: asOf,
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
+    });
+    return response.data;
+  },
+
+  getParashariTopicTiming: async ({ topicId, birthChartId, birthData, chartData, startDate, days = 120, calculationProfile = null }) => {
+    const response = await apiClient.post(getEndpoint('/parashari/topic-timing'), {
+      topic_id: topicId,
+      birth_chart_id: birthChartId || null,
+      birth_data: birthChartId ? null : birthData,
+      chart_data: chartData || null,
+      as_of: startDate,
+      start_date: startDate,
+      days,
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
+    });
+    return response.data;
+  },
+
   getRectificationEventTypes: async () => {
     const response = await apiClient.get(getEndpoint('/rectification/event-types'));
     return response.data;

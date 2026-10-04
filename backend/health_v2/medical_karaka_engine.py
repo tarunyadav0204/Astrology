@@ -400,13 +400,13 @@ class MedicalKarakaEngine:
             # the primary karaka.  Use only direct, independent pressure here.
             pressure = self._direct_house_pressure(house, rule.primary_karakas)
             if pressure:
-                evidence.append(f"Anatomical house: {pressure[0]}")
+                evidence.append(f"Body-area house: {pressure[0]}")
         for sign in rule.signs:
             sign_house = next((h for h in range(1, 13) if _house_sign(self.chart, h) == sign), None)
             if sign_house:
                 pressure = self._direct_house_pressure(sign_house, rule.primary_karakas)
                 if pressure:
-                    evidence.append(f"{SIGN_NAMES[sign]} anatomical field: {pressure[0]}")
+                    evidence.append(f"{SIGN_NAMES[sign]} body-area connection: {pressure[0]}")
         chain = self.raw.get("sixth_house_chain") or {}
         chain_zones = " ".join(
             str(value).lower()
@@ -416,7 +416,7 @@ class MedicalKarakaEngine:
         )
         matched = [term for term in rule.zone_terms if term in chain_zones]
         if matched:
-            evidence.append(f"House 6 anatomical chain repeats {', '.join(matched[:3])}")
+            evidence.append(f"House 6 indicators repeat the body areas {', '.join(matched[:3])}")
         return list(dict.fromkeys(evidence))
 
     def _illness_axis_evidence(self, rule: MedicalSystemRule) -> list[str]:

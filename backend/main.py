@@ -69,6 +69,7 @@ from panchang.muhurat_routes import router as muhurat_router
 from muhurat_routes import router as childbirth_router
 from health.health_routes import router as health_router
 from health_v2.routes import router as health_v2_router
+from parashari_topics.routes import router as parashari_topics_router
 from wealth.wealth_routes import router as wealth_router
 from longevity.routes import router as longevity_router
 from chat.chat_routes import router as chat_router
@@ -1047,6 +1048,7 @@ app.include_router(childbirth_router, prefix="/api")
 # Note: childbirth_router already includes vehicle and griha pravesh endpoints
 app.include_router(health_router, prefix="/api")
 app.include_router(health_v2_router, prefix="/api")
+app.include_router(parashari_topics_router, prefix="/api")
 app.include_router(charts_router, prefix="/api")
 app.include_router(prashna_router, prefix="/api")
 app.include_router(birth_charts_router, prefix="/api")

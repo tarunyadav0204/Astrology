@@ -2225,7 +2225,11 @@ def test_requested_divisional_and_jaimini_chart_facts_are_really_calculated():
     }
     karakas = {
         "chara_karakas": {
-            "Atmakaraka": {"planet": "Mars"},
+            # Saturn has the highest longitude within its sign in this fixture.
+            # Keep the supplied evidence consistent with the strict calculator;
+            # this test exercises real divisional-chart construction rather than
+            # the separate mismatch-rejection path.
+            "Atmakaraka": {"planet": "Saturn"},
         }
     }
     facts = _instant_real_chart_facts(
@@ -2246,7 +2250,7 @@ def test_requested_divisional_and_jaimini_chart_facts_are_really_calculated():
     assert isinstance(d12["planets"]["Sun"]["aspects_to_houses"], list)
     assert d12["houses"]
     assert d12["support_signals"] or d12["caution_signals"]
-    assert facts["charts"]["SWAMSA"]["atmakaraka"] == "Mars"
+    assert facts["charts"]["SWAMSA"]["atmakaraka"] == "Saturn"
     assert facts["charts"]["KARAKAMSHA"]["domain"]["code"] == "Karkamsa"
     assert any(line.startswith("D12 lagna:") for line in facts["reading_lines"])
     assert "D12 Ketu:" in facts["reading_text"]

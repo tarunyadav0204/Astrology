@@ -59,8 +59,9 @@ SIGN_LORDS = {
 # broader temperament hints below: for medical ranking the 6th lord's exact
 # nakshatra supplies a concrete anatomical candidate, not merely a doshic tone.
 # Canonical 27-fold Nakshatra Purusha anatomy used by the health engine.
-# Source family: Narada-Purana anatomical sequence, as summarized in the
-# supplied Dr. K. S. Charak computational framework.  Keep this as one table:
+# Source: the Vamana Purana Nakshatra Shareera of Lord Vishnu, as reproduced
+# by Dr K. S. Charak in Essentials of Medical Astrology, chapter 4. Keep this
+# as one table:
 # reports, Instant, and evidence UI must never maintain competing mappings.
 NAKSHATRA_BODY: Dict[str, List[str]] = {
     "ashwini": ["knees"],
@@ -70,7 +71,7 @@ NAKSHATRA_BODY: Dict[str, List[str]] = {
     "mrigashira": ["eyes"],
     "ardra": ["hair"],
     "punarvasu": ["fingers"],
-    "pushya": ["mouth", "face"],
+    "pushya": ["mouth"],
     "ashlesha": ["nails"],
     "magha": ["nose"],
     "purva phalguni": ["private parts"],
@@ -95,7 +96,7 @@ NAKSHATRA_BODY: Dict[str, List[str]] = {
     "shatabhishak": ["chin"],
     "purva bhadrapada": ["sides of body"],
     "uttara bhadrapada": ["sides of body"],
-    "revati": ["armpits", "groins"],
+    "revati": ["armpits"],
 }
 
 # Production payloads have historically used several transliterations and
@@ -569,7 +570,7 @@ def build_priority_body_zones(
             factor="sixth_lord_nakshatra",
             label=(
                 f"House 6 lord {sixth_lord} occupies {sixth_nakshatra['name']}{pada_text}{lord_text}; "
-                f"its anatomical focus is {', '.join(sixth_nakshatra['zones'][:3])}."
+                f"the body areas connected with this placement are {', '.join(sixth_nakshatra['zones'][:3])}."
             ),
             base_weight=24,
         )
@@ -583,7 +584,7 @@ def build_priority_body_zones(
                     f" in {SIGN_NAMES[nak_lord_sign]}"
                     if nak_lord_sign is not None else ""
                 )
-                + ", confirming how this anatomical indication is expressed."
+                + ", further describing how this body-area indication may be expressed."
             )
             for zone in sixth_nakshatra["zones"]:
                 bucket = zone_weights.get(str(zone).strip().lower())
@@ -608,7 +609,7 @@ def build_priority_body_zones(
             factor="sixth_lord_house",
             label=(
                 f"House 6 lord {sixth_lord} is placed in House {sixth_lord_house}; "
-                f"that house's anatomical field includes {', '.join(destination_zones[:4])}."
+                f"that house represents body areas including {', '.join(destination_zones[:4])}."
             ),
             # This is a real anatomical limb of the medical chain, but ranks
             # below the exact nakshatra and rashi mappings unless corroborated.

@@ -268,10 +268,18 @@
 }
 
 .pdm__pane--dasha,
-.pdm__pane--act {
+.pdm__pane--act,
+.pdm__pane--study {
   min-height: calc(100dvh - 11rem);
   display: flex;
   flex-direction: column;
+}
+
+.pdm__pane--study .dtl {
+  min-height: calc(100dvh - 12rem);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  overflow: hidden;
 }
 
 .pdm__pane--act .desk-act--focus {

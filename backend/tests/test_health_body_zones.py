@@ -318,14 +318,14 @@ def test_all_27_nakshatra_anatomy_mappings_are_available():
     expected = {
         "Ashwini": ["knees"], "Bharani": ["head"], "Krittika": ["waist"],
         "Rohini": ["legs"], "Mrigashira": ["eyes"], "Ardra": ["hair"],
-        "Punarvasu": ["fingers"], "Pushya": ["mouth", "face"], "Ashlesha": ["nails"],
+        "Punarvasu": ["fingers"], "Pushya": ["mouth"], "Ashlesha": ["nails"],
         "Magha": ["nose"], "Purva Phalguni": ["private parts"],
         "Uttara Phalguni": ["private parts"], "Hasta": ["hands"], "Chitra": ["forehead"],
         "Swati": ["teeth"], "Vishakha": ["upper limbs"], "Anuradha": ["heart"],
         "Jyeshtha": ["tongue"], "Mula": ["feet"], "Purva Ashadha": ["thighs"],
         "Uttara Ashadha": ["thighs"], "Shravana": ["ears"], "Dhanishta": ["back"],
         "Shatabhisha": ["chin"], "Purva Bhadrapada": ["sides of body"],
-        "Uttara Bhadrapada": ["sides of body"], "Revati": ["armpits", "groins"],
+        "Uttara Bhadrapada": ["sides of body"], "Revati": ["armpits"],
     }
     for name, zones in expected.items():
         result = build_priority_body_zones(

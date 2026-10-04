@@ -163,7 +163,10 @@ export default function HealthBlueprintScreen({ navigation, route }) {
   const vulnerabilityTitle = useCallback((item) => {
     const stableId = item.stable_id || item.finding_id || '';
     const condition = String(stableId).replace('health.condition.', '');
-    if (item.claim_type !== 'named_classical_susceptibility' || !condition) return sentenceCase(bodyFocus(item) || item.label);
+    if (item.claim_type !== 'named_classical_susceptibility' || !condition) {
+      const area = sentenceCase(bodyFocus(item) || item.label);
+      return t('healthBlueprint.bodyAreaNeedsCare', { area });
+    }
     return sentenceCase(t(`healthBlueprint.conditions.${condition}.title`, item.label || bodyFocus(item)));
   }, [bodyFocus, t]);
   const gradeLabel = (value) => t(`healthBlueprint.grades.${valueKey(value)}`, value);
@@ -288,6 +291,9 @@ export default function HealthBlueprintScreen({ navigation, route }) {
   const dashaExplanationText = (row) => {
     const facts = [];
     if (row.direct_finding_planet) facts.push(t('healthBlueprint.timing.dashaFacts.direct'));
+    if (row.associated_finding_planets?.length) facts.push(t('healthBlueprint.timing.dashaFacts.joinedCarrier', { planet: row.associated_finding_planets.map(localizePlanet).join(', ') }));
+    if (row.dispositor_finding_planets?.length) facts.push(t('healthBlueprint.timing.dashaFacts.nodeDispositorCarrier', { lord: localizePlanet(row.dispositor), planet: row.dispositor_finding_planets.map(localizePlanet).join(', ') }));
+    if (row.nakshatra_lord_finding_planets?.length) facts.push(t('healthBlueprint.timing.dashaFacts.nodeNakshatraCarrier', { lord: localizePlanet(row.nakshatra_lord), planet: row.nakshatra_lord_finding_planets.map(localizePlanet).join(', ') }));
     if ((row.reasons || []).includes('occupies_relevant_house')) facts.push(t('healthBlueprint.timing.dashaFacts.occupies', { house: row.natal_house }));
     if (row.connected_houses?.length) facts.push(t('healthBlueprint.timing.dashaFacts.rules', { houses: row.connected_houses.join(t('healthBlueprint.constitution.houseJoiner')) }));
     if (row.aspected_relevant_houses?.length) facts.push(t('healthBlueprint.timing.dashaFacts.aspects', { houses: row.aspected_relevant_houses.join(t('healthBlueprint.constitution.houseJoiner')) }));
@@ -805,9 +811,10 @@ export default function HealthBlueprintScreen({ navigation, route }) {
             <Text style={[styles.causalConclusion, isTablet && styles.bodyTablet, { color: colors.text, borderTopColor: colors.cardBorder }]}>{t('healthBlueprint.timing.causalConclusion', { condition: timingFindingTitle(detail) })}</Text>
           </View>
 
-          {(selectedWindow.sun_phases?.length > 0 || selectedWindow.moon_peak_dates?.length > 0) && <View style={styles.factorBlock}>
+          {(selectedWindow.sun_phases?.length > 0 || selectedWindow.active_dasha_transit_phases?.length > 0 || selectedWindow.moon_peak_dates?.length > 0) && <View style={styles.factorBlock}>
             <Text style={[styles.factorLabel, isTablet && styles.factorLabelTablet, { color: colors.textSecondary }]}>{t('healthBlueprint.timing.strongerWithinWindow')}</Text>
             {selectedWindow.sun_phases?.map((phase, index) => <Text key={`sun-phase-${index}`} style={[styles.evidenceRow, isTablet && styles.evidenceRowTablet, { color: colors.textSecondary }]}>• {t('healthBlueprint.timing.sunPhase', { range: dateRange(phase.start_date, phase.end_date) })}</Text>)}
+            {selectedWindow.active_dasha_transit_phases?.map((phase, index) => <Text key={`dasha-contact-${index}`} style={[styles.evidenceRow, isTablet && styles.evidenceRowTablet, { color: colors.textSecondary }]}>• {t('healthBlueprint.timing.activeDashaContact', { range: dateRange(phase.start_date, phase.end_date) })}</Text>)}
             {selectedWindow.moon_peak_dates?.map((value) => <Text key={`moon-peak-${value}`} style={[styles.evidenceRow, isTablet && styles.evidenceRowTablet, { color: colors.textSecondary }]}>• {t('healthBlueprint.timing.moonPeak', { date: formatDate(value, { dateStyle: 'long' }) })}</Text>)}
           </View>}
 

@@ -99,7 +99,7 @@ def test_health_v2_route_calculates_charak_medical_vargas_when_longitudes_exist(
 
     response = asyncio.run(natal_blueprint(request, user))
 
-    assert calls == [3, 9, 12]
+    assert calls == [3, 9, 12, 30]
     confirmation = response["result"]["constitutional_protection"]["planet_conditions"]["Sun"]["divisional_confirmation"]
     assert set(confirmation) == {"D3", "D9", "D12"}
 
