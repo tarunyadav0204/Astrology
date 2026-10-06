@@ -22,6 +22,97 @@
   padding: 28px 24px 76px;
 }
 
+.festival-tabs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--festival-line);
+  padding-bottom: 8px;
+  grid-column: 1 / -1;
+}
+
+.festival-tab {
+  background: none;
+  border: none;
+  color: var(--festival-muted);
+  font-size: 1.1rem;
+  font-weight: 500;
+  padding: 8px 16px;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.festival-tab:hover {
+  color: var(--festival-ink);
+}
+
+.festival-tab.is-active {
+  color: var(--festival-rust);
+}
+
+.festival-tab.is-active::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: var(--festival-rust);
+}
+
+.festival-inline-search {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  width: 100%;
+  max-width: 500px;
+}
+
+.festival-inline-search input {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--festival-line);
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: var(--festival-ink);
+  font-size: 1rem;
+}
+
+.festival-inline-search input:focus {
+  outline: none;
+  border-color: var(--festival-rust);
+}
+
+.festival-category-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-right: auto;
+}
+
+.festival-chip {
+  background: transparent;
+  border: 1px solid var(--festival-line);
+  color: var(--festival-muted);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.festival-chip:hover {
+  border-color: var(--festival-rust);
+  color: var(--festival-ink);
+}
+
+.festival-chip.is-active {
+  background: var(--festival-rust);
+  border-color: var(--festival-rust);
+  color: #fff;
+}
+
 .festivals-hero,
 .festival-controls,
 .festival-panel,

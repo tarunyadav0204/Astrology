@@ -22,6 +22,68 @@
   padding: 28px 24px 76px;
 }
 
+.festival-tabs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--monthly-line);
+  padding-bottom: 8px;
+  grid-column: 1 / -1;
+}
+
+.festival-tab {
+  background: none;
+  border: none;
+  color: var(--monthly-muted);
+  font-size: 1.1rem;
+  font-weight: 500;
+  padding: 8px 16px;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.festival-tab:hover {
+  color: var(--monthly-ink);
+}
+
+.festival-tab.is-active {
+  color: var(--monthly-rust);
+}
+
+.festival-tab.is-active::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: var(--monthly-rust);
+}
+
+.festival-inline-search {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  width: 100%;
+  max-width: 500px;
+}
+
+.festival-inline-search input {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--monthly-line);
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: var(--monthly-ink);
+  font-size: 1rem;
+}
+
+.festival-inline-search input:focus {
+  outline: none;
+  border-color: var(--monthly-rust);
+}
+
 .monthly-festivals-hero,
 .monthly-toolbar,
 .monthly-panel,
