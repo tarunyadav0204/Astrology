@@ -11,6 +11,7 @@ const BirthFormModal = ({
   title,
   description,
   prefilledData,
+  submitLabel,
   defaultActiveTab = 'saved',
   onRequireAuth,
 }) => {
@@ -56,6 +57,7 @@ const BirthFormModal = ({
             pickModeTitle={title}
             pickModeDescription={description}
             prefilledData={prefilledData}
+            submitLabel={submitLabel}
             onClose={onClose}
             defaultActiveTab={defaultActiveTab}
             onRequireAuth={onRequireAuth}

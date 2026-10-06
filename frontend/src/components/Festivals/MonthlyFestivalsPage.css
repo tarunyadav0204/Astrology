@@ -793,16 +793,17 @@
 .monthly-festivals-page--themed .monthly-festivals-hero {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(21rem, .72fr);
-  gap: 2rem;
+  grid-template-columns: minmax(0, 1.35fr) minmax(12rem, 15rem);
+  grid-template-rows: auto auto;
+  gap: .75rem 1.25rem;
   align-items: center;
-  min-height: clamp(36rem, 72vh, 49rem);
+  min-height: 0;
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--color-border-inverse);
   border-radius: var(--radius-xl);
   background:
-    radial-gradient(circle at 75% 42%, var(--color-cosmic-glow), transparent 26rem),
+    radial-gradient(circle at 82% 40%, var(--color-cosmic-glow), transparent 18rem),
     linear-gradient(145deg, var(--color-surface-inverse), var(--color-cosmic-surface));
   color: var(--color-text-inverse);
   box-shadow: var(--shadow-card);
@@ -830,14 +831,14 @@
   position: relative;
   z-index: 1;
   align-self: center;
-  padding: clamp(3rem, 7vw, 7rem);
+  padding: 1.15rem clamp(1.15rem, 2.5vw, 1.85rem) 1rem;
 }
 
 .monthly-festivals-back {
   display: inline-flex;
   align-items: center;
   gap: .65rem;
-  margin: 0 0 clamp(3rem, 7vh, 5rem);
+  margin: 0 0 .65rem;
   padding: 0;
   border: 0;
   background: transparent;
@@ -861,31 +862,35 @@
 .monthly-festivals-page--themed .monthly-festivals-hero .monthly-festivals-eyebrow { color: var(--color-accent-soft); }
 
 .monthly-festivals-page--themed .monthly-festivals-hero h1 {
-  max-width: 12ch;
-  margin: 1rem 0 1.5rem;
+  max-width: 24ch;
+  margin: .4rem 0 .55rem;
   color: var(--color-text-inverse);
-  font: 400 clamp(3.55rem, 7vw, 7.35rem)/.88 var(--font-display);
-  letter-spacing: -.055em;
+  font: 400 clamp(1.85rem, 2.8vw, 2.45rem)/1.08 var(--font-display);
+  letter-spacing: -.035em;
 }
 .monthly-festivals-page--themed .monthly-festivals-hero h1 em { color: var(--color-accent-soft); font-weight: 400; }
-.monthly-festivals-page--themed .monthly-festivals-hero__copy > p { max-width: 39rem; margin: 0; color: var(--color-text-inverse-muted); font-size: clamp(1rem, 1.45vw, 1.22rem); line-height: 1.72; }
-.monthly-festivals-page--themed .monthly-festivals-hero__actions { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: 2rem; }
+.monthly-festivals-page--themed .monthly-festivals-hero__copy > p { max-width: 38rem; margin: 0; color: var(--color-text-inverse-muted); font-size: .95rem; line-height: 1.5; }
+.monthly-festivals-page--themed .monthly-festivals-hero__actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .85rem; }
 
 .monthly-festivals-page--themed .monthly-festivals-hero__panel {
   position: relative;
   z-index: 1;
-  justify-self: center;
-  width: min(33vw, 27rem);
-  max-width: none;
+  justify-self: end;
+  align-self: center;
+  width: 100%;
+  max-width: 14rem;
+  margin: clamp(1rem, 2vw, 1.5rem) clamp(1rem, 2vw, 1.75rem) clamp(1rem, 2vw, 1.5rem) 0;
   padding: 0;
   border: 0;
   background: transparent;
+  box-shadow: none;
 }
 
 .monthly-festivals-orbit {
   position: relative;
   display: flex;
-  width: 100%;
+  width: min(100%, 11.5rem);
+  margin-inline: auto;
   aspect-ratio: 1;
   flex-direction: column;
   align-items: center;
@@ -893,47 +898,66 @@
   border: 1px solid var(--color-cosmic-line-strong);
   border-radius: 50%;
   background: color-mix(in srgb, var(--color-surface-inverse-raised) 32%, transparent);
-  box-shadow: inset 0 0 0 clamp(2.8rem, 5vw, 4.5rem) color-mix(in srgb, var(--color-surface-inverse-raised) 44%, transparent), 0 0 85px var(--color-cosmic-glow);
+  box-shadow: inset 0 0 0 1.6rem color-mix(in srgb, var(--color-surface-inverse-raised) 44%, transparent), 0 0 36px var(--color-cosmic-glow);
 }
 .monthly-festivals-orbit::before,
 .monthly-festivals-orbit::after { content: ''; position: absolute; border: 1px solid var(--color-cosmic-line); border-radius: 50%; }
 .monthly-festivals-orbit::before { inset: 14%; }
-.monthly-festivals-orbit::after { inset: -8%; border-style: dashed; opacity: .55; }
-.monthly-festivals-orbit > span { color: var(--color-accent-soft); font: 400 clamp(2rem, 4vw, 4rem)/1 var(--font-display); }
-.monthly-festivals-orbit > strong { margin-top: .5rem; color: var(--color-cosmic-text-muted); font: 700 .75rem/1 var(--font-mono); letter-spacing: .22em; }
-.monthly-festivals-orbit > div { position: absolute; bottom: 17%; display: flex; gap: .65rem; }
-.monthly-festivals-orbit i { display: block; width: .55rem; height: .55rem; border: 1px solid var(--color-accent-soft); border-radius: 50%; }
+.monthly-festivals-orbit::after { inset: -6%; border-style: dashed; opacity: .55; }
+.monthly-festivals-orbit > span { color: var(--color-accent-soft); font: 400 1.55rem/1 var(--font-display); }
+.monthly-festivals-orbit > strong { margin-top: .35rem; color: var(--color-cosmic-text-muted); font: 700 .7rem/1 var(--font-mono); letter-spacing: .18em; }
+.monthly-festivals-orbit > div { position: absolute; bottom: 14%; display: flex; gap: .45rem; }
+.monthly-festivals-orbit i { display: block; width: .4rem; height: .4rem; border: 1px solid var(--color-accent-soft); border-radius: 50%; }
 .monthly-festivals-orbit i:nth-child(2),
 .monthly-festivals-orbit i:nth-child(4) { background: linear-gradient(90deg, var(--color-accent-soft) 50%, transparent 50%); }
-.monthly-festivals-orbit i:nth-child(3) { background: var(--color-accent-soft); box-shadow: 0 0 16px var(--color-accent); }
+.monthly-festivals-orbit i:nth-child(3) { background: var(--color-accent-soft); box-shadow: 0 0 10px var(--color-accent); }
+
+/* Compact month badge replaces the old full-circle orbit that forced a tall hero */
+.monthly-festival-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .35rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--color-border-inverse);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface-inverse-raised) 55%, transparent);
+}
+.monthly-festival-badge > span {
+  color: var(--color-accent-soft);
+  font: 400 1.85rem/.95 var(--font-display);
+}
+.monthly-festival-badge > strong {
+  color: var(--color-cosmic-text-muted);
+  font: 700 .72rem/1 var(--font-mono);
+  letter-spacing: .16em;
+}
 
 .monthly-festivals-page--themed .monthly-festival-stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1px;
-  margin-top: 1.5rem;
+  margin-top: .85rem;
   overflow: hidden;
   border: 1px solid var(--color-border-inverse);
   border-radius: var(--radius-md);
   background: var(--color-border-inverse);
 }
-.monthly-festivals-page--themed .monthly-festival-stats div { padding: 1rem; border: 0; border-radius: 0; background: var(--color-cosmic-surface-raised); }
-.monthly-festivals-page--themed .monthly-festival-stats strong { color: var(--color-accent-soft); font: 400 1.8rem/1 var(--font-display); }
-.monthly-festivals-page--themed .monthly-festival-stats span { color: var(--color-text-inverse-muted); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; }
+.monthly-festivals-page--themed .monthly-festival-stats div { padding: .7rem .65rem; border: 0; border-radius: 0; background: var(--color-cosmic-surface-raised); }
+.monthly-festivals-page--themed .monthly-festival-stats strong { color: var(--color-accent-soft); font: 400 1.35rem/1 var(--font-display); }
+.monthly-festivals-page--themed .monthly-festival-stats span { color: var(--color-text-inverse-muted); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; }
 .monthly-festivals-page--themed .monthly-adhika-note { color: var(--color-accent-soft); text-align: center; }
 
 .monthly-festivals-hero__proof {
-  position: absolute;
+  position: static;
   z-index: 2;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   border-top: 1px solid var(--color-border-inverse);
   background: color-mix(in srgb, var(--color-cosmic-surface) 72%, transparent);
 }
-.monthly-festivals-hero__proof span { display: flex; align-items: center; gap: .75rem; padding: 1.25rem clamp(1rem, 3vw, 2.5rem); color: var(--color-text-inverse-muted); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; }
+.monthly-festivals-hero__proof span { display: flex; align-items: center; gap: .75rem; padding: .85rem clamp(1rem, 3vw, 2rem); color: var(--color-text-inverse-muted); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .monthly-festivals-hero__proof span + span { border-left: 1px solid var(--color-border-inverse); }
 .monthly-festivals-hero__proof strong { color: var(--color-accent-soft); }
 
@@ -958,19 +982,64 @@
 
 .monthly-festivals-page--themed .monthly-toolbar {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  grid-template-columns: auto auto auto minmax(0, 1fr) auto auto;
   gap: .7rem;
   align-items: center;
-  margin-top: clamp(1.5rem, 4vw, 3.5rem);
-  padding: 1.25rem;
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   background: var(--color-surface);
   box-shadow: none;
 }
-.monthly-festivals-page--themed .monthly-toolbar__title { text-align: center; }
-.monthly-festivals-page--themed .monthly-toolbar h2 { margin-top: .45rem; color: var(--color-text); font: 400 clamp(2rem, 3vw, 3.2rem)/1 var(--font-display); letter-spacing: -.04em; }
+.monthly-festivals-page--themed .monthly-toolbar__title { text-align: left; min-width: 0; }
+.monthly-festivals-page--themed .monthly-toolbar h2 { margin-top: .35rem; color: var(--color-text); font: 400 clamp(1.6rem, 2.4vw, 2.4rem)/1 var(--font-display); letter-spacing: -.04em; }
 .monthly-festivals-page--themed .monthly-nav-btn { display: grid; width: var(--control-height-md); padding: 0; place-items: center; font-size: 1.45rem; }
+
+/* Month / year jump controls sit between the arrows so users can jump without stepping */
+.monthly-toolbar__pickers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .55rem;
+  margin: 0;
+}
+.monthly-toolbar__picker {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  color: var(--color-text-muted);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.monthly-toolbar__picker select {
+  min-width: 7.5rem;
+  height: var(--control-height-sm, 2.25rem);
+  padding: 0 2.35rem 0 .85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  /* Native OS chevrons ignore padding; draw our own inset arrow instead */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: var(--color-surface-raised);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.25L6 7.75L9.5 4.25' stroke='%236b5c63' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .9rem center;
+  background-size: .75rem;
+  color: var(--color-text);
+  font: 600 .88rem/1 var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.monthly-toolbar__picker select::-ms-expand { display: none; }
+.monthly-toolbar__picker select:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
 
 .monthly-festivals-page--themed .monthly-panel,
 .monthly-festivals-page--themed .monthly-calendar-panel,
@@ -1085,18 +1154,44 @@
 @media (max-width: 760px) {
   .monthly-festivals-page--themed { padding-top: 0; }
   .monthly-festivals-page--themed .monthly-festivals-shell { width: min(calc(100% - 1.25rem), var(--content-wide)); padding: 1rem 0 var(--space-section); }
-  .monthly-festivals-page--themed .monthly-festivals-hero { display: block; min-height: 62rem; border-radius: var(--radius-lg); }
-  .monthly-festivals-page--themed .monthly-festivals-hero__copy { padding: 2rem 1.35rem 1rem; }
-  .monthly-festivals-back { margin-bottom: 2.5rem; }
-  .monthly-festivals-page--themed .monthly-festivals-hero h1 { font-size: clamp(3.3rem, 16vw, 5.4rem); }
-  .monthly-festivals-page--themed .monthly-festivals-hero__copy > p { font-size: .98rem; }
+  .monthly-festivals-page--themed .monthly-festivals-hero {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-radius: var(--radius-lg);
+  }
+  .monthly-festivals-page--themed .monthly-festivals-hero__copy { padding: 1.35rem 1.15rem .85rem; }
+  .monthly-festivals-back { margin-bottom: .85rem; }
+  .monthly-festivals-page--themed .monthly-festivals-hero h1 { font-size: clamp(2rem, 8vw, 2.7rem); }
+  .monthly-festivals-page--themed .monthly-festivals-hero__copy > p { font-size: .92rem; }
   .monthly-festivals-page--themed .monthly-festivals-hero__actions .monthly-festival-btn { width: auto; }
-  .monthly-festivals-page--themed .monthly-festivals-hero__panel { width: min(70vw, 18rem); margin: 1.75rem auto 0; }
+  .monthly-festivals-page--themed .monthly-festivals-hero__panel {
+    width: min(58vw, 11rem);
+    max-width: none;
+    margin: .35rem auto .85rem;
+    justify-self: center;
+  }
   .monthly-festivals-page--themed .monthly-festivals-hero__proof { grid-template-columns: 1fr; }
-  .monthly-festivals-page--themed .monthly-festivals-hero__proof span { padding: .65rem 1.2rem; }
+  .monthly-festivals-page--themed .monthly-festivals-hero__proof span { padding: .55rem 1.1rem; }
   .monthly-festivals-page--themed .monthly-festivals-hero__proof span + span { border-top: 1px solid var(--color-border-inverse); border-left: 0; }
-  .monthly-festivals-page--themed .monthly-toolbar { grid-template-columns: auto 1fr auto; padding: 1rem; }
-  .monthly-festivals-page--themed .monthly-toolbar .monthly-festival-btn { grid-column: 1 / -1; width: 100%; }
+  .monthly-festivals-page--themed .monthly-toolbar {
+    grid-template-columns: auto 1fr auto;
+    padding: 1rem;
+  }
+  .monthly-festivals-page--themed .monthly-toolbar__pickers {
+    grid-column: 1 / -1;
+    order: 4;
+    width: 100%;
+  }
+  .monthly-festivals-page--themed .monthly-toolbar__title {
+    text-align: center;
+  }
+  .monthly-festivals-page--themed .monthly-toolbar .monthly-festival-btn {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .monthly-toolbar__picker { flex: 1 1 auto; }
+  .monthly-toolbar__picker select { width: 100%; min-width: 0; }
   .monthly-festivals-page--themed .monthly-calendar-panel { padding: .75rem; overflow-x: auto; scroll-snap-type: x proximity; }
   .monthly-festivals-page--themed .monthly-calendar-grid { min-width: 46rem; }
   .monthly-festivals-page--themed .monthly-day { min-height: 8rem; }

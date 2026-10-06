@@ -8,18 +8,31 @@ HINDU_FESTIVALS = {
         "name": "Diwali",
         "type": "major_festival",
         "lunar_day": "amavasya",
+        "paksha": "krishna",
         "month": "kartik",
         "duration": 5,
         "description": "The most celebrated Hindu festival, Diwali marks the triumph of light over darkness, good over evil, and knowledge over ignorance. Celebrated over five days, it honors the return of Lord Rama to Ayodhya and the worship of Goddess Lakshmi for prosperity.",
         "significance": "Celebrates Lord Rama's return from exile, Goddess Lakshmi's blessings for wealth and prosperity, and the victory of dharma. Each day has special meaning: Dhanteras (wealth), Naraka Chaturdashi (victory over demon), Lakshmi Puja (prosperity), Govardhan Puja (gratitude), and Bhai Dooj (sibling love).",
         "rituals": ["lighting oil lamps and candles", "creating colorful rangoli patterns", "Lakshmi and Ganesha worship", "exchanging sweets and gifts", "fireworks and celebrations", "cleaning and decorating homes", "wearing new clothes", "charitable giving"]
     },
+    "holika_dahan": {
+        "name": "Holika Dahan",
+        "type": "festival",
+        "lunar_day": "purnima",
+        "paksha": "shukla",
+        "month": "phalguna",
+        "duration": 1,
+        "description": "The bonfire night before Holi, commemorating the burning of Holika and the triumph of Prahlad's devotion.",
+        "significance": "Victory of devotion over evil; purification before the festival of colors.",
+        "rituals": ["Holika bonfire", "offering wheat and coconut", "circling the fire", "prayers for protection"]
+    },
     "holi": {
         "name": "Holi",
-        "type": "major_festival", 
-        "lunar_day": "purnima",
-        "month": "phalguna",
-        "duration": 2,
+        "type": "major_festival",
+        "lunar_day": "pratipada",
+        "paksha": "krishna",
+        "month": "chaitra",
+        "duration": 1,
         "description": "The vibrant festival of colors celebrating the arrival of spring, the triumph of good over evil, and the divine love between Radha and Krishna. Known as the 'Festival of Love' and 'Festival of Colors', it brings people together in joyous celebration.",
         "significance": "Commemorates the burning of demoness Holika and salvation of Prahlad, celebrates the eternal love of Radha-Krishna, marks the end of winter and arrival of spring, promotes unity and forgiveness among people, and represents the victory of devotion over evil.",
         "rituals": ["Holika Dahan bonfire ceremony", "playing with colored powders and water", "preparing traditional sweets like gujiya and malpua", "drinking thandai and bhang", "singing Holi songs and dancing", "visiting friends and family", "seeking forgiveness and renewing relationships"]
@@ -28,6 +41,7 @@ HINDU_FESTIVALS = {
         "name": "Dussehra/Vijayadashami",
         "type": "major_festival",
         "lunar_day": "dashami",
+        "paksha": "shukla",
         "month": "ashwin",
         "duration": 1,
         "description": "Celebrated as the victory of Lord Rama over the ten-headed demon king Ravana, Dussehra symbolizes the triumph of righteousness over evil. It marks the end of Navratri and celebrates the divine feminine power's victory over demonic forces.",
@@ -35,9 +49,10 @@ HINDU_FESTIVALS = {
         "rituals": ["burning effigies of Ravana, Meghnad, and Kumbhakarna", "Durga idol immersion (Visarjan)", "weapon worship (Shastra Puja)", "Ram Lila performances", "reading Ramayana", "seeking blessings for new ventures", "charitable acts and feeding the poor"]
     },
     "navratri": {
-        "name": "Navratri",
+        "name": "Sharad Navratri",
         "type": "major_festival",
         "lunar_day": "pratipada",
+        "paksha": "shukla",
         "month": "ashwin",
         "duration": 9,
         "description": "Nine sacred nights dedicated to the worship of Goddess Durga and her nine divine forms (Navadurga). Each night honors a different aspect of the Divine Mother, culminating in the celebration of feminine power and spiritual transformation.",
@@ -50,6 +65,7 @@ HINDU_FESTIVALS = {
         "name": "Krishna Janmashtami",
         "type": "major_festival",
         "lunar_day": "ashtami",
+        "paksha": "krishna",
         "month": "bhadrapada",
         "duration": 1,
         "description": "The joyous celebration of Lord Krishna's birth at midnight in Mathura. This festival commemorates the divine incarnation who came to restore dharma and guide humanity through his teachings in the Bhagavad Gita.",
@@ -60,6 +76,7 @@ HINDU_FESTIVALS = {
         "name": "Govardhan Puja",
         "type": "festival",
         "lunar_day": "pratipada",
+        "paksha": "shukla",
         "month": "kartik",
         "duration": 1,
         "description": "Commemorates Lord Krishna's lifting of Govardhan mountain to protect the people of Vrindavan from Indra's wrath. Also known as Annakut, it celebrates the abundance of nature and Krishna's protective power.",
@@ -72,6 +89,7 @@ HINDU_FESTIVALS = {
         "name": "Ganesh Chaturthi",
         "type": "major_festival",
         "lunar_day": "chaturthi",
+        "paksha": "shukla",
         "month": "bhadrapada",
         "duration": 11,
         "description": "The grand celebration of Lord Ganesha's birth, marked by installing clay idols in homes and public pandals. The festival culminates with the immersion ceremony (Visarjan), symbolizing the cycle of creation and dissolution.",
@@ -84,7 +102,8 @@ HINDU_FESTIVALS = {
         "name": "Maha Shivratri",
         "type": "major_festival",
         "lunar_day": "chaturdashi",
-        "month": "magha",
+        "paksha": "krishna",
+        "month": "phalguna",
         "duration": 1,
         "description": "The most sacred night dedicated to Lord Shiva, celebrating his cosmic dance and the divine union with Goddess Parvati. Devotees observe night-long vigils, fasting, and intensive worship to receive Shiva's blessings for spiritual liberation.",
         "significance": "Commemorates the marriage of Shiva and Parvati, celebrates Shiva's cosmic dance (Tandava) that maintains universal rhythm, marks the night when Shiva drank poison to save the world, represents the triumph of consciousness over ignorance, and offers the opportunity for spiritual transformation and moksha.",
@@ -96,6 +115,7 @@ HINDU_FESTIVALS = {
         "name": "Ram Navami",
         "type": "major_festival",
         "lunar_day": "navami",
+        "paksha": "shukla",
         "month": "chaitra",
         "duration": 1,
         "description": "The celebration of Lord Rama's birth, honoring the seventh avatar of Vishnu who exemplified dharma, righteousness, and ideal kingship. The festival promotes the values of truth, duty, and moral conduct in personal and social life.",
@@ -108,6 +128,7 @@ HINDU_FESTIVALS = {
         "name": "Hanuman Jayanti",
         "type": "festival",
         "lunar_day": "purnima",
+        "paksha": "shukla",
         "month": "chaitra",
         "duration": 1,
         "description": "The birth celebration of Lord Hanuman, the devoted follower of Rama known for his immense strength, courage, and unwavering devotion. This festival inspires devotees to cultivate similar qualities of service, strength, and spiritual dedication.",
@@ -120,7 +141,9 @@ HINDU_FESTIVALS = {
         "name": "Karva Chauth",
         "type": "vrat",
         "lunar_day": "chaturthi",
+        "paksha": "krishna",
         "month": "kartik",
+        "has_moonrise": True,
         "duration": 1,
         "description": "A sacred fast observed by married women for the longevity, prosperity, and well-being of their husbands. The fast is broken only after sighting the moon and performing the traditional rituals, symbolizing the deep bond of marriage.",
         "significance": "Celebrates marital devotion and the sacred bond between husband and wife, ensures the husband's long life and prosperity, strengthens family relationships, promotes the tradition of sacrifice and love in marriage, and brings blessings for a happy married life.",
@@ -130,6 +153,7 @@ HINDU_FESTIVALS = {
         "name": "Hariyali Teej",
         "type": "vrat",
         "lunar_day": "tritiya",
+        "paksha": "shukla",
         "month": "sravana",
         "duration": 1,
         "description": "A joyous festival celebrated by women during the monsoon season, honoring the reunion of Lord Shiva and Goddess Parvati. It celebrates marital bliss, fertility, and the beauty of nature during the rainy season.",
@@ -164,6 +188,7 @@ HINDU_FESTIVALS = {
         "name": "Devutthana Ekadashi",
         "type": "vrat",
         "lunar_day": "ekadashi",
+        "paksha": "shukla",
         "month": "kartik",
         "duration": 1,
         "description": "Also known as Prabodhini Ekadashi, this marks the awakening of Lord Vishnu from his four-month cosmic sleep (Yoga Nidra). It signals the end of Chaturmas and the beginning of the auspicious period for weddings and religious ceremonies.",
@@ -174,6 +199,7 @@ HINDU_FESTIVALS = {
         "name": "Utpanna Ekadashi",
         "type": "vrat",
         "lunar_day": "ekadashi",
+        "paksha": "krishna",
         "month": "margashirsha",
         "duration": 1,
         "description": "The Krishna Paksha Ekadashi of Margashirsha month, believed to be the day when Ekadashi Devi manifested to destroy demons. This powerful vrat purifies the soul and grants liberation from sins and negative karma.",
@@ -186,6 +212,7 @@ HINDU_FESTIVALS = {
         "name": "Kansa Vadh",
         "type": "festival",
         "lunar_day": "ekadashi",
+        "paksha": "shukla",
         "month": "kartik",
         "duration": 1,
         "description": "Killing of demon Kansa by Krishna",
@@ -196,6 +223,7 @@ HINDU_FESTIVALS = {
         "name": "Tulasi Vivah",
         "type": "festival",
         "lunar_day": "dvadashi",
+        "paksha": "shukla",
         "month": "kartik",
         "duration": 1,
         "description": "Marriage ceremony of Tulasi with Vishnu",
@@ -206,6 +234,7 @@ HINDU_FESTIVALS = {
         "name": "Dev Diwali",
         "type": "major_festival",
         "lunar_day": "purnima",
+        "paksha": "shukla",
         "month": "kartik",
         "duration": 1,
         "description": "Festival of lights for gods",
@@ -216,6 +245,7 @@ HINDU_FESTIVALS = {
         "name": "Kalabhairav Jayanti",
         "type": "festival",
         "lunar_day": "ashtami",
+        "paksha": "krishna",
         "month": "margashirsha",
         "duration": 1,
         "description": "Birth of Kalabhairav (Shiva's fierce form)",
@@ -247,7 +277,8 @@ HINDU_FESTIVALS = {
         "name": "Pitra Paksha",
         "type": "ancestral_period",
         "lunar_day": "purnima_to_amavasya",
-        "month": "bhadrapada",
+        "paksha": "krishna",
+        "month": "ashwin",
         "duration": 15,
         "description": "Fortnight for ancestor worship",
         "significance": "Honoring departed souls",
@@ -259,6 +290,7 @@ HINDU_FESTIVALS = {
         "name": "Gudi Padwa",
         "type": "regional_festival",
         "lunar_day": "pratipada",
+        "paksha": "shukla",
         "month": "chaitra",
         "duration": 1,
         "description": "Marathi New Year celebrated with Gudi (flag) hoisting",
@@ -269,6 +301,7 @@ HINDU_FESTIVALS = {
         "name": "Ugadi",
         "type": "regional_festival",
         "lunar_day": "pratipada",
+        "paksha": "shukla",
         "month": "chaitra",
         "duration": 1,
         "description": "Telugu and Kannada New Year with pachadi preparation",
@@ -316,6 +349,7 @@ HINDU_FESTIVALS = {
         "name": "Durga Puja",
         "type": "regional_festival",
         "lunar_day": "saptami_to_dashami",
+        "paksha": "shukla",
         "month": "ashwin",
         "duration": 4,
         "description": "Bengali goddess worship",
@@ -328,6 +362,7 @@ HINDU_FESTIVALS = {
         "name": "Guru Purnima",
         "type": "spiritual_festival",
         "lunar_day": "purnima",
+        "paksha": "shukla",
         "month": "ashadha",
         "duration": 1,
         "description": "Honoring spiritual teachers",
@@ -362,7 +397,8 @@ HINDU_FESTIVALS = {
         "name": "Akshaya Tritiya",
         "type": "major_festival",
         "lunar_day": "tritiya",
-        "month": "vaishakha",
+        "paksha": "shukla",
+        "month": "vaisakha",
         "duration": 1,
         "description": "The most auspicious day for new beginnings, investments, and spiritual practices. Believed to bring eternal prosperity and success to any venture started on this day.",
         "significance": "Represents eternal prosperity and good fortune, marks the beginning of Treta Yuga, celebrates the friendship of Krishna and Sudama, promotes charitable giving and spiritual merit, and is considered the most auspicious day for gold purchases and new ventures.",
@@ -372,6 +408,7 @@ HINDU_FESTIVALS = {
         "name": "Raksha Bandhan",
         "type": "major_festival",
         "lunar_day": "purnima",
+        "paksha": "shukla",
         "month": "sravana",
         "duration": 1,
         "description": "A beautiful festival celebrating the bond between brothers and sisters, where sisters tie protective threads (rakhi) on their brothers' wrists, and brothers pledge to protect their sisters throughout life.",
@@ -382,6 +419,7 @@ HINDU_FESTIVALS = {
         "name": "Nag Panchami",
         "type": "festival",
         "lunar_day": "panchami",
+        "paksha": "shukla",
         "month": "sravana",
         "duration": 1,
         "description": "A festival dedicated to the worship of serpents (Nagas), seeking their blessings for protection from snake bites and for fertility and prosperity.",
@@ -392,6 +430,7 @@ HINDU_FESTIVALS = {
         "name": "Karthik Purnima",
         "type": "major_festival",
         "lunar_day": "purnima",
+        "paksha": "shukla",
         "month": "kartik",
         "duration": 1,
         "description": "Also known as Dev Diwali, this festival is celebrated as the Diwali of the gods, marked by lighting lamps and taking holy baths in sacred rivers.",
@@ -404,6 +443,7 @@ HINDU_FESTIVALS = {
         "name": "Vat Savitri Vrat",
         "type": "vrat",
         "lunar_day": "amavasya",
+        "paksha": "krishna",
         "month": "jyeshtha",
         "duration": 1,
         "description": "A sacred fast observed by married women for their husbands' longevity, inspired by the legend of Savitri who brought her husband Satyavan back from death through her devotion.",
@@ -414,6 +454,7 @@ HINDU_FESTIVALS = {
         "name": "Ahoi Ashtami",
         "type": "vrat",
         "lunar_day": "ashtami",
+        "paksha": "krishna",
         "month": "kartik",
         "duration": 1,
         "description": "A fast observed by mothers for the well-being, health, and long life of their children, dedicated to Goddess Ahoi who protects children from harm.",
@@ -424,6 +465,7 @@ HINDU_FESTIVALS = {
         "name": "Sharad Purnima",
         "type": "festival",
         "lunar_day": "purnima",
+        "paksha": "shukla",
         "month": "ashwin",
         "duration": 1,
         "description": "The harvest moon festival celebrating the full moon of autumn, believed to shower nectar (amrit) from the moon, bringing health and prosperity.",
@@ -431,6 +473,140 @@ HINDU_FESTIVALS = {
         "rituals": ["moonlight meditation and prayers", "preparing kheer and sweets in moonlight", "staying awake to enjoy moonbeams", "Lakshmi worship", "cultural programs and folk dances", "community celebrations under the moon"]
     },
     
+    # Diwali cluster and other widely observed dates (Drik-aligned rules)
+    "dhanteras": {
+        "name": "Dhanteras",
+        "type": "festival",
+        "lunar_day": "trayodashi",
+        "paksha": "krishna",
+        "month": "kartik",
+        "duration": 1,
+        "description": "The first major day of the Diwali festival, dedicated to Lord Dhanvantari and Goddess Lakshmi, traditionally auspicious for buying metal, utensils, or gold.",
+        "significance": "Invokes health and prosperity at the start of Diwali observances.",
+        "rituals": ["Lakshmi-Kubera worship", "buying utensils or precious metal", "lighting lamps", "cleaning the home"]
+    },
+    "naraka_chaturdashi": {
+        "name": "Naraka Chaturdashi",
+        "type": "festival",
+        "lunar_day": "chaturdashi",
+        "paksha": "krishna",
+        "month": "kartik",
+        "duration": 1,
+        "description": "Also called Chhoti Diwali or Kali Chaudas, commemorating Krishna's victory over Narakasura.",
+        "significance": "Removal of darkness and negative forces before Lakshmi Puja.",
+        "rituals": ["abhyanga snan", "lighting lamps", "Yama Deepam", "Hanuman worship in some regions"]
+    },
+    "bhai_dooj": {
+        "name": "Bhai Dooj",
+        "type": "festival",
+        "lunar_day": "dvitiya",
+        "paksha": "shukla",
+        "month": "kartik",
+        "duration": 1,
+        "description": "Celebration of the bond between brothers and sisters, observed on the second day after Diwali.",
+        "significance": "Sibling protection, family harmony, and gratitude.",
+        "rituals": ["tilak ceremony", "aarti of brothers", "exchange of gifts", "family feast"]
+    },
+    "chaitra_navratri": {
+        "name": "Chaitra Navratri",
+        "type": "major_festival",
+        "lunar_day": "pratipada",
+        "paksha": "shukla",
+        "month": "chaitra",
+        "duration": 9,
+        "description": "Nine nights of Goddess Durga worship beginning the Hindu lunar new year in Chaitra.",
+        "significance": "Spring Navratri; Ghatasthapana and Ram Navami fall in this period.",
+        "rituals": ["Ghatasthapana", "daily Devi worship", "fasting", "Kanya Puja"]
+    },
+    "vasant_panchami": {
+        "name": "Vasant Panchami",
+        "type": "festival",
+        "lunar_day": "panchami",
+        "paksha": "shukla",
+        "month": "magha",
+        "duration": 1,
+        "description": "Spring festival dedicated to Goddess Saraswati, marking the onset of Basant.",
+        "significance": "Learning, arts, and wisdom; auspicious for new studies.",
+        "rituals": ["Saraswati Puja", "wearing yellow", "starting education", "kite flying in some regions"]
+    },
+    "ratha_saptami": {
+        "name": "Ratha Saptami",
+        "type": "festival",
+        "lunar_day": "saptami",
+        "paksha": "shukla",
+        "month": "magha",
+        "duration": 1,
+        "description": "Solar festival on Magha Shukla Saptami honoring Surya's celestial chariot.",
+        "significance": "Sun worship, health, and the symbolic beginning of the harvest season.",
+        "rituals": ["Surya Arghya", "holy bath", "charity", "ratha symbolism worship"]
+    },
+    "buddha_purnima": {
+        "name": "Buddha Purnima",
+        "type": "festival",
+        "lunar_day": "purnima",
+        "paksha": "shukla",
+        "month": "vaisakha",
+        "duration": 1,
+        "description": "Commemorates the birth, enlightenment, and mahaparinirvana of Gautama Buddha.",
+        "significance": "Compassion, non-violence, and spiritual awakening.",
+        "rituals": ["temple visits", "meditation", "charity", "holy bath"]
+    },
+    "radha_ashtami": {
+        "name": "Radha Ashtami",
+        "type": "festival",
+        "lunar_day": "ashtami",
+        "paksha": "shukla",
+        "month": "bhadrapada",
+        "duration": 1,
+        "description": "Celebration of the appearance of Goddess Radha.",
+        "significance": "Divine love and devotion in the Krishna tradition.",
+        "rituals": ["Radha-Krishna worship", "bhajans", "fasting", "temple celebrations"]
+    },
+    "anant_chaturdashi": {
+        "name": "Anant Chaturdashi",
+        "type": "festival",
+        "lunar_day": "chaturdashi",
+        "paksha": "shukla",
+        "month": "bhadrapada",
+        "duration": 1,
+        "description": "Observance of Lord Ananta/Vishnu and, in many regions, the day of Ganesh Visarjan.",
+        "significance": "Eternal protection of Vishnu; culmination of Ganeshotsav in many cities.",
+        "rituals": ["Ananta thread vow", "Vishnu worship", "Ganesh Visarjan", "charity"]
+    },
+    "hartalika_teej": {
+        "name": "Hartalika Teej",
+        "type": "vrat",
+        "lunar_day": "tritiya",
+        "paksha": "shukla",
+        "month": "bhadrapada",
+        "duration": 1,
+        "description": "Women's fast for marital bliss dedicated to Parvati and Shiva, observed on Bhadrapada Shukla Tritiya.",
+        "significance": "Devotion, marriage harmony, and Parvati's penance.",
+        "rituals": ["nirjala or fruit fast", "Shiva-Parvati worship", "mehendi", "listening to Teej katha"]
+    },
+    "sarva_pitru_amavasya": {
+        "name": "Sarva Pitru Amavasya",
+        "type": "ancestral_period",
+        "lunar_day": "amavasya",
+        "paksha": "krishna",
+        "month": "ashwin",
+        "duration": 1,
+        "description": "Mahalaya Amavasya — the culminating day of Pitru Paksha for offerings to all ancestors.",
+        "significance": "Ancestral blessings and completion of shraddha rites.",
+        "rituals": ["shraddha", "tarpan", "pind daan", "feeding the needy"]
+    },
+    "ganga_dussehra": {
+        "name": "Ganga Dussehra",
+        "type": "festival",
+        "lunar_day": "dashami",
+        "paksha": "shukla",
+        "month": "jyeshtha",
+        "duration": 1,
+        "description": "Celebrates the descent of the Ganga; holy baths are considered highly meritorious.",
+        "significance": "Purification through Ganga worship.",
+        "rituals": ["Ganga snan", "deep daan", "charity", "river aarti"]
+    },
+
     # Astrological Festivals
     "kumbh_mela": {
         "name": "Kumbh Mela",
@@ -503,36 +679,40 @@ MONTHLY_VRATS = {
 # Festival Categories
 FESTIVAL_CATEGORIES = {
     "major_festivals": [
-        "diwali", "holi", "dussehra", "navratri", "janmashtami", 
-        "ganesh_chaturthi", "maha_shivratri", "ram_navami", 
+        "diwali", "holi", "holika_dahan", "dussehra", "navratri", "chaitra_navratri",
+        "janmashtami", "ganesh_chaturthi", "maha_shivratri", "ram_navami",
         "akshaya_tritiya", "raksha_bandhan", "karthik_purnima"
     ],
     "vrats_and_fasts": [
-        "karva_chauth", "teej", "devutthana_ekadashi", "utpanna_ekadashi",
+        "karva_chauth", "teej", "hartalika_teej", "devutthana_ekadashi", "utpanna_ekadashi",
         "vat_savitri", "ahoi_ashtami", "pradosh_vrat", "sankashti_chaturthi"
     ],
     "seasonal_festivals": [
-        "makar_sankranti", "baisakhi", "sharad_purnima", "nag_panchami"
+        "makar_sankranti", "baisakhi", "sharad_purnima", "nag_panchami",
+        "vasant_panchami", "ratha_saptami", "ganga_dussehra"
     ],
     "regional_festivals": [
         "onam", "durga_puja", "dev_diwali", "kalabhairav_jayanti"
     ],
     "spiritual_festivals": [
-        "guru_purnima", "maha_shivratri", "hanuman_jayanti", "kumbh_mela"
+        "guru_purnima", "maha_shivratri", "hanuman_jayanti", "buddha_purnima", "kumbh_mela"
     ],
     "krishna_festivals": [
-        "janmashtami", "govardhan_puja", "kansa_vadh"
+        "janmashtami", "govardhan_puja", "kansa_vadh", "radha_ashtami"
+    ],
+    "diwali_cluster": [
+        "dhanteras", "naraka_chaturdashi", "diwali", "govardhan_puja", "bhai_dooj"
     ],
     "monthly_observances": [
         "ekadashi", "pradosh", "sankashti", "shivaratri", "purnima", "amavasya"
     ],
     "women_festivals": [
-        "karva_chauth", "teej", "vat_savitri", "ahoi_ashtami"
+        "karva_chauth", "teej", "hartalika_teej", "vat_savitri", "ahoi_ashtami"
     ],
     "ancestral_periods": [
-        "pitra_paksha"
+        "pitra_paksha", "sarva_pitru_amavasya"
     ],
     "special_occasions": [
-        "tulasi_vivah", "dev_diwali", "kalabhairav_jayanti"
+        "tulasi_vivah", "dev_diwali", "kalabhairav_jayanti", "anant_chaturdashi"
     ]
 }

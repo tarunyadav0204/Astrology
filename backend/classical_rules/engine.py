@@ -36,6 +36,14 @@ class ClassicalRuleEngine:
                 "witness_url": rule.source.witness_url,
                 "witness_policy": rule.source.witness_policy,
             }
+            if rule.source.edition_key:
+                source["edition_key"] = rule.source.edition_key
+            if rule.source.pdf_pages:
+                source["pdf_pages"] = list(rule.source.pdf_pages)
+            if rule.source.printed_pages:
+                source["printed_pages"] = list(rule.source.printed_pages)
+            if rule.source.editorial_status:
+                source["editorial_status"] = rule.source.editorial_status
             try:
                 payload = rule.evaluator(chart, birth_data)
                 applicability = str(payload.pop("applicability", "matched"))

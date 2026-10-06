@@ -1,0 +1,74 @@
+{
+  "schema_version": "deva-keralam-reviewed-manifest/1.0.0",
+  "batch_key": "deva_keralam.book_1.completion_stream_e.v1",
+  "edition_key": "deva_keralam_volume_1_scan",
+  "source_scope": {
+    "pdf_pages": [117, 197],
+    "catalogue_ordinals": [294, 586],
+    "stream": "E",
+    "selection": "New executable natal rules admitted during complete-disposition review of the middle catalogue third."
+  },
+  "reviewer_method": "Every assigned catalogue passage received a disposition. Newly executable clauses were checked against the rendered source page and surrounding inherited context, screened for astronomical feasibility, and limited to premises supported by the canonical Deva Keralam fact adapter.",
+  "candidates": [
+    {
+      "key": "DK.E.1889.AQUARIUS_NIRMALAA_MERCURY_KETU",
+      "title": "Mercury with Ketu in Aries and Leo Navamsa",
+      "passage_key": "DK1.OCR.P0186.V1889-1889",
+      "context_block_key": "DK1.E.CONTEXT.P0186.V1889",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1889,
+        "verse_end": 1889,
+        "pdf_pages": [186],
+        "printed_pages": [168],
+        "reference_label": "Deva Keralam Book I, verse 1889, PDF page 186 (printed page 168)",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, translation and the continuing Aquarius/Nirmalaa section context were checked on the rendered page. The verse does not restrict the Nadiamsa half."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {"op": "fact", "key": "deva_keralam.ascendant.rashi.name", "comparator": "equals", "value": "Aquarius"},
+          {"op": "fact", "key": "deva_keralam.ascendant.nadiamsa.name", "comparator": "equals", "value": "Nirmalaa"},
+          {"op": "fact", "key": "deva_keralam.ascendant.nadiamsa.ordinal", "comparator": "equals", "value": 68},
+          {"op": "fact", "key": "deva_keralam.planet.Mercury.rashi.name", "comparator": "equals", "value": "Aries"},
+          {"op": "fact", "key": "deva_keralam.planet.Ketu.rashi.name", "comparator": "equals", "value": "Aries"},
+          {"op": "fact", "key": "deva_keralam.relationship.conjunction.Mercury.Ketu.present", "comparator": "equals", "value": true},
+          {"op": "fact", "key": "deva_keralam.planet.Mercury.navamsa.name", "comparator": "equals", "value": "Leo"}
+        ]
+      },
+      "outcome": {
+        "topic": "faith_and_siblings",
+        "prediction_kind": "natal_promise",
+        "traditional_results": [
+          "The text describes devotion to Vishnu and absence of co-born siblings."
+        ],
+        "certainty_note": "This is a source match, not a guarantee that the result must occur literally."
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "The recorded birth time does not establish the required Nadiamsa reliably."
+        }
+      ],
+      "context_status": "qualified",
+      "context_qualification_acknowledged": true,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Aquarius",
+        "nadiamsa": "Nirmalaa",
+        "half": "not restricted by verse 1889"
+      },
+      "topics": ["faith", "siblings", "nadiamsa"],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "The page places verse 1889 inside the continuing Aquarius/Nirmalaa sequence; that inherited context is retained rather than treating the placement as a universal rule."
+      ]
+    }
+  ]
+}

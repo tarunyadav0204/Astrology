@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { apiService } from '../../services/apiService';
 
-export default function DeskTopicSelector({ value = 'whole_chart', onChange, compact = false }) {
+export default function DeskTopicSelector({ value = 'whole_chart', onChange, compact = false, licenseLocked = false }) {
   const [topics, setTopics] = useState([]);
 
   useEffect(() => {
@@ -37,9 +37,10 @@ export default function DeskTopicSelector({ value = 'whole_chart', onChange, com
             className={value === topic.key ? 'is-active' : ''}
             onClick={() => onChange?.(topic.key, topic)}
             key={topic.key}
-            title={topic.description}
+            title={licenseLocked ? `${topic.description || topic.label || 'Topic'}. Requires an Astrologer License.` : topic.description}
           >
             {topic.short_label || topic.label}
+            {licenseLocked ? <i className="parashari-topic-selector__lock">License</i> : null}
           </button>
         ))}
       </div>

@@ -329,3 +329,34 @@
     display: none;
   }
 }
+
+.house-insight-overlay--corner {
+  background: transparent;
+  backdrop-filter: none;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 72px 16px 16px;
+  pointer-events: none;
+}
+
+.house-insight-overlay--corner .house-insight-panel {
+  width: min(400px, calc(100vw - 32px));
+  max-height: calc(100vh - 88px);
+  border-radius: 16px;
+  box-shadow: 0 18px 48px rgba(40, 20, 10, 0.28);
+  pointer-events: auto;
+}
+
+.house-insight-overlay--corner .house-insight-head {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.house-insight-overlay--corner .house-insight-head:active {
+  cursor: grabbing;
+}
+
+.house-insight-overlay--corner .house-insight-handle {
+  display: none;
+}

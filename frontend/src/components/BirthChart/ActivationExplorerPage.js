@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import { useAstrology } from '../../context/AstrologyContext';
+import { useCredits } from '../../context/CreditContext';
 import { apiService } from '../../services/apiService';
 import './ActivationExplorerPage.css';
 
@@ -223,6 +224,7 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { birthData, chartData } = useAstrology();
+  const { isAstrologerLicensed, loading: creditsLoading } = useCredits();
   const initialAsOf = (() => {
     const fromQuery = searchParams.get('asOf');
     if (fromQuery && /^\d{4}-\d{2}-\d{2}$/.test(fromQuery)) return fromQuery;
@@ -244,7 +246,7 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
   const hasChart = Boolean(birthData && chartData);
 
   const loadExplorer = useCallback(async () => {
-    if (!user || !birthData) return;
+    if (!user || !birthData || creditsLoading || !isAstrologerLicensed) return;
     setLoading(true);
     setError('');
     try {
@@ -268,7 +270,7 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
     } finally {
       setLoading(false);
     }
-  }, [asOf, birthData, calculationProfile, horizonDays, user]);
+  }, [asOf, birthData, calculationProfile, horizonDays, user, creditsLoading, isAstrologerLicensed]);
 
   useEffect(() => {
     loadExplorer();
@@ -426,6 +428,17 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
             <h2>Sign in to see what’s active</h2>
             <p>Choose a saved birth chart and explore the life areas drawing attention now.</p>
             <button type="button" className="activation-primary-button" onClick={() => onLogin?.()}>Sign in</button>
+          </section>
+        ) : creditsLoading ? (
+          <section className="activation-state-panel">
+            <h2>Checking access</h2>
+            <p>Activations are part of the Astrologer License.</p>
+          </section>
+        ) : !isAstrologerLicensed ? (
+          <section className="activation-state-panel">
+            <h2>Activations are a professional tool.</h2>
+            <p>The activation desk and the chart marks are included with an active Astrologer License.</p>
+            <Link className="activation-primary-button" to="/subscription?family=astrologer">View the Astrologer License</Link>
           </section>
         ) : !hasChart ? (
           <section className="activation-state-panel">

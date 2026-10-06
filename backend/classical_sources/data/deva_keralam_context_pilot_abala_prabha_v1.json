@@ -1,0 +1,553 @@
+{
+  "schema_version": "deva-keralam-context/1.0.0",
+  "edition_key": "deva_keralam_volume_1_scan",
+  "context_block_key": "DK1.CTX.ABALA_PRABHA.V0054-0096",
+  "title": "Abala (Prabhaa) Nadiamsa: verses 54-96",
+  "pdf_page_start": 32,
+  "pdf_page_end": 36,
+  "verse_start": 54,
+  "verse_end": 96,
+  "identity": {
+    "source_name": "Abala",
+    "canonical_table_name": "Prabhaa",
+    "ordinal": 16,
+    "physical_division_for_fixed_signs": 135,
+    "sign_modality": "fixed",
+    "degree_span": {
+      "start": "26°48′",
+      "end": "27°00′"
+    },
+    "halves": [
+      {
+        "name": "former",
+        "start": "26°48′",
+        "end": "26°54′"
+      },
+      {
+        "name": "latter",
+        "start": "26°54′",
+        "end": "27°00′"
+      }
+    ],
+    "qualification": "Abala is identified with Prabhaa by the edition's note; the alias is retained as an editorial identification rather than silently normalized."
+  },
+  "boundary_basis": {
+    "start": "The printed heading at verse 54 begins Taurus Ascendant—Abala Nadiamsa.",
+    "end": "Verse 97 begins the next printed section, Virgo Navamsa.",
+    "source": "PDF pages 32 and 36; editor notes around verses 54 and 97"
+  },
+  "spans": [
+    {
+      "key": "DK1.CTX.ABALA_PRABHA.V0054-0060",
+      "ordinal": 1,
+      "verse_start": 54,
+      "verse_end": 60,
+      "pdf_page_start": 32,
+      "pdf_page_end": 33,
+      "title": "Abala outcomes stated for immovable ascendants",
+      "context": {
+        "nadiamsa": "Abala (Prabhaa)",
+        "ascendant_scope": "immovable signs",
+        "heading_sign": "Taurus",
+        "qualification": "The heading names Taurus, while the edition note says verses 54-93 concern immovable ascendants. Individual verses and half qualifications remain local."
+      },
+      "status": "verified"
+    },
+    {
+      "key": "DK1.CTX.ABALA_PRABHA.V0061-0075",
+      "ordinal": 2,
+      "verse_start": 61,
+      "verse_end": 75,
+      "pdf_page_start": 33,
+      "pdf_page_end": 34,
+      "title": "Taurus-specific parallel branches",
+      "context": {
+        "ascendant_scope": "Taurus",
+        "branches": [
+          {
+            "scope": "Aries Navamsa",
+            "applies_to": "the opening prosperity statement only"
+          },
+          {
+            "scope": "Abala (Prabhaa) Nadiamsa",
+            "applies_to": "the following independently worded Nadiamsa statements"
+          }
+        ],
+        "qualification": "Aries Navamsa and Abala Nadiamsa are parallel clauses on the page and must not be accumulated into one astronomical condition."
+      },
+      "status": "qualified"
+    },
+    {
+      "key": "DK1.CTX.ABALA_PRABHA.V0076-0087",
+      "ordinal": 3,
+      "verse_start": 76,
+      "verse_end": 87,
+      "pdf_page_start": 34,
+      "pdf_page_end": 35,
+      "title": "Return to the general immovable-sign Abala context",
+      "context": {
+        "nadiamsa": "Abala (Prabhaa)",
+        "ascendant_scope": "immovable signs",
+        "qualification": "No continuing Taurus-only statement is carried past verse 75; local planetary and half premises govern these verses."
+      },
+      "status": "qualified"
+    },
+    {
+      "key": "DK1.CTX.ABALA_PRABHA.V0088-0096",
+      "ordinal": 4,
+      "verse_start": 88,
+      "verse_end": 96,
+      "pdf_page_start": 36,
+      "pdf_page_end": 36,
+      "title": "Aquarius ascendant continuation",
+      "context": {
+        "nadiamsa": "Abala (Prabhaa)",
+        "ascendant_scope": "Aquarius",
+        "qualification": "The edition note explicitly changes the ascendant context to Aquarius from verse 88 onward."
+      },
+      "status": "verified"
+    }
+  ],
+  "premises": [
+    {
+      "key": "DK1.PREM.V0054-0096.NADI",
+      "span": null,
+      "type": "nadiamsa_identity",
+      "verse_start": 54,
+      "verse_end": 96,
+      "status": "qualified",
+      "value": {
+        "source_name": "Abala",
+        "canonical_table_name": "Prabhaa",
+        "ordinal": 16,
+        "physical_division_for_fixed_signs": 135
+      },
+      "provenance": {
+        "pdf_pages": [
+          32,
+          36
+        ],
+        "basis": "printed heading, edition note, and the edition's nadiamsa table"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0054-0096.HALVES",
+      "span": null,
+      "type": "nadiamsa_half_schema",
+      "verse_start": 54,
+      "verse_end": 96,
+      "status": "verified",
+      "value": {
+        "former": "26°48′-26°54′",
+        "latter": "26°54′-27°00′"
+      },
+      "provenance": {
+        "pdf_pages": [
+          32
+        ],
+        "basis": "fixed-sign reverse-order table and half references in the verses"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0054-0060.SCOPE",
+      "span": "DK1.CTX.ABALA_PRABHA.V0054-0060",
+      "type": "ascendant_scope",
+      "verse_start": 54,
+      "verse_end": 60,
+      "status": "qualified",
+      "value": {
+        "modality": "immovable",
+        "heading_sign": "Taurus"
+      },
+      "provenance": {
+        "pdf_pages": [
+          32,
+          33
+        ],
+        "basis": "heading and editor note"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0056.MARS_JUPITER",
+      "span": "DK1.CTX.ABALA_PRABHA.V0054-0060",
+      "type": "planetary_configuration",
+      "verse_start": 56,
+      "verse_end": 56,
+      "status": "verified",
+      "value": {
+        "mars": {
+          "house": 1
+        },
+        "jupiter": {
+          "house": 5
+        }
+      },
+      "provenance": {
+        "pdf_pages": [
+          33
+        ],
+        "basis": "verse 56"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0057.HALF",
+      "span": "DK1.CTX.ABALA_PRABHA.V0054-0060",
+      "type": "nadiamsa_half",
+      "verse_start": 57,
+      "verse_end": 57,
+      "status": "verified",
+      "value": {
+        "half": "former",
+        "independent_of_previous_verse": true
+      },
+      "provenance": {
+        "pdf_pages": [
+          33
+        ],
+        "basis": "verse 57 and editor note"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0058-0060.HALVES",
+      "span": "DK1.CTX.ABALA_PRABHA.V0054-0060",
+      "type": "nadiamsa_half",
+      "verse_start": 58,
+      "verse_end": 60,
+      "status": "verified",
+      "value": {
+        "outcomes_are_half_dependent": true
+      },
+      "provenance": {
+        "pdf_pages": [
+          33
+        ],
+        "basis": "verses 58-60"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0061-0075.SCOPE",
+      "span": "DK1.CTX.ABALA_PRABHA.V0061-0075",
+      "type": "parallel_clause_scopes",
+      "verse_start": 61,
+      "verse_end": 75,
+      "status": "qualified",
+      "value": {
+        "ascendant": "Taurus",
+        "branches": [
+          {
+            "navamsa": "Aries",
+            "applies_to": "opening prosperity statement"
+          },
+          {
+            "nadiamsa": "Abala (Prabhaa)",
+            "applies_to": "subsequent independently worded Nadiamsa statements"
+          }
+        ],
+        "cumulative": false
+      },
+      "provenance": {
+        "pdf_pages": [
+          34
+        ],
+        "basis": "sentence-level reading of verses 61-75 and the edition note"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0063.SUN_SATURN",
+      "span": "DK1.CTX.ABALA_PRABHA.V0061-0075",
+      "type": "planetary_configuration",
+      "verse_start": 63,
+      "verse_end": 63,
+      "status": "verified",
+      "value": {
+        "sun": {
+          "house": 11
+        },
+        "saturn": {
+          "house": 11
+        }
+      },
+      "provenance": {
+        "pdf_pages": [
+          34
+        ],
+        "basis": "verse 63"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0064.DASHA",
+      "span": "DK1.CTX.ABALA_PRABHA.V0061-0075",
+      "type": "timing_condition",
+      "verse_start": 64,
+      "verse_end": 64,
+      "status": "verified",
+      "value": {
+        "dasha_lord": "eighth_from_moon",
+        "bhukti_lords": "malefics"
+      },
+      "provenance": {
+        "pdf_pages": [
+          34
+        ],
+        "basis": "verse 64"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0065.GRAHA",
+      "span": "DK1.CTX.ABALA_PRABHA.V0061-0075",
+      "type": "planet_in_nadiamsa",
+      "verse_start": 65,
+      "verse_end": 65,
+      "status": "ambiguous",
+      "value": {
+        "alternatives": [
+          "Moon in Abala",
+          "Saturn in Abala"
+        ]
+      },
+      "provenance": {
+        "pdf_pages": [
+          34
+        ],
+        "basis": "recorded textual alternatives in verse 65"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0066.SATURN",
+      "span": "DK1.CTX.ABALA_PRABHA.V0061-0075",
+      "type": "planetary_configuration",
+      "verse_start": 66,
+      "verse_end": 66,
+      "status": "verified",
+      "value": {
+        "nadiamsa_half": "former",
+        "saturn": {
+          "aspects_house": 12
+        }
+      },
+      "provenance": {
+        "pdf_pages": [
+          34
+        ],
+        "basis": "verse 66"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0067.NODE",
+      "span": "DK1.CTX.ABALA_PRABHA.V0061-0075",
+      "type": "planetary_configuration",
+      "verse_start": 67,
+      "verse_end": 67,
+      "status": "verified",
+      "value": {
+        "nadiamsa_half": "former",
+        "fifth_lord": "with Rahu",
+        "saturn": {
+          "house": 11
+        }
+      },
+      "provenance": {
+        "pdf_pages": [
+          34
+        ],
+        "basis": "verse 67"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0069-0072.JUPITER",
+      "span": "DK1.CTX.ABALA_PRABHA.V0061-0075",
+      "type": "planetary_configuration",
+      "verse_start": 69,
+      "verse_end": 72,
+      "status": "qualified",
+      "value": {
+        "nadiamsa_half": "former",
+        "jupiter": {
+          "house": 5,
+          "receives_malefic_aspects": 2
+        }
+      },
+      "provenance": {
+        "pdf_pages": [
+          34
+        ],
+        "basis": "verses 69-72½"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0073-0075.JUPITER",
+      "span": "DK1.CTX.ABALA_PRABHA.V0061-0075",
+      "type": "planetary_configuration",
+      "verse_start": 73,
+      "verse_end": 75,
+      "status": "qualified",
+      "value": {
+        "ascendant": "Taurus",
+        "sun": {
+          "house": 11,
+          "condition": "blemished"
+        },
+        "jupiter": {
+          "lord_of_house": 8,
+          "house": 5,
+          "aspected_by": "Saturn"
+        }
+      },
+      "provenance": {
+        "pdf_pages": [
+          34
+        ],
+        "basis": "verses 73-75"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0076.DISPOSITOR",
+      "span": "DK1.CTX.ABALA_PRABHA.V0076-0087",
+      "type": "planetary_configuration",
+      "verse_start": 76,
+      "verse_end": 76,
+      "status": "verified",
+      "value": {
+        "third_lord": {
+          "navamsa_dignity": "debilitated",
+          "receives_aspect": "benefic"
+        }
+      },
+      "provenance": {
+        "pdf_pages": [
+          34
+        ],
+        "basis": "verse 76"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0079.NIRMALA",
+      "span": "DK1.CTX.ABALA_PRABHA.V0076-0087",
+      "type": "nested_nadiamsa_condition",
+      "verse_start": 79,
+      "verse_end": 79,
+      "status": "verified",
+      "value": {
+        "third_lord": {
+          "nadiamsa": "Nirmala"
+        }
+      },
+      "provenance": {
+        "pdf_pages": [
+          35
+        ],
+        "basis": "verse 79"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0081-0084.CONFIG",
+      "span": "DK1.CTX.ABALA_PRABHA.V0076-0087",
+      "type": "planetary_configuration",
+      "verse_start": 81,
+      "verse_end": 84,
+      "status": "ambiguous",
+      "value": {
+        "alternatives": [
+          {
+            "mars": "seventh_from Moon",
+            "saturn": "aspects Mars"
+          },
+          {
+            "malefic": "seventh_from Moon",
+            "saturn": "aspects malefic"
+          }
+        ],
+        "subdivision": "one-third qualification present"
+      },
+      "provenance": {
+        "pdf_pages": [
+          35
+        ],
+        "basis": "verses 81-84 and editor note"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0085-0087.MOON",
+      "span": "DK1.CTX.ABALA_PRABHA.V0076-0087",
+      "type": "planetary_configuration",
+      "verse_start": 85,
+      "verse_end": 87,
+      "status": "verified",
+      "value": {
+        "moon": {
+          "vargottama": true
+        },
+        "outcomes_are_half_dependent": true
+      },
+      "provenance": {
+        "pdf_pages": [
+          35
+        ],
+        "basis": "verses 85-87"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0088-0096.SCOPE",
+      "span": "DK1.CTX.ABALA_PRABHA.V0088-0096",
+      "type": "ascendant_scope",
+      "verse_start": 88,
+      "verse_end": 96,
+      "status": "verified",
+      "value": {
+        "ascendant": "Aquarius"
+      },
+      "provenance": {
+        "pdf_pages": [
+          36
+        ],
+        "basis": "editor note before verse 88"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0088-0093.CONFIG",
+      "span": "DK1.CTX.ABALA_PRABHA.V0088-0096",
+      "type": "planetary_configuration",
+      "verse_start": 88,
+      "verse_end": 93,
+      "status": "qualified",
+      "value": {
+        "moon": {
+          "lord_of_house": 6,
+          "nadiamsa": "Nirmala"
+        },
+        "mars": {
+          "lord_of_house": 10,
+          "rashi_dignity": "own",
+          "navamsa_dignity": "own"
+        }
+      },
+      "provenance": {
+        "pdf_pages": [
+          36
+        ],
+        "basis": "verses 88-93"
+      }
+    },
+    {
+      "key": "DK1.PREM.V0094-0096.TIMING",
+      "span": "DK1.CTX.ABALA_PRABHA.V0088-0096",
+      "type": "timing_condition",
+      "verse_start": 94,
+      "verse_end": 96,
+      "status": "qualified",
+      "value": {
+        "saturn_transit": "to natal Moon or Moon's Navamsa rashi",
+        "dasha_lords": [
+          4,
+          8
+        ]
+      },
+      "provenance": {
+        "pdf_pages": [
+          36
+        ],
+        "basis": "verses 94-96; alternatives retained"
+      }
+    }
+  ]
+}

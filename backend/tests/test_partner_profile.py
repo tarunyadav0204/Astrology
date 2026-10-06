@@ -137,6 +137,43 @@ def test_classical_spouse_karaka_follows_native_gender():
     )
 
 
+def test_spouse_karaka_skips_complexion_when_not_marriage_linked():
+    evidence = {
+        "d1": {
+            "seventh_house": {"sign": "Aries"},
+            "seventh_house_occupants": [],
+            "seventh_house_aspectors": [],
+            "seventh_lord": {"planet": "Mars", "sign": "Leo", "dignity": "own_sign"},
+            "darakaraka": {"planet": "Saturn", "sign": "Capricorn", "dignity": "own_sign"},
+            "spouse_karaka": {"planet": "Venus", "sign": "Taurus", "dignity": "own_sign"},
+        },
+        "d9": {
+            "seventh_house": {"sign": "Scorpio"},
+            "seventh_house_occupants": [],
+            "seventh_house_aspectors": [],
+            "seventh_lord": {"planet": "Mars", "sign": "Aries", "dignity": "own_sign"},
+        },
+    }
+    profile = synthesize_partner_profile(evidence)
+    karaka_reading = next(
+        row for row in profile["factor_readings"]
+        if row["channel"] == "spouse_karaka" and row["factor"] == "Venus"
+    )
+    assert karaka_reading["appearance"]
+    assert not any(item["attribute"] == "complexion" for item in karaka_reading["appearance"])
+    assert not any(item["attribute"] in {"head_hair", "hair"} for item in karaka_reading["appearance"])
+    assert not any(
+        row["channel"] == "spouse_karaka" and row["attribute"] == "complexion"
+        for row in profile["appearance"].get("complexion", {}).get("primary", {}).get("evidence", [])
+    )
+    head_hair = profile["appearance"].get("head_hair") or {}
+    primary_hair = head_hair.get("primary") or {}
+    assert not any(
+        row["channel"] == "spouse_karaka"
+        for row in primary_hair.get("evidence") or []
+    )
+
+
 def test_partner_portrait_does_not_use_disputed_node_aspects():
     profile = build_partner_profile(_chart())
     assert "Rahu" not in profile["evidence"]["d1"]["seventh_house"]["aspecting_planets"]
@@ -181,43 +218,109 @@ def test_image_prompt_uses_resolved_traits_without_identity_claims():
 
 
 def test_complexion_is_classical_evidence_not_a_regional_default():
-    profile = {
+    weak_profile = {
         "appearance": {
             "complexion": {
                 "primary": {
                     "value": "fair or light complexion",
                     "confidence": "suggestive",
                     "independent_repetitions": 1,
-                    "evidence": [{"source_id": "bphs.graha_forms", "verse": "3.16"}],
+                    "effective_repetitions": 1.0,
+                    "evidence": [{"source_id": "bphs.graha_forms", "verse": "3.16", "independence": "spouse_karaka"}],
                 }
             }
         }
     }
-    prompt = build_portrait_prompt(
-        profile,
+    weak_prompt = build_portrait_prompt(
+        weak_profile,
         presentation="feminine",
         age_band="25-34",
         clothing_style="contemporary",
         visual_context="south_asian",
     )
+    # A lone suggestive channel must not hard-code complexion into the image model.
+    assert "complexion:" not in weak_prompt
+    assert "South Asian regional appearance and setting" in weak_prompt
+    assert "Regional context must never determine, darken, lighten, or override skin tone" in weak_prompt
 
-    assert "complexion: fair or light complexion" in prompt
-    assert "South Asian regional appearance and setting" in prompt
-    assert "Regional context must never determine, darken, lighten, or override skin tone" in prompt
+    corroborated_profile = {
+        "appearance": {
+            "complexion": {
+                "primary": {
+                    "value": "fair or light complexion",
+                    "confidence": "suggestive",
+                    "independent_repetitions": 2,
+                    "effective_repetitions": 2.0,
+                    "evidence": [
+                        {"source_id": "bphs.graha_forms", "verse": "3.16", "independence": "d1_occupant"},
+                        {"source_id": "bphs.graha_forms", "verse": "3.16", "independence": "d1_lord"},
+                    ],
+                }
+            }
+        }
+    }
+    corroborated_prompt = build_portrait_prompt(
+        corroborated_profile,
+        presentation="feminine",
+        age_band="25-34",
+        clothing_style="contemporary",
+        visual_context="south_asian",
+    )
+    assert "complexion: fair or light complexion" in corroborated_prompt
     assert PLANET_RULES["Moon"]["appearance"]["complexion"] == "fair or light complexion"
+    assert PLANET_RULES["Mercury"]["appearance"]["complexion"] == "olive or wheatish complexion"
+    assert PLANET_RULES["Venus"]["appearance"]["complexion"] == "warm fair complexion with soft brown undertone"
+    assert PLANET_RULES["Venus"]["appearance"]["head_hair"] == "soft wavy or gently curled hair"
     assert PLANET_RULES["Moon"]["appearance_verses"]["complexion"] == "3.16"
     assert PLANET_RULES["Jupiter"]["appearance_verses"]["complexion"] == "3.17"
 
 
 def test_explicit_classical_hair_signal_reaches_image_prompt_without_fake_repetition():
-    profile = {
+    weak_profile = {
         "appearance": {
             "hair": {
                 "primary": {
-                    "value": "curly hair",
+                    "value": "soft wavy or gently curled hair",
                     "confidence": "suggestive",
                     "independent_repetitions": 1,
-                    "evidence": [{"source_id": "bphs.graha_forms", "verse": "3.28"}],
+                    "effective_repetitions": 1.0,
+                    "evidence": [{"source_id": "bphs.graha_forms", "verse": "3.28", "independence": "spouse_karaka"}],
+                }
+            },
+            "build": {
+                "primary": {
+                    "value": "rounded and soft",
+                    "confidence": "suggestive",
+                    "independent_repetitions": 1,
+                    "evidence": [{"source_id": "bphs.graha_forms", "verse": "3.24"}],
+                }
+            },
+        }
+    }
+    weak_prompt = build_portrait_prompt(
+        weak_profile,
+        presentation="feminine",
+        age_band="25-34",
+        clothing_style="contemporary",
+        visual_context="south_asian",
+    )
+    # A lone suggestive Venus-style curl must not force curly hair into the image.
+    assert "soft natural waves" not in weak_prompt
+    assert "curly" not in weak_prompt
+    assert "build: rounded and soft" not in weak_prompt
+
+    corroborated_profile = {
+        "appearance": {
+            "hair": {
+                "primary": {
+                    "value": "soft wavy or gently curled hair",
+                    "confidence": "moderate",
+                    "independent_repetitions": 2,
+                    "effective_repetitions": 2.0,
+                    "evidence": [
+                        {"source_id": "bphs.graha_forms", "verse": "3.28", "independence": "d1_occupant"},
+                        {"source_id": "bphs.graha_forms", "verse": "3.28", "independence": "d1_lord"},
+                    ],
                 }
             },
             "build": {
@@ -231,14 +334,15 @@ def test_explicit_classical_hair_signal_reaches_image_prompt_without_fake_repeti
         }
     }
     prompt = build_portrait_prompt(
-        profile,
+        corroborated_profile,
         presentation="feminine",
         age_band="25-34",
         clothing_style="contemporary",
         visual_context="south_asian",
     )
 
-    assert "hair: curly hair" in prompt
+    assert "soft natural waves or gentle curls" in prompt
+    assert "not tight ringlets" in prompt
     assert "build: rounded and soft" not in prompt
 
 
@@ -248,9 +352,13 @@ def test_sun_hair_description_cannot_be_rendered_as_baldness():
             "head_hair": {
                 "primary": {
                     "value": "less abundant hair",
-                    "confidence": "suggestive",
-                    "independent_repetitions": 1,
-                    "evidence": [{"source_id": "bphs.graha_forms", "verse": "3.23"}],
+                    "confidence": "moderate",
+                    "independent_repetitions": 2,
+                    "effective_repetitions": 2.0,
+                    "evidence": [
+                        {"source_id": "bphs.graha_forms", "verse": "3.23", "independence": "d1_occupant"},
+                        {"source_id": "bphs.graha_forms", "verse": "3.23", "independence": "d1_lord"},
+                    ],
                 }
             }
         }

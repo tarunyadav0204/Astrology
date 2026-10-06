@@ -12,12 +12,24 @@
   pointer-events: none;
 }
 
-.chart-overlay-actions--desk {
-  top: 34px;
-  right: 4px;
-  z-index: 3;
-  flex-direction: column;
-  align-items: flex-end;
+.chart-overlay-actions--header {
+  position: static;
+  top: auto;
+  right: auto;
+  z-index: auto;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+  max-width: none;
+}
+
+.chart-overlay-actions--header .chart-overlay-actions__btn {
+  min-height: 1.35rem;
+  padding: 0 0.42rem;
+  font-size: 0.55rem;
+  letter-spacing: 0.03em;
+  box-shadow: none;
+  white-space: nowrap;
 }
 
 .chart-overlay-actions__btn {

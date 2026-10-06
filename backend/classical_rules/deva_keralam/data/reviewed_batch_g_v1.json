@@ -1,0 +1,1852 @@
+{
+  "schema_version": "deva-keralam-reviewed-manifest/1.0.0",
+  "batch_key": "deva_keralam.reviewed_batch_g.v1",
+  "edition_key": "deva_keralam_volume_1_scan",
+  "source_scope": {
+    "pdf_pages": [
+      38,
+      241
+    ],
+    "catalogue_ordinals": [
+      52,
+      56,
+      78,
+      88,
+      90,
+      140,
+      148,
+      207,
+      246,
+      248,
+      349,
+      354,
+      364,
+      382,
+      393,
+      426,
+      468,
+      472,
+      489,
+      528,
+      590,
+      598,
+      609,
+      649,
+      669,
+      700,
+      714,
+      728,
+      781,
+      790
+    ],
+    "streams": [
+      "D",
+      "E",
+      "F"
+    ],
+    "selection": "Thirty high-priority ambiguous-context passages reviewed against rendered page images and adjacent section context.",
+    "candidate_count": 30,
+    "approved_count": 7,
+    "rejected_count": 23
+  },
+  "reviewer_method": "Read each rendered page together with adjacent pages and edition notes; map a Nadi name only when the pinned table and local degree or section evidence agree; compile only complete source-secure natal premises; retain every reviewed non-executable passage as an explicit fail-closed rejection.",
+  "candidates": [
+    {
+      "key": "DK.G.REJECTED.0110-0110.SOURCE_IDENTITY_UNRESOLVED",
+      "title": "Rejected after page review: verses 110–110",
+      "passage_key": "DK1.OCR.P0038.V0110-0110",
+      "context_block_key": "DK1.G.CTX.V0110-0110",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 110,
+        "verse_end": 110,
+        "pdf_pages": [
+          38
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 110, PDF page 38",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "Agada is not a name in the pinned 150-Nadi Table 1, and the adjacent page does not supply a secure canonical ordinal. The “former half” result cannot be attached to a computed chart position.",
+        "indications": [
+          "Agada is not a name in the pinned 150-Nadi Table 1, and the adjacent page does not supply a secure canonical ordinal. The “former half” result cannot be attached to a computed chart position."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "Agada is not a name in the pinned 150-Nadi Table 1, and the adjacent page does not supply a secure canonical ordinal. The “former half” result cannot be attached to a computed chart position."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "source_identity_unresolved",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 52
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.0115-0118.SOURCE_IDENTITY_AND_MORTALITY",
+      "title": "Rejected after page review: verses 115–118",
+      "passage_key": "DK1.OCR.P0038.V0115-0118",
+      "context_block_key": "DK1.G.CTX.V0115-0118",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 115,
+        "verse_end": 118,
+        "pdf_pages": [
+          38
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 115–118, PDF page 38",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "Agada remains unmapped to the pinned table; the passage also contains death or child-loss statements and remedies, so it is not executable in the natal compiler.",
+        "indications": [
+          "Agada remains unmapped to the pinned table; the passage also contains death or child-loss statements and remedies, so it is not executable in the natal compiler."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "Agada remains unmapped to the pinned table; the passage also contains death or child-loss statements and remedies, so it is not executable in the natal compiler."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "source_identity_and_mortality",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 56
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.0190-0191.SOURCE_TABLE_CONFLICT",
+      "title": "Rejected after page review: verses 190–191",
+      "passage_key": "DK1.OCR.P0045.V0190-0191",
+      "context_block_key": "DK1.G.CTX.V0190-0191",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 190,
+        "verse_end": 191,
+        "pdf_pages": [
+          45
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 190–191, PDF page 45",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The page note emends Varuna to Varuni and proposes modality-specific ordinals that conflict with the pinned canonical table. A second textual witness is required before chart matching.",
+        "indications": [
+          "The page note emends Varuna to Varuni and proposes modality-specific ordinals that conflict with the pinned canonical table. A second textual witness is required before chart matching."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "The page note emends Varuna to Varuni and proposes modality-specific ordinals that conflict with the pinned canonical table. A second textual witness is required before chart matching."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "source_table_conflict",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 78
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.0214-0214.SOURCE_TABLE_CONFLICT",
+      "title": "Rejected after page review: verses 214–214",
+      "passage_key": "DK1.OCR.P0048.V0214-0214",
+      "context_block_key": "DK1.G.CTX.V0214-0214",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 214,
+        "verse_end": 214,
+        "pdf_pages": [
+          48
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 214, PDF page 48",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The local Sagittarius/Varuna section is clear, but Varuna/Varuni cannot be mapped consistently to the pinned table without contradicting its ordinal names.",
+        "indications": [
+          "The local Sagittarius/Varuna section is clear, but Varuna/Varuni cannot be mapped consistently to the pinned table without contradicting its ordinal names."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "The local Sagittarius/Varuna section is clear, but Varuna/Varuni cannot be mapped consistently to the pinned table without contradicting its ordinal names."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "source_table_conflict",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 88
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.0216-0216.CLAUSE_BOUNDARY_AND_TIMING",
+      "title": "Rejected after page review: verses 216–216",
+      "passage_key": "DK1.OCR.P0048.V0216-0216",
+      "context_block_key": "DK1.G.CTX.V0216-0216",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 216,
+        "verse_end": 216,
+        "pdf_pages": [
+          48
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 216, PDF page 48",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "Verse 216 is a Varuna dasha result. The extracted Jupiter and Venus conditions belong to verse 217, so the candidate joined separate clauses and cannot be compiled.",
+        "indications": [
+          "Verse 216 is a Varuna dasha result. The extracted Jupiter and Venus conditions belong to verse 217, so the candidate joined separate clauses and cannot be compiled."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "Verse 216 is a Varuna dasha result. The extracted Jupiter and Venus conditions belong to verse 217, so the candidate joined separate clauses and cannot be compiled."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "dasha_or_life_stage",
+      "operationalization_status": "clause_boundary_and_timing",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 90
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.0388-0390.SOURCE_IDENTITY_AND_CLAUSE_SPLIT",
+      "title": "Rejected after page review: verses 388–390",
+      "passage_key": "DK1.OCR.P0065.V0388-0390",
+      "context_block_key": "DK1.G.CTX.V0388-0390",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 388,
+        "verse_end": 390,
+        "pdf_pages": [
+          65
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 388–390, PDF page 65",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The page confirms Uraga context, but Uraga is absent from the pinned table and verses 388–390 contain distinct former/latter-half clauses that cannot be represented as one rule.",
+        "indications": [
+          "The page confirms Uraga context, but Uraga is absent from the pinned table and verses 388–390 contain distinct former/latter-half clauses that cannot be represented as one rule."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "The page confirms Uraga context, but Uraga is absent from the pinned table and verses 388–390 contain distinct former/latter-half clauses that cannot be represented as one rule."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "source_identity_and_clause_split",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 140
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.0401-0401.SOURCE_IDENTITY_UNRESOLVED",
+      "title": "Rejected after page review: verses 401–401",
+      "passage_key": "DK1.OCR.P0066.V0401-0401",
+      "context_block_key": "DK1.G.CTX.V0401-0401",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 401,
+        "verse_end": 401,
+        "pdf_pages": [
+          66
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 401, PDF page 66",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The adjacent page identifies the inherited Nadiamsa as Uraga, but Uraga has no source-secure canonical ordinal in the pinned table.",
+        "indications": [
+          "The adjacent page identifies the inherited Nadiamsa as Uraga, but Uraga has no source-secure canonical ordinal in the pinned table."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "The adjacent page identifies the inherited Nadiamsa as Uraga, but Uraga has no source-secure canonical ordinal in the pinned table."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "source_identity_unresolved",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 148
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.0656-0658.PISCES_MERCURY_KUNDAA_SATURN",
+      "title": "Maternal relatives when Mercury occupies Kundaa with Saturn",
+      "passage_key": "DK1.OCR.P0089.V0656-0658",
+      "context_block_key": "DK1.G.CTX.V0656-0658",
+      "decision": "approved",
+      "source": {
+        "verse_start": 656,
+        "verse_end": 658,
+        "pdf_pages": [
+          89
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 656–658, PDF page 89",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Pisces"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mercury.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 133
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mercury.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Kundaa"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Mercury.Saturn.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "maternal_relatives",
+        "summary": "The passage describes a long-lived maternal grandmother and two maternal uncles.",
+        "indications": [
+          "A long-lived maternal grandmother is described.",
+          "Two maternal uncles are described."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Pisces",
+        "planet_nadiamsa": "Mercury in Kundaa",
+        "source_check": "page_image_context"
+      },
+      "topics": [
+        "maternal_relatives",
+        "siblings_of_mother"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "Only the natal statements in verses 656–658 are compiled. The following second-dasha and transit clauses remain outside this natal rule."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.0867-0867.INHERITED_SUBJECT_WITHOUT_CONDITION",
+      "title": "Rejected after page review: verses 867–867",
+      "passage_key": "DK1.OCR.P0105.V0867-0867",
+      "context_block_key": "DK1.G.CTX.V0867-0867",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 867,
+        "verse_end": 867,
+        "pdf_pages": [
+          105
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 867, PDF page 105",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The phrase “last mentioned uncle” is recoverable from the preceding paragraph, but verse 867 contains no astrological premise of its own and cannot form an executable rule.",
+        "indications": [
+          "The phrase “last mentioned uncle” is recoverable from the preceding paragraph, but verse 867 contains no astrological premise of its own and cannot form an executable rule."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "The phrase “last mentioned uncle” is recoverable from the preceding paragraph, but verse 867 contains no astrological premise of its own and cannot form an executable rule."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "inherited_subject_without_condition",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 246
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.0870-0871.MORTALITY_EXCLUDED",
+      "title": "Rejected after page review: verses 870–871",
+      "passage_key": "DK1.OCR.P0105.V0870-0871",
+      "context_block_key": "DK1.G.CTX.V0870-0871",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 870,
+        "verse_end": 871,
+        "pdf_pages": [
+          105
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 870–871, PDF page 105",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "Nirmalaa and the Saturn-in-Leo condition are recoverable, but the result predicts widowhood and severe deprivation for named relatives; the candidate remains excluded under the mortality/sensitive-relative policy.",
+        "indications": [
+          "Nirmalaa and the Saturn-in-Leo condition are recoverable, but the result predicts widowhood and severe deprivation for named relatives; the candidate remains excluded under the mortality/sensitive-relative policy."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "Nirmalaa and the Saturn-in-Leo condition are recoverable, but the result predicts widowhood and severe deprivation for named relatives; the candidate remains excluded under the mortality/sensitive-relative policy."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "mortality_excluded",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 248
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.1248-1248.SOURCE_IDENTITY_AND_MORTALITY",
+      "title": "Rejected after page review: verses 1248–1248",
+      "passage_key": "DK1.OCR.P0137.V1248-1248",
+      "context_block_key": "DK1.G.CTX.V1248-1248",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1248,
+        "verse_end": 1248,
+        "pdf_pages": [
+          137
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 1248, PDF page 137",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "Guha/Guhamsa is not a canonical name in the pinned table, while the result is explicitly a longevity claim with remedial prescription.",
+        "indications": [
+          "Guha/Guhamsa is not a canonical name in the pinned table, while the result is explicitly a longevity claim with remedial prescription."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "Guha/Guhamsa is not a canonical name in the pinned table, while the result is explicitly a longevity claim with remedial prescription."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "source_identity_and_mortality",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 349
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.1256-1257.SOURCE_DISPUTE_AND_MORTALITY",
+      "title": "Rejected after page review: verses 1256–1257",
+      "passage_key": "DK1.OCR.P0138.V1256-1257",
+      "context_block_key": "DK1.G.CTX.V1256-1257",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1256,
+        "verse_end": 1257,
+        "pdf_pages": [
+          138
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 1256–1257, PDF page 138",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The editor states that the sub-division reconstruction is assumptive and the verses are mixed; Guha is also unmapped and the results contain longevity and sibling-destruction claims.",
+        "indications": [
+          "The editor states that the sub-division reconstruction is assumptive and the verses are mixed; Guha is also unmapped and the results contain longevity and sibling-destruction claims."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "The editor states that the sub-division reconstruction is assumptive and the verses are mixed; Guha is also unmapped and the results contain longevity and sibling-destruction claims."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "source_dispute_and_mortality",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 354
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.1272-1274.SOURCE_IDENTITY_UNRESOLVED",
+      "title": "Rejected after page review: verses 1272–1274",
+      "passage_key": "DK1.OCR.P0139.V1272-1274",
+      "context_block_key": "DK1.G.CTX.V1272-1274",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1272,
+        "verse_end": 1274,
+        "pdf_pages": [
+          139
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 1272–1274, PDF page 139",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The second-half Guha context is readable, but Guha has no secure canonical ordinal in the pinned table, so the otherwise natal results cannot be matched to chart facts.",
+        "indications": [
+          "The second-half Guha context is readable, but Guha has no secure canonical ordinal in the pinned table, so the otherwise natal results cannot be matched to chart facts."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "The second-half Guha context is readable, but Guha has no secure canonical ordinal in the pinned table, so the otherwise natal results cannot be matched to chart facts."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "source_identity_unresolved",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 364
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.1336.CAPRICORN_KANTHAA_FORMER_PROFILE",
+      "title": "Capricorn Kanthaa former-half birth profile",
+      "passage_key": "DK1.OCR.P0144.V1336-1336",
+      "context_block_key": "DK1.G.CTX.V1336-1336",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1336,
+        "verse_end": 1336,
+        "pdf_pages": [
+          144
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 1336, PDF page 144",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 31
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Kanthaa"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.half",
+            "comparator": "equals",
+            "value": "former"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "birth_profile",
+        "summary": "The passage describes a happy Brahmin native who is the fourth issue of the family.",
+        "indications": [
+          "A happy disposition is described.",
+          "The native is described as the fourth issue of the family.",
+          "The traditional social description is Brahmin."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Capricorn",
+        "nadiamsa": "Kanthaa ordinal 31",
+        "source_check": "page_image_context"
+      },
+      "topics": [
+        "birth_profile",
+        "birth_order"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "The page note gives the exact Kanthaa span for movable, fixed and common signs; those bounds identify canonical ordinal 31, resolving the duplicate-name ambiguity in Table 1."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.1370-1371.MORTALITY_EXCLUDED",
+      "title": "Rejected after page review: verses 1370–1371",
+      "passage_key": "DK1.OCR.P0147.V1370-1371",
+      "context_block_key": "DK1.G.CTX.V1370-1371",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1370,
+        "verse_end": 1371,
+        "pdf_pages": [
+          147
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 1370–1371, PDF page 147",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The Kanthaa former-half identity is recoverable as ordinal 31, but the passage predicts destruction of elder and younger siblings; the full candidate remains excluded.",
+        "indications": [
+          "The Kanthaa former-half identity is recoverable as ordinal 31, but the passage predicts destruction of elder and younger siblings; the full candidate remains excluded."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "The Kanthaa former-half identity is recoverable as ordinal 31, but the passage predicts destruction of elder and younger siblings; the full candidate remains excluded."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "mortality_excluded",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 393
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.1451-1452.PLANET_NADIAMSA_ORDINAL_AMBIGUOUS",
+      "title": "Rejected after page review: verses 1451–1452",
+      "passage_key": "DK1.OCR.P0154.V1451-1452",
+      "context_block_key": "DK1.G.CTX.V1451-1452",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1451,
+        "verse_end": 1452,
+        "pdf_pages": [
+          154
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 1451–1452, PDF page 154",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The Ascendant Champaka context is recoverable, but the Sun’s Kanta/Kanthaa Nadiamsa is not assigned a degree span here and Kanthaa occurs at two canonical ordinals.",
+        "indications": [
+          "The Ascendant Champaka context is recoverable, but the Sun’s Kanta/Kanthaa Nadiamsa is not assigned a degree span here and Kanthaa occurs at two canonical ordinals."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "The Ascendant Champaka context is recoverable, but the Sun’s Kanta/Kanthaa Nadiamsa is not assigned a degree span here and Kanthaa occurs at two canonical ordinals."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "planet_nadiamsa_ordinal_ambiguous",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 426
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.1639.CAPRICORN_TRAILOKYA_FORMER_PATERNAL_UNCLE",
+      "title": "Paternal uncle indication in Trailokya former half",
+      "passage_key": "DK1.OCR.P0167.V1639-1639",
+      "context_block_key": "DK1.G.CTX.V1639-1639",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1639,
+        "verse_end": 1639,
+        "pdf_pages": [
+          167
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 1639, PDF page 167",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 75
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Trailokya-mohankari"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.half",
+            "comparator": "equals",
+            "value": "former"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "paternal_relatives",
+        "summary": "The paternal uncle is described as adopting two boys, one of whom prospers strongly over time.",
+        "indications": [
+          "The paternal uncle is described as adopting two boys.",
+          "One adopted son is described as prospering strongly over time."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Capricorn",
+        "source_label": "Trailokya",
+        "canonical_table_name": "Trailokya-mohankari",
+        "source_check": "page_image_context"
+      },
+      "topics": [
+        "paternal_relatives",
+        "adoption"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "The uninterrupted Capricorn section and the edition label Trailokya resolve to canonical Table 1 ordinal 75, Trailokya-mohankari."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.1662-1662.MORTALITY_EXCLUDED",
+      "title": "Rejected after page review: verses 1662–1662",
+      "passage_key": "DK1.OCR.P0169.V1662-1662",
+      "context_block_key": "DK1.G.CTX.V1662-1662",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1662,
+        "verse_end": 1662,
+        "pdf_pages": [
+          169
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 1662, PDF page 169",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The Trailokya halves are clear, but the rule contrasts maternal longevity with early maternal loss and therefore remains excluded from executable natal output.",
+        "indications": [
+          "The Trailokya halves are clear, but the rule contrasts maternal longevity with early maternal loss and therefore remains excluded from executable natal output."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "The Trailokya halves are clear, but the rule contrasts maternal longevity with early maternal loss and therefore remains excluded from executable natal output."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "mortality_excluded",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 472
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.1713.CAPRICORN_TRAILOKYA_LATTER_CONFINEMENT",
+      "title": "Confinement and later recovery in Trailokya latter half",
+      "passage_key": "DK1.OCR.P0173.V1713-1713",
+      "context_block_key": "DK1.G.CTX.V1713-1713",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1713,
+        "verse_end": 1713,
+        "pdf_pages": [
+          173
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 1713, PDF page 173",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 75
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Trailokya-mohankari"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.half",
+            "comparator": "equals",
+            "value": "latter"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "adversity_and_recovery",
+        "summary": "The passage describes fear of confinement and blows by an iron chain, followed by recovery after some time.",
+        "indications": [
+          "Fear of confinement and physical blows is described.",
+          "Recovery after an interval is described."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Capricorn",
+        "source_label": "Trailokya",
+        "canonical_table_name": "Trailokya-mohankari",
+        "source_check": "page_image_context"
+      },
+      "topics": [
+        "adversity",
+        "recovery"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "“After some time” is retained as narrative sequence, not compiled as a date, age or dasha trigger."
+      ]
+    },
+    {
+      "key": "DK.G.1840.TAURUS_SEETHALA_SUN_SECOND_PISCES_NAVAMSA",
+      "title": "Vaishnavite initiation with Sun in the second and Pisces Navamsa",
+      "passage_key": "DK1.OCR.P0182.V1840-1840",
+      "context_block_key": "DK1.G.CTX.V1840-1840",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1840,
+        "verse_end": 1840,
+        "pdf_pages": [
+          182
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 1840, PDF page 182",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Taurus"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 55
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Seethala"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Sun.house",
+            "comparator": "equals",
+            "value": 2
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Sun.navamsa.name",
+            "comparator": "equals",
+            "value": "Pisces"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "spiritual_inclination",
+        "summary": "The passage describes Vaishnavite initiation and adherence to Vaishnavite observances.",
+        "indications": [
+          "Vaishnavite initiation is described.",
+          "Following Vaishnavite observances is described."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Taurus",
+        "nadiamsa": "Seethala",
+        "source_check": "page_image_context"
+      },
+      "topics": [
+        "spirituality",
+        "religious_practice"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "The Taurus and Seethala premises are inherited from the uninterrupted section and retained in the expression."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.2013-2014.MORTALITY_EXCLUDED",
+      "title": "Rejected after page review: verses 2013–2014",
+      "passage_key": "DK1.OCR.P0199.V2013-2014",
+      "context_block_key": "DK1.G.CTX.V2013-2014",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 2013,
+        "verse_end": 2014,
+        "pdf_pages": [
+          199
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 2013–2014, PDF page 199",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "Leo/Champaka and the Venus–Jupiter condition are clear, but the result includes destruction of sisters; the complete candidate is excluded rather than selectively weakening the source result.",
+        "indications": [
+          "Leo/Champaka and the Venus–Jupiter condition are clear, but the result includes destruction of sisters; the complete candidate is excluded rather than selectively weakening the source result."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "Leo/Champaka and the Venus–Jupiter condition are clear, but the result includes destruction of sisters; the complete candidate is excluded rather than selectively weakening the source result."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "mortality_excluded",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 590
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.2033-2034.LEO_CHAMBAKA_FORMER_BIRTH_PROFILE",
+      "title": "Leo Chambaka former-half birth setting and birth order",
+      "passage_key": "DK1.OCR.P0200.V2033-2034",
+      "context_block_key": "DK1.G.CTX.V2033-2034",
+      "decision": "approved",
+      "source": {
+        "verse_start": 2033,
+        "verse_end": 2034,
+        "pdf_pages": [
+          200
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 2033–2034, PDF page 200",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Leo"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 26
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Chambaka"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.half",
+            "comparator": "equals",
+            "value": "former"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "birth_circumstances",
+        "summary": "The passage describes a Brahmin native, fifth in birth order, born in a Mahanadi-region city beside a Siva temple.",
+        "indications": [
+          "The traditional social description is Brahmin.",
+          "The native is described as the fifth issue of the family.",
+          "Birth in a Mahanadi-region city beside a Siva temple is described."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Leo",
+        "source_label": "Champaka",
+        "canonical_table_name": "Chambaka",
+        "source_check": "page_image_context"
+      },
+      "topics": [
+        "birth_circumstances",
+        "birth_order"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "The edition consistently prints Champaka in the prose; the pinned Table 1 source name for ordinal 26 is Chambaka."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.2068-2068.TIMING_PENDING",
+      "title": "Rejected after page review: verses 2068–2068",
+      "passage_key": "DK1.OCR.P0202.V2068-2068",
+      "context_block_key": "DK1.G.CTX.V2068-2068",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 2068,
+        "verse_end": 2068,
+        "pdf_pages": [
+          202
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 2068, PDF page 202",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The Gadaa identity is recoverable, but “second dasha” and “adverse sub-period” are required premises and the adverse sub-period is not operationally defined.",
+        "indications": [
+          "The Gadaa identity is recoverable, but “second dasha” and “adverse sub-period” are required premises and the adverse sub-period is not operationally defined."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "The Gadaa identity is recoverable, but “second dasha” and “adverse sub-period” are required premises and the adverse sub-period is not operationally defined."
+      ],
+      "timing_kind": "dasha_or_life_stage",
+      "operationalization_status": "timing_pending",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 609
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.2159-2161.UNSUPPORTED_SUBDIVISION_AND_THEOLOGY",
+      "title": "Rejected after page review: verses 2159–2161",
+      "passage_key": "DK1.OCR.P0211.V2159-2161",
+      "context_block_key": "DK1.G.CTX.V2159-2161",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 2159,
+        "verse_end": 2161,
+        "pdf_pages": [
+          211
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 2159–2161, PDF page 211",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The rule requires the first quarter/Vipra Kala inside Gadaa, while the current canonical calculator exposes only Nadiamsa halves; it also asserts prior and future births and final emancipation.",
+        "indications": [
+          "The rule requires the first quarter/Vipra Kala inside Gadaa, while the current canonical calculator exposes only Nadiamsa halves; it also asserts prior and future births and final emancipation."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "The rule requires the first quarter/Vipra Kala inside Gadaa, while the current canonical calculator exposes only Nadiamsa halves; it also asserts prior and future births and final emancipation."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "unsupported_subdivision_and_theology",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 649
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.2216-2219.ARIES_MANGALA_FORMER_FATHER",
+      "title": "Father indication from Sun, Saturn and the eighth lord in Mangala former half",
+      "passage_key": "DK1.OCR.P0216.V2216-2219",
+      "context_block_key": "DK1.G.CTX.V2216-2219",
+      "decision": "approved",
+      "source": {
+        "verse_start": 2216,
+        "verse_end": 2219,
+        "pdf_pages": [
+          216
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 2216–2219, PDF page 216",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Aries"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 92
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Mangala"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.half",
+            "comparator": "equals",
+            "value": "former"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Saturn.relative_to.Sun.house",
+            "comparator": "equals",
+            "value": 10
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.house.8.lord.house",
+            "comparator": "equals",
+            "value": 6
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "father",
+        "summary": "The father is described as physically weak yet gentle, quick to anger and quick to settle, religious, and limited in siblings.",
+        "indications": [
+          "Physical weakness and gentleness are described.",
+          "Anger followed by quick reconciliation is described.",
+          "Religious observance and devotion to Siva are described.",
+          "Only one brother and few sisters are described."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Aries",
+        "nadiamsa": "Mangala",
+        "source_check": "page_image_context",
+        "relative_position": "Saturn is tenth from Sun"
+      },
+      "topics": [
+        "father",
+        "temperament",
+        "family"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "The directional phrase is encoded with the canonical relative-house fact: Saturn occupies the tenth counted from the Sun. The eighth lord’s placement in House 6 is encoded through the generic house-lord projection."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.2298-2299.SOURCE_IDENTITY_UNRESOLVED",
+      "title": "Rejected after page review: verses 2298–2299",
+      "passage_key": "DK1.OCR.P0223.V2298-2299",
+      "context_block_key": "DK1.G.CTX.V2298-2299",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 2298,
+        "verse_end": 2299,
+        "pdf_pages": [
+          223
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 2298–2299, PDF page 223",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The page confirms former-half Uraga with Moon–Mars conjunction, but Uraga has no source-secure canonical ordinal in the pinned table.",
+        "indications": [
+          "The page confirms former-half Uraga with Moon–Mars conjunction, but Uraga has no source-secure canonical ordinal in the pinned table."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "The page confirms former-half Uraga with Moon–Mars conjunction, but Uraga has no source-secure canonical ordinal in the pinned table."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "source_identity_unresolved",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 700
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.2326-2328.SOURCE_IDENTITY_TIMING_AND_MORTALITY",
+      "title": "Rejected after page review: verses 2326–2328",
+      "passage_key": "DK1.OCR.P0226.V2326-2328",
+      "context_block_key": "DK1.G.CTX.V2326-2328",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 2326,
+        "verse_end": 2328,
+        "pdf_pages": [
+          226
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 2326–2328, PDF page 226",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "Uraga is unmapped; the passage also mixes natal marriage/progeny statements with father-danger timing and an omitted transit planet.",
+        "indications": [
+          "Uraga is unmapped; the passage also mixes natal marriage/progeny statements with father-danger timing and an omitted transit planet."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "Uraga is unmapped; the passage also mixes natal marriage/progeny statements with father-danger timing and an omitted transit planet."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "dasha_or_life_stage",
+      "operationalization_status": "source_identity_timing_and_mortality",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 714
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.2369-2369.SOURCE_IDENTITY_UNRESOLVED",
+      "title": "Rejected after page review: verses 2369–2369",
+      "passage_key": "DK1.OCR.P0229.V2369-2369",
+      "context_block_key": "DK1.G.CTX.V2369-2369",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 2369,
+        "verse_end": 2369,
+        "pdf_pages": [
+          229
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 2369, PDF page 229",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "Sumathi is not a name in the pinned 150-Nadi table, and the adjacent section supplies no secure canonical ordinal.",
+        "indications": [
+          "Sumathi is not a name in the pinned 150-Nadi table, and the adjacent section supplies no secure canonical ordinal."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "Sumathi is not a name in the pinned 150-Nadi table, and the adjacent section supplies no secure canonical ordinal."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "source_identity_unresolved",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 728
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.2499-2500.MORTALITY_EXCLUDED",
+      "title": "Rejected after page review: verses 2499–2500",
+      "passage_key": "DK1.OCR.P0240.V2499-2500",
+      "context_block_key": "DK1.G.CTX.V2499-2500",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 2499,
+        "verse_end": 2500,
+        "pdf_pages": [
+          240
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verses 2499–2500, PDF page 240",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "The page note resolves Kaalaa as canonical ordinal 32 and the Jupiter–Saturn relation is expressible, but the results predict loss of brothers and widowhood of sisters.",
+        "indications": [
+          "The page note resolves Kaalaa as canonical ordinal 32 and the Jupiter–Saturn relation is expressible, but the results predict loss of brothers and widowhood of sisters."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "The page note resolves Kaalaa as canonical ordinal 32 and the Jupiter–Saturn relation is expressible, but the results predict loss of brothers and widowhood of sisters."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "mortality_excluded",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 781
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    },
+    {
+      "key": "DK.G.REJECTED.2510-2510.LIFE_STAGE_TIMING_PENDING",
+      "title": "Rejected after page review: verses 2510–2510",
+      "passage_key": "DK1.OCR.P0241.V2510-2510",
+      "context_block_key": "DK1.G.CTX.V2510-2510",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 2510,
+        "verse_end": 2510,
+        "pdf_pages": [
+          241
+        ],
+        "printed_pages": [],
+        "reference_label": "Deva Keralam, Book 1, verse 2510, PDF page 241",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse number, printed page, English translation, Sanskrit lines and adjacent section context were checked on the rendered page image."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.house",
+        "comparator": "equals",
+        "value": 1
+      },
+      "outcome": {
+        "topic": "review_rejection",
+        "summary": "Kaalaa former half is secure, but the only result is grief from a son in old age; “old age” is not a bounded timing trigger in the compiler.",
+        "indications": [
+          "Kaalaa former half is secure, but the only result is grief from a son in old age; “old age” is not a bounded timing trigger in the compiler."
+        ],
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "Kaalaa former half is secure, but the only result is grief from a son in old age; “old age” is not a bounded timing trigger in the compiler."
+      ],
+      "timing_kind": "dasha_or_life_stage",
+      "operationalization_status": "life_stage_timing_pending",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "catalogue_ordinal": 790
+      },
+      "topics": [
+        "review_rejection"
+      ],
+      "scope": "Reviewed but non-executable source candidate",
+      "notes": [
+        "The placeholder expression is deliberately non-operative: the candidate is rejected fail-closed before rule construction. No unresolved Nadiamsa alias is encoded as a chart fact."
+      ]
+    }
+  ]
+}

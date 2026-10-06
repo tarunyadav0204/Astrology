@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
+import BirthFormModal from '../BirthForm/BirthFormModal';
 import SEOHead from '../SEO/SEOHead';
 import { generatePageSEO } from '../../config/seo.config';
+import { trackAstrologyEvent } from '../../utils/analytics';
 import './FestivalsPage.css';
 
 const POPULAR_LOCATIONS = [
@@ -107,7 +109,7 @@ const getTypeClass = (type) => {
   return 'is-festival';
 };
 
-const FestivalCard = ({ festival }) => {
+const FestivalCard = ({ festival, onAskTara, onCreateKundli }) => {
   const rituals = Array.isArray(festival.rituals)
     ? festival.rituals
     : festival.rituals
@@ -149,12 +151,30 @@ const FestivalCard = ({ festival }) => {
         {festival.moonrise_time && <span><strong>Moonrise:</strong> {festival.moonrise_time}</span>}
         {festival.paksha && <span><strong>Paksha:</strong> {festival.paksha === 'shukla' ? 'Shukla' : 'Krishna'}</span>}
       </div>
+
+      <div className="festival-card__actions">
+        <button
+          type="button"
+          className="festival-btn festival-btn--primary"
+          onClick={() => onAskTara?.(festival)}
+        >
+          Ask Tara about this
+        </button>
+        <button
+          type="button"
+          className="festival-btn festival-btn--ghost"
+          onClick={() => onCreateKundli?.(festival)}
+        >
+          Create free Kundli
+        </button>
+      </div>
     </article>
   );
 };
 
 const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton }) => {
   const navigate = useNavigate();
+  const trackedDateRef = useRef('');
   const [selectedDate, setSelectedDate] = useState(() => {
     const dateParam = new URLSearchParams(window.location.search).get('date');
     return dateParam || todayIso();
@@ -166,6 +186,7 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
   const [showSearch, setShowSearch] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [showTransits, setShowTransits] = useState(false);
+  const [showBirthModal, setShowBirthModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -180,7 +201,46 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
 
   const locationKey = `${location.lat},${location.lon}`;
   const selectedDateLabel = formatDate(selectedDate);
+  const isToday = selectedDate === todayIso();
+  const festivalNames = todayFestivals.map((festival) => festival.name).filter(Boolean);
+  const festivalAnswerLine = festivalNames.length
+    ? festivalNames.slice(0, 3).join(' · ') + (festivalNames.length > 3 ? ` · +${festivalNames.length - 3} more` : '')
+    : null;
   const seoData = generatePageSEO('festivals', { path: '/festivals' });
+
+  const openCreateKundli = (source = 'hero', festivalName = '') => {
+    trackAstrologyEvent.festivalCta('create_kundli', festivalName || source);
+    if (!user) {
+      onLogin?.();
+      return;
+    }
+    setShowBirthModal(true);
+  };
+
+  const openAskTara = (source = 'hero', festival = null) => {
+    const festivalName = festival?.name || festivalNames[0] || '';
+    trackAstrologyEvent.festivalCta('ask_tara', festivalName || source);
+    if (!user) {
+      onLogin?.();
+      return;
+    }
+    const question = festivalName
+      ? `What does ${festivalName} on ${selectedDateLabel} mean for my chart, and how should I observe it today in ${location.name}?`
+      : `What do today’s Hindu festivals and vrats mean for my chart in ${location.name}?`;
+    navigate('/chat?app=1', {
+      state: {
+        openSingleChartChat: true,
+        followUpQuestion: question,
+        queryContext: {
+          source: 'festivals_page',
+          festival_name: festivalName || null,
+          festival_date: selectedDate,
+          location_name: location.name,
+          suppress_mode_intro: true,
+        },
+      },
+    });
+  };
 
   const structuredData = useMemo(() => ({
     '@context': 'https://schema.org',
@@ -263,6 +323,14 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
     fetchPageData();
   }, [selectedDate, locationKey, userTimezone, location.lat, location.lon]);
 
+  useEffect(() => {
+    if (loading) return;
+    const key = `${selectedDate}:${locationKey}`;
+    if (trackedDateRef.current === key) return;
+    trackedDateRef.current = key;
+    trackAstrologyEvent.festivalPageViewed(selectedDate);
+  }, [loading, selectedDate, locationKey]);
+
   const searchFestivals = async () => {
     if (!searchTerm.trim()) return;
 
@@ -310,18 +378,38 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
             <button type="button" className="festivals-back-link" onClick={() => navigate('/panchang')}>
               <span aria-hidden>←</span> Panchang
             </button>
-            <span className="festivals-eyebrow">Sacred observances · Location aware</span>
-            <h1>Keep time with<br /><em>what is sacred.</em></h1>
+            <span className="festivals-eyebrow">
+              {isToday ? `Today · ${location.name}` : `${selectedDateLabel} · ${location.name}`}
+            </span>
+            <h1>
+              {isToday ? (
+                <>Today’s Hindu<br /><em>festivals.</em></>
+              ) : (
+                <>Keep time with<br /><em>what is sacred.</em></>
+              )}
+            </h1>
+            {festivalAnswerLine ? (
+              <p className="festivals-hero__answer">{festivalAnswerLine}</p>
+            ) : !loading && isToday ? (
+              <p className="festivals-hero__answer">No major festival or vrat listed for today in {location.name}.</p>
+            ) : null}
             <p>
-              Discover festivals and vrats through the local tithi, sunrise, parana window,
-              rituals and meaning that shape their observance.
+              {isToday
+                ? 'See local tithi, sunrise, parana windows, rituals and meaning — then ask how today’s observance fits your chart.'
+                : 'Discover festivals and vrats through the local tithi, sunrise, parana window, rituals and meaning that shape their observance.'}
             </p>
             <div className="festivals-hero__actions">
-              <button type="button" className="festival-btn festival-btn--primary" onClick={() => navigate('/festivals/monthly')}>
+              <button type="button" className="festival-btn festival-btn--primary" onClick={() => openCreateKundli('hero')}>
+                Create free Kundli
+              </button>
+              <button type="button" className="festival-btn festival-btn--secondary" onClick={() => openAskTara('hero')}>
+                Ask Tara
+              </button>
+              <button type="button" className="festival-btn festival-btn--ghost festivals-hero__tool-btn" onClick={() => navigate('/festivals/monthly')}>
                 Monthly Calendar
               </button>
-              <button type="button" className="festival-btn festival-btn--secondary" onClick={() => setShowSearch(true)}>
-                Search Festivals
+              <button type="button" className="festival-btn festival-btn--ghost festivals-hero__tool-btn" onClick={() => setShowSearch(true)}>
+                Search
               </button>
             </div>
           </div>
@@ -420,16 +508,48 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
           ) : todayFestivals.length > 0 ? (
             <div className="festivals-grid">
               {todayFestivals.map((festival, index) => (
-                <FestivalCard festival={festival} key={`${festival.name}-${festival.date}-${index}`} />
+                <FestivalCard
+                  festival={festival}
+                  key={`${festival.name}-${festival.date}-${index}`}
+                  onAskTara={(item) => openAskTara('card', item)}
+                  onCreateKundli={(item) => openCreateKundli('card', item?.name)}
+                />
               ))}
             </div>
           ) : (
             <div className="festival-empty">
               <span aria-hidden>🌸</span>
               <h3>No special festivals or vrats on this date</h3>
-              <p>Use the monthly calendar to browse upcoming Ekadashi, Pradosh, Purnima, Amavasya and major festivals.</p>
+              <p>Use the monthly calendar to browse upcoming Ekadashi, Pradosh, Purnima, Amavasya and major festivals — or ask Tara what your chart highlights today.</p>
+              <div className="festival-empty__actions">
+                <button type="button" className="festival-btn festival-btn--primary" onClick={() => openAskTara('empty')}>
+                  Ask Tara about today
+                </button>
+                <button type="button" className="festival-btn festival-btn--secondary" onClick={() => navigate('/festivals/monthly')}>
+                  Browse month
+                </button>
+              </div>
             </div>
           )}
+        </section>
+
+        <section className="festival-conversion" aria-label="Personalise this festival day">
+          <div className="festival-conversion__copy">
+            <span className="festivals-eyebrow">Personal timing</span>
+            <h2>See how today’s observance fits your chart</h2>
+            <p>
+              Festivals and vrats are shared dates. Your dashas, Moon and house activations show which
+              themes are active for you right now.
+            </p>
+          </div>
+          <div className="festival-conversion__actions">
+            <button type="button" className="festival-btn festival-btn--primary" onClick={() => openCreateKundli('strip')}>
+              Create free Kundli
+            </button>
+            <button type="button" className="festival-btn festival-btn--secondary" onClick={() => openAskTara('strip')}>
+              Ask Tara
+            </button>
+          </div>
         </section>
 
         <section className="festival-seo-section">
@@ -542,7 +662,18 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
               ) : searchResults.length > 0 ? (
                 <div className="festivals-grid festivals-grid--modal">
                   {searchResults.map((festival, index) => (
-                    <FestivalCard festival={festival} key={`${festival.name}-search-${index}`} />
+                    <FestivalCard
+                      festival={festival}
+                      key={`${festival.name}-search-${index}`}
+                      onAskTara={(item) => {
+                        setShowSearch(false);
+                        openAskTara('search', item);
+                      }}
+                      onCreateKundli={(item) => {
+                        setShowSearch(false);
+                        openCreateKundli('search', item?.name);
+                      }}
+                    />
                   ))}
                 </div>
               ) : searchTerm ? (
@@ -556,6 +687,14 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
           </div>
         </div>
       )}
+
+      <BirthFormModal
+        isOpen={showBirthModal}
+        onClose={() => setShowBirthModal(false)}
+        onSubmit={() => setShowBirthModal(false)}
+        title="Create your free Kundli"
+        description="Use accurate birth details to see how today’s festivals and vrats relate to your chart."
+      />
     </div>
   );
 };

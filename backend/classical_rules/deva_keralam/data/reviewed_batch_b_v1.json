@@ -1,0 +1,3201 @@
+{
+  "schema_version": "deva-keralam-reviewed-manifest/1.0.0",
+  "batch_key": "deva_keralam.book_1.reviewed_batch_b.pages_111_185.v1",
+  "edition_key": "deva_keralam_volume_1_scan",
+  "source_scope": {
+    "pdf_pages": [
+      111,
+      185
+    ],
+    "printed_pages": [
+      87,
+      161
+    ],
+    "verse_span": [
+      938,
+      1879
+    ],
+    "stream": "B",
+    "disjoint_policy": "Only candidate keys in this file; no registration and no overlap with pilot or batch A manifests."
+  },
+  "reviewer_method": "Rendered-page review with OCR used only as navigation aid; each admitted unit was checked against the page image, inherited context was resolved locally, astronomical geometry was screened, and timing/corrupt/unsupported passages were rejected.",
+  "candidates": [
+    {
+      "key": "DK.B.0950_INDRA_YOGA",
+      "title": "Indra yoga for Libra Ascendant",
+      "passage_key": "DK1.B.P112.V0950-952_5",
+      "context_block_key": "DK1.B.CONTEXT.P112.V0950",
+      "decision": "approved",
+      "source": {
+        "verse_start": 950,
+        "verse_end": 952,
+        "pdf_pages": [
+          112
+        ],
+        "printed_pages": [
+          88
+        ],
+        "reference_label": "Deva Keralam Book I, verses 950-952.5, PDF page 112 (printed page 88)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Libra"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Venus.house",
+            "comparator": "equals",
+            "value": 11
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Venus.navamsa.name",
+            "comparator": "equals",
+            "value": "Cancer"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Venus.Saturn.present",
+            "comparator": "equals",
+            "value": true
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Mercury.Venus.present",
+            "comparator": "equals",
+            "value": true
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Saturn.navamsa.name",
+            "comparator": "equals",
+            "value": "Cancer"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mercury.navamsa.name",
+            "comparator": "equals",
+            "value": "Cancer"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "wealth_status",
+        "summary": "Material prosperity, religious merit, social honour and support from authority are emphasized.",
+        "indications": [
+          "Material prosperity, religious merit, social honour and support from authority are emphasized."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Libra",
+        "configuration": "Venus in House 11 with Saturn and Mercury, in Cancer Navamsa"
+      },
+      "topics": [
+        "wealth_status"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "The translated clause places Venus, Saturn and Mercury together in Cancer Navamsa; all three Navamsa positions are therefore required rather than inferred from D1 conjunction."
+      ]
+    },
+    {
+      "key": "DK.B.0968_VENUS_TAURUS_RAJA_YOGA",
+      "title": "Venus in Taurus Raja yoga",
+      "passage_key": "DK1.B.P113.V0968-968",
+      "context_block_key": "DK1.B.CONTEXT.P113.V0968",
+      "decision": "approved",
+      "source": {
+        "verse_start": 968,
+        "verse_end": 968,
+        "pdf_pages": [
+          113
+        ],
+        "printed_pages": [
+          89
+        ],
+        "reference_label": "Deva Keralam Book I, verses 968-968, PDF page 113 (printed page 89)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "in",
+            "value": [
+              "Aries",
+              "Cancer",
+              "Libra",
+              "Capricorn"
+            ]
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Venus.rashi.name",
+            "comparator": "equals",
+            "value": "Taurus"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Venus.navamsa.name",
+            "comparator": "equals",
+            "value": "Aquarius"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "wealth_status",
+        "summary": "A rise in position, comforts and recognition is indicated.",
+        "indications": [
+          "A rise in position, comforts and recognition is indicated."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant_modality": "movable"
+      },
+      "topics": [
+        "wealth_status"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.0971_WEAK_BODY_YOGA",
+      "title": "Movable Ascendant weak-body combination",
+      "passage_key": "DK1.B.P113.V0971-972",
+      "context_block_key": "DK1.B.CONTEXT.P113.V0971",
+      "decision": "approved",
+      "source": {
+        "verse_start": 971,
+        "verse_end": 972,
+        "pdf_pages": [
+          113
+        ],
+        "printed_pages": [
+          89
+        ],
+        "reference_label": "Deva Keralam Book I, verses 971-972, PDF page 113 (printed page 89)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "in",
+            "value": [
+              "Aries",
+              "Cancer",
+              "Libra",
+              "Capricorn"
+            ]
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.navamsa.name",
+            "comparator": "equals",
+            "value": "Scorpio"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.dignity",
+            "comparator": "equals",
+            "value": "debilitated"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Moon.house",
+            "comparator": "equals",
+            "value": 3
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "health_constitution",
+        "summary": "The text associates this combination with a thin constitution and respiratory or blood-cough vulnerability.",
+        "indications": [
+          "The text associates this combination with a thin constitution and respiratory or blood-cough vulnerability."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant_modality": "movable"
+      },
+      "topics": [
+        "health_constitution"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.0973_VISHNU_YOGA_SUN_JUPITER_KETU",
+      "title": "Vishnu yoga through Sun and Jupiter-Ketu",
+      "passage_key": "DK1.B.P114.V0973-977_5",
+      "context_block_key": "DK1.B.CONTEXT.P114.V0973",
+      "decision": "approved",
+      "source": {
+        "verse_start": 973,
+        "verse_end": 977,
+        "pdf_pages": [
+          114
+        ],
+        "printed_pages": [
+          90
+        ],
+        "reference_label": "Deva Keralam Book I, verses 973-977.5, PDF page 114 (printed page 90)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "in",
+            "value": [
+              "Aries",
+              "Cancer",
+              "Libra",
+              "Capricorn"
+            ]
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Sun.rashi.name",
+            "comparator": "equals",
+            "value": "Aries"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Sun.navamsa.name",
+            "comparator": "equals",
+            "value": "Leo"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Jupiter.Ketu.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "dharma_status",
+        "summary": "Prosperity, principled religious conduct, intelligence and recognition are emphasized.",
+        "indications": [
+          "Prosperity, principled religious conduct, intelligence and recognition are emphasized."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant_modality": "movable"
+      },
+      "topics": [
+        "dharma_status"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.0973_VISHNU_YOGA_MARS_SATURN",
+      "title": "Vishnu yoga through Mars and Saturn",
+      "passage_key": "DK1.B.P114.V0973-977_5",
+      "context_block_key": "DK1.B.CONTEXT.P114.V0973",
+      "decision": "approved",
+      "source": {
+        "verse_start": 973,
+        "verse_end": 977,
+        "pdf_pages": [
+          114
+        ],
+        "printed_pages": [
+          90
+        ],
+        "reference_label": "Deva Keralam Book I, verses 973-977.5, PDF page 114 (printed page 90)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "in",
+            "value": [
+              "Aries",
+              "Cancer",
+              "Libra",
+              "Capricorn"
+            ]
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.house",
+            "comparator": "equals",
+            "value": 1
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Saturn.house",
+            "comparator": "equals",
+            "value": 12
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "life_pattern",
+        "summary": "A difficult early foundation is followed by capability, courage and eventual prosperity.",
+        "indications": [
+          "A difficult early foundation is followed by capability, courage and eventual prosperity."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant_modality": "movable"
+      },
+      "topics": [
+        "life_pattern"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.0986_CANCER_SCORPIO_NAVAMSA_HEALTH",
+      "title": "Cancer Ascendant constitution in Scorpio Navamsa",
+      "passage_key": "DK1.B.P115.V0986-994_5",
+      "context_block_key": "DK1.B.CONTEXT.P115.V0986",
+      "decision": "approved",
+      "source": {
+        "verse_start": 986,
+        "verse_end": 994,
+        "pdf_pages": [
+          115
+        ],
+        "printed_pages": [
+          91
+        ],
+        "reference_label": "Deva Keralam Book I, verses 986-994.5, PDF page 115 (printed page 91)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Cancer"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.navamsa.name",
+            "comparator": "equals",
+            "value": "Scorpio"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "health_constitution",
+        "summary": "A warm constitution with phlegmatic, bilious and cough-related sensitivity is described.",
+        "indications": [
+          "A warm constitution with phlegmatic, bilious and cough-related sensitivity is described."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Cancer"
+      },
+      "topics": [
+        "health_constitution"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1013_LIBRA_INDRA_VENUS_SATURN",
+      "title": "Indra Nadiamsa with Venus-Saturn",
+      "passage_key": "DK1.B.P116.V1013-1015",
+      "context_block_key": "DK1.B.CONTEXT.P116.V1013",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1013,
+        "verse_end": 1015,
+        "pdf_pages": [
+          116
+        ],
+        "printed_pages": [
+          92
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1013-1015, PDF page 116 (printed page 92)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Libra"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 110
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Indra"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Venus.Saturn.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "wealth_status",
+        "summary": "Wealth, learning, fame, social standing, family support and longevity are emphasized.",
+        "indications": [
+          "Wealth, learning, fame, social standing, family support and longevity are emphasized."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Libra",
+        "nadiamsa": "Indra",
+        "nadiamsa_ordinal": 110
+      },
+      "topics": [
+        "wealth_status"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1017_INDRA_DEBILITATED_MOON",
+      "title": "Indra yoga with debilitated Moon",
+      "passage_key": "DK1.B.P117.V1017-1017",
+      "context_block_key": "DK1.B.CONTEXT.P117.V1017",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1017,
+        "verse_end": 1017,
+        "pdf_pages": [
+          117
+        ],
+        "printed_pages": [
+          93
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1017-1017, PDF page 117 (printed page 93)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Libra"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 110
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Indra"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Venus.Saturn.present",
+            "comparator": "equals",
+            "value": true
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Moon.dignity",
+            "comparator": "equals",
+            "value": "debilitated"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Moon.navamsa.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "personality",
+        "summary": "A restrained, articulate, clean and pleasure-seeking disposition is described.",
+        "indications": [
+          "A restrained, articulate, clean and pleasure-seeking disposition is described."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Libra",
+        "nadiamsa": "Indra",
+        "indras_yoga": "Venus-Saturn conjunction"
+      },
+      "topics": [
+        "personality"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1030_LIBRA_MARS_NINTH",
+      "title": "Mars in the ninth for Libra Ascendant",
+      "passage_key": "DK1.B.P118.V1030-1031",
+      "context_block_key": "DK1.B.CONTEXT.P118.V1030",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1030,
+        "verse_end": 1031,
+        "pdf_pages": [
+          118
+        ],
+        "printed_pages": [
+          94
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1030-1031, PDF page 118 (printed page 94)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Libra"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.house",
+            "comparator": "equals",
+            "value": 9
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "family_health",
+        "summary": "The text connects this placement with paternal strain and weak digestion.",
+        "indications": [
+          "The text connects this placement with paternal strain and weak digestion."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Libra"
+      },
+      "topics": [
+        "family_health"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1042_INDRA_TRIPLE_CONJUNCTION_PROTECTION",
+      "title": "Indra Nadiamsa protection combination",
+      "passage_key": "DK1.B.P118.V1042-1042",
+      "context_block_key": "DK1.B.CONTEXT.P118.V1042",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1042,
+        "verse_end": 1042,
+        "pdf_pages": [
+          118
+        ],
+        "printed_pages": [
+          94
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1042-1042, PDF page 118 (printed page 94)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Libra"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 110
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Indra"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Venus.Saturn.present",
+            "comparator": "equals",
+            "value": true
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Mercury.Venus.present",
+            "comparator": "equals",
+            "value": true
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Mercury.Saturn.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "protection",
+        "summary": "Strong protection against adversity is attributed to this combination.",
+        "indications": [
+          "Strong protection against adversity is attributed to this combination."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Libra",
+        "nadiamsa": "Indra"
+      },
+      "topics": [
+        "protection"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1043_INDRA_SUN_VENUS_EYES",
+      "title": "Sun-Venus eye sensitivity in Indra Nadiamsa",
+      "passage_key": "DK1.B.P119.V1043-1046",
+      "context_block_key": "DK1.B.CONTEXT.P119.V1043",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1043,
+        "verse_end": 1046,
+        "pdf_pages": [
+          119
+        ],
+        "printed_pages": [
+          95
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1043-1046, PDF page 119 (printed page 95)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Libra"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 110
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Indra"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Sun.house",
+            "comparator": "equals",
+            "value": 5
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Venus.house",
+            "comparator": "equals",
+            "value": 5
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Sun.Venus.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "health_senses",
+        "summary": "Childhood eye sensitivity is indicated, with the source also describing recovery.",
+        "indications": [
+          "Childhood eye sensitivity is indicated, with the source also describing recovery."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Libra",
+        "nadiamsa": "Indra"
+      },
+      "topics": [
+        "health_senses"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1096_PISCES_SEETHALA_SATURN_VENUS",
+      "title": "Rejected: Pisces Seethala Saturn-Venus health passage",
+      "passage_key": "DK1.B.P123.V1096-1097",
+      "context_block_key": "DK1.B.CONTEXT.P123.V1096",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1096,
+        "verse_end": 1097,
+        "pdf_pages": [
+          123
+        ],
+        "printed_pages": [
+          99
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1096-1097, PDF page 123 (printed page 99)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Pisces"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 55
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Seethala"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Saturn.house",
+            "comparator": "equals",
+            "value": 5
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Venus.house",
+            "comparator": "equals",
+            "value": 5
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Venus.Saturn.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "appearance",
+        "summary": "A fair, pleasing appearance and auspicious support are described.",
+        "indications": [
+          "A fair, pleasing appearance and auspicious support are described."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "Sudha Shashtiamsa is an essential premise in the rendered source, but the reviewed fact ontology does not currently expose planetary Shashtiamsa. Omitting it would broaden the rule incorrectly."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "blocked_missing_shashtiamsa_facts",
+      "inherited_context": {
+        "ascendant": "Pisces",
+        "nadiamsa": "Seethala"
+      },
+      "topics": [
+        "appearance"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "Retain as a rejected source candidate until canonical Shashtiamsa facts are available; do not compile a Saturn-Venus-only surrogate."
+      ]
+    },
+    {
+      "key": "DK.B.1172_SEETHALA_MOON_VIRGO_FAMILY",
+      "title": "Moon in Virgo family pattern",
+      "passage_key": "DK1.B.P129.V1172-1172",
+      "context_block_key": "DK1.B.CONTEXT.P129.V1172",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1172,
+        "verse_end": 1172,
+        "pdf_pages": [
+          129
+        ],
+        "printed_pages": [
+          105
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1172-1172, PDF page 129 (printed page 105)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Pisces"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 55
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Seethala"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Moon.rashi.name",
+            "comparator": "equals",
+            "value": "Virgo"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "family",
+        "summary": "The text describes daughters, two long-lived sons and more than one marriage.",
+        "indications": [
+          "The text describes daughters, two long-lived sons and more than one marriage."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Pisces",
+        "nadiamsa": "Seethala"
+      },
+      "topics": [
+        "family"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1194_KOKILA_SATURN_FIFTH",
+      "title": "Kokila Nadiamsa with Saturn in fifth",
+      "passage_key": "DK1.B.P131.V1194-1196",
+      "context_block_key": "DK1.B.CONTEXT.P131.V1194",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1194,
+        "verse_end": 1196,
+        "pdf_pages": [
+          131
+        ],
+        "printed_pages": [
+          107
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1194-1196, PDF page 131 (printed page 107)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Sagittarius"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 108
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Kokila"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Saturn.house",
+            "comparator": "equals",
+            "value": 5
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "siblings_children",
+        "summary": "Few or no younger siblings, childhood strain, and later progeny are described.",
+        "indications": [
+          "Few or no younger siblings, childhood strain, and later progeny are described."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Sagittarius",
+        "nadiamsa": "Kokila",
+        "nadiamsa_ordinal": 108
+      },
+      "topics": [
+        "siblings_children"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1199_KOKILA_MOON_RAHU_ASC",
+      "title": "Kokila Moon-Rahu in Ascendant",
+      "passage_key": "DK1.B.P132.V1199-1201",
+      "context_block_key": "DK1.B.CONTEXT.P132.V1199",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1199,
+        "verse_end": 1201,
+        "pdf_pages": [
+          132
+        ],
+        "printed_pages": [
+          108
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1199-1201, PDF page 132 (printed page 108)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Sagittarius"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 108
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Kokila"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Moon.house",
+            "comparator": "equals",
+            "value": 1
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Rahu.house",
+            "comparator": "equals",
+            "value": 1
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Moon.Rahu.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "personality",
+        "summary": "Anger, poor judgment and a difficult early phase are described, followed by improvement.",
+        "indications": [
+          "Anger, poor judgment and a difficult early phase are described, followed by improvement."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Sagittarius",
+        "nadiamsa": "Kokila"
+      },
+      "topics": [
+        "personality"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1313_AQUARIUS_DHRUVA_SATURN_MARS",
+      "title": "Aquarius Dhruva sibling strain",
+      "passage_key": "DK1.B.P142.V1313-1314_5",
+      "context_block_key": "DK1.B.CONTEXT.P142.V1313",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1313,
+        "verse_end": 1314,
+        "pdf_pages": [
+          142
+        ],
+        "printed_pages": [
+          118
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1313-1314.5, PDF page 142 (printed page 118)",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Aquarius"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 22
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Dhruvaa"
+          },
+          {
+            "op": "any",
+            "children": [
+              {
+                "op": "all",
+                "children": [
+                  {
+                    "op": "fact",
+                    "key": "deva_keralam.planet.Saturn.house",
+                    "comparator": "equals",
+                    "value": 3
+                  },
+                  {
+                    "op": "fact",
+                    "key": "deva_keralam.planet.Mars.house",
+                    "comparator": "equals",
+                    "value": 6
+                  }
+                ]
+              },
+              {
+                "op": "all",
+                "children": [
+                  {
+                    "op": "fact",
+                    "key": "deva_keralam.planet.Saturn.house",
+                    "comparator": "equals",
+                    "value": 6
+                  },
+                  {
+                    "op": "fact",
+                    "key": "deva_keralam.planet.Mars.house",
+                    "comparator": "equals",
+                    "value": 3
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "siblings",
+        "summary": "An elder sister is described as facing persistent health and emotional strain.",
+        "indications": [
+          "An elder sister is described as facing persistent health and emotional strain."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "qualified",
+      "context_qualification_acknowledged": true,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "source_label": "Guha",
+        "resolved_table_name": "Dhruvaa",
+        "resolution_basis": "The editor explicitly identifies Guha here as Dhruva Nadiamsa."
+      },
+      "topics": [
+        "siblings"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "The source editor resolves the locally used Guha label to canonical Table 1 Dhruvaa."
+      ]
+    },
+    {
+      "key": "DK.B.1322_AQUARIUS_DHRUVA_MARS_TENTH",
+      "title": "Aquarius Dhruva Mars in tenth",
+      "passage_key": "DK1.B.P143.V1322-1324",
+      "context_block_key": "DK1.B.CONTEXT.P143.V1322",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1322,
+        "verse_end": 1324,
+        "pdf_pages": [
+          143
+        ],
+        "printed_pages": [
+          119
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1322-1324, PDF page 143 (printed page 119)",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Aquarius"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 22
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Dhruvaa"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.half",
+            "comparator": "equals",
+            "value": "former"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.house",
+            "comparator": "equals",
+            "value": 10
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "dharma_family",
+        "summary": "Good conduct, devotion to father and care for sacred places are emphasized.",
+        "indications": [
+          "Good conduct, devotion to father and care for sacred places are emphasized."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "qualified",
+      "context_qualification_acknowledged": true,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "source_label": "Guha",
+        "resolved_table_name": "Dhruvaa",
+        "half": "former"
+      },
+      "topics": [
+        "dharma_family"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1325_AQUARIUS_DHRUVA_MARS_KENDRA",
+      "title": "Aquarius Dhruva Mars partnership indication",
+      "passage_key": "DK1.B.P143.V1325-1325_5",
+      "context_block_key": "DK1.B.CONTEXT.P143.V1325",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1325,
+        "verse_end": 1325,
+        "pdf_pages": [
+          143
+        ],
+        "printed_pages": [
+          119
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1325-1325.5, PDF page 143 (printed page 119)",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Aquarius"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 22
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Dhruvaa"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.house",
+            "comparator": "in",
+            "value": [
+              1,
+              7,
+              10
+            ]
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "marriage_wealth",
+        "summary": "A distinguished spouse and wealth from birth are described.",
+        "indications": [
+          "A distinguished spouse and wealth from birth are described."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "qualified",
+      "context_qualification_acknowledged": true,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "source_label": "Guha",
+        "resolved_table_name": "Dhruvaa"
+      },
+      "topics": [
+        "marriage_wealth"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1343_KANTHAA_JUPITER_SIBLINGS",
+      "title": "Kanthaa Jupiter and sibling pattern",
+      "passage_key": "DK1.B.P145.V1343-1345_5",
+      "context_block_key": "DK1.B.CONTEXT.P145.V1343",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1343,
+        "verse_end": 1345,
+        "pdf_pages": [
+          145
+        ],
+        "printed_pages": [
+          121
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1343-1345.5, PDF page 145 (printed page 121)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 31
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Kanthaa"
+          },
+          {
+            "op": "any",
+            "children": [
+              {
+                "op": "fact",
+                "key": "deva_keralam.planet.Jupiter.dignity",
+                "comparator": "in",
+                "value": [
+                  "own_sign",
+                  "exalted"
+                ]
+              },
+              {
+                "op": "fact",
+                "key": "deva_keralam.planet.Jupiter.house",
+                "comparator": "in",
+                "value": [
+                  1,
+                  4,
+                  7,
+                  10
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "siblings",
+        "summary": "Strain or loss involving an older sibling is described alongside younger siblings.",
+        "indications": [
+          "Strain or loss involving an older sibling is described alongside younger siblings."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Capricorn",
+        "nadiamsa": "Kanthaa",
+        "nadiamsa_ordinal": 31
+      },
+      "topics": [
+        "siblings"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1355_KANTHAA_PROGENY_PRESSURE",
+      "title": "Kanthaa progeny pressure combination",
+      "passage_key": "DK1.B.P146.V1355-1355",
+      "context_block_key": "DK1.B.CONTEXT.P146.V1355",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1355,
+        "verse_end": 1355,
+        "pdf_pages": [
+          146
+        ],
+        "printed_pages": [
+          122
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1355-1355, PDF page 146 (printed page 122)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 31
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Kanthaa"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Venus.house",
+            "comparator": "equals",
+            "value": 6
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Sun.Jupiter.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "children",
+        "summary": "Miscarriage or loss of children is indicated in the traditional text.",
+        "indications": [
+          "Miscarriage or loss of children is indicated in the traditional text."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Capricorn",
+        "nadiamsa": "Kanthaa"
+      },
+      "topics": [
+        "children"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1356_KANTHAA_SATURN_PROGENY_PRESSURE",
+      "title": "Kanthaa Saturn progeny pressure",
+      "passage_key": "DK1.B.P146.V1356-1356_5",
+      "context_block_key": "DK1.B.CONTEXT.P146.V1356",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1356,
+        "verse_end": 1356,
+        "pdf_pages": [
+          146
+        ],
+        "printed_pages": [
+          122
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1356-1356.5, PDF page 146 (printed page 122)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 31
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Kanthaa"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Saturn.house",
+            "comparator": "in",
+            "value": [
+              4,
+              8,
+              12
+            ]
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "children",
+        "summary": "Serious progeny pressure is indicated by Saturn occupying the eighth house or one of its trines.",
+        "indications": [
+          "Serious progeny pressure is indicated by Saturn occupying the eighth house or one of its trines."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Capricorn",
+        "nadiamsa": "Kanthaa"
+      },
+      "topics": [
+        "children"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1611_TRAILOKYA_FIRST_APPEARANCE",
+      "title": "Trailokya first-half appearance",
+      "passage_key": "DK1.B.P165.V1611-1612_5",
+      "context_block_key": "DK1.B.CONTEXT.P165.V1611",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1611,
+        "verse_end": 1612,
+        "pdf_pages": [
+          165
+        ],
+        "printed_pages": [
+          141
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1611-1612.5, PDF page 165 (printed page 141)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "in",
+            "value": [
+              "Aries",
+              "Cancer",
+              "Libra",
+              "Capricorn"
+            ]
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 75
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Trailokya-mohankari"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.half",
+            "comparator": "equals",
+            "value": "former"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "appearance",
+        "summary": "A reddish complexion, pleasing appearance, devotional conduct and a large sibling group are described.",
+        "indications": [
+          "A reddish complexion, pleasing appearance, devotional conduct and a large sibling group are described."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant_modality": "movable",
+        "source_label": "Trailokya",
+        "canonical_table_name": "Trailokya-mohankari"
+      },
+      "topics": [
+        "appearance"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1617_TRAILOKYA_FIRST_PARENTS",
+      "title": "Trailokya first-half parental support",
+      "passage_key": "DK1.B.P166.V1617-1618",
+      "context_block_key": "DK1.B.CONTEXT.P166.V1617",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1617,
+        "verse_end": 1618,
+        "pdf_pages": [
+          166
+        ],
+        "printed_pages": [
+          142
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1617-1618, PDF page 166 (printed page 142)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "in",
+            "value": [
+              "Aries",
+              "Cancer",
+              "Libra",
+              "Capricorn"
+            ]
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 75
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Trailokya-mohankari"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.half",
+            "comparator": "equals",
+            "value": "former"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "parents",
+        "summary": "Long-lived parents and gains through family business are described.",
+        "indications": [
+          "Long-lived parents and gains through family business are described."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant_modality": "movable",
+        "nadiamsa": "Trailokya-mohankari"
+      },
+      "topics": [
+        "parents"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1623_TRAILOKYA_MERCURY_ARIES",
+      "title": "Trailokya Mercury and paternal support",
+      "passage_key": "DK1.B.P166.V1623-1626",
+      "context_block_key": "DK1.B.CONTEXT.P166.V1623",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1623,
+        "verse_end": 1626,
+        "pdf_pages": [
+          166
+        ],
+        "printed_pages": [
+          142
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1623-1626, PDF page 166 (printed page 142)",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "in",
+            "value": [
+              "Libra",
+              "Capricorn"
+            ]
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 75
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Trailokya-mohankari"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.half",
+            "comparator": "equals",
+            "value": "latter"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mercury.rashi.name",
+            "comparator": "equals",
+            "value": "Aries"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mercury.navamsa.name",
+            "comparator": "equals",
+            "value": "Scorpio"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "parents",
+        "summary": "A large paternal family and devoted care for parents are described.",
+        "indications": [
+          "A large paternal family and devoted care for parents are described."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "qualified",
+      "context_qualification_acknowledged": true,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Libra or Capricorn because Mercury must rule House 9",
+        "half": "latter"
+      },
+      "topics": [
+        "parents"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "The stated ninth-lord identity restricts the movable Ascendant alternatives to Libra and Capricorn."
+      ]
+    },
+    {
+      "key": "DK.B.1729_TRAILOKYA_KETU_URINARY_MARRIAGE",
+      "title": "Ketu in Pisces and marital/urinary strain",
+      "passage_key": "DK1.B.P175.V1729-1729_5",
+      "context_block_key": "DK1.B.CONTEXT.P175.V1729",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1729,
+        "verse_end": 1729,
+        "pdf_pages": [
+          175
+        ],
+        "printed_pages": [
+          151
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1729-1729.5, PDF page 175 (printed page 151)",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 75
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Trailokya-mohankari"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Ketu.rashi.name",
+            "comparator": "equals",
+            "value": "Pisces"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Ketu.navamsa.name",
+            "comparator": "in",
+            "value": [
+              "Libra",
+              "Scorpio"
+            ]
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "health_marriage",
+        "summary": "Marital dissatisfaction and urinary-passage sensitivity are described.",
+        "indications": [
+          "Marital dissatisfaction and urinary-passage sensitivity are described."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "qualified",
+      "context_qualification_acknowledged": true,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Capricorn",
+        "ongoing_context": "Trailokya Nadiamsa"
+      },
+      "topics": [
+        "health_marriage"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "The Capricorn Ascendant and Trailokya-mohankari Nadiamsa premises are inherited from the uninterrupted section rather than restated in verse 1729; approval is qualified and retains both premises in the executable expression."
+      ]
+    },
+    {
+      "key": "DK.B.1745_MARS_RAHU_EAR_PRESSURE",
+      "title": "Mars-Rahu ear pressure",
+      "passage_key": "DK1.B.P176.V1745-1747",
+      "context_block_key": "DK1.B.CONTEXT.P176.V1745",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1745,
+        "verse_end": 1747,
+        "pdf_pages": [
+          176
+        ],
+        "printed_pages": [
+          152
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1745-1747, PDF page 176 (printed page 152)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.house",
+            "comparator": "equals",
+            "value": 2
+          },
+          {
+            "op": "any",
+            "children": [
+              {
+                "op": "fact",
+                "key": "deva_keralam.relationship.conjunction.Mars.Rahu.present",
+                "comparator": "equals",
+                "value": true
+              },
+              {
+                "op": "fact",
+                "key": "deva_keralam.relationship.aspect.Mars.Rahu.present",
+                "comparator": "equals",
+                "value": true
+              },
+              {
+                "op": "fact",
+                "key": "deva_keralam.relationship.aspect.Rahu.Mars.present",
+                "comparator": "equals",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "health_senses",
+        "summary": "Ulceration or inflammatory trouble around the roots of the ears is described.",
+        "indications": [
+          "Ulceration or inflammatory trouble around the roots of the ears is described."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "configuration": "Mars in House 2, joined by or classically aspected by Rahu"
+      },
+      "topics": [
+        "health_senses"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1745_JUPITER_THIRD_EAR_PROTECTION",
+      "title": "Jupiter in third protects the ears",
+      "passage_key": "DK1.B.P176.V1745-1747",
+      "context_block_key": "DK1.B.CONTEXT.P176.V1745",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1745,
+        "verse_end": 1747,
+        "pdf_pages": [
+          176
+        ],
+        "printed_pages": [
+          152
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1745-1747, PDF page 176 (printed page 152)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.planet.Jupiter.house",
+        "comparator": "equals",
+        "value": 3
+      },
+      "outcome": {
+        "topic": "protection",
+        "summary": "Jupiter in the third is explicitly described as protection from ear disorders.",
+        "indications": [
+          "Jupiter in the third is explicitly described as protection from ear disorders."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {},
+      "topics": [
+        "protection"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1813_CANCER_KAHALA_YOGA",
+      "title": "Cancer Kahala yoga",
+      "passage_key": "DK1.B.P180.V1813-1815",
+      "context_block_key": "DK1.B.CONTEXT.P180.V1813",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1813,
+        "verse_end": 1815,
+        "pdf_pages": [
+          180
+        ],
+        "printed_pages": [
+          156
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1813-1815, PDF page 180 (printed page 156)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Cancer"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.rashi.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.navamsa.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Mars.Saturn.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "wealth_status",
+        "summary": "Wealth, resources, intelligence, radiance, courage and command are emphasized.",
+        "indications": [
+          "Wealth, resources, intelligence, radiance, courage and command are emphasized."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Cancer",
+        "Mars_condition": "Capricorn Vargottama represented by identical Rashi and Navamsa"
+      },
+      "topics": [
+        "wealth_status"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1823_TAURUS_SEETHALA_APPEARANCE",
+      "title": "Taurus Seethala appearance combination",
+      "passage_key": "DK1.B.P181.V1823-1823",
+      "context_block_key": "DK1.B.CONTEXT.P181.V1823",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1823,
+        "verse_end": 1823,
+        "pdf_pages": [
+          181
+        ],
+        "printed_pages": [
+          157
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1823-1823, PDF page 181 (printed page 157)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Taurus"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 55
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Seethala"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Mercury.Venus.present",
+            "comparator": "equals",
+            "value": true
+          },
+          {
+            "op": "any",
+            "children": [
+              {
+                "op": "fact",
+                "key": "deva_keralam.relationship.aspect.Saturn.Venus.present",
+                "comparator": "equals",
+                "value": true
+              },
+              {
+                "op": "fact",
+                "key": "deva_keralam.relationship.aspect.Venus.Saturn.present",
+                "comparator": "equals",
+                "value": true
+              }
+            ]
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Venus.navamsa.name",
+            "comparator": "equals",
+            "value": "Pisces"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "appearance",
+        "summary": "A reddish complexion and pleasing appearance are described.",
+        "indications": [
+          "A reddish complexion and pleasing appearance are described."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Taurus",
+        "nadiamsa": "Seethala"
+      },
+      "topics": [
+        "appearance"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "The translation states an aspect relation between Venus and Saturn without an unambiguous direction; the reviewed expression accepts either classical directional aspect while preserving the conjunction and Navamsa premises."
+      ]
+    },
+    {
+      "key": "DK.B.1843_TAURUS_SEETHALA_LEARNING",
+      "title": "Taurus Seethala learning combination",
+      "passage_key": "DK1.B.P183.V1843-1844",
+      "context_block_key": "DK1.B.CONTEXT.P183.V1843",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1843,
+        "verse_end": 1844,
+        "pdf_pages": [
+          183
+        ],
+        "printed_pages": [
+          159
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1843-1844, PDF page 183 (printed page 159)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Taurus"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 55
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Seethala"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Jupiter.house",
+            "comparator": "equals",
+            "value": 1
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.aspect.Saturn.Sun.present",
+            "comparator": "equals",
+            "value": true
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Sun.navamsa.name",
+            "comparator": "equals",
+            "value": "Pisces"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "learning",
+        "summary": "Wide learning, command of languages, graceful speech and devotional conduct are described.",
+        "indications": [
+          "Wide learning, command of languages, graceful speech and devotional conduct are described."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Taurus",
+        "nadiamsa": "Seethala"
+      },
+      "topics": [
+        "learning"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1848_TAURUS_SEETHALA_SINGLE_MARRIAGE",
+      "title": "Taurus Seethala single-marriage combination",
+      "passage_key": "DK1.B.P183.V1848-1848",
+      "context_block_key": "DK1.B.CONTEXT.P183.V1848",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1848,
+        "verse_end": 1848,
+        "pdf_pages": [
+          183
+        ],
+        "printed_pages": [
+          159
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1848-1848, PDF page 183 (printed page 159)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Taurus"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 55
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Seethala"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Mars.Saturn.present",
+            "comparator": "equals",
+            "value": true
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.navamsa.name",
+            "comparator": "in",
+            "value": [
+              "Taurus",
+              "Leo",
+              "Scorpio",
+              "Aquarius"
+            ]
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.aspect.Jupiter.Mars.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "marriage",
+        "summary": "The text treats this as a cancellation of remarriage indications and indicates one marriage.",
+        "indications": [
+          "The text treats this as a cancellation of remarriage indications and indicates one marriage."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant": "Taurus",
+        "nadiamsa": "Seethala"
+      },
+      "topics": [
+        "marriage"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.1853_FIXED_SEETHALA_FIRST_APPEARANCE",
+      "title": "Fixed Ascendant Seethala first-half profile",
+      "passage_key": "DK1.B.P183.V1853-1854_5",
+      "context_block_key": "DK1.B.CONTEXT.P183.V1853",
+      "decision": "approved",
+      "source": {
+        "verse_start": 1853,
+        "verse_end": 1854,
+        "pdf_pages": [
+          183,
+          184
+        ],
+        "printed_pages": [
+          159,
+          160
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1853-1854.5, PDF pages 183-184 (printed pages 159-160)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "in",
+            "value": [
+              "Taurus",
+              "Leo",
+              "Scorpio",
+              "Aquarius"
+            ]
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 55
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Seethala"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.half",
+            "comparator": "equals",
+            "value": "former"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "appearance",
+        "summary": "Beauty, intelligence, skill, attractive eyes, generosity and wealth are emphasized.",
+        "indications": [
+          "Beauty, intelligence, skill, attractive eyes, generosity and wealth are emphasized."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "ascendant_modality": "fixed",
+        "nadiamsa": "Seethala",
+        "half": "former"
+      },
+      "topics": [
+        "appearance"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.R0969_AROODHA_VENUS",
+      "title": "Rejected: Venus and Aroodha Raja yoga",
+      "passage_key": "DK1.B.P113.V0969-970_5",
+      "context_block_key": "DK1.B.CONTEXT.P113.V0969",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 969,
+        "verse_end": 970,
+        "pdf_pages": [
+          113
+        ],
+        "printed_pages": [
+          89
+        ],
+        "reference_label": "Deva Keralam Book I, verses 969-970.5, PDF page 113 (printed page 89)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.rashi.name",
+        "comparator": "in",
+        "value": [
+          "Aries",
+          "Cancer",
+          "Libra",
+          "Capricorn"
+        ]
+      },
+      "outcome": {
+        "topic": "wealth_status",
+        "summary": "Raja yoga through Venus contacting selected Aroodha positions.",
+        "indications": [
+          "Raja yoga through Venus contacting selected Aroodha positions."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "The current canonical fact ontology has no Aroodha Lagna or Aroodha-house contact facts; reducing the premise to ordinary houses would alter the rule."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "blocked_missing_aroodha_fact_ontology",
+      "inherited_context": {},
+      "topics": [
+        "wealth_status"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.R0972_LAGNA_LORD_NAVAMSA",
+      "title": "Rejected: Lagna lord in Capricorn Navamsa",
+      "passage_key": "DK1.B.P113.V0972-972_5",
+      "context_block_key": "DK1.B.CONTEXT.P113.V0972",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 972,
+        "verse_end": 972,
+        "pdf_pages": [
+          113
+        ],
+        "printed_pages": [
+          89
+        ],
+        "reference_label": "Deva Keralam Book I, verses 972-972.5, PDF page 113 (printed page 89)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.navamsa.name",
+        "comparator": "equals",
+        "value": "Capricorn"
+      },
+      "outcome": {
+        "topic": "personality",
+        "summary": "Anger and weak judgment are attributed to the Lagna lord in Capricorn Navamsa.",
+        "indications": [
+          "Anger and weak judgment are attributed to the Lagna lord in Capricorn Navamsa."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "The condition belongs to the planet ruling the Ascendant, not to the Ascendant Navamsa itself; the current expression language cannot bind a dynamic house lord to that planet’s Navamsa."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "blocked_dynamic_lord_binding",
+      "inherited_context": {},
+      "topics": [
+        "personality"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.R1020_SWATI_MOON",
+      "title": "Rejected: Swati Moon in Capricorn Navamsa",
+      "passage_key": "DK1.B.P117.V1020-1025",
+      "context_block_key": "DK1.B.CONTEXT.P117.V1020",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1020,
+        "verse_end": 1025,
+        "pdf_pages": [
+          117
+        ],
+        "printed_pages": [
+          93
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1020-1025, PDF page 117 (printed page 93)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Moon.navamsa.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "personality",
+        "summary": "Eloquence, intelligence, siblings and paternal-family effects are described.",
+        "indications": [
+          "Eloquence, intelligence, siblings and paternal-family effects are described."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "The editor resolves the deity-name wording specifically to Swati second quarter; the canonical Deva Keralam ontology does not yet expose planetary Nakshatra or pada facts."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "blocked_missing_nakshatra_facts",
+      "inherited_context": {},
+      "topics": [
+        "personality"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.R1057_MARS_SATURN_MORTALITY",
+      "title": "Rejected: Mars-Saturn mortality statement",
+      "passage_key": "DK1.B.P120.V1057-1057",
+      "context_block_key": "DK1.B.CONTEXT.P120.V1057",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1057,
+        "verse_end": 1057,
+        "pdf_pages": [
+          120
+        ],
+        "printed_pages": [
+          96
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1057-1057, PDF page 120 (printed page 96)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Libra"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.house",
+            "comparator": "equals",
+            "value": 8
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Saturn.house",
+            "comparator": "equals",
+            "value": 8
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Mars.Saturn.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "longevity",
+        "summary": "The passage makes a direct untimely-death claim.",
+        "indications": [
+          "The passage makes a direct untimely-death claim."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "A deterministic death claim is not approved for execution or user-facing chart judgment."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "rejected_direct_mortality_claim",
+      "inherited_context": {},
+      "topics": [
+        "longevity"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.R1219_GUHA_UNRESOLVED",
+      "title": "Rejected: Guha Nadiamsa block",
+      "passage_key": "DK1.B.P134.V1219-1225",
+      "context_block_key": "DK1.B.CONTEXT.P134.V1219",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1219,
+        "verse_end": 1225,
+        "pdf_pages": [
+          134
+        ],
+        "printed_pages": [
+          110
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1219-1225, PDF page 134 (printed page 110)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.ascendant.rashi.name",
+        "comparator": "equals",
+        "value": "Aquarius"
+      },
+      "outcome": {
+        "topic": "life_pattern",
+        "summary": "Birth-order, physique, sibling and place-of-birth outcomes are described.",
+        "indications": [
+          "Birth-order, physique, sibling and place-of-birth outcomes are described."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "The source states Guha is absent from all three consulted lists and only tentatively proposes Dhruva; this local block is not admitted without a reviewed name resolution for each verse."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "blocked_unresolved_nadi_name",
+      "inherited_context": {},
+      "topics": [
+        "life_pattern"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.R1338_KANTHAA_VENUS_TRIMSAMSA",
+      "title": "Rejected: Kanthaa in Venus Trimsamsa",
+      "passage_key": "DK1.B.P145.V1338-1342",
+      "context_block_key": "DK1.B.CONTEXT.P145.V1338",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1338,
+        "verse_end": 1342,
+        "pdf_pages": [
+          145
+        ],
+        "printed_pages": [
+          121
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1338-1342, PDF page 145 (printed page 121)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.ordinal",
+            "comparator": "equals",
+            "value": 31
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.nadiamsa.name",
+            "comparator": "equals",
+            "value": "Kanthaa"
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "appearance",
+        "summary": "Complexion, build, intelligence and sensual disposition are described.",
+        "indications": [
+          "Complexion, build, intelligence and sensual disposition are described."
+        ]
+      },
+      "precision_requirements": [
+        {
+          "key": "deva_keralam.precision.ascendant.reliable",
+          "comparator": "equals",
+          "value": true,
+          "unavailable_reason": "Exact Nadiamsa or half-Nadiamsa context is unsafe when the Ascendant can cross its source boundary."
+        }
+      ],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "The editor explicitly notes that Capricorn Kanthaa Nadiamsa at 6°00′–6°12′ does not fall in the stated Venus Trimsamsa at 0°–5°; the combined premise is astronomically impossible."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "rejected_impossible_subdivision_context",
+      "inherited_context": {},
+      "topics": [
+        "appearance"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.R1782_PANKAJA_PROGENY",
+      "title": "Rejected: Pankaja progeny geometry",
+      "passage_key": "DK1.B.P179.V1782-1783_5",
+      "context_block_key": "DK1.B.CONTEXT.P179.V1782",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1782,
+        "verse_end": 1783,
+        "pdf_pages": [
+          179
+        ],
+        "printed_pages": [
+          155
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1782-1783.5, PDF page 179 (printed page 155)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Capricorn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.house",
+            "comparator": "equals",
+            "value": 7
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Jupiter.house",
+            "comparator": "equals",
+            "value": 5
+          },
+          {
+            "op": "any",
+            "children": [
+              {
+                "op": "fact",
+                "key": "deva_keralam.relationship.aspect.Mars.Jupiter.present",
+                "comparator": "equals",
+                "value": true
+              },
+              {
+                "op": "fact",
+                "key": "deva_keralam.relationship.aspect.Jupiter.Mars.present",
+                "comparator": "equals",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "children",
+        "summary": "Children through remarriage are described.",
+        "indications": [
+          "Children through remarriage are described."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "For Capricorn Ascendant, Mars in House 7 and Jupiter in House 5 cannot form a classical Parashari graha aspect in either direction; the stated conjunction of premises is geometrically impossible."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "rejected_impossible_aspect_geometry",
+      "inherited_context": {},
+      "topics": [
+        "children"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    },
+    {
+      "key": "DK.B.R1818_JUPITER_DEBILITATED_CANCER_NAVAMSA",
+      "title": "Rejected: debilitated Jupiter in Cancer Navamsa",
+      "passage_key": "DK1.B.P180.V1818-1818_5",
+      "context_block_key": "DK1.B.CONTEXT.P180.V1818",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 1818,
+        "verse_end": 1818,
+        "pdf_pages": [
+          180
+        ],
+        "printed_pages": [
+          156
+        ],
+        "reference_label": "Deva Keralam Book I, verses 1818-1818.5, PDF page 180 (printed page 156)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse range and local inherited context were checked against the rendered page image; half-verses are represented by the containing integer verse range."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "equals",
+            "value": "Cancer"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Jupiter.dignity",
+            "comparator": "equals",
+            "value": "debilitated"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Jupiter.navamsa.name",
+            "comparator": "equals",
+            "value": "Cancer"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.conjunction.Jupiter.Venus.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "children",
+        "summary": "Children and their longevity are described.",
+        "indications": [
+          "Children and their longevity are described."
+        ]
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "Debilitated Jupiter must be in Capricorn, whose nine Navamsas run Virgo through Taurus and cannot be Cancer; the stated Rashi-Navamsa combination is impossible."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "rejected_impossible_rashi_navamsa_geometry",
+      "inherited_context": {},
+      "topics": [
+        "children"
+      ],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": []
+    }
+  ]
+}

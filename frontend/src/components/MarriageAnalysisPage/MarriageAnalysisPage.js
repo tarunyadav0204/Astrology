@@ -103,6 +103,7 @@ const MarriageAnalysisPage = ({ user, onLogout, onAdminClick, onLogin, showLogin
             title="Marriage Analysis - Enter Birth Details"
             description="Please provide your birth information to generate your marriage analysis report"
             prefilledData={prefilledData}
+            submitLabel="Generate Marriage Analysis"
           />
         </div>
       </div>

@@ -1,0 +1,2071 @@
+{
+  "schema_version": "deva-keralam-completion-backlog/1.0.0",
+  "edition_key": "deva_keralam_volume_1_scan",
+  "disposition": "ambiguous_context",
+  "entries": [
+    {
+      "catalogue_ordinal": 2,
+      "passage_key": "DK1.OCR.P0026.V0003-0003",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream D, PDF page 26, verses 3–3. The term 'muletics' is unintelligible and requires identification of the intended astrological entity. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 7,
+      "passage_key": "DK1.OCR.P0028.V0019-0019",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 28, verses 19–19. The definition of Maatanga Yoga is not provided in the text. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 8,
+      "passage_key": "DK1.OCR.P0028.V0020-0020",
+      "category": "technical_term_definition",
+      "details": "Stream D, PDF page 28, verses 20–20. Definition of 'Maalint Amsa' is missing.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 28,
+      "passage_key": "DK1.OCR.P0031.V0046-0046",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 31, verses 46–46. The definition of Koorma Yoga is missing from the provided text. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 45,
+      "passage_key": "DK1.OCR.P0036.V0097-0098",
+      "category": "clause_boundary",
+      "details": "Stream D, PDF page 36, verses 97–98. The term 'Vipra Kaala', 'Vaisya Kaala', 'Kshatriya Kaala', and 'Soodra Kaala' are not defined in the passage. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 46,
+      "passage_key": "DK1.OCR.P0037.V0099-0099",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 37, verses 99–99. The text provides specific degree ranges for the Nadiamsa but the rule is explicitly tied to Aquarius ascendant in the notes; it is unclear if the general effects apply to all ascendants or only Aquarius. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 47,
+      "passage_key": "DK1.OCR.P0037.V0100-0100",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 37, verses 100–100. The term 'after-born' is interpreted as younger siblings based on the context of the notes.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 49,
+      "passage_key": "DK1.OCR.P0037.V0103-0103",
+      "category": "relationship_or_reference_point",
+      "details": "Stream D, PDF page 37, verses 103–103. The term 'friendly Rasi' relies on standard planetary friendship tables not explicitly defined in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 51,
+      "passage_key": "DK1.OCR.P0038.V0108-0109",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 38, verses 108–109. The text presents conflicting information regarding coborns (no coborns vs only sisters). This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 52,
+      "passage_key": "DK1.OCR.P0038.V0110-0110",
+      "category": "ascendant_scope",
+      "details": "Stream D, PDF page 38, verses 110–110. The definition of 'former half' of a Nadiamsa is not provided. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_identity_unresolved): Agada is not a name in the pinned 150-Nadi Table 1, and the adjacent page does not supply a secure canonical ordinal. The “former half” result cannot be attached to a computed chart position.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_identity_unresolved"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 53,
+      "passage_key": "DK1.OCR.P0038.V0111-0111",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 38, verses 111–111. The text states the 11th lord is in Viswsambhara Nadiamsa but then says the rule is for a birth in Agada Nadiamsa; it is unclear if both must be true or if the text contains a transcription error.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 56,
+      "passage_key": "DK1.OCR.P0038.V0115-0118",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 38, verses 115–118. The definition and calculation method for 'Agada Nadiamsa' are not provided in the text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_identity_and_mortality): Agada remains unmapped to the pinned table; the passage also contains death or child-loss statements and remedies, so it is not executable in the natal compiler.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_identity_and_mortality"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 60,
+      "passage_key": "DK1.OCR.P0039.V0129-0129",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 39, verses 129–129. The passage ends abruptly before stating the consequence or prediction associated with the condition. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 67,
+      "passage_key": "DK1.OCR.P0041.V0143-0143",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 41, verses 143–143. The definition of 'benefic' navamsa is not provided in the text. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 78,
+      "passage_key": "DK1.OCR.P0045.V0190-0191",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 45, verses 190–191. The definition and degree boundaries of 'Varuna Nadiamsa' are not provided. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_table_conflict): The page note emends Varuna to Varuni and proposes modality-specific ordinals that conflict with the pinned canonical table. A second textual witness is required before chart matching.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_table_conflict"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 82,
+      "passage_key": "DK1.OCR.P0046.V0200-0200",
+      "category": "outcome_or_subject_interpretation",
+      "details": "Stream D, PDF page 46, verses 200–200. Definition of 'Varuna adiamsa' is missing.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 86,
+      "passage_key": "DK1.OCR.P0047.V0206-0208",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 47, verses 206–208. OCR corruption in '1116 ascendant' makes the house placement of Jupiter ambiguous. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 88,
+      "passage_key": "DK1.OCR.P0048.V0214-0214",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 48, verses 214–214. Definition of 'Varuna Nadiamsa' is missing. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_table_conflict): The local Sagittarius/Varuna section is clear, but Varuna/Varuni cannot be mapped consistently to the pinned table without contradicting its ordinal names.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_table_conflict"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 90,
+      "passage_key": "DK1.OCR.P0048.V0216-0216",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 48, verses 216–216. The definition of 'Varuna Nadiamsa' is not provided in the text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (clause_boundary_and_timing): Verse 216 is a Varuna dasha result. The extracted Jupiter and Venus conditions belong to verse 217, so the candidate joined separate clauses and cannot be compiled.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "clause_boundary_and_timing"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 104,
+      "passage_key": "DK1.OCR.P0053.V0259-0261",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 53, verses 259–261. The definition and calculation method for 'Nadiamsa' are not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 105,
+      "passage_key": "DK1.OCR.P0053.V0262-0262",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 53, verses 262–262. The term 'Aruna Nadiamsa' requires specific astrological context for identification. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 109,
+      "passage_key": "DK1.OCR.P0054.V0271-0272",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 54, verses 271–272. The text mentions 'Sun 15', which is likely an OCR error for 'Sun is'. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 118,
+      "passage_key": "DK1.OCR.P0055.V0291-0291",
+      "category": "ascendant_scope",
+      "details": "Stream D, PDF page 55, verses 291–291. The text mentions 'trine from natal ascendant' but the example provided uses Sagittarius ascendant and specifies Mars (the 9th lord for Sagittarius) in Aries or Leo Navamsa. It is unclear if the rule applies generally to any 9th lord or specifically to Mars for Sagittarius.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 122,
+      "passage_key": "DK1.OCR.P0057.V0314-0317",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 57, verses 314–317. The source text is truncated and does not contain the predicted outcome for the described planetary configuration. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 130,
+      "passage_key": "DK1.OCR.P0060.V0344-0344",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 60, verses 344–344. The text notes that the rule is generally found in standard texts but provides specific, varied outcomes for different houses that may depend on the strength of the planet, which is not fully defined.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 138,
+      "passage_key": "DK1.OCR.P0063.V0370-0372",
+      "category": "ascendant_scope",
+      "details": "Stream D, PDF page 63, verses 370–372. The passage mentions 'die instantly' for Scorpio ascendant in Uraga Nadiamsa, but then provides conditions for survival; the relationship between these two states is unclear.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 140,
+      "passage_key": "DK1.OCR.P0065.V0388-0390",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 65, verses 388–390. The specific Nadiamsa identifier is not provided in the text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_identity_and_clause_split): The page confirms Uraga context, but Uraga is absent from the pinned table and verses 388–390 contain distinct former/latter-half clauses that cannot be represented as one rule.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_identity_and_clause_split"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 143,
+      "passage_key": "DK1.OCR.P0065.V0395-0395",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 65, verses 395–395. The passage mentions 'Jupiter's aspect' in the second sentence but does not provide the rule for the first half of the Nadiamsa.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 148,
+      "passage_key": "DK1.OCR.P0066.V0401-0401",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 66, verses 401–401. The specific Nadiamsa being referenced is not identified in the provided text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_identity_unresolved): The adjacent page identifies the inherited Nadiamsa as Uraga, but Uraga has no source-secure canonical ordinal in the pinned table.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_identity_unresolved"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 150,
+      "passage_key": "DK1.OCR.P0066.V0404-0404",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 66, verses 404–404. The source text is truncated ('mar-'), making the specific prediction regarding marriage impossible to determine. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 158,
+      "passage_key": "DK1.OCR.P0067.V0415-0416",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 67, verses 415–416. The specific Nadiamsa being referenced is not identified in the provided text. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 159,
+      "passage_key": "DK1.OCR.P0068.V0417-0417",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 68, verses 417–417. The text mentions '(or in Sura Nadiamsa)' as an alternative condition to Leo Navamsa, but the definition and scope of Sura Nadiamsa are not provided.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 168,
+      "passage_key": "DK1.OCR.P0068.V0427-0427",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 68, verses 427–427. The OCR text contains Sanskrit verses with potential transcription errors (e.g., 'स्यलकप्रनलं'). This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 189,
+      "passage_key": "DK1.OCR.P0080.V0562-0562",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 80, verses 562–562. The passage contains a second, contradictory Sanskrit verse (562.5) regarding the maternal uncle (matula) having tuberculosis, which conflicts with the English text regarding the maternal grandfather. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 192,
+      "passage_key": "DK1.OCR.P0080.V0565-0566",
+      "category": "technical_term_definition",
+      "details": "Stream D, PDF page 80, verses 565–566. The term 'Rajavastha' is explicitly noted by the author as unknown and potentially erroneous. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 199,
+      "passage_key": "DK1.OCR.P0084.V0608-0609",
+      "category": "technical_term_definition",
+      "details": "Stream D, PDF page 84, verses 608–609. Definition of 'malefics' is not provided in the passage.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 200,
+      "passage_key": "DK1.OCR.P0084.V0610-0611",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 84, verses 610–611. The term 'Sachira' may be an OCR error for a standard Nadiamsa name. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 203,
+      "passage_key": "DK1.OCR.P0085.V0619-0620",
+      "category": "technical_term_definition",
+      "details": "Stream D, PDF page 85, verses 619–620. The term 'king' is used in the source; it is unclear if this applies to modern political leaders, individuals of high status, or is a metaphorical reference to the native's temperament.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 207,
+      "passage_key": "DK1.OCR.P0089.V0656-0658",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 89, verses 656–658. Definition of Kunda Nadiamsa is not provided. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved into approved batch-G candidate DK.G.0656-0658.PISCES_MERCURY_KUNDAA_SATURN.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "canonical_fact_compiler"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 218,
+      "passage_key": "DK1.OCR.P0091.V0698-0698",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 91, verses 698–698. The term '25-sociation' is ambiguous and likely an OCR error for 'association'. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 246,
+      "passage_key": "DK1.OCR.P0105.V0867-0867",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream D, PDF page 105, verses 867–867. The passage refers to a 'last mentioned uncle' which implies a preceding context not provided here. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (inherited_subject_without_condition): The phrase “last mentioned uncle” is recoverable from the preceding paragraph, but verse 867 contains no astrological premise of its own and cannot form an executable rule.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "inherited_subject_without_condition"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 248,
+      "passage_key": "DK1.OCR.P0105.V0870-0871",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 105, verses 870–871. The definition and calculation method for 'Nirmala Nadiamsa' are not provided in the text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (mortality_excluded): Nirmalaa and the Saturn-in-Leo condition are recoverable, but the result predicts widowhood and severe deprivation for named relatives; the candidate remains excluded under the mortality/sensitive-relative policy.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "mortality_excluded"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 249,
+      "passage_key": "DK1.OCR.P0105.V0872-0872",
+      "category": "relationship_or_reference_point",
+      "details": "Stream D, PDF page 105, verses 872–872. The passage does not define the astrological house or planet used to signify the paternal uncle.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 250,
+      "passage_key": "DK1.OCR.P0105.V0873-0873",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream D, PDF page 105, verses 873–873. The Sanskrit text 'स्वपितुव्यसुतस्थाने' (house of father's brother's children) is interpreted here as 'house of step-brothers' based on the English translation provided in the source, but requires verification of the specific house index.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 256,
+      "passage_key": "DK1.OCR.P0107.V0894-0895",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 107, verses 894–895. The definition and calculation method for 'Nirmala Nadiamsa' are not provided in the text. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 263,
+      "passage_key": "DK1.OCR.P0108.V0907-0907",
+      "category": "section_or_nadi_identity",
+      "details": "Stream D, PDF page 108, verses 907–907. The definition and calculation method for 'Nirmala Nadiamsa' are not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 264,
+      "passage_key": "DK1.OCR.P0108.V0908-0908",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 108, verses 908–908. The passage refers to 'other textual sources' for the first claim, which are not provided. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 265,
+      "passage_key": "DK1.OCR.P0108.V0909-0910",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream D, PDF page 108, verses 909–910. The text mentions 'dots contributed by Mars in his Ashtaka Varga' without specifying if this refers to the Bhinnashtakavarga of Mars or the Sarvashtakavarga.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 266,
+      "passage_key": "DK1.OCR.P0109.V0911-0914",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 109, verses 911–914. The text contains a typo 'ice.' which obscures the identification of the 3rd lord. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 276,
+      "passage_key": "DK1.OCR.P0110.V0933-0937",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 110, verses 933–937. The text is truncated at 'disposi-', implying 'disposition', but the full word is missing. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 278,
+      "passage_key": "DK1.OCR.P0112.V0960-0960",
+      "category": "technical_term_definition",
+      "details": "Stream D, PDF page 112, verses 960–960. The specific planetary configuration defining Indra Yoga is missing from the provided text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 286,
+      "passage_key": "DK1.OCR.P0115.V0997-1002",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream D, PDF page 115, verses 997–1002. The text mentions '15 aspected by Rahu', which is likely an OCR error for 'is aspected by Rahu'. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 291,
+      "passage_key": "DK1.OCR.P0117.V1016-1016",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream D, PDF page 117, verses 1016–1016. The definition of 'the said yoga' is missing from the provided text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 294,
+      "passage_key": "DK1.OCR.P0117.V1026-1028",
+      "category": "technical_term_definition",
+      "details": "Stream E, PDF page 117, verses 1026–1028. The passage is cut off at the end ('denotes that the native’s father would in-'), potentially missing further outcomes related to the father.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 295,
+      "passage_key": "DK1.OCR.P0118.V1029-1029",
+      "category": "outcome_or_subject_interpretation",
+      "details": "Stream E, PDF page 118, verses 1029–1029. The text uses 'or' between 7th Navamsa and 7th house Aries, which may imply different rules or a lack of technical precision in the source.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 300,
+      "passage_key": "DK1.OCR.P0119.V1050-1051",
+      "category": "ascendant_scope",
+      "details": "Stream E, PDF page 119, verses 1050–1051. The definition of 'Indra Nadiamsa' and 'Indra yoga' is not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 303,
+      "passage_key": "DK1.OCR.P0120.V1058-1058",
+      "category": "relationship_or_reference_point",
+      "details": "Stream E, PDF page 120, verses 1058–1058. The text mentions 'relatives like mother and other' as examples, but does not define the scope of 'destruction' or which specific relatives are affected by which specific Bhava.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 312,
+      "passage_key": "DK1.OCR.P0128.V1151-1155",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream E, PDF page 128, verses 1151–1155. The passage lists Cancer twice in the list of Kroora Rasis, which may be an OCR error or a specific emphasis. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 313,
+      "passage_key": "DK1.OCR.P0128.V1156-1160",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 128, verses 1156–1160. Definition of 'malefic bhuktis' is not provided in the passage.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 323,
+      "passage_key": "DK1.OCR.P0131.V1188-1188",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream E, PDF page 131, verses 1188–1188. The passage explicitly defers the description of the Rajayoga effects to the Chandra Nadi, which is not provided. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 326,
+      "passage_key": "DK1.OCR.P0132.V1195-1196",
+      "category": "relationship_or_reference_point",
+      "details": "Stream E, PDF page 132, verses 1195–1196. The passage lacks the astrological conditions (e.g., planetary placements) required to trigger these specific outcomes.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 341,
+      "passage_key": "DK1.OCR.P0136.V1238-1239",
+      "category": "technical_term_definition",
+      "details": "Stream E, PDF page 136, verses 1238–1239. The term 'Guhamsa native' is not defined in the passage and its astrological significance is unclear.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 349,
+      "passage_key": "DK1.OCR.P0137.V1248-1248",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 137, verses 1248–1248. Definition of 'Guhamsa' is not provided in the text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_identity_and_mortality): Guha/Guhamsa is not a canonical name in the pinned table, while the result is explicitly a longevity claim with remedial prescription.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_identity_and_mortality"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 354,
+      "passage_key": "DK1.OCR.P0138.V1256-1257",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 138, verses 1256–1257. The definition of 'Guha Nadi Amsa' and its 'second part' is not provided. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_dispute_and_mortality): The editor states that the sub-division reconstruction is assumptive and the verses are mixed; Guha is also unmapped and the results contain longevity and sibling-destruction claims.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_dispute_and_mortality"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 356,
+      "passage_key": "DK1.OCR.P0138.V1260-1260",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream E, PDF page 138, verses 1260–1260. Ambiguity regarding whether the rule applies exclusively to Mars as the 3rd lord or if Mars is an example. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 357,
+      "passage_key": "DK1.OCR.P0138.V1261-1261",
+      "category": "relationship_or_reference_point",
+      "details": "Stream E, PDF page 138, verses 1261–1261. Definition and calculation method for 'Guhamsa' are missing.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 358,
+      "passage_key": "DK1.OCR.P0138.V1262-1262",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream E, PDF page 138, verses 1262–1262. The specific Nadiamsa identity is missing. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 364,
+      "passage_key": "DK1.OCR.P0139.V1272-1274",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 139, verses 1272–1274. The definition of 'Guha Nadi Amsa' is not provided in the text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_identity_unresolved): The second-half Guha context is readable, but Guha has no secure canonical ordinal in the pinned table, so the otherwise natal results cannot be matched to chart facts.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_identity_unresolved"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 367,
+      "passage_key": "DK1.OCR.P0140.V1287-1287",
+      "category": "technical_term_definition",
+      "details": "Stream E, PDF page 140, verses 1287–1287. The text explicitly identifies the 11th lord as Jupiter in the parenthetical note, but it is unclear if this is a general rule for all charts or a specific condition for this passage.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 368,
+      "passage_key": "DK1.OCR.P0140.V1288-1288",
+      "category": "outcome_or_subject_interpretation",
+      "details": "Stream E, PDF page 140, verses 1288–1288. The passage lacks the astrological conditions or planetary configurations that lead to the stated outcome.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 371,
+      "passage_key": "DK1.OCR.P0141.V1295-1297",
+      "category": "technical_term_definition",
+      "details": "Stream E, PDF page 141, verses 1295–1297. The passage lacks specific astrological indicators (planetary positions, houses, or aspects) required to trigger these outcomes.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 382,
+      "passage_key": "DK1.OCR.P0144.V1336-1336",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 144, verses 1336–1336. The definition of 'former half' of the Kanthaa Nadiamsa is provided in the notes but requires precise degree calculation logic to implement. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved into approved batch-G candidate DK.G.1336.CAPRICORN_KANTHAA_FORMER_PROFILE.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "canonical_fact_compiler"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 393,
+      "passage_key": "DK1.OCR.P0147.V1370-1371",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 147, verses 1370–1371. The definition of 'Kanthaa Nadiamsa' is not provided in the text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (mortality_excluded): The Kanthaa former-half identity is recoverable as ordinal 31, but the passage predicts destruction of elder and younger siblings; the full candidate remains excluded.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "mortality_excluded"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 394,
+      "passage_key": "DK1.OCR.P0148.V1372-1376",
+      "category": "outcome_or_subject_interpretation",
+      "details": "Stream E, PDF page 148, verses 1372–1376. The text mentions 'company of' which is interpreted as conjunction, but requires verification against specific astrological terminology.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 407,
+      "passage_key": "DK1.OCR.P0150.V1397-1397",
+      "category": "relationship_or_reference_point",
+      "details": "Stream E, PDF page 150, verses 1397–1397. The definition of 'aspect' in this context is not specified (e.g., sign-based vs. orb-based).",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 416,
+      "passage_key": "DK1.OCR.P0152.V1416-1418",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream E, PDF page 152, verses 1416–1418. The passage refers to 'former half of Champaka Nadiamsa' which is a specific technical division not defined in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 420,
+      "passage_key": "DK1.OCR.P0153.V1434-1435",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 153, verses 1434–1435. Ambiguity regarding whether the planetary positions (8th lord in 6th) refer to the native's chart or the grandfather's chart.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 424,
+      "passage_key": "DK1.OCR.P0153.V1442-1442",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 153, verses 1442–1442. The source text is incomplete and ends abruptly before describing the result. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 426,
+      "passage_key": "DK1.OCR.P0154.V1451-1452",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 154, verses 1451–1452. The definition of 'Champaka Nadiamsa' and 'Kanta Nadiamsa' in terms of zodiacal degrees is not provided. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (planet_nadiamsa_ordinal_ambiguous): The Ascendant Champaka context is recoverable, but the Sun’s Kanta/Kanthaa Nadiamsa is not assigned a degree span here and Kanthaa occurs at two canonical ordinals.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "planet_nadiamsa_ordinal_ambiguous"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 435,
+      "passage_key": "DK1.OCR.P0157.V1493-1496",
+      "category": "ascendant_scope",
+      "details": "Stream E, PDF page 157, verses 1493–1496. The definition of 'medium span of life' is not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 448,
+      "passage_key": "DK1.OCR.P0162.V1561-1566",
+      "category": "technical_term_definition",
+      "details": "Stream E, PDF page 162, verses 1561–1566. The text does not specify the house system used to determine the 4th lord.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 459,
+      "passage_key": "DK1.OCR.P0165.V1605-1606",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 165, verses 1605–1606. The specific Nadiamsa being referenced is not defined in the provided text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 460,
+      "passage_key": "DK1.OCR.P0165.V1607-1610",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream E, PDF page 165, verses 1607–1610. The term 'Mahanadi' is ambiguous as to whether it refers to the specific river Mahanadi or a generic 'great river'.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 464,
+      "passage_key": "DK1.OCR.P0166.V1628-1628",
+      "category": "clause_boundary",
+      "details": "Stream E, PDF page 166, verses 1628–1628. The text does not specify the exact numerical mapping between the Sun's Ashtaka Varga bindus and the count of siblings/uncles.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 466,
+      "passage_key": "DK1.OCR.P0167.V1630-1630",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream E, PDF page 167, verses 1630–1630. The passage refers to a birth cited previously in the text which is not provided.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 468,
+      "passage_key": "DK1.OCR.P0167.V1639-1639",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 167, verses 1639–1639. The definition and calculation method for 'Trailokya Nadiamsa' are not provided. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved into approved batch-G candidate DK.G.1639.CAPRICORN_TRAILOKYA_FORMER_PATERNAL_UNCLE.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "canonical_fact_compiler"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 470,
+      "passage_key": "DK1.OCR.P0167.V1641-1641",
+      "category": "ascendant_scope",
+      "details": "Stream E, PDF page 167, verses 1641–1641. The term 'Trailoxya Nadiamsa' is not defined, and its specific degree range or calculation method is missing.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 472,
+      "passage_key": "DK1.OCR.P0169.V1662-1662",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 169, verses 1662–1662. The definition of 'first part' versus 'second half' is not provided in the text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (mortality_excluded): The Trailokya halves are clear, but the rule contrasts maternal longevity with early maternal loss and therefore remains excluded from executable natal output.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "mortality_excluded"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 473,
+      "passage_key": "DK1.OCR.P0169.V1663-1665",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream E, PDF page 169, verses 1663–1665. The passage refers to 'Trailokya Nadiamsa' but does not define the specific zodiacal degree or chart parameters required to identify this Nadiamsa.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 474,
+      "passage_key": "DK1.OCR.P0170.V1677-1680",
+      "category": "ascendant_scope",
+      "details": "Stream E, PDF page 170, verses 1677–1680. The text mentions 'Acquisition of learning and' but cuts off, implying the list of benefits is incomplete.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 489,
+      "passage_key": "DK1.OCR.P0173.V1713-1713",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 173, verses 1713–1713. The definition and calculation method for Trailokya Nadiamsa are not provided. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved into approved batch-G candidate DK.G.1713.CAPRICORN_TRAILOKYA_LATTER_CONFINEMENT.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "canonical_fact_compiler"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 499,
+      "passage_key": "DK1.OCR.P0175.V1733-1733",
+      "category": "ascendant_scope",
+      "details": "Stream E, PDF page 175, verses 1733–1733. The text mentions 'Ketu in the 9th (in Libra)' which is consistent with Aquarius ascendant, but the relationship between the Sanskrit verses and the English text is unclear.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 500,
+      "passage_key": "DK1.OCR.P0175.V1734-1735",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream E, PDF page 175, verses 1734–1735. The Sanskrit text provided in the passage appears to contain OCR errors and does not perfectly align with the English translation provided. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 501,
+      "passage_key": "DK1.OCR.P0175.V1736-1737",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 175, verses 1736–1737. The definition of 'immovable birth Lagna' in the context of Nadiamsa systems needs verification.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 503,
+      "passage_key": "DK1.OCR.P0176.V1740-1742",
+      "category": "clause_boundary",
+      "details": "Stream E, PDF page 176, verses 1740–1742. The text mentions '3rd lord' in a conditional clause for a positive outcome, but does not define the conditions for the negative outcome clearly regarding the 3rd house or its lord.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 508,
+      "passage_key": "DK1.OCR.P0177.V1752-1755",
+      "category": "technical_term_definition",
+      "details": "Stream E, PDF page 177, verses 1752–1755. The definition of 'malefics' is not provided in the passage.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 511,
+      "passage_key": "DK1.OCR.P0178.V1771-1772",
+      "category": "clause_boundary",
+      "details": "Stream E, PDF page 178, verses 1771–1772. Definition of 'benefic' planet.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 512,
+      "passage_key": "DK1.OCR.P0178.V1777-1778",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 178, verses 1777–1778. Definition of 'Pankaja Nadiamsa' is missing.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 513,
+      "passage_key": "DK1.OCR.P0179.V1779-1780",
+      "category": "relationship_or_reference_point",
+      "details": "Stream E, PDF page 179, verses 1779–1780. The text mentions remedial measures (prayers to Lord Sun, etc.) which are presented as conditional factors for achieving progeny, but it is unclear if these are required for the promise to manifest or if they are independent remedies.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 521,
+      "passage_key": "DK1.OCR.P0181.V1821-1822",
+      "category": "ascendant_scope",
+      "details": "Stream E, PDF page 181, verses 1821–1822. The Sanskrit text 'के शा शनियुते दृष्टे' implies Ketu and Saturn are involved, but the exact nature of the relationship (conjunction vs aspect) is ambiguous due to the phrasing.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 524,
+      "passage_key": "DK1.OCR.P0181.V1826-1827",
+      "category": "ascendant_scope",
+      "details": "Stream E, PDF page 181, verses 1826–1827. The term 'immovable ascendant' (Sthira Rashi) needs mapping to specific zodiac signs.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 528,
+      "passage_key": "DK1.OCR.P0182.V1840-1840",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 182, verses 1840–1840. The definition of 'Seethala Nadiamsa' is not provided. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved into approved batch-G candidate DK.G.1840.TAURUS_SEETHALA_SUN_SECOND_PISCES_NAVAMSA.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "canonical_fact_compiler"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 529,
+      "passage_key": "DK1.OCR.P0182.V1841-1841",
+      "category": "clause_boundary",
+      "details": "Stream E, PDF page 182, verses 1841–1841. The text does not explicitly state if the Moon and Venus conjunction must occur in the same house as the Sun or elsewhere.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 530,
+      "passage_key": "DK1.OCR.P0183.V1845-1845",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 183, verses 1845–1845. The definition and calculation method for 'Seethala Nadiamsa' are not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 535,
+      "passage_key": "DK1.OCR.P0183.V1850-1850",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 183, verses 1850–1850. The definition of 'Seethala Nadiamsa' is not provided.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 542,
+      "passage_key": "DK1.OCR.P0185.V1873-1873",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 185, verses 1873–1873. The text notes suggest sloka 1874 should be clubbed with Aquarius ascendant, but the primary text for 1874 does not explicitly state the ascendant.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 546,
+      "passage_key": "DK1.OCR.P0186.V1884-1884",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream E, PDF page 186, verses 1884–1884. The specific Nadiamsa being referenced is not identified. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 559,
+      "passage_key": "DK1.OCR.P0189.V1928-1929",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream E, PDF page 189, verses 1928–1929. The term 'role m wealth' is an OCR error and requires verification of the original Sanskrit or intended meaning. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 564,
+      "passage_key": "DK1.OCR.P0190.V1941-1941",
+      "category": "section_or_nadi_identity",
+      "details": "Stream E, PDF page 190, verses 1941–1941. The definition of 'Gada Nadiamsa' and its 'second half' is not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 566,
+      "passage_key": "DK1.OCR.P0191.V1947-1948",
+      "category": "clause_boundary",
+      "details": "Stream E, PDF page 191, verses 1947–1948. The passage mentions 'With other major transits being evil and with the Sun in adverse Rasis' as additional conditions, but these are not clearly defined.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 575,
+      "passage_key": "DK1.OCR.P0195.V1983-1983",
+      "category": "relationship_or_reference_point",
+      "details": "Stream E, PDF page 195, verses 1983–1983. The passage implies a specific configuration of Saturn, Mars, Jupiter, and Rahu, but the exact house placement of the Jupiter-Rahu conjunction is not explicitly defined as the 9th house.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 583,
+      "passage_key": "DK1.OCR.P0196.V1995-1995",
+      "category": "technical_term_definition",
+      "details": "Stream E, PDF page 196, verses 1995–1995. The definition of Sakata Yoga is not provided in the passage.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 590,
+      "passage_key": "DK1.OCR.P0199.V2013-2014",
+      "category": "ascendant_scope",
+      "details": "Stream F, PDF page 199, verses 2013–2014. The definition of Champaka Nadiamsa is missing from the provided text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (mortality_excluded): Leo/Champaka and the Venus–Jupiter condition are clear, but the result includes destruction of sisters; the complete candidate is excluded rather than selectively weakening the source result.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "mortality_excluded"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 595,
+      "passage_key": "DK1.OCR.P0200.V2023-2023",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 200, verses 2023–2023. Definition of 'third round' of Saturn.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 598,
+      "passage_key": "DK1.OCR.P0200.V2033-2034",
+      "category": "ascendant_scope",
+      "details": "Stream F, PDF page 200, verses 2033–2034. The exact definition and degree boundaries of the 'Champaka Nadiamsa' are not provided in the passage. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved into approved batch-G candidate DK.G.2033-2034.LEO_CHAMBAKA_FORMER_BIRTH_PROFILE.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "canonical_fact_compiler"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 607,
+      "passage_key": "DK1.OCR.P0202.V2066-2066",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 202, verses 2066–2066. The passage mentions 'Venus in Aries in the 12th' in the notes, but the primary rule does not explicitly restrict the sign to Aries. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 608,
+      "passage_key": "DK1.OCR.P0202.V2067-2067",
+      "category": "ascendant_scope",
+      "details": "Stream F, PDF page 202, verses 2067–2067. The text assumes the Sun is the 4th lord, which is only true for specific ascendants (Taurus). It is unclear if this rule applies generally or only when the Sun is the 4th lord.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 609,
+      "passage_key": "DK1.OCR.P0202.V2068-2068",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 202, verses 2068–2068. The definition of 'Gada Nadiamsa' is not provided. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (timing_pending): The Gadaa identity is recoverable, but “second dasha” and “adverse sub-period” are required premises and the adverse sub-period is not operationally defined.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "timing_pending"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 617,
+      "passage_key": "DK1.OCR.P0203.V2079-2080",
+      "category": "technical_term_definition",
+      "details": "Stream F, PDF page 203, verses 2079–2080. The definition of 'Gada' is missing from the provided passage.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 620,
+      "passage_key": "DK1.OCR.P0204.V2083-2084",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 204, verses 2083–2084. The passage does not explicitly state if these conditions are exclusive to a specific Ascendant, though the surrounding text mentions Gemini. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 632,
+      "passage_key": "DK1.OCR.P0206.V2109-2110",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 206, verses 2109–2110. The text mentions 'first quarter of Gada Nadiamsa' as a condition, but the notes explicitly state Gada Nadiamsa should be excluded for Vargothama in a common sign, creating a contradiction. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 648,
+      "passage_key": "DK1.OCR.P0211.V2158-2158",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 211, verses 2158–2158. The OCR text is fragmented and contains Sanskrit terms that require expert philological verification. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 649,
+      "passage_key": "DK1.OCR.P0211.V2159-2161",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 211, verses 2159–2161. The definition of 'Gada Nadiamsa' and its specific degree boundaries are not provided in the text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (unsupported_subdivision_and_theology): The rule requires the first quarter/Vipra Kala inside Gadaa, while the current canonical calculator exposes only Nadiamsa halves; it also asserts prior and future births and final emancipation.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "unsupported_subdivision_and_theology"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 650,
+      "passage_key": "DK1.OCR.P0211.V2162-2163",
+      "category": "ascendant_scope",
+      "details": "Stream F, PDF page 211, verses 2162–2163. The text implies a specific ascendant (Aquarius) in the notes, but the primary verses do not explicitly state the ascendant requirement.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 657,
+      "passage_key": "DK1.OCR.P0213.V2184-2186",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream F, PDF page 213, verses 2184–2186. The definition of 'dispositor' is not explicitly provided.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 660,
+      "passage_key": "DK1.OCR.P0214.V2195-2196",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 214, verses 2195–2196. The definition of 'Kunda Nadiamsa' is not provided and requires external astrological context. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 661,
+      "passage_key": "DK1.OCR.P0214.V2197-2197",
+      "category": "technical_term_definition",
+      "details": "Stream F, PDF page 214, verses 2197–2197. The definition of 'fatal degree' is not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 662,
+      "passage_key": "DK1.OCR.P0215.V2198-2198",
+      "category": "technical_term_definition",
+      "details": "Stream F, PDF page 215, verses 2198–2198. The definition of 'obstructive' planets is not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 666,
+      "passage_key": "DK1.OCR.P0215.V2208-2209",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream F, PDF page 215, verses 2208–2209. The term 'Mangala' refers to Mars, but the specific astrological condition (e.g., placement in the Ascendant vs. other houses) is not explicitly defined in the fragment.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 667,
+      "passage_key": "DK1.OCR.P0216.V2210-2211",
+      "category": "ascendant_scope",
+      "details": "Stream F, PDF page 216, verses 2210–2211. The definition and boundaries of 'Mangala Nadiamsa' in Aries are not provided. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 668,
+      "passage_key": "DK1.OCR.P0216.V2212-2212",
+      "category": "ascendant_scope",
+      "details": "Stream F, PDF page 216, verses 2212–2212. The definition and calculation method for 'Mangala Nadiamsa' are not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 669,
+      "passage_key": "DK1.OCR.P0216.V2216-2219",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 216, verses 2216–2219. The definition of 'first half of Mangala Nadiamsa' is not provided. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved into approved batch-G candidate DK.G.2216-2219.ARIES_MANGALA_FORMER_FATHER.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "canonical_fact_compiler"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 673,
+      "passage_key": "DK1.OCR.P0218.V2238-2238",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 218, verses 2238–2238. The definition of 'second half' of a Nadiamsa is not provided. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 674,
+      "passage_key": "DK1.OCR.P0218.V2239-2239",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 218, verses 2239–2239. The definition of Kunda Nadiamsa is missing from the provided text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 682,
+      "passage_key": "DK1.OCR.P0219.V2254-2254",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream F, PDF page 219, verses 2254–2254. The text provides three distinct possibilities for the bride's Moon sign without specifying how to choose between them.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 698,
+      "passage_key": "DK1.OCR.P0223.V2295-2296",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 223, verses 2295–2296. The definition of 'Uraga Nadiamsa' is not provided in the text. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 700,
+      "passage_key": "DK1.OCR.P0223.V2298-2299",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 223, verses 2298–2299. The specific degree range for the 'former half of Uraga Nadiamsa' is not defined. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_identity_unresolved): The page confirms former-half Uraga with Moon–Mars conjunction, but Uraga has no source-secure canonical ordinal in the pinned table.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_identity_unresolved"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 704,
+      "passage_key": "DK1.OCR.P0224.V2306-2306",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 224, verses 2306–2306. The text states the native will have no coborns (siblings) but also states they will be the 3rd issue of the family; these outcomes are contradictory. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 714,
+      "passage_key": "DK1.OCR.P0226.V2326-2328",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 226, verses 2326–2328. Definition of 'first half' and 'second half' of Uraga Nadiamsa is not provided. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_identity_timing_and_mortality): Uraga is unmapped; the passage also mixes natal marriage/progeny statements with father-danger timing and an omitted transit planet.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_identity_timing_and_mortality"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 717,
+      "passage_key": "DK1.OCR.P0226.V2339-2340",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 226, verses 2339–2340. The source text is truncated and does not provide the specific outcome associated with the condition. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 720,
+      "passage_key": "DK1.OCR.P0227.V2350-2351",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 227, verses 2350–2351. Definition of 'beginning of Aries' in degrees.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 725,
+      "passage_key": "DK1.OCR.P0229.V2364-2365",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 229, verses 2364–2365. The specific Dasa system is not identified.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 728,
+      "passage_key": "DK1.OCR.P0229.V2369-2369",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 229, verses 2369–2369. The definition of 'Sumathi Nadiamsa' is not provided in the text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (source_identity_unresolved): Sumathi is not a name in the pinned 150-Nadi table, and the adjacent section supplies no secure canonical ordinal.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "source_identity_unresolved"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 735,
+      "passage_key": "DK1.OCR.P0230.V2381-2383",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 230, verses 2381–2383. The definition of 'Sumathi Nadiamsa' and 'Gada Nadiamsa' is not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 751,
+      "passage_key": "DK1.OCR.P0234.V2424-2424",
+      "category": "ascendant_scope",
+      "details": "Stream F, PDF page 234, verses 2424–2424. The definition of 'Vasudhamsha' is missing.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 756,
+      "passage_key": "DK1.OCR.P0234.V2429-2430",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 234, verses 2429–2430. The text mentions an alternative reading where the 10th lord is the Moon and the ascendant is Libra, creating ambiguity regarding the primary rule. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 768,
+      "passage_key": "DK1.OCR.P0237.V2468-2468",
+      "category": "technical_term_definition",
+      "details": "Stream F, PDF page 237, verses 2468–2468. The definition of Kesari Yoga is not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 769,
+      "passage_key": "DK1.OCR.P0237.V2469-2470",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 237, verses 2469–2470. The definition of Amsadhi Yoga is not provided in the passage. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 781,
+      "passage_key": "DK1.OCR.P0240.V2499-2500",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 240, verses 2499–2500. The specific Nadiamsa in Capricorn is not identified. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (mortality_excluded): The page note resolves Kaalaa as canonical ordinal 32 and the Jupiter–Saturn relation is expressible, but the results predict loss of brothers and widowhood of sisters.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "mortality_excluded"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 786,
+      "passage_key": "DK1.OCR.P0241.V2506-2506",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 241, verses 2506–2506. The text identifies Venus as the 5th lord for a Capricorn ascendant, which contradicts standard Vedic astrology (where Venus rules the 5th house for Capricorn only if the 5th house is Taurus, but the 5th house of Capricorn is Taurus). This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 790,
+      "passage_key": "DK1.OCR.P0241.V2510-2510",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 241, verses 2510–2510. The specific Nadiamsa being referenced is not identified in the provided text. Selected for the first resolution set because local context can likely settle it without textual emendation. Rendered page and adjacent context reviewed. Resolved as a fail-closed batch-G rejection (life_stage_timing_pending): Kaalaa former half is secure, but the only result is grief from a son in old age; “old age” is not a bounded timing trigger in the compiler.",
+      "required_capabilities": [
+        "page_image_context_review",
+        "life_stage_timing_pending"
+      ],
+      "resolution": "excluded",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 792,
+      "passage_key": "DK1.OCR.P0241.V2512-2513",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 241, verses 2512–2513. The definition of 'second half' within the Kaala Nadiamsa is not provided.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 794,
+      "passage_key": "DK1.OCR.P0241.V2515-2515",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 241, verses 2515–2515. Definition of 'Kaala Nadiamsa' within the broader Nadi astrology framework.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 796,
+      "passage_key": "DK1.OCR.P0241.V2517-2517",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 241, verses 2517–2517. The specific Nadiamsa being referenced is not identified in the provided text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 800,
+      "passage_key": "DK1.OCR.P0242.V2522-2522",
+      "category": "ascendant_scope",
+      "details": "Stream F, PDF page 242, verses 2522–2522. The definition of Kamala Nadiamsa is missing from the provided text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 802,
+      "passage_key": "DK1.OCR.P0242.V2524-2524",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream F, PDF page 242, verses 2524–2524. The text explicitly states Apaampathi is not enlisted as a standard Nadiamsa. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 805,
+      "passage_key": "DK1.OCR.P0243.V2529-2529",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 243, verses 2529–2529. The definition and calculation method for 'Vipra Kaala of Dhruva Nadiamsa' are not provided. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 806,
+      "passage_key": "DK1.OCR.P0243.V2530-2530",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 243, verses 2530–2530. Definition of 'Dhruva Nadiamsa' and its 'former half' segment.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 808,
+      "passage_key": "DK1.OCR.P0243.V2534-2534",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 243, verses 2534–2534. Definition of 'Dhruva Nadiamsa' boundaries.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 810,
+      "passage_key": "DK1.OCR.P0243.V2536-2537",
+      "category": "ascendant_scope",
+      "details": "Stream F, PDF page 243, verses 2536–2537. The passage mentions 'Saturn in the 5th house in Seethala Nadiamsa' separately from 'Saturn in Gemini in Seethala Nadiamsa'. It is unclear if the latter implies the 5th house or if they are distinct conditions.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 828,
+      "passage_key": "DK1.OCR.P0246.V2574-2575",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream F, PDF page 246, verses 2574–2575. The exact degree range for the 'former half' of Sivada Nadiamsa is not defined in this passage.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 831,
+      "passage_key": "DK1.OCR.P0247.V2584-2584",
+      "category": "relationship_or_reference_point",
+      "details": "Stream F, PDF page 247, verses 2584–2584. The term 'after-born' is interpreted as younger siblings, but requires confirmation of the specific astrological definition of 'after-born' in this context.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 837,
+      "passage_key": "DK1.OCR.P0248.V2591-2591",
+      "category": "clause_boundary",
+      "details": "Stream F, PDF page 248, verses 2591–2591. The text uses '12th/8th' which is ambiguous regarding the reference point (e.g., house from ascendant vs house from 4th lord).",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 842,
+      "passage_key": "DK1.OCR.P0249.V2603-2604",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 249, verses 2603–2604. The definition of 'Sivada Nadiamsa' is not provided in the text.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 844,
+      "passage_key": "DK1.OCR.P0249.V2606-2608",
+      "category": "ascendant_scope",
+      "details": "Stream F, PDF page 249, verses 2606–2608. The notes suggest the rule might be restricted to Gemini ascendant, but the verse itself does not explicitly state this.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 850,
+      "passage_key": "DK1.OCR.P0250.V2623-2626",
+      "category": "ocr_or_source_dispute",
+      "details": "Stream F, PDF page 250, verses 2623–2626. The definition of 'Kamala Nadiamsa' is not provided in the text and refers to external notes. This edition alone cannot settle the reading safely.",
+      "required_capabilities": [
+        "independent_source_witness",
+        "sanskrit_translation_comparison",
+        "adjacent_page_context_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 854,
+      "passage_key": "DK1.OCR.P0251.V2638-2638",
+      "category": "section_or_nadi_identity",
+      "details": "Stream F, PDF page 251, verses 2638–2638. The definition and calculation method for 'Sura Nadiamsa' and 'Kamala Nadiamsa' are not provided.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 860,
+      "passage_key": "DK1.OCR.P0253.V2664-2667",
+      "category": "pronoun_or_inherited_planet",
+      "details": "Stream F, PDF page 253, verses 2664–2667. The definition of 'third dasa' depends on the specific Dasa system used (e.g., Vimshottari), which is not explicitly stated.",
+      "required_capabilities": [
+        "adjacent_page_context_review",
+        "section_boundary_reconstruction"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    }
+  ]
+}

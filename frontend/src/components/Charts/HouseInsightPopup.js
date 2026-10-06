@@ -51,6 +51,7 @@ function HouseInsightPopup({
   onMakeAscendant,
   transitDate,
   calculationProfile = null,
+  anchor = 'sheet',
 }) {
   const navigate = useNavigate();
   const [insight, setInsight] = useState(null);
@@ -59,6 +60,9 @@ function HouseInsightPopup({
   const [gandanta, setGandanta] = useState(null);
   const [error, setError] = useState('');
   const bodyRef = useRef(null);
+  const panelRef = useRef(null);
+  const dragRef = useRef(null);
+  const [position, setPosition] = useState(null);
 
   const meta = HOUSE_META[houseNumber] || { title: `House ${houseNumber}`, desc: '' };
   const houseLord = SIGN_LORDS[rashiIndex] || insight?.house_lord || '—';
@@ -67,6 +71,40 @@ function HouseInsightPopup({
     if (!chartData || rashiIndex == null || !houseNumber) return [];
     return getHouseAspects(chartData, houseNumber, rashiIndex);
   }, [chartData, houseNumber, rashiIndex]);
+
+  useEffect(() => {
+    if (!isOpen) setPosition(null);
+  }, [isOpen]);
+
+  const beginDrag = (event) => {
+    if (anchor !== 'corner' || event.button !== 0 || event.target.closest('button')) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    dragRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveDrag = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const panel = panelRef.current;
+    const width = panel?.offsetWidth || 400;
+    const margin = 8;
+    setPosition({
+      left: Math.min(window.innerWidth - width - margin, Math.max(margin, event.clientX - drag.offsetX)),
+      top: Math.min(window.innerHeight - 48, Math.max(margin, event.clientY - drag.offsetY)),
+    });
+  };
+
+  const endDrag = (event) => {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+  };
 
   useEffect(() => {
     if (!isOpen || !birthData || !houseNumber) {
@@ -154,16 +192,24 @@ function HouseInsightPopup({
   const askPrompt = `Analyze the ${houseNumber} house in my ${chartId === 'lagna' ? 'D1 Lagna' : chartId} chart. It has ${signName} sign and ${planetsInHouse.length ? planetsInHouse.map((p) => p.name).join(', ') : 'no planets'}.`;
 
   return createPortal(
-    <div className="house-insight-overlay" onClick={onClose} role="presentation">
+    <div className={`house-insight-overlay${anchor === 'corner' ? ' house-insight-overlay--corner' : ''}`} onClick={onClose} role="presentation">
       <aside
+        ref={panelRef}
         className="house-insight-panel"
         role="dialog"
-        aria-modal="true"
+        aria-modal={anchor !== 'corner'}
         aria-label={`House ${houseNumber} insights`}
+        style={position ? { position: 'fixed', left: position.left, top: position.top, margin: 0 } : undefined}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="house-insight-handle" />
-        <header className="house-insight-head">
+        <header
+          className="house-insight-head"
+          onPointerDown={beginDrag}
+          onPointerMove={moveDrag}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        >
           <span className="house-insight-badge">{houseNumber}</span>
           <div>
             <h2>{meta.title}</h2>

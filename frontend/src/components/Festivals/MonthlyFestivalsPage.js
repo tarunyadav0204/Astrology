@@ -224,6 +224,25 @@ const MonthlyFestivalsPage = ({ user, onLogout, onAdminClick, onLogin }) => {
 
   const goToCurrentMonth = () => setCurrentDate(new Date());
 
+  // Jump to any month/year without stepping arrow-by-arrow through the calendar.
+  const setCalendarMonth = (monthIndex) => {
+    const nextDate = new Date(currentDate.getFullYear(), Number(monthIndex), 1);
+    setCurrentDate(nextDate);
+  };
+
+  const setCalendarYear = (year) => {
+    const nextDate = new Date(Number(year), currentDate.getMonth(), 1);
+    setCurrentDate(nextDate);
+  };
+
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    // Keep a practical planning window around "now" plus the currently viewed year.
+    const start = Math.min(currentYear - 5, currentDate.getFullYear());
+    const end = Math.max(currentYear + 5, currentDate.getFullYear());
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }, [currentDate]);
+
   const getEventsForDate = (date) => {
     const dateStr = formatDateKey(date);
     return allEvents.filter((event) => event.date === dateStr);
@@ -253,10 +272,9 @@ const MonthlyFestivalsPage = ({ user, onLogout, onAdminClick, onLogin }) => {
               <span aria-hidden>←</span> Daily Festivals
             </button>
             <span className="monthly-festivals-eyebrow">Sacred month · {location.name}</span>
-            <h1>See the month<br /><em>in observance.</em></h1>
+            <h1>See the month <em>in observance.</em></h1>
             <p>
-              Scan festivals, Ekadashi, Pradosh, Purnima, Amavasya and vrats together,
-              then open an observance without losing the rhythm of the month.
+              Scan festivals, Ekadashi, Pradosh, Purnima, Amavasya and vrats, then open any observance from the calendar.
             </p>
             <div className="monthly-festivals-hero__actions">
               <button type="button" className="monthly-festival-btn monthly-festival-btn--primary" onClick={() => navigate('/festivals')}>
@@ -268,10 +286,9 @@ const MonthlyFestivalsPage = ({ user, onLogout, onAdminClick, onLogin }) => {
             </div>
           </div>
           <div className="monthly-festivals-hero__panel">
-            <div className="monthly-festivals-orbit" aria-hidden="true">
+            <div className="monthly-festival-badge" aria-hidden="true">
               <span>{MONTH_NAMES[currentDate.getMonth()]}</span>
               <strong>{currentDate.getFullYear()}</strong>
-              <div><i></i><i></i><i></i><i></i><i></i></div>
             </div>
             <div className="monthly-festival-stats">
               <div><strong>{monthlyData.festivals?.length || 0}</strong><span>Festivals</span></div>
@@ -288,11 +305,37 @@ const MonthlyFestivalsPage = ({ user, onLogout, onAdminClick, onLogin }) => {
 
         <section className="monthly-toolbar">
           <button type="button" className="monthly-nav-btn" onClick={() => navigateMonth(-1)} aria-label="Previous month">‹</button>
+          <div className="monthly-toolbar__pickers">
+            <label className="monthly-toolbar__picker">
+              Month
+              <select
+                value={currentDate.getMonth()}
+                onChange={(event) => setCalendarMonth(event.target.value)}
+                aria-label="Select month"
+              >
+                {MONTH_NAMES.map((name, index) => (
+                  <option key={name} value={index}>{name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="monthly-toolbar__picker">
+              Year
+              <select
+                value={currentDate.getFullYear()}
+                onChange={(event) => setCalendarYear(event.target.value)}
+                aria-label="Select year"
+              >
+                {yearOptions.map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <button type="button" className="monthly-nav-btn" onClick={() => navigateMonth(1)} aria-label="Next month">›</button>
           <div className="monthly-toolbar__title">
             <span className="monthly-festivals-eyebrow">Calendar</span>
             <h2>{monthTitle}</h2>
           </div>
-          <button type="button" className="monthly-nav-btn" onClick={() => navigateMonth(1)} aria-label="Next month">›</button>
           <button type="button" className="monthly-festival-btn monthly-festival-btn--ghost" onClick={() => setShowTransits((value) => !value)}>
             {showTransits ? 'Hide Transits' : 'Show Transits'}
           </button>

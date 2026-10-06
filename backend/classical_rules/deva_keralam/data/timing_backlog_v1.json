@@ -1,0 +1,3048 @@
+{
+  "schema_version": "deva-keralam-completion-backlog/1.0.0",
+  "edition_key": "deva_keralam_volume_1_scan",
+  "disposition": "timing_pending",
+  "entries": [
+    {
+      "catalogue_ordinal": 6,
+      "passage_key": "DK1.OCR.P0028.V0017-0018",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Dasa Effects: Janma Dasa and Vipat Dasa Marriage Timing.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 9,
+      "passage_key": "DK1.OCR.P0029.V0023-0023",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Dasa of the 10th Lord for Aries Ascendant.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 13,
+      "passage_key": "DK1.OCR.P0029.V0027-0027",
+      "category": "life_stage_or_relative_event",
+      "details": "The timing is expressed as a life stage or relative event rather than a computable date. Review unit: Wealth and Life Stages in Maalini Nadi Amsa.",
+      "required_capabilities": [
+        "life_stage_normalizer",
+        "external_event_anchor_support",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 14,
+      "passage_key": "DK1.OCR.P0029.V0028-0028",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Grief and National Danger Timing.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 16,
+      "passage_key": "DK1.OCR.P0029.V0030-0030",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Maatanga Nadi Amsa: Saturn Transit over Sun's Navamsa.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 18,
+      "passage_key": "DK1.OCR.P0030.V0035-0035",
+      "category": "unclear_dasha_method",
+      "details": "A Dasha is mentioned, but the passage does not yet establish the intended system or period mapping. Review unit: Interruption of Maatanga Yoga Effects.",
+      "required_capabilities": [
+        "dasha_system_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 19,
+      "passage_key": "DK1.OCR.P0030.V0036-0036",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Moon Dasa First Half Effect.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 22,
+      "passage_key": "DK1.OCR.P0030.V0040-0040",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Marriage and Sub-period Outcomes in Moon Dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 23,
+      "passage_key": "DK1.OCR.P0030.V0041-0041",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Koorma Yoga Effects in 5th Dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 24,
+      "passage_key": "DK1.OCR.P0031.V0042-0042",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Wealth in a foreign place during 5th Dasa sub-periods of Moon and Mars.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 25,
+      "passage_key": "DK1.OCR.P0031.V0043-0043",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Dasa period of Koorma Yoga.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 26,
+      "passage_key": "DK1.OCR.P0031.V0044-0044",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Danger to Coborns via Saturn Transit.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 27,
+      "passage_key": "DK1.OCR.P0031.V0045-0045",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Danger to coborns in Maalini Nadiamsa.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 66,
+      "passage_key": "DK1.OCR.P0041.V0139-0142",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Half-sister and brother-in-law indicators from Moon in Kutila Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 68,
+      "passage_key": "DK1.OCR.P0041.V0144-0144",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Step-sister's marriage timing.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 69,
+      "passage_key": "DK1.OCR.P0042.V0001-0001",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Step-brother's progeny and wealth trajectory.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 70,
+      "passage_key": "DK1.OCR.P0042.V0002-0002",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Financial losses to father at age 8 or 10.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 71,
+      "passage_key": "DK1.OCR.P0043.V0168-0170",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Saturn Transits and Relatives/Mother/Danger.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 73,
+      "passage_key": "DK1.OCR.P0045.V0183-0183",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Fever in Mars sub-period under 8th Lord Dasha.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 74,
+      "passage_key": "DK1.OCR.P0045.V0184-0184",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Wealthy status during 9th Rasi Dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 75,
+      "passage_key": "DK1.OCR.P0045.V0185-0186",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Wealth, Fame, and Progeny Timing in Dasa Periods.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 81,
+      "passage_key": "DK1.OCR.P0046.V0198-0199",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Jupiter in Varuna Amsa and Co-borns.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 83,
+      "passage_key": "DK1.OCR.P0046.V0201-0203",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Specific Horoscope Planetary Configuration and Life Outcomes.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 84,
+      "passage_key": "DK1.OCR.P0047.V0204-0204",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Jupiter in Varuna Nadi Amsa and Father's Prosperity.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 85,
+      "passage_key": "DK1.OCR.P0047.V0205-0205",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Happiness and Life Difficulties in Varuna Nadiamsa (Vipra Kala).",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 89,
+      "passage_key": "DK1.OCR.P0048.V0215-0215",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Gain of conveyances and Rajayoga in 3rd Dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 98,
+      "passage_key": "DK1.OCR.P0050.V0237-0238",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Prabha Nadiamsa First Half Natal Promises.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 99,
+      "passage_key": "DK1.OCR.P0051.V0239-0239",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Father's Wealth in 9th Lord's Dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 112,
+      "passage_key": "DK1.OCR.P0055.V0277-0283",
+      "category": "unclear_dasha_method",
+      "details": "A Dasha is mentioned, but the passage does not yet establish the intended system or period mapping. Review unit: Loss of eldest son due to Saturn in the 3rd house.",
+      "required_capabilities": [
+        "dasha_system_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 114,
+      "passage_key": "DK1.OCR.P0055.V0285-0285",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Loss of fortunes via Saturn transit in Varuna Nadiamsa.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 115,
+      "passage_key": "DK1.OCR.P0055.V0286-0286",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Mental agony to father via Saturn transit.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 119,
+      "passage_key": "DK1.OCR.P0056.V0293-0295",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Eighth Lord Dasa and Tenth Lord Bhukti Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 123,
+      "passage_key": "DK1.OCR.P0058.V0318-0319",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Royal Displeasure and Associated Difficulties.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 128,
+      "passage_key": "DK1.OCR.P0060.V0339-0340",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Obstruction to Father's Prosperity via Ketu in Rasi Dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 129,
+      "passage_key": "DK1.OCR.P0060.V0341-0341",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Royal honours and marriage activities from Sun in 7th house.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 131,
+      "passage_key": "DK1.OCR.P0061.V0348-0350",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Mars Dasa and Transit Jupiter Aspect on Leo for Sagittarius Ascendant.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 132,
+      "passage_key": "DK1.OCR.P0061.V0353-0353",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Dasa of Moon's Dispositor and Paternal Uncle Distress.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 133,
+      "passage_key": "DK1.OCR.P0061.V0354-0354",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Saturn Transit over Navamsa of 8th Lord of a Bhava.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 134,
+      "passage_key": "DK1.OCR.P0062.V0355-0356",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Prosperity and Status for Varuna Nadiamsa.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 147,
+      "passage_key": "DK1.OCR.P0066.V0400-0400",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Evils for maternal relatives in 2nd dasa (Uraga Nadiamsa).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 149,
+      "passage_key": "DK1.OCR.P0066.V0402-0403",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Marriage Timing and Spouse Origin in Uraga Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 151,
+      "passage_key": "DK1.OCR.P0067.V0405-0405",
+      "category": "calendar_trigger",
+      "details": "The primary trigger is a weekday, lunar day, or ruling Nakshatra/day condition. Review unit: Timing of Marriage by 7th Lord and Navamsa Trines.",
+      "required_capabilities": [
+        "panchang_day_calculator",
+        "nakshatra_day_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 154,
+      "passage_key": "DK1.OCR.P0067.V0408-0408",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Marriage Timing and Parental Status in Uraga Nadiamsa (Former Half).",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 172,
+      "passage_key": "DK1.OCR.P0072.V0468-0469",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Ascendant Lord Aspected by Jupiter.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 180,
+      "passage_key": "DK1.OCR.P0076.V0520-0522",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Timing of Health Decline via Mercury Sub-period and Transits.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 181,
+      "passage_key": "DK1.OCR.P0076.V0523-0523",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Wealth acquisition in the third dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 183,
+      "passage_key": "DK1.OCR.P0077.V0525-0525",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Saturn Transit Danger to Children.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 186,
+      "passage_key": "DK1.OCR.P0078.V0532-0542",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Venus in 11th with Jupiter in 2nd, 10th, or 4th (Durdhara Nadiamsa).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 196,
+      "passage_key": "DK1.OCR.P0081.V0577-0579",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Ascendant Lord in Sachira Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 198,
+      "passage_key": "DK1.OCR.P0082.V0582-0582",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Prosperity of Native with Mercury in Capricorn Lagna.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 201,
+      "passage_key": "DK1.OCR.P0085.V0612-0612",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Honours in Royal Service during 4th Dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 202,
+      "passage_key": "DK1.OCR.P0085.V0613-0618",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Sachira Nadiamsa Capricorn Lagna Dasa-Bhukti Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 204,
+      "passage_key": "DK1.OCR.P0085.V0621-0623",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Rahu in 9th House in Virgo with Taurus Navamsa.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 206,
+      "passage_key": "DK1.OCR.P0086.V0636-0637",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Conjunction of 9th and 10th Lords in Sachira Nadiamsa for Capricorn Lagna.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 209,
+      "passage_key": "DK1.OCR.P0090.V0682-0683",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Danger to Father via 8th Lord Dasa and Saturn Transits.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 210,
+      "passage_key": "DK1.OCR.P0090.V0684-0684",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Mercury in Kunda Nadiamsa and Saturn Transit.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 212,
+      "passage_key": "DK1.OCR.P0091.V0690-0691",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Mercury in Kunda Nadiamsa and Sun in Ambuja Nadiamsa: 4th Dasa Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 213,
+      "passage_key": "DK1.OCR.P0091.V0692-0692",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Venus Dasa in Libra Prosperity and Fame.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 214,
+      "passage_key": "DK1.OCR.P0091.V0693-0693",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Moon in Virgo with Jupiter in Aries or Trine.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 217,
+      "passage_key": "DK1.OCR.P0091.V0697-0697",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Mercury in Mukunda Nadiamsa Prosperity.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 219,
+      "passage_key": "DK1.OCR.P0092.V0699-0700",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Danger to wife and father via 7th lord in Kunda Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 229,
+      "passage_key": "DK1.OCR.P0097.V0757-0760",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Saturn Transit over Sun's Navamsa Rasi.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 230,
+      "passage_key": "DK1.OCR.P0097.V0765-0765",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Tenth Rasi Dasa Effects for Sura Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 231,
+      "passage_key": "DK1.OCR.P0097.V0766-0766",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Danger to father in Sura Nadiamsa.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 234,
+      "passage_key": "DK1.OCR.P0100.V0795-0796",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Mars in 4th House with Exalted Planet.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 236,
+      "passage_key": "DK1.OCR.P0101.V0813-0815",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Ketu conjunct Mars in Vipra Kala of Kamala Nadiamsa (Pisces Ascendant).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 237,
+      "passage_key": "DK1.OCR.P0101.V0816-0817",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Maternal Relatives and Family Outcomes via 3rd Lord Venus.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 238,
+      "passage_key": "DK1.OCR.P0102.V0818-0818",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Marriage in Dasa of Gemini with 4th Lord Mercury in 2nd House (Aries).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 277,
+      "passage_key": "DK1.OCR.P0112.V0953-0959",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Saturn in 11th House for Libra Ascendant.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 279,
+      "passage_key": "DK1.OCR.P0112.V0961-0962",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Dasa-based Wealth and Health Predictions.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 284,
+      "passage_key": "DK1.OCR.P0114.V0978-0983",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Avastha Yoga Life Timing.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 285,
+      "passage_key": "DK1.OCR.P0115.V0995-0996",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Moon in Virgo with Capricorn Navamsa for many daughters.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 297,
+      "passage_key": "DK1.OCR.P0118.V1037-1041",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Transit of Saturn to Navamsa Dispositor of 9th Lord and Paternal Uncle Harm.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 305,
+      "passage_key": "DK1.OCR.P0120.V1060-1060",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Malefic Transits in Libra Ascendant.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 306,
+      "passage_key": "DK1.OCR.P0120.V1064-1064",
+      "category": "unclear_dasha_method",
+      "details": "A Dasha is mentioned, but the passage does not yet establish the intended system or period mapping. Review unit: Ketu in 8th House and Fear of Thieves.",
+      "required_capabilities": [
+        "dasha_system_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 309,
+      "passage_key": "DK1.OCR.P0122.V1080-1082",
+      "category": "life_stage_or_relative_event",
+      "details": "The timing is expressed as a life stage or relative event rather than a computable date. Review unit: Rahu in Vargothama in the 2nd House (Indra Yoga).",
+      "required_capabilities": [
+        "life_stage_normalizer",
+        "external_event_anchor_support",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 311,
+      "passage_key": "DK1.OCR.P0124.V1101-1104",
+      "category": "life_stage_or_relative_event",
+      "details": "The timing is expressed as a life stage or relative event rather than a computable date. Review unit: Saturn-Ketu Conjunction Effects on Father and Native.",
+      "required_capabilities": [
+        "life_stage_normalizer",
+        "external_event_anchor_support",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 314,
+      "passage_key": "DK1.OCR.P0129.V1168-1168",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Raja Yoga and Conveyances in Seethala Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 315,
+      "passage_key": "DK1.OCR.P0129.V1169-1171",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Saturn Transit Danger to Wife.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 319,
+      "passage_key": "DK1.OCR.P0130.V1176-1178",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Dasa of 10th Lord and Saturn Transit Effects on Siblings.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 322,
+      "passage_key": "DK1.OCR.P0131.V1187-1187",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Distress in 48th or 57th year.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 327,
+      "passage_key": "DK1.OCR.P0132.V1197-1197",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Danger to parents and happiness after 30.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 328,
+      "passage_key": "DK1.OCR.P0132.V1198-1198",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Cotton Merchant Profession and Comfort after Age 30.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 332,
+      "passage_key": "DK1.OCR.P0133.V1207-1211",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Sagittarius Lagna, Dhaatha Nadiamsa, Saturn in Scorpio.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 359,
+      "passage_key": "DK1.OCR.P0138.V1263-1265",
+      "category": "unclear_dasha_method",
+      "details": "A Dasha is mentioned, but the passage does not yet establish the intended system or period mapping. Review unit: Mars in 11th House for Aquarius Ascendant.",
+      "required_capabilities": [
+        "dasha_system_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 365,
+      "passage_key": "DK1.OCR.P0139.V1276-1277",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Marriage to an angry woman.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 369,
+      "passage_key": "DK1.OCR.P0140.V1289-1289",
+      "category": "unclear_dasha_method",
+      "details": "A Dasha is mentioned, but the passage does not yet establish the intended system or period mapping. Review unit: Siblings and Property Division in Guha Nadiamsa.",
+      "required_capabilities": [
+        "dasha_system_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 370,
+      "passage_key": "DK1.OCR.P0140.V1290-1290",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Prosperity of step-brother's son in third dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 377,
+      "passage_key": "DK1.OCR.P0143.V1315-1316",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Marriage Timing and Direction for Aquarius Ascendant in Guha Nadiamsa (Second Half).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 390,
+      "passage_key": "DK1.OCR.P0147.V1359-1365",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Dasa Effects for 8th Lord Main Period and 3rd Dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 396,
+      "passage_key": "DK1.OCR.P0148.V1379-1380",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Mudgara Nadiamsa in Sagittarius (First Half) Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 397,
+      "passage_key": "DK1.OCR.P0148.V1381-1381",
+      "category": "life_stage_or_relative_event",
+      "details": "The timing is expressed as a life stage or relative event rather than a computable date. Review unit: Ascetic order and bathing in the Ganges for Mudgara Nadiamsa.",
+      "required_capabilities": [
+        "life_stage_normalizer",
+        "external_event_anchor_support",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 400,
+      "passage_key": "DK1.OCR.P0149.V1384-1386",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Mudgara Nadiamsa Sagittarius Ascendant Prosperity and Danger.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 401,
+      "passage_key": "DK1.OCR.P0149.V1387-1387",
+      "category": "unclear_dasha_method",
+      "details": "A Dasha is mentioned, but the passage does not yet establish the intended system or period mapping. Review unit: Rahu in 2nd House Dasa-bhukti Physical Distress.",
+      "required_capabilities": [
+        "dasha_system_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 402,
+      "passage_key": "DK1.OCR.P0149.V1391-1392",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Rahu Dasa, Jupiter Antardasa Gains.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 403,
+      "passage_key": "DK1.OCR.P0150.V1393-1393",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Rahu Dasa Second Half Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 404,
+      "passage_key": "DK1.OCR.P0150.V1394-1394",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Dasa of the 5th Lord.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 410,
+      "passage_key": "DK1.OCR.P0150.V1400-1403",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Dasa-based predictions for father, step-mother, and paternal uncle.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 411,
+      "passage_key": "DK1.OCR.P0151.V1404-1404",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Expenditure Amount Prediction.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 417,
+      "passage_key": "DK1.OCR.P0152.V1422-1423",
+      "category": "life_stage_or_relative_event",
+      "details": "The timing is expressed as a life stage or relative event rather than a computable date. Review unit: Nadiamsa: Champaka Nadiamsa (Former Half) - Native's Life Outcomes.",
+      "required_capabilities": [
+        "life_stage_normalizer",
+        "external_event_anchor_support",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 418,
+      "passage_key": "DK1.OCR.P0152.V1424-1424",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Rise in life and prosperity timing.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 422,
+      "passage_key": "DK1.OCR.P0153.V1438-1440",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Saturn Dasa Sub-period Malefic Conjunction Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 430,
+      "passage_key": "DK1.OCR.P0156.V1480-1480",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Rahu Bhukti Effects and Jupiter Transit Mitigation.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 431,
+      "passage_key": "DK1.OCR.P0156.V1481-1481",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Venus Sub-period in Rahu Dasa for Cancer Ascendant.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 432,
+      "passage_key": "DK1.OCR.P0156.V1482-1482",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Rahu Dasa Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 438,
+      "passage_key": "DK1.OCR.P0158.V1503-1506",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Sivada Nadiamsa First Half Sagittarius Lagna Dasa Results.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 439,
+      "passage_key": "DK1.OCR.P0158.V1508-1510",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Dasa of 10th Lord with Malefic Antardasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 441,
+      "passage_key": "DK1.OCR.P0159.V1515-1517",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Dhanada Nadiamsa First Half: Siblings and Religious Devotion.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 449,
+      "passage_key": "DK1.OCR.P0162.V1567-1568",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Acquisition of a new house via Moon ruling 4th house.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 451,
+      "passage_key": "DK1.OCR.P0162.V1570-1572",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Venus as 2nd Lord and Jupiter Transit Marriage.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 453,
+      "passage_key": "DK1.OCR.P0163.V1577-1577",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Childbirth timing via Sun in 5th house.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 456,
+      "passage_key": "DK1.OCR.P0163.V1589-1589",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Sundara Nadiamsa Capricorn Fortune Timing.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 457,
+      "passage_key": "DK1.OCR.P0164.V1593-1594",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Jupiter in 12th from Moon for Capricorn Birth: House Acquisition and Dasa/Bhukti Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 469,
+      "passage_key": "DK1.OCR.P0167.V1640-1640",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Second Dasa Wealth for Father.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 475,
+      "passage_key": "DK1.OCR.P0171.V1681-1681",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Trailokya Nadiamsa: Saturn Transit in Taurus.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 476,
+      "passage_key": "DK1.OCR.P0171.V1682-1682",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Dasa and Transit Effects on Father.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 478,
+      "passage_key": "DK1.OCR.P0171.V1686-1687",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Marriage and Progeny Timing for Trailokya Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 479,
+      "passage_key": "DK1.OCR.P0171.V1688-1690",
+      "category": "life_stage_or_relative_event",
+      "details": "The timing is expressed as a life stage or relative event rather than a computable date. Review unit: Nadiamsa: Frailokya (Former Half) Natal Promises.",
+      "required_capabilities": [
+        "life_stage_normalizer",
+        "external_event_anchor_support",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 480,
+      "passage_key": "DK1.OCR.P0172.V1691-1691",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Wealth and Prosperity in Trailokva Nadiamsa.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 482,
+      "passage_key": "DK1.OCR.P0172.V1693-1693",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Venus in 5th House with 8th Lord Sun Dasa Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 483,
+      "passage_key": "DK1.OCR.P0172.V1694-1696",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Third Dasa Effects for Trailokya Nadiamsa (Former Half).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 484,
+      "passage_key": "DK1.OCR.P0173.V1704-1705",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: 7th Lord Moon in 4th House Dasa Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 485,
+      "passage_key": "DK1.OCR.P0173.V1706-1707",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Nadiamsa 1706-1707 First Half Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 486,
+      "passage_key": "DK1.OCR.P0173.V1708-1709",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Mars Dasa Effects based on 5th Star and Placement.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 487,
+      "passage_key": "DK1.OCR.P0173.V1710-1711",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Dasa-based predictions for Trailokya Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 488,
+      "passage_key": "DK1.OCR.P0173.V1712-1712",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: 4th Lord with Rahu Dasa Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 490,
+      "passage_key": "DK1.OCR.P0174.V1714-1715",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Dasa and Sub-period Effects for Trailokya Nadiamsa (First Half).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 491,
+      "passage_key": "DK1.OCR.P0174.V1716-1717",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Rahu Dasa Effects in Trailokya Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 495,
+      "passage_key": "DK1.OCR.P0174.V1725-1725",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Severing of Ears (Mars-Saturn-Ketu).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 517,
+      "passage_key": "DK1.OCR.P0179.V1790-1792",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Ascendant Lord Moon in Second House and Moon in Leo/Virgo Navamsa.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 519,
+      "passage_key": "DK1.OCR.P0180.V1816-1816",
+      "category": "life_stage_or_relative_event",
+      "details": "The timing is expressed as a life stage or relative event rather than a computable date. Review unit: Kahala Yoga Life Stage Effects.",
+      "required_capabilities": [
+        "life_stage_normalizer",
+        "external_event_anchor_support",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 523,
+      "passage_key": "DK1.OCR.P0181.V1824-1825",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Sudha Nadiamsa Birth Order and Caste.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 527,
+      "passage_key": "DK1.OCR.P0182.V1839-1839",
+      "category": "life_stage_or_relative_event",
+      "details": "The timing is expressed as a life stage or relative event rather than a computable date. Review unit: Saturn and Mars in the Fifth House for Seethala Nadiamsa.",
+      "required_capabilities": [
+        "life_stage_normalizer",
+        "external_event_anchor_support",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 531,
+      "passage_key": "DK1.OCR.P0183.V1846-1846",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Marriage Timing for Seethala Nadiamsa (First Half).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 532,
+      "passage_key": "DK1.OCR.P0183.V1847-1847",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Jupiter Transit in Scorpio for Seethala Nadiamsa Marriage.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 538,
+      "passage_key": "DK1.OCR.P0184.V1860-1863",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Nadiamsa Taurus Ascendant Prosperity and Obstructions.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 539,
+      "passage_key": "DK1.OCR.P0184.V1864-1865",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Saturn Transit Effects for Seethala Nadiamsa Native.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 547,
+      "passage_key": "DK1.OCR.P0186.V1885-1885",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Nirmala Nadiamsa Moon Blemish Effects.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 554,
+      "passage_key": "DK1.OCR.P0187.V1896-1896",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Danger to Mother during Saturn in Taurus.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 556,
+      "passage_key": "DK1.OCR.P0187.V1900-1900",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Timing of Sacred Thread Ceremony via Saturn Transit.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 557,
+      "passage_key": "DK1.OCR.P0188.V1908-1910",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Nirmala Nadiamsa First Half Immovable Ascendant Prosperity.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 567,
+      "passage_key": "DK1.OCR.P0192.V1956-1957",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Raja Yoga via Jupiter Transit or Natal Position.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 568,
+      "passage_key": "DK1.OCR.P0193.V1964-1965",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Health decline during Mars Dasa with Mars or Mercury sub-periods.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 569,
+      "passage_key": "DK1.OCR.P0193.V1966-1969",
+      "category": "unclear_dasha_method",
+      "details": "A Dasha is mentioned, but the passage does not yet establish the intended system or period mapping. Review unit: Distress at Dasa Junctions of Moon and Mars.",
+      "required_capabilities": [
+        "dasha_system_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 570,
+      "passage_key": "DK1.OCR.P0194.V1970-1971",
+      "category": "calendar_trigger",
+      "details": "The primary trigger is a weekday, lunar day, or ruling Nakshatra/day condition. Review unit: Effect of Moon Strength and Ruling Asterism on Daily Well-being.",
+      "required_capabilities": [
+        "panchang_day_calculator",
+        "nakshatra_day_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 572,
+      "passage_key": "DK1.OCR.P0194.V1976-1976",
+      "category": "unclear_dasha_method",
+      "details": "A Dasha is mentioned, but the passage does not yet establish the intended system or period mapping. Review unit: Moon near Ascendant with Sun in 9th or trine.",
+      "required_capabilities": [
+        "dasha_system_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 580,
+      "passage_key": "DK1.OCR.P0196.V1989-1989",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Timing of Neechbhanga Rajayoga Results.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 581,
+      "passage_key": "DK1.OCR.P0196.V1990-1992",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Auspicious Effects of Dasa Period.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 582,
+      "passage_key": "DK1.OCR.P0196.V1993-1993",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Dasha periods of 6th/8th lords causing fever and ailments.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 592,
+      "passage_key": "DK1.OCR.P0199.V2016-2016",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Saturn ruling 7th house in trine from 11th house.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 600,
+      "passage_key": "DK1.OCR.P0201.V2050-2051",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Sun in Pisces Navamsa - Character and Marriage Timing.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 605,
+      "passage_key": "DK1.OCR.P0202.V2063-2063",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Thread Ceremony Timing via Ascendant Lord in Pisces.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 606,
+      "passage_key": "DK1.OCR.P0202.V2064-2065",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Early Marriage Timing and Origin in Gada Nadiamsa.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 610,
+      "passage_key": "DK1.OCR.P0203.V2069-2069",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Fourth Dasa Effects for Immovable Ascendants.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 612,
+      "passage_key": "DK1.OCR.P0203.V2072-2072",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Nadiamsa Son Prediction.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 614,
+      "passage_key": "DK1.OCR.P0203.V2074-2076",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Dasa-based Transits for Progeny and Parental Danger.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 624,
+      "passage_key": "DK1.OCR.P0205.V2092-2092",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Transit Saturn Trine Navamsa Lord of Ascendant in Third Dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 625,
+      "passage_key": "DK1.OCR.P0205.V2093-2094",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Timing of Thread Ceremony and Marriage in Second Dasa for Sura Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 626,
+      "passage_key": "DK1.OCR.P0205.V2095-2096",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Moon in Libra aspected by Saturn and Mars for Sura Nadiamsa.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 627,
+      "passage_key": "DK1.OCR.P0205.V2100-2102",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Jupiter in Libra and Sth Lord Aspect for Sura Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 629,
+      "passage_key": "DK1.OCR.P0206.V2105-2105",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Dasa of Ascendant Lord in Sura Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 637,
+      "passage_key": "DK1.OCR.P0207.V2116-2116",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Marriage Timing for Jarjhara Nadiamsa Native.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 638,
+      "passage_key": "DK1.OCR.P0207.V2121-2123",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Mercury in Jarjhara Nadiamsa with Moon in Seethala Nadiamsa.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 640,
+      "passage_key": "DK1.OCR.P0208.V2125-2125",
+      "category": "life_stage_or_relative_event",
+      "details": "The timing is expressed as a life stage or relative event rather than a computable date. Review unit: Great fortunes in youth based on 9th and 5th lord positions.",
+      "required_capabilities": [
+        "life_stage_normalizer",
+        "external_event_anchor_support",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 645,
+      "passage_key": "DK1.OCR.P0210.V2147-2149",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Wealthy status for Capricorn Ascendant in Jagathi Nadiamsa.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 646,
+      "passage_key": "DK1.OCR.P0211.V2155-2156",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Jagathi Nadiamsa 4th Lord Yoga Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 654,
+      "passage_key": "DK1.OCR.P0213.V2178-2181",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Marriage and Life Events for Movable Ascendant.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 658,
+      "passage_key": "DK1.OCR.P0214.V2189-2192",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Saturn Transit Effects for Kunda Nadiamsa Native.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 659,
+      "passage_key": "DK1.OCR.P0214.V2194-2194",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Dasa of the 11th Lord (Jupiter).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 664,
+      "passage_key": "DK1.OCR.P0215.V2202-2204",
+      "category": "unclear_dasha_method",
+      "details": "A Dasha is mentioned, but the passage does not yet establish the intended system or period mapping. Review unit: Kunda Nadiamsa Sun in Capricorn Dasa/Bhukti Auspiciousness.",
+      "required_capabilities": [
+        "dasha_system_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 679,
+      "passage_key": "DK1.OCR.P0219.V2251-2251",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Gains in the 3rd Dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 680,
+      "passage_key": "DK1.OCR.P0219.V2252-2252",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Varuna Nadiamsa Prosperity and Marriage.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 688,
+      "passage_key": "DK1.OCR.P0221.V2269-2271",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Mars in Varuna Nadiamsa with 9th Lord in Kumara Nadiamsa.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 691,
+      "passage_key": "DK1.OCR.P0222.V2276-2276",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Pilgrimage to Sethu via Saturn Dasa/Transit.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 705,
+      "passage_key": "DK1.OCR.P0224.V2307-2307",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Saturn Dasa: Loss of Coborn.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 707,
+      "passage_key": "DK1.OCR.P0224.V2313-2314",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Danger to Mother via Jupiter Transit.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 708,
+      "passage_key": "DK1.OCR.P0225.V2315-2315",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Maternal Danger in Uraga Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 709,
+      "passage_key": "DK1.OCR.P0225.V2316-2316",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Timing of Thread Ceremony via Jupiter Transit.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 710,
+      "passage_key": "DK1.OCR.P0225.V2317-2317",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Marriage Timing in Uraga Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 715,
+      "passage_key": "DK1.OCR.P0226.V2330-2332",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Uraga Nadiamsa First Half Dasa Effects.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 716,
+      "passage_key": "DK1.OCR.P0226.V2335-2338",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Dasa and Bhukti Effects for Uraga Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 718,
+      "passage_key": "DK1.OCR.P0227.V2345-2348",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Health and Life Events in Uraga Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 726,
+      "passage_key": "DK1.OCR.P0229.V2366-2366",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Marriage Timing in Sumathi Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 727,
+      "passage_key": "DK1.OCR.P0229.V2368-2368",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Sumathi Nadiamsa Life Events Timing.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 729,
+      "passage_key": "DK1.OCR.P0229.V2370-2370",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Timing of Marriage by Sumathi Nadiamsa.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 732,
+      "passage_key": "DK1.OCR.P0230.V2375-2376",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Saturn Transit Effects on Father-in-law and Maternal Uncle.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 734,
+      "passage_key": "DK1.OCR.P0230.V2379-2379",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Sumathi Nadiamsa: Danger to Kinsmen.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 736,
+      "passage_key": "DK1.OCR.P0230.V2384-2384",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Saturn-Mars Dasa Sub-period Danger.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 737,
+      "passage_key": "DK1.OCR.P0230.V2385-2385",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Saturn Transit or Rahu-Mars Dasa Illness.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 739,
+      "passage_key": "DK1.OCR.P0231.V2393-2395",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Moon in Kutila Nadiamsa and 4th Lord in Gada Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 743,
+      "passage_key": "DK1.OCR.P0232.V2403-2404",
+      "category": "life_stage_or_relative_event",
+      "details": "The timing is expressed as a life stage or relative event rather than a computable date. Review unit: Jupiter in the 10th House and Pilgrimage.",
+      "required_capabilities": [
+        "life_stage_normalizer",
+        "external_event_anchor_support",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 744,
+      "passage_key": "DK1.OCR.P0232.V2408-2409",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: Prosperity and Health from Ascendant Lord and 11th Lord Configuration.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 759,
+      "passage_key": "DK1.OCR.P0235.V2442-2448",
+      "category": "age_or_year",
+      "details": "An explicit native age or numbered year is the primary timing anchor. Review unit: 10th Lord Jupiter with Sun and Mars or in Aspect to Mars.",
+      "required_capabilities": [
+        "native_age_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 783,
+      "passage_key": "DK1.OCR.P0240.V2502-2503",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Danger to Mother in Kaala Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 784,
+      "passage_key": "DK1.OCR.P0240.V2504-2504",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Timing of Thread Ceremony in Capricorn Ascendant.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 785,
+      "passage_key": "DK1.OCR.P0240.V2505-2505",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Happiness in Kaala Nadiamsa (Capricorn).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 787,
+      "passage_key": "DK1.OCR.P0241.V2507-2507",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Birth of child through second wife.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 791,
+      "passage_key": "DK1.OCR.P0241.V2511-2511",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Conveyance in Mercury Dasa for Kaala Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 795,
+      "passage_key": "DK1.OCR.P0241.V2516-2516",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Danger to Father in Kaala Nadiamsa Capricorn.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 807,
+      "passage_key": "DK1.OCR.P0243.V2533-2533",
+      "category": "named_planet_or_lord_period",
+      "details": "The timing names a planet, sign, dispositor, or house-lord period/sub-period. Review unit: Dasa of 11th Lord for Dhruva Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "planet_lord_period_resolver",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 811,
+      "passage_key": "DK1.OCR.P0244.V2538-2538",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Saturn in 5th House in Seethala Nadiamsa Marriage Timing.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 812,
+      "passage_key": "DK1.OCR.P0244.V2539-2539",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Prosperity Timing based on Sun Navamsa and Saturn Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 814,
+      "passage_key": "DK1.OCR.P0244.V2541-2541",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Saturn in Seethala Nadiamsa in the Fourth Dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 818,
+      "passage_key": "DK1.OCR.P0245.V2550-2551",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Marriage timing for 8th Lord Jupiter in Sachira Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 819,
+      "passage_key": "DK1.OCR.P0245.V2552-2552",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Father's health during third dasa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 821,
+      "passage_key": "DK1.OCR.P0245.V2555-2555",
+      "category": "unclear_timing_method",
+      "details": "The timing language is too vague or incomplete to bind to a deterministic calculator. Review unit: Mars-Venus Conjunction in Kamala Nadiamsa for Progeny.",
+      "required_capabilities": [
+        "timing_clause_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 822,
+      "passage_key": "DK1.OCR.P0245.V2556-2556",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Mother's danger in Taurus Ascendant (Kamala Nadiamsa).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 835,
+      "passage_key": "DK1.OCR.P0248.V2588-2589",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Thread Ceremony Timing for Sivada Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 836,
+      "passage_key": "DK1.OCR.P0248.V2590-2590",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Marriage Timing for Sivada Nadiamsa (Former Half).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 838,
+      "passage_key": "DK1.OCR.P0248.V2594-2595",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Transit of Saturn or Jupiter over the Navamsa of the 8th Lord.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 840,
+      "passage_key": "DK1.OCR.P0248.V2597-2598",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Nadiamsa 4th Dasa Auspicious Functions and Travel.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 846,
+      "passage_key": "DK1.OCR.P0249.V2610-2611",
+      "category": "transit_activation",
+      "details": "A transit to a natal, Rashi, Navamsha, lord, or cycle-derived target is the primary trigger. Review unit: Sivada Nadiamsa: Jupiter Transit and Progeny.",
+      "required_capabilities": [
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "transit_cycle_counter",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 853,
+      "passage_key": "DK1.OCR.P0251.V2636-2636",
+      "category": "dasha_phase_or_junction",
+      "details": "The result is narrowed to a fraction, boundary, or junction of a Dasha period. Review unit: Wealth and Prosperity in Second Dasa (Kamala Nadiamsa).",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "period_fraction_calculator",
+        "junction_boundary_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 859,
+      "passage_key": "DK1.OCR.P0253.V2661-2662",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Jupiter in Kaala Nadiamsa or Sagittarius/Gemini Navamsa and 3rd Dasa Health.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 861,
+      "passage_key": "DK1.OCR.P0254.V2668-2669",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Kamala Nadiamsa Ascendant Lord in Sagittarius.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 862,
+      "passage_key": "DK1.OCR.P0254.V2670-2670",
+      "category": "ordinal_tara_or_rasi_dasha",
+      "details": "The timing uses an ordinal, Tara-labelled, or Rashi period whose source-specific sequence must be identified. Review unit: Danger to Mother in Kamala Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "ordinal_tara_rasi_dasha_calculator",
+        "period_interval_calculator",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 867,
+      "passage_key": "DK1.OCR.P0256.V2694-2696",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Timing of Thread Ceremony and Marriage in Champaka Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 870,
+      "passage_key": "DK1.OCR.P0256.V2700-2700",
+      "category": "unclear_dasha_method",
+      "details": "A Dasha is mentioned, but the passage does not yet establish the intended system or period mapping. Review unit: Conveyance Ownership Condition.",
+      "required_capabilities": [
+        "dasha_system_source_resolution",
+        "second_witness_review"
+      ],
+      "resolution": "second_witness",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 871,
+      "passage_key": "DK1.OCR.P0256.V2701-2701",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Danger to Mother during Saturn transit.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 872,
+      "passage_key": "DK1.OCR.P0257.V2702-2702",
+      "category": "dasha_transit_combination",
+      "details": "The timing requires both a Dasha permission window and a transit trigger. Review unit: Wealth in Champaka Nadiamsa.",
+      "required_capabilities": [
+        "typed_dasha_system_identifier",
+        "period_interval_calculator",
+        "sidereal_transit_ephemeris",
+        "derived_natal_transit_target_resolver",
+        "source_timing_context_review"
+      ],
+      "resolution": "source_review",
+      "priority": "medium"
+    }
+  ]
+}

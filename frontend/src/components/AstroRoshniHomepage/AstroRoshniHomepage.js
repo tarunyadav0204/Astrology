@@ -22,9 +22,7 @@ import CosmicForecast from '../Numerology/CosmicForecast';
 
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import PartnerForm from '../MarriageAnalysis/PartnerForm';
-import LoginForm from '../Auth/LoginForm';
-import RegisterForm from '../Auth/RegisterForm';
-import AuthModalShell from '../Auth/AuthModalShell';
+import ThemedAuthModal from '../Auth/ThemedAuthModal';
 import { showToast } from '../../utils/toast';
 import TrustBanner from '../TrustBanner/TrustBanner';
 import KpTodayHome from '../Home/KpTodayHome';
@@ -1176,15 +1174,14 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
             <div className="native-selector-callout__left">
               <span className="native-selector-callout__eyebrow">Chart workspace</span>
               <div className="native-selector-callout__title-row">
-                <h4>Work with one selected native across reports and predictions</h4>
+                <h4>Open the selected native's charts and dashas</h4>
               </div>
               <p>
-                Choose the person whose birth chart you want to use, then move across life events,
-                reports, matching, and remedies without resetting context.
+                Open the complete chart workspace directly, or change the selected native here.
               </p>
               <div className="native-selector-callout__status native-selector-callout__status--primary">
                 {birthData && birthData.name ? (
-                  <>Current native: <strong>{birthData.name}</strong></>
+                  <>Selected chart: <strong>{birthData.name}</strong></>
                 ) : (
                   <>No native selected yet</>
                 )}
@@ -1198,13 +1195,27 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
                     onLogin();
                     return;
                   }
-                  setBirthFormContext('changeNative');
-                  setShowBirthFormModal(true);
+                  if (!birthData?.name) {
+                    setBirthFormContext('changeNative');
+                    setShowBirthFormModal(true);
+                    return;
+                  }
+                  navigate('/charts-dashas');
                 }}
               >
-                {birthData && birthData.name ? 'Change Native' : 'Select Native'}
+                {birthData && birthData.name ? 'Open Charts & Dashas' : 'Select Native'}
               </button>
-              {!birthData?.name && (
+              {birthData?.name ? (
+                <button
+                  className="native-selector-callout__btn native-selector-callout__btn--secondary"
+                  onClick={() => {
+                    setBirthFormContext('changeNative');
+                    setShowBirthFormModal(true);
+                  }}
+                >
+                  Change Native
+                </button>
+              ) : (
                 <button
                   className="native-selector-callout__btn native-selector-callout__btn--secondary"
                   onClick={() => {
@@ -2554,57 +2565,16 @@ const AstroRoshniHomepage = ({ user, onLogout, onAdminClick, onLogin, showLoginB
         onLogin={onLogin}
       />
       
-      <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
-            <div style={{ marginBottom: '20px' }}>
-              <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '20px' }}>Welcome to AstroRoshni</h2>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                <button 
-                  onClick={() => setAuthView('login')}
-                  style={{
-                    padding: '10px 20px',
-                    border: 'none',
-                    background: authView === 'login' ? '#e91e63' : 'transparent',
-                    color: authView === 'login' ? 'white' : '#e91e63',
-                    borderRadius: '25px 0 0 25px',
-                    cursor: 'pointer',
-                    borderRight: '1px solid #e91e63'
-                  }}
-                >
-                  Sign In
-                </button>
-                <button 
-                  onClick={() => setAuthView('register')}
-                  style={{
-                    padding: '10px 20px',
-                    border: 'none',
-                    background: authView === 'register' ? '#e91e63' : 'transparent',
-                    color: authView === 'register' ? 'white' : '#e91e63',
-                    borderRadius: '0 25px 25px 0',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Sign Up
-                </button>
-              </div>
-            </div>
-            {authView === 'login' ? (
-              <LoginForm 
-                onLogin={() => {
-                  setShowLoginModal(false);
-                  window.location.reload();
-                }}
-                onSwitchToRegister={() => setAuthView('register')} 
-              />
-            ) : (
-              <RegisterForm 
-                onRegister={() => {
-                  setShowLoginModal(false);
-                  window.location.reload();
-                }}
-                onSwitchToLogin={() => setAuthView('login')} 
-              />
-            )}
-      </AuthModalShell>
+      <ThemedAuthModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        authView={authView}
+        setAuthView={setAuthView}
+        onAuthenticated={() => {
+          setShowLoginModal(false);
+          window.location.reload();
+        }}
+      />
       
       {showChartModal && (
         <div style={{

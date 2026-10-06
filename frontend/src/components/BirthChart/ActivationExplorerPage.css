@@ -165,6 +165,13 @@
   box-shadow: 0 8px 18px rgba(194, 24, 91, 0.18);
 }
 
+a.activation-primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .activation-primary-button:disabled {
   cursor: wait;
   opacity: 0.65;

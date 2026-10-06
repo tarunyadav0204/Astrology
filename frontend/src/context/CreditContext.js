@@ -40,6 +40,7 @@ export const CreditProvider = ({ children }) => {
     const [speechTtsProvider, setSpeechTtsProvider] = useState(null);
     const [features, setFeatures] = useState({});
     const [partnerPortraitCost, setPartnerPortraitCost] = useState(44);
+    const [isAstrologerLicensed, setIsAstrologerLicensed] = useState(false);
 
     const fetchBalance = useCallback(async () => {
         try {
@@ -51,6 +52,7 @@ export const CreditProvider = ({ children }) => {
                 setCredits(0);
                 setFreeQuestionAvailable(false);
                 setFreeQuestionRequiresNotifications(false);
+                setIsAstrologerLicensed(false);
                 return;
             }
 
@@ -88,23 +90,27 @@ export const CreditProvider = ({ children }) => {
                 setFreeQuestionRequiresNotifications(
                     canUseFreeQuestion && Boolean(data.free_question_requires_notifications)
                 );
+                setIsAstrologerLicensed(Boolean(data.is_astrologer_licensed));
             } else if (response.status === 403 || response.status === 401) {
                 // User not authenticated or token expired
                 console.log('💳 Authentication failed, setting credits to 0');
                 setCredits(0);
                 setFreeQuestionAvailable(false);
                 setFreeQuestionRequiresNotifications(false);
+                setIsAstrologerLicensed(false);
             } else {
                 console.error('Credit balance fetch failed:', response.status, response.statusText);
                 setCredits(0);
                 setFreeQuestionAvailable(false);
                 setFreeQuestionRequiresNotifications(false);
+                setIsAstrologerLicensed(false);
             }
         } catch (error) {
             console.error('Error fetching credit balance:', error);
             setCredits(0);
             setFreeQuestionAvailable(false);
             setFreeQuestionRequiresNotifications(false);
+            setIsAstrologerLicensed(false);
         }
     }, []);
 
@@ -287,6 +293,7 @@ export const CreditProvider = ({ children }) => {
             speechChatEnabled,
             speechTtsProvider,
             features,
+            isAstrologerLicensed,
             partnerPortraitCost,
             loading,
             fetchBalance,

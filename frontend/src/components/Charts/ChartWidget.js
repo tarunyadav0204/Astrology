@@ -82,6 +82,7 @@ const ChartWidget = ({
   const [charaKarakasData, setCharaKarakasData] = useState(null);
   const [showShadbala, setShowShadbala] = useState(false);
   const [deskControlsHost, setDeskControlsHost] = useState(null);
+  const [deskActionSlot, setDeskActionSlot] = useState(null);
 
   useEffect(() => {
     if (!deskControlsHostId || typeof document === 'undefined') {
@@ -308,7 +309,9 @@ const ChartWidget = ({
   };
   
   const deskControls = deskMode ? (
-    <div
+    <>
+      <div ref={setDeskActionSlot} className="chart-desk-action-slot" />
+      <div
       className="chart-desk-mini-bar"
       style={{
         position: 'absolute',
@@ -365,6 +368,7 @@ const ChartWidget = ({
         </button>
       )}
     </div>
+    </>
   ) : null;
 
   return (
@@ -550,6 +554,7 @@ const ChartWidget = ({
             highlightedHouseNumbers={highlightedHouseNumbers}
             activationHouseStates={activationHouseStates}
             showPlanetHoverDetails={!inlinePlanetDetails}
+            deskActionsHost={deskActionSlot}
           />
         ) : (
           <SouthIndianChart 
@@ -566,6 +571,7 @@ const ChartWidget = ({
             highlightedHouseNumbers={highlightedHouseNumbers}
             activationHouseStates={activationHouseStates}
             showPlanetHoverDetails={!inlinePlanetDetails}
+            deskActionsHost={deskActionSlot}
           />
         )}
       </ChartContainer>

@@ -8,96 +8,7 @@ import HouseInsightPopup from './HouseInsightPopup';
 import ChartOverlayActions from './ChartOverlayActions';
 import { resolveChartId } from '../../utils/chartIds';
 import { chartActivationFill } from './chartActivationTheme';
-
-const getTopTriangleRowCounts = (totalPlanets) => {
-  if (totalPlanets <= 3) return [totalPlanets];
-  if (totalPlanets === 4) return [3, 1];
-  if (totalPlanets <= 8) return [Math.ceil(totalPlanets / 2), Math.floor(totalPlanets / 2)];
-
-  // A chart can also include Gulika, Mandi and Indu Lagna. Keep those rare,
-  // very crowded combinations inside the triangle with a tapered third row.
-  const layouts = {
-    9: [4, 3, 2],
-    10: [4, 3, 3],
-    11: [4, 4, 3],
-  };
-  return layouts[totalPlanets] || [5, 4, Math.max(1, totalPlanets - 9)];
-};
-
-export const getTopTrianglePlanetPosition = (houseNumber, planetIndex, totalPlanets) => {
-  if (![2, 12].includes(houseNumber) || totalPlanets < 1) return null;
-
-  const rowCounts = getTopTriangleRowCounts(totalPlanets);
-  // Reserve the lower tip of the triangle for its sign number. Even the
-  // three-row layout therefore finishes high enough that degree/nakshatra
-  // detail cannot collide with that number.
-  const rowY = rowCounts.length === 1
-    ? [28]
-    : rowCounts.length === 2
-      ? [18, 48]
-      : [12, 34, 56];
-
-  let rowIndex = 0;
-  let indexInRow = planetIndex;
-  while (rowIndex < rowCounts.length - 1 && indexInRow >= rowCounts[rowIndex]) {
-    indexInRow -= rowCounts[rowIndex];
-    rowIndex += 1;
-  }
-
-  const countInRow = rowCounts[rowIndex];
-  const y = rowY[rowIndex];
-  const triangleCenterX = houseNumber === 2 ? 100 : 300;
-  // At y, each top triangle extends (100 - y) units either side of its
-  // centre. Preserve a 14-unit text margin so labels never cross a diagonal.
-  const usableHalfWidth = Math.max(0, 100 - y - 14);
-  const spacing = countInRow > 1
-    ? Math.min(38, (usableHalfWidth * 2) / (countInRow - 1))
-    : 0;
-
-  return {
-    x: triangleCenterX + ((indexInRow - ((countInRow - 1) / 2)) * spacing),
-    y,
-  };
-};
-
-// The four narrow side houses need a bounded vertical lane.  This must be
-// used for every dense count, because the rendered collection can also
-// include Gulika, Mandi or Indu Lagna in addition to the visible planets.
-// Falling through to the generic 5+ layout lets the final item cross the
-// diagonal into the neighbouring house.
-export const getSideTrianglePlanetPosition = (houseNumber, planetIndex, totalPlanets) => {
-  if (![3, 5, 9, 11].includes(houseNumber) || totalPlanets < 1) return null;
-
-  const isLeft = houseNumber === 3 || houseNumber === 5;
-  const isLower = houseNumber === 5 || houseNumber === 9;
-  // Keep the complete label group (symbol plus its two detail lines) clear of
-  // both diagonals.  The previous x=35/y=48 anchor put the symbol itself on
-  // the upper diagonal even though its centre was technically inside.
-  const startY = totalPlanets === 1 ? (isLower ? 300 : 100) : (isLower ? 260 : 60);
-  const endY = totalPlanets === 1 ? startY : (isLower ? 340 : 145);
-  const spacing = totalPlanets > 1 ? (endY - startY) / (totalPlanets - 1) : 0;
-
-  return {
-    x: isLeft ? 25 : 375,
-    y: startY + (planetIndex * spacing),
-  };
-};
-
-export const getPlanetTypography = (totalPlanets) => {
-  if (totalPlanets <= 1) {
-    return { symbolSize: 17, detailSize: 10, symbolOffset: -9, detailOffsets: [5, 17] };
-  }
-  if (totalPlanets === 2) {
-    return { symbolSize: 16, detailSize: 9.5, symbolOffset: -9, detailOffsets: [5, 17] };
-  }
-  if (totalPlanets === 3) {
-    return { symbolSize: 14, detailSize: 8.5, symbolOffset: -8, detailOffsets: [4, 14] };
-  }
-  if (totalPlanets === 4) {
-    return { symbolSize: 12, detailSize: 7.5, symbolOffset: -7, detailOffsets: [3, 12] };
-  }
-  return { symbolSize: 10, detailSize: 6.5, symbolOffset: -6, detailOffsets: [3, 11] };
-};
+import { HOUSE_POLYGONS, layoutWebHouse, textHalfWidth } from './northChartPlacement';
 
 // Keep sign numbers in the open part of each North Indian chart compartment.
 // The previous offsets put the narrow triangular houses almost directly on a
@@ -148,16 +59,12 @@ export const getRashiNumberPosition = (houseNumber) => (
  * label centred between their two diagonals instead of deriving it from the
  * looser house/planet centre.
  * 
- * PLANET POSITIONING RULES:
- * - Houses 2,12: Inverted triangles - planets above rashi
- * - Houses 3,4,5: Left side - planets left of rashi  
- * - Houses 9,10,11: Right side - planets right of rashi
- * - Houses 1,6,7,8: Standard - planets below rashi
- * - Spacing: Use (col === 0 ? -spacing : spacing) NOT (col * spacing)
- * - 2-4 planets: 16px horizontal, 18px vertical spacing
- * - 5+ planets: 3-column grid, 12px horizontal, 15px vertical
- * 
- * See: docs/NORTH_INDIAN_CHART_POSITIONING.md for complete reference
+ * PLANET POSITIONING:
+ * Labels are packed inside each house polygon (see northChartPlacement).
+ * The sign number stays put and is treated as occupied space. Symbol, status
+ * marks such as (R) and (c), and the degree lines must clear the borders and
+ * each other. Crowded houses shrink or shorten the detail lines instead of
+ * crossing a diagonal.
  */
 
 const NorthIndianChart = ({
@@ -179,6 +86,7 @@ const NorthIndianChart = ({
   /** Current Parashari activation state keyed by natal house number. */
   activationHouseStates = null,
   showPlanetHoverDetails = true,
+  deskActionsHost = null,
 }) => {
   const { signs, planets } = CHART_CONFIG;
   const chartId = resolveChartId(chartType, division);
@@ -434,7 +342,15 @@ const NorthIndianChart = ({
   const handleHouseAnalysis = (houseNumber, signName) => {
     const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
     const rashiIndex = rashiNames.indexOf(signName);
-    openHouseInsight(rashiIndex >= 0 ? rashiIndex : getRashiForHouse(houseNumber - 1), houseNumber);
+    const resolvedIndex = rashiIndex >= 0 ? rashiIndex : getRashiForHouse(houseNumber - 1);
+    setHouseContextMenu({ show: false, x: 0, y: 0, houseNumber: null, signName: null });
+    setHouseInsight({
+      show: true,
+      houseNumber,
+      signName: rashiNames[resolvedIndex] || signName,
+      rashiIndex: resolvedIndex,
+      corner: true,
+    });
   };
 
   const handleHouseStrength = (houseNumber, signName) => {
@@ -664,10 +580,38 @@ const NorthIndianChart = ({
     return planetsInHouse;
   };
 
+  const houseLayouts = useMemo(() => {
+    const layouts = {};
+    if (!chartData?.planets) return layouts;
+    for (let houseNumber = 1; houseNumber <= 12; houseNumber += 1) {
+      const planetsInHouse = getPlanetsInHouse(houseNumber - 1);
+      const rashiIndex = getRashiForHouse(houseNumber - 1);
+      layouts[houseNumber] = layoutWebHouse({
+        polygon: HOUSE_POLYGONS[houseNumber],
+        sign: getRashiNumberPosition(houseNumber),
+        signLabel: String(rashiIndex + 1),
+        showDegree: showDegreeNakshatra,
+        planets: planetsInHouse.map((planet) => ({
+          symbol: getPlanetSymbolWithStatus(planet),
+          degree: formatDegreeCompact(parseFloat(planet.degree)),
+          nakshatra: planet.shortNakshatra,
+        })),
+        asc: houseNumber === 1 ? {
+          label: 'ASC',
+          degree: chartData.ascendant != null ? formatDegreeCompact(chartData.ascendant % 30) : '',
+          nakshatra: chartData.ascendant != null ? getShortNakshatra(chartData.ascendant) : '',
+          bias: { x: 34, y: 8 },
+        } : null,
+      });
+    }
+    return layouts;
+  }, [chartData, customAscendant, showDegreeNakshatra]);
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'visible', zIndex: 1 }}>
       <ChartOverlayActions
         deskMode={deskMode}
+        host={deskMode ? deskActionsHost : null}
         highlightedPlanet={highlightedPlanet}
         onClearHighlight={clearHighlight}
         customAscendant={customAscendant}
@@ -815,136 +759,55 @@ const NorthIndianChart = ({
             </text>
             
             {/* Ascendant marker for house 1 */}
-            {houseNumber === 1 && (
+            {houseNumber === 1 && houseLayouts[1]?.asc && (
               <g style={{ pointerEvents: 'none' }}>
-                <text x={houseData.center.x + 38} y={houseData.center.y + 24} 
-                      fontSize="10" fill="#e91e63" fontWeight="900" textAnchor="middle">
+                <text x={houseLayouts[1].asc.x} y={houseLayouts[1].asc.y}
+                      fontSize={houseLayouts[1].asc.symbolFont} fill="#e91e63" fontWeight="900" textAnchor="middle">
                   ASC
                 </text>
-                {chartData.ascendant && (
-                  <text x={houseData.center.x + 38} y={houseData.center.y + 35} 
-                        fontSize="7" fill="var(--color-chart-text-muted, var(--color-text-muted))" fontWeight="500" textAnchor="middle">
-                    {formatDegreeCompact(chartData.ascendant % 30)}
+                {showDegreeNakshatra && houseLayouts[1].asc.mode === 'inline' && houseLayouts[1].asc.lines?.[0] ? (
+                  <text
+                    x={houseLayouts[1].asc.x + textHalfWidth('ASC', houseLayouts[1].asc.symbolFont) + 2}
+                    y={houseLayouts[1].asc.y}
+                    fontSize={houseLayouts[1].asc.detailFont}
+                    fill="var(--color-chart-text-muted, var(--color-text-muted))"
+                    fontWeight="500"
+                    textAnchor="start"
+                  >
+                    {houseLayouts[1].asc.lines[0]}
                   </text>
-                )}
-                {chartData.ascendant && (
-                  <text x={houseData.center.x + 38} y={houseData.center.y + 44} 
-                        fontSize="7" fill="var(--color-chart-text-muted, var(--color-text-muted))" fontWeight="500" textAnchor="middle">
-                    {getShortNakshatra(chartData.ascendant)}
+                ) : null}
+                {showDegreeNakshatra && houseLayouts[1].asc.mode !== 'inline' && houseLayouts[1].asc.lines?.[0] ? (
+                  <text x={houseLayouts[1].asc.x} y={houseLayouts[1].asc.y + houseLayouts[1].asc.line1}
+                        fontSize={houseLayouts[1].asc.detailFont} fill="var(--color-chart-text-muted, var(--color-text-muted))" fontWeight="500" textAnchor="middle">
+                    {houseLayouts[1].asc.lines[0]}
                   </text>
-                )}
+                ) : null}
+                {showDegreeNakshatra && houseLayouts[1].asc.mode !== 'inline' && houseLayouts[1].asc.lines?.[1] ? (
+                  <text x={houseLayouts[1].asc.x} y={houseLayouts[1].asc.y + houseLayouts[1].asc.line2}
+                        fontSize={houseLayouts[1].asc.detailFont} fill="var(--color-chart-text-muted, var(--color-text-muted))" fontWeight="500" textAnchor="middle">
+                    {houseLayouts[1].asc.lines[1]}
+                  </text>
+                ) : null}
               </g>
             )}
             
 
             {/* Planets */}
             {planetsInHouse.map((planet, pIndex) => {
-              const totalPlanets = planetsInHouse.length;
-              let planetX, planetY;
-              const topTrianglePosition = getTopTrianglePlanetPosition(houseNumber, pIndex, totalPlanets);
-              const sideTrianglePosition = getSideTrianglePlanetPosition(houseNumber, pIndex, totalPlanets);
-              
-              if (topTrianglePosition) {
-                planetX = topTrianglePosition.x;
-                planetY = topTrianglePosition.y;
-              } else if (sideTrianglePosition) {
-                planetX = sideTrianglePosition.x;
-                planetY = sideTrianglePosition.y;
-              } else if (totalPlanets === 1) {
-                if (houseNumber === 1) {
-                  planetX = houseData.center.x;
-                  planetY = houseData.center.y - 15;
-                } else if ([3, 4, 5].includes(houseNumber)) {
-                  planetX = houseData.center.x - 15;
-                  planetY = houseData.center.y + 10;
-                } else if ([6, 7, 8].includes(houseNumber)) {
-                  planetX = houseData.center.x;
-                  planetY = houseData.center.y + 30;
-                } else if (houseNumber === 9) {
-                  planetX = houseData.center.x + 25;
-                  planetY = houseData.center.y - 10;
-                } else if (houseNumber === 10) {
-                  planetX = houseData.center.x + 15;
-                  planetY = houseData.center.y - 20;
-                } else if (houseNumber === 11) {
-                  planetX = houseData.center.x + 15;
-                  planetY = houseData.center.y - 5;
-                } else {
-                  planetX = houseData.center.x;
-                  planetY = houseData.center.y - 10;
-                }
-              } else if (totalPlanets <= 4) {
-                if (![3, 5, 9, 11].includes(houseNumber)) {
-                  // Other houses: 2-column arrangement
-                  const row = Math.floor(pIndex / 2);
-                  const col = pIndex % 2;
-                  const spacing = 25;
-                  const rowSpacing = 38;
-                  
-                  if (houseNumber === 1) {
-                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y - 20 + (row * rowSpacing);
-                  } else if (houseNumber === 4) {
-                    planetX = houseData.center.x - 25 + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y + 5 + (row * rowSpacing);
-                  } else if ([6, 8].includes(houseNumber)) {
-                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    // The sign number occupies the upper tip of these bottom
-                    // triangles. Start the first planet row below that lane;
-                    // a second row still finishes within the 400px viewBox.
-                    planetY = houseData.center.y + 20 + (row * 35);
-                  } else if (houseNumber === 7) {
-                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y + 15 + (row * 35);
-                  } else if (houseNumber === 10) {
-                    planetX = houseData.center.x + 15 + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y - 25 + (row * rowSpacing);
-                  } else {
-                    planetX = houseData.center.x + (col === 0 ? -spacing : spacing);
-                    planetY = houseData.center.y - 25 + (row * rowSpacing);
-                  }
-                }
-              } else {
-                // For 5+ planets - arrange in single column
-                const rowSpacing = 32;
-                
-                if (houseNumber === 1) {
-                  planetX = houseData.center.x;
-                  planetY = houseData.center.y - 25 + (pIndex * rowSpacing);
-                } else if ([3, 4, 5].includes(houseNumber)) {
-                  planetX = houseData.center.x - 25;
-                  planetY = houseData.center.y + 0 + (pIndex * rowSpacing);
-                } else if ([6, 7, 8].includes(houseNumber)) {
-                  planetX = houseData.center.x;
-                  planetY = houseData.center.y + 20 + (pIndex * rowSpacing);
-                } else if (houseNumber === 9) {
-                  planetX = houseData.center.x + 35;
-                  planetY = houseData.center.y - 20 + (pIndex * rowSpacing);
-                } else if (houseNumber === 10) {
-                  planetX = houseData.center.x + 15;
-                  planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
-                } else if (houseNumber === 11) {
-                  planetX = houseData.center.x + 25;
-                  planetY = houseData.center.y - 15 + (pIndex * rowSpacing);
-                } else {
-                  planetX = houseData.center.x;
-                  planetY = houseData.center.y - 30 + (pIndex * rowSpacing);
-                }
-              }
-              const typography = getPlanetTypography(totalPlanets);
-              const symbolFontSize = String(typography.symbolSize);
-              const detailFontSize = String(typography.detailSize);
-              const symbolY = planetY + typography.symbolOffset;
-              const detailLine1Y = planetY + typography.detailOffsets[0];
-              const detailLine2Y = planetY + typography.detailOffsets[1];
-              const compactDegree = formatDegreeCompact(parseFloat(planet.degree));
-              const compactNakshatra = planet.shortNakshatra;
+              const slot = houseLayouts[houseNumber]?.planets[pIndex];
+              const planetX = slot?.x ?? houseData.center.x;
+              const planetY = slot?.y ?? houseData.center.y;
+              const symbolFontSize = slot?.symbolFont || 12;
+              const detailFontSize = slot?.detailFont || 8;
+              const symbol = getPlanetSymbolWithStatus(planet);
+              const glyphCenterY = planetY - symbolFontSize * 0.35;
               const aspectingPlanet = aspectsHighlight.show && aspectsHighlight.aspectingPlanets?.find(p => p.name === planet.name);
               
               return (
                 <g key={pIndex}>
                   {aspectingPlanet && (
-                    <circle cx={planetX} cy={planetY} r="12" 
+                    <circle cx={planetX} cy={glyphCenterY} r={Math.max(11, symbolFontSize * 0.72)}
                             fill="none" 
                             stroke={aspectingPlanet.isPositive ? '#4caf50' : '#f44336'} 
                             strokeWidth="2" 
@@ -954,7 +817,7 @@ const NorthIndianChart = ({
                   {/* Chart reference planet highlighting */}
                   {chartRefHighlightState?.type === 'planet' && 
                    planet.name.toLowerCase() === chartRefHighlightState.value.toLowerCase() && (
-                    <circle cx={planetX} cy={planetY} r="18" 
+                    <circle cx={planetX} cy={glyphCenterY} r="18"
                             fill="rgba(255, 107, 53, 0.4)" 
                             stroke="#ff6b35" 
                             strokeWidth="3" 
@@ -966,9 +829,9 @@ const NorthIndianChart = ({
                   {/* Desk yoga / karaka: accent glyph + thin underline (no rings) */}
                   {highlightedPlanetSet?.has(planet.name.toLowerCase()) ? (
                     <rect
-                      x={planetX - (Number(symbolFontSize) * 0.85)}
-                      y={planetY - 5}
-                      width={Number(symbolFontSize) * 1.7}
+                      x={planetX - textHalfWidth(symbol, symbolFontSize)}
+                      y={planetY + 1}
+                      width={textHalfWidth(symbol, symbolFontSize) * 2}
                       height={2}
                       rx={1}
                       fill="#9f1239"
@@ -978,7 +841,7 @@ const NorthIndianChart = ({
                   ) : null}
                   {/* Planet symbol */}
                   <text x={planetX} 
-                        y={symbolY}
+                        y={planetY}
                         fontSize={symbolFontSize} 
                         fill={highlightedPlanetSet?.has(planet.name.toLowerCase()) ? '#9f1239' : getPlanetColor(planet)}
                         fontWeight="900"
@@ -1005,35 +868,47 @@ const NorthIndianChart = ({
                         handleRashiClick(e, rashiIndex, houseNumber);
                       }}
                       onContextMenu={(e) => handleRashiClick(e, rashiIndex, houseNumber)}>
-                    {getPlanetSymbolWithStatus(planet)}
+                    {symbol}
                   </text>
-                  {/* Degree and Nakshatra combined */}
-                  {showDegreeNakshatra && (
-                    <>
-                      <text x={planetX} 
-                            y={detailLine1Y} 
-                            fontSize={detailFontSize} 
-                            fill="var(--color-chart-text-muted, var(--color-text-muted))"
-                            fontWeight="500"
-                            textAnchor="middle"
-                            style={{ cursor: 'pointer' }}
-                          onClick={(e) => handleRashiClick(e, rashiIndex, houseNumber)}
-                          onContextMenu={(e) => handleRashiClick(e, rashiIndex, houseNumber)}>
-                        {compactDegree}
-                      </text>
-                      <text x={planetX} 
-                            y={detailLine2Y} 
-                            fontSize={detailFontSize} 
-                            fill="var(--color-chart-text-muted, var(--color-text-muted))"
-                            fontWeight="500"
-                            textAnchor="middle"
-                            style={{ cursor: 'pointer' }}
-                          onClick={(e) => handleRashiClick(e, rashiIndex, houseNumber)}
-                          onContextMenu={(e) => handleRashiClick(e, rashiIndex, houseNumber)}>
-                        {compactNakshatra}
-                      </text>
-                    </>
-                  )}
+                  {showDegreeNakshatra && slot?.mode === 'inline' && slot.lines?.[0] ? (
+                    <text x={planetX + textHalfWidth(symbol, symbolFontSize) + 2}
+                          y={planetY}
+                          fontSize={detailFontSize}
+                          fill="var(--color-chart-text-muted, var(--color-text-muted))"
+                          fontWeight="500"
+                          textAnchor="start"
+                          style={{ cursor: 'pointer' }}
+                        onClick={(e) => handleRashiClick(e, rashiIndex, houseNumber)}
+                        onContextMenu={(e) => handleRashiClick(e, rashiIndex, houseNumber)}>
+                      {slot.lines[0]}
+                    </text>
+                  ) : null}
+                  {showDegreeNakshatra && slot?.mode !== 'inline' && slot?.lines?.[0] ? (
+                    <text x={planetX}
+                          y={planetY + slot.line1}
+                          fontSize={detailFontSize}
+                          fill="var(--color-chart-text-muted, var(--color-text-muted))"
+                          fontWeight="500"
+                          textAnchor="middle"
+                          style={{ cursor: 'pointer' }}
+                        onClick={(e) => handleRashiClick(e, rashiIndex, houseNumber)}
+                        onContextMenu={(e) => handleRashiClick(e, rashiIndex, houseNumber)}>
+                      {slot.lines[0]}
+                    </text>
+                  ) : null}
+                  {showDegreeNakshatra && slot?.mode !== 'inline' && slot?.lines?.[1] ? (
+                    <text x={planetX}
+                          y={planetY + slot.line2}
+                          fontSize={detailFontSize}
+                          fill="var(--color-chart-text-muted, var(--color-text-muted))"
+                          fontWeight="500"
+                          textAnchor="middle"
+                          style={{ cursor: 'pointer' }}
+                        onClick={(e) => handleRashiClick(e, rashiIndex, houseNumber)}
+                        onContextMenu={(e) => handleRashiClick(e, rashiIndex, houseNumber)}>
+                      {slot.lines[1]}
+                    </text>
+                  ) : null}
                 </g>
               );
             })}
@@ -1148,7 +1023,8 @@ const NorthIndianChart = ({
 
       <HouseInsightPopup
         isOpen={houseInsight.show}
-        onClose={() => setHouseInsight({ show: false, houseNumber: null, signName: null, rashiIndex: null })}
+        anchor={houseInsight.corner ? 'corner' : 'sheet'}
+        onClose={() => setHouseInsight({ show: false, houseNumber: null, signName: null, rashiIndex: null, corner: false })}
         houseNumber={houseInsight.houseNumber}
         signName={houseInsight.signName}
         rashiIndex={houseInsight.rashiIndex}

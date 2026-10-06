@@ -9,11 +9,25 @@ import CreditsModal from '../Credits/CreditsModal';
 import ModernSiteSearch from '../Search/ModernSiteSearch';
 import './ModernNavigationHeader.css';
 
-const SECTION_LINKS = [
-  ['your-day', 'Your day'],
-  ['method', 'How it works'],
-  ['clarity', 'Explore'],
-  ['tools', 'Vedic tools'],
+const CALENDAR_LINKS = [
+  ['/panchang', 'Today’s Panchang', 'Tithi, nakshatra, yoga and the day’s rhythm'],
+  ['/festivals', 'Festivals', 'Hindu observances with lunar timing'],
+  ['/festivals/monthly', 'Monthly calendar', 'Plan festivals and vrats across the month'],
+  ['/monthly-panchang', 'Monthly Panchang', 'Wider month view of tithi and nakshatra'],
+  ['/muhurat-finder', 'Muhurat', 'Find a considered window for beginnings'],
+  ['/nakshatras', 'Nakshatras', 'The 27 lunar constellations'],
+];
+
+// Paid / account readings — linked directly so they are not buried mid-page
+const READING_LINKS = [
+  ['/career-guidance', 'Career', 'Strengths, turning points and timing'],
+  ['/marriage-analysis', 'Marriage', 'Compatibility and relationship periods'],
+  ['/wealth-analysis', 'Wealth', 'Earning patterns and financial cycles'],
+  ['/health-analysis', 'Health', 'Constitution and supportive periods'],
+  ['/life-events', 'Life timing', 'Dashas, transits and activation windows'],
+  ['/karma-analysis', 'Past-life karma', 'Inherited patterns made practical'],
+  ['/progeny-analysis', 'Progeny', 'Children and family-growth themes'],
+  ['/education', 'Education', 'Learning patterns and examination periods'],
 ];
 
 const ModernNavigationHeader = ({
@@ -30,11 +44,13 @@ const ModernNavigationHeader = ({
   const { pathname } = useLocation();
   const { birthData } = useAstrology();
   const { credits, loading: creditsLoading, features } = useCredits();
-  const partnerPortraitEnabled = Boolean(user && features?.partner_portrait_enabled);
+  // Show the menu entry whenever the UI flag is on so guests can discover it.
+  const partnerPortraitEnabled = Boolean(features?.partner_portrait_enabled);
   const { theme, themes, setTheme } = useTheme();
   const accountMenuRef = useRef(null);
   const themeMenuRef = useRef(null);
   const discoverMenuRef = useRef(null);
+  const calendarMenuRef = useRef(null);
   const learnMenuRef = useRef(null);
   const mobileMenuRef = useRef(null);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
@@ -74,7 +90,7 @@ const ModernNavigationHeader = ({
   useEffect(() => {
     const closeMenus = (event) => {
       const isEscape = event.type === 'keydown' && event.key === 'Escape';
-      [accountMenuRef, themeMenuRef, discoverMenuRef, learnMenuRef, mobileMenuRef].forEach((menuRef) => {
+      [accountMenuRef, themeMenuRef, discoverMenuRef, calendarMenuRef, learnMenuRef, mobileMenuRef].forEach((menuRef) => {
         const menu = menuRef.current;
         if (!menu?.open) return;
         if (isEscape || (event.type === 'pointerdown' && !menu.contains(event.target))) {
@@ -96,6 +112,7 @@ const ModernNavigationHeader = ({
     accountMenuRef.current?.removeAttribute('open');
     themeMenuRef.current?.removeAttribute('open');
     discoverMenuRef.current?.removeAttribute('open');
+    calendarMenuRef.current?.removeAttribute('open');
     learnMenuRef.current?.removeAttribute('open');
     mobileMenuRef.current?.removeAttribute('open');
   };
@@ -149,16 +166,51 @@ const ModernNavigationHeader = ({
           </Link>
 
           <nav className="mh-nav__links" aria-label="Site sections">
-            {SECTION_LINKS.map(([id, label]) => (
-              <a key={id} href={sectionHref(id)} onClick={onHomeClick ? goSection(id) : undefined}>{label}</a>
-            ))}
+            <Link className="mh-nav__workspace-link" to="/charts-dashas" onClick={goSiteRoute('/charts-dashas')}>
+              Charts &amp; Dashas
+            </Link>
             <details className="mh-nav-menu" ref={discoverMenuRef}>
-              <summary>Discover</summary>
+              <summary>Readings</summary>
+              <div className="mh-nav-menu__panel mh-nav-menu__panel--readings" onClick={closeMenus}>
+                <a href={sectionHref('clarity')} onClick={onHomeClick ? goSection('clarity') : undefined}>
+                  <span>All life themes</span>
+                  <small>Browse career, wealth, marriage and more</small>
+                </a>
+                {READING_LINKS.map(([to, label, blurb]) => (
+                  <Link key={to} to={to} onClick={goSiteRoute(to)}>
+                    <span>{label}</span>
+                    <small>{blurb}</small>
+                  </Link>
+                ))}
+                <Link to="/kundli-matching" onClick={goSiteRoute('/kundli-matching')}>
+                  <span>Kundli matching</span>
+                  <small>Compare two charts for partnership</small>
+                </Link>
+                {partnerPortraitEnabled && (
+                  <Link to="/partner-portrait" onClick={goSiteRoute('/partner-portrait')}>
+                    <span>Partner Portrait</span>
+                    <small>Meet the person your Kundli describes</small>
+                  </Link>
+                )}
+                <Link to="/ai-kundli-generator" onClick={goSiteRoute('/ai-kundli-generator')}>
+                  <span>Create Kundli</span>
+                  <small>Calculate and save your Vedic chart</small>
+                </Link>
+                <Link to="/horoscope/daily" onClick={goSiteRoute('/horoscope/daily')}>
+                  <span>Horoscope</span>
+                  <small>Daily to yearly Sun-sign forecasts</small>
+                </Link>
+              </div>
+            </details>
+            <details className="mh-nav-menu" ref={calendarMenuRef}>
+              <summary>Calendar</summary>
               <div className="mh-nav-menu__panel" onClick={closeMenus}>
-                <a href={sectionHref('discover')} onClick={onHomeClick ? goSection('discover') : undefined}><span>Discover overview</span><small>Explore AstroRoshni</small></a>
-                <Link to="/ai-kundli-generator" onClick={goSiteRoute('/ai-kundli-generator')}><span>Create Kundli</span><small>Calculate and save your Vedic chart</small></Link>
-                <Link to="/horoscope/daily" onClick={goSiteRoute('/horoscope/daily')}><span>Horoscope</span><small>Daily to yearly Sun-sign forecasts</small></Link>
-                {partnerPortraitEnabled && <Link to="/partner-portrait" onClick={goSiteRoute('/partner-portrait')}><span>Partner Portrait</span><small>Meet the person your Kundli describes</small></Link>}
+                {CALENDAR_LINKS.map(([to, label, blurb]) => (
+                  <Link key={to} to={to} onClick={goSiteRoute(to)}>
+                    <span>{label}</span>
+                    <small>{blurb}</small>
+                  </Link>
+                ))}
               </div>
             </details>
             <details className="mh-nav-menu" ref={learnMenuRef}>
@@ -171,7 +223,6 @@ const ModernNavigationHeader = ({
                 <Link to="/lesson/1" onClick={goSiteRoute('/lesson/1')}><span>Start lesson one</span><small>What is astrology?</small></Link>
               </div>
             </details>
-            <Link to="/panchang" onClick={goSiteRoute('/panchang')}>Panchang</Link>
           </nav>
 
           <div className="mh-nav__actions">
@@ -249,21 +300,26 @@ const ModernNavigationHeader = ({
           <details className="mh-mobile-menu" ref={mobileMenuRef}>
             <summary aria-label="Open menu"><span></span><span></span></summary>
             <div className="mh-mobile-menu__panel" onClick={closeMenus}>
-              {SECTION_LINKS.map(([id, label]) => (
-                <a key={id} href={sectionHref(id)} onClick={onHomeClick ? goSection(id) : undefined}>{label}</a>
+              <Link className="mh-mobile-menu__workspace" to="/charts-dashas" onClick={goSiteRoute('/charts-dashas')}>Charts &amp; Dashas</Link>
+              <span className="mh-mobile-menu__label">Readings</span>
+              <a href={sectionHref('clarity')} onClick={onHomeClick ? goSection('clarity') : undefined}>All life themes</a>
+              {READING_LINKS.map(([to, label]) => (
+                <Link key={to} to={to} onClick={goSiteRoute(to)}>{label}</Link>
               ))}
-              <span className="mh-mobile-menu__label">Discover</span>
-              <a href={sectionHref('discover')} onClick={onHomeClick ? goSection('discover') : undefined}>Discover overview</a>
+              <Link to="/kundli-matching" onClick={goSiteRoute('/kundli-matching')}>Kundli matching</Link>
+              {partnerPortraitEnabled && <Link to="/partner-portrait" onClick={goSiteRoute('/partner-portrait')}>Partner Portrait</Link>}
               <Link to="/ai-kundli-generator" onClick={goSiteRoute('/ai-kundli-generator')}>Create Kundli</Link>
               <Link to="/horoscope/daily" onClick={goSiteRoute('/horoscope/daily')}>Horoscope</Link>
-              {partnerPortraitEnabled && <Link to="/partner-portrait" onClick={goSiteRoute('/partner-portrait')}>Partner Portrait</Link>}
+              <span className="mh-mobile-menu__label">Calendar</span>
+              {CALENDAR_LINKS.map(([to, label]) => (
+                <Link key={to} to={to} onClick={goSiteRoute(to)}>{label}</Link>
+              ))}
               <span className="mh-mobile-menu__label">Learn</span>
               <a href={sectionHref('journal')} onClick={onHomeClick ? goSection('journal') : undefined}>Learning overview</a>
               <Link to="/beginners-guide" onClick={goSiteRoute('/beginners-guide')}>Beginner’s guide</Link>
               <Link to="/advanced-courses" onClick={goSiteRoute('/advanced-courses')}>Advanced courses</Link>
               <Link to="/myths-vs-reality" onClick={goSiteRoute('/myths-vs-reality')}>Myths vs reality</Link>
               <Link to="/lesson/1" onClick={goSiteRoute('/lesson/1')}>Start lesson one</Link>
-              <Link to="/panchang" onClick={goSiteRoute('/panchang')}>Panchang</Link>
               <button type="button" onClick={askTara}>Ask Tara</button>
               <button type="button" onClick={() => openBirthForm('new')}>Create Kundli</button>
               {user && <button type="button" onClick={() => openBirthForm('saved')}>Saved Kundlis</button>}
@@ -294,14 +350,21 @@ const ModernNavigationHeader = ({
 
         {user && showNativeBar && (
           <div className="mh-native-bar" aria-label="Current Kundli">
-            <span className="mh-native-bar__label">Current Kundli</span>
-            <button type="button" className="mh-native-bar__subject" onClick={openCurrentChart}>
+            <span className="mh-native-bar__label">Selected chart</span>
+            <div className="mh-native-bar__subject">
               <i aria-hidden>{birthData?.name?.charAt(0)?.toUpperCase() || '+'}</i>
               <span><strong>{birthData?.name || 'Choose a birth chart'}</strong><small>{birthData?.place || 'Select a saved native to personalize every reading'}</small></span>
-            </button>
-            <button type="button" className="mh-native-bar__change" onClick={() => openBirthForm('saved')}>
-              {birthData ? 'Change native' : 'Select Kundli'} <span aria-hidden>↗</span>
-            </button>
+            </div>
+            <div className="mh-native-bar__actions">
+              {birthData && (
+                <button type="button" className="mh-native-bar__open" onClick={openCurrentChart}>
+                  Open chart <span aria-hidden>↗</span>
+                </button>
+              )}
+              <button type="button" className="mh-native-bar__change" onClick={() => openBirthForm('saved')}>
+                {birthData ? 'Change native' : 'Select Kundli'}
+              </button>
+            </div>
           </div>
         )}
       </header>

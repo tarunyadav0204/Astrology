@@ -35,6 +35,38 @@ CLOTHING_DIRECTIONS = {
 PRESENTATIONS = {"feminine": "adult woman", "masculine": "adult man"}
 
 
+def _complexion_prompt_ready(primary: Mapping[str, Any]) -> bool:
+    """Only send complexion to the image model when evidence is corroborated.
+
+    A single suggestive channel (often spouse karaka before 1.5.0) was enough to
+    lock portraits into an overly dark tone. Moderate-or-strong confidence, or
+    two independent marriage channels, is the minimum bar for a hard instruction.
+    """
+    if primary.get("confidence") in {"strong", "moderate"}:
+        return True
+    evidence = list(primary.get("evidence") or [])
+    independent = len({row.get("independence") for row in evidence if row.get("independence")})
+    return independent >= 2
+
+
+def _complexion_trait(result: Mapping[str, Any], primary: Mapping[str, Any]) -> str:
+    """Phrase complexion for the image model, softening close classical conflicts."""
+    value = str(primary.get("value") or "")
+    alternatives = [row for row in (result.get("alternatives") or []) if isinstance(row, Mapping) and row.get("value")]
+    if not alternatives:
+        return f"complexion: {value}"
+    alternative = alternatives[0]
+    primary_support = float(primary.get("effective_repetitions") or 0.0)
+    alternative_support = float(alternative.get("effective_repetitions") or 0.0)
+    if alternative_support >= primary_support * 0.75:
+        # When two classical tones are nearly tied, avoid forcing an extreme.
+        return (
+            f"complexion: balanced between {value} and {alternative['value']}; "
+            "render a natural middle tone without pushing toward either extreme"
+        )
+    return f"complexion: {value}"
+
+
 def _resolved_traits(profile: Mapping[str, Any]) -> list[str]:
     traits: list[str] = []
     appearance = profile.get("appearance") or {}
@@ -46,11 +78,16 @@ def _resolved_traits(profile: Mapping[str, Any]) -> list[str]:
         primary = result.get("primary") if isinstance(result, dict) else None
         if not isinstance(primary, dict):
             continue
-        # BPHS gives explicit hair descriptions for the Sun, Jupiter, Venus and
-        # Saturn (3.23, 3.27-29). A single direct spouse indicator is still
-        # meaningful enough to constrain head hair; other visible attributes
-        # continue to require repetition.
-        if primary.get("confidence") not in {"strong", "moderate"} and attribute not in {"hair", "head_hair", "complexion"}:
+        # Complexion and head hair use corroboration gates so a lone Venus
+        # spouse-karaka signal cannot lock every male portrait into brown skin
+        # or curls. Other attributes still need moderate/strong confidence.
+        if attribute == "complexion":
+            if not _complexion_prompt_ready(primary):
+                continue
+        elif attribute in {"hair", "head_hair"}:
+            if not _complexion_prompt_ready(primary):
+                continue
+        elif primary.get("confidence") not in {"strong", "moderate"}:
             continue
         # Body-hair wording in BPHS describes Scorpio's form. It is retained in
         # the textual evidence, but a clothed portrait cannot represent it
@@ -72,6 +109,21 @@ def _resolved_traits(profile: Mapping[str, Any]) -> list[str]:
                 "head hair: coarse-textured or slightly wiry hair with ordinary natural coverage; "
                 "density is unspecified, so do not make it unusually thick, dense, or luxuriant"
             )
+            continue
+        if attribute in {"hair", "head_hair"} and value in {
+            "curly hair",
+            "soft wavy or gently curled hair",
+        }:
+            # BPHS 3.28 vakramūrdhaja supports curl, but "curly" alone makes
+            # image models overdo tight ringlets. Prefer soft wave unless
+            # stronger classical wording is supplied later.
+            traits.append(
+                "head hair: soft natural waves or gentle curls; "
+                "not tight ringlets, not overly curly, not a defined curly-hair stereotype"
+            )
+            continue
+        if attribute == "complexion":
+            traits.append(_complexion_trait(result, primary))
             continue
         traits.append(f"{attribute.replace('_', ' ')}: {value}")
     return traits[:8]

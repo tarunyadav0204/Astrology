@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
 import { SEO_CONFIG, buildHomeAccuracyProofStructuredData } from '../../config/seo.config';
@@ -156,14 +156,20 @@ const FOOTER_GROUPS = [
     links: [
       ['Career guidance', '/career-guidance'],
       ['Marriage analysis', '/marriage-analysis'],
+      ['Wealth analysis', '/wealth-analysis'],
+      ['Health analysis', '/health-analysis'],
       ['Life timing', '/life-events'],
       ['Past-life karma', '/karma-analysis'],
+      ['Progeny analysis', '/progeny-analysis'],
+      ['Education', '/education'],
     ],
   },
   {
     title: 'Vedic tools',
     links: [
       ['Panchang', '/panchang'],
+      ['Festivals', '/festivals'],
+      ['Monthly calendar', '/festivals/monthly'],
       ['Muhurat', '/muhurat-finder'],
       ['Nakshatras', '/nakshatras'],
       ['Ashtakavarga', '/ashtakavarga'],
@@ -209,9 +215,11 @@ const ModernAstroRoshniHomepage = ({
   onAdminClick,
 }) => {
   const navigate = useNavigate();
-  const { birthData } = useAstrology();
+  const { birthData, chartData } = useAstrology();
   const { features, partnerPortraitCost } = useCredits();
-  const showPartnerPortrait = Boolean(user && features?.partner_portrait_enabled);
+  // Discovery card should excite visitors before login; the portrait page
+  // itself prompts sign-in when they try to generate.
+  const showPartnerPortrait = Boolean(features?.partner_portrait_enabled);
   const partnerSample = ['female', 'woman', 'f', 'girl'].includes(String(birthData?.gender || '').trim().toLowerCase())
     ? partnerPortraitMaleSample
     : partnerPortraitSample;
@@ -220,11 +228,29 @@ const ModernAstroRoshniHomepage = ({
   const [latestArticles, setLatestArticles] = useState([]);
   const [verifiedTestimonials, setVerifiedTestimonials] = useState([]);
   const [showIosInstallGuide, setShowIosInstallGuide] = useState(false);
+  const focusDetailRef = useRef(null);
+  const focusTouchedRef = useRef(false);
   const selectedFocus = useMemo(
     () => FOCUS_AREAS.find((area) => area.key === focusKey) || FOCUS_AREAS[0],
     [focusKey]
   );
   const activeMethod = METHOD_LAYERS[methodIndex];
+
+  const selectFocus = (key) => {
+    focusTouchedRef.current = true;
+    setFocusKey(key);
+  };
+
+  useEffect(() => {
+    if (!focusTouchedRef.current || !focusDetailRef.current) return undefined;
+    if (typeof window === 'undefined' || !window.matchMedia('(max-width: 900px)').matches) {
+      return undefined;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      focusDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusKey]);
 
   useEffect(() => {
     document.body.classList.add('modern-homepage-active');
@@ -291,6 +317,8 @@ const ModernAstroRoshniHomepage = ({
       };
     }
 
+    // Always observe against the homepage scrollport so footer/chapter reveals
+    // still fire on tablet after layout switches away from window scrolling.
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return;
@@ -298,12 +326,20 @@ const ModernAstroRoshniHomepage = ({
         observer.unobserve(entry.target);
       });
     }, {
-      root: window.matchMedia('(min-width: 981px)').matches ? scrollRoot : null,
-      rootMargin: '0px 0px -8% 0px',
-      threshold: 0.12,
+      root: scrollRoot,
+      rootMargin: '0px 0px -6% 0px',
+      threshold: 0.08,
     });
 
     targets.forEach((target) => observer.observe(target));
+
+    // Footer is below the fold and easy to miss if an early layout pass
+    // reports zero intersection — keep it readable either way.
+    page.querySelectorAll('.mh-footer .mh-reveal').forEach((target) => {
+      target.classList.add('is-visible');
+      observer.unobserve(target);
+    });
+
     return () => {
       observer.disconnect();
       page.classList.remove('mh-motion-ready');
@@ -396,10 +432,23 @@ const ModernAstroRoshniHomepage = ({
               Tara interprets your complete Vedic chart to reveal patterns, timing and possibilities unique to you.
             </p>
             <div className="mh-hero__actions">
-              <button className="mh-primary-button" type="button" onClick={askTara}>Ask Tara <span aria-hidden>↗</span></button>
-              <Link className="mh-secondary-button" to="/ai-kundli-generator">
-                Create free Kundli
-              </Link>
+              {user && birthData ? (
+                <>
+                  <button className="mh-primary-button" type="button" onClick={askTara}>
+                    Ask Tara <span aria-hidden>↗</span>
+                  </button>
+                  <button className="mh-secondary-button" type="button" onClick={() => navigate('/charts-dashas')}>
+                    Open Charts &amp; Dashas
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="mh-primary-button" type="button" onClick={askTara}>Ask Tara <span aria-hidden>↗</span></button>
+                  <Link className="mh-secondary-button" to="/ai-kundli-generator">
+                    Create free Kundli
+                  </Link>
+                </>
+              )}
             </div>
             <div className="mh-proof-line" aria-label="Calculation credentials">
               <span>Swiss Ephemeris</span><i></i><span>90+ analysis layers</span><i></i><span>Four-system synthesis</span>
@@ -407,7 +456,7 @@ const ModernAstroRoshniHomepage = ({
           </div>
 
           <div className="mh-hero__visual" aria-label="Live sidereal transit visualization">
-            <LiveTransitRing />
+            <LiveTransitRing birthData={birthData} chartData={chartData} />
           </div>
           <a className="mh-scroll-cue" href="#your-day"><span>See your day</span><i aria-hidden></i></a>
         </section>
@@ -485,18 +534,42 @@ const ModernAstroRoshniHomepage = ({
           </div>
           <div className="mh-focus-layout">
             <div className="mh-focus-list" role="list">
-              {FOCUS_AREAS.map((area) => (
-                <button
-                  key={area.key}
-                  className={area.key === focusKey ? 'mh-focus-row is-active' : 'mh-focus-row'}
-                  type="button"
-                  onClick={() => setFocusKey(area.key)}
-                >
-                  <span>{area.number}</span><strong>{area.title}</strong><i aria-hidden>↗</i>
-                </button>
-              ))}
+              {FOCUS_AREAS.map((area) => {
+                const isActive = area.key === focusKey;
+                return (
+                  <div
+                    key={area.key}
+                    className={isActive ? 'mh-focus-item is-active' : 'mh-focus-item'}
+                    role="listitem"
+                  >
+                    <button
+                      className={isActive ? 'mh-focus-row is-active' : 'mh-focus-row'}
+                      type="button"
+                      aria-expanded={isActive}
+                      onClick={() => selectFocus(area.key)}
+                    >
+                      <span>{area.number}</span><strong>{area.title}</strong><i aria-hidden>{isActive ? '▾' : '↗'}</i>
+                    </button>
+                    {isActive && (
+                      <div
+                        className="mh-focus-detail mh-focus-detail--inline"
+                        ref={focusDetailRef}
+                        aria-live="polite"
+                      >
+                        <p className="mh-panel-label">Selected theme · {area.number}</p>
+                        <h3>{area.title}</h3>
+                        <p>{area.text}</p>
+                        <div className="mh-focus-signal"><span>Chart signals</span><strong>{area.signal}</strong></div>
+                        <button className="mh-primary-button" type="button" onClick={() => requireAccount(area.path)}>
+                          Explore {area.title.toLowerCase()} <span aria-hidden>↗</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <div className="mh-focus-detail" key={selectedFocus.key} aria-live="polite">
+            <div className="mh-focus-detail mh-focus-detail--aside" key={selectedFocus.key} aria-live="polite">
               <p className="mh-panel-label">Selected theme · {selectedFocus.number}</p>
               <h3>{selectedFocus.title}</h3>
               <p>{selectedFocus.text}</p>

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { apiService } from '../../services/apiService';
+import { useCredits } from '../../context/CreditContext';
 import { formatTopicEvidence } from './topicEvidenceFormatters';
 import './DeskTopicLens.css';
 
@@ -203,6 +205,8 @@ export default function DeskTopicLens({
   calculationProfile,
   onInspectDate,
   compact = false,
+  preview = false,
+  onOpenFull,
 }) {
   const [section, setSection] = useState('overview');
   const [judgment, setJudgment] = useState(null);
@@ -223,6 +227,7 @@ export default function DeskTopicLens({
   const asOf = isoDate(asOfDate);
   const timingStart = timingStartDate || asOf;
   const timingContextKey = `${topicId || ''}:${birthChartId || ''}:${birthData?.date || ''}:${birthData?.time || ''}`;
+  const { isAstrologerLicensed, loading: creditsLoading } = useCredits();
 
   useEffect(() => {
     timingRequestRef.current += 1;
@@ -235,7 +240,14 @@ export default function DeskTopicLens({
 
   useEffect(() => {
     let cancelled = false;
-    if (!topicId || topicId === 'whole_chart' || !birthData || !chartData) return undefined;
+    if (!topicId || topicId === 'whole_chart' || !birthData || !chartData || creditsLoading || !isAstrologerLicensed) {
+      if (!creditsLoading && !isAstrologerLicensed) {
+        setLoading(false);
+        setJudgment(null);
+        setError('');
+      }
+      return undefined;
+    }
     setLoading(true);
     setError('');
     setJudgment(null);
@@ -251,7 +263,7 @@ export default function DeskTopicLens({
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [topicId, birthChartId, birthData, chartData, asOf, calculationProfile]);
+  }, [topicId, birthChartId, birthData, chartData, asOf, calculationProfile, creditsLoading, isAstrologerLicensed]);
 
   const loadTiming = () => {
     if (timingLoading) return;
@@ -317,9 +329,33 @@ export default function DeskTopicLens({
   const foundation = judgment?.raw_sections?.vitality_foundation || {};
   const sixth = judgment?.raw_sections?.sixth_house_chain || {};
 
+  if (creditsLoading) return <div className="dtl__status"><span className="dtl__spinner" /><strong>Checking access</strong><small>Judgment is part of the Astrologer License.</small></div>;
+  if (!isAstrologerLicensed) {
+    return (
+      <div className="dtl dtl--license">
+        <div className="dtl__license">
+          <em>Astrologer License</em>
+          <h2>Judgment is a professional tool.</h2>
+          <p>Natal promise, timing and the classical basis for a topic are included with an active Astrologer License.</p>
+          <Link to="/subscription?family=astrologer">View the Astrologer License</Link>
+        </div>
+      </div>
+    );
+  }
   if (loading) return <div className="dtl__status"><span className="dtl__spinner" /><strong>Building the Health judgment</strong><small>Reading constitution, protection and established natal susceptibilities.</small></div>;
   if (error) return <div className="dtl__status dtl__status--error"><strong>Health Topic Lens is unavailable</strong><small>{error}</small></div>;
   if (!judgment) return null;
+
+  const topicLabel = String(topicId || 'Topic').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  if (preview) {
+    return (
+      <button type="button" className="dtl dtl--preview" onClick={onOpenFull}>
+        <em>{topicLabel} · Topic Lens</em>
+        <strong>{judgment.natal_promise?.headline}</strong>
+        <span>Read the full judgment</span>
+      </button>
+    );
+  }
 
   return (
     <div className={`dtl${compact ? ' dtl--compact' : ''}`}>

@@ -13,6 +13,7 @@ import AstroVishnuLanding from './components/AstroVishnu/AstroVishnuLanding';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import AuthModalShell from './components/Auth/AuthModalShell';
+import ThemedAuthModal from './components/Auth/ThemedAuthModal';
 import { AstrologyProvider } from './context/AstrologyContext';
 import { CreditProvider } from './context/CreditContext';
 import { APP_CONFIG } from './config/app.config';
@@ -50,64 +51,9 @@ function RoutePageFallback() {
   );
 }
 
-/** Auth sheet for Vedic analysis routes when the guest taps Sign in / Create account on the tool page. */
-function AnalysisGuestAuthModal({ isOpen, onClose, authView, setAuthView, description, onAuthenticated }) {
-  return (
-    <AuthModalShell isOpen={isOpen} onClose={onClose}>
-      <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Sign in</h2>
-        <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>{description}</p>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-          <button
-            type="button"
-            onClick={() => setAuthView('login')}
-            style={{
-              padding: '10px 20px',
-              border: 'none',
-              background: authView === 'login' ? '#e91e63' : 'transparent',
-              color: authView === 'login' ? 'white' : '#e91e63',
-              borderRadius: '25px 0 0 25px',
-              cursor: 'pointer',
-              borderRight: '1px solid #e91e63',
-            }}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => setAuthView('register')}
-            style={{
-              padding: '10px 20px',
-              border: 'none',
-              background: authView === 'register' ? '#e91e63' : 'transparent',
-              color: authView === 'register' ? 'white' : '#e91e63',
-              borderRadius: '0 25px 25px 0',
-              cursor: 'pointer',
-            }}
-          >
-            Sign Up
-          </button>
-        </div>
-      </div>
-      {authView === 'login' ? (
-        <LoginForm
-          onLogin={(userData) => {
-            onAuthenticated(userData);
-            onClose();
-          }}
-          onSwitchToRegister={() => setAuthView('register')}
-        />
-      ) : (
-        <RegisterForm
-          onRegister={(userData) => {
-            onAuthenticated(userData);
-            onClose();
-          }}
-          onSwitchToLogin={() => setAuthView('login')}
-        />
-      )}
-    </AuthModalShell>
-  );
+/** Same modal as homepage header Sign in — kept as an alias for tool-route call sites. */
+function AnalysisGuestAuthModal(props) {
+  return <ThemedAuthModal {...props} />;
 }
 
 const AstroRoshniHomepage = lazy(() => import('./components/AstroRoshniHomepage/HomepageExperience'));
@@ -472,63 +418,13 @@ function App() {
                     onLogin={() => setShowLoginModal(true)} 
                     showLoginButton={true} 
                   />
-                  <AuthModalShell isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}>
-                        <div className="auth-experience" style={{ marginBottom: '20px' }}>
-                          <p className="auth-experience__eyebrow">Your chart, remembered</p>
-                          <h2 className="auth-experience__title">Welcome to AstroRoshni</h2>
-                          <p className="auth-experience__lead">Sign in to continue with your saved Kundlis, personal timing and Tara conversations.</p>
-                          <div className="auth-experience__tabs" style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                            <button 
-                              onClick={() => setAuthView('login')}
-                              className={authView === 'login' ? 'is-active' : ''}
-                              type="button"
-                              style={{
-                                padding: '10px 20px',
-                                border: 'none',
-                                background: authView === 'login' ? '#e91e63' : 'transparent',
-                                color: authView === 'login' ? 'white' : '#e91e63',
-                                borderRadius: '25px 0 0 25px',
-                                cursor: 'pointer',
-                                borderRight: '1px solid #e91e63'
-                              }}
-                            >
-                              Sign In
-                            </button>
-                            <button 
-                              onClick={() => setAuthView('register')}
-                              className={authView === 'register' ? 'is-active' : ''}
-                              type="button"
-                              style={{
-                                padding: '10px 20px',
-                                border: 'none',
-                                background: authView === 'register' ? '#e91e63' : 'transparent',
-                                color: authView === 'register' ? 'white' : '#e91e63',
-                                borderRadius: '0 25px 25px 0',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Sign Up
-                            </button>
-                          </div>
-                        </div>
-                        {authView === 'login' ? (
-                          <LoginForm 
-                            onLogin={(userData) => {
-                              handleLogin(userData);
-                              setShowLoginModal(false);
-                            }} 
-                            onSwitchToRegister={() => setAuthView('register')} 
-                          />
-                        ) : (
-                          <RegisterForm 
-                            onRegister={(userData) => {
-                              handleLogin(userData);
-                              setShowLoginModal(false);
-                            }} 
-                            onSwitchToLogin={() => setAuthView('login')} 
-                          />
-                        )}
-                  </AuthModalShell>
+                  <ThemedAuthModal
+                    isOpen={showLoginModal}
+                    onClose={() => setShowLoginModal(false)}
+                    authView={authView}
+                    setAuthView={setAuthView}
+                    onAuthenticated={handleLogin}
+                  />
                 </>
               ) : domainConfig.userType === 'software' ? (
                 <>
@@ -1012,13 +908,22 @@ function App() {
               showLoginButton={!user}
             />
           } />
-          <Route path="/festivals" element={<FestivalsPage />} />
+          <Route path="/festivals" element={
+            <FestivalsPage
+              user={user}
+              onLogout={user ? handleLogout : undefined}
+              onAdminClick={user ? handleAdminClick : undefined}
+              onLogin={!user ? () => setShowLoginModal(true) : undefined}
+              showLoginButton={!user}
+            />
+          } />
           <Route path="/festivals/monthly" element={
             <MonthlyFestivalsPage
               user={user}
               onLogout={user ? handleLogout : undefined}
               onAdminClick={user ? handleAdminClick : undefined}
               onLogin={!user ? () => setShowLoginModal(true) : undefined}
+              showLoginButton={!user}
             />
           } />
           {/* CRA route: in-app navigation + fallback when static HTML is not served. SEO HTML: build/karma-analysis.html */}
@@ -1033,62 +938,14 @@ function App() {
                   onLogin={() => setShowLoginModal(true)}
                   showLoginButton={!user}
                 />
-                <AuthModalShell isOpen={showLoginModal && !user} onClose={() => setShowLoginModal(false)}>
-                  <div style={{ marginBottom: '20px' }}>
-                    <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Sign in required</h2>
-                    <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>
-                      Sign in to run your personalised past-life karma analysis.
-                    </p>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setAuthView('login')}
-                        style={{
-                          padding: '10px 20px',
-                          border: 'none',
-                          background: authView === 'login' ? '#e91e63' : 'transparent',
-                          color: authView === 'login' ? 'white' : '#e91e63',
-                          borderRadius: '25px 0 0 25px',
-                          cursor: 'pointer',
-                          borderRight: '1px solid #e91e63',
-                        }}
-                      >
-                        Sign In
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAuthView('register')}
-                        style={{
-                          padding: '10px 20px',
-                          border: 'none',
-                          background: authView === 'register' ? '#e91e63' : 'transparent',
-                          color: authView === 'register' ? 'white' : '#e91e63',
-                          borderRadius: '0 25px 25px 0',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Sign Up
-                      </button>
-                    </div>
-                  </div>
-                  {authView === 'login' ? (
-                    <LoginForm
-                      onLogin={(userData) => {
-                        handleLogin(userData);
-                        setShowLoginModal(false);
-                      }}
-                      onSwitchToRegister={() => setAuthView('register')}
-                    />
-                  ) : (
-                    <RegisterForm
-                      onRegister={(userData) => {
-                        handleLogin(userData);
-                        setShowLoginModal(false);
-                      }}
-                      onSwitchToLogin={() => setAuthView('login')}
-                    />
-                  )}
-                </AuthModalShell>
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to run your personalised past-life karma analysis."
+                  onAuthenticated={handleLogin}
+                />
               </>
             }
           />
@@ -1103,62 +960,14 @@ function App() {
                   onLogin={() => setShowLoginModal(true)}
                   showLoginButton={!user}
                 />
-                <AuthModalShell isOpen={showLoginModal && !user} onClose={() => setShowLoginModal(false)}>
-                  <div style={{ marginBottom: '20px' }}>
-                    <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Sign in required</h2>
-                    <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>
-                      Sign in to use saved charts and run Kundli matching with your account.
-                    </p>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setAuthView('login')}
-                        style={{
-                          padding: '10px 20px',
-                          border: 'none',
-                          background: authView === 'login' ? '#e91e63' : 'transparent',
-                          color: authView === 'login' ? 'white' : '#e91e63',
-                          borderRadius: '25px 0 0 25px',
-                          cursor: 'pointer',
-                          borderRight: '1px solid #e91e63'
-                        }}
-                      >
-                        Sign In
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAuthView('register')}
-                        style={{
-                          padding: '10px 20px',
-                          border: 'none',
-                          background: authView === 'register' ? '#e91e63' : 'transparent',
-                          color: authView === 'register' ? 'white' : '#e91e63',
-                          borderRadius: '0 25px 25px 0',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Sign Up
-                      </button>
-                    </div>
-                  </div>
-                  {authView === 'login' ? (
-                    <LoginForm
-                      onLogin={(userData) => {
-                        handleLogin(userData);
-                        setShowLoginModal(false);
-                      }}
-                      onSwitchToRegister={() => setAuthView('register')}
-                    />
-                  ) : (
-                    <RegisterForm
-                      onRegister={(userData) => {
-                        handleLogin(userData);
-                        setShowLoginModal(false);
-                      }}
-                      onSwitchToLogin={() => setAuthView('login')}
-                    />
-                  )}
-                </AuthModalShell>
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to use saved charts and run Kundli matching with your account."
+                  onAuthenticated={handleLogin}
+                />
               </>
             }
           />
@@ -1173,62 +982,14 @@ function App() {
                   onLogin={() => setShowLoginModal(true)}
                   showLoginButton={!user}
                 />
-                <AuthModalShell isOpen={showLoginModal && !user} onClose={() => setShowLoginModal(false)}>
-                  <div style={{ marginBottom: '20px' }}>
-                    <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Sign in required</h2>
-                    <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>
-                      Sign in to select saved charts and generate premium PDF reports.
-                    </p>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setAuthView('login')}
-                        style={{
-                          padding: '10px 20px',
-                          border: 'none',
-                          background: authView === 'login' ? '#e91e63' : 'transparent',
-                          color: authView === 'login' ? 'white' : '#e91e63',
-                          borderRadius: '25px 0 0 25px',
-                          cursor: 'pointer',
-                          borderRight: '1px solid #e91e63'
-                        }}
-                      >
-                        Sign In
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAuthView('register')}
-                        style={{
-                          padding: '10px 20px',
-                          border: 'none',
-                          background: authView === 'register' ? '#e91e63' : 'transparent',
-                          color: authView === 'register' ? 'white' : '#e91e63',
-                          borderRadius: '0 25px 25px 0',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Sign Up
-                      </button>
-                    </div>
-                  </div>
-                  {authView === 'login' ? (
-                    <LoginForm
-                      onLogin={(userData) => {
-                        handleLogin(userData);
-                        setShowLoginModal(false);
-                      }}
-                      onSwitchToRegister={() => setAuthView('register')}
-                    />
-                  ) : (
-                    <RegisterForm
-                      onRegister={(userData) => {
-                        handleLogin(userData);
-                        setShowLoginModal(false);
-                      }}
-                      onSwitchToLogin={() => setAuthView('login')}
-                    />
-                  )}
-                </AuthModalShell>
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to select saved charts and generate premium PDF reports."
+                  onAuthenticated={handleLogin}
+                />
               </>
             }
           />
@@ -1268,65 +1029,14 @@ function App() {
                     setShowLoginModal(true);
                   }}
                 />
-                <AuthModalShell isOpen={showLoginModal && !user} onClose={() => setShowLoginModal(false)}>
-                  <div style={{ maxWidth: 420, margin: '0 auto' }}>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-                      <div style={{
-                        display: 'flex',
-                        background: '#f8f9fa',
-                        borderRadius: 25,
-                        padding: 4,
-                        width: 'fit-content'
-                      }}>
-                        <button
-                          type="button"
-                          onClick={() => setAuthView('login')}
-                          style={{
-                            padding: '10px 20px',
-                            border: 'none',
-                            background: authView === 'login' ? '#e91e63' : 'transparent',
-                            color: authView === 'login' ? 'white' : '#e91e63',
-                            borderRadius: '25px 0 0 25px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Login
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAuthView('register')}
-                          style={{
-                            padding: '10px 20px',
-                            border: 'none',
-                            background: authView === 'register' ? '#e91e63' : 'transparent',
-                            color: authView === 'register' ? 'white' : '#e91e63',
-                            borderRadius: '0 25px 25px 0',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Sign Up
-                        </button>
-                      </div>
-                    </div>
-                    {authView === 'login' ? (
-                      <LoginForm
-                        onLogin={(userData) => {
-                          handleLogin(userData);
-                          setShowLoginModal(false);
-                        }}
-                        onSwitchToRegister={() => setAuthView('register')}
-                      />
-                    ) : (
-                      <RegisterForm
-                        onRegister={(userData) => {
-                          handleLogin(userData);
-                          setShowLoginModal(false);
-                        }}
-                        onSwitchToLogin={() => setAuthView('login')}
-                      />
-                    )}
-                  </div>
-                </AuthModalShell>
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to explore Ashtakavarga with your saved Kundli."
+                  onAuthenticated={handleLogin}
+                />
               </>
             }
           />
@@ -1356,62 +1066,14 @@ function App() {
                     setShowLoginModal(true);
                   }}
                 />
-                <AuthModalShell isOpen={showLoginModal && !user} onClose={() => setShowLoginModal(false)}>
-                  <div style={{ marginBottom: '20px' }}>
-                    <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Sign in required</h2>
-                    <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>
-                      Sign in to confirm your identity before deleting your account.
-                    </p>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setAuthView('login')}
-                        style={{
-                          padding: '10px 20px',
-                          border: 'none',
-                          background: authView === 'login' ? '#e91e63' : 'transparent',
-                          color: authView === 'login' ? 'white' : '#e91e63',
-                          borderRadius: '25px 0 0 25px',
-                          cursor: 'pointer',
-                          borderRight: '1px solid #e91e63',
-                        }}
-                      >
-                        Sign In
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAuthView('register')}
-                        style={{
-                          padding: '10px 20px',
-                          border: 'none',
-                          background: authView === 'register' ? '#e91e63' : 'transparent',
-                          color: authView === 'register' ? 'white' : '#e91e63',
-                          borderRadius: '0 25px 25px 0',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Sign Up
-                      </button>
-                    </div>
-                  </div>
-                  {authView === 'login' ? (
-                    <LoginForm
-                      onLogin={(userData) => {
-                        handleLogin(userData);
-                        setShowLoginModal(false);
-                      }}
-                      onSwitchToRegister={() => setAuthView('register')}
-                    />
-                  ) : (
-                    <RegisterForm
-                      onRegister={(userData) => {
-                        handleLogin(userData);
-                        setShowLoginModal(false);
-                      }}
-                      onSwitchToLogin={() => setAuthView('login')}
-                    />
-                  )}
-                </AuthModalShell>
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to confirm your identity before deleting your account."
+                  onAuthenticated={handleLogin}
+                />
               </>
             }
           />
@@ -1523,62 +1185,14 @@ function App() {
               element={
                 <ChatRouteGate>
                   <ChatPage onLogin={() => setShowLoginModal(true)} />
-                  <AuthModalShell isOpen={showLoginModal && !user} onClose={() => setShowLoginModal(false)}>
-                    <div style={{ marginBottom: '20px' }}>
-                      <h2 style={{ textAlign: 'center', color: '#e91e63', marginBottom: '10px' }}>Sign in required</h2>
-                      <p style={{ textAlign: 'center', color: '#666', marginBottom: '20px' }}>
-                        Sign in to chat with your saved birth chart and use credits.
-                      </p>
-                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-                        <button
-                          type="button"
-                          onClick={() => setAuthView('login')}
-                          style={{
-                            padding: '10px 20px',
-                            border: 'none',
-                            background: authView === 'login' ? '#e91e63' : 'transparent',
-                            color: authView === 'login' ? 'white' : '#e91e63',
-                            borderRadius: '25px 0 0 25px',
-                            cursor: 'pointer',
-                            borderRight: '1px solid #e91e63',
-                          }}
-                        >
-                          Sign In
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAuthView('register')}
-                          style={{
-                            padding: '10px 20px',
-                            border: 'none',
-                            background: authView === 'register' ? '#e91e63' : 'transparent',
-                            color: authView === 'register' ? 'white' : '#e91e63',
-                            borderRadius: '0 25px 25px 0',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Sign Up
-                        </button>
-                      </div>
-                    </div>
-                    {authView === 'login' ? (
-                      <LoginForm
-                        onLogin={(userData) => {
-                          handleLogin(userData);
-                          setShowLoginModal(false);
-                        }}
-                        onSwitchToRegister={() => setAuthView('register')}
-                      />
-                    ) : (
-                      <RegisterForm
-                        onRegister={(userData) => {
-                          handleLogin(userData);
-                          setShowLoginModal(false);
-                        }}
-                        onSwitchToLogin={() => setAuthView('login')}
-                      />
-                    )}
-                  </AuthModalShell>
+                  <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to chat with your saved birth chart and use credits."
+                  onAuthenticated={handleLogin}
+                />
                 </ChatRouteGate>
               }
             />

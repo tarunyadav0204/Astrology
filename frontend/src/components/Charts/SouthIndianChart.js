@@ -24,6 +24,7 @@ const SouthIndianChart = ({
   highlightedHouseNumbers = null,
   activationHouseStates = null,
   showPlanetHoverDetails = true,
+  deskActionsHost = null,
 }) => {
   const { signs, planets } = CHART_CONFIG;
   const chartId = resolveChartId(chartType, division);
@@ -400,7 +401,15 @@ const SouthIndianChart = ({
   const handleHouseAnalysis = (houseNumber, signName) => {
     const rashiNames = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
     const rashiIndex = rashiNames.indexOf(signName);
-    openHouseInsight(rashiIndex >= 0 ? rashiIndex : 0, houseNumber);
+    const resolvedIndex = rashiIndex >= 0 ? rashiIndex : 0;
+    setHouseContextMenu({ show: false, x: 0, y: 0, houseNumber: null, signName: null });
+    setHouseInsight({
+      show: true,
+      houseNumber,
+      signName: rashiNames[resolvedIndex] || signName,
+      rashiIndex: resolvedIndex,
+      corner: true,
+    });
   };
 
   const handleHouseStrength = (houseNumber, signName) => {
@@ -482,6 +491,7 @@ const SouthIndianChart = ({
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <ChartOverlayActions
         deskMode={deskMode}
+        host={deskMode ? deskActionsHost : null}
         highlightedPlanet={highlightedPlanet}
         onClearHighlight={clearHighlight}
         customAscendant={customAscendant}
@@ -860,7 +870,8 @@ const SouthIndianChart = ({
 
       <HouseInsightPopup
         isOpen={houseInsight.show}
-        onClose={() => setHouseInsight({ show: false, houseNumber: null, signName: null, rashiIndex: null })}
+        anchor={houseInsight.corner ? 'corner' : 'sheet'}
+        onClose={() => setHouseInsight({ show: false, houseNumber: null, signName: null, rashiIndex: null, corner: false })}
         houseNumber={houseInsight.houseNumber}
         signName={houseInsight.signName}
         rashiIndex={houseInsight.rashiIndex}

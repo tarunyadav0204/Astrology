@@ -84,8 +84,9 @@
     }
 }
 
-/* Modern AstroRoshni homepage theme — scoped so legacy/domain auth stays unchanged. */
-body.modern-homepage-active .auth-modal-shell {
+/* Themed AstroRoshni auth — homepage body class or explicit --themed shell. AstroVishnu keeps default. */
+body.modern-homepage-active .auth-modal-shell,
+.auth-modal-shell--themed {
     z-index: var(--z-modal, 100000);
     padding: max(14px, env(safe-area-inset-top, 0px)) 14px max(14px, env(safe-area-inset-bottom, 0px));
     background:
@@ -94,7 +95,8 @@ body.modern-homepage-active .auth-modal-shell {
     backdrop-filter: blur(16px);
 }
 
-body.modern-homepage-active .auth-modal-shell__panel {
+body.modern-homepage-active .auth-modal-shell__panel,
+.auth-modal-shell--themed .auth-modal-shell__panel {
     position: relative;
     max-width: 500px;
     color: var(--color-text);
@@ -105,7 +107,8 @@ body.modern-homepage-active .auth-modal-shell__panel {
     overflow: hidden;
 }
 
-body.modern-homepage-active .auth-modal-shell__panel::before {
+body.modern-homepage-active .auth-modal-shell__panel::before,
+.auth-modal-shell--themed .auth-modal-shell__panel::before {
     content: '';
     position: absolute;
     z-index: 4;
@@ -117,13 +120,15 @@ body.modern-homepage-active .auth-modal-shell__panel::before {
     pointer-events: none;
 }
 
-body.modern-homepage-active .auth-modal-shell__sticky-close {
+body.modern-homepage-active .auth-modal-shell__sticky-close,
+.auth-modal-shell--themed .auth-modal-shell__sticky-close {
     min-height: 54px;
     padding: 10px 12px 0;
     background: linear-gradient(180deg, var(--color-surface) 72%, color-mix(in srgb, var(--color-surface) 92%, transparent));
 }
 
-body.modern-homepage-active .auth-modal-shell__close {
+body.modern-homepage-active .auth-modal-shell__close,
+.auth-modal-shell--themed .auth-modal-shell__close {
     width: 38px;
     height: 38px;
     color: var(--color-brand);
@@ -136,23 +141,27 @@ body.modern-homepage-active .auth-modal-shell__close {
 }
 
 body.modern-homepage-active .auth-modal-shell__close:hover,
-body.modern-homepage-active .auth-modal-shell__close:focus-visible {
+body.modern-homepage-active .auth-modal-shell__close:focus-visible,
+.auth-modal-shell--themed .auth-modal-shell__close:focus-visible {
     color: var(--color-on-brand);
     background: var(--color-brand);
     border-color: var(--color-brand);
 }
 
-body.modern-homepage-active .auth-modal-shell__body {
+body.modern-homepage-active .auth-modal-shell__body,
+.auth-modal-shell--themed .auth-modal-shell__body {
     padding: 0 clamp(22px, 5vw, 42px) 38px;
     font-family: 'Segoe UI', Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-body.modern-homepage-active .auth-experience {
+body.modern-homepage-active .auth-experience,
+.auth-modal-shell--themed .auth-experience {
     margin: 0 0 24px !important;
     text-align: center;
 }
 
-body.modern-homepage-active .auth-experience__eyebrow {
+body.modern-homepage-active .auth-experience__eyebrow,
+.auth-modal-shell--themed .auth-experience__eyebrow {
     margin: 0 0 9px;
     color: var(--color-brand);
     font-size: 9px;
@@ -161,7 +170,8 @@ body.modern-homepage-active .auth-experience__eyebrow {
     text-transform: uppercase;
 }
 
-body.modern-homepage-active .auth-experience__title {
+body.modern-homepage-active .auth-experience__title,
+.auth-modal-shell--themed .auth-experience__title {
     margin: 0 !important;
     color: var(--color-text) !important;
     font-family: var(--font-display);
@@ -171,7 +181,8 @@ body.modern-homepage-active .auth-experience__title {
     letter-spacing: -0.04em;
 }
 
-body.modern-homepage-active .auth-experience__lead {
+body.modern-homepage-active .auth-experience__lead,
+.auth-modal-shell--themed .auth-experience__lead {
     max-width: 390px;
     margin: 14px auto 22px;
     color: var(--color-text-muted);
@@ -179,7 +190,8 @@ body.modern-homepage-active .auth-experience__lead {
     line-height: 1.65;
 }
 
-body.modern-homepage-active .auth-experience__tabs {
+body.modern-homepage-active .auth-experience__tabs,
+.auth-modal-shell--themed .auth-experience__tabs {
     width: 100%;
     margin: 0 !important;
     padding: 4px;
@@ -189,7 +201,8 @@ body.modern-homepage-active .auth-experience__tabs {
     border-radius: 999px;
 }
 
-body.modern-homepage-active .auth-experience__tabs button {
+body.modern-homepage-active .auth-experience__tabs button,
+.auth-modal-shell--themed .auth-experience__tabs button {
     min-height: 42px;
     flex: 1;
     padding: 0 18px !important;
@@ -203,13 +216,15 @@ body.modern-homepage-active .auth-experience__tabs button {
     transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 
-body.modern-homepage-active .auth-experience__tabs button.is-active {
+body.modern-homepage-active .auth-experience__tabs button.is-active,
+.auth-modal-shell--themed .auth-experience__tabs button.is-active {
     color: var(--color-on-brand) !important;
     background: var(--color-brand) !important;
     box-shadow: var(--shadow-sm);
 }
 
-body.modern-homepage-active .auth-form {
+body.modern-homepage-active .auth-form,
+.auth-modal-shell--themed .auth-form {
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
@@ -223,11 +238,14 @@ body.modern-homepage-active .auth-form {
 }
 
 body.modern-homepage-active .auth-form--login > .auth-form__title,
-body.modern-homepage-active .auth-form--register > .auth-form__title {
+body.modern-homepage-active .auth-form--register > .auth-form__title,
+.auth-modal-shell--themed .auth-form--login > .auth-form__title,
+.auth-modal-shell--themed .auth-form--register > .auth-form__title {
     display: none;
 }
 
-body.modern-homepage-active .auth-form--reset .auth-form__title {
+body.modern-homepage-active .auth-form--reset .auth-form__title,
+.auth-modal-shell--themed .auth-form--reset .auth-form__title {
     margin: 2px 0 25px !important;
     color: var(--color-text) !important;
     font-family: var(--font-display);
@@ -236,9 +254,11 @@ body.modern-homepage-active .auth-form--reset .auth-form__title {
     letter-spacing: -0.035em;
 }
 
-body.modern-homepage-active .auth-form__title-icon { display: none; }
+body.modern-homepage-active .auth-form__title-icon,
+.auth-modal-shell--themed .auth-form__title-icon { display: none; }
 
-body.modern-homepage-active .auth-form label {
+body.modern-homepage-active .auth-form label,
+.auth-modal-shell--themed .auth-form label {
     margin-bottom: 8px !important;
     color: var(--color-text-muted) !important;
     font-size: 10px;
@@ -248,7 +268,9 @@ body.modern-homepage-active .auth-form label {
 }
 
 body.modern-homepage-active .auth-form input,
-body.modern-homepage-active .auth-form select {
+body.modern-homepage-active .auth-form select,
+.auth-modal-shell--themed .auth-form input,
+.auth-modal-shell--themed .auth-form select {
     min-height: 50px;
     padding: 0 14px !important;
     color: var(--color-text) !important;
@@ -263,23 +285,29 @@ body.modern-homepage-active .auth-form select {
 }
 
 body.modern-homepage-active .auth-form input:focus,
-body.modern-homepage-active .auth-form select:focus {
+body.modern-homepage-active .auth-form select:focus,
+.auth-modal-shell--themed .auth-form input:focus,
+.auth-modal-shell--themed .auth-form select:focus {
     background: var(--color-surface-raised) !important;
     border-color: var(--color-focus) !important;
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-focus) 12%, transparent) !important;
 }
 
-body.modern-homepage-active .auth-form input::placeholder {
+body.modern-homepage-active .auth-form input::placeholder,
+.auth-modal-shell--themed .auth-form input::placeholder {
     color: var(--color-text-subtle);
     -webkit-text-fill-color: var(--color-text-subtle);
 }
 
-body.modern-homepage-active .auth-form--login input[name='password'] {
+body.modern-homepage-active .auth-form--login input[name='password'],
+.auth-modal-shell--themed .auth-form--login input[name='password'] {
     padding-right: 48px !important;
 }
 
 body.modern-homepage-active .auth-form__primary,
-body.modern-homepage-active .auth-form__secondary-action {
+body.modern-homepage-active .auth-form__secondary-action,
+.auth-modal-shell--themed .auth-form__primary,
+.auth-modal-shell--themed .auth-form__secondary-action {
     min-height: 50px;
     color: var(--color-on-brand) !important;
     -webkit-text-fill-color: var(--color-on-brand);
@@ -295,18 +323,24 @@ body.modern-homepage-active .auth-form__secondary-action {
 body.modern-homepage-active .auth-form__primary:hover:not(:disabled),
 body.modern-homepage-active .auth-form__primary:focus-visible:not(:disabled),
 body.modern-homepage-active .auth-form__secondary-action:hover:not(:disabled),
-body.modern-homepage-active .auth-form__secondary-action:focus-visible:not(:disabled) {
+body.modern-homepage-active .auth-form__secondary-action:focus-visible:not(:disabled),
+.auth-modal-shell--themed .auth-form__primary:hover:not(:disabled),
+.auth-modal-shell--themed .auth-form__primary:focus-visible:not(:disabled),
+.auth-modal-shell--themed .auth-form__secondary-action:hover:not(:disabled),
+.auth-modal-shell--themed .auth-form__secondary-action:focus-visible:not(:disabled) {
     background: var(--color-brand-hover) !important;
     transform: translateY(-1px);
     box-shadow: var(--shadow-card);
 }
 
-body.modern-homepage-active .auth-form button:disabled {
+body.modern-homepage-active .auth-form button:disabled,
+.auth-modal-shell--themed .auth-form button:disabled {
     cursor: not-allowed !important;
     opacity: 0.5 !important;
 }
 
-body.modern-homepage-active .auth-form__biometric {
+body.modern-homepage-active .auth-form__biometric,
+.auth-modal-shell--themed .auth-form__biometric {
     min-height: 48px;
     color: var(--color-text) !important;
     -webkit-text-fill-color: var(--color-text);
@@ -317,7 +351,8 @@ body.modern-homepage-active .auth-form__biometric {
     font-size: 12px !important;
 }
 
-body.modern-homepage-active .auth-form__text-button {
+body.modern-homepage-active .auth-form__text-button,
+.auth-modal-shell--themed .auth-form__text-button {
     color: var(--color-brand) !important;
     -webkit-text-fill-color: var(--color-brand);
     background: transparent !important;
@@ -325,7 +360,8 @@ body.modern-homepage-active .auth-form__text-button {
     text-underline-offset: 4px;
 }
 
-body.modern-homepage-active .auth-form__password-toggle {
+body.modern-homepage-active .auth-form__password-toggle,
+.auth-modal-shell--themed .auth-form__password-toggle {
     width: 40px;
     height: 40px;
     right: 5px !important;
@@ -338,26 +374,31 @@ body.modern-homepage-active .auth-form__password-toggle {
     font-size: 16px !important;
 }
 
-body.modern-homepage-active .auth-form p {
+body.modern-homepage-active .auth-form p,
+.auth-modal-shell--themed .auth-form p {
     color: var(--color-text-muted) !important;
     font-size: 12px !important;
     line-height: 1.6;
 }
 
-body.modern-homepage-active .register-otp-row {
+body.modern-homepage-active .register-otp-row,
+.auth-modal-shell--themed .register-otp-row {
     gap: 10px;
 }
 
 @media (max-width: 479px) {
-    body.modern-homepage-active .auth-modal-shell__panel {
+body.modern-homepage-active .auth-modal-shell__panel,
+.auth-modal-shell--themed .auth-modal-shell__panel {
         border-radius: 22px;
     }
 
-    body.modern-homepage-active .auth-modal-shell__body {
+body.modern-homepage-active .auth-modal-shell__body,
+.auth-modal-shell--themed .auth-modal-shell__body {
         padding: 0 20px 28px;
     }
 
-    body.modern-homepage-active .auth-experience__title {
+body.modern-homepage-active .auth-experience__title,
+.auth-modal-shell--themed .auth-experience__title {
         font-size: 34px;
     }
 }

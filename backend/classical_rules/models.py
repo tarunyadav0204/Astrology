@@ -24,9 +24,16 @@ class SourceProfile:
     witness_url: str
     witness_policy: str = "external_reference_only"
     numbering_note: str = "Verse numbering follows the pinned witness."
+    reference_label: Optional[str] = None
+    edition_key: Optional[str] = None
+    pdf_pages: Tuple[int, ...] = ()
+    printed_pages: Tuple[int, ...] = ()
+    editorial_status: Optional[str] = None
 
     @property
     def reference(self) -> str:
+        if self.reference_label:
+            return self.reference_label
         suffix = str(self.verse_start) if self.verse_start == self.verse_end else f"{self.verse_start}–{self.verse_end}"
         return f"BPHS {self.chapter}.{suffix}"
 
@@ -64,6 +71,12 @@ class ClassicalRule:
         row = asdict(self)
         row.pop("evaluator", None)
         row["source"]["reference"] = self.source.reference
+        for key in ("reference_label", "edition_key", "editorial_status"):
+            if row["source"].get(key) is None:
+                row["source"].pop(key, None)
+        for key in ("pdf_pages", "printed_pages"):
+            if not row["source"].get(key):
+                row["source"].pop(key, None)
         return row
 
 

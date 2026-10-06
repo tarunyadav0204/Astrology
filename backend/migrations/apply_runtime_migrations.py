@@ -12,6 +12,9 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 MIGRATIONS_DIR = Path(__file__).resolve().parent
 RUNTIME_MIGRATIONS = (
     "create_classical_rule_engine.sql",
+    "add_deva_keralam_source_catalog.sql",
+    "add_deva_keralam_rule_candidates.sql",
+    "add_deva_keralam_context_reconstruction.sql",
     "add_astrologer_subscription.sql",
     "add_payment_failure_alerts.sql",
     "add_remedy_funnel_events.sql",

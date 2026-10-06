@@ -1,0 +1,161 @@
+{
+  "schema_version": "deva-keralam-reviewed-manifest/1.0.0",
+  "batch_key": "deva_keralam.reviewed_batch_f.v1",
+  "edition_key": "deva_keralam_volume_1_scan",
+  "source_scope": {
+    "stream": "F",
+    "catalogue_ordinals": [587, 878],
+    "pdf_pages": [198, 258],
+    "selection": "New natal rules whose complete condition and result were verified against the rendered page image and are fully expressible in the canonical fact ontology.",
+    "candidate_count": 2
+  },
+  "reviewer_method": "Review the rendered source page together with its local heading and neighboring prose; preserve directional aspects; compile only complete natal condition-result pairs whose premises exist in the canonical fact ontology; record every other assigned passage separately in completion_ledger_f_v1.json.",
+  "candidates": [
+    {
+      "key": "DK.F.2062.IMMOVABLE_ASC_SATURN_EXALTED_JUPITER_ASPECT",
+      "title": "Only child when exalted Saturn rules the Moon sign and receives Jupiter's aspect",
+      "passage_key": "DK1.OCR.P0202.V2062-2062",
+      "context_block_key": "DK1.F.CTX.V2062-2062",
+      "decision": "approved",
+      "source": {
+        "verse_start": 2062,
+        "verse_end": 2062,
+        "pdf_pages": [202],
+        "printed_pages": [185],
+        "reference_label": "Deva Keralam, Book 1, verse 2062, PDF page 202 (printed page 185)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse number, printed page, English translation and Sanskrit line were checked on the rendered page image. Guru-nirikshite is retained directionally as Jupiter viewing Saturn."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.ascendant.rashi.name",
+            "comparator": "in",
+            "value": ["Taurus", "Leo", "Scorpio", "Aquarius"]
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Moon.rashi.lord",
+            "comparator": "equals",
+            "value": "Saturn"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Saturn.dignity",
+            "comparator": "equals",
+            "value": "exalted"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.relationship.aspect.Jupiter.Saturn.present",
+            "comparator": "equals",
+            "value": true
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "siblings",
+        "prediction_kind": "natal_promise",
+        "traditional_results": [
+          "The text describes the native as the only child, without co-born siblings."
+        ],
+        "timing": null,
+        "certainty_note": "This is a source match and should be read as a traditional natal indication, not a guaranteed literal outcome."
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "aspect_direction": "Jupiter aspects Saturn"
+      },
+      "topics": ["siblings", "only_child", "dignity", "aspect"],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "Immovable Ascendant is encoded explicitly as Taurus, Leo, Scorpio or Aquarius rather than introducing a second modality calculator.",
+        "The rule does not inherit the Taurus/Gadaa section heading because the verse itself gives immovable Ascendant as its complete scope."
+      ]
+    },
+    {
+      "key": "DK.F.2605.SEVENTH_LORD_MARS_ASC_SATURN_MALEFIC",
+      "title": "Secretive sexual conduct when seventh-lord Mars is pressured in the Ascendant",
+      "passage_key": "DK1.OCR.P0249.V2605-2605",
+      "context_block_key": "DK1.F.CTX.V2605-2605",
+      "decision": "approved",
+      "source": {
+        "verse_start": 2605,
+        "verse_end": 2605,
+        "pdf_pages": [249],
+        "printed_pages": [232],
+        "reference_label": "Deva Keralam, Book 1, verse 2605, PDF page 249 (printed page 232)",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse number, printed page, English translation and Sanskrit line were checked on the rendered page image. The source explicitly allows Saturn's aspect or association."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {
+            "op": "fact",
+            "key": "deva_keralam.house.7.lord",
+            "comparator": "equals",
+            "value": "Mars"
+          },
+          {
+            "op": "fact",
+            "key": "deva_keralam.planet.Mars.house",
+            "comparator": "equals",
+            "value": 1
+          },
+          {
+            "op": "any",
+            "children": [
+              {"op": "fact", "key": "deva_keralam.planet.Sun.house", "comparator": "equals", "value": 1},
+              {"op": "fact", "key": "deva_keralam.planet.Saturn.house", "comparator": "equals", "value": 1},
+              {"op": "fact", "key": "deva_keralam.planet.Rahu.house", "comparator": "equals", "value": 1},
+              {"op": "fact", "key": "deva_keralam.planet.Ketu.house", "comparator": "equals", "value": 1}
+            ]
+          },
+          {
+            "op": "any",
+            "children": [
+              {"op": "fact", "key": "deva_keralam.relationship.conjunction.Mars.Saturn.present", "comparator": "equals", "value": true},
+              {"op": "fact", "key": "deva_keralam.relationship.aspect.Saturn.Mars.present", "comparator": "equals", "value": true}
+            ]
+          }
+        ]
+      },
+      "outcome": {
+        "topic": "relationships_and_conduct",
+        "prediction_kind": "natal_promise",
+        "traditional_results": [
+          "The text describes a tendency toward secretive or illicit sexual conduct."
+        ],
+        "timing": null,
+        "certainty_note": "This is a sensitive traditional indication. It must not be presented as proof of conduct or as a factual accusation about a person."
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "saturn_relation": "Saturn aspects Mars or is conjunct Mars"
+      },
+      "topics": ["relationships", "conduct", "seventh_house", "malefic_pressure"],
+      "scope": "D1 source-bounded natal judgment",
+      "notes": [
+        "Mars itself does not satisfy the separate 'with a malefic' clause; the additional Ascendant occupant is limited to Sun, Saturn, Rahu or Ketu.",
+        "The Sanskrit construction makes the seventh-lord Mars the object: Saturn aspects Mars or is conjunct Mars. Mars merely aspecting Saturn does not satisfy the rule."
+      ]
+    }
+  ]
+}

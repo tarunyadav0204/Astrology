@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from auth import get_current_user
@@ -14,6 +14,8 @@ from .catalog import SUBJECT_TYPES, catalog
 
 
 router = APIRouter(prefix="/admin/sutra-rules", tags=["admin_sutra_rules"])
+
+DEVA_KERALAM_EDITION_KEY = "deva_keralam_volume_1_scan"
 
 STREAMS = ["parashari", "jaimini", "kp", "nadi"]
 CHARTS = ["D1", "D2", "D3", "D4", "D7", "D9", "D10", "D12", "D20", "D24", "D30", "D60", "bhava_chalit"]
@@ -121,6 +123,28 @@ def _payload_values(payload: SutraRulePayload, user_id: int) -> tuple:
     )
 
 
+def _rows(cursor) -> List[Dict[str, Any]]:
+    columns = [column[0] for column in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+
+def _row(cursor) -> Optional[Dict[str, Any]]:
+    columns = [column[0] for column in cursor.description]
+    value = cursor.fetchone()
+    return dict(zip(columns, value)) if value else None
+
+
+def _status_counts(conn, table: str, column: str, *, edition_column: str = "edition_key") -> Dict[str, int]:
+    # Identifiers are internal constants supplied only by callers below.
+    cursor = execute(
+        conn,
+        f"SELECT {column}, COUNT(*) AS count FROM {table} "
+        f"WHERE {edition_column} = %s GROUP BY {column} ORDER BY {column}",
+        (DEVA_KERALAM_EDITION_KEY,),
+    )
+    return {str(row[0]): int(row[1]) for row in cursor.fetchall()}
+
+
 @router.get("/catalog")
 def get_catalog(_: Any = Depends(require_admin)):
     return {**catalog(), "visibility": VISIBILITY}
@@ -139,6 +163,252 @@ def get_classical_pack(work_key: str, chapter: int, _: Any = Depends(require_adm
         return get_pack(work_key, chapter)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/deva-keralam/coverage")
+def get_deva_keralam_coverage(_: Any = Depends(require_admin)):
+    """Return import and review coverage without returning copyrighted text."""
+    with get_conn() as conn:
+        coverage = _row(execute(
+            conn,
+            """
+            SELECT edition_key, expected_pages, catalogued_pages, ocr_complete_pages,
+                   verified_pages, catalogued_passages, executable_passages, source_linked_rules
+              FROM classical_source_coverage
+             WHERE edition_key = %s
+            """,
+            (DEVA_KERALAM_EDITION_KEY,),
+        ))
+        latest_run = _row(execute(
+            conn,
+            """
+            SELECT import_run_key, status, page_start, page_end, pages_completed, pages_failed,
+                   started_at, completed_at, error_message
+              FROM classical_source_import_runs
+             WHERE edition_key = %s
+             ORDER BY started_at DESC
+             LIMIT 1
+            """,
+            (DEVA_KERALAM_EDITION_KEY,),
+        ))
+        page_ocr = _status_counts(conn, "classical_source_pages", "ocr_status")
+        page_review = _status_counts(conn, "classical_source_pages", "review_status")
+        context_review = _status_counts(conn, "classical_context_blocks", "context_status")
+        passage_review = _status_counts(conn, "classical_passages", "review_status")
+        passage_execution = _status_counts(conn, "classical_passages", "executable_status")
+
+    if coverage is None:
+        coverage = {
+            "edition_key": DEVA_KERALAM_EDITION_KEY,
+            "expected_pages": 0,
+            "catalogued_pages": 0,
+            "ocr_complete_pages": 0,
+            "verified_pages": 0,
+            "catalogued_passages": 0,
+            "executable_passages": 0,
+            "source_linked_rules": 0,
+        }
+    if latest_run:
+        total = max(int(latest_run["page_end"]) - int(latest_run["page_start"]) + 1, 1)
+        processed = int(latest_run["pages_completed"]) + int(latest_run["pages_failed"])
+        latest_run["total_pages"] = total
+        latest_run["processed_pages"] = processed
+        latest_run["progress_percent"] = round(min(processed / total, 1.0) * 100, 2)
+    return {
+        "edition_key": DEVA_KERALAM_EDITION_KEY,
+        "coverage": coverage,
+        "latest_import_run": latest_run,
+        "status_totals": {
+            "page_ocr": page_ocr,
+            "page_review": page_review,
+            "context_review": context_review,
+            "passage_review": passage_review,
+            "passage_execution": passage_execution,
+        },
+        "source_text_included": False,
+    }
+
+
+@router.get("/deva-keralam/pages")
+def list_deva_keralam_pages(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    ocr_status: Optional[str] = Query(None),
+    review_status: Optional[str] = Query(None),
+    _: Any = Depends(require_admin),
+):
+    filters = ["edition_key = %s"]
+    params: List[Any] = [DEVA_KERALAM_EDITION_KEY]
+    if ocr_status:
+        filters.append("ocr_status = %s")
+        params.append(ocr_status)
+    if review_status:
+        filters.append("review_status = %s")
+        params.append(review_status)
+    where = " AND ".join(filters)
+    with get_conn() as conn:
+        total_row = execute(conn, f"SELECT COUNT(*) FROM classical_source_pages WHERE {where}", tuple(params)).fetchone()
+        cursor = execute(
+            conn,
+            f"""
+            SELECT source_page_id, pdf_page, printed_page_label, chapter_label,
+                   ocr_engine, ocr_languages, ocr_confidence, ocr_status, review_status,
+                   last_import_run_key, updated_at,
+                   (raw_ocr <> '') AS has_raw_ocr,
+                   (corrected_text <> '') AS has_corrected_text,
+                   (image_object_key <> '') AS has_page_image
+              FROM classical_source_pages
+             WHERE {where}
+             ORDER BY pdf_page
+             LIMIT %s OFFSET %s
+            """,
+            (*params, limit, offset),
+        )
+        pages = _rows(cursor)
+    return {
+        "edition_key": DEVA_KERALAM_EDITION_KEY,
+        "pages": pages,
+        "pagination": {"total": int(total_row[0] if total_row else 0), "limit": limit, "offset": offset},
+        "source_text_included": False,
+    }
+
+
+@router.get("/deva-keralam/passages")
+def list_deva_keralam_passages(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    review_status: Optional[str] = Query(None),
+    executable_status: Optional[str] = Query(None),
+    _: Any = Depends(require_admin),
+):
+    filters = ["passage.edition_key = %s"]
+    params: List[Any] = [DEVA_KERALAM_EDITION_KEY]
+    if review_status:
+        filters.append("passage.review_status = %s")
+        params.append(review_status)
+    if executable_status:
+        filters.append("passage.executable_status = %s")
+        params.append(executable_status)
+    where = " AND ".join(filters)
+    with get_conn() as conn:
+        total_row = execute(conn, f"SELECT COUNT(*) FROM classical_passages passage WHERE {where}", tuple(params)).fetchone()
+        cursor = execute(
+            conn,
+            f"""
+            SELECT passage.passage_key, passage.context_block_key, passage.chapter_number,
+                   passage.verse_start, passage.verse_end, passage.title, passage.classification,
+                   passage.source_text_status, passage.review_status, passage.textual_confidence,
+                   passage.executable_status, passage.pdf_page_start, passage.pdf_page_end,
+                   passage.printed_page_start, passage.printed_page_end,
+                   (passage.source_text <> '') AS has_source_text,
+                   (passage.translation_text <> '') AS has_translation,
+                   (passage.editor_notes <> '') AS has_editor_notes,
+                   COUNT(DISTINCT anchor.anchor_type || ':' || anchor.anchor_value) AS anchor_count,
+                   COUNT(DISTINCT link.rule_key || ':' || link.rule_version::text) AS linked_rule_count
+              FROM classical_passages passage
+              LEFT JOIN classical_passage_anchors anchor ON anchor.passage_key = passage.passage_key
+              LEFT JOIN classical_rule_source_links link ON link.passage_key = passage.passage_key
+             WHERE {where}
+             GROUP BY passage.passage_key
+             ORDER BY passage.pdf_page_start NULLS LAST, passage.verse_start, passage.passage_key
+             LIMIT %s OFFSET %s
+            """,
+            (*params, limit, offset),
+        )
+        passages = _rows(cursor)
+    return {
+        "edition_key": DEVA_KERALAM_EDITION_KEY,
+        "passages": passages,
+        "pagination": {"total": int(total_row[0] if total_row else 0), "limit": limit, "offset": offset},
+        "source_text_included": False,
+    }
+
+
+@router.get("/deva-keralam/executable-rules")
+def list_deva_keralam_executable_rules(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    status: Optional[str] = Query(None),
+    _: Any = Depends(require_admin),
+):
+    status_filter = " AND rule.status = %s" if status else ""
+    params: List[Any] = [DEVA_KERALAM_EDITION_KEY]
+    if status:
+        params.append(status)
+    with get_conn() as conn:
+        total_row = execute(
+            conn,
+            f"""
+            SELECT COUNT(DISTINCT (rule.rule_key, rule.version))
+              FROM classical_rule_versions rule
+              JOIN classical_rule_source_links link
+                ON link.rule_key = rule.rule_key AND link.rule_version = rule.version
+              JOIN classical_passages passage ON passage.passage_key = link.passage_key
+             WHERE passage.edition_key = %s{status_filter}
+            """,
+            tuple(params),
+        ).fetchone()
+        cursor = execute(
+            conn,
+            f"""
+            WITH selected_rules AS (
+              SELECT DISTINCT rule.rule_key, rule.version, rule.title, rule.rule_type,
+                     rule.scope, rule.status, rule.calculator_binding, rule.topics, rule.created_at
+                FROM classical_rule_versions rule
+                JOIN classical_rule_source_links link
+                  ON link.rule_key = rule.rule_key AND link.rule_version = rule.version
+                JOIN classical_passages passage ON passage.passage_key = link.passage_key
+               WHERE passage.edition_key = %s{status_filter}
+               ORDER BY rule.rule_key, rule.version DESC
+               LIMIT %s OFFSET %s
+            )
+            SELECT selected.*, link.relationship, passage.passage_key,
+                   passage.verse_start, passage.verse_end, passage.pdf_page_start,
+                   passage.pdf_page_end, passage.review_status AS source_review_status,
+                   passage.textual_confidence AS source_textual_confidence,
+                   passage.executable_status AS source_executable_status
+              FROM selected_rules selected
+              LEFT JOIN classical_rule_source_links link
+                ON link.rule_key = selected.rule_key AND link.rule_version = selected.version
+              LEFT JOIN classical_passages passage ON passage.passage_key = link.passage_key
+             ORDER BY selected.rule_key, selected.version DESC, passage.verse_start
+            """,
+            (*params, limit, offset),
+        )
+        rows = _rows(cursor)
+
+    rules: List[Dict[str, Any]] = []
+    by_key: Dict[tuple, Dict[str, Any]] = {}
+    rule_fields = (
+        "rule_key", "version", "title", "rule_type", "scope", "status",
+        "calculator_binding", "topics", "created_at",
+    )
+    for row in rows:
+        identity = (row["rule_key"], row["version"])
+        rule = by_key.get(identity)
+        if rule is None:
+            rule = {key: row[key] for key in rule_fields}
+            rule["sources"] = []
+            by_key[identity] = rule
+            rules.append(rule)
+        if row.get("passage_key"):
+            rule["sources"].append({
+                "passage_key": row["passage_key"],
+                "relationship": row["relationship"],
+                "verse_start": row["verse_start"],
+                "verse_end": row["verse_end"],
+                "pdf_page_start": row["pdf_page_start"],
+                "pdf_page_end": row["pdf_page_end"],
+                "review_status": row["source_review_status"],
+                "textual_confidence": row["source_textual_confidence"],
+                "executable_status": row["source_executable_status"],
+            })
+    return {
+        "edition_key": DEVA_KERALAM_EDITION_KEY,
+        "rules": rules,
+        "pagination": {"total": int(total_row[0] if total_row else 0), "limit": limit, "offset": offset},
+        "source_text_included": False,
+    }
 
 
 @router.get("")

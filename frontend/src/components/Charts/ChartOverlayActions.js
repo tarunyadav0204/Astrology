@@ -1,12 +1,14 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import './ChartOverlayActions.css';
 
 /**
- * Floating chart actions (reset ASC, clear highlight/aspects).
- * In deskMode, sits below the N / maximize mini-bar.
+ * Chart actions (reset ASC, clear highlight/aspects).
+ * On the desk these sit in the chart header; elsewhere they float on the chart.
  */
 export default function ChartOverlayActions({
   deskMode = false,
+  host = null,
   highlightedPlanet,
   onClearHighlight,
   customAscendant,
@@ -17,10 +19,11 @@ export default function ChartOverlayActions({
   const showReset = customAscendant !== null && customAscendant !== undefined;
   const showAspects = Boolean(aspectsHighlight?.show);
   if (!highlightedPlanet && !showReset && !showAspects) return null;
+  if (deskMode && !host) return null;
 
-  return (
+  const actions = (
     <div
-      className={`chart-overlay-actions${deskMode ? ' chart-overlay-actions--desk' : ''}`}
+      className={`chart-overlay-actions${deskMode ? ' chart-overlay-actions--header' : ''}`}
       role="toolbar"
       aria-label="Chart actions"
     >
@@ -46,4 +49,6 @@ export default function ChartOverlayActions({
       ) : null}
     </div>
   );
+
+  return host ? createPortal(actions, host) : actions;
 }

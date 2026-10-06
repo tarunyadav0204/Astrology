@@ -22,7 +22,24 @@ CHANNELS = {
     "spouse_karaka": {"weight": 1.5, "independence": "spouse_karaka"},
 }
 
-RULESET_VERSION = "bphs-partner-portrait/1.4.0"
+RULESET_VERSION = "bphs-partner-portrait/1.5.1"
+
+# Complexion is a graha-form quality (BPHS 3.16-17). Marriage-linked channels
+# should dominate because spouse karaka alone was injecting Venus on every male
+# chart and systematically biasing portraits darker than the rest of the evidence.
+COMPLEXION_CHANNEL_WEIGHTS = {
+    "d1_occupant": 5.0,
+    "d1_seventh_lord": 4.0,
+    "d9_occupant": 3.5,
+    "darakaraka": 3.0,
+    "d1_aspect": 2.5,
+    "d9_seventh_lord": 2.5,
+    "d9_d1_seventh_lord": 2.5,
+    "d9_aspect": 1.75,
+    "spouse_karaka": 1.0,
+    "d1_seventh_sign": 2.0,
+    "d9_seventh_sign": 1.5,
+}
 
 # Source translations often use different English phrases for the same broad
 # visual quality. These aliases prevent exact wording from blocking genuine
@@ -62,8 +79,12 @@ APPEARANCE_CONCEPTS = {
     "fair or light golden complexion": "light_complexion",
     "warm reddish-brown complexion": "warm_complexion",
     "warm reddish complexion": "warm_complexion",
-    "olive or dusky complexion": "dusky_complexion",
-    "brown or dusky complexion": "dusky_complexion",
+    # Separate Mercury's harita-olive from Venus's warm-fair śyāva so equivalent
+    # wording does not collapse distinct classical tones into one bucket.
+    "olive or wheatish complexion": "olive_complexion",
+    "warm fair complexion with soft brown undertone": "warm_fair_complexion",
+    # Legacy alias kept so older cached profiles still resolve cleanly.
+    "medium brown complexion with warm undertone": "warm_fair_complexion",
     "dark complexion": "dark_complexion",
 }
 
@@ -121,19 +142,25 @@ def _planet_condition(row: Mapping[str, Any]) -> Dict[str, Any]:
 def _add_rule_signals(
     ledger: list[Dict[str, Any]], *, channel: str, factor: str, rule: Mapping[str, Any],
     condition: Mapping[str, Any] | None = None,
+    skip_attributes: frozenset[str] | None = None,
 ) -> None:
     channel_meta = CHANNELS[channel]
     condition = dict(condition or {})
     condition_factor = float(condition.get("condition_factor", 1.0))
     for attribute, value in (rule.get("appearance") or {}).items():
+        if skip_attributes and attribute in skip_attributes:
+            continue
         attribute_sources = rule.get("appearance_sources") or {}
         attribute_verses = rule.get("appearance_verses") or {}
+        base_weight = channel_meta["weight"]
+        if attribute == "complexion":
+            base_weight = COMPLEXION_CHANNEL_WEIGHTS.get(channel, base_weight)
         ledger.append({
             "attribute": attribute,
             "value": value,
             "concept": APPEARANCE_CONCEPTS.get(value, value),
-            "weight": channel_meta["weight"] * condition_factor,
-            "base_weight": channel_meta["weight"],
+            "weight": base_weight * condition_factor,
+            "base_weight": base_weight,
             "independence": channel_meta["independence"],
             "channel": channel,
             "factor": factor,
@@ -392,11 +419,37 @@ def _resolved_summary(
     }
 
 
+def _marriage_linked_planets(d1: Mapping[str, Any], d9: Mapping[str, Any]) -> set[str]:
+    """Planets that actually testify to the spouse through marriage channels."""
+    linked: set[str] = set()
+
+    def add_from_row(row: Any) -> None:
+        if isinstance(row, dict):
+            planet = str(row.get("planet") or "").strip()
+            if planet:
+                linked.add(planet)
+
+    for row in d1.get("seventh_house_occupants") or []:
+        add_from_row(row)
+    for row in d1.get("seventh_house_aspectors") or []:
+        add_from_row(row)
+    add_from_row(d1.get("seventh_lord"))
+    for row in d9.get("seventh_house_occupants") or []:
+        add_from_row(row)
+    for row in d9.get("seventh_house_aspectors") or []:
+        add_from_row(row)
+    add_from_row(d9.get("seventh_lord"))
+    add_from_row(d9.get("d1_seventh_lord"))
+    add_from_row(d1.get("darakaraka"))
+    return linked
+
+
 def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
     appearance_ledger: list[Dict[str, Any]] = []
     personality_ledger: list[Dict[str, Any]] = []
     d1 = evidence.get("d1") if isinstance(evidence.get("d1"), dict) else {}
     d9 = evidence.get("d9") if isinstance(evidence.get("d9"), dict) else {}
+    marriage_linked = _marriage_linked_planets(d1, d9)
 
     def add_sign(channel: str, sign: Any) -> None:
         name = str(sign or "")
@@ -412,7 +465,20 @@ def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
         rule = PLANET_RULES.get(planet)
         if rule:
             condition = _planet_condition(row)
-            _add_rule_signals(appearance_ledger, channel=channel, factor=planet, rule=rule, condition=condition)
+            skip_attributes = None
+            if channel == "spouse_karaka" and planet not in marriage_linked:
+                # Karaka still contributes build and temperament, but complexion
+                # and Venus curly/wavy hair from an unlinked karaka were biasing
+                # every male chart toward darker skin and curls.
+                skip_attributes = frozenset({"complexion", "head_hair", "hair"})
+            _add_rule_signals(
+                appearance_ledger,
+                channel=channel,
+                factor=planet,
+                rule=rule,
+                condition=condition,
+                skip_attributes=skip_attributes,
+            )
             _personality_signals(personality_ledger, channel=channel, factor=planet, rule=rule, condition=condition)
 
     def add_planet_and_placement_sign(channel: str, row: Any) -> None:

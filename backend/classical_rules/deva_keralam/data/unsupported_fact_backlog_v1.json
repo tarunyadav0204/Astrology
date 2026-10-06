@@ -1,0 +1,2167 @@
+{
+  "schema_version": "deva-keralam-completion-backlog/1.0.0",
+  "edition_key": "deva_keralam_volume_1_scan",
+  "disposition": "unsupported_fact",
+  "entries": [
+    {
+      "catalogue_ordinal": 32,
+      "passage_key": "DK1.OCR.P0032.V0053-0053",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Maathanga Nadiamsa Malefic in 12th House. Missing source facts: nadiamsa, house_12_malefic_presence. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:nadiamsa",
+        "source_fact:house_12_malefic_presence"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 50,
+      "passage_key": "DK1.OCR.P0038.V0106-0107",
+      "category": "existing_structural_fact_bindings",
+      "details": "Jupiter in Viswambhara Nadiamsa with Rahu in Ascendant. Missing source facts: ascendant_sign_occupant, jupiter_nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign_occupant",
+        "source_fact:jupiter_nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 54,
+      "passage_key": "DK1.OCR.P0038.V0112-0113",
+      "category": "dynamic_house_lord_relations",
+      "details": "Step-brother characteristics based on Rahu in Ascendant and 11th Lord in 10th. Missing source facts: ascendant_occupant, eleventh_lord_house. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_occupant",
+        "source_fact:eleventh_lord_house"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 55,
+      "passage_key": "DK1.OCR.P0038.V0114-0114",
+      "category": "dynamic_house_lord_relations",
+      "details": "5th Lord in 5th House with Taurus Navamsa and Progeny Obstacles. Missing source facts: lord_of_5th_house_position, lord_of_5th_house_navamsa. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_of_5th_house_position",
+        "source_fact:lord_of_5th_house_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 61,
+      "passage_key": "DK1.OCR.P0040.V0130-0131",
+      "category": "existing_structural_fact_bindings",
+      "details": "Effects of Moon in Kutila Nadiamsa during Agada Nadiamsa birth on Mother and Maternal Aunt. Missing source facts: birth_nadiamsa, moon_nadiamsa, birth_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:birth_nadiamsa",
+        "source_fact:moon_nadiamsa",
+        "source_fact:birth_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 91,
+      "passage_key": "DK1.OCR.P0048.V0218-0218",
+      "category": "dynamic_house_lord_relations",
+      "details": "Bride's Moon Sign Determination. Missing source facts: native_7th_lord_navamsa_sign. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:native_7th_lord_navamsa_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 92,
+      "passage_key": "DK1.OCR.P0048.V0219-0219",
+      "category": "existing_structural_fact_bindings",
+      "details": "Obstacles to marriage in Varuna Nadiamsa. Missing source facts: nadiamsa, mars_navamsa_sign, saturn_rasi_sign, venus_navamsa_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa",
+        "source_fact:mars_navamsa_sign",
+        "source_fact:saturn_rasi_sign",
+        "source_fact:venus_navamsa_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 93,
+      "passage_key": "DK1.OCR.P0048.V0221-0223",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Father-in-law danger via 3rd house malefic. Missing source facts: house_3_occupant, house_3_lord_navamsa_nature, house_3_lord_strength, house_3_lord_aspect. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:house_3_occupant",
+        "source_fact:house_3_lord_navamsa_nature",
+        "source_fact:house_3_lord_strength",
+        "source_fact:house_3_lord_aspect"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 94,
+      "passage_key": "DK1.OCR.P0049.V0224-0225",
+      "category": "dynamic_house_lord_relations",
+      "details": "Mangala Nadiamsa Spouse and Wealth Prediction. Missing source facts: ascendant_sign, nadiamsa, lord_of_7th_house. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa",
+        "source_fact:lord_of_7th_house"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 95,
+      "passage_key": "DK1.OCR.P0049.V0226-0226",
+      "category": "existing_structural_fact_bindings",
+      "details": "Mars in Mangala Nadiamsa and Sun in Aries Navamsa. Missing source facts: rising_sign, mars_nadiamsa, sun_navamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:rising_sign",
+        "source_fact:mars_nadiamsa",
+        "source_fact:sun_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 96,
+      "passage_key": "DK1.OCR.P0049.V0228-0228",
+      "category": "existing_structural_fact_bindings",
+      "details": "Maternal Uncle Count via Jupiter in Varuna Nadiamsa. Missing source facts: jupiter_nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:jupiter_nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 100,
+      "passage_key": "DK1.OCR.P0051.V0242-0242",
+      "category": "birth_context_and_panchang",
+      "details": "Father's Prosperity for Saturday Birth with Saturn in 3rd House. Missing source facts: birth_day_of_week, saturn_house, saturn_sign, saturn_navamsa. Expose weekday and day/night birth context. reuse:panchang_calculator.",
+      "required_capabilities": [
+        "reuse:panchang_calculator",
+        "source_fact:birth_day_of_week",
+        "source_fact:saturn_house",
+        "source_fact:saturn_sign",
+        "source_fact:saturn_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 101,
+      "passage_key": "DK1.OCR.P0051.V0243-0243",
+      "category": "birth_context_and_panchang",
+      "details": "Limited fortunes for Sagittarius Ascendant in Prabha Nadiamsa. Missing source facts: ascendant_sign, nadiamsa, birth_time_of_day, sun_malefic_influence, sun_benefic_aspect. Expose weekday and day/night birth context. reuse:panchang_calculator.",
+      "required_capabilities": [
+        "reuse:panchang_calculator",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa",
+        "source_fact:birth_time_of_day",
+        "source_fact:sun_malefic_influence",
+        "source_fact:sun_benefic_aspect"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 106,
+      "passage_key": "DK1.OCR.P0054.V0263-0264",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Wide Rulership Combination. Missing source facts: jupiter_house, venus_house, malefic_planet_house. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:jupiter_house",
+        "source_fact:venus_house",
+        "source_fact:malefic_planet_house"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 107,
+      "passage_key": "DK1.OCR.P0054.V0265-0267",
+      "category": "existing_structural_fact_bindings",
+      "details": "Sun in Kumara Nadiamsa and Rahu in Scorpio for Sagittarius Ascendant. Missing source facts: ascendant_sign, sun_nadiamsa, rahu_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:sun_nadiamsa",
+        "source_fact:rahu_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 108,
+      "passage_key": "DK1.OCR.P0054.V0268-0270",
+      "category": "dynamic_house_lord_relations",
+      "details": "Saturn as 9th Lord in Capricorn Navamsa. Missing source facts: lord_of_9th_house, saturn_navamsa_sign. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_of_9th_house",
+        "source_fact:saturn_navamsa_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 110,
+      "passage_key": "DK1.OCR.P0054.V0273-0273",
+      "category": "dynamic_house_lord_relations",
+      "details": "Limited progeny due to 5th lord in Mangala Nadiamsa. Missing source facts: lord_of_5th_house_nadiamsa, lord_of_5th_house_association. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_of_5th_house_nadiamsa",
+        "source_fact:lord_of_5th_house_association"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 124,
+      "passage_key": "DK1.OCR.P0058.V0320-0320",
+      "category": "existing_structural_fact_bindings",
+      "details": "Sagittarius Ascendant with Virgo Navamsa and Moon in Aquarius. Missing source facts: ascendant_sign, ascendant_navamsa, moon_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:ascendant_navamsa",
+        "source_fact:moon_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 139,
+      "passage_key": "DK1.OCR.P0064.V0373-0374",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Umbilical Cord Entanglement in Uraga Nadiamsa. Missing source facts: nadiamsa_name, nadiamsa_half, sign_placement, moon_conjunction, house_10_aspect. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:nadiamsa_name",
+        "source_fact:nadiamsa_half",
+        "source_fact:sign_placement",
+        "source_fact:moon_conjunction",
+        "source_fact:house_10_aspect"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 141,
+      "passage_key": "DK1.OCR.P0065.V0391-0393",
+      "category": "existing_structural_fact_bindings",
+      "details": "Uraga Nadiamsa Rahu Placement Effects. Missing source facts: nadiamsa, rahu_position. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa",
+        "source_fact:rahu_position"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 146,
+      "passage_key": "DK1.OCR.P0066.V0398-0399",
+      "category": "existing_structural_fact_bindings",
+      "details": "Effect of Moon in Uraga Nadiamsa on Maternal Relatives. Missing source facts: ascendant_sign, navamsa_sign, moon_nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:navamsa_sign",
+        "source_fact:moon_nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 156,
+      "passage_key": "DK1.OCR.P0067.V0411-0411",
+      "category": "dispositor_relationships",
+      "details": "Chronic illness of spouse based on Mars and Moon positions. Missing source facts: mars_position_relative_to_moon, mars_dispositor_aspect_by_jupiter. Resolve sign dispositors and their placements, conjunctions and aspects as first-class facts. reuse:sign_lord_map+chart_facts.",
+      "required_capabilities": [
+        "reuse:sign_lord_map+chart_facts",
+        "source_fact:mars_position_relative_to_moon",
+        "source_fact:mars_dispositor_aspect_by_jupiter"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 157,
+      "passage_key": "DK1.OCR.P0067.V0412-0412",
+      "category": "dispositor_relationships",
+      "details": "Mercury's dispositor conjunct Ketu and spouse health. Missing source facts: mercury_dispositor_conjunction. Resolve sign dispositors and their placements, conjunctions and aspects as first-class facts. reuse:sign_lord_map+chart_facts.",
+      "required_capabilities": [
+        "reuse:sign_lord_map+chart_facts",
+        "source_fact:mercury_dispositor_conjunction"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 169,
+      "passage_key": "DK1.OCR.P0069.V0428-0431",
+      "category": "existing_structural_fact_bindings",
+      "details": "Durdhara Nadiamsa Elder Brother Destruction. Missing source facts: nadiamsa, ascendant_sign_type, jupiter_condition. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa",
+        "source_fact:ascendant_sign_type",
+        "source_fact:jupiter_condition"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 170,
+      "passage_key": "DK1.OCR.P0070.V0448-0449",
+      "category": "existing_structural_fact_bindings",
+      "details": "Durdhara Nadiamsa: Saturn in Virgo and Jupiter in Pisces. Missing source facts: nadiamsa_type, saturn_sign, jupiter_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa_type",
+        "source_fact:saturn_sign",
+        "source_fact:jupiter_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 171,
+      "passage_key": "DK1.OCR.P0070.V0450-0450",
+      "category": "dynamic_house_lord_relations",
+      "details": "Mars as Ruler of Third House in Angle and Libra Navamsa. Missing source facts: third_house_ruler, ascendant_sign, mars_house_position, mars_navamsa. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:third_house_ruler",
+        "source_fact:ascendant_sign",
+        "source_fact:mars_house_position",
+        "source_fact:mars_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 174,
+      "passage_key": "DK1.OCR.P0073.V0475-0475",
+      "category": "source_trigger_reconstruction",
+      "details": "11th House Significance for Elder Brothers. Missing source facts: house_11_significance. Recover the missing inherited astrological trigger from adjoining pages or a second witness. review:page_context_or_second_witness.",
+      "required_capabilities": [
+        "review:page_context_or_second_witness",
+        "source_fact:house_11_significance"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 179,
+      "passage_key": "DK1.OCR.P0076.V0511-0512",
+      "category": "timing_sequence_and_transit",
+      "details": "Paternal Uncle's Outcomes in 4th and 5th Dasas. Missing source facts: dasa_sequence_index. Model the source-specific Dasha sequence and transit-to-derived-sign predicates before admission. reuse:dasha_calculators+transit_calculator.",
+      "required_capabilities": [
+        "reuse:dasha_calculators+transit_calculator",
+        "source_fact:dasa_sequence_index"
+      ],
+      "resolution": "implementable_now",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 190,
+      "passage_key": "DK1.OCR.P0080.V0563-0563",
+      "category": "dynamic_house_lord_relations",
+      "details": "Maternal uncle's health (tuberculosis) via Mercury. Missing source facts: ascendant_sign, ruler_of_6th_house, mercury_conjunction. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_sign",
+        "source_fact:ruler_of_6th_house",
+        "source_fact:mercury_conjunction"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 191,
+      "passage_key": "DK1.OCR.P0080.V0564-0564",
+      "category": "dynamic_house_lord_relations",
+      "details": "Destruction of maternal uncles via lung tuberculosis. Missing source facts: 4th_lord, ascendant_lord, 4th_lord_conjunction_ascendant_lord, 4th_lord_navamsa_sign. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:4th_lord",
+        "source_fact:ascendant_lord",
+        "source_fact:4th_lord_conjunction_ascendant_lord",
+        "source_fact:4th_lord_navamsa_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 193,
+      "passage_key": "DK1.OCR.P0081.V0567-0568",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Paternal Uncle Characteristics for Aquarius Ascendant. Missing source facts: ascendant_sign, saturn_avastha, seventh_house_lord. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:ascendant_sign",
+        "source_fact:saturn_avastha",
+        "source_fact:seventh_house_lord"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 195,
+      "passage_key": "DK1.OCR.P0081.V0576-0576",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Saturn conjunct Mars in Libra Navamsa. Missing source facts: saturn_mars_conjunction, saturn_navamsa_sign. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:saturn_mars_conjunction",
+        "source_fact:saturn_navamsa_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 215,
+      "passage_key": "DK1.OCR.P0091.V0694-0695",
+      "category": "existing_structural_fact_bindings",
+      "details": "Abundant fortunes and health/behavioral outcomes for Pisces Lagna. Missing source facts: lagna_sign, moon_sign, venus_sign, jupiter_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:lagna_sign",
+        "source_fact:moon_sign",
+        "source_fact:venus_sign",
+        "source_fact:jupiter_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 216,
+      "passage_key": "DK1.OCR.P0091.V0696-0696",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Conjunction of Mars and Venus in Scorpio. Missing source facts: mars_venus_conjunction_sign. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:mars_venus_conjunction_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 253,
+      "passage_key": "DK1.OCR.P0106.V0882-0883",
+      "category": "existing_structural_fact_bindings",
+      "details": "Saturn in Libra, Nirmalamsa of Libra Lagna: Paternal Aunt's Husband. Missing source facts: saturn_sign, nadiamsa, ascendant_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:saturn_sign",
+        "source_fact:nadiamsa",
+        "source_fact:ascendant_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 255,
+      "passage_key": "DK1.OCR.P0107.V0892-0893",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Paternal Grandfather's Fortune and Character for Libra Ascendant. Missing source facts: ascendant_sign, saturn_conjunctions. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:ascendant_sign",
+        "source_fact:saturn_conjunctions"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 281,
+      "passage_key": "DK1.OCR.P0113.V0966-0967",
+      "category": "dynamic_house_lord_relations",
+      "details": "12th Lord with Venus and Jupiter with Sun in 11th (Nirmala Nadiamsa, Libra Lagna). Missing source facts: nadiamsa, ascendant_sign, lord_12_house_position, jupiter_house_position, sun_house_position. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:nadiamsa",
+        "source_fact:ascendant_sign",
+        "source_fact:lord_12_house_position",
+        "source_fact:jupiter_house_position",
+        "source_fact:sun_house_position"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 293,
+      "passage_key": "DK1.OCR.P0117.V1018-1019",
+      "category": "named_yoga_bindings",
+      "details": "Indra Yoga Native Characteristics. Missing source facts: yoga_type. Bind only source-defined named-yoga premises to reviewed yoga calculators. reuse:classical_core_yogas+yoga_calculator.",
+      "required_capabilities": [
+        "reuse:classical_core_yogas+yoga_calculator",
+        "source_fact:yoga_type"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 307,
+      "passage_key": "DK1.OCR.P0121.V1070-1071",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Benefic in 11th House with Saturn. Missing source facts: benefic_planet_in_11th_house, benefic_planet_aspect_or_conjunction_saturn, benefic_planet_navamsa_debilitation. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:benefic_planet_in_11th_house",
+        "source_fact:benefic_planet_aspect_or_conjunction_saturn",
+        "source_fact:benefic_planet_navamsa_debilitation"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 310,
+      "passage_key": "DK1.OCR.P0122.V1083-1083",
+      "category": "existing_structural_fact_bindings",
+      "details": "Rahu in 2nd House without Vargothama. Missing source facts: rahu_house_position, rahu_vargothama_status. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:rahu_house_position",
+        "source_fact:rahu_vargothama_status"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 317,
+      "passage_key": "DK1.OCR.P0129.V1173-1173",
+      "category": "dynamic_house_lord_relations",
+      "details": "Small-pox and child loss for Pisces ascendant with 5th lord Moon in Capricorn Navamsa. Missing source facts: ascendant_sign, lord_of_5th_house_planet, lord_of_5th_house_navamsa_sign. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_sign",
+        "source_fact:lord_of_5th_house_planet",
+        "source_fact:lord_of_5th_house_navamsa_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 331,
+      "passage_key": "DK1.OCR.P0132.V1203-1203",
+      "category": "existing_structural_fact_bindings",
+      "details": "Caste status for Sagittarius Lagna in Kokila Nadiamsa with Saturn in 5th house. Missing source facts: ascendant_sign, nadiamsa, saturn_house. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa",
+        "source_fact:saturn_house"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 333,
+      "passage_key": "DK1.OCR.P0133.V1212-1212",
+      "category": "fine_varga_bindings",
+      "details": "Saturn in Davagni Shashtiamsa for Sagittarius Lagna. Missing source facts: ascendant_sign, saturn_shashtiamsa. Expose D30 lord and D60 Shashtiamsa identity/quality using one reviewed Vargas implementation. reuse:divisional_chart_calculation+classical_shadbala.",
+      "required_capabilities": [
+        "reuse:divisional_chart_calculation+classical_shadbala",
+        "source_fact:ascendant_sign",
+        "source_fact:saturn_shashtiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 334,
+      "passage_key": "DK1.OCR.P0133.V1213-1213",
+      "category": "existing_structural_fact_bindings",
+      "details": "Devotion to Vishnu and Siva for Sagittarius Ascendant. Missing source facts: ascendant_sign, jupiter_nadiamsa, saturn_nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:jupiter_nadiamsa",
+        "source_fact:saturn_nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 340,
+      "passage_key": "DK1.OCR.P0135.V1236-1237",
+      "category": "existing_structural_fact_bindings",
+      "details": "Father's Virtues and Habits (Guha Nadiamsa). Missing source facts: nadiamsa_segment. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa_segment"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 361,
+      "passage_key": "DK1.OCR.P0139.V1269-1269",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Guha Nadiamsa Sinful Activities. Missing source facts: nadiamsa, moon_aspect_or_conjunction, malefic_planets. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:nadiamsa",
+        "source_fact:moon_aspect_or_conjunction",
+        "source_fact:malefic_planets"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 362,
+      "passage_key": "DK1.OCR.P0139.V1270-1270",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Knowledgeable and Fortunate in Guha Nadiamsa. Missing source facts: nadiamsa, venus_aspects_9th_from_moon. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:nadiamsa",
+        "source_fact:venus_aspects_9th_from_moon"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 363,
+      "passage_key": "DK1.OCR.P0139.V1271-1271",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Wealthy and Fortunate Nadiamsa Condition. Missing source facts: nadiamsa, jupiter_navamsa_sign, jupiter_conjunctions. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:nadiamsa",
+        "source_fact:jupiter_navamsa_sign",
+        "source_fact:jupiter_conjunctions"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 366,
+      "passage_key": "DK1.OCR.P0140.V1286-1286",
+      "category": "dynamic_house_lord_relations",
+      "details": "Many Wives in Guha Nadiamsa. Missing source facts: ascendant_sign, nadiamsa, ninth_lord, ninth_lord_house, ninth_lord_association. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa",
+        "source_fact:ninth_lord",
+        "source_fact:ninth_lord_house",
+        "source_fact:ninth_lord_association"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 373,
+      "passage_key": "DK1.OCR.P0141.V1299-1299",
+      "category": "existing_structural_fact_bindings",
+      "details": "Maternal Uncle's Wife Disposition (Aquarius Ascendant). Missing source facts: ascendant_sign, navamsa_sign, saturn_house. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:navamsa_sign",
+        "source_fact:saturn_house"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 383,
+      "passage_key": "DK1.OCR.P0145.V1337-1337",
+      "category": "dynamic_house_lord_relations",
+      "details": "Birth Place and Street Orientation based on Saturn in 12th House. Missing source facts: ascendant_lord, saturn_house_position, saturn_sign_position. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_lord",
+        "source_fact:saturn_house_position",
+        "source_fact:saturn_sign_position"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 391,
+      "passage_key": "DK1.OCR.P0147.V1366-1366",
+      "category": "existing_structural_fact_bindings",
+      "details": "Sagittarius Ascendant, Second Half of Kanthaa Nadiamsa. Missing source facts: ascendant_sign, nadiamsa_name, nadiamsa_half. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa_name",
+        "source_fact:nadiamsa_half"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 392,
+      "passage_key": "DK1.OCR.P0147.V1367-1368",
+      "category": "existing_structural_fact_bindings",
+      "details": "Kanthaa Nadiamsa First Half Sagittarius Ascendant with Jupiter in 8th. Missing source facts: ascendant_sign, nadiamsa_segment, jupiter_house. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa_segment",
+        "source_fact:jupiter_house"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 409,
+      "passage_key": "DK1.OCR.P0150.V1399-1399",
+      "category": "source_trigger_reconstruction",
+      "details": "Wealth and Fame from Precious Gems and North-West Business. Missing source facts: native_wealth_source. Recover the missing inherited astrological trigger from adjoining pages or a second witness. review:page_context_or_second_witness.",
+      "required_capabilities": [
+        "review:page_context_or_second_witness",
+        "source_fact:native_wealth_source"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 412,
+      "passage_key": "DK1.OCR.P0151.V1405-1405",
+      "category": "dynamic_house_lord_relations",
+      "details": "7th Lord with Sun and Marital Outcomes. Missing source facts: lord_of_7th_house_conjunction. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_of_7th_house_conjunction"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 413,
+      "passage_key": "DK1.OCR.P0151.V1406-1406",
+      "category": "existing_structural_fact_bindings",
+      "details": "Amala Yoga via Jupiter in Virgo. Missing source facts: jupiter_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:jupiter_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 421,
+      "passage_key": "DK1.OCR.P0153.V1436-1436",
+      "category": "source_trigger_reconstruction",
+      "details": "Nadiamsa Native Wife Characteristics. Missing source facts: nadiamsa_identity. Recover the missing inherited astrological trigger from adjoining pages or a second witness. review:page_context_or_second_witness.",
+      "required_capabilities": [
+        "review:page_context_or_second_witness",
+        "source_fact:nadiamsa_identity"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 434,
+      "passage_key": "DK1.OCR.P0157.V1492-1492",
+      "category": "existing_structural_fact_bindings",
+      "details": "Sagittarius Ascendant with Rahu in Aquarius in Jupiter's Navamsa. Missing source facts: ascendant_sign, rahu_sign, rahu_navamsa_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:rahu_sign",
+        "source_fact:rahu_navamsa_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 436,
+      "passage_key": "DK1.OCR.P0158.V1500-1500",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Rahu or Sun in Pisces in 4th with Moon in 2nd aspected by Jupiter. Missing source facts: planets_in_4th_house, sign_of_4th_house, moon_house, moon_aspect_by. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:planets_in_4th_house",
+        "source_fact:sign_of_4th_house",
+        "source_fact:moon_house",
+        "source_fact:moon_aspect_by"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 445,
+      "passage_key": "DK1.OCR.P0161.V1550-1550",
+      "category": "existing_structural_fact_bindings",
+      "details": "Nadiamsa Caste Assignment for Aries Ascendant. Missing source facts: ascendant_sign, nadiamsa_segment. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa_segment"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 446,
+      "passage_key": "DK1.OCR.P0161.V1555-1555",
+      "category": "dynamic_house_lord_relations",
+      "details": "Mercury as 3rd Lord in Aries Navamsa with Mars Aspect. Missing source facts: third_lord, third_lord_aspect, third_lord_navamsa. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:third_lord",
+        "source_fact:third_lord_aspect",
+        "source_fact:third_lord_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 494,
+      "passage_key": "DK1.OCR.P0174.V1723-1723",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Ketu in 12th House and Moral Balance. Missing source facts: ketu_house, ketu_aspect. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:ketu_house",
+        "source_fact:ketu_aspect"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 496,
+      "passage_key": "DK1.OCR.P0175.V1726-1728",
+      "category": "existing_structural_fact_bindings",
+      "details": "Ketu in Pisces with Libra or Scorpio Navamsa. Missing source facts: ketu_sign, ketu_navamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ketu_sign",
+        "source_fact:ketu_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 497,
+      "passage_key": "DK1.OCR.P0175.V1730-1731",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Ketu and Jupiter/Mars/Saturn configurations for physical deformity. Missing source facts: ketu_sign, ketu_aspecting_planet, ketu_sign, ketu_conjunction, jupiter_navamsa. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:ketu_sign",
+        "source_fact:ketu_aspecting_planet",
+        "source_fact:ketu_sign",
+        "source_fact:ketu_conjunction",
+        "source_fact:jupiter_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 498,
+      "passage_key": "DK1.OCR.P0175.V1732-1732",
+      "category": "dynamic_house_lord_relations",
+      "details": "Ketu in 12th House with Jupiter and Mercury Navamsa. Missing source facts: ketu_house, ketu_jupiter_aspect_or_conjunction, ketu_navamsa_ruler. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ketu_house",
+        "source_fact:ketu_jupiter_aspect_or_conjunction",
+        "source_fact:ketu_navamsa_ruler"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 502,
+      "passage_key": "DK1.OCR.P0175.V1738-1738",
+      "category": "source_trigger_reconstruction",
+      "details": "Physical features: hair or flesh around the ears. Missing source facts: subject_exists. Recover the missing inherited astrological trigger from adjoining pages or a second witness. review:page_context_or_second_witness.",
+      "required_capabilities": [
+        "review:page_context_or_second_witness",
+        "source_fact:subject_exists"
+      ],
+      "resolution": "source_review",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 504,
+      "passage_key": "DK1.OCR.P0176.V1743-1743",
+      "category": "dynamic_house_lord_relations",
+      "details": "Third House Lord and Ear Health. Missing source facts: third_house_lord_condition. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:third_house_lord_condition"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 505,
+      "passage_key": "DK1.OCR.P0176.V1744-1744",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Ear disorders from 2nd house malefic and 3rd lord condition. Missing source facts: house_2_malefic_presence, house_2_malefic_aspect_by_saturn, lord_house_3_navamsa_ruler. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:house_2_malefic_presence",
+        "source_fact:house_2_malefic_aspect_by_saturn",
+        "source_fact:lord_house_3_navamsa_ruler"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 509,
+      "passage_key": "DK1.OCR.P0177.V1756-1763",
+      "category": "dynamic_house_lord_relations",
+      "details": "Brahmayaamala Ear-ache Condition. Missing source facts: 3rd_house_occupant, 3rd_lord_association, 2nd_house_aspect. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:3rd_house_occupant",
+        "source_fact:3rd_lord_association",
+        "source_fact:2nd_house_aspect"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 510,
+      "passage_key": "DK1.OCR.P0177.V1768-1770",
+      "category": "existing_structural_fact_bindings",
+      "details": "Ketu in Ascendant and Daughter's Eye Disease. Missing source facts: ketu_position, ascendant_sign_type. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ketu_position",
+        "source_fact:ascendant_sign_type"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 514,
+      "passage_key": "DK1.OCR.P0179.V1781-1781",
+      "category": "dynamic_house_lord_relations",
+      "details": "Number and Gender of Children via Navamsa of Ascendant Lord. Missing source facts: ascendant_lord_navamsa_sign. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_lord_navamsa_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 520,
+      "passage_key": "DK1.OCR.P0180.V1817-1817",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Jupiter-Mars Conjunction in Specific Signs/Angles. Missing source facts: ascendant_sign, jupiter_mars_conjunction, jupiter_mars_sign, jupiter_mars_house_type. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:ascendant_sign",
+        "source_fact:jupiter_mars_conjunction",
+        "source_fact:jupiter_mars_sign",
+        "source_fact:jupiter_mars_house_type"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 525,
+      "passage_key": "DK1.OCR.P0181.V1828-1830",
+      "category": "existing_structural_fact_bindings",
+      "details": "Longevity and Birth Conditions for Seethala Nadiamsa (First Half) in Taurus Ascendant. Missing source facts: ascendant_sign, nadiamsa_type, nadiamsa_half, jupiter_position. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa_type",
+        "source_fact:nadiamsa_half",
+        "source_fact:jupiter_position"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 526,
+      "passage_key": "DK1.OCR.P0182.V1837-1838",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Saturn in 12th with Mars in Seethala Nadiamsa. Missing source facts: nadiamsa, saturn_house, saturn_conjunction. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:nadiamsa",
+        "source_fact:saturn_house",
+        "source_fact:saturn_conjunction"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 536,
+      "passage_key": "DK1.OCR.P0183.V1851-1851",
+      "category": "arudha_and_derived_padas",
+      "details": "Post-marital Fortunes via Venus in 7th Aroodha Pada. Missing source facts: venus_position_7th_aroodha_pada. Expose reviewed house Arudha and A7 placement facts. reuse:jaimini_point_calculator.",
+      "required_capabilities": [
+        "reuse:jaimini_point_calculator",
+        "source_fact:venus_position_7th_aroodha_pada"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 537,
+      "passage_key": "DK1.OCR.P0184.V1855-1858",
+      "category": "dynamic_house_lord_relations",
+      "details": "Obstacles to Progeny for Immovable Ascendant. Missing source facts: ascendant_sign_type, lord_5_planet, lord_5_conjunctions, lord_5_position. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_sign_type",
+        "source_fact:lord_5_planet",
+        "source_fact:lord_5_conjunctions",
+        "source_fact:lord_5_position"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 541,
+      "passage_key": "DK1.OCR.P0185.V1871-1872",
+      "category": "fine_varga_bindings",
+      "details": "Seethala Nadiamsa: Sun in Karala and Moon in Nirmala. Missing source facts: nadiamsa_type, sun_shashtiamsa, moon_nadiamsa. Expose D30 lord and D60 Shashtiamsa identity/quality using one reviewed Vargas implementation. reuse:divisional_chart_calculation+classical_shadbala.",
+      "required_capabilities": [
+        "reuse:divisional_chart_calculation+classical_shadbala",
+        "source_fact:nadiamsa_type",
+        "source_fact:sun_shashtiamsa",
+        "source_fact:moon_nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 543,
+      "passage_key": "DK1.OCR.P0185.V1875-1877",
+      "category": "existing_structural_fact_bindings",
+      "details": "Aquarius Ascendant and Nirmala Nadiamsa Birth Order. Missing source facts: ascendant_sign, nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 558,
+      "passage_key": "DK1.OCR.P0189.V1918-1920",
+      "category": "dynamic_house_lord_relations",
+      "details": "Gada Nadiamsa Ascendant Lord in Scorpio. Missing source facts: ascendant_lord_sign, nadiamsa. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_lord_sign",
+        "source_fact:nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 561,
+      "passage_key": "DK1.OCR.P0190.V1931-1931",
+      "category": "dynamic_house_lord_relations",
+      "details": "First Child Gender in Gada Nadiamsa. Missing source facts: nadiamsa, lord_5th_sign_type, lord_5th_navamsa_type. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:nadiamsa",
+        "source_fact:lord_5th_sign_type",
+        "source_fact:lord_5th_navamsa_type"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 562,
+      "passage_key": "DK1.OCR.P0190.V1938-1938",
+      "category": "fine_varga_bindings",
+      "details": "Physical Appearance of Gada Nadiamsa (Vipra Kaala) in Scorpio. Missing source facts: ascendant_sign, nadiamsa, nadiamsa_subdivision, trimsamsa_lord. Expose D30 lord and D60 Shashtiamsa identity/quality using one reviewed Vargas implementation. reuse:divisional_chart_calculation+classical_shadbala.",
+      "required_capabilities": [
+        "reuse:divisional_chart_calculation+classical_shadbala",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa",
+        "source_fact:nadiamsa_subdivision",
+        "source_fact:trimsamsa_lord"
+      ],
+      "resolution": "implementable_now",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 577,
+      "passage_key": "DK1.OCR.P0195.V1985-1985",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Jupiter aspecting Sagittarius and progeny. Missing source facts: jupiter_aspects_sagittarius. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:jupiter_aspects_sagittarius"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 584,
+      "passage_key": "DK1.OCR.P0197.V1996-1996",
+      "category": "dynamic_house_lord_relations",
+      "details": "Delayed Progeny via Second Wife. Missing source facts: lord_of_8th_house_position, lord_of_12th_house_position. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_of_8th_house_position",
+        "source_fact:lord_of_12th_house_position"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 603,
+      "passage_key": "DK1.OCR.P0202.V2061-2061",
+      "category": "nadiamsa_subdivisions_beyond_halves",
+      "details": "Physical Appearance of Gada Nadiamsa Vipra Kala (Taurus Ascendant). Missing source facts: ascendant_sign, nadiamsa_name, nadiamsa_subdivision, jupiter_sign, mercury_sun_conjunction. Extend exact Nadiamsa precision facts to source-stated quarters and thirds. extend:nadiamsa_table_and_precision_policy.",
+      "required_capabilities": [
+        "extend:nadiamsa_table_and_precision_policy",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa_name",
+        "source_fact:nadiamsa_subdivision",
+        "source_fact:jupiter_sign",
+        "source_fact:mercury_sun_conjunction"
+      ],
+      "resolution": "implementable_now",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 611,
+      "passage_key": "DK1.OCR.P0203.V2070-2071",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Yoga for Birth of Dead Children. Missing source facts: malefic_planet_in_5th_house, jupiter_conjunction. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:malefic_planet_in_5th_house",
+        "source_fact:jupiter_conjunction"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 613,
+      "passage_key": "DK1.OCR.P0203.V2073-2073",
+      "category": "dynamic_house_lord_relations",
+      "details": "Endowment of Progeny and Intelligence via 9th, 6th, and Sun placements. Missing source facts: lord_9th_house_position, lord_6th_house_position, sun_house_position. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_9th_house_position",
+        "source_fact:lord_6th_house_position",
+        "source_fact:sun_house_position"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 615,
+      "passage_key": "DK1.OCR.P0203.V2077-2077",
+      "category": "ashtakavarga_bindings",
+      "details": "Two Sons from Jupiter's Ashtaka Varga. Missing source facts: jupiter_ashtaka_varga_dots, jupiter_house_position. Expose planet BAV bindus by house/sign through canonical facts. reuse:ashtakavarga.",
+      "required_capabilities": [
+        "reuse:ashtakavarga",
+        "source_fact:jupiter_ashtaka_varga_dots",
+        "source_fact:jupiter_house_position"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 621,
+      "passage_key": "DK1.OCR.P0204.V2085-2087",
+      "category": "nadiamsa_subdivisions_beyond_halves",
+      "details": "Jupiter in Libra aspecting Saturn and Mars in Sura Nadiamsa. Missing source facts: ascendant_sign, nadiamsa, nadiamsa_quarter, jupiter_sign, jupiter_aspects. Extend exact Nadiamsa precision facts to source-stated quarters and thirds. extend:nadiamsa_table_and_precision_policy.",
+      "required_capabilities": [
+        "extend:nadiamsa_table_and_precision_policy",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa",
+        "source_fact:nadiamsa_quarter",
+        "source_fact:jupiter_sign",
+        "source_fact:jupiter_aspects"
+      ],
+      "resolution": "implementable_now",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 622,
+      "passage_key": "DK1.OCR.P0204.V2088-2089",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Gemini Ascendant with Moon in Gemini Navamsa aspected by Jupiter. Missing source facts: ascendant_sign, navamsa_ascendant_sign, moon_sign, jupiter_aspects_moon. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:ascendant_sign",
+        "source_fact:navamsa_ascendant_sign",
+        "source_fact:moon_sign",
+        "source_fact:jupiter_aspects_moon"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 631,
+      "passage_key": "DK1.OCR.P0206.V2108-2108",
+      "category": "existing_structural_fact_bindings",
+      "details": "Father's character in Sura Nadiamsa. Missing source facts: jupiter_nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:jupiter_nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 634,
+      "passage_key": "DK1.OCR.P0207.V2112-2112",
+      "category": "existing_structural_fact_bindings",
+      "details": "Absence of Elder Brother. Missing source facts: mercury_nadiamsa, moon_nadiamsa, ascendant_vargothama. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:mercury_nadiamsa",
+        "source_fact:moon_nadiamsa",
+        "source_fact:ascendant_vargothama"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 635,
+      "passage_key": "DK1.OCR.P0207.V2114-2114",
+      "category": "existing_structural_fact_bindings",
+      "details": "Saturn in Seethala Nadiamsa and Siblings. Missing source facts: saturn_nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:saturn_nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 643,
+      "passage_key": "DK1.OCR.P0209.V2141-2142",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Saturn-Mars Association with Saturn in Vargottama Navamsa. Missing source facts: saturn_navamsa_status, saturn_mars_association. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:saturn_navamsa_status",
+        "source_fact:saturn_mars_association"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 653,
+      "passage_key": "DK1.OCR.P0212.V2167-2167",
+      "category": "dynamic_house_lord_relations",
+      "details": "Royal Service via 9th Lord in Sachira Nadiamsa. Missing source facts: 9th_lord_nadiamsa, 9th_lord_aspect. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:9th_lord_nadiamsa",
+        "source_fact:9th_lord_aspect"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 655,
+      "passage_key": "DK1.OCR.P0213.V2182-2182",
+      "category": "dynamic_house_lord_relations",
+      "details": "Skill in Veena Instrumental Music. Missing source facts: 7th_lord_house, 7th_lord_conjunction. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:7th_lord_house",
+        "source_fact:7th_lord_conjunction"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 656,
+      "passage_key": "DK1.OCR.P0213.V2183-2183",
+      "category": "existing_structural_fact_bindings",
+      "details": "Sun in Taurus Navamsa for Movable Ascendant. Missing source facts: ascendant_sign_type, sun_navamsa_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign_type",
+        "source_fact:sun_navamsa_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 670,
+      "passage_key": "DK1.OCR.P0217.V2220-2221",
+      "category": "dynamic_house_lord_relations",
+      "details": "Father's Wealth and Wisdom (Aries Ascendant). Missing source facts: ascendant_sign, ascendant_navamsa, ninth_lord_house, ninth_lord_aspect. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_sign",
+        "source_fact:ascendant_navamsa",
+        "source_fact:ninth_lord_house",
+        "source_fact:ninth_lord_aspect"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 672,
+      "passage_key": "DK1.OCR.P0218.V2236-2237",
+      "category": "nadiamsa_subdivisions_beyond_halves",
+      "details": "Mangala Nadiamsa: Middle one-third of the first half. Missing source facts: nadiamsa_type, nadiamsa_segment. Extend exact Nadiamsa precision facts to source-stated quarters and thirds. extend:nadiamsa_table_and_precision_policy.",
+      "required_capabilities": [
+        "extend:nadiamsa_table_and_precision_policy",
+        "source_fact:nadiamsa_type",
+        "source_fact:nadiamsa_segment"
+      ],
+      "resolution": "implementable_now",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 681,
+      "passage_key": "DK1.OCR.P0219.V2253-2253",
+      "category": "dynamic_house_lord_relations",
+      "details": "4th Lord in Aries with Virgo Navamsa and Ascendant in Leo Navamsa. Missing source facts: lord_of_4th_house_sign, lord_of_4th_house_navamsa, ascendant_sign, ascendant_navamsa. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_of_4th_house_sign",
+        "source_fact:lord_of_4th_house_navamsa",
+        "source_fact:ascendant_sign",
+        "source_fact:ascendant_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 684,
+      "passage_key": "DK1.OCR.P0220.V2256-2256",
+      "category": "dynamic_house_lord_relations",
+      "details": "3rd Lord in Aquarius Navamsa with Benefic. Missing source facts: lord_of_3rd_house_sign_navamsa, lord_of_3rd_house_aspect_or_conjunction. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_of_3rd_house_sign_navamsa",
+        "source_fact:lord_of_3rd_house_aspect_or_conjunction"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 693,
+      "passage_key": "DK1.OCR.P0222.V2278-2278",
+      "category": "existing_structural_fact_bindings",
+      "details": "Pilgrimage due to Rahu in 8th House. Missing source facts: rahu_house_position. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:rahu_house_position"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 694,
+      "passage_key": "DK1.OCR.P0222.V2282-2287",
+      "category": "dynamic_house_lord_relations",
+      "details": "Past and Future Birth Status based on 9th and 5th Lord Nadiamsa. Missing source facts: lord_of_9th_house_nadiamsa, lord_of_5th_house_nadiamsa. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_of_9th_house_nadiamsa",
+        "source_fact:lord_of_5th_house_nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 697,
+      "passage_key": "DK1.OCR.P0223.V2291-2291",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Moon-Saturn aspect in Uraga Nadiamsa (Former Half) and Umbilical Cord Entanglement. Missing source facts: nadiamsa, nadiamsa_half, moon_aspect_or_association_saturn. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:nadiamsa",
+        "source_fact:nadiamsa_half",
+        "source_fact:moon_aspect_or_association_saturn"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 699,
+      "passage_key": "DK1.OCR.P0223.V2297-2297",
+      "category": "existing_structural_fact_bindings",
+      "details": "Moon in Uraga Nadiamsa and Elder Siblings. Missing source facts: moon_nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:moon_nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 701,
+      "passage_key": "DK1.OCR.P0223.V2300-2300",
+      "category": "existing_structural_fact_bindings",
+      "details": "Uraga Nadiamsa Second Half Results. Missing source facts: nadiamsa_type, nadiamsa_half. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa_type",
+        "source_fact:nadiamsa_half"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 702,
+      "passage_key": "DK1.OCR.P0223.V2301-2302",
+      "category": "existing_structural_fact_bindings",
+      "details": "Wealth and Disposition in Uraga Nadiamsa. Missing source facts: nadiamsa, nadiamsa_half. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa",
+        "source_fact:nadiamsa_half"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 711,
+      "passage_key": "DK1.OCR.P0225.V2318-2318",
+      "category": "dynamic_house_lord_relations",
+      "details": "Direction of Bride based on 7th Lord in Taurus Navamsa. Missing source facts: lord_7th_house, navamsa_sign_7th_lord, nadiamsa_segment. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_7th_house",
+        "source_fact:navamsa_sign_7th_lord",
+        "source_fact:nadiamsa_segment"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 719,
+      "passage_key": "DK1.OCR.P0227.V2349-2349",
+      "category": "fine_varga_bindings",
+      "details": "Sudha Nadiamsa Scorpio Ascendant Mercury Trimsamsa. Missing source facts: nadiamsa, ascendant_sign, ascendant_trimsamsa_lord. Expose D30 lord and D60 Shashtiamsa identity/quality using one reviewed Vargas implementation. reuse:divisional_chart_calculation+classical_shadbala.",
+      "required_capabilities": [
+        "reuse:divisional_chart_calculation+classical_shadbala",
+        "source_fact:nadiamsa",
+        "source_fact:ascendant_sign",
+        "source_fact:ascendant_trimsamsa_lord"
+      ],
+      "resolution": "implementable_now",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 722,
+      "passage_key": "DK1.OCR.P0228.V2353-2354",
+      "category": "existing_structural_fact_bindings",
+      "details": "Sumathi Nadiamsa: First Half in Scorpio Ascendant. Missing source facts: ascendant_sign, nadiamsa_name, nadiamsa_half. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa_name",
+        "source_fact:nadiamsa_half"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 723,
+      "passage_key": "DK1.OCR.P0228.V2356-2356",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Mercury-Mars Aspect and Lack of Siblings. Missing source facts: ascendant_sign_type, nadiamsa_segment, mercury_mars_relationship. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:ascendant_sign_type",
+        "source_fact:nadiamsa_segment",
+        "source_fact:mercury_mars_relationship"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 730,
+      "passage_key": "DK1.OCR.P0229.V2371-2371",
+      "category": "dynamic_house_lord_relations",
+      "details": "Lord of the Fourth in Aspect to a Benefic in Immovable Navamsa. Missing source facts: lord_of_fourth_house_aspect, lord_of_fourth_house_navamsa_type. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_of_fourth_house_aspect",
+        "source_fact:lord_of_fourth_house_navamsa_type"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 738,
+      "passage_key": "DK1.OCR.P0231.V2386-2389",
+      "category": "existing_structural_fact_bindings",
+      "details": "Birth in Immovable Sign with Cancer Navamsa. Missing source facts: birth_sign_type, navamsa_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:birth_sign_type",
+        "source_fact:navamsa_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 740,
+      "passage_key": "DK1.OCR.P0231.V2396-2396",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Saturn in 4th House with Venus in Immovable Navamsa. Missing source facts: nadiamsa_segment, saturn_house, saturn_aspect_venus, venus_navamsa_type. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:nadiamsa_segment",
+        "source_fact:saturn_house",
+        "source_fact:saturn_aspect_venus",
+        "source_fact:venus_navamsa_type"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 741,
+      "passage_key": "DK1.OCR.P0232.V2399-2401",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Saturn-Venus Aspect or Association Effects. Missing source facts: saturn_venus_relationship. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:saturn_venus_relationship"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 742,
+      "passage_key": "DK1.OCR.P0232.V2402-2402",
+      "category": "existing_structural_fact_bindings",
+      "details": "Moon in Kutila Nadiamsa for Sumathi Nadiamsa Birth. Missing source facts: birth_nadiamsa, moon_nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:birth_nadiamsa",
+        "source_fact:moon_nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 745,
+      "passage_key": "DK1.OCR.P0233.V2414-2416",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Paternal Properties and Prosperity for Pisces Ascendant in Vasudha Nadiamsa. Missing source facts: ascendant_sign, nadiamsa_segment, mars_aspects_saturn. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa_segment",
+        "source_fact:mars_aspects_saturn"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 746,
+      "passage_key": "DK1.OCR.P0233.V2417-2417",
+      "category": "existing_structural_fact_bindings",
+      "details": "Horse-riding and Military Command in Vasudha Nadiamsa. Missing source facts: ascendant_sign, nadiamsa_name, nadiamsa_segment. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa_name",
+        "source_fact:nadiamsa_segment"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 747,
+      "passage_key": "DK1.OCR.P0233.V2418-2418",
+      "category": "dynamic_house_lord_relations",
+      "details": "Mars aspecting the Lord of the Ascendant. Missing source facts: mars_aspect_ascendant_lord, ascendant_lord. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:mars_aspect_ascendant_lord",
+        "source_fact:ascendant_lord"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 748,
+      "passage_key": "DK1.OCR.P0233.V2419-2419",
+      "category": "dynamic_house_lord_relations",
+      "details": "Pisces Ascendant: Venus in Sagittarius with Cancer Navamsa. Missing source facts: ascendant_sign, lord_3_sign, lord_3_navamsa. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_sign",
+        "source_fact:lord_3_sign",
+        "source_fact:lord_3_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 750,
+      "passage_key": "DK1.OCR.P0234.V2423-2423",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Mars in Malefic Navamsa in Pisces Ascendant (Vasudha Nadiamsa). Missing source facts: ascendant_sign, nadiamsa_segment, mars_navamsa_nature. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa_segment",
+        "source_fact:mars_navamsa_nature"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 752,
+      "passage_key": "DK1.OCR.P0234.V2425-2425",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Pisces Ascendant Poetic Talent and Conveyances. Missing source facts: ascendant_sign, planetary_aspects. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:ascendant_sign",
+        "source_fact:planetary_aspects"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 753,
+      "passage_key": "DK1.OCR.P0234.V2426-2426",
+      "category": "named_yoga_bindings",
+      "details": "Adhi Yoga. Missing source facts: adhi_yoga_presence. Bind only source-defined named-yoga premises to reviewed yoga calculators. reuse:classical_core_yogas+yoga_calculator.",
+      "required_capabilities": [
+        "reuse:classical_core_yogas+yoga_calculator",
+        "source_fact:adhi_yoga_presence"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 755,
+      "passage_key": "DK1.OCR.P0234.V2428-2428",
+      "category": "named_yoga_bindings",
+      "details": "Adhi Yoga Wealth and Status. Missing source facts: yoga_type. Bind only source-defined named-yoga premises to reviewed yoga calculators. reuse:classical_core_yogas+yoga_calculator.",
+      "required_capabilities": [
+        "reuse:classical_core_yogas+yoga_calculator",
+        "source_fact:yoga_type"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 757,
+      "passage_key": "DK1.OCR.P0235.V2431-2431",
+      "category": "existing_structural_fact_bindings",
+      "details": "Father's Brothers for Vasudha Nadiamsa in Pisces Ascendant. Missing source facts: ascendant_sign, nadiamsa, sun_navamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa",
+        "source_fact:sun_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 760,
+      "passage_key": "DK1.OCR.P0236.V2449-2449",
+      "category": "existing_structural_fact_bindings",
+      "details": "Vasudha Nadiamsa Progeny Count. Missing source facts: nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 761,
+      "passage_key": "DK1.OCR.P0236.V2450-2451",
+      "category": "dynamic_house_lord_relations",
+      "details": "Sun as 6th Lord in conjunction with 8th Lord and aspected by Mars. Missing source facts: nadiamsa, lord_of_6th, lord_of_6th_conjunction, lord_of_6th_aspect. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:nadiamsa",
+        "source_fact:lord_of_6th",
+        "source_fact:lord_of_6th_conjunction",
+        "source_fact:lord_of_6th_aspect"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 762,
+      "passage_key": "DK1.OCR.P0236.V2452-2453",
+      "category": "dynamic_house_lord_relations",
+      "details": "Mercury as 7th Lord in Immovable Rasi with Libra Navamsa and Venus for Pisces Ascendant. Missing source facts: ascendant_sign, lord_of_7th_house, lord_of_7th_house_rasi_type, lord_of_7th_house_navamsa, lord_of_7th_house_conjunction. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_sign",
+        "source_fact:lord_of_7th_house",
+        "source_fact:lord_of_7th_house_rasi_type",
+        "source_fact:lord_of_7th_house_navamsa",
+        "source_fact:lord_of_7th_house_conjunction"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 765,
+      "passage_key": "DK1.OCR.P0237.V2459-2459",
+      "category": "dynamic_house_lord_relations",
+      "details": "Nadiamsa Vasudha: 9th and 10th Lord Placement. Missing source facts: nadiamsa, lord_10_house, lord_9_house. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:nadiamsa",
+        "source_fact:lord_10_house",
+        "source_fact:lord_9_house"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 766,
+      "passage_key": "DK1.OCR.P0237.V2461-2465",
+      "category": "dynamic_house_lord_relations",
+      "details": "10th Lord Jupiter in 2nd House with Leo Navamsa. Missing source facts: lord_10th_house, lord_10th_house_placement, lord_10th_house_navamsa. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:lord_10th_house",
+        "source_fact:lord_10th_house_placement",
+        "source_fact:lord_10th_house_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 770,
+      "passage_key": "DK1.OCR.P0238.V2471-2471",
+      "category": "timing_sequence_and_transit",
+      "details": "Wealth and Prosperity during Ascendant Lord Dasa. Missing source facts: dasa_lord. Model the source-specific Dasha sequence and transit-to-derived-sign predicates before admission. reuse:dasha_calculators+transit_calculator.",
+      "required_capabilities": [
+        "reuse:dasha_calculators+transit_calculator",
+        "source_fact:dasa_lord"
+      ],
+      "resolution": "implementable_now",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 772,
+      "passage_key": "DK1.OCR.P0238.V2473-2474",
+      "category": "named_yoga_bindings",
+      "details": "Adhi Yoga from Moon. Missing source facts: adhi_yoga_from_moon. Bind only source-defined named-yoga premises to reviewed yoga calculators. reuse:classical_core_yogas+yoga_calculator.",
+      "required_capabilities": [
+        "reuse:classical_core_yogas+yoga_calculator",
+        "source_fact:adhi_yoga_from_moon"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 773,
+      "passage_key": "DK1.OCR.P0238.V2477-2478",
+      "category": "dynamic_house_lord_relations",
+      "details": "Ketu in 7th and 7th Lord with Rahu affecting spouse. Missing source facts: ketu_house_position, seventh_lord_conjunction. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ketu_house_position",
+        "source_fact:seventh_lord_conjunction"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 776,
+      "passage_key": "DK1.OCR.P0239.V2485-2486",
+      "category": "dynamic_house_lord_relations",
+      "details": "Malefic influence on 3rd House and 3rd Lord (Dhruva Nadiamsa). Missing source facts: nadiamsa, third_house_occupant, third_lord_conjunction. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:nadiamsa",
+        "source_fact:third_house_occupant",
+        "source_fact:third_lord_conjunction"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 777,
+      "passage_key": "DK1.OCR.P0239.V2487-2493",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Malefic in 7th House and 7th Lord Condition. Missing source facts: malefic_in_7th_house, 7th_lord_strength, 7th_lord_conjunct_malefic. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:malefic_in_7th_house",
+        "source_fact:7th_lord_strength",
+        "source_fact:7th_lord_conjunct_malefic"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 778,
+      "passage_key": "DK1.OCR.P0240.V2494-2495",
+      "category": "fine_varga_bindings",
+      "details": "Capricorn Ascendant, Jupiter's Trimsamsa, Kaala Nadiamsa. Missing source facts: ascendant_sign, ascendant_trimsamsa_lord, nadiamsa. Expose D30 lord and D60 Shashtiamsa identity/quality using one reviewed Vargas implementation. reuse:divisional_chart_calculation+classical_shadbala.",
+      "required_capabilities": [
+        "reuse:divisional_chart_calculation+classical_shadbala",
+        "source_fact:ascendant_sign",
+        "source_fact:ascendant_trimsamsa_lord",
+        "source_fact:nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 779,
+      "passage_key": "DK1.OCR.P0240.V2496-2496",
+      "category": "existing_structural_fact_bindings",
+      "details": "Birth location and house orientation for second half of Nadiamsa. Missing source facts: nadiamsa_segment. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa_segment"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 788,
+      "passage_key": "DK1.OCR.P0241.V2508-2508",
+      "category": "existing_structural_fact_bindings",
+      "details": "First child gender for Kaala Nadiamsa. Missing source facts: nadiamsa, jupiter_navamsa_type, jupiter_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa",
+        "source_fact:jupiter_navamsa_type",
+        "source_fact:jupiter_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 798,
+      "passage_key": "DK1.OCR.P0242.V2519-2520",
+      "category": "existing_structural_fact_bindings",
+      "details": "Effects of the second half of the Dhruva Nadiamsa. Missing source facts: nadiamsa_segment. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa_segment"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 801,
+      "passage_key": "DK1.OCR.P0242.V2523-2523",
+      "category": "existing_structural_fact_bindings",
+      "details": "Sun-Mercury Conjunction in Gemini for Capricorn Ascendant (Dhruva Nadiamsa). Missing source facts: ascendant_sign, nadiamsa, sun_sign, mercury_sign. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa",
+        "source_fact:sun_sign",
+        "source_fact:mercury_sign"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 803,
+      "passage_key": "DK1.OCR.P0242.V2525-2526",
+      "category": "fine_varga_bindings",
+      "details": "Saturn in Malefic Shashtiamsa (Dhruva Nadiamsa). Missing source facts: saturn_shashtiamsa_quality, nadiamsa. Expose D30 lord and D60 Shashtiamsa identity/quality using one reviewed Vargas implementation. reuse:divisional_chart_calculation+classical_shadbala.",
+      "required_capabilities": [
+        "reuse:divisional_chart_calculation+classical_shadbala",
+        "source_fact:saturn_shashtiamsa_quality",
+        "source_fact:nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 804,
+      "passage_key": "DK1.OCR.P0243.V2528-2528",
+      "category": "existing_structural_fact_bindings",
+      "details": "Absence of Paternal Uncles in Capricorn Ascendant. Missing source facts: ascendant_sign, nadiamsa_segment. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa_segment"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 816,
+      "passage_key": "DK1.OCR.P0244.V2543-2544",
+      "category": "existing_structural_fact_bindings",
+      "details": "Saturn in Gemini in Seethala Nadiamsa (Fixed Sign Ascendant). Missing source facts: saturn_sign, nadiamsa, ascendant_modality. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:saturn_sign",
+        "source_fact:nadiamsa",
+        "source_fact:ascendant_modality"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 817,
+      "passage_key": "DK1.OCR.P0244.V2545-2546",
+      "category": "nadiamsa_subdivisions_beyond_halves",
+      "details": "Kamala Nadiamsa Taurus Ascendant Birth Order and Siblings. Missing source facts: ascendant_sign, nadiamsa_name, nadiamsa_part. Extend exact Nadiamsa precision facts to source-stated quarters and thirds. extend:nadiamsa_table_and_precision_policy.",
+      "required_capabilities": [
+        "extend:nadiamsa_table_and_precision_policy",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa_name",
+        "source_fact:nadiamsa_part"
+      ],
+      "resolution": "implementable_now",
+      "priority": "medium"
+    },
+    {
+      "catalogue_ordinal": 820,
+      "passage_key": "DK1.OCR.P0245.V2553-2554",
+      "category": "dynamic_house_lord_relations",
+      "details": "Kamala Nadiamsa: Mercury as 5th Lord with Sun/Saturn Navamsa or Mars. Missing source facts: nadiamsa, lord_5_planet, lord_5_conjunctions. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:nadiamsa",
+        "source_fact:lord_5_planet",
+        "source_fact:lord_5_conjunctions"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 826,
+      "passage_key": "DK1.OCR.P0245.V2561-2563",
+      "category": "existing_structural_fact_bindings",
+      "details": "Physical and Life Circumstances for Sagittarius Ascendant in Pankaja Nadiamsa (First Half). Missing source facts: ascendant_sign, nadiamsa, nadiamsa_half. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa",
+        "source_fact:nadiamsa_half"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 829,
+      "passage_key": "DK1.OCR.P0247.V2577-2579",
+      "category": "existing_structural_fact_bindings",
+      "details": "Father's Siblings and Paternal Grandfather's Status in Sivada Nadiamsa. Missing source facts: nadiamsa_type, nadiamsa_half, ascendant_sign_modality. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa_type",
+        "source_fact:nadiamsa_half",
+        "source_fact:ascendant_sign_modality"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 849,
+      "passage_key": "DK1.OCR.P0250.V2619-2622",
+      "category": "existing_structural_fact_bindings",
+      "details": "Sivada Nadiamsa Gemini Ascendant Yoga. Missing source facts: ascendant_sign, nadiamsa, moon_house, sun_house, nadiamsa_half. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa",
+        "source_fact:moon_house",
+        "source_fact:sun_house",
+        "source_fact:nadiamsa_half"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 852,
+      "passage_key": "DK1.OCR.P0251.V2635-2635",
+      "category": "dynamic_house_lord_relations",
+      "details": "Bhagya Yoga via Ascendant Lord in Sagittarius aspected by Saturn. Missing source facts: ascendant_lord_sign, ascendant_lord_aspect_by_saturn. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_lord_sign",
+        "source_fact:ascendant_lord_aspect_by_saturn"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 855,
+      "passage_key": "DK1.OCR.P0252.V2648-2651",
+      "category": "existing_structural_fact_bindings",
+      "details": "Father of the native of former half of Kamala Nadiamsa. Missing source facts: nadiamsa_type. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa_type"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 856,
+      "passage_key": "DK1.OCR.P0252.V2652-2652",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Ascendant Lord in Debility with Malefic Aspect. Missing source facts: ascendant_lord_rasi_dignity, ascendant_lord_navamsa_dignity, ascendant_lord_aspects. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:ascendant_lord_rasi_dignity",
+        "source_fact:ascendant_lord_navamsa_dignity",
+        "source_fact:ascendant_lord_aspects"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 858,
+      "passage_key": "DK1.OCR.P0253.V2656-2656",
+      "category": "existing_structural_fact_bindings",
+      "details": "Birth of a Daughter in Kamala Nadiamsa. Missing source facts: nadiamsa, jupiter_sign_trine, jupiter_navamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:nadiamsa",
+        "source_fact:jupiter_sign_trine",
+        "source_fact:jupiter_navamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 863,
+      "passage_key": "DK1.OCR.P0254.V2671-2671",
+      "category": "timing_sequence_and_transit",
+      "details": "Professional Progress via Jupiter Transit to Ascendant Lord's Navamsa. Missing source facts: jupiter_transit_sign_relation, dasa_lord. Model the source-specific Dasha sequence and transit-to-derived-sign predicates before admission. reuse:dasha_calculators+transit_calculator.",
+      "required_capabilities": [
+        "reuse:dasha_calculators+transit_calculator",
+        "source_fact:jupiter_transit_sign_relation",
+        "source_fact:dasa_lord"
+      ],
+      "resolution": "implementable_now",
+      "priority": "low"
+    },
+    {
+      "catalogue_ordinal": 866,
+      "passage_key": "DK1.OCR.P0255.V2684-2685",
+      "category": "dynamic_house_lord_relations",
+      "details": "9th Lord in Cancer Ascendant. Missing source facts: ascendant_sign, ninth_lord_position. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:ascendant_sign",
+        "source_fact:ninth_lord_position"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 868,
+      "passage_key": "DK1.OCR.P0256.V2697-2698",
+      "category": "existing_structural_fact_bindings",
+      "details": "7th Lord Venus in Even Navamsa and Mangala Nadiamsa. Missing source facts: ascendant_sign, venus_navamsa_parity, venus_nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:ascendant_sign",
+        "source_fact:venus_navamsa_parity",
+        "source_fact:venus_nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 869,
+      "passage_key": "DK1.OCR.P0256.V2699-2699",
+      "category": "pushkara_bindings",
+      "details": "Life-long Fortune for Champaka Nadiamsa. Missing source facts: jupiter_pushkara_navamsa, tenth_lord_identity, tenth_lord_aspect_by_mars, nadiamsa. Expose Pushkara Navamsa status as a source fact. reuse:pushkara_calculator.",
+      "required_capabilities": [
+        "reuse:pushkara_calculator",
+        "source_fact:jupiter_pushkara_navamsa",
+        "source_fact:tenth_lord_identity",
+        "source_fact:tenth_lord_aspect_by_mars",
+        "source_fact:nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 873,
+      "passage_key": "DK1.OCR.P0257.V2703-2703",
+      "category": "dynamic_house_lord_relations",
+      "details": "Number of Father's Brothers. Missing source facts: jupiter_lord_of_mars_sign, jupiter_position. Add generic house-lord identity, placement, Vargas and relationship projections for all twelve houses. reuse:chart_facts+sign_lord_map.",
+      "required_capabilities": [
+        "reuse:chart_facts+sign_lord_map",
+        "source_fact:jupiter_lord_of_mars_sign",
+        "source_fact:jupiter_position"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 874,
+      "passage_key": "DK1.OCR.P0257.V2704-2705",
+      "category": "existing_structural_fact_bindings",
+      "details": "Saturn in 11th House in Champaka Nadiamsa. Missing source facts: saturn_house_placement, nadiamsa. Expose already-derived sign, house, Navamsa, Nadiamsa, modality and conjunction values through canonical keys. reuse:deva_keralam.chart_facts.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts",
+        "source_fact:saturn_house_placement",
+        "source_fact:nadiamsa"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 876,
+      "passage_key": "DK1.OCR.P0257.V2709-2710",
+      "category": "relationship_quantifiers_and_aspects",
+      "details": "Sun and Mercury in 10th House with Mars Aspect. Missing source facts: sun_longitude, mercury_longitude, house_placement, mars_aspect_to_house. Normalize conjunction, Parashari aspect, relative-house and any/all relationship predicates. reuse:deva_keralam.chart_facts+aspect_calculator.",
+      "required_capabilities": [
+        "reuse:deva_keralam.chart_facts+aspect_calculator",
+        "source_fact:sun_longitude",
+        "source_fact:mercury_longitude",
+        "source_fact:house_placement",
+        "source_fact:mars_aspect_to_house"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    },
+    {
+      "catalogue_ordinal": 878,
+      "passage_key": "DK1.OCR.P0258.V2717-2718",
+      "category": "planet_nature_strength_and_condition",
+      "details": "Malefic influence on Aries Ascendant and 4th House in Champaka Nadiamsa. Missing source facts: ascendant_sign, nadiamsa, ascendant_house_malefic_influence, fourth_house_malefic_influence. Expose classical natural nature, dignity, Avastha and strength predicates without inventing a composite score. reuse:classical_natural_nature+planetary_dignities+strength.",
+      "required_capabilities": [
+        "reuse:classical_natural_nature+planetary_dignities+strength",
+        "source_fact:ascendant_sign",
+        "source_fact:nadiamsa",
+        "source_fact:ascendant_house_malefic_influence",
+        "source_fact:fourth_house_malefic_influence"
+      ],
+      "resolution": "implementable_now",
+      "priority": "high"
+    }
+  ]
+}

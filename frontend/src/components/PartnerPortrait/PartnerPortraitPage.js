@@ -70,7 +70,9 @@ const consolidatedFactorReadings = (readings = []) => {
   });
   return [...grouped.values()];
 };
-const chartId = (chart) => Number(chart?.birth_chart_id || chart?.id || 0);
+const chartId = (chart) => Number(
+  chart?.birth_chart_id || chart?.chart_id || chart?.id || 0
+);
 const partnerIsFeminine = (gender) => !['female', 'woman', 'f', 'girl'].includes(String(gender || '').trim().toLowerCase());
 const errorDetail = (error) => {
   const detail = error?.response?.data?.detail;
@@ -319,13 +321,17 @@ export default function PartnerPortraitPage({ user, onLogin, onLogout, onAdminCl
   const [showCredits, setShowCredits] = useState(false);
   const pollRef = useRef(null);
   const selected = charts.find((item) => chartId(item) === selectedId) || birthData;
+  const activeChartId = chartId(birthData);
   const effectiveCost = Number(cost ?? partnerPortraitCost ?? 44);
   const featureEnabled = features?.partner_portrait_enabled === true;
 
   const stopPolling = useCallback(() => { if (pollRef.current) window.clearTimeout(pollRef.current); pollRef.current = null; }, []);
-  const poll = useCallback(async (jobId) => {
+  const loadGenerationRef = useRef(0);
+  const poll = useCallback(async (jobId, generation) => {
     try {
       const payload = await apiService.getPartnerPortraitStatus(jobId);
+      // Ignore responses for a previous native after Change Native.
+      if (generation !== loadGenerationRef.current) return;
       if (payload.chart_matches_current_version === false) {
         stopPolling(); setResult(null); setResultJobId(''); setState('setup'); return;
       }
@@ -337,17 +343,36 @@ export default function PartnerPortraitPage({ user, onLogin, onLogout, onAdminCl
       }
       const reported = payload.progress_stage || (payload.status === 'processing' ? 'creating_portrait' : 'reading_chart');
       setStage((current) => (PROGRESS_RANK[reported] >= PROGRESS_RANK[current] ? reported : current));
-      pollRef.current = window.setTimeout(() => poll(jobId), 3500);
-    } catch (_) { pollRef.current = window.setTimeout(() => poll(jobId), 5000); }
+      pollRef.current = window.setTimeout(() => poll(jobId, generation), 3500);
+    } catch (_) {
+      if (generation !== loadGenerationRef.current) return;
+      pollRef.current = window.setTimeout(() => poll(jobId, generation), 5000);
+    }
   }, [fetchBalance, stopPolling]);
 
   const loadForChart = useCallback(async (id) => {
-    if (!id) { setState('setup'); return; }
-    stopPolling(); setDirection(null); setDirectionIssue(null); setResultJobId(''); setCreatingVariation(false); setError(''); setState('loading');
+    const generation = ++loadGenerationRef.current;
+    if (!id) {
+      stopPolling();
+      setResult(null);
+      setResultJobId('');
+      setState('setup');
+      return;
+    }
+    // Drop the previous native's portrait immediately so Change Native never keeps showing it.
+    stopPolling();
+    setResult(null);
+    setDirection(null);
+    setDirectionIssue(null);
+    setResultJobId('');
+    setCreatingVariation(false);
+    setError('');
+    setState('loading');
     try {
       const [config, directionData, history] = await Promise.all([
         apiService.getPartnerPortraitConfig(), apiService.getPartnerPortraitDirection(id), apiService.getPartnerPortraitHistory(),
       ]);
+      if (generation !== loadGenerationRef.current) return;
       setCost(Number(config.cost)); setAvailable(config.available !== false); setDirection(directionData);
       const chartHistory = (history.items || []).filter((item) => (
         Number(item.birth_chart_id) === Number(id) && item.matches_current_chart !== false
@@ -355,9 +380,10 @@ export default function PartnerPortraitPage({ user, onLogin, onLogout, onAdminCl
       const active = chartHistory.find((item) => ['pending', 'processing'].includes(item.status));
       const completedHistory = chartHistory.find((item) => item.status === 'completed');
       if (active) {
-        setState('working'); setStartedAt(Date.now()); poll(active.job_id);
+        setState('working'); setStartedAt(Date.now()); poll(active.job_id, generation);
       } else if (completedHistory) {
         const completed = await apiService.getPartnerPortraitStatus(completedHistory.job_id);
+        if (generation !== loadGenerationRef.current) return;
         if (completed.chart_matches_current_version === false) {
           setResult(null); setResultJobId(''); setState('setup');
         } else {
@@ -365,6 +391,7 @@ export default function PartnerPortraitPage({ user, onLogin, onLogout, onAdminCl
         }
       } else { setResult(null); setResultJobId(''); setCreatingVariation(false); setState('setup'); }
     } catch (requestError) {
+      if (generation !== loadGenerationRef.current) return;
       const detail = errorDetail(requestError);
       if (detail.code === 'GENDER_REQUIRED') { setDirectionIssue('GENDER_REQUIRED'); setState('setup'); }
       else { setError(detail.message); setState('error'); }
@@ -379,23 +406,33 @@ export default function PartnerPortraitPage({ user, onLogin, onLogout, onAdminCl
       if (cancelled) return;
       const list = chartResponse.charts || chartResponse.items || [];
       setCharts(list);
+      // Prefer the shared selected native; otherwise seed context from the first saved chart.
       const preferred = list.find((item) => chartId(item) === chartId(birthData)) || list[0];
-      const id = chartId(preferred);
-      setSelectedId(id);
-      if (preferred) setBirthData(preferred);
-      if (id) loadForChart(id); else setState('setup');
+      if (preferred && !chartId(birthData)) setBirthData(preferred);
+      if (!list.length) setState('setup');
     }).catch((requestError) => { if (!cancelled) { setError(errorDetail(requestError).message); setState('error'); } });
     return () => { cancelled = true; stopPolling(); };
   }, [creditsLoading, featureEnabled, user]);
+
+  // Follow the shared Change Native bar — same birthData other pages already use.
+  useEffect(() => {
+    if (!user || creditsLoading || !featureEnabled) return undefined;
+    if (!activeChartId) {
+      setSelectedId(0);
+      setResult(null);
+      setResultJobId('');
+      setState('setup');
+      return undefined;
+    }
+    setSelectedId(activeChartId);
+    loadForChart(activeChartId);
+    return undefined;
+  }, [activeChartId, creditsLoading, featureEnabled, loadForChart, user]);
 
   useEffect(() => {
     if (!creditsLoading && !featureEnabled) navigate('/', { replace: true });
   }, [creditsLoading, featureEnabled, navigate]);
 
-  const chooseChart = (event) => {
-    const id = Number(event.target.value); const next = charts.find((item) => chartId(item) === id);
-    setSelectedId(id); if (next) setBirthData(next); loadForChart(id);
-  };
   const generate = async () => {
     if (!user) return onLogin?.();
     if (!selectedId || directionIssue) return;
@@ -403,7 +440,7 @@ export default function PartnerPortraitPage({ user, onLogin, onLogout, onAdminCl
     setError(''); setState('working'); setStage('reading_chart'); setStartedAt(Date.now());
     try {
       const job = await apiService.generatePartnerPortrait({ birth_chart_id: selectedId, age_band: ageBand, clothing_style: clothing, idempotency_key: uniqueId() });
-      setResultJobId(job.job_id); fetchBalance(); poll(job.job_id);
+      setResultJobId(job.job_id); fetchBalance(); poll(job.job_id, loadGenerationRef.current);
     } catch (requestError) {
       const detail = errorDetail(requestError);
       if (requestError?.response?.status === 402) setShowCredits(true);
@@ -412,12 +449,11 @@ export default function PartnerPortraitPage({ user, onLogin, onLogout, onAdminCl
     }
   };
 
-  const pageProps = { user, onLogin, onLogout, onAdminClick, showNativeBar: false };
+  const pageProps = { user, onLogin, onLogout, onAdminClick };
   return (
     <div className="partner-portrait-page">
       <Helmet><title>Partner Portrait from Your Kundli | AstroRoshni</title><meta name="description" content="Create an artistic portrait and personality profile of the partner archetype described by your Vedic birth chart." /></Helmet>
       <ModernNavigationHeader {...pageProps} />
-      {user && featureEnabled && <div className="pp-toolbar"><div><span>Reading for</span><select value={selectedId || ''} onChange={chooseChart} aria-label="Select birth chart"><option value="" disabled>Select a Kundli</option>{charts.map((chart) => <option key={chartId(chart)} value={chartId(chart)}>{chart.name}</option>)}</select></div><button type="button" onClick={() => navigate('/charts-dashas')}>Open Kundli ↗</button></div>}
       <main className="pp-main">
         {creditsLoading && <div className="pp-loading"><span></span><h2>Opening Partner Portrait…</h2></div>}
         {!creditsLoading && state === 'guest' && <SampleExperience signedIn={false} onStart={onLogin} />}
@@ -431,7 +467,7 @@ export default function PartnerPortraitPage({ user, onLogin, onLogout, onAdminCl
               <p>{creatingVariation ? 'This deliberately creates a different face from the same chart indications. Your current portrait remains saved until the new one is complete.' : 'The chart decides the partner presentation and cultural context from saved gender and birth coordinates. You choose only the age and clothing style.'}</p>
               {creatingVariation && <button className="pp-keep-current" type="button" onClick={() => { setCreatingVariation(false); setState('result'); }}>← Keep my current portrait</button>}
             </div>
-            {charts.length === 0 ? <div className="pp-callout"><strong>A saved Kundli is needed</strong><p>Create or save a birth chart before generating the portrait.</p><button className="pp-primary" type="button" onClick={() => navigate('/ai-kundli-generator')}>Create Kundli →</button></div> : directionIssue === 'GENDER_REQUIRED' ? <div className="pp-callout pp-callout--warning"><strong>Add gender to this Kundli</strong><p>Partner presentation is derived from the selected native. Add gender in the saved chart before continuing.</p><button className="pp-secondary" type="button" onClick={() => navigate('/profile')}>Update saved Kundli</button></div> : <div className="pp-form">
+            {charts.length === 0 && !birthData ? <div className="pp-callout"><strong>A saved Kundli is needed</strong><p>Create or save a birth chart before generating the portrait.</p><button className="pp-primary" type="button" onClick={() => navigate('/ai-kundli-generator')}>Create Kundli →</button></div> : directionIssue === 'GENDER_REQUIRED' ? <div className="pp-callout pp-callout--warning"><strong>Add gender to this Kundli</strong><p>Partner presentation is derived from the selected native. Add gender in the saved chart before continuing.</p><button className="pp-secondary" type="button" onClick={() => navigate('/profile')}>Update saved Kundli</button></div> : !selectedId ? <div className="pp-callout"><strong>Select a Kundli</strong><p>Use Change native in the header to choose the birth chart this portrait should follow.</p></div> : <div className="pp-form">
               <label><span>Partner age in the artwork</span><div className="pp-choice-row">{AGES.map((age) => <button type="button" className={ageBand === age ? 'is-active' : ''} onClick={() => setAgeBand(age)} key={age}>{age}</button>)}</div></label>
               <label><span>Portrait style</span><div className="pp-choice-row">{CLOTHING.map(([key, label]) => <button type="button" className={clothing === key ? 'is-active' : ''} onClick={() => setClothing(key)} key={key}>{label}</button>)}</div></label>
               {direction && <p className="pp-derived">Tara will create a <strong>{direction.presentation}</strong> partner portrait with <strong>{words(direction.visual_context)}</strong> visual context, derived from this saved chart.</p>}

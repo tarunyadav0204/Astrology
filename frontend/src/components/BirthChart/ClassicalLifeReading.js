@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/apiService';
+import { useCredits } from '../../context/CreditContext';
 import './ClassicalLifeReading.css';
 
 const CONDITION_LABELS = {
@@ -88,10 +89,12 @@ export default function ClassicalLifeReading({
   birthData,
   chartData,
   variant = 'compact',
+  preview = false,
   onOpenFull,
   initialAreaKey = '',
 }) {
   const navigate = useNavigate();
+  const { isAstrologerLicensed, loading: creditsLoading } = useCredits();
   const [reading, setReading] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -102,8 +105,10 @@ export default function ClassicalLifeReading({
 
   useEffect(() => {
     let cancelled = false;
-    if (!chartData?.planets || chartData?.ascendant == null) {
+    if (!chartData?.planets || chartData?.ascendant == null || creditsLoading || !isAstrologerLicensed) {
       setReading(null);
+      setLoading(false);
+      if (!creditsLoading && !isAstrologerLicensed) setError('');
       return undefined;
     }
     setLoading(true);
@@ -124,7 +129,7 @@ export default function ClassicalLifeReading({
       })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [fingerprint, chartData, birthData, initialAreaKey, retryNonce]);
+  }, [fingerprint, chartData, birthData, initialAreaKey, retryNonce, creditsLoading, isAstrologerLicensed]);
 
   const areas = reading?.areas || [];
   const selected = areas.find((row) => row.key === selectedAreaKey) || areas[0];
@@ -135,10 +140,44 @@ export default function ClassicalLifeReading({
   const insights = variant === 'compact' ? filteredInsights.slice(0, 2) : filteredInsights;
   const openFull = onOpenFull || (() => navigate(`/life-reading${selected ? `?area=${encodeURIComponent(selected.key)}` : ''}`));
 
+  if (chartData?.planets && creditsLoading) return <div className="clr-state clr-state--loading"><i aria-hidden></i><strong>Checking access</strong><p>Life is part of the Astrologer License.</p></div>;
+  if (chartData?.planets && !isAstrologerLicensed) {
+    if (preview) {
+      return (
+        <button type="button" className="clr clr--preview" onClick={onOpenFull}>
+          <em>Astrologer License</em>
+          <strong>Life is a professional reading.</strong>
+          <span>View what’s included</span>
+        </button>
+      );
+    }
+    return (
+      <div className="clr clr--license">
+        <div className="clr__license">
+          <em>Astrologer License</em>
+          <h2>Life is a professional reading.</h2>
+          <p>The classical natal reading, with its rules and sources, is included with an active Astrologer License.</p>
+          <Link to="/subscription?family=astrologer">View the Astrologer License</Link>
+        </div>
+      </div>
+    );
+  }
   if (!chartData?.planets) return <div className="clr-state"><strong>Select a birth chart</strong><p>Choose a native to open the classical Life reading.</p></div>;
   if (loading) return <div className="clr-state clr-state--loading"><i aria-hidden></i><strong>Reading the published classical rules…</strong><p>Bringing the matching indications together by life area.</p></div>;
   if (error) return <div className="clr-state clr-state--error"><strong>Life reading unavailable</strong><p>{error}</p><button type="button" onClick={() => { requestCache.delete(fingerprint); setReading(null); setError(''); setRetryNonce((value) => value + 1); }}>Try again</button></div>;
   if (!selected) return null;
+
+  const openReading = onOpenFull || (() => navigate(`/life-reading${selected ? `?area=${encodeURIComponent(selected.key)}` : ''}`));
+  if (preview) {
+    const lead = selected.insights?.[0];
+    return (
+      <button type="button" className="clr clr--preview" onClick={openReading}>
+        <em>Classical natal reading</em>
+        <strong>{lead?.title || selected.label}</strong>
+        <span>Read the full Life reading</span>
+      </button>
+    );
+  }
 
   const supports = unique(filteredInsights.flatMap((row) => row.supports || []), (row) => row);
   const pressures = unique(filteredInsights.flatMap((row) => row.pressures || []), (row) => row);

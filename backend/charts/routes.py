@@ -36,6 +36,7 @@ from charts.house_insight_service import build_house_insight
 from classical_rules.bphs.chapter_24 import evaluate_chapter_24
 from classical_rules.reading import build_classical_reading
 from classical_rules.models import RuleInputUnavailable
+from credits.entitlements import ASTROLOGER_TOOLS_ENTITLEMENT, require_entitlement
 from charts.double_transit_service import (
     DoubleTransitCalculationError,
     DoubleTransitInputError,
@@ -1093,6 +1094,7 @@ async def calculate_classical_natal_promise(request: dict, current_user: User = 
 @router.post("/classical-reading")
 async def calculate_classical_reading(request: dict, current_user: User = Depends(get_current_user)):
     """Return all published chart-reading insights through one stable contract."""
+    require_entitlement(current_user, ASTROLOGER_TOOLS_ENTITLEMENT)
     chart_data = request.get("chart_data") or {}
     birth_data = request.get("birth_data") or None
     area_keys = request.get("area_keys") or None

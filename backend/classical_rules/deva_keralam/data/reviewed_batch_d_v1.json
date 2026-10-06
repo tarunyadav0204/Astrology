@@ -1,0 +1,262 @@
+{
+  "schema_version": "deva-keralam-reviewed-manifest/1.0.0",
+  "batch_key": "deva_keralam_reviewed_batch_d_v1",
+  "edition_key": "deva_keralam_volume_1_scan",
+  "source_scope": {
+    "stream": "D",
+    "catalogue_ordinals": [1, 293],
+    "pdf_pages": [26, 117],
+    "selection_policy": "First-third completion audit. Only a source-image-checked natal clause with self-contained conditions is approved; adjacent passages with unresolved inherited context, missing text, or an unmapped section label are retained as explicit rejections."
+  },
+  "reviewer_method": "Compared the retained page image with the local two-column OCR and extraction draft. Conditions were rewritten only with canonical chart facts; inherited section assumptions were not silently supplied.",
+  "candidates": [
+    {
+      "key": "DK1.D.V0099.VISWAMBHARAA_SCOPE_REJECTED",
+      "title": "Jupiter in Viswambharaa: unresolved Ascendant scope",
+      "passage_key": "DK1.OCR.P0037.V0099-0099",
+      "context_block_key": "DK1.CTX.P0037.V0097-0105",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 99,
+        "verse_end": 99,
+        "pdf_pages": [37],
+        "printed_pages": [12],
+        "reference_label": "Deva Keralam I, verse 99, PDF p.37",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse and page numbering follow the supplied English edition. The translation states a general Jupiter placement, while its editorial note supplies Aquarius Ascendant only for one stated result."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.planet.Jupiter.nadiamsa.name",
+        "comparator": "equals",
+        "value": "Viswambharaa"
+      },
+      "outcome": {
+        "topic": "appearance_education",
+        "traditional_result": "Appearance, education and general-wellbeing statements are attached to this placement.",
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "The page does not establish whether Aquarius Ascendant governs the complete verse or only the education explanation in the editor's note."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "rejected",
+      "inherited_context": {"source_check": "page_image_context"},
+      "topics": ["appearance", "education"],
+      "scope": "Source-bounded natal judgment pending context resolution",
+      "notes": ["Not executable until the Ascendant scope is resolved from the surrounding Sanskrit/context."]
+    },
+    {
+      "key": "DK1.D.V0100.SIBLING_TERMS_REJECTED",
+      "title": "Jupiter in Viswambharaa: unresolved sibling terms",
+      "passage_key": "DK1.OCR.P0037.V0100-0100",
+      "context_block_key": "DK1.CTX.P0037.V0097-0105",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 100,
+        "verse_end": 100,
+        "pdf_pages": [37],
+        "printed_pages": [12],
+        "reference_label": "Deva Keralam I, verse 100, PDF p.37",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "Verse and page numbering follow the supplied English edition; the editor expressly flags unusual treatment of younger and elder co-borns."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {"op": "fact", "key": "deva_keralam.planet.Jupiter.nadiamsa.name", "comparator": "equals", "value": "Viswambharaa"},
+          {"op": "fact", "key": "deva_keralam.planet.Jupiter.house", "comparator": "in", "value": [1, 5, 8, 9, 11]}
+        ]
+      },
+      "outcome": {
+        "topic": "siblings",
+        "traditional_result": "The passage distinguishes younger co-borns from half-brothers.",
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [
+        "The edition note says the verse treats younger co-borns unusually in an eleventh-house context, so the relationship terms cannot yet be normalized safely."
+      ],
+      "timing_kind": "none",
+      "operationalization_status": "rejected",
+      "inherited_context": {"source_check": "page_image_context"},
+      "topics": ["siblings"],
+      "scope": "Source-bounded natal judgment pending kinship resolution",
+      "notes": []
+    },
+    {
+      "key": "DK1.D.V0101_0102.JUPITER_SCORPIO_VIRGO_NAVAMSA",
+      "title": "Jupiter in Scorpio and Virgo Navamsha",
+      "passage_key": "DK1.OCR.P0037.V0101-0102",
+      "context_block_key": "DK1.CTX.P0037.V0097-0105",
+      "decision": "approved",
+      "source": {
+        "verse_start": 101,
+        "verse_end": 102,
+        "pdf_pages": [37],
+        "printed_pages": [12],
+        "reference_label": "Deva Keralam I, verses 101-102, PDF p.37",
+        "editorial_status": "reviewed_clear",
+        "numbering_note": "Verse and page numbering follow the supplied English edition. The translated clause has a self-contained heading and explicitly names both the Rashi and Navamsha placements."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {"op": "fact", "key": "deva_keralam.planet.Jupiter.rashi.name", "comparator": "equals", "value": "Scorpio"},
+          {"op": "fact", "key": "deva_keralam.planet.Jupiter.navamsa.name", "comparator": "equals", "value": "Virgo"}
+        ]
+      },
+      "outcome": {
+        "topic": "character_and_learning",
+        "prediction_kind": "natal_promise",
+        "traditional_results": [
+          "The text describes an even or well-proportioned build.",
+          "It associates the placement with resolve, righteousness, truthfulness and an ability to understand other people's expressions.",
+          "It associates the placement with intelligence, talkativeness, writing skill and learning."
+        ],
+        "timing": null,
+        "certainty_note": "This is a source match, not a guarantee that every stated result must occur literally."
+      },
+      "precision_requirements": [],
+      "context_status": "verified",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "approved",
+      "inherited_context": {
+        "source_check": "page_image_context",
+        "scope_note": "The independent translated heading supplies the two required placements; the following editorial Aquarius example is not added as a condition."
+      },
+      "topics": ["appearance", "character", "education", "skills"],
+      "scope": "D1 Rashi and Navamsha natal judgment",
+      "notes": ["No Nadiamsa premise is inherited from the surrounding section."]
+    },
+    {
+      "key": "DK1.D.V0103.BLENDED_CLAUSES_REJECTED",
+      "title": "Jupiter in Mercury Navamsha: blended clauses",
+      "passage_key": "DK1.OCR.P0037.V0103-0103",
+      "context_block_key": "DK1.CTX.P0037.V0097-0105",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 103,
+        "verse_end": 103,
+        "pdf_pages": [37],
+        "printed_pages": [12],
+        "reference_label": "Deva Keralam I, verse 103, PDF p.37",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "The supplied translation combines a friendly-Rashi/Mercury-Navamsha clause with a Viswambharaa clause without making the dependency of the final sibling statement explicit."
+      },
+      "expression": {
+        "op": "fact",
+        "key": "deva_keralam.planet.Jupiter.navamsa.lord",
+        "comparator": "equals",
+        "value": "Mercury"
+      },
+      "outcome": {
+        "topic": "character_career_family",
+        "traditional_result": "The translation contains passion, royal service, wealth and half-brother statements.",
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [
+        "The English paragraph does not unambiguously assign each result to the Mercury-Navamsha and Viswambharaa premises."
+      ],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "rejected",
+      "inherited_context": {"source_check": "page_image_context"},
+      "topics": ["character", "career", "wealth", "siblings"],
+      "scope": "Source-bounded natal judgment pending clause separation",
+      "notes": []
+    },
+    {
+      "key": "DK1.D.V0212_0213.MISSING_LINK_REJECTED",
+      "title": "Venus in Pisces: source explicitly missing a premise",
+      "passage_key": "DK1.OCR.P0048.V0212-0213",
+      "context_block_key": "DK1.CTX.P0048.V0212-0223",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 212,
+        "verse_end": 213,
+        "pdf_pages": [48],
+        "printed_pages": [23],
+        "reference_label": "Deva Keralam I, verses 212-213, PDF p.48",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "The edition prints ellipses in the translated condition and states in its note that an original linking premise is missing."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {"op": "fact", "key": "deva_keralam.planet.Venus.rashi.name", "comparator": "equals", "value": "Pisces"},
+          {"op": "fact", "key": "deva_keralam.planet.Venus.navamsa.lord", "comparator": "equals", "value": "Saturn"}
+        ]
+      },
+      "outcome": {
+        "topic": "education",
+        "traditional_result": "The incomplete translation gives mixed educational ability.",
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": ["The edition explicitly says an original condition is missing from the verse."],
+      "inherited_ambiguities": [],
+      "timing_kind": "none",
+      "operationalization_status": "rejected",
+      "inherited_context": {"source_check": "page_image_context"},
+      "topics": ["education"],
+      "scope": "Non-executable incomplete source",
+      "notes": []
+    },
+    {
+      "key": "DK1.D.V0219.VARUNA_IDENTITY_REJECTED",
+      "title": "Varuna Nadiamsa marriage obstacles: section identity unresolved",
+      "passage_key": "DK1.OCR.P0048.V0219-0219",
+      "context_block_key": "DK1.CTX.P0048.V0212-0223",
+      "decision": "rejected",
+      "source": {
+        "verse_start": 219,
+        "verse_end": 219,
+        "pdf_pages": [48],
+        "printed_pages": [23],
+        "reference_label": "Deva Keralam I, verse 219, PDF p.48",
+        "editorial_status": "reviewed_interpreted",
+        "numbering_note": "The verse conditions are legible, but the section label Varuna is not a canonical Table 1 Nadiamsa name and has not yet received a reviewed edition-specific alias."
+      },
+      "expression": {
+        "op": "all",
+        "children": [
+          {"op": "fact", "key": "deva_keralam.planet.Mars.navamsa.name", "comparator": "equals", "value": "Capricorn"},
+          {"op": "fact", "key": "deva_keralam.planet.Saturn.rashi.name", "comparator": "equals", "value": "Pisces"},
+          {"op": "fact", "key": "deva_keralam.planet.Venus.navamsa.name", "comparator": "equals", "value": "Aquarius"}
+        ]
+      },
+      "outcome": {
+        "topic": "marriage",
+        "traditional_result": "The passage associates the complete configuration with obstacles in marriage.",
+        "timing": null
+      },
+      "precision_requirements": [],
+      "context_status": "rejected",
+      "context_qualification_acknowledged": false,
+      "source_disputes": [],
+      "inherited_ambiguities": ["Varuna has not been resolved to a canonical Nadiamsa name and ordinal for this edition."],
+      "timing_kind": "none",
+      "operationalization_status": "rejected",
+      "inherited_context": {"source_check": "page_image_context", "section_name": "Varuna"},
+      "topics": ["marriage"],
+      "scope": "D1 and Navamsha natal judgment pending section-alias resolution",
+      "notes": ["The three planetary premises alone must not be used without the source's Varuna context."]
+    }
+  ]
+}

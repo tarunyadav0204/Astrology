@@ -6851,7 +6851,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 <div className="settings-section">
                   <h3>Classical Life tab</h3>
                   <p className="settings-hint">
-                    Controls only the Life tab in Planetary Positions. The authenticated classical-reading APIs stay available so development and testing can continue.
+                    Controls who can see the Life tab. Opening the reading still requires an active Astrologer License.
                   </p>
                   <div className="setting-item">
                     <div className="setting-info">

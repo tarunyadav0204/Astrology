@@ -66,7 +66,7 @@ function FullHamburgerMenuItems({
     <div className="mobile-menu-section-label">Birth Chart</div>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { onBirthChartAction('create'); onClose(); }}>✨ Create birth chart</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { onBirthChartAction('select'); onClose(); }}>👤 Select birth chart</button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas'); onClose(); }}>📊 Parashari Desk</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--featured" onClick={() => { navigate('/charts-dashas'); onClose(); }}>📊 Open Charts &amp; Dashas</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/nadi'); onClose(); }}>🧭 Nadi Desk</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/kp'); onClose(); }}>🪐 KP Desk</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/activations'); onClose(); }}>✦ What’s activated</button>
@@ -239,6 +239,23 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
 
     // Fallback for legacy pages that don't expose modal callbacks.
     navigate(`/?birthChart=${mode}`);
+  };
+
+  const openChartsDashas = () => {
+    if (!user) {
+      try {
+        sessionStorage.setItem('pendingBirthChart', 'select');
+      } catch (_) { /* ignore */ }
+      handleLoginClick();
+      return;
+    }
+
+    if (!birthData?.name) {
+      applyBirthChartIntent('select');
+      return;
+    }
+
+    navigate('/charts-dashas');
   };
 
   useEffect(() => {
@@ -531,17 +548,35 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
                 </button>
               </div>
             )}
+            <button
+              type="button"
+              className={`charts-dashas-quick-btn${birthData?.name ? ' charts-dashas-quick-btn--has-native' : ''}`}
+              onClick={openChartsDashas}
+              title="Open Charts & Dashas"
+            >
+              <span aria-hidden>▦</span>
+              <span className="charts-dashas-quick-btn__label">Charts &amp; Dashas</span>
+            </button>
             {user && birthData && birthData.name && onChangeNative && (
-              <button
-                type="button"
-                className="native-selector-chip native-selector-chip--nav-mobile"
-                onClick={onChangeNative}
-                title={`Native: ${birthData.name} — tap to change`}
-              >
-                <span className="native-selector-chip__icon" aria-hidden>👤</span>
-                <span className="native-selector-chip__name">{birthData.name}</span>
-                <span className="native-selector-chip__chevron" aria-hidden>▾</span>
-              </button>
+              <div className="nav-native-control" aria-label={`Selected chart: ${birthData.name}`}>
+                <button
+                  type="button"
+                  className="nav-native-control__chart"
+                  onClick={openChartsDashas}
+                  title={`Open ${birthData.name}'s chart`}
+                >
+                  <span className="nav-native-control__context">Selected chart</span>
+                  <span className="nav-native-control__name">{birthData.name}</span>
+                </button>
+                <button
+                  type="button"
+                  className="nav-native-control__change"
+                  onClick={onChangeNative}
+                  title="Change selected native"
+                >
+                  Change
+                </button>
+              </div>
             )}
             <button
               type="button"
@@ -560,6 +595,11 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
         <div className="container">
           <ul className="nav-menu">
             <li><button onClick={onHomeClick || (() => navigate('/'))}>Home</button></li>
+            <li>
+              <button type="button" className="nav-menu__charts-cta" onClick={openChartsDashas}>
+                Charts &amp; Dashas
+              </button>
+            </li>
             <li
               className={`dropdown ${activeDropdown === 'birthchart' ? 'active' : ''}`}
               onMouseEnter={(e) => openDropdown('birthchart', e)}

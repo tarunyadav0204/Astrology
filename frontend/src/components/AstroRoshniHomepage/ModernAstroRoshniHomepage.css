@@ -561,6 +561,10 @@ body.modern-homepage-active {
 .mh-transit-ring__glow,
 .mh-transit-ring__circle,
 .mh-transit-rashi-axis,
+.mh-transit-degree,
+.mh-transit-asc,
+.mh-transit-asc-label,
+.mh-transit-cusp,
 .mh-transit-nakshatra-tick,
 .mh-transit-nakshatra-label,
 .mh-transit-rashi-label,
@@ -587,19 +591,99 @@ body.modern-homepage-active {
   transform: translate(-50%, -50%);
 }
 
-.mh-transit-ring__circle--outer { width: 93%; height: 93%; border-color: var(--color-cosmic-line-strong); }
-.mh-transit-ring__circle--nakshatra { width: 86.8%; height: 86.8%; }
+.mh-transit-ring__circle--outer { width: 88%; height: 88%; border-color: var(--color-cosmic-line-strong); }
+.mh-transit-ring__circle--nakshatra { width: 82.4%; height: 82.4%; }
 .mh-transit-ring__circle--planet { width: 55%; height: 55%; border-style: dashed; }
 
 .mh-transit-rashi-axis {
   top: 50%;
   left: 50%;
   z-index: 1;
-  width: 46%;
+  width: 44%;
   height: 1px;
   background: var(--color-cosmic-line);
   transform: rotate(var(--transit-angle));
   transform-origin: left center;
+}
+
+.mh-transit-degree {
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  width: 44%;
+  height: 1px;
+  background-image: radial-gradient(circle, var(--planet-color) 0.7px, transparent 0.9px);
+  background-size: 5px 1px;
+  background-repeat: repeat-x;
+  opacity: 0.8;
+  pointer-events: none;
+  transform: rotate(var(--transit-angle));
+  transform-origin: left center;
+}
+
+.mh-transit-degree.is-active {
+  z-index: 3;
+  background-image: radial-gradient(circle, var(--planet-color) 0.95px, transparent 1.15px);
+  opacity: 1;
+}
+
+.mh-transit-degree--sun { --planet-color: var(--planet-sun); }
+.mh-transit-degree--moon { --planet-color: var(--planet-moon); }
+.mh-transit-degree--mars { --planet-color: var(--planet-mars); }
+.mh-transit-degree--mercury { --planet-color: var(--planet-mercury); }
+.mh-transit-degree--jupiter { --planet-color: var(--planet-jupiter); }
+.mh-transit-degree--venus { --planet-color: var(--planet-venus); }
+.mh-transit-degree--saturn { --planet-color: var(--planet-saturn); }
+.mh-transit-degree--rahu { --planet-color: var(--planet-rahu); }
+.mh-transit-degree--ketu { --planet-color: var(--planet-ketu); }
+
+.mh-transit-asc {
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  width: 44%;
+  height: 1.5px;
+  background: var(--color-accent-soft);
+  pointer-events: none;
+  transform: rotate(var(--transit-angle));
+  transform-origin: left center;
+}
+
+.mh-transit-asc-label {
+  z-index: 5;
+  left: var(--transit-x);
+  top: var(--transit-y);
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  color: var(--color-accent-soft);
+  font-family: var(--mh-sans);
+  font-size: clamp(7px, 0.68vw, 9px);
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.mh-transit-asc-label small {
+  letter-spacing: 0;
+  font-weight: 650;
+}
+
+.mh-transit-cusp {
+  z-index: 4;
+  left: var(--transit-x);
+  top: var(--transit-y);
+  color: var(--color-cosmic-text-muted);
+  font-family: var(--mh-sans);
+  font-size: clamp(7px, 0.72vw, 9px);
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
 }
 
 .mh-transit-nakshatra-tick {
@@ -632,8 +716,9 @@ body.modern-homepage-active {
   z-index: 3;
   left: var(--transit-x);
   top: var(--transit-y);
-  max-width: 70px;
+  max-width: 96px;
   color: var(--color-cosmic-text-muted);
+  white-space: nowrap;
   font-size: clamp(7px, 0.72vw, 10px);
   font-weight: 650;
   letter-spacing: 0.04em;
@@ -738,19 +823,173 @@ body.modern-homepage-active {
 .mh-transit-shell--stale .mh-chart-meta__status i { background: var(--color-warning); box-shadow: none; }
 
 .mh-chart-readout {
-  padding: 17px 8px 4px;
+  align-items: baseline;
+  padding: 8px 8px 0;
 }
 
 .mh-chart-readout div {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mh-chart-readout span {
+  flex: 0 0 auto;
+  text-transform: uppercase;
 }
 
 .mh-chart-readout strong {
   color: var(--color-cosmic-text);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 550;
   letter-spacing: 0;
+  text-transform: none;
+}
+
+.mh-transit-rashi-label b {
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--color-accent-soft);
+  font-weight: 750;
+}
+
+.mh-transit-rashi-label b.is-lagna {
+  color: var(--color-cosmic-text);
+}
+
+.mh-chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 8px;
+  padding: 6px 8px 0;
+  border-top: 1px solid var(--color-cosmic-line);
+}
+
+.mh-chart-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.mh-chart-date span {
+  color: var(--color-cosmic-text-muted);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.mh-chart-date input {
+  border: 1px solid var(--color-cosmic-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-cosmic-text);
+  color-scheme: dark;
+  font-family: var(--mh-sans);
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 2px 8px;
+}
+
+.mh-chart-switch {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  justify-content: end;
+  gap: 2px 16px;
+  margin-left: auto;
+}
+
+.mh-chart-controls:not(:has(.mh-chart-date)) .mh-chart-switch {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.mh-chart-switch button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-cosmic-text-muted);
+  font-family: var(--mh-sans);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  line-height: 1.3;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.mh-chart-switch button.is-active {
+  color: var(--color-accent-soft);
+}
+
+.mh-north-frame {
+  display: grid;
+}
+
+.mh-north-chart {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.mh-north-surface {
+  fill: var(--color-cosmic-surface);
+  stroke: var(--color-cosmic-line-strong);
+  stroke-width: 1.2;
+}
+
+.mh-north-line {
+  fill: none;
+  stroke: var(--color-cosmic-line-strong);
+  stroke-width: 1.2;
+}
+
+.mh-north-house {
+  fill: transparent;
+}
+
+.mh-north-sign {
+  fill: var(--color-cosmic-text-muted);
+  font-family: var(--mh-sans);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.mh-north-planet {
+  font-family: var(--mh-sans);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.mh-north-planet.is-active {
+  font-weight: 800;
+}
+
+.mh-north-planet--sun { fill: var(--planet-sun); }
+.mh-north-planet--moon { fill: var(--planet-moon); }
+.mh-north-planet--mars { fill: var(--planet-mars); }
+.mh-north-planet--mercury { fill: var(--planet-mercury); }
+.mh-north-planet--jupiter { fill: var(--planet-jupiter); }
+.mh-north-planet--venus { fill: var(--planet-venus); }
+.mh-north-planet--saturn { fill: var(--planet-saturn); }
+.mh-north-planet--rahu { fill: var(--planet-rahu); }
+.mh-north-planet--ketu { fill: var(--planet-ketu); }
+
+.mh-chart-prompt {
+  position: absolute;
+  inset: 18%;
+  z-index: 6;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: var(--color-cosmic-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .mh-scroll-cue {
@@ -1001,6 +1240,9 @@ body.modern-homepage-active {
   border-left: 1px solid rgba(255, 255, 255, 0.16);
 }
 
+/* Desktop: wrappers dissolve so rows still fill the 2-col grid */
+.mh-focus-item { display: contents; }
+
 .mh-focus-row {
   width: 100%;
   min-height: 82px;
@@ -1034,6 +1276,10 @@ body.modern-homepage-active {
   background: var(--mh-paper);
   border-radius: 28px;
 }
+
+/* Must beat .mh-focus-detail { display: flex } above — otherwise the mobile
+   accordion card also paints on desktop and duplicates the aside panel. */
+.mh-focus-detail.mh-focus-detail--inline { display: none; }
 
 .mh-focus-detail .mh-primary-button {
   align-self: flex-start;
@@ -1406,6 +1652,7 @@ body.modern-homepage-active {
 .mh-karma-mark b { right: 11px; bottom: 15px; }
 
 .mh-discover__calendar { min-width: 0; }
+.mh-discover__calendar .mh-eyebrow { color: var(--mh-gold-soft); }
 .mh-discover__calendar .mh-section-heading > p:last-child { color: rgba(255, 248, 238, 0.54); }
 .mh-discovery-list { margin-top: 34px; border-top: 1px solid rgba(255, 255, 255, 0.15); }
 .mh-discovery-list button { width: 100%; min-width: 0; display: grid; grid-template-columns: 36px minmax(0, 1fr) 24px; gap: 18px; align-items: center; padding: 20px 0; color: var(--color-header-text); background: transparent; border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.15); text-align: left; cursor: pointer; }
@@ -2510,34 +2757,45 @@ body.modern-homepage-active {
 }
 @keyframes mh-karma-turn { to { transform: rotate(360deg); } }
 
+/* Tablet + compact desktop: kill full-viewport chapter voids and wide minmax grids */
 @media (max-width: 1250px) {
+  /* Keep page as the scrollport so the footer stays reachable; only kill chapter voids */
+  body.modern-homepage-active { overflow: hidden; }
+  .mh-page {
+    height: 100svh;
+    overflow: hidden;
+  }
+  .mh-hero { overflow-x: clip; }
+  .mh-page .ar-modern-nav-shell--pin { height: 72px; }
+  .mh-page .ar-modern-nav-shell--pin.ar-modern-nav-shell--with-native { height: 118px; }
+  .mh-nav { height: 72px; }
+  .mh-page--with-native .mh-nav { height: 118px; }
+  .mh-page--with-native .mh-nav__inner { height: 72px; }
   .mh-nav__links { display: none; }
   .mh-mobile-menu { display: block; }
-  .mh-hero { grid-template-columns: minmax(0, 1fr) minmax(360px, 0.7fr); gap: 54px; }
-  .mh-method,
-  .mh-tools { grid-template-columns: minmax(270px, 0.5fr) minmax(560px, 1.1fr); gap: 52px; }
-  .mh-clarity { grid-template-columns: minmax(280px, 0.55fr) minmax(580px, 1.2fr); gap: 50px; }
-  .mh-match { grid-template-columns: minmax(330px, 0.65fr) minmax(520px, 1fr); gap: 54px; }
-  .mh-day { grid-template-columns: minmax(0, 0.5fr) minmax(0, 1.15fr); gap: 52px; }
-  .mh-discover { grid-template-columns: minmax(330px, 0.75fr) minmax(0, 1fr); gap: 52px; }
-  .mh-journal { grid-template-columns: minmax(260px, 0.42fr) minmax(0, 1fr); gap: 50px; }
-  .mh-focus-layout { gap: 24px; }
-  .mh-app { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
-}
-
-@media (max-width: 980px) {
-  body.modern-homepage-active { overflow: auto; }
-  .mh-page { height: auto; min-height: 100svh; overflow: visible; }
-  .mh-page .ar-modern-nav-shell--pin { height: 64px; }
-  .mh-page .ar-modern-nav-shell--pin.ar-modern-nav-shell--with-native { height: 116px; }
-  .mh-nav { height: 64px; }
-  .mh-page--with-native .mh-nav { height: 116px; }
-  .mh-page--with-native .mh-nav__inner { height: 64px; }
-  .mh-nav__actions .mh-text-button { display: none; }
-  .mh-scroll { height: auto; overflow: visible; scroll-snap-type: none; }
-  .mh-page--with-native .mh-scroll { height: auto; }
-  .mh-chapter { min-height: auto; padding: 88px 34px; scroll-snap-align: none; }
-  .mh-page--with-native .mh-chapter { min-height: auto; }
+  .mh-scroll,
+  .mh-page--with-native .mh-scroll {
+    height: calc(100svh - 72px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-snap-type: none;
+    scroll-padding-top: 84px;
+  }
+  .mh-page--with-native .mh-scroll { height: calc(100svh - 118px); }
+  .mh-chapter,
+  .mh-page--with-native .mh-chapter {
+    min-height: auto;
+    padding: 56px clamp(24px, 4vw, 48px);
+    overflow: visible;
+    scroll-snap-align: none;
+    scroll-margin-top: 84px;
+  }
+  /* Footer must never stay invisible if reveal observer misses it */
+  .mh-footer .mh-reveal,
+  .mh-footer .mh-reveal > :is(.mh-eyebrow, h1, h2) {
+    opacity: 1 !important;
+    transform: none !important;
+  }
   .mh-hero,
   .mh-method,
   .mh-tools,
@@ -2548,34 +2806,210 @@ body.modern-homepage-active {
   .mh-journal,
   .mh-trust,
   .mh-app,
-  .mh-faq { grid-template-columns: 1fr; }
-  .mh-hero { min-height: calc(100svh - 64px); padding-top: 70px; gap: 70px; }
-  .mh-hero__copy { max-width: 780px; }
-  .mh-hero h1 { font-size: clamp(58px, 10vw, 90px); }
-  .mh-hero__visual { max-width: 560px; }
+  .mh-faq {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .mh-hero {
+    min-height: auto;
+    padding-top: 40px;
+    padding-bottom: 56px;
+    gap: 40px;
+  }
+  .mh-hero__copy { max-width: none; min-width: 0; }
+  .mh-hero h1 {
+    font-size: clamp(44px, 6vw, 68px);
+    max-width: none;
+    overflow-wrap: anywhere;
+  }
+  .mh-hero__lead { max-width: 46rem; }
+  .mh-hero__visual {
+    width: 100%;
+    max-width: none;
+    justify-self: stretch;
+  }
   .mh-scroll-cue { display: none; }
-  .mh-method__stage { min-height: 480px; }
-  .mh-focus-layout { grid-template-columns: 0.78fr 1fr; }
-  .mh-match__copy { max-width: 760px; }
-  .mh-match__visual { max-width: 760px; width: 100%; justify-self: center; }
+  .mh-method__stage { min-height: 360px; }
+  .mh-section-heading { max-width: none; width: 100%; }
+  .mh-section-heading h2,
+  .mh-app h2 {
+    font-size: clamp(40px, 5.2vw, 60px);
+  }
+  .mh-section-heading > p:last-child {
+    max-width: min(42rem, 100%);
+    margin-top: 18px;
+  }
+  /* Clarity: keep list + detail side-by-side on tablet */
+  .mh-focus-layout {
+    grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.9fr);
+    gap: 18px;
+    align-items: stretch;
+  }
+  .mh-focus-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mh-focus-row {
+    min-height: 64px;
+    grid-template-columns: 36px 1fr 22px;
+    padding-inline: 12px;
+  }
+  .mh-focus-row strong { font-size: clamp(18px, 2.4vw, 24px); }
+  .mh-focus-detail {
+    min-height: 0;
+    max-width: none;
+    padding: 24px 22px;
+    justify-content: flex-start;
+  }
+  .mh-focus-detail h3 { font-size: clamp(28px, 3.6vw, 36px); }
+  .mh-focus-detail .mh-primary-button { margin-top: 18px; }
+  .mh-match__copy,
+  .mh-match__visual,
+  .mh-discover__feature,
+  .mh-discover__calendar,
+  .mh-journal__heading,
+  .mh-trust__statement {
+    max-width: none;
+    width: 100%;
+  }
+  .mh-match__visual { justify-self: center; }
   .mh-day__content { width: 100%; }
-  .mh-tools-grid { grid-template-columns: repeat(2, 1fr); }
-  .mh-discover__feature { max-width: 760px; }
-  .mh-discover__calendar { max-width: 860px; }
-  .mh-journal__heading { max-width: 740px; }
+  .mh-day__links { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mh-day__links button { min-height: 148px; padding: 20px 18px; }
+  /* Tools: denser 2-up cards with horizontal content */
+  .mh-tools-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mh-tool-card {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    column-gap: 14px;
+    row-gap: 4px;
+    align-content: start;
+    padding: 20px 18px;
+  }
+  .mh-tool-card__index { grid-column: 2; }
+  .mh-tool-card__code {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    align-self: center;
+    width: 48px;
+    height: 48px;
+    margin: 0;
+    font-size: 13px;
+  }
+  .mh-tool-card strong,
+  .mh-tool-card p { grid-column: 2; }
+  .mh-tool-card strong { font-size: 19px; }
+  .mh-tool-card p {
+    max-width: none;
+    overflow-wrap: anywhere;
+  }
   .mh-journal__body { width: 100%; }
-  .mh-trust__statement { max-width: 760px; }
-  .mh-app { padding-bottom: 88px; }
-  .mh-app__visual { height: 620px; order: 3; }
+  .mh-article-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mh-article-card { min-height: 210px; }
+  .mh-voices__grid { grid-template-columns: 1fr 1fr; }
+  .mh-app { padding-bottom: 56px; gap: 24px; }
+  .mh-app__visual { height: 480px; order: 3; }
   .mh-app__visual img { height: 100%; }
-  .mh-final-cta { padding: 40px 0 0; border-left: 0; border-top: 1px solid var(--mh-line); }
-  .mh-footer { min-height: auto; padding: 78px 34px 30px; scroll-snap-align: none; }
-  .mh-footer__main { grid-template-columns: 1fr; gap: 58px; }
-  .mh-footer__brand { max-width: 680px; }
-  .mh-footer__nav { max-width: 720px; }
+  .mh-final-cta { padding: 28px 0 0; border-left: 0; border-top: 1px solid var(--mh-line); }
+  .mh-faq {
+    min-height: auto;
+    padding: 56px clamp(24px, 4vw, 48px);
+    scroll-snap-align: none;
+  }
+  .mh-faq__heading > p:last-child { max-width: min(40rem, 100%); }
+  .mh-footer {
+    min-height: auto;
+    padding: 56px clamp(24px, 4vw, 48px) 28px;
+    scroll-snap-align: none;
+  }
+  .mh-footer__main { grid-template-columns: 1fr; gap: 40px; }
+  .mh-footer__brand,
+  .mh-footer__nav { max-width: none; }
   .mh-footer__connect { align-items: flex-start; }
-  .mh-footer__bottom { grid-template-columns: auto 1fr auto; gap: 24px; }
-  .mh-faq { min-height: auto; padding: 88px 34px; scroll-snap-align: none; }
+  .mh-footer__bottom { grid-template-columns: auto 1fr auto; gap: 20px; }
+}
+
+/* Narrow tablet / large phone landscape */
+@media (max-width: 900px) {
+  .mh-nav__actions .mh-text-button { display: none; }
+  .mh-day__links button { min-height: 136px; }
+  .mh-focus-layout {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .mh-focus-list {
+    grid-template-columns: 1fr;
+    border: 0;
+  }
+  /* Accordion: open theme card directly under the tapped row */
+  .mh-focus-item {
+    display: block;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-bottom: 0;
+  }
+  .mh-focus-item:last-child { border-bottom: 1px solid rgba(255, 255, 255, 0.16); }
+  .mh-focus-item .mh-focus-row {
+    border: 0;
+    min-height: 64px;
+  }
+  .mh-focus-row i {
+    opacity: 0.45;
+    transform: none;
+  }
+  .mh-focus-row.is-active i {
+    opacity: 1;
+    transform: none;
+  }
+  .mh-focus-detail--aside { display: none; }
+  /* Same dual-class specificity as the desktop hide rule */
+  .mh-focus-detail.mh-focus-detail--inline {
+    display: flex;
+    min-height: 0;
+    margin: 0 12px 14px;
+    padding: 22px 20px;
+    border-radius: 18px;
+    justify-content: flex-start;
+  }
+  .mh-focus-detail.mh-focus-detail--inline .mh-primary-button { margin-top: 18px; }
+  .mh-focus-row strong { font-size: clamp(20px, 3.2vw, 26px); }
+  .mh-section-heading h2,
+  .mh-app h2 { font-size: clamp(36px, 5.8vw, 48px); }
+  .mh-section-heading > p:last-child { max-width: none; }
+  /* Keep 2-up tool cards on portrait tablets so width is used */
+  .mh-tools-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mh-tool-card {
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-areas:
+      "code index"
+      "code title"
+      "code desc";
+    column-gap: 12px;
+    row-gap: 2px;
+    align-content: start;
+    padding: 18px 16px;
+  }
+  .mh-tool-card__index { grid-area: index; }
+  .mh-tool-card__code {
+    grid-area: code;
+    grid-row: 1 / span 3;
+    align-self: center;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    font-size: 12px;
+  }
+  .mh-tool-card strong {
+    grid-area: title;
+    font-size: 18px;
+  }
+  .mh-tool-card p {
+    grid-area: desc;
+    margin: 0;
+    font-size: 12px;
+    max-width: none;
+  }
+  .mh-tool-card i { display: none; }
+  .mh-article-grid { grid-template-columns: 1fr 1fr; }
+  .mh-voices__grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
@@ -2599,8 +3033,16 @@ body.modern-homepage-active {
   .mh-chart-shell { padding: 10px; border-radius: 22px; }
   .mh-transit-ring { border-radius: 16px; }
   .mh-chart-meta { padding: 5px 5px 11px; }
-  .mh-chart-readout { padding: 12px 5px 4px; }
-  .mh-chart-readout div:last-child { display: none; }
+  .mh-chart-readout { padding: 8px 5px 0; }
+  .mh-chart-readout > strong { display: none; }
+  .mh-chart-controls { align-items: flex-start; flex-wrap: wrap; gap: 6px 12px; padding-top: 6px; }
+  .mh-chart-switch,
+  .mh-chart-controls:not(:has(.mh-chart-date)) .mh-chart-switch {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    justify-content: space-between;
+    margin-left: 0;
+  }
   .mh-section-heading h2,
   .mh-app h2 { font-size: clamp(48px, 13vw, 64px); }
   .mh-section-heading > p:last-child { margin-top: 22px; }
@@ -2613,9 +3055,14 @@ body.modern-homepage-active {
   .mh-method__stat { text-align: left; }
   .mh-focus-layout { grid-template-columns: 1fr; }
   .mh-focus-list { grid-template-columns: 1fr; }
-  .mh-focus-row { min-height: 70px; }
-  .mh-focus-row strong { font-size: 24px; }
-  .mh-focus-detail { min-height: 390px; padding: 28px; border-radius: 22px; }
+  .mh-focus-row { min-height: 66px; }
+  .mh-focus-row strong { font-size: 22px; }
+  .mh-focus-detail--inline {
+    min-height: 0;
+    margin: 0 10px 12px;
+    padding: 20px 18px;
+    border-radius: 16px;
+  }
   .mh-match h2,
   .mh-faq h2 { font-size: clamp(48px, 13vw, 64px); }
   .mh-match__visual { min-height: 360px; }

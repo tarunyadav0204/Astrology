@@ -117,6 +117,7 @@ export default function ParashariDeskMobile({
   onHouseSelect,
   onOpenTool,
   onChangeNative,
+  onRequireLicense,
   initialHubTab,
   calculationProfile,
   onCalculationProfileChange,
@@ -124,6 +125,7 @@ export default function ParashariDeskMobile({
   lifeTabEnabled = false,
   topicId = 'whole_chart',
   onTopicChange,
+  licenseLocked = false,
 }) {
   const navigate = useNavigate();
   const effectiveChartData = viewChartData || chartData;
@@ -314,7 +316,7 @@ export default function ParashariDeskMobile({
           {calculationProfileLoading ? <i>Updating…</i> : null}
         </div>
 
-        <DeskTopicSelector value={topicId} onChange={onTopicChange} compact />
+        <DeskTopicSelector value={topicId} onChange={onTopicChange} compact licenseLocked={licenseLocked} />
 
         <nav className="pdm__hub" aria-label="Desk sections" style={{ gridTemplateColumns: `repeat(${hubTabs.length}, 1fr)` }}>
           {hubTabs.map((tab) => (
@@ -322,10 +324,17 @@ export default function ParashariDeskMobile({
               key={tab.id}
               type="button"
               className={hubTab === tab.id ? 'is-active' : ''}
-              onClick={() => setHubTab(tab.id)}
+              onClick={() => {
+                if (tab.id === 'act' && licenseLocked) {
+                  onRequireLicense?.();
+                  return;
+                }
+                setHubTab(tab.id);
+              }}
             >
               {tab.label}
-              {tab.id === 'act' && activationNowCount ? <em>{activationNowCount}</em> : null}
+              {tab.id === 'act' && licenseLocked ? <i className="pdm__hub-lock">License</i> : null}
+              {tab.id === 'act' && !licenseLocked && activationNowCount ? <em>{activationNowCount}</em> : null}
             </button>
           ))}
         </nav>
@@ -352,6 +361,8 @@ export default function ParashariDeskMobile({
                   onToggle={onShowChartActivationsChange}
                   loading={activationLoading}
                   compact
+                  locked={licenseLocked}
+                  onLocked={onRequireLicense}
                 />
                 {chartPill === 'lagna' ? (
                   <button type="button" className="pdm__overview-chip" onClick={openOverview}>

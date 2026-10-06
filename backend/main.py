@@ -3549,11 +3549,17 @@ async def analyze_transits(request: TransitRequest):
 
 
 @app.get("/api/public/current-sky")
-async def get_public_current_sky():
-    """Live Lahiri sidereal positions for public, non-personalized displays."""
+async def get_public_current_sky(at: Optional[str] = Query(default=None)):
+    """Lahiri sidereal positions for now, or for an ISO-8601 instant in `at`."""
+    moment = None
+    if at:
+        try:
+            moment = datetime.fromisoformat(at.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="at must be an ISO-8601 datetime")
     try:
         return JSONResponse(
-            content=calculate_current_sky(),
+            content=calculate_current_sky(moment),
             headers={
                 "Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
             },

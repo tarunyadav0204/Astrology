@@ -146,8 +146,10 @@
       "fair_or_light_complexion": "fair or light complexion",
       "warm_reddish_complexion": "warm reddish complexion",
       "olive_or_dusky_complexion": "olive or dusky complexion",
+      "olive_or_wheatish_complexion": "olive or wheatish complexion",
       "fair_or_light_golden_complexion": "fair or light golden complexion",
       "brown_or_dusky_complexion": "brown or dusky complexion",
+      "medium_brown_complexion_with_warm_undertone": "medium brown complexion with warm undertone",
       "dark_complexion": "dark complexion"
     },
     "channels": {

@@ -3,8 +3,9 @@ import './AuthModalShell.css';
 
 /**
  * Mobile-safe auth dialog: scrollable body, sticky close so × stays visible on tall forms.
+ * @param {boolean} [themed] Use AstroRoshni design-token styling (not limited to the homepage).
  */
-export default function AuthModalShell({ isOpen, onClose, children }) {
+export default function AuthModalShell({ isOpen, onClose, children, themed = false }) {
     useEffect(() => {
         if (!isOpen) return undefined;
         const prev = document.body.style.overflow;
@@ -18,7 +19,7 @@ export default function AuthModalShell({ isOpen, onClose, children }) {
 
     return (
         <div
-            className="auth-modal-shell"
+            className={themed ? 'auth-modal-shell auth-modal-shell--themed' : 'auth-modal-shell'}
             role="presentation"
             onClick={onClose}
         >

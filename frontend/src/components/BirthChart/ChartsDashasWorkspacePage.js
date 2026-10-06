@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import SEOHead from '../SEO/SEOHead';
 import ChartWidget from '../Charts/ChartWidget';
@@ -35,11 +35,21 @@ import './ChartsDashasWorkspacePage.css';
 
 // The four-chart workstation needs genuine desktop width. Tablet portrait and
 // compact landscape use the focused hub instead of shrinking the workstation.
+const LICENSE_NOTICES = {
+  draw: {
+    title: 'Drawing is a professional tool.',
+    body: 'Marking charts, dashas and notes on the desk is included with an active Astrologer License.',
+  },
+  activations: {
+    title: 'Activations are a professional tool.',
+    body: 'The activation desk and the chart marks are included with an active Astrologer License.',
+  },
+};
+
 const MOBILE_DESK_MQ = '(max-width: 1180px)';
 const PARASHARI_PROFILE_KEY = 'astroroshni_parashari_view_profile_v1';
 const PARASHARI_SPLIT_KEY = 'astroroshni_parashari_desk_split_v1';
 const PARASHARI_COMPARE_CHART_KEY = 'astroroshni_parashari_compare_chart_v1';
-const PARASHARI_TOPIC_KEY = 'astroroshni_parashari_topic_v1';
 const DEFAULT_CHART_ROW_PERCENT = 54;
 const MIN_CHART_ROW_PERCENT = 30;
 const MAX_CHART_ROW_PERCENT = 76;
@@ -145,11 +155,6 @@ function loadCompareChart() {
   return COMPARE_CHART_VALUES.has(normalized) ? normalized : 10;
 }
 
-function loadTopicLens() {
-  if (typeof window === 'undefined') return 'whole_chart';
-  return window.localStorage.getItem(PARASHARI_TOPIC_KEY) || 'whole_chart';
-}
-
 const STRENGTH_TOOLS = [
   { id: 'shadbala', label: 'SB', title: 'Shadbala' },
   { id: 'ashtakavarga', label: 'AV', title: 'Ashtakavarga' },
@@ -227,7 +232,7 @@ const ChartsDashasWorkspacePage = ({
   const [searchParams] = useSearchParams();
   const isMobileDesk = useMobileDesk();
   const { birthData, chartData, setBirthData } = useAstrology();
-  const { features } = useCredits();
+  const { features, isAstrologerLicensed, loading: creditsLoading } = useCredits();
   const lifeTabEnabled = Boolean(features?.classical_life_tab_enabled);
   const [showBirthModal, setShowBirthModal] = useState(false);
   const [birthModalTab, setBirthModalTab] = useState('saved');
@@ -235,7 +240,9 @@ const ChartsDashasWorkspacePage = ({
   const [asOfDate, setAsOfDate] = useState(new Date());
   /** number (D2–D60) or 'karkamsa' | 'swamsa' */
   const [selectedDx, setSelectedDx] = useState(loadCompareChart);
-  const [topicId, setTopicId] = useState(loadTopicLens);
+  // Topic lenses are an explicit study mode. Always enter the workspace on
+  // the complete chart instead of restoring a previously opened lens.
+  const [topicId, setTopicId] = useState('whole_chart');
   const [comparePickerOpen, setComparePickerOpen] = useState(false);
   const [dashaSystem, setDashaSystem] = useState('vimshottari');
   const [activationLedger, setActivationLedger] = useState(null);
@@ -250,6 +257,7 @@ const ChartsDashasWorkspacePage = ({
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [houseSheetOpen, setHouseSheetOpen] = useState(false);
   const [drawingActive, setDrawingActive] = useState(false);
+  const [licensePrompt, setLicensePrompt] = useState(null);
   const [viewProfile, setViewProfile] = useState(loadParashariProfile);
   const [appliedViewProfile, setAppliedViewProfile] = useState(DEFAULT_PARASHARI_PROFILE);
   const [viewChartData, setViewChartData] = useState(null);
@@ -279,7 +287,18 @@ const ChartsDashasWorkspacePage = ({
     isMobileDesk ? 'compact' : 'desktop',
   ].join('|');
 
+  const astrologerLocked = !creditsLoading && !isAstrologerLicensed;
+  useEffect(() => {
+    if (astrologerLocked) setActivationsFocus(false);
+  }, [astrologerLocked]);
   const openDrawingBoard = () => {
+    if (creditsLoading) return;
+    if (!isAstrologerLicensed) {
+      setDrawingActive(false);
+      setLicensePrompt('draw');
+      return;
+    }
+    setLicensePrompt(null);
     setComparePickerOpen(false);
     setOverviewOpen(false);
     setHouseSheetOpen(false);
@@ -300,10 +319,6 @@ const ChartsDashasWorkspacePage = ({
       window.localStorage.setItem(PARASHARI_COMPARE_CHART_KEY, String(selectedDx));
     }
   }, [selectedDx]);
-
-  useEffect(() => {
-    window.localStorage.setItem(PARASHARI_TOPIC_KEY, topicId);
-  }, [topicId]);
 
   const changeTopic = (nextTopic, definition = null) => {
     setTopicId(nextTopic);
@@ -449,7 +464,7 @@ const ChartsDashasWorkspacePage = ({
 
   useEffect(() => {
     let cancelled = false;
-    if (!user || !birthData || !chartData) {
+    if (!user || !birthData || !chartData || creditsLoading || !isAstrologerLicensed) {
       setActivationLedger(null);
       setActivationError(null);
       setActivationLoading(false);
@@ -483,7 +498,7 @@ const ChartsDashasWorkspacePage = ({
       }
     });
     return () => { cancelled = true; };
-  }, [birthData, chartData, user, asOfDate, effectiveViewProfile]);
+  }, [birthData, chartData, user, asOfDate, effectiveViewProfile, creditsLoading, isAstrologerLicensed]);
 
   const activationNowCount = useMemo(() => {
     const rows = activationLedger?.house_activations || [];
@@ -602,12 +617,23 @@ const ChartsDashasWorkspacePage = ({
           <button
             type="button"
             className={`parashari-desk-chip parashari-desk-chip--activations${activationsFocus ? ' is-active' : ''}`}
-            onClick={() => setActivationsFocus((open) => !open)}
-            title={activationsFocus ? 'Close activations focus (Esc)' : 'Open activations with D1, D9, Transit and dashas'}
+            onClick={() => {
+              if (creditsLoading) return;
+              if (!isAstrologerLicensed) {
+                setActivationsFocus(false);
+                setLicensePrompt('activations');
+                return;
+              }
+              setActivationsFocus((open) => !open);
+            }}
+            title={astrologerLocked
+              ? 'Activations require an Astrologer License.'
+              : (activationsFocus ? 'Close activations focus (Esc)' : 'Open activations with D1, D9, Transit and dashas')}
             aria-pressed={activationsFocus}
           >
             {activationsFocus ? 'Close activations' : 'Activations'}
-            {!activationsFocus && activationNowCount ? <em>{activationNowCount}</em> : null}
+            {astrologerLocked ? <i className="parashari-desk-chip__lock">License</i> : null}
+            {!astrologerLocked && !activationsFocus && activationNowCount ? <em>{activationNowCount}</em> : null}
           </button>
           <button type="button" className="parashari-desk-chip" onClick={() => navigate('/charts-dashas/kp')}>
             KP Desk
@@ -639,9 +665,10 @@ const ChartsDashasWorkspacePage = ({
               className={`parashari-desk-chip parashari-desk-chip--draw${drawingActive ? ' is-active' : ''}`}
               onClick={openDrawingBoard}
               aria-pressed={drawingActive}
-              title="Draw across charts, dashas and analysis"
+              title={astrologerLocked ? 'Drawing requires an Astrologer License.' : 'Draw across charts, dashas and analysis'}
             >
               <span aria-hidden="true">✎</span> Draw
+              {astrologerLocked ? <i className="parashari-desk-chip__lock">License</i> : null}
             </button>
           ) : null}
         </div>
@@ -707,10 +734,12 @@ const ChartsDashasWorkspacePage = ({
           onHouseSelect={handleHouseSelect}
           onOpenTool={setActiveTool}
           onChangeNative={() => openBirthModal('saved')}
+          onRequireLicense={() => setLicensePrompt('activations')}
           initialHubTab={searchParams.get('tab')}
           lifeTabEnabled={lifeTabEnabled}
           topicId={topicId}
           onTopicChange={changeTopic}
+          licenseLocked={!creditsLoading && !isAstrologerLicensed}
         />
       ) : (
         <div className="parashari-desk-body">
@@ -718,7 +747,7 @@ const ChartsDashasWorkspacePage = ({
           <div className={`parashari-desk-tools${activationsFocus ? ' is-act-focus' : ''}`}>
             <div className="parashari-desk-tools__settings">
               <span className="parashari-desk-tools__category">Viewing</span>
-              <DeskTopicSelector value={topicId} onChange={changeTopic} />
+              <DeskTopicSelector value={topicId} onChange={changeTopic} licenseLocked={!creditsLoading && !isAstrologerLicensed} />
               <div className="parashari-view-profile" aria-label="Chart viewing standard">
                 <span>Calculation standard</span>
                 <select
@@ -744,6 +773,8 @@ const ChartsDashasWorkspacePage = ({
                 enabled={showChartActivations}
                 onToggle={setShowChartActivations}
                 loading={activationLoading}
+                locked={astrologerLocked}
+                onLocked={() => setLicensePrompt('activations')}
               />
             </div>
             <div className="parashari-desk-tools__foundations">
@@ -1130,9 +1161,14 @@ const ChartsDashasWorkspacePage = ({
                           role="tab"
                           aria-selected={analysisTab === 'life'}
                           className={analysisTab === 'life' ? 'is-active' : ''}
-                          onClick={() => setAnalysisTab('life')}
+                          onClick={() => {
+                            setAnalysisTab('life');
+                            setAnalysisExpanded(true);
+                          }}
+                          title={astrologerLocked ? 'Life reading requires an Astrologer License.' : 'Classical natal life reading'}
                         >
                           Life
+                          {astrologerLocked ? <i className="parashari-desk-analysis__tab-lock">License</i> : null}
                         </button>
                       ) : null}
                       <button
@@ -1204,6 +1240,8 @@ const ChartsDashasWorkspacePage = ({
                       calculationProfile={effectiveViewProfile}
                       onInspectDate={setAsOfDate}
                       compact={!analysisExpanded}
+                      preview={!analysisExpanded}
+                      onOpenFull={() => setAnalysisExpanded(true)}
                     />
                   ) : analysisTab === 'house' ? (
                     <>
@@ -1249,6 +1287,8 @@ const ChartsDashasWorkspacePage = ({
                       birthData={birthData}
                       chartData={renderedChartData}
                       variant={analysisExpanded ? 'expanded' : 'compact'}
+                      preview={!analysisExpanded}
+                      onOpenFull={() => setAnalysisExpanded(true)}
                     />
                   ) : analysisTab === 'yogas' ? (
                     <DeskYogasPanel birthData={birthData} chartData={renderedChartData} calculationProfile={effectiveViewProfile} />
@@ -1322,13 +1362,36 @@ const ChartsDashasWorkspacePage = ({
         />
       ) : null}
 
-      {user && hasChart ? (
+      {user && hasChart && isAstrologerLicensed ? (
         <DeskDrawingBoard
           active={drawingActive}
           onActiveChange={setDrawingActive}
           drawingKey={drawingKey}
           showLauncher={isMobileDesk}
         />
+      ) : null}
+      {user && hasChart && isMobileDesk && astrologerLocked ? (
+        <button
+          type="button"
+          className="desk-drawing-launcher"
+          onClick={() => setLicensePrompt('draw')}
+          aria-label="Draw on the desk"
+          title="Drawing requires an Astrologer License."
+        >
+          ✎
+        </button>
+      ) : null}
+      {licensePrompt && LICENSE_NOTICES[licensePrompt] ? (
+        <div className="parashari-desk-license" role="dialog" aria-labelledby="desk-license-title">
+          <button type="button" className="parashari-desk-license__backdrop" aria-label="Close" onClick={() => setLicensePrompt(null)} />
+          <div className="parashari-desk-license__card">
+            <em>Astrologer License</em>
+            <h2 id="desk-license-title">{LICENSE_NOTICES[licensePrompt].title}</h2>
+            <p>{LICENSE_NOTICES[licensePrompt].body}</p>
+            <Link to="/subscription?family=astrologer">View the Astrologer License</Link>
+            <button type="button" onClick={() => setLicensePrompt(null)}>Close</button>
+          </div>
+        </div>
       ) : null}
     </div>
   );

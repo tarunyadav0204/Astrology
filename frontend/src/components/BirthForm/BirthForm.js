@@ -16,6 +16,7 @@ const BirthForm = ({
   pickModeTitle,
   pickModeDescription,
   prefilledData,
+  submitLabel,
   showCloseButton,
   onClose,
   defaultActiveTab = 'saved',
@@ -622,7 +623,7 @@ const BirthForm = ({
             type="submit"
             disabled={!formData.latitude || !formData.longitude || formData.latitude === null || formData.longitude === null}
           >
-            {editingChart ? 'Update Chart' : prefilledData ? 'Generate Marriage Analysis' : 'Calculate Birth Chart'}
+            {editingChart ? 'Update Chart' : (submitLabel || 'Create Birth Chart')}
           </Button>
           {editingChart && (
             <Button type="button" onClick={cancelEdit} className="birth-form-button--secondary">

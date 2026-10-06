@@ -1,13 +1,18 @@
-import { gtag } from 'gtag';
 import { initMetaPixel, trackMetaPixelEvent, trackMetaPixelPageView } from '../services/metaPixel';
 
 // Replace with your actual Google Analytics 4 Measurement ID
 const GA_MEASUREMENT_ID = process.env.REACT_APP_GA_MEASUREMENT_ID || 'G-XXXXXXXXXX';
 
+const callGtag = (...args) => {
+  if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+    window.gtag(...args);
+  }
+};
+
 // Initialize Google Analytics + Meta Pixel
 export const initGA = () => {
   if (typeof window !== 'undefined' && GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX') {
-    gtag('config', GA_MEASUREMENT_ID, {
+    callGtag('config', GA_MEASUREMENT_ID, {
       page_title: document.title,
       page_location: window.location.href,
     });
@@ -18,7 +23,7 @@ export const initGA = () => {
 // Track page views
 export const trackPageView = (path, title) => {
   if (typeof window !== 'undefined' && GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX') {
-    gtag('config', GA_MEASUREMENT_ID, {
+    callGtag('config', GA_MEASUREMENT_ID, {
       page_path: path,
       page_title: title,
     });
@@ -29,7 +34,7 @@ export const trackPageView = (path, title) => {
 // Track custom events
 export const trackEvent = (action, category, label, value) => {
   if (typeof window !== 'undefined' && GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX') {
-    gtag('event', action, {
+    callGtag('event', action, {
       event_category: category,
       event_label: label,
       value: value,
@@ -44,11 +49,18 @@ export const trackEvent = (action, category, label, value) => {
     action === 'horoscope_viewed' ||
     action === 'analysis_requested' ||
     action === 'panchang_viewed' ||
-    action === 'chart_generated'
+    action === 'chart_generated' ||
+    action === 'festival_page_viewed'
   ) {
     trackMetaPixelEvent('ViewContent', {
       content_name: action,
       content_category: category || 'astrology',
+      content_ids: [String(label || action)],
+    });
+  } else if (action === 'festival_cta_ask_tara' || action === 'festival_cta_create_kundli') {
+    trackMetaPixelEvent('Lead', {
+      content_name: action,
+      content_category: category || 'conversion',
       content_ids: [String(label || action)],
     });
   } else if (action === 'muhurat_searched') {
@@ -68,6 +80,8 @@ export const trackAstrologyEvent = {
   muhuratSearched: (muhuratType) => trackEvent('muhurat_searched', 'astrology', muhuratType),
   panchangViewed: (date) => trackEvent('panchang_viewed', 'astrology', date),
   analysisRequested: (analysisType) => trackEvent('analysis_requested', 'astrology', analysisType),
+  festivalPageViewed: (date) => trackEvent('festival_page_viewed', 'astrology', date),
+  festivalCta: (cta, label) => trackEvent(`festival_cta_${cta}`, 'conversion', label),
   userRegistered: () => trackEvent('sign_up', 'engagement', 'user_registration'),
   userLoggedIn: () => trackEvent('login', 'engagement', 'user_login'),
   consultationRequested: () => trackEvent('consultation_requested', 'conversion', 'astrologer_consultation'),

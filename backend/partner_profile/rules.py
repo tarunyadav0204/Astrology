@@ -105,7 +105,10 @@ PLANET_RULES: Dict[str, Dict[str, Any]] = {
         "verse": "3.25",
     },
     "Mercury": {
-        "appearance": _signals(complexion="olive or dusky complexion", build="well-proportioned and youthful", presence="attractive and animated"),
+        # BPHS 3.16 gives Budha a harita (grass-green) tone. "Olive or wheatish"
+        # keeps that green-olive quality without collapsing Mercury into Venus's
+        # warm-fair śyāva phrasing.
+        "appearance": _signals(complexion="olive or wheatish complexion", build="well-proportioned and youthful", presence="attractive and animated"),
         "appearance_verses": {"complexion": "3.16"},
         "personality": ["witty", "adaptable", "articulate", "playful"],
         "source_id": "bphs.graha_forms",
@@ -119,8 +122,21 @@ PLANET_RULES: Dict[str, Dict[str, Any]] = {
         "verse": "3.27",
     },
     "Venus": {
-        "appearance": _signals(complexion="brown or dusky complexion", build="graceful and well-proportioned", eyes="pleasing and expressive", head_hair="curly hair", presence="polished and attractive"),
-        "appearance_verses": {"complexion": "3.17"},
+        # BPHS 3.17 calls Śukra śyāva (brown/tawny), not kṛṣṇa (Saturn's dark).
+        # "Medium brown" was over-reading that word into a deep skin tone that
+        # image models and users treat as dark. Render śyāva as a warm fair
+        # base with soft brown undertone — lighter than Mercury's wheatish and
+        # Saturn's dark, warmer than Moon/Jupiter's plain fair.
+        # BPHS 3.28 vakramūrdhaja is curly/wavy hair; keep it soft so the
+        # image model does not force tight curls on every Venus-led portrait.
+        "appearance": _signals(
+            complexion="warm fair complexion with soft brown undertone",
+            build="graceful and well-proportioned",
+            eyes="pleasing and expressive",
+            head_hair="soft wavy or gently curled hair",
+            presence="polished and attractive",
+        ),
+        "appearance_verses": {"complexion": "3.17", "head_hair": "3.28"},
         "personality": ["refined", "creative", "affectionate", "socially graceful"],
         "source_id": "bphs.graha_forms",
         "verse": "3.28",

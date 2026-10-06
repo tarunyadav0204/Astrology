@@ -1,0 +1,3345 @@
+{
+  "schema_version": "deva-keralam-completion-ledger/1.0.0",
+  "edition_key": "deva_keralam_volume_1_scan",
+  "stream_key": "deva_keralam_completion_d_v1",
+  "catalog_ordinal_start": 1,
+  "catalog_ordinal_end": 293,
+  "source_snapshot_count": 878,
+  "rows": [
+    {
+      "catalogue_ordinal": 1,
+      "passage_key": "DK1.OCR.P0026.V0001-0002",
+      "pdf_page": 26,
+      "verse_start": 1,
+      "verse_end": 2,
+      "disposition": "corrupt_or_disputed",
+      "candidate_keys": [],
+      "reason": "The extraction and source notes retain a textual dispute that prevents a stable executable condition.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 2,
+      "passage_key": "DK1.OCR.P0026.V0003-0003",
+      "pdf_page": 26,
+      "verse_start": 3,
+      "verse_end": 3,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 3,
+      "passage_key": "DK1.OCR.P0026.V0004-0005",
+      "pdf_page": 26,
+      "verse_start": 4,
+      "verse_end": 5,
+      "disposition": "corrupt_or_disputed",
+      "candidate_keys": [],
+      "reason": "The retained text or edition notes contain a missing, contradictory or damaged condition.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 4,
+      "passage_key": "DK1.OCR.P0026.V0006-0007",
+      "pdf_page": 26,
+      "verse_start": 6,
+      "verse_end": 7,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 5,
+      "passage_key": "DK1.OCR.P0027.V0014-0016",
+      "pdf_page": 27,
+      "verse_start": 14,
+      "verse_end": 16,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 6,
+      "passage_key": "DK1.OCR.P0028.V0017-0018",
+      "pdf_page": 28,
+      "verse_start": 17,
+      "verse_end": 18,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 7,
+      "passage_key": "DK1.OCR.P0028.V0019-0019",
+      "pdf_page": 28,
+      "verse_start": 19,
+      "verse_end": 19,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 8,
+      "passage_key": "DK1.OCR.P0028.V0020-0020",
+      "pdf_page": 28,
+      "verse_start": 20,
+      "verse_end": 20,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 9,
+      "passage_key": "DK1.OCR.P0029.V0023-0023",
+      "pdf_page": 29,
+      "verse_start": 23,
+      "verse_end": 23,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 10,
+      "passage_key": "DK1.OCR.P0029.V0024-0024",
+      "pdf_page": 29,
+      "verse_start": 24,
+      "verse_end": 24,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 11,
+      "passage_key": "DK1.OCR.P0029.V0025-0025",
+      "pdf_page": 29,
+      "verse_start": 25,
+      "verse_end": 25,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 12,
+      "passage_key": "DK1.OCR.P0029.V0026-0026",
+      "pdf_page": 29,
+      "verse_start": 26,
+      "verse_end": 26,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 13,
+      "passage_key": "DK1.OCR.P0029.V0027-0027",
+      "pdf_page": 29,
+      "verse_start": 27,
+      "verse_end": 27,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 14,
+      "passage_key": "DK1.OCR.P0029.V0028-0028",
+      "pdf_page": 29,
+      "verse_start": 28,
+      "verse_end": 28,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 15,
+      "passage_key": "DK1.OCR.P0029.V0029-0029",
+      "pdf_page": 29,
+      "verse_start": 29,
+      "verse_end": 29,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 16,
+      "passage_key": "DK1.OCR.P0029.V0030-0030",
+      "pdf_page": 29,
+      "verse_start": 30,
+      "verse_end": 30,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 17,
+      "passage_key": "DK1.OCR.P0030.V0031-0034",
+      "pdf_page": 30,
+      "verse_start": 31,
+      "verse_end": 34,
+      "disposition": "commentary_only",
+      "candidate_keys": [],
+      "reason": "The unit is editorial, remedial or mundane commentary rather than a supported personal natal rule.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 18,
+      "passage_key": "DK1.OCR.P0030.V0035-0035",
+      "pdf_page": 30,
+      "verse_start": 35,
+      "verse_end": 35,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 19,
+      "passage_key": "DK1.OCR.P0030.V0036-0036",
+      "pdf_page": 30,
+      "verse_start": 36,
+      "verse_end": 36,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 20,
+      "passage_key": "DK1.OCR.P0030.V0038-0038",
+      "pdf_page": 30,
+      "verse_start": 38,
+      "verse_end": 38,
+      "disposition": "duplicate",
+      "candidate_keys": [],
+      "reason": "The source unit is a repetition or cross-reference and adds no independent executable judgment.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 21,
+      "passage_key": "DK1.OCR.P0030.V0039-0039",
+      "pdf_page": 30,
+      "verse_start": 39,
+      "verse_end": 39,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 22,
+      "passage_key": "DK1.OCR.P0030.V0040-0040",
+      "pdf_page": 30,
+      "verse_start": 40,
+      "verse_end": 40,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 23,
+      "passage_key": "DK1.OCR.P0030.V0041-0041",
+      "pdf_page": 30,
+      "verse_start": 41,
+      "verse_end": 41,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 24,
+      "passage_key": "DK1.OCR.P0031.V0042-0042",
+      "pdf_page": 31,
+      "verse_start": 42,
+      "verse_end": 42,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 25,
+      "passage_key": "DK1.OCR.P0031.V0043-0043",
+      "pdf_page": 31,
+      "verse_start": 43,
+      "verse_end": 43,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 26,
+      "passage_key": "DK1.OCR.P0031.V0044-0044",
+      "pdf_page": 31,
+      "verse_start": 44,
+      "verse_end": 44,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 27,
+      "passage_key": "DK1.OCR.P0031.V0045-0045",
+      "pdf_page": 31,
+      "verse_start": 45,
+      "verse_end": 45,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 28,
+      "passage_key": "DK1.OCR.P0031.V0046-0046",
+      "pdf_page": 31,
+      "verse_start": 46,
+      "verse_end": 46,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 29,
+      "passage_key": "DK1.OCR.P0031.V0047-0048",
+      "pdf_page": 31,
+      "verse_start": 47,
+      "verse_end": 48,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 30,
+      "passage_key": "DK1.OCR.P0032.V0049-0050",
+      "pdf_page": 32,
+      "verse_start": 49,
+      "verse_end": 50,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 31,
+      "passage_key": "DK1.OCR.P0032.V0051-0052",
+      "pdf_page": 32,
+      "verse_start": 51,
+      "verse_end": 52,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 32,
+      "passage_key": "DK1.OCR.P0032.V0053-0053",
+      "pdf_page": 32,
+      "verse_start": 53,
+      "verse_end": 53,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 33,
+      "passage_key": "DK1.OCR.P0032.V0054-0055",
+      "pdf_page": 32,
+      "verse_start": 54,
+      "verse_end": 55,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.1.54-55.PRABHAA_FORMER_DESCRIPTION"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 34,
+      "passage_key": "DK1.OCR.P0033.V0056-0056",
+      "pdf_page": 33,
+      "verse_start": 56,
+      "verse_end": 56,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.1.56.PRABHAA_COBORNS_TAURUS_AQUARIUS"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 35,
+      "passage_key": "DK1.OCR.P0033.V0057-0057",
+      "pdf_page": 33,
+      "verse_start": 57,
+      "verse_end": 57,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.1.57.PRABHAA_FORMER_FAMILY"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 36,
+      "passage_key": "DK1.OCR.P0033.V0058-0058",
+      "pdf_page": 33,
+      "verse_start": 58,
+      "verse_end": 58,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.1.58.PRABHAA_FORMER_ELDER_BROTHER",
+        "DK.1.58.PRABHAA_LATTER_PARENTS"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 37,
+      "passage_key": "DK1.OCR.P0033.V0059-0060",
+      "pdf_page": 33,
+      "verse_start": 59,
+      "verse_end": 60,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.1.59-60.PRABHAA_LATTER_HOME_PROSPERITY",
+        "DK.1.59-60.FORMER.TIMING"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 38,
+      "passage_key": "DK1.OCR.P0034.V0076-0077",
+      "pdf_page": 34,
+      "verse_start": 76,
+      "verse_end": 77,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.1.76.THIRD_LORD_NAVAMSA_DIGNITY",
+        "DK.1.77.SISTER_CHILDREN"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 39,
+      "passage_key": "DK1.OCR.P0035.V0010-0010",
+      "pdf_page": 35,
+      "verse_start": 10,
+      "verse_end": 10,
+      "disposition": "corrupt_or_disputed",
+      "candidate_keys": [],
+      "reason": "The retained text or edition notes contain a missing, contradictory or damaged condition.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 40,
+      "passage_key": "DK1.OCR.P0035.V0078-0078",
+      "pdf_page": 35,
+      "verse_start": 78,
+      "verse_end": 78,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.1.78.PRABHAA_FORMER_RELATIVE_SUPPORT",
+        "DK.1.78.PRABHAA_LATTER_SISTERS"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 41,
+      "passage_key": "DK1.OCR.P0035.V0081-0083",
+      "pdf_page": 35,
+      "verse_start": 81,
+      "verse_end": 83,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.1.81-84.MOTHER"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 42,
+      "passage_key": "DK1.OCR.P0035.V0085-0087",
+      "pdf_page": 35,
+      "verse_start": 85,
+      "verse_end": 87,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.1.85-87.THIRD_DASHA"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 43,
+      "passage_key": "DK1.OCR.P0036.V0088-0092",
+      "pdf_page": 36,
+      "verse_start": 88,
+      "verse_end": 92,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.1.88-92.AQUARIUS_RUN"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 44,
+      "passage_key": "DK1.OCR.P0036.V0094-0096",
+      "pdf_page": 36,
+      "verse_start": 94,
+      "verse_end": 96,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.1.94-96.TIMING"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 45,
+      "passage_key": "DK1.OCR.P0036.V0097-0098",
+      "pdf_page": 36,
+      "verse_start": 97,
+      "verse_end": 98,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 46,
+      "passage_key": "DK1.OCR.P0037.V0099-0099",
+      "pdf_page": 37,
+      "verse_start": 99,
+      "verse_end": 99,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [
+        "DK1.D.V0099.VISWAMBHARAA_SCOPE_REJECTED"
+      ],
+      "reason": "The page image leaves unresolved whether Aquarius Ascendant governs the whole verse or only the editor’s education explanation.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 47,
+      "passage_key": "DK1.OCR.P0037.V0100-0100",
+      "pdf_page": 37,
+      "verse_start": 100,
+      "verse_end": 100,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [
+        "DK1.D.V0100.SIBLING_TERMS_REJECTED"
+      ],
+      "reason": "The edition itself flags unusual mixing of younger, elder and half-sibling significations, so the kinship result is not normalized.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 48,
+      "passage_key": "DK1.OCR.P0037.V0101-0102",
+      "pdf_page": 37,
+      "verse_start": 101,
+      "verse_end": 102,
+      "disposition": "executable",
+      "candidate_keys": [
+        "DK1.D.V0101_0102.JUPITER_SCORPIO_VIRGO_NAVAMSA"
+      ],
+      "reason": "The page image gives a self-contained Jupiter-in-Scorpio and Virgo-Navamsha natal clause supported by canonical facts.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 49,
+      "passage_key": "DK1.OCR.P0037.V0103-0103",
+      "pdf_page": 37,
+      "verse_start": 103,
+      "verse_end": 103,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [
+        "DK1.D.V0103.BLENDED_CLAUSES_REJECTED"
+      ],
+      "reason": "The translated paragraph blends Mercury-Navamsha and Viswambharaa premises without assigning every result unambiguously.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 50,
+      "passage_key": "DK1.OCR.P0038.V0106-0107",
+      "pdf_page": 38,
+      "verse_start": 106,
+      "verse_end": 107,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 51,
+      "passage_key": "DK1.OCR.P0038.V0108-0109",
+      "pdf_page": 38,
+      "verse_start": 108,
+      "verse_end": 109,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 52,
+      "passage_key": "DK1.OCR.P0038.V0110-0110",
+      "pdf_page": 38,
+      "verse_start": 110,
+      "verse_end": 110,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 53,
+      "passage_key": "DK1.OCR.P0038.V0111-0111",
+      "pdf_page": 38,
+      "verse_start": 111,
+      "verse_end": 111,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 54,
+      "passage_key": "DK1.OCR.P0038.V0112-0113",
+      "pdf_page": 38,
+      "verse_start": 112,
+      "verse_end": 113,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 55,
+      "passage_key": "DK1.OCR.P0038.V0114-0114",
+      "pdf_page": 38,
+      "verse_start": 114,
+      "verse_end": 114,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 56,
+      "passage_key": "DK1.OCR.P0038.V0115-0118",
+      "pdf_page": 38,
+      "verse_start": 115,
+      "verse_end": 118,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 57,
+      "passage_key": "DK1.OCR.P0039.V0119-0120",
+      "pdf_page": 39,
+      "verse_start": 119,
+      "verse_end": 120,
+      "disposition": "corrupt_or_disputed",
+      "candidate_keys": [],
+      "reason": "The retained text or edition notes contain a missing, contradictory or damaged condition.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 58,
+      "passage_key": "DK1.OCR.P0039.V0121-0122",
+      "pdf_page": 39,
+      "verse_start": 121,
+      "verse_end": 122,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 59,
+      "passage_key": "DK1.OCR.P0039.V0125-0128",
+      "pdf_page": 39,
+      "verse_start": 125,
+      "verse_end": 128,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 60,
+      "passage_key": "DK1.OCR.P0039.V0129-0129",
+      "pdf_page": 39,
+      "verse_start": 129,
+      "verse_end": 129,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 61,
+      "passage_key": "DK1.OCR.P0040.V0130-0131",
+      "pdf_page": 40,
+      "verse_start": 130,
+      "verse_end": 131,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 62,
+      "passage_key": "DK1.OCR.P0040.V0132-0135",
+      "pdf_page": 40,
+      "verse_start": 132,
+      "verse_end": 135,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 63,
+      "passage_key": "DK1.OCR.P0040.V0136-0136",
+      "pdf_page": 40,
+      "verse_start": 136,
+      "verse_end": 136,
+      "disposition": "commentary_only",
+      "candidate_keys": [],
+      "reason": "The unit is editorial, remedial or mundane commentary rather than a supported personal natal rule.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 64,
+      "passage_key": "DK1.OCR.P0040.V0137-0137",
+      "pdf_page": 40,
+      "verse_start": 137,
+      "verse_end": 137,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 65,
+      "passage_key": "DK1.OCR.P0041.V0138-0138",
+      "pdf_page": 41,
+      "verse_start": 138,
+      "verse_end": 138,
+      "disposition": "corrupt_or_disputed",
+      "candidate_keys": [],
+      "reason": "The retained text or edition notes contain a missing, contradictory or damaged condition.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 66,
+      "passage_key": "DK1.OCR.P0041.V0139-0142",
+      "pdf_page": 41,
+      "verse_start": 139,
+      "verse_end": 142,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 67,
+      "passage_key": "DK1.OCR.P0041.V0143-0143",
+      "pdf_page": 41,
+      "verse_start": 143,
+      "verse_end": 143,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 68,
+      "passage_key": "DK1.OCR.P0041.V0144-0144",
+      "pdf_page": 41,
+      "verse_start": 144,
+      "verse_end": 144,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 69,
+      "passage_key": "DK1.OCR.P0042.V0001-0001",
+      "pdf_page": 42,
+      "verse_start": 1,
+      "verse_end": 1,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 70,
+      "passage_key": "DK1.OCR.P0042.V0002-0002",
+      "pdf_page": 42,
+      "verse_start": 2,
+      "verse_end": 2,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 71,
+      "passage_key": "DK1.OCR.P0043.V0168-0170",
+      "pdf_page": 43,
+      "verse_start": 168,
+      "verse_end": 170,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 72,
+      "passage_key": "DK1.OCR.P0044.V0181-0182",
+      "pdf_page": 44,
+      "verse_start": 181,
+      "verse_end": 182,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 73,
+      "passage_key": "DK1.OCR.P0045.V0183-0183",
+      "pdf_page": 45,
+      "verse_start": 183,
+      "verse_end": 183,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 74,
+      "passage_key": "DK1.OCR.P0045.V0184-0184",
+      "pdf_page": 45,
+      "verse_start": 184,
+      "verse_end": 184,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 75,
+      "passage_key": "DK1.OCR.P0045.V0185-0186",
+      "pdf_page": 45,
+      "verse_start": 185,
+      "verse_end": 186,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 76,
+      "passage_key": "DK1.OCR.P0045.V0187-0187",
+      "pdf_page": 45,
+      "verse_start": 187,
+      "verse_end": 187,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 77,
+      "passage_key": "DK1.OCR.P0045.V0188-0189",
+      "pdf_page": 45,
+      "verse_start": 188,
+      "verse_end": 189,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 78,
+      "passage_key": "DK1.OCR.P0045.V0190-0191",
+      "pdf_page": 45,
+      "verse_start": 190,
+      "verse_end": 191,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 79,
+      "passage_key": "DK1.OCR.P0046.V0195-0195",
+      "pdf_page": 46,
+      "verse_start": 195,
+      "verse_end": 195,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 80,
+      "passage_key": "DK1.OCR.P0046.V0196-0197",
+      "pdf_page": 46,
+      "verse_start": 196,
+      "verse_end": 197,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 81,
+      "passage_key": "DK1.OCR.P0046.V0198-0199",
+      "pdf_page": 46,
+      "verse_start": 198,
+      "verse_end": 199,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 82,
+      "passage_key": "DK1.OCR.P0046.V0200-0200",
+      "pdf_page": 46,
+      "verse_start": 200,
+      "verse_end": 200,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 83,
+      "passage_key": "DK1.OCR.P0046.V0201-0203",
+      "pdf_page": 46,
+      "verse_start": 201,
+      "verse_end": 203,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 84,
+      "passage_key": "DK1.OCR.P0047.V0204-0204",
+      "pdf_page": 47,
+      "verse_start": 204,
+      "verse_end": 204,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 85,
+      "passage_key": "DK1.OCR.P0047.V0205-0205",
+      "pdf_page": 47,
+      "verse_start": 205,
+      "verse_end": 205,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 86,
+      "passage_key": "DK1.OCR.P0047.V0206-0208",
+      "pdf_page": 47,
+      "verse_start": 206,
+      "verse_end": 208,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 87,
+      "passage_key": "DK1.OCR.P0048.V0212-0213",
+      "pdf_page": 48,
+      "verse_start": 212,
+      "verse_end": 213,
+      "disposition": "corrupt_or_disputed",
+      "candidate_keys": [
+        "DK1.D.V0212_0213.MISSING_LINK_REJECTED"
+      ],
+      "reason": "The page image contains ellipses and the edition note expressly says an original linking condition is missing.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 88,
+      "passage_key": "DK1.OCR.P0048.V0214-0214",
+      "pdf_page": 48,
+      "verse_start": 214,
+      "verse_end": 214,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 89,
+      "passage_key": "DK1.OCR.P0048.V0215-0215",
+      "pdf_page": 48,
+      "verse_start": 215,
+      "verse_end": 215,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 90,
+      "passage_key": "DK1.OCR.P0048.V0216-0216",
+      "pdf_page": 48,
+      "verse_start": 216,
+      "verse_end": 216,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 91,
+      "passage_key": "DK1.OCR.P0048.V0218-0218",
+      "pdf_page": 48,
+      "verse_start": 218,
+      "verse_end": 218,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 92,
+      "passage_key": "DK1.OCR.P0048.V0219-0219",
+      "pdf_page": 48,
+      "verse_start": 219,
+      "verse_end": 219,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [
+        "DK1.D.V0219.VARUNA_IDENTITY_REJECTED"
+      ],
+      "reason": "The planetary conditions are readable, but the inherited Varuna section label lacks a reviewed canonical Nadiamsa identity and ordinal.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 93,
+      "passage_key": "DK1.OCR.P0048.V0221-0223",
+      "pdf_page": 48,
+      "verse_start": 221,
+      "verse_end": 223,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 94,
+      "passage_key": "DK1.OCR.P0049.V0224-0225",
+      "pdf_page": 49,
+      "verse_start": 224,
+      "verse_end": 225,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 95,
+      "passage_key": "DK1.OCR.P0049.V0226-0226",
+      "pdf_page": 49,
+      "verse_start": 226,
+      "verse_end": 226,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 96,
+      "passage_key": "DK1.OCR.P0049.V0228-0228",
+      "pdf_page": 49,
+      "verse_start": 228,
+      "verse_end": 228,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 97,
+      "passage_key": "DK1.OCR.P0050.V0230-0233",
+      "pdf_page": 50,
+      "verse_start": 230,
+      "verse_end": 233,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 98,
+      "passage_key": "DK1.OCR.P0050.V0237-0238",
+      "pdf_page": 50,
+      "verse_start": 237,
+      "verse_end": 238,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 99,
+      "passage_key": "DK1.OCR.P0051.V0239-0239",
+      "pdf_page": 51,
+      "verse_start": 239,
+      "verse_end": 239,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 100,
+      "passage_key": "DK1.OCR.P0051.V0242-0242",
+      "pdf_page": 51,
+      "verse_start": 242,
+      "verse_end": 242,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 101,
+      "passage_key": "DK1.OCR.P0051.V0243-0243",
+      "pdf_page": 51,
+      "verse_start": 243,
+      "verse_end": 243,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 102,
+      "passage_key": "DK1.OCR.P0051.V0244-0244",
+      "pdf_page": 51,
+      "verse_start": 244,
+      "verse_end": 244,
+      "disposition": "commentary_only",
+      "candidate_keys": [],
+      "reason": "The unit is editorial, remedial or mundane commentary rather than a supported personal natal rule.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 103,
+      "passage_key": "DK1.OCR.P0053.V0252-0254",
+      "pdf_page": 53,
+      "verse_start": 252,
+      "verse_end": 254,
+      "disposition": "commentary_only",
+      "candidate_keys": [],
+      "reason": "The passage is mundane, ritual or explanatory material and is not a personal natal rule for the matcher.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 104,
+      "passage_key": "DK1.OCR.P0053.V0259-0261",
+      "pdf_page": 53,
+      "verse_start": 259,
+      "verse_end": 261,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 105,
+      "passage_key": "DK1.OCR.P0053.V0262-0262",
+      "pdf_page": 53,
+      "verse_start": 262,
+      "verse_end": 262,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 106,
+      "passage_key": "DK1.OCR.P0054.V0263-0264",
+      "pdf_page": 54,
+      "verse_start": 263,
+      "verse_end": 264,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 107,
+      "passage_key": "DK1.OCR.P0054.V0265-0267",
+      "pdf_page": 54,
+      "verse_start": 265,
+      "verse_end": 267,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 108,
+      "passage_key": "DK1.OCR.P0054.V0268-0270",
+      "pdf_page": 54,
+      "verse_start": 268,
+      "verse_end": 270,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 109,
+      "passage_key": "DK1.OCR.P0054.V0271-0272",
+      "pdf_page": 54,
+      "verse_start": 271,
+      "verse_end": 272,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 110,
+      "passage_key": "DK1.OCR.P0054.V0273-0273",
+      "pdf_page": 54,
+      "verse_start": 273,
+      "verse_end": 273,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 111,
+      "passage_key": "DK1.OCR.P0054.V0274-0276",
+      "pdf_page": 54,
+      "verse_start": 274,
+      "verse_end": 276,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 112,
+      "passage_key": "DK1.OCR.P0055.V0277-0283",
+      "pdf_page": 55,
+      "verse_start": 277,
+      "verse_end": 283,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 113,
+      "passage_key": "DK1.OCR.P0055.V0284-0284",
+      "pdf_page": 55,
+      "verse_start": 284,
+      "verse_end": 284,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 114,
+      "passage_key": "DK1.OCR.P0055.V0285-0285",
+      "pdf_page": 55,
+      "verse_start": 285,
+      "verse_end": 285,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 115,
+      "passage_key": "DK1.OCR.P0055.V0286-0286",
+      "pdf_page": 55,
+      "verse_start": 286,
+      "verse_end": 286,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 116,
+      "passage_key": "DK1.OCR.P0055.V0287-0287",
+      "pdf_page": 55,
+      "verse_start": 287,
+      "verse_end": 287,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 117,
+      "passage_key": "DK1.OCR.P0055.V0288-0290",
+      "pdf_page": 55,
+      "verse_start": 288,
+      "verse_end": 290,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 118,
+      "passage_key": "DK1.OCR.P0055.V0291-0291",
+      "pdf_page": 55,
+      "verse_start": 291,
+      "verse_end": 291,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 119,
+      "passage_key": "DK1.OCR.P0056.V0293-0295",
+      "pdf_page": 56,
+      "verse_start": 293,
+      "verse_end": 295,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 120,
+      "passage_key": "DK1.OCR.P0057.V0305-0307",
+      "pdf_page": 57,
+      "verse_start": 305,
+      "verse_end": 307,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 121,
+      "passage_key": "DK1.OCR.P0057.V0308-0308",
+      "pdf_page": 57,
+      "verse_start": 308,
+      "verse_end": 308,
+      "disposition": "corrupt_or_disputed",
+      "candidate_keys": [],
+      "reason": "The retained text or edition notes contain a missing, contradictory or damaged condition.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 122,
+      "passage_key": "DK1.OCR.P0057.V0314-0317",
+      "pdf_page": 57,
+      "verse_start": 314,
+      "verse_end": 317,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 123,
+      "passage_key": "DK1.OCR.P0058.V0318-0319",
+      "pdf_page": 58,
+      "verse_start": 318,
+      "verse_end": 319,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 124,
+      "passage_key": "DK1.OCR.P0058.V0320-0320",
+      "pdf_page": 58,
+      "verse_start": 320,
+      "verse_end": 320,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 125,
+      "passage_key": "DK1.OCR.P0058.V0324-0327",
+      "pdf_page": 58,
+      "verse_start": 324,
+      "verse_end": 327,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 126,
+      "passage_key": "DK1.OCR.P0058.V0328-0328",
+      "pdf_page": 58,
+      "verse_start": 328,
+      "verse_end": 328,
+      "disposition": "corrupt_or_disputed",
+      "candidate_keys": [],
+      "reason": "The retained text or edition notes contain a missing, contradictory or damaged condition.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 127,
+      "passage_key": "DK1.OCR.P0059.V1616-1616",
+      "pdf_page": 59,
+      "verse_start": 1616,
+      "verse_end": 1616,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 128,
+      "passage_key": "DK1.OCR.P0060.V0339-0340",
+      "pdf_page": 60,
+      "verse_start": 339,
+      "verse_end": 340,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 129,
+      "passage_key": "DK1.OCR.P0060.V0341-0341",
+      "pdf_page": 60,
+      "verse_start": 341,
+      "verse_end": 341,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 130,
+      "passage_key": "DK1.OCR.P0060.V0344-0344",
+      "pdf_page": 60,
+      "verse_start": 344,
+      "verse_end": 344,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 131,
+      "passage_key": "DK1.OCR.P0061.V0348-0350",
+      "pdf_page": 61,
+      "verse_start": 348,
+      "verse_end": 350,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 132,
+      "passage_key": "DK1.OCR.P0061.V0353-0353",
+      "pdf_page": 61,
+      "verse_start": 353,
+      "verse_end": 353,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 133,
+      "passage_key": "DK1.OCR.P0061.V0354-0354",
+      "pdf_page": 61,
+      "verse_start": 354,
+      "verse_end": 354,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 134,
+      "passage_key": "DK1.OCR.P0062.V0355-0356",
+      "pdf_page": 62,
+      "verse_start": 355,
+      "verse_end": 356,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 135,
+      "passage_key": "DK1.OCR.P0063.V0360-0361",
+      "pdf_page": 63,
+      "verse_start": 360,
+      "verse_end": 361,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 136,
+      "passage_key": "DK1.OCR.P0063.V0362-0363",
+      "pdf_page": 63,
+      "verse_start": 362,
+      "verse_end": 363,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 137,
+      "passage_key": "DK1.OCR.P0063.V0364-0367",
+      "pdf_page": 63,
+      "verse_start": 364,
+      "verse_end": 367,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 138,
+      "passage_key": "DK1.OCR.P0063.V0370-0372",
+      "pdf_page": 63,
+      "verse_start": 370,
+      "verse_end": 372,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 139,
+      "passage_key": "DK1.OCR.P0064.V0373-0374",
+      "pdf_page": 64,
+      "verse_start": 373,
+      "verse_end": 374,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 140,
+      "passage_key": "DK1.OCR.P0065.V0388-0390",
+      "pdf_page": 65,
+      "verse_start": 388,
+      "verse_end": 390,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 141,
+      "passage_key": "DK1.OCR.P0065.V0391-0393",
+      "pdf_page": 65,
+      "verse_start": 391,
+      "verse_end": 393,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 142,
+      "passage_key": "DK1.OCR.P0065.V0394-0394",
+      "pdf_page": 65,
+      "verse_start": 394,
+      "verse_end": 394,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 143,
+      "passage_key": "DK1.OCR.P0065.V0395-0395",
+      "pdf_page": 65,
+      "verse_start": 395,
+      "verse_end": 395,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 144,
+      "passage_key": "DK1.OCR.P0066.V0396-0396",
+      "pdf_page": 66,
+      "verse_start": 396,
+      "verse_end": 396,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 145,
+      "passage_key": "DK1.OCR.P0066.V0397-0397",
+      "pdf_page": 66,
+      "verse_start": 397,
+      "verse_end": 397,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 146,
+      "passage_key": "DK1.OCR.P0066.V0398-0399",
+      "pdf_page": 66,
+      "verse_start": 398,
+      "verse_end": 399,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 147,
+      "passage_key": "DK1.OCR.P0066.V0400-0400",
+      "pdf_page": 66,
+      "verse_start": 400,
+      "verse_end": 400,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 148,
+      "passage_key": "DK1.OCR.P0066.V0401-0401",
+      "pdf_page": 66,
+      "verse_start": 401,
+      "verse_end": 401,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 149,
+      "passage_key": "DK1.OCR.P0066.V0402-0403",
+      "pdf_page": 66,
+      "verse_start": 402,
+      "verse_end": 403,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 150,
+      "passage_key": "DK1.OCR.P0066.V0404-0404",
+      "pdf_page": 66,
+      "verse_start": 404,
+      "verse_end": 404,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 151,
+      "passage_key": "DK1.OCR.P0067.V0405-0405",
+      "pdf_page": 67,
+      "verse_start": 405,
+      "verse_end": 405,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 152,
+      "passage_key": "DK1.OCR.P0067.V0406-0406",
+      "pdf_page": 67,
+      "verse_start": 406,
+      "verse_end": 406,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 153,
+      "passage_key": "DK1.OCR.P0067.V0407-0407",
+      "pdf_page": 67,
+      "verse_start": 407,
+      "verse_end": 407,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 154,
+      "passage_key": "DK1.OCR.P0067.V0408-0408",
+      "pdf_page": 67,
+      "verse_start": 408,
+      "verse_end": 408,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 155,
+      "passage_key": "DK1.OCR.P0067.V0409-0410",
+      "pdf_page": 67,
+      "verse_start": 409,
+      "verse_end": 410,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 156,
+      "passage_key": "DK1.OCR.P0067.V0411-0411",
+      "pdf_page": 67,
+      "verse_start": 411,
+      "verse_end": 411,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 157,
+      "passage_key": "DK1.OCR.P0067.V0412-0412",
+      "pdf_page": 67,
+      "verse_start": 412,
+      "verse_end": 412,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 158,
+      "passage_key": "DK1.OCR.P0067.V0415-0416",
+      "pdf_page": 67,
+      "verse_start": 415,
+      "verse_end": 416,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 159,
+      "passage_key": "DK1.OCR.P0068.V0417-0417",
+      "pdf_page": 68,
+      "verse_start": 417,
+      "verse_end": 417,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 160,
+      "passage_key": "DK1.OCR.P0068.V0418-0418",
+      "pdf_page": 68,
+      "verse_start": 418,
+      "verse_end": 418,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 161,
+      "passage_key": "DK1.OCR.P0068.V0419-0419",
+      "pdf_page": 68,
+      "verse_start": 419,
+      "verse_end": 419,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 162,
+      "passage_key": "DK1.OCR.P0068.V0420-0420",
+      "pdf_page": 68,
+      "verse_start": 420,
+      "verse_end": 420,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 163,
+      "passage_key": "DK1.OCR.P0068.V0421-0421",
+      "pdf_page": 68,
+      "verse_start": 421,
+      "verse_end": 421,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 164,
+      "passage_key": "DK1.OCR.P0068.V0422-0422",
+      "pdf_page": 68,
+      "verse_start": 422,
+      "verse_end": 422,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 165,
+      "passage_key": "DK1.OCR.P0068.V0423-0423",
+      "pdf_page": 68,
+      "verse_start": 423,
+      "verse_end": 423,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 166,
+      "passage_key": "DK1.OCR.P0068.V0425-0425",
+      "pdf_page": 68,
+      "verse_start": 425,
+      "verse_end": 425,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 167,
+      "passage_key": "DK1.OCR.P0068.V0426-0426",
+      "pdf_page": 68,
+      "verse_start": 426,
+      "verse_end": 426,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 168,
+      "passage_key": "DK1.OCR.P0068.V0427-0427",
+      "pdf_page": 68,
+      "verse_start": 427,
+      "verse_end": 427,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 169,
+      "passage_key": "DK1.OCR.P0069.V0428-0431",
+      "pdf_page": 69,
+      "verse_start": 428,
+      "verse_end": 431,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 170,
+      "passage_key": "DK1.OCR.P0070.V0448-0449",
+      "pdf_page": 70,
+      "verse_start": 448,
+      "verse_end": 449,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 171,
+      "passage_key": "DK1.OCR.P0070.V0450-0450",
+      "pdf_page": 70,
+      "verse_start": 450,
+      "verse_end": 450,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 172,
+      "passage_key": "DK1.OCR.P0072.V0468-0469",
+      "pdf_page": 72,
+      "verse_start": 468,
+      "verse_end": 469,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 173,
+      "passage_key": "DK1.OCR.P0072.V0470-0471",
+      "pdf_page": 72,
+      "verse_start": 470,
+      "verse_end": 471,
+      "disposition": "commentary_only",
+      "candidate_keys": [],
+      "reason": "The passage is mundane, ritual or explanatory material and is not a personal natal rule for the matcher.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 174,
+      "passage_key": "DK1.OCR.P0073.V0475-0475",
+      "pdf_page": 73,
+      "verse_start": 475,
+      "verse_end": 475,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 175,
+      "passage_key": "DK1.OCR.P0074.V0490-0491",
+      "pdf_page": 74,
+      "verse_start": 490,
+      "verse_end": 491,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 176,
+      "passage_key": "DK1.OCR.P0074.V0492-0493",
+      "pdf_page": 74,
+      "verse_start": 492,
+      "verse_end": 493,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 177,
+      "passage_key": "DK1.OCR.P0074.V0495-0497",
+      "pdf_page": 74,
+      "verse_start": 495,
+      "verse_end": 497,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 178,
+      "passage_key": "DK1.OCR.P0074.V0498-0498",
+      "pdf_page": 74,
+      "verse_start": 498,
+      "verse_end": 498,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 179,
+      "passage_key": "DK1.OCR.P0076.V0511-0512",
+      "pdf_page": 76,
+      "verse_start": 511,
+      "verse_end": 512,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 180,
+      "passage_key": "DK1.OCR.P0076.V0520-0522",
+      "pdf_page": 76,
+      "verse_start": 520,
+      "verse_end": 522,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 181,
+      "passage_key": "DK1.OCR.P0076.V0523-0523",
+      "pdf_page": 76,
+      "verse_start": 523,
+      "verse_end": 523,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 182,
+      "passage_key": "DK1.OCR.P0077.V0524-0524",
+      "pdf_page": 77,
+      "verse_start": 524,
+      "verse_end": 524,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 183,
+      "passage_key": "DK1.OCR.P0077.V0525-0525",
+      "pdf_page": 77,
+      "verse_start": 525,
+      "verse_end": 525,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 184,
+      "passage_key": "DK1.OCR.P0077.V0526-0527",
+      "pdf_page": 77,
+      "verse_start": 526,
+      "verse_end": 527,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 185,
+      "passage_key": "DK1.OCR.P0077.V0531-0531",
+      "pdf_page": 77,
+      "verse_start": 531,
+      "verse_end": 531,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 186,
+      "passage_key": "DK1.OCR.P0078.V0532-0542",
+      "pdf_page": 78,
+      "verse_start": 532,
+      "verse_end": 542,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 187,
+      "passage_key": "DK1.OCR.P0078.V0543-0547",
+      "pdf_page": 78,
+      "verse_start": 543,
+      "verse_end": 547,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 188,
+      "passage_key": "DK1.OCR.P0080.V0560-0561",
+      "pdf_page": 80,
+      "verse_start": 560,
+      "verse_end": 561,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 189,
+      "passage_key": "DK1.OCR.P0080.V0562-0562",
+      "pdf_page": 80,
+      "verse_start": 562,
+      "verse_end": 562,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 190,
+      "passage_key": "DK1.OCR.P0080.V0563-0563",
+      "pdf_page": 80,
+      "verse_start": 563,
+      "verse_end": 563,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 191,
+      "passage_key": "DK1.OCR.P0080.V0564-0564",
+      "pdf_page": 80,
+      "verse_start": 564,
+      "verse_end": 564,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 192,
+      "passage_key": "DK1.OCR.P0080.V0565-0566",
+      "pdf_page": 80,
+      "verse_start": 565,
+      "verse_end": 566,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 193,
+      "passage_key": "DK1.OCR.P0081.V0567-0568",
+      "pdf_page": 81,
+      "verse_start": 567,
+      "verse_end": 568,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 194,
+      "passage_key": "DK1.OCR.P0081.V0572-0573",
+      "pdf_page": 81,
+      "verse_start": 572,
+      "verse_end": 573,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 195,
+      "passage_key": "DK1.OCR.P0081.V0576-0576",
+      "pdf_page": 81,
+      "verse_start": 576,
+      "verse_end": 576,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 196,
+      "passage_key": "DK1.OCR.P0081.V0577-0579",
+      "pdf_page": 81,
+      "verse_start": 577,
+      "verse_end": 579,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 197,
+      "passage_key": "DK1.OCR.P0082.V0580-0581",
+      "pdf_page": 82,
+      "verse_start": 580,
+      "verse_end": 581,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 198,
+      "passage_key": "DK1.OCR.P0082.V0582-0582",
+      "pdf_page": 82,
+      "verse_start": 582,
+      "verse_end": 582,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 199,
+      "passage_key": "DK1.OCR.P0084.V0608-0609",
+      "pdf_page": 84,
+      "verse_start": 608,
+      "verse_end": 609,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 200,
+      "passage_key": "DK1.OCR.P0084.V0610-0611",
+      "pdf_page": 84,
+      "verse_start": 610,
+      "verse_end": 611,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 201,
+      "passage_key": "DK1.OCR.P0085.V0612-0612",
+      "pdf_page": 85,
+      "verse_start": 612,
+      "verse_end": 612,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 202,
+      "passage_key": "DK1.OCR.P0085.V0613-0618",
+      "pdf_page": 85,
+      "verse_start": 613,
+      "verse_end": 618,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 203,
+      "passage_key": "DK1.OCR.P0085.V0619-0620",
+      "pdf_page": 85,
+      "verse_start": 619,
+      "verse_end": 620,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 204,
+      "passage_key": "DK1.OCR.P0085.V0621-0623",
+      "pdf_page": 85,
+      "verse_start": 621,
+      "verse_end": 623,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 205,
+      "passage_key": "DK1.OCR.P0086.V0634-0635",
+      "pdf_page": 86,
+      "verse_start": 634,
+      "verse_end": 635,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 206,
+      "passage_key": "DK1.OCR.P0086.V0636-0637",
+      "pdf_page": 86,
+      "verse_start": 636,
+      "verse_end": 637,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 207,
+      "passage_key": "DK1.OCR.P0089.V0656-0658",
+      "pdf_page": 89,
+      "verse_start": 656,
+      "verse_end": 658,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 208,
+      "passage_key": "DK1.OCR.P0090.V0677-0681",
+      "pdf_page": 90,
+      "verse_start": 677,
+      "verse_end": 681,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0677_0681"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 209,
+      "passage_key": "DK1.OCR.P0090.V0682-0683",
+      "pdf_page": 90,
+      "verse_start": 682,
+      "verse_end": 683,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 210,
+      "passage_key": "DK1.OCR.P0090.V0684-0684",
+      "pdf_page": 90,
+      "verse_start": 684,
+      "verse_end": 684,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 211,
+      "passage_key": "DK1.OCR.P0090.V0685-0686",
+      "pdf_page": 90,
+      "verse_start": 685,
+      "verse_end": 686,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0685.SUN_HARINI",
+        "DK1.A.V0686.AMBUJA_HARINI"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 212,
+      "passage_key": "DK1.OCR.P0091.V0690-0691",
+      "pdf_page": 91,
+      "verse_start": 690,
+      "verse_end": 691,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 213,
+      "passage_key": "DK1.OCR.P0091.V0692-0692",
+      "pdf_page": 91,
+      "verse_start": 692,
+      "verse_end": 692,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 214,
+      "passage_key": "DK1.OCR.P0091.V0693-0693",
+      "pdf_page": 91,
+      "verse_start": 693,
+      "verse_end": 693,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 215,
+      "passage_key": "DK1.OCR.P0091.V0694-0695",
+      "pdf_page": 91,
+      "verse_start": 694,
+      "verse_end": 695,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 216,
+      "passage_key": "DK1.OCR.P0091.V0696-0696",
+      "pdf_page": 91,
+      "verse_start": 696,
+      "verse_end": 696,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 217,
+      "passage_key": "DK1.OCR.P0091.V0697-0697",
+      "pdf_page": 91,
+      "verse_start": 697,
+      "verse_end": 697,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 218,
+      "passage_key": "DK1.OCR.P0091.V0698-0698",
+      "pdf_page": 91,
+      "verse_start": 698,
+      "verse_end": 698,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 219,
+      "passage_key": "DK1.OCR.P0092.V0699-0700",
+      "pdf_page": 92,
+      "verse_start": 699,
+      "verse_end": 700,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 220,
+      "passage_key": "DK1.OCR.P0092.V0701-0707",
+      "pdf_page": 92,
+      "verse_start": 701,
+      "verse_end": 707,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0701.MERCURY_JUPITER_OWN"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 221,
+      "passage_key": "DK1.OCR.P0092.V0708-0708",
+      "pdf_page": 92,
+      "verse_start": 708,
+      "verse_end": 708,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 222,
+      "passage_key": "DK1.OCR.P0092.V0709-0709",
+      "pdf_page": 92,
+      "verse_start": 709,
+      "verse_end": 709,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 223,
+      "passage_key": "DK1.OCR.P0092.V0710-0713",
+      "pdf_page": 92,
+      "verse_start": 710,
+      "verse_end": 713,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0710.JUPITER_PISCES_CANCER_NAVAMSA"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 224,
+      "passage_key": "DK1.OCR.P0093.V0714-0716",
+      "pdf_page": 93,
+      "verse_start": 714,
+      "verse_end": 716,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0714_0716"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 225,
+      "passage_key": "DK1.OCR.P0095.V0738-0740",
+      "pdf_page": 95,
+      "verse_start": 738,
+      "verse_end": 740,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0738_DHANADA_FORMER"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 226,
+      "passage_key": "DK1.OCR.P0095.V0741-0741",
+      "pdf_page": 95,
+      "verse_start": 741,
+      "verse_end": 741,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0741.MERCURY_VENUS_NAVAMSA"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 227,
+      "passage_key": "DK1.OCR.P0095.V0743-0744",
+      "pdf_page": 95,
+      "verse_start": 743,
+      "verse_end": 744,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0743.SURA_SUN_LIBRA_VARGA"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 228,
+      "passage_key": "DK1.OCR.P0096.V0746-0748",
+      "pdf_page": 96,
+      "verse_start": 746,
+      "verse_end": 748,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0746_0748"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 229,
+      "passage_key": "DK1.OCR.P0097.V0757-0760",
+      "pdf_page": 97,
+      "verse_start": 757,
+      "verse_end": 760,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 230,
+      "passage_key": "DK1.OCR.P0097.V0765-0765",
+      "pdf_page": 97,
+      "verse_start": 765,
+      "verse_end": 765,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 231,
+      "passage_key": "DK1.OCR.P0097.V0766-0766",
+      "pdf_page": 97,
+      "verse_start": 766,
+      "verse_end": 766,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 232,
+      "passage_key": "DK1.OCR.P0098.V0775-0777",
+      "pdf_page": 98,
+      "verse_start": 775,
+      "verse_end": 777,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 233,
+      "passage_key": "DK1.OCR.P0099.V0783-0783",
+      "pdf_page": 99,
+      "verse_start": 783,
+      "verse_end": 783,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0783"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 234,
+      "passage_key": "DK1.OCR.P0100.V0795-0796",
+      "pdf_page": 100,
+      "verse_start": 795,
+      "verse_end": 796,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 235,
+      "passage_key": "DK1.OCR.P0100.V0801-0803",
+      "pdf_page": 100,
+      "verse_start": 801,
+      "verse_end": 803,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0801_0803"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 236,
+      "passage_key": "DK1.OCR.P0101.V0813-0815",
+      "pdf_page": 101,
+      "verse_start": 813,
+      "verse_end": 815,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 237,
+      "passage_key": "DK1.OCR.P0101.V0816-0817",
+      "pdf_page": 101,
+      "verse_start": 816,
+      "verse_end": 817,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 238,
+      "passage_key": "DK1.OCR.P0102.V0818-0818",
+      "pdf_page": 102,
+      "verse_start": 818,
+      "verse_end": 818,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 239,
+      "passage_key": "DK1.OCR.P0103.V0842-0843",
+      "pdf_page": 103,
+      "verse_start": 842,
+      "verse_end": 843,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 240,
+      "passage_key": "DK1.OCR.P0103.V0844-0846",
+      "pdf_page": 103,
+      "verse_start": 844,
+      "verse_end": 846,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 241,
+      "passage_key": "DK1.OCR.P0104.V0847-0849",
+      "pdf_page": 104,
+      "verse_start": 847,
+      "verse_end": 849,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0847.NIRMALA_FORMER_BASE",
+        "DK1.A.V0848.FOREST_BIRTH_CONFIGURATION"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 242,
+      "passage_key": "DK1.OCR.P0104.V0853-0855",
+      "pdf_page": 104,
+      "verse_start": 853,
+      "verse_end": 855,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0853_0855"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 243,
+      "passage_key": "DK1.OCR.P0104.V0859-0859",
+      "pdf_page": 104,
+      "verse_start": 859,
+      "verse_end": 859,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0859"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 244,
+      "passage_key": "DK1.OCR.P0104.V0860-0860",
+      "pdf_page": 104,
+      "verse_start": 860,
+      "verse_end": 860,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0860.MOON_SCORPIO_SATURN_NAVAMSA"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 245,
+      "passage_key": "DK1.OCR.P0105.V0861-0866",
+      "pdf_page": 105,
+      "verse_start": 861,
+      "verse_end": 866,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0861.MARS_NINTH"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 246,
+      "passage_key": "DK1.OCR.P0105.V0867-0867",
+      "pdf_page": 105,
+      "verse_start": 867,
+      "verse_end": 867,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 247,
+      "passage_key": "DK1.OCR.P0105.V0868-0869",
+      "pdf_page": 105,
+      "verse_start": 868,
+      "verse_end": 869,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0868_0869"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 248,
+      "passage_key": "DK1.OCR.P0105.V0870-0871",
+      "pdf_page": 105,
+      "verse_start": 870,
+      "verse_end": 871,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 249,
+      "passage_key": "DK1.OCR.P0105.V0872-0872",
+      "pdf_page": 105,
+      "verse_start": 872,
+      "verse_end": 872,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 250,
+      "passage_key": "DK1.OCR.P0105.V0873-0873",
+      "pdf_page": 105,
+      "verse_start": 873,
+      "verse_end": 873,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 251,
+      "passage_key": "DK1.OCR.P0106.V0874-0877",
+      "pdf_page": 106,
+      "verse_start": 874,
+      "verse_end": 877,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0874.SATURN_ELEVENTH_VENUS"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 252,
+      "passage_key": "DK1.OCR.P0106.V0878-0880",
+      "pdf_page": 106,
+      "verse_start": 878,
+      "verse_end": 880,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 253,
+      "passage_key": "DK1.OCR.P0106.V0882-0883",
+      "pdf_page": 106,
+      "verse_start": 882,
+      "verse_end": 883,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 254,
+      "passage_key": "DK1.OCR.P0107.V0888-0891",
+      "pdf_page": 107,
+      "verse_start": 888,
+      "verse_end": 891,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0888.SATURN_MERCURY_LIBRA_NAVAMSA",
+        "DK1.A.V0889.GRANDFATHER_FAME"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 255,
+      "passage_key": "DK1.OCR.P0107.V0892-0893",
+      "pdf_page": 107,
+      "verse_start": 892,
+      "verse_end": 893,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 256,
+      "passage_key": "DK1.OCR.P0107.V0894-0895",
+      "pdf_page": 107,
+      "verse_start": 894,
+      "verse_end": 895,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 257,
+      "passage_key": "DK1.OCR.P0107.V0896-0897",
+      "pdf_page": 107,
+      "verse_start": 896,
+      "verse_end": 897,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0896.JUPITER_ASPECT_ASC"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 258,
+      "passage_key": "DK1.OCR.P0107.V0898-0902",
+      "pdf_page": 107,
+      "verse_start": 898,
+      "verse_end": 902,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0898.THREE_PLANETS_ELEVENTH"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 259,
+      "passage_key": "DK1.OCR.P0108.V0903-0903",
+      "pdf_page": 108,
+      "verse_start": 903,
+      "verse_end": 903,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0903.NIRMALA_LATTER_SIBLINGS"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 260,
+      "passage_key": "DK1.OCR.P0108.V0904-0904",
+      "pdf_page": 108,
+      "verse_start": 904,
+      "verse_end": 904,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0904.SATURN_LEO_MALEFIC_CONTACT"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 261,
+      "passage_key": "DK1.OCR.P0108.V0905-0905",
+      "pdf_page": 108,
+      "verse_start": 905,
+      "verse_end": 905,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0905.NIRMALA_FORMER_SIBLINGS"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 262,
+      "passage_key": "DK1.OCR.P0108.V0906-0906",
+      "pdf_page": 108,
+      "verse_start": 906,
+      "verse_end": 906,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 263,
+      "passage_key": "DK1.OCR.P0108.V0907-0907",
+      "pdf_page": 108,
+      "verse_start": 907,
+      "verse_end": 907,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 264,
+      "passage_key": "DK1.OCR.P0108.V0908-0908",
+      "pdf_page": 108,
+      "verse_start": 908,
+      "verse_end": 908,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 265,
+      "passage_key": "DK1.OCR.P0108.V0909-0910",
+      "pdf_page": 108,
+      "verse_start": 909,
+      "verse_end": 910,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 266,
+      "passage_key": "DK1.OCR.P0109.V0911-0914",
+      "pdf_page": 109,
+      "verse_start": 911,
+      "verse_end": 914,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 267,
+      "passage_key": "DK1.OCR.P0109.V0915-0915",
+      "pdf_page": 109,
+      "verse_start": 915,
+      "verse_end": 915,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0915.SATURN_STRONG_ASPECTED_JUPITER"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 268,
+      "passage_key": "DK1.OCR.P0109.V0916-0916",
+      "pdf_page": 109,
+      "verse_start": 916,
+      "verse_end": 916,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0916"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 269,
+      "passage_key": "DK1.OCR.P0109.V0917-0919",
+      "pdf_page": 109,
+      "verse_start": 917,
+      "verse_end": 919,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 270,
+      "passage_key": "DK1.OCR.P0109.V0920-0920",
+      "pdf_page": 109,
+      "verse_start": 920,
+      "verse_end": 920,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0920"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 271,
+      "passage_key": "DK1.OCR.P0109.V0921-0924",
+      "pdf_page": 109,
+      "verse_start": 921,
+      "verse_end": 924,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 272,
+      "passage_key": "DK1.OCR.P0110.V0925-0925",
+      "pdf_page": 110,
+      "verse_start": 925,
+      "verse_end": 925,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0925"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 273,
+      "passage_key": "DK1.OCR.P0110.V0926-0926",
+      "pdf_page": 110,
+      "verse_start": 926,
+      "verse_end": 926,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0926.SATURN_VENUS_STRONG_NAVAMSA"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 274,
+      "passage_key": "DK1.OCR.P0110.V0927-0930",
+      "pdf_page": 110,
+      "verse_start": 927,
+      "verse_end": 930,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.V0927.JUPITER_SEVENTH_CHARITY"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 275,
+      "passage_key": "DK1.OCR.P0110.V0931-0932",
+      "pdf_page": 110,
+      "verse_start": 931,
+      "verse_end": 932,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK1.A.REJ.V0931_0932"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 276,
+      "passage_key": "DK1.OCR.P0110.V0933-0937",
+      "pdf_page": 110,
+      "verse_start": 933,
+      "verse_end": 937,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 277,
+      "passage_key": "DK1.OCR.P0112.V0953-0959",
+      "pdf_page": 112,
+      "verse_start": 953,
+      "verse_end": 959,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 278,
+      "passage_key": "DK1.OCR.P0112.V0960-0960",
+      "pdf_page": 112,
+      "verse_start": 960,
+      "verse_end": 960,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 279,
+      "passage_key": "DK1.OCR.P0112.V0961-0962",
+      "pdf_page": 112,
+      "verse_start": 961,
+      "verse_end": 962,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 280,
+      "passage_key": "DK1.OCR.P0113.V0963-0963",
+      "pdf_page": 113,
+      "verse_start": 963,
+      "verse_end": 963,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 281,
+      "passage_key": "DK1.OCR.P0113.V0966-0967",
+      "pdf_page": 113,
+      "verse_start": 966,
+      "verse_end": 967,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 282,
+      "passage_key": "DK1.OCR.P0113.V0968-0968",
+      "pdf_page": 113,
+      "verse_start": 968,
+      "verse_end": 968,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.B.0968_VENUS_TAURUS_RAJA_YOGA"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 283,
+      "passage_key": "DK1.OCR.P0113.V0971-0972",
+      "pdf_page": 113,
+      "verse_start": 971,
+      "verse_end": 972,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.B.0971_WEAK_BODY_YOGA",
+        "DK.B.R0972_LAGNA_LORD_NAVAMSA"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 284,
+      "passage_key": "DK1.OCR.P0114.V0978-0983",
+      "pdf_page": 114,
+      "verse_start": 978,
+      "verse_end": 983,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 285,
+      "passage_key": "DK1.OCR.P0115.V0995-0996",
+      "pdf_page": 115,
+      "verse_start": 995,
+      "verse_end": 996,
+      "disposition": "timing_pending",
+      "candidate_keys": [],
+      "reason": "The passage depends on Dasha, transit, age or another time sequence that requires a separately reviewed timing model.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 286,
+      "passage_key": "DK1.OCR.P0115.V0997-1002",
+      "pdf_page": 115,
+      "verse_start": 997,
+      "verse_end": 1002,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 287,
+      "passage_key": "DK1.OCR.P0116.V1003-1009",
+      "pdf_page": 116,
+      "verse_start": 1003,
+      "verse_end": 1009,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 288,
+      "passage_key": "DK1.OCR.P0116.V1010-1010",
+      "pdf_page": 116,
+      "verse_start": 1010,
+      "verse_end": 1010,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 289,
+      "passage_key": "DK1.OCR.P0116.V1011-1012",
+      "pdf_page": 116,
+      "verse_start": 1011,
+      "verse_end": 1012,
+      "disposition": "mortality_excluded",
+      "candidate_keys": [],
+      "reason": "The passage primarily predicts death, lifespan or fatality; this outcome is excluded from executable consumer rules.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 290,
+      "passage_key": "DK1.OCR.P0116.V1013-1015",
+      "pdf_page": 116,
+      "verse_start": 1013,
+      "verse_end": 1015,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.B.1013_LIBRA_INDRA_VENUS_SATURN"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 291,
+      "passage_key": "DK1.OCR.P0117.V1016-1016",
+      "pdf_page": 117,
+      "verse_start": 1016,
+      "verse_end": 1016,
+      "disposition": "ambiguous_context",
+      "candidate_keys": [],
+      "reason": "The extraction cannot establish all inherited sign, Nadiamsa, relative-chart or clause dependencies from this passage alone.",
+      "source_check": "ocr_context"
+    },
+    {
+      "catalogue_ordinal": 292,
+      "passage_key": "DK1.OCR.P0117.V1017-1017",
+      "pdf_page": 117,
+      "verse_start": 1017,
+      "verse_end": 1017,
+      "disposition": "already_reviewed",
+      "candidate_keys": [
+        "DK.B.1017_INDRA_DEBILITATED_MOON"
+      ],
+      "reason": "This passage already has source-reviewed candidate dispositions in the earlier pilot or reviewed manifests.",
+      "source_check": "page_image_context"
+    },
+    {
+      "catalogue_ordinal": 293,
+      "passage_key": "DK1.OCR.P0117.V1018-1019",
+      "pdf_page": 117,
+      "verse_start": 1018,
+      "verse_end": 1019,
+      "disposition": "unsupported_fact",
+      "candidate_keys": [],
+      "reason": "The draft is potentially natal but still depends on an unreviewed alias, derived relation, yoga, Avastha or other fact not safely bound to the canonical ontology.",
+      "source_check": "ocr_context"
+    }
+  ]
+}

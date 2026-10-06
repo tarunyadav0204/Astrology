@@ -13,7 +13,7 @@ calculator = FestivalCalculator()
 async def get_today_festivals():
     """Get festivals for today"""
     today = datetime.now()
-    festivals = calculator.find_festival_dates(today.year, today.month, 28.6139, 77.2090, "amanta", "Asia/Kolkata")
+    festivals = calculator.find_festival_dates(today.year, today.month, 28.6139, 77.2090, "purnimanta", "Asia/Kolkata")
     today_str = today.strftime("%Y-%m-%d")
     
     return {
@@ -23,8 +23,8 @@ async def get_today_festivals():
 
 @router.get("/month/{year}/{month}")
 async def get_monthly_festivals(year: int, month: int, lat: float = 28.6139, lon: float = 77.2090, 
-                              calendar_system: str = "amanta", timezone: str = "Asia/Kolkata"):
-    """Get all festivals for a specific month with full Drik Panchang accuracy"""
+                              calendar_system: str = "purnimanta", timezone: str = "Asia/Kolkata"):
+    """Get all festivals for a specific month (Udaya Tithi; default Purnimanta / North-India labels)."""
     if month < 1 or month > 12:
         raise HTTPException(status_code=400, detail="Invalid month")
     
@@ -53,7 +53,7 @@ async def get_monthly_festivals(year: int, month: int, lat: float = 28.6139, lon
 @router.get("/year/{year}")
 async def get_yearly_festivals(year: int, lat: float = 28.6139, lon: float = 77.2090):
     """Get all festivals for a year with geographic precision"""
-    festivals = calculator.find_festival_dates(year, None, lat, lon, "amanta", "Asia/Kolkata")
+    festivals = calculator.find_festival_dates(year, None, lat, lon, "purnimanta", "Asia/Kolkata")
     
     # Group by month
     monthly_data = {}

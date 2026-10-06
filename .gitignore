@@ -122,6 +122,7 @@ venv.bak/
 astrology.db
 # Log files
 backend/backend.log
+backend/private_classical_sources/
 frontend/frontend.log
 backend/server_shutdown.log
 *.log
@@ -141,6 +142,11 @@ backend/gcp_key.json
 !astroroshni_mobile/src/data/eventTimelineMonthlySample.json
 !backend/whatsapp/flows/registration_flow.json
 !backend/longevity/classical_rule_registry.json
+!backend/classical_sources/data/
+!backend/classical_sources/data/deva_keralam_context_pilot_abala_prabha_v1.json
+!backend/classical_rules/deva_keralam/data/reviewed_batch_*_v*.json
+!backend/classical_rules/deva_keralam/data/completion_ledger_*_v*.json
+!backend/classical_rules/deva_keralam/data/*_backlog_v*.json
 !backend/longevity/validation_data/
 !backend/longevity/validation_data/*.json
 !backend/rectification/benchmark_data/

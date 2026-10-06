@@ -82,6 +82,8 @@ def evaluate_fact_expression(expression: Mapping[str, Any], facts: ClassicalFact
         actual = fact.value
         if comparator == "equals":
             matched = actual == expected
+        elif comparator == "not_equals":
+            matched = actual != expected
         elif comparator == "in":
             matched = actual in (expected or [])
         elif comparator == "contains":
@@ -92,6 +94,14 @@ def evaluate_fact_expression(expression: Mapping[str, Any], facts: ClassicalFact
             matched = actual >= expected
         elif comparator == "lte":
             matched = actual <= expected
+        elif comparator == "gt":
+            matched = actual > expected
+        elif comparator == "lt":
+            matched = actual < expected
+        elif comparator == "between":
+            if not isinstance(expected, (list, tuple)) or len(expected) != 2:
+                raise ValueError("between comparator requires [minimum, maximum]")
+            matched = expected[0] <= actual <= expected[1]
         else:
             raise ValueError(f"Unsupported classical fact comparator: {comparator}")
         used = ({

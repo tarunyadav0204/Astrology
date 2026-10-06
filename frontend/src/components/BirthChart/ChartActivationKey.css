@@ -21,6 +21,15 @@
   cursor: pointer;
 }
 
+.chart-act-key > button > em {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
 .chart-act-key > button > i {
   width: 0.52rem;
   height: 0.52rem;
