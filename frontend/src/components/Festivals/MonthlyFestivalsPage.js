@@ -307,7 +307,22 @@ const MonthlyFestivalsPage = ({ user, onLogout, onAdminClick, onLogin }) => {
           <button type="button" className="monthly-nav-btn" onClick={() => navigateMonth(-1)} aria-label="Previous month">‹</button>
           <div className="monthly-toolbar__title">
             <span className="monthly-festivals-eyebrow">Calendar</span>
-            <h2>{monthTitle}</h2>
+            <input
+              type="month"
+              className="monthly-jump-picker"
+              value={`${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`}
+              onChange={(e) => {
+                if (e.target.value) {
+                  const [year, month] = e.target.value.split('-');
+                  const newDate = new Date(currentDate);
+                  newDate.setDate(1); // Prevent month rollover bugs on the 31st
+                  newDate.setFullYear(parseInt(year, 10));
+                  newDate.setMonth(parseInt(month, 10) - 1);
+                  setCurrentDate(newDate);
+                }
+              }}
+              aria-label="Select month and year"
+            />
           </div>
           <button type="button" className="monthly-nav-btn" onClick={() => navigateMonth(1)} aria-label="Next month">›</button>
           <button type="button" className="monthly-festival-btn monthly-festival-btn--ghost" onClick={() => setShowTransits((value) => !value)}>
