@@ -163,13 +163,13 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
   const [panchangData, setPanchangData] = useState(null);
   const [transits, setTransits] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showSearch, setShowSearch] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [showTransits, setShowTransits] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(() => new URLSearchParams(window.location.search).get('q') || '');
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [location, setLocation] = useState(POPULAR_LOCATIONS[0]);
+  const [activeFilter, setActiveFilter] = useState('All');
   const [userTimezone] = useState(() => {
     try {
       return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -215,6 +215,21 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
       },
     ],
   }), [seoData.canonical, seoData.description, seoData.title]);
+
+  const filteredFestivals = useMemo(() => {
+    if (activeFilter === 'All') return todayFestivals;
+    if (activeFilter === 'Major Festivals') return todayFestivals.filter((f) => f.type === 'major_festival');
+    if (activeFilter === 'Vrats') return todayFestivals.filter((f) => f.type === 'vrat');
+    if (activeFilter === 'Regional') return todayFestivals.filter((f) => f.type === 'regional_festival');
+    return todayFestivals;
+  }, [todayFestivals, activeFilter]);
+
+  useEffect(() => {
+    if (searchTerm) {
+      searchFestivals();
+    }
+    // eslint-disable-next-line
+  }, []);
 
   useEffect(() => {
     const fetchPageData = async () => {
@@ -263,12 +278,20 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
     fetchPageData();
   }, [selectedDate, locationKey, userTimezone, location.lat, location.lon]);
 
-  const searchFestivals = async () => {
-    if (!searchTerm.trim()) return;
+  const searchFestivals = async (queryToSearch) => {
+    const term = typeof queryToSearch === 'string' ? queryToSearch : searchTerm;
+    if (!term.trim()) {
+      setSearchResults([]);
+      navigate('/festivals', { replace: true });
+      return;
+    }
+
+    // Update URL to make it shareable
+    navigate(`/festivals?q=${encodeURIComponent(term)}`, { replace: true });
 
     try {
       setSearchLoading(true);
-      const response = await fetch(`/api/festivals/search?q=${encodeURIComponent(searchTerm)}`);
+      const response = await fetch(`/api/festivals/search?q=${encodeURIComponent(term)}`);
       if (response.ok) {
         const data = await response.json();
         setSearchResults(data.festivals || []);
@@ -306,9 +329,13 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
 
       <main className="festivals-shell">
         <section className="festivals-hero">
+          <div className="festival-tabs">
+            <button type="button" className="festival-tab is-active" onClick={() => navigate('/festivals')}>Daily View</button>
+            <button type="button" className="festival-tab" onClick={() => navigate('/festivals/monthly')}>Monthly Calendar</button>
+          </div>
           <div className="festivals-hero__copy">
             <button type="button" className="festivals-back-link" onClick={() => navigate('/panchang')}>
-              <span aria-hidden>←</span> Panchang
+              <span aria-hidden>←</span> Back to Panchang
             </button>
             <span className="festivals-eyebrow">Sacred observances · Location aware</span>
             <h1>Keep time with<br /><em>what is sacred.</em></h1>
@@ -316,12 +343,18 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
               Discover festivals and vrats through the local tithi, sunrise, parana window,
               rituals and meaning that shape their observance.
             </p>
-            <div className="festivals-hero__actions">
-              <button type="button" className="festival-btn festival-btn--primary" onClick={() => navigate('/festivals/monthly')}>
-                Monthly Calendar
-              </button>
-              <button type="button" className="festival-btn festival-btn--secondary" onClick={() => setShowSearch(true)}>
-                Search Festivals
+            <div className="festival-inline-search">
+              <input
+                type="text"
+                placeholder="Search by festival name, deity or type..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') searchFestivals();
+                }}
+              />
+              <button type="button" className="festival-btn festival-btn--primary" disabled={!searchTerm.trim()} onClick={searchFestivals}>
+                Search
               </button>
             </div>
           </div>
@@ -343,7 +376,56 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
           </div>
         </section>
 
+        {(searchResults.length > 0 || (searchTerm && !searchLoading && searchResults.length === 0)) && (
+          <section className="festival-panel">
+            <div className="festival-panel__header festival-panel__header--split">
+              <div>
+                <span className="festivals-eyebrow">Results</span>
+                <h2>Search Results for "{searchTerm}"</h2>
+              </div>
+              <button type="button" className="festival-btn festival-btn--ghost" onClick={() => {
+                setSearchResults([]);
+                setSearchTerm('');
+                navigate('/festivals', { replace: true });
+              }}>
+                Clear Search
+              </button>
+            </div>
+
+            {searchLoading ? (
+              <div className="festival-loading">
+                <div className="festival-spinner" />
+                <p>Searching festivals...</p>
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className="festivals-grid">
+                {searchResults.map((festival, index) => (
+                  <FestivalCard festival={festival} key={`${festival.name}-search-res-${index}`} />
+                ))}
+              </div>
+            ) : (
+              <div className="festival-empty">
+                <span aria-hidden>🔎</span>
+                <h3>No festivals found</h3>
+                <p>Try another keyword such as Diwali, Ekadashi, Shiva, Navratri or Pradosh.</p>
+              </div>
+            )}
+          </section>
+        )}
+
         <section className="festival-controls" aria-label="Festival filters">
+          <div className="festival-category-chips">
+            {['All', 'Major Festivals', 'Vrats', 'Regional'].map(filter => (
+              <button
+                type="button"
+                key={filter}
+                className={`festival-chip ${activeFilter === filter ? 'is-active' : ''}`}
+                onClick={() => setActiveFilter(filter)}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
           <label className="festival-field">
             <span>Date</span>
             <input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
@@ -417,9 +499,9 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
               <div className="festival-spinner" />
               <p>Loading festival calendar...</p>
             </div>
-          ) : todayFestivals.length > 0 ? (
+          ) : filteredFestivals.length > 0 ? (
             <div className="festivals-grid">
-              {todayFestivals.map((festival, index) => (
+              {filteredFestivals.map((festival, index) => (
                 <FestivalCard festival={festival} key={`${festival.name}-${festival.date}-${index}`} />
               ))}
             </div>
@@ -511,51 +593,6 @@ const FestivalsPage = ({ user, onLogout, onAdminClick, onLogin, showLoginButton 
         </div>
       )}
 
-      {showSearch && (
-        <div className="festival-modal-overlay">
-          <div className="festival-modal festival-modal--wide" role="dialog" aria-modal="true" aria-label="Search festivals">
-            <div className="festival-modal__header">
-              <h3>Search Festivals and Vrats</h3>
-              <button type="button" onClick={() => setShowSearch(false)} aria-label="Close search">×</button>
-            </div>
-            <div className="festival-search-row">
-              <input
-                type="text"
-                placeholder="Search by festival name, deity or type"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') searchFestivals();
-                }}
-              />
-              <button type="button" className="festival-btn festival-btn--primary" disabled={!searchTerm.trim()} onClick={searchFestivals}>
-                Search
-              </button>
-            </div>
-
-            <div className="festival-modal__content">
-              {searchLoading ? (
-                <div className="festival-loading">
-                  <div className="festival-spinner" />
-                  <p>Searching festivals...</p>
-                </div>
-              ) : searchResults.length > 0 ? (
-                <div className="festivals-grid festivals-grid--modal">
-                  {searchResults.map((festival, index) => (
-                    <FestivalCard festival={festival} key={`${festival.name}-search-${index}`} />
-                  ))}
-                </div>
-              ) : searchTerm ? (
-                <div className="festival-empty">
-                  <span aria-hidden>🔎</span>
-                  <h3>No festivals found</h3>
-                  <p>Try another keyword such as Diwali, Ekadashi, Shiva, Navratri or Pradosh.</p>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

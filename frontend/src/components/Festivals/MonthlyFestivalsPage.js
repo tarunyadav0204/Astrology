@@ -121,6 +121,7 @@ const MonthlyFestivalsPage = ({ user, onLogout, onAdminClick, onLogin }) => {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [transits, setTransits] = useState([]);
   const [showTransits, setShowTransits] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [userTimezone] = useState(() => {
     try {
       return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -224,6 +225,12 @@ const MonthlyFestivalsPage = ({ user, onLogout, onAdminClick, onLogin }) => {
 
   const goToCurrentMonth = () => setCurrentDate(new Date());
 
+  const searchFestivals = () => {
+    if (searchTerm.trim()) {
+      navigate(`/festivals?q=${encodeURIComponent(searchTerm)}`);
+    }
+  };
+
   const getEventsForDate = (date) => {
     const dateStr = formatDateKey(date);
     return allEvents.filter((event) => event.date === dateStr);
@@ -248,9 +255,13 @@ const MonthlyFestivalsPage = ({ user, onLogout, onAdminClick, onLogin }) => {
 
       <main className="monthly-festivals-shell">
         <section className={`monthly-festivals-hero ${monthlyData.is_adhika_month ? 'is-adhika' : ''}`}>
+          <div className="festival-tabs">
+            <button type="button" className="festival-tab" onClick={() => navigate('/festivals')}>Daily View</button>
+            <button type="button" className="festival-tab is-active" onClick={() => navigate('/festivals/monthly')}>Monthly Calendar</button>
+          </div>
           <div className="monthly-festivals-hero__copy">
-            <button type="button" className="monthly-festivals-back" onClick={() => navigate('/festivals')}>
-              <span aria-hidden>←</span> Daily Festivals
+            <button type="button" className="monthly-festivals-back" onClick={() => setShowLocationPicker(true)}>
+              <span aria-hidden>📍</span> {location.name}
             </button>
             <span className="monthly-festivals-eyebrow">Sacred month · {location.name}</span>
             <h1>See the month<br /><em>in observance.</em></h1>
@@ -258,12 +269,18 @@ const MonthlyFestivalsPage = ({ user, onLogout, onAdminClick, onLogin }) => {
               Scan festivals, Ekadashi, Pradosh, Purnima, Amavasya and vrats together,
               then open an observance without losing the rhythm of the month.
             </p>
-            <div className="monthly-festivals-hero__actions">
-              <button type="button" className="monthly-festival-btn monthly-festival-btn--primary" onClick={() => navigate('/festivals')}>
-                Daily View
-              </button>
-              <button type="button" className="monthly-festival-btn monthly-festival-btn--secondary" onClick={() => setShowLocationPicker(true)}>
-                {location.name}
+            <div className="festival-inline-search">
+              <input
+                type="text"
+                placeholder="Search across all dates..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') searchFestivals();
+                }}
+              />
+              <button type="button" className="festival-btn festival-btn--primary" disabled={!searchTerm.trim()} onClick={searchFestivals}>
+                Search
               </button>
             </div>
           </div>
@@ -290,7 +307,22 @@ const MonthlyFestivalsPage = ({ user, onLogout, onAdminClick, onLogin }) => {
           <button type="button" className="monthly-nav-btn" onClick={() => navigateMonth(-1)} aria-label="Previous month">‹</button>
           <div className="monthly-toolbar__title">
             <span className="monthly-festivals-eyebrow">Calendar</span>
-            <h2>{monthTitle}</h2>
+            <input
+              type="month"
+              className="monthly-jump-picker"
+              value={`${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`}
+              onChange={(e) => {
+                if (e.target.value) {
+                  const [year, month] = e.target.value.split('-');
+                  const newDate = new Date(currentDate);
+                  newDate.setDate(1); // Prevent month rollover bugs on the 31st
+                  newDate.setFullYear(parseInt(year, 10));
+                  newDate.setMonth(parseInt(month, 10) - 1);
+                  setCurrentDate(newDate);
+                }
+              }}
+              aria-label="Select month and year"
+            />
           </div>
           <button type="button" className="monthly-nav-btn" onClick={() => navigateMonth(1)} aria-label="Next month">›</button>
           <button type="button" className="monthly-festival-btn monthly-festival-btn--ghost" onClick={() => setShowTransits((value) => !value)}>
