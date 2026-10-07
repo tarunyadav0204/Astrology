@@ -433,8 +433,10 @@
       "fair_or_light_complexion": "गोरी या हल्की रंगत",
       "warm_reddish_complexion": "गरम लालिमा वाली रंगत",
       "olive_or_dusky_complexion": "जैतूनी या सांवली रंगत",
+      "olive_or_wheatish_complexion": "जैतूनी या गेहुँआ रंगत",
       "fair_or_light_golden_complexion": "गोरी या हल्की सुनहरी रंगत",
       "brown_or_dusky_complexion": "भूरी या सांवली रंगत",
+      "medium_brown_complexion_with_warm_undertone": "गरम अंतर्स्वर वाली मध्यम भूरी रंगत",
       "dark_complexion": "गहरी रंगत"
     },
     "channels": {
@@ -718,8 +720,10 @@
       "fair_or_light_complexion": "tez clara",
       "warm_reddish_complexion": "tez cálida con matiz rojizo",
       "olive_or_dusky_complexion": "tez oliva o morena",
+      "olive_or_wheatish_complexion": "tez oliva o trigueña",
       "fair_or_light_golden_complexion": "tez clara o dorada suave",
       "brown_or_dusky_complexion": "tez castaña o morena",
+      "medium_brown_complexion_with_warm_undertone": "tez castaña media con matiz cálido",
       "dark_complexion": "tez oscura"
     },
     "channels": {
@@ -1003,8 +1007,10 @@
       "fair_or_light_complexion": "teint clair",
       "warm_reddish_complexion": "teint chaud aux nuances rouges",
       "olive_or_dusky_complexion": "teint olive ou mat",
+      "olive_or_wheatish_complexion": "teint olive ou couleur de blé",
       "fair_or_light_golden_complexion": "teint clair ou légèrement doré",
       "brown_or_dusky_complexion": "teint brun ou mat",
+      "medium_brown_complexion_with_warm_undertone": "teint brun moyen aux nuances chaudes",
       "dark_complexion": "teint foncé"
     },
     "channels": {
@@ -1288,8 +1294,10 @@
       "fair_or_light_complexion": "heller Hautton",
       "warm_reddish_complexion": "warmer rötlicher Hautton",
       "olive_or_dusky_complexion": "olivfarbener oder dunklerer Hautton",
+      "olive_or_wheatish_complexion": "olivfarbener oder weizenfarbener Hautton",
       "fair_or_light_golden_complexion": "heller oder leicht goldener Hautton",
       "brown_or_dusky_complexion": "brauner oder dunklerer Hautton",
+      "medium_brown_complexion_with_warm_undertone": "mittlerer brauner Hautton mit warmem Unterton",
       "dark_complexion": "dunkler Hautton"
     },
     "channels": {
@@ -1573,8 +1581,10 @@
       "fair_or_light_complexion": "светлый тон кожи",
       "warm_reddish_complexion": "тёплый красноватый тон кожи",
       "olive_or_dusky_complexion": "оливковый или смуглый тон кожи",
+      "olive_or_wheatish_complexion": "оливковый или пшеничный тон кожи",
       "fair_or_light_golden_complexion": "светлый или слегка золотистый тон кожи",
       "brown_or_dusky_complexion": "коричневый или смуглый тон кожи",
+      "medium_brown_complexion_with_warm_undertone": "средний коричневый тон кожи с тёплым подтоном",
       "dark_complexion": "тёмный тон кожи"
     },
     "channels": {
@@ -1858,8 +1868,10 @@
       "fair_or_light_complexion": "白皙或浅色肤色",
       "warm_reddish_complexion": "暖红肤色",
       "olive_or_dusky_complexion": "橄榄色或偏深肤色",
+      "olive_or_wheatish_complexion": "橄榄色或小麦色肤色",
       "fair_or_light_golden_complexion": "白皙或浅金色肤色",
       "brown_or_dusky_complexion": "棕色或偏深肤色",
+      "medium_brown_complexion_with_warm_undertone": "暖调中等棕色肤色",
       "dark_complexion": "深色肤色"
     },
     "channels": {
@@ -2143,8 +2155,10 @@
       "fair_or_light_complexion": "வெளிர் நிறம்",
       "warm_reddish_complexion": "வெப்பமான சிவப்பு கலந்த நிறம்",
       "olive_or_dusky_complexion": "ஆலிவ் அல்லது மாநிறம்",
+      "olive_or_wheatish_complexion": "ஆலிவ் அல்லது கோதுமை நிறம்",
       "fair_or_light_golden_complexion": "வெளிர் அல்லது மென் பொன்னிறம்",
       "brown_or_dusky_complexion": "பழுப்பு அல்லது மாநிறம்",
+      "medium_brown_complexion_with_warm_undertone": "வெப்பமான அடிச்சாயலுடன் நடுத்தர பழுப்பு நிறம்",
       "dark_complexion": "கருமையான நிறம்"
     },
     "channels": {
@@ -2428,8 +2442,10 @@
       "fair_or_light_complexion": "తెలుపు లేదా లేత ఛాయ",
       "warm_reddish_complexion": "వెచ్చని ఎరుపు ఛాయ",
       "olive_or_dusky_complexion": "ఆలివ్ లేదా చామనచాయ",
+      "olive_or_wheatish_complexion": "ఆలివ్ లేదా గోధుమలాంటి ఛాయ",
       "fair_or_light_golden_complexion": "తెలుపు లేదా లేత బంగారు ఛాయ",
       "brown_or_dusky_complexion": "గోధుమ లేదా చామనచాయ",
+      "medium_brown_complexion_with_warm_undertone": "వెచ్చని మధ్యస్థ గోధుమ ఛాయ",
       "dark_complexion": "ముదురు ఛాయ"
     },
     "channels": {
@@ -2713,8 +2729,10 @@
       "fair_or_light_complexion": "ગોરો અથવા હળવો વર્ણ",
       "warm_reddish_complexion": "ઉષ્મ લાલાશ પડતો વર્ણ",
       "olive_or_dusky_complexion": "ઓલિવ અથવા ઘઉંવર્ણી શ્યામ છાયા",
+      "olive_or_wheatish_complexion": "ઓલિવ અથવા ઘઉંવર્ણી છાયા",
       "fair_or_light_golden_complexion": "ગોરો અથવા હળવો સોનેરી વર્ણ",
       "brown_or_dusky_complexion": "ભુરો અથવા શ્યામ વર્ણ",
+      "medium_brown_complexion_with_warm_undertone": "ઉષ્મ અંડરટોન સાથે મધ્યમ ભુરો વર્ણ",
       "dark_complexion": "ઘેરો વર્ણ"
     },
     "channels": {
@@ -2998,8 +3016,10 @@
       "fair_or_light_complexion": "गोरा किंवा फिकट वर्ण",
       "warm_reddish_complexion": "उबदार तांबूस वर्ण",
       "olive_or_dusky_complexion": "ऑलिव्ह किंवा सावळा वर्ण",
+      "olive_or_wheatish_complexion": "ऑलिव्ह किंवा गव्हाळ वर्ण",
       "fair_or_light_golden_complexion": "गोरा किंवा फिकट सोनेरी वर्ण",
       "brown_or_dusky_complexion": "तपकिरी किंवा सावळा वर्ण",
+      "medium_brown_complexion_with_warm_undertone": "उबदार मध्यम तपकिरी वर्ण",
       "dark_complexion": "गडद वर्ण"
     },
     "channels": {
