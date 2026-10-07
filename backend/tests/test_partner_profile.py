@@ -97,7 +97,7 @@ def test_legacy_partner_portrait_matches_only_when_classical_evidence_still_matc
 def test_partner_profile_resolves_d1_d9_and_source_trace():
     profile = build_partner_profile(_chart())
 
-    assert profile["schema_version"] == "partner-profile/v1"
+    assert profile["schema_version"] == "partner-profile/v2"
     assert profile["portrait_readiness"] == "ready"
     assert profile["evidence"]["d1"]["seventh_house"]["sign"]
     assert profile["evidence"]["d9"]["seventh_house"]["sign"]
@@ -201,7 +201,8 @@ def test_image_prompt_uses_resolved_traits_without_identity_claims():
     assert "European regional appearance" in prompt
     assert "Indian visual context" not in prompt
     assert "adult woman" in prompt
-    assert "complexion:" in prompt
+    assert "medium-deep to deep complexion with a neutral, matte quality" in prompt
+    assert "dark complexion" not in prompt
     assert "do not default a South Asian person to wheatish" in prompt
 
     body_prompt = build_full_body_prompt(
@@ -441,15 +442,12 @@ def _all_appearance_factors(profile: dict, attribute: str) -> set[str]:
     }
 
 
-def test_uncancelled_debilitation_keeps_graha_form_at_reduced_weight():
+def test_uncancelled_debilitation_keeps_graha_form_without_suppressing_testimony():
     profile = synthesize_partner_profile(_jupiter_seventh_evidence(cancelled=False))
 
     complexion = profile["appearance"]["complexion"]
-    assert complexion["primary"]["value"] == "dark complexion"
-    assert any(
-        any(row["factor"] == "Jupiter" for row in candidate["evidence"])
-        for candidate in complexion["alternatives"]
-    )
+    assert complexion["primary"]["value"] == "fair or light golden complexion"
+    assert any(row["factor"] == "Jupiter" for row in complexion["primary"]["evidence"])
     assert "Jupiter" in _all_appearance_factors(profile, "head_hair")
     jupiter = next(
         row for row in profile["factor_readings"]
@@ -464,7 +462,7 @@ def test_uncancelled_debilitation_keeps_graha_form_at_reduced_weight():
         row for candidate in complexion_candidates for row in candidate["evidence"]
         if row["factor"] == "Jupiter"
     )
-    assert jupiter_evidence["condition_factor"] == 0.55
+    assert jupiter_evidence["condition_quality"] == "strained"
     assert any(
         row["channel"] == "d1_seventh_sign" and row["factor"] == "Capricorn" and row["appearance"]
         for row in profile["factor_readings"]
@@ -472,7 +470,8 @@ def test_uncancelled_debilitation_keeps_graha_form_at_reduced_weight():
     prompt = build_portrait_prompt(
         profile, presentation="feminine", age_band="25-34", clothing_style="contemporary",
     )
-    assert "fair or light golden complexion" not in prompt
+    assert "complexion:" not in prompt
+    assert "light-to-light-medium complexion with a warm golden quality" not in prompt
     assert "golden-brown hair" not in prompt
     summary = profile["resolved_summary"]
     assert summary["appearance"]
@@ -481,17 +480,17 @@ def test_uncancelled_debilitation_keeps_graha_form_at_reduced_weight():
     complexion_resolution = next(
         row for row in summary["conflicts_resolved"] if row["attribute"] == "complexion"
     )
-    assert complexion_resolution["selected"] == "dark complexion"
-    assert complexion_resolution["alternative"] == "fair or light golden complexion"
-    assert "Saturn" in complexion_resolution["selected_factors"]
-    assert "Jupiter" in complexion_resolution["alternative_factors"]
+    assert complexion_resolution["selected"] == "fair or light golden complexion"
+    assert complexion_resolution["alternative"] == "dark complexion"
+    assert "Jupiter" in complexion_resolution["selected_factors"]
+    assert "Saturn" in complexion_resolution["alternative_factors"]
 
 
 def test_chart_screen_neecha_bhanga_mitigates_without_overriding_stronger_form():
     profile = synthesize_partner_profile(_jupiter_seventh_evidence(cancelled=True))
 
     assert "Jupiter" in _all_appearance_factors(profile, "complexion")
-    assert profile["appearance"]["complexion"]["primary"]["value"] == "dark complexion"
+    assert profile["appearance"]["complexion"]["primary"]["value"] == "fair or light golden complexion"
     jupiter = next(
         row for row in profile["factor_readings"]
         if row["factor"] == "Jupiter" and row["channel"] == "d1_occupant"
@@ -506,8 +505,26 @@ def test_chart_screen_neecha_bhanga_mitigates_without_overriding_stronger_form()
         row for candidate in candidates for row in candidate["evidence"]
         if row["factor"] == "Jupiter"
     )
-    assert evidence["condition_factor"] == 0.8
+    assert evidence["condition_quality"] == "restored_after_debilitation"
     assert any(ref["source_id"] == "phaladeepika.neecha_bhanga" for ref in profile["references"])
+
+
+def test_conflicting_d1_and_d9_complexion_is_withheld_from_portrait_inference():
+    profile = synthesize_partner_profile({
+        "d1": {
+            "seventh_lord": {"planet": "Moon"},
+            "seventh_house_occupants": [{"planet": "Moon"}],
+        },
+        "d9": {
+            "seventh_lord": {"planet": "Saturn"},
+            "seventh_house_occupants": [{"planet": "Saturn"}],
+        },
+    })
+
+    complexion = profile["appearance"]["complexion"]["primary"]
+    assert complexion["consistency"] == "mixed"
+    assert complexion["confidence"] == "suggestive"
+    assert not any(item["attribute"] == "complexion" for item in profile["portrait_inference"])
 
 
 def test_uncancelled_debilitation_stays_false_and_is_not_copied_into_d9():

@@ -233,18 +233,21 @@ def _public_result(profile: dict[str, Any], assets: list[dict[str, str]]) -> dic
     public_assets = [{**asset, "url": storage.display_uri(asset["stored_uri"])} for asset in assets]
     factor_readings = profile.get("factor_readings")
     resolved_summary = profile.get("resolved_summary")
+    portrait_inference = profile.get("portrait_inference")
     # Results created before factor readings were added still contain their
     # complete evidence packet. Enrich them when read so an existing paid
     # portrait gains the explanation without requiring another purchase.
-    if (not factor_readings or not resolved_summary) and isinstance(profile.get("evidence"), dict):
+    if (not factor_readings or not resolved_summary or portrait_inference is None) and isinstance(profile.get("evidence"), dict):
         enriched = synthesize_partner_profile(profile["evidence"])
         factor_readings = factor_readings or enriched.get("factor_readings")
         resolved_summary = resolved_summary or enriched.get("resolved_summary")
+        portrait_inference = portrait_inference or enriched.get("portrait_inference")
     safe_profile = {
         "schema_version": profile.get("schema_version"),
         "ruleset_version": profile.get("ruleset_version"),
         "scope": profile.get("scope"),
         "appearance": profile.get("appearance"),
+        "portrait_inference": portrait_inference,
         "personality": profile.get("personality"),
         "factor_readings": factor_readings,
         "resolved_summary": resolved_summary,

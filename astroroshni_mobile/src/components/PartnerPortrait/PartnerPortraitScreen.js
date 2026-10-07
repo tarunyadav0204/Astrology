@@ -446,8 +446,12 @@ export default function PartnerPortraitScreen({ navigation }) {
   const factors = result?.profile?.chart_factors || {};
   const factorReadings = result?.profile?.factor_readings || [];
   const resolvedSummary = result?.profile?.resolved_summary || {};
+  const portraitInference = result?.profile?.portrait_inference || [];
   const summaryAppearance = (resolvedSummary.appearance || appearance)
     .filter((entry) => entry?.confidence === 'strong' || entry?.confidence === 'moderate' || ['hair', 'head_hair', 'complexion'].includes(entry?.attribute));
+  // v2 exposes one modern, resolved description for both this screen and the
+  // image prompt. Classical phrases remain available in the evidence section.
+  const portraitAppearance = portraitInference.length ? portraitInference : summaryAppearance;
   const summaryPersonality = (resolvedSummary.personality || personality).slice(0, 4);
   const dominantFactors = resolvedSummary.dominant_factors?.length
     ? resolvedSummary.dominant_factors
@@ -519,14 +523,14 @@ export default function PartnerPortraitScreen({ navigation }) {
   };
   const localizedTrait = (value) => copy(`traits.${traitKey(value)}`, value);
   const shareTraits = [
-    ...appearance.slice(0, 2).map((item) => localizedTrait(item.value)),
+    ...portraitAppearance.slice(0, 2).map((item) => item.description || localizedTrait(item.value)),
     ...personality.slice(0, 2).map((item) => localizedTrait(item.trait)),
   ].filter((value, index, values) => value && values.indexOf(value) === index).slice(0, 3);
   const portraitAsset = assets.find((asset) => asset.kind === 'portrait') || assets[0];
   const selectedAsset = assets.find((asset) => asset.kind === selectedAssetKind) || portraitAsset;
 
   const summaryTrait = (item) => {
-    const value = localizedTrait(item.value || item.trait);
+    const value = item.description || localizedTrait(item.value || item.trait);
     if (['hair', 'head_hair'].includes(item.attribute)) return copy('hairLabel', 'Hair: {{value}}', { value });
     if (item.attribute === 'body_hair') return copy('bodyHairLabel', 'Body hair: {{value}}', { value });
     if (item.attribute === 'complexion') return copy('complexionLabel', 'Complexion: {{value}}', { value });
@@ -647,7 +651,7 @@ export default function PartnerPortraitScreen({ navigation }) {
               <View style={styles.glanceColumns}>
                 <View style={styles.glanceColumn}>
                   <Text style={[styles.glanceLabel, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>{copy('atGlanceAppearance', 'Appearance')}</Text>
-                  {summaryAppearance.slice(0, 5).map((item, index) => (
+                  {portraitAppearance.slice(0, 5).map((item, index) => (
                     <View key={`${item.attribute}-${item.value}-${index}`} style={styles.glanceTraitRow}>
                       <Ionicons name="sparkles" size={13} color={colors.accent} />
                       <Text style={[styles.glanceTrait, { color: colors.onSurfaceInverse || colors.textInverse }]}>{summaryTrait(item)}</Text>

@@ -68,6 +68,17 @@ def _complexion_trait(result: Mapping[str, Any], primary: Mapping[str, Any]) -> 
 
 
 def _resolved_traits(profile: Mapping[str, Any]) -> list[str]:
+    inference = profile.get("portrait_inference")
+    if isinstance(inference, list):
+        # v2 has already resolved disagreement before this point. The image
+        # generator receives the same modern wording shown to the user, rather
+        # than classical alternatives it could interpret inconsistently.
+        return [
+            str(item.get("description")) for item in inference
+            if isinstance(item, Mapping) and item.get("confidence") in {"strong", "moderate"}
+            and item.get("description")
+        ][:8]
+
     traits: list[str] = []
     appearance = profile.get("appearance") or {}
     # Complexion needs an explicit instruction before regional context reaches

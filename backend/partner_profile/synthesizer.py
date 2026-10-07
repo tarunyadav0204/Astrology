@@ -22,7 +22,19 @@ CHANNELS = {
     "spouse_karaka": {"weight": 1.5, "independence": "spouse_karaka"},
 }
 
-RULESET_VERSION = "bphs-partner-portrait/1.5.1"
+RULESET_VERSION = "bphs-partner-portrait/2.0.0"
+
+# Several channels can describe one placement without being separate testimony.
+# These caps are resolver policy, not classical points.  They preserve a clear
+# distinction between repeated support and a single placement echoed through
+# its sign, lord or divisional placement.
+CHAIN_CAPS = {
+    "d1_core": 2.2,
+    "d9_core": 1.7,
+    "d1_lord_d9": 0.65,
+    "darakaraka": 0.50,
+    "spouse_karaka": 0.40,
+}
 
 # Complexion is a graha-form quality (BPHS 3.16-17). Marriage-linked channels
 # should dominate because spouse karaka alone was injecting Venus on every male
@@ -90,34 +102,18 @@ APPEARANCE_CONCEPTS = {
 
 
 def _planet_condition(row: Mapping[str, Any]) -> Dict[str, Any]:
-    """Qualify how clearly a graha can deliver its natural description.
+    """Keep representation and condition separate.
 
-    The classics supply the dignity and cancellation conditions. The numeric
-    factors are an explicit resolver policy used only to rank competing
-    descriptions; they are not presented as classical points.
+    Dignity qualifies the *quality* of a planet's manifestation.  It must not
+    erase the planet's testimony or manufacture a numerical appearance score.
     """
     dignity = str(row.get("dignity") or "neutral").strip().lower()
     neecha_bhanga = bool(row.get("neecha_bhanga"))
     combust = bool(row.get("combust"))
     # BPHS 45.5-6 qualifies a debilitated graha's capacity to deliver results;
     # it does not state that the graha ceases to signify its classical form.
-    # Keep that testimony visible at reduced resolver weight. Neecha Bhanga
-    # removes this particular reduction without inventing extra appearance.
-    dignity_factor = {
-        "exalted": 1.20,
-        "moolatrikona": 1.12,
-        "own_sign": 1.08,
-        "favorable": 1.04,
-        "friendly": 1.04,
-        "neutral": 1.00,
-        "unfavorable": 0.85,
-        "enemy": 0.85,
-        # Cancellation mitigates debilitation; it does not make the graha
-        # exalted or erase the natal fact that it occupies its fall sign.
-        "debilitated": 0.80 if neecha_bhanga else 0.55,
-    }.get(dignity, 1.00)
-    combustion_factor = 0.80 if combust else 1.00
-    factor = dignity_factor * combustion_factor
+    # Keep that testimony visible with a condition tag. Neecha Bhanga restores
+    # the quality tag without inventing additional appearance.
     if dignity == "debilitated" and neecha_bhanga:
         state = "debilitation_cancelled"
     elif dignity == "debilitated":
@@ -135,7 +131,12 @@ def _planet_condition(row: Mapping[str, Any]) -> Dict[str, Any]:
         "neecha_bhanga_source": row.get("neecha_bhanga_source"),
         "combust": combust,
         "condition_state": state,
-        "condition_factor": round(factor, 4),
+        "condition_quality": (
+            "restored_after_debilitation" if dignity == "debilitated" and neecha_bhanga
+            else "strained" if dignity == "debilitated" or combust
+            else "supported" if dignity in {"exalted", "moolatrikona", "own_sign", "favorable", "friendly"}
+            else "ordinary"
+        ),
     }
 
 
@@ -146,7 +147,6 @@ def _add_rule_signals(
 ) -> None:
     channel_meta = CHANNELS[channel]
     condition = dict(condition or {})
-    condition_factor = float(condition.get("condition_factor", 1.0))
     for attribute, value in (rule.get("appearance") or {}).items():
         if skip_attributes and attribute in skip_attributes:
             continue
@@ -159,7 +159,7 @@ def _add_rule_signals(
             "attribute": attribute,
             "value": value,
             "concept": APPEARANCE_CONCEPTS.get(value, value),
-            "weight": base_weight * condition_factor,
+            "weight": base_weight,
             "base_weight": base_weight,
             "independence": channel_meta["independence"],
             "channel": channel,
@@ -176,11 +176,10 @@ def _personality_signals(
 ) -> None:
     channel_meta = CHANNELS[channel]
     condition = dict(condition or {})
-    condition_factor = float(condition.get("condition_factor", 1.0))
     for value in (rule.get("personality") or rule.get("temperament") or []):
         ledger.append({
             "value": value,
-            "weight": channel_meta["weight"] * condition_factor,
+            "weight": channel_meta["weight"],
             "base_weight": channel_meta["weight"],
             "independence": channel_meta["independence"],
             "channel": channel,
@@ -191,19 +190,32 @@ def _personality_signals(
         })
 
 
+def _chain_for(row: Mapping[str, Any]) -> str:
+    channel = str(row.get("channel") or "")
+    if channel in {"d1_seventh_sign", "d1_occupant", "d1_aspect", "d1_seventh_lord"}:
+        return "d1_core"
+    if channel in {"d9_seventh_sign", "d9_occupant", "d9_aspect", "d9_seventh_lord"}:
+        return "d9_core"
+    if channel == "d9_d1_seventh_lord":
+        return "d1_lord_d9"
+    return channel
+
+
 def _effective_repetitions(rows: Iterable[Dict[str, Any]]) -> float:
-    strongest_by_channel: dict[str, float] = {}
+    """Count independent chains, with a cap on repeated testimony per chain."""
+    strongest_by_chain: dict[str, float] = {}
     for row in rows:
-        independence = str(row["independence"])
-        strongest_by_channel[independence] = max(
-            strongest_by_channel.get(independence, 0.0),
-            min(1.0, float(row.get("condition_factor", 1.0))),
-        )
-    return sum(strongest_by_channel.values())
+        chain = _chain_for(row)
+        strongest_by_chain[chain] = max(strongest_by_chain.get(chain, 0.0), float(row.get("weight", 0.0)))
+    return sum(min(weight, CHAIN_CAPS.get(chain, 1.0)) for chain, weight in strongest_by_chain.items())
 
 
-def _confidence(rows: Iterable[Dict[str, Any]]) -> str:
+def _confidence(rows: Iterable[Dict[str, Any]], *, contradictory_support: float = 0.0) -> str:
     effective = _effective_repetitions(rows)
+    # A near-tied alternative is evidence that the feature is mixed, not a
+    # reason to express either extreme with confidence.
+    if contradictory_support >= effective * 0.75:
+        return "suggestive"
     if effective >= 2.5:
         return "strong"
     if effective >= 1.5:
@@ -235,17 +247,90 @@ def _rank_appearance(ledger: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
             candidates.append({
                 "value": display_row["value"],
                 "concept": display_row.get("concept") or display_row["value"],
-                "confidence": _confidence(evidence),
+                # Assigned once both leading alternatives are known below.
+                "confidence": "suggestive",
                 "independent_repetitions": independent,
                 "effective_repetitions": round(_effective_repetitions(evidence), 2),
                 "evidence": evidence,
             })
         if candidates:
+            primary_support = float(candidates[0]["effective_repetitions"])
+            alternative_support = float(candidates[1]["effective_repetitions"]) if len(candidates) > 1 else 0.0
+            candidates[0]["confidence"] = _confidence(
+                candidates[0]["evidence"], contradictory_support=alternative_support,
+            )
+            candidates[0]["consistency"] = (
+                "mixed" if alternative_support >= primary_support * 0.75 else "clear"
+            )
+            for candidate in candidates[1:]:
+                candidate["confidence"] = _confidence(
+                    candidate["evidence"], contradictory_support=primary_support,
+                )
+                candidate["consistency"] = "mixed"
             result[attribute] = {
                 "primary": candidates[0],
                 "alternatives": candidates[1:],
             }
     return result
+
+
+# This is intentionally a separate, explicitly modern inference layer.  The
+# source-bound classical phrase remains in `appearance`; this layer gives the
+# image model practical, non-literal wording without presenting it as a verse.
+PORTRAIT_INFERENCES = {
+    "fair or light complexion": ("complexion", "light-to-light-medium complexion with a soft, clear quality"),
+    "fair or light golden complexion": ("complexion", "light-to-light-medium complexion with a warm golden quality"),
+    "warm fair complexion with soft brown undertone": ("complexion", "light-medium complexion with a warm-neutral undertone and clear quality"),
+    "olive or wheatish complexion": ("complexion", "medium complexion with an olive-neutral undertone"),
+    "warm reddish-brown complexion": ("complexion", "medium complexion with a warm undertone"),
+    "warm reddish complexion": ("complexion", "medium complexion with a warm undertone"),
+    "dark complexion": ("complexion", "medium-deep to deep complexion with a neutral, matte quality"),
+    "square and structured": ("build", "firm, structured build"),
+    "rounded and soft": ("build", "soft-rounded build"),
+    "rounded or substantial": ("build", "soft-rounded to substantial build"),
+    "medium and soft": ("build", "medium, softly built frame"),
+    "lean and wiry": ("build", "lean, wiry build"),
+    "lean and elongated": ("build", "lean, long-lined build"),
+    "slender and compact": ("build", "lean, compact build"),
+    "well-proportioned and youthful": ("build", "medium, well-proportioned build"),
+    "graceful and well-proportioned": ("build", "medium, proportionate build"),
+    "broad or substantial": ("build", "broad, substantial build"),
+    "long or taller": ("height", "taller tendency"),
+    "taller or long-limbed": ("height", "taller, long-limbed tendency"),
+    "round": ("face", "round, softly shaped face"),
+    "square": ("face", "structured, square-leaning face"),
+    "pleasing and expressive": ("eyes", "pleasant, expressive eyes"),
+    "warm, honey-toned expression": ("eyes", "bright, warm expression"),
+    "soft wavy or gently curled hair": ("hair", "soft hair with natural waves"),
+    "coarse hair": ("hair", "coarse-textured, naturally styled hair"),
+    "less abundant hair": ("hair", "naturally fine, lower-volume hair with normal coverage"),
+}
+
+
+def _portrait_inference(appearance: Mapping[str, Any]) -> list[Dict[str, Any]]:
+    """Return only resolved, non-conflicted traits for human and image output."""
+    inferred: list[Dict[str, Any]] = []
+    for attribute, result in appearance.items():
+        primary = result.get("primary") if isinstance(result, Mapping) else None
+        if not isinstance(primary, Mapping) or primary.get("confidence") not in {"strong", "moderate"}:
+            continue
+        mapping = PORTRAIT_INFERENCES.get(str(primary.get("value") or ""))
+        if not mapping:
+            continue
+        dimension, description = mapping
+        # A contradictory result is retained in source trace but deliberately
+        # withheld from the portrait: no model is asked to guess a compromise.
+        inferred.append({
+            "attribute": attribute,
+            "dimension": dimension,
+            "description": description,
+            "confidence": primary["confidence"],
+            "classical_value": primary["value"],
+            "condition_quality": sorted({
+                str(row.get("condition_quality") or "ordinary") for row in primary.get("evidence") or []
+            }),
+        })
+    return inferred
 
 
 def _rank_personality(ledger: Iterable[Dict[str, Any]]) -> list[Dict[str, Any]]:
@@ -298,6 +383,7 @@ def _factor_readings(
                 "neecha_bhanga_source": row.get("neecha_bhanga_source"),
                 "combust": bool(row.get("combust")),
                 "condition_state": row.get("condition_state"),
+                "condition_quality": row.get("condition_quality"),
             }
         return grouped[key]
 
@@ -344,8 +430,9 @@ def _resolved_summary(
             "appearance": [],
             "personality": [],
             "channels": [],
-            "condition_state": row.get("condition_state"),
-            "dignity": row.get("dignity"),
+                "condition_state": row.get("condition_state"),
+                "dignity": row.get("dignity"),
+                "condition_quality": row.get("condition_quality"),
         })
         if row.get("channel") and row["channel"] not in bucket["channels"]:
             bucket["channels"].append(row["channel"])
@@ -503,6 +590,7 @@ def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
     add_planet_and_placement_sign("spouse_karaka", d1.get("spouse_karaka") or d1.get("venus"))
 
     appearance = _rank_appearance(appearance_ledger)
+    portrait_inference = _portrait_inference(appearance)
     personality = _rank_personality(personality_ledger)
     factor_readings = _factor_readings(appearance_ledger, personality_ledger)
     resolved_summary = _resolved_summary(appearance, personality)
@@ -522,10 +610,11 @@ def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
 
     strong_visuals = sum(1 for value in appearance.values() if (value.get("primary") or {}).get("confidence") in {"strong", "moderate"})
     return {
-        "schema_version": "partner-profile/v1",
+        "schema_version": "partner-profile/v2",
         "ruleset_version": RULESET_VERSION,
         "scope": "A birth-chart-guided portrait of likely partner traits; not an exact photograph or identification of a specific person.",
         "appearance": appearance,
+        "portrait_inference": portrait_inference,
         "personality": personality,
         "factor_readings": factor_readings,
         "resolved_summary": resolved_summary,
@@ -533,9 +622,10 @@ def synthesize_partner_profile(evidence: Mapping[str, Any]) -> Dict[str, Any]:
         "references": references,
         "portrait_readiness": "ready" if strong_visuals >= 2 else "limited",
         "method_note": (
-            "The classical texts supply the rashi and graha descriptions. Debilitation weakens how prominently "
-            "a graha's description is used; a matched Phaladeepika 7.26-30 Neecha Bhanga condition mitigates, "
-            "but does not reverse, that reduction. AstroRoshni's declared resolver ranks the descriptions by spouse relevance "
-            "and independent repetition; the numerical weights are an implementation policy, not a verse from the classics."
+            "The classical texts supply the rashi and graha descriptions. The portrait wording is a separate modern "
+            "inference layer. Conditions qualify how a graha manifests but do not erase its testimony or multiply its "
+            "appearance score. AstroRoshni groups dependent testimony into capped D1 and D9 evidence chains, and withholds "
+            "near-tied or contradictory traits from the generated portrait. These resolver rules are implementation policy, "
+            "not verses from the classics."
         ),
     }
