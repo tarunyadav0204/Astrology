@@ -20,6 +20,7 @@ import PodcastGenerationExperience from './PodcastGenerationExperience';
 import { buildInstantTypingLines, INSTANT_LOADER_TAKING_LONGER } from '../../constants/instantChatLoader';
 import { buildReadableEvidence, buildRoutingSummary } from '../../utils/instantEvidence';
 import { autoWrapGlossaryTermsInHtml, buildGlossaryTooltipHtml } from '../../utils/chatGlossary';
+import { formatChatHeadings } from '../../utils/chatFormatting';
 
 const premiumPodcastReadyKeys = new Set();
 const PODCAST_READY_TOAST = 'Podcast ready — tap to listen';
@@ -1581,12 +1582,7 @@ const MessageBubble = ({
         }
         
         // 8. Headings (lighter, non-overwhelming)
-        formatted = formatted.replace(/#### (.*?)\n/g, (match, header) => {
-            return `<h4 class="chat-subheader">${header.trim()}</h4>\n`;
-        });
-        formatted = formatted.replace(/### (.*?)\n/g, (match, header) => {
-            return `<h3 class="chat-section-title">${header.trim()}</h3>\n`;
-        });
+        formatted = formatChatHeadings(formatted);
 
         // 9. Lists (keep them readable without heavy card chrome)
         // Some responses return dash bullets inline on one line:

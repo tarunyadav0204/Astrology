@@ -779,6 +779,17 @@ def is_instant_chat_enabled() -> bool:
     return _parse_bool_setting(get_setting("instant_chat_enabled"), default=False)
 
 
+def is_verified_chat_enabled() -> bool:
+    """Global feature flag for the Verified Chat rollout."""
+    return _parse_bool_setting(get_setting("verified_chat_enabled"), default=False)
+
+
+def verified_chat_enabled_for_user(user_id: Optional[int]) -> bool:
+    """Verified Chat is deliberately a global flag; it has no user allowlist."""
+    _ = user_id
+    return is_verified_chat_enabled()
+
+
 EVENT_TIMELINE_MODE_DETERMINISTIC = "deterministic"
 EVENT_TIMELINE_MODE_LEGACY_AI = "legacy_ai"
 

@@ -128,6 +128,7 @@ const styles = StyleSheet.create({
   },
   btnGhost: {
     borderWidth: 1,
+    alignItems: 'center',
   },
   btnGhostText: {
     fontWeight: '600',

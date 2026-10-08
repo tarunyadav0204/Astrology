@@ -138,6 +138,7 @@ backend/gcp_key.json
 !knowledge_graph/wealth_poc/wealth-runtime-preview.json
 !knowledge_graph/manifestation/competency-cases.json
 !astroroshni_mobile/src/locales/*.json
+!backend/data/chat_glossary_terms_v2.json
 !astroroshni_mobile/src/data/eventTimelineYearlySample.json
 !astroroshni_mobile/src/data/eventTimelineMonthlySample.json
 !backend/whatsapp/flows/registration_flow.json

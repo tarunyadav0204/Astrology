@@ -14,6 +14,7 @@ import uuid
 import json
 import logging
 import os
+import re
 import time
 import asyncio
 import jwt
@@ -66,6 +67,57 @@ def sanitize_text(text):
     text = text.encode('utf-8', 'surrogatepass').decode('utf-8', 'ignore')
     text = text.replace('\0', '')
     return text.strip()
+
+
+_NON_ASTROLOGY_SCOPE_MESSAGES = {
+    "english": "This is not an astrology question. I can help with questions about your chart and astrology.",
+    "hindi": "यह ज्योतिष से जुड़ा प्रश्न नहीं है। मैं आपकी कुंडली और ज्योतिषीय विषयों पर सहायता कर सकती हूँ।",
+    "es": "Esta no es una pregunta de astrología. Puedo ayudarte con preguntas sobre tu carta y astrología.",
+    "fr": "Ce n’est pas une question d’astrologie. Je peux vous aider avec des questions sur votre thème et l’astrologie.",
+    "german": "Das ist keine astrologische Frage. Ich kann bei Fragen zu Ihrem Horoskop und zur Astrologie helfen.",
+    "russian": "Это не астрологический вопрос. Я могу помочь с вопросами о вашей карте и астрологии.",
+    "chinese": "这不是占星问题。我可以帮助解答有关您的星盘和占星的问题。",
+    "tamil": "இது ஜோதிடக் கேள்வி அல்ல. உங்கள் ஜாதகம் மற்றும் ஜோதிடம் தொடர்பான கேள்விகளுக்கு நான் உதவ முடியும்.",
+    "telugu": "ఇది జ్యోతిష్య ప్రశ్న కాదు. మీ జాతకం మరియు జ్యోతిష్యానికి సంబంధించిన ప్రశ్నలకు నేను సహాయం చేయగలను.",
+    "gujarati": "આ જ્યોતિષનો પ્રશ્ન નથી. હું તમારી કુંડળી અને જ્યોતિષ સંબંધિત પ્રશ્નોમાં મદદ કરી શકું છું.",
+    "marathi": "हा ज्योतिषाशी संबंधित प्रश्न नाही. तुमच्या कुंडलीबद्दल आणि ज्योतिषाबद्दलच्या प्रश्नांमध्ये मी मदत करू शकते.",
+}
+
+
+def _non_astrology_scope_response(question: str, language: str) -> str | None:
+    """Return a localized boundary for clear AI/model-identity questions.
+
+    This runs before chart construction so a question about the product or model
+    cannot be turned into a fabricated chart reading. The patterns are deliberately
+    narrow; ordinary chart terminology that happens to include "model" remains
+    available to the semantic astrology router.
+    """
+    text = str(question or "").strip().lower()
+    if not text:
+        return None
+    is_model_identity_question = any((
+        re.search(r"\b(?:what|which)\s+(?:ai\s+)?(?:model|modal)\s+(?:are|r)\s+you\b", text),
+        re.search(r"\b(?:who|what)\s+are\s+you\b", text),
+        re.search(r"\b(?:aap|aapka|tum|aap\s+kon(?:sa|se)?)\s+(?:kaun|kon|koun|kaunsa|kaunse|konsa|konse)\b.*\b(?:model|modal|ho)\b", text),
+        re.search(r"(?:आप|तुम)\s+(?:कौन|कौन-सा|कौन सा).*(?:मॉडल|हो)", text),
+    ))
+    if not is_model_identity_question:
+        return None
+    normalized_language = {
+        "en": "english",
+        "spanish": "es",
+        "hi": "hindi",
+        "ta": "tamil",
+        "te": "telugu",
+        "gu": "gujarati",
+        "mr": "marathi",
+        "de": "german",
+        "french": "fr",
+        "fr": "fr",
+        "ru": "russian",
+        "zh": "chinese",
+    }.get(str(language or "english").strip().lower(), str(language or "english").strip().lower())
+    return _NON_ASTROLOGY_SCOPE_MESSAGES.get(normalized_language, _NON_ASTROLOGY_SCOPE_MESSAGES["english"])
 
 
 def _instant_stream_reveal_prefixes(previous: str, current: str, chunk_size: int = 44) -> list[str]:
@@ -519,6 +571,126 @@ def _ensure_chat_messages_response_style(conn):
         return
     execute(conn, "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS response_style TEXT")
     _mark_schema_ready("chat_messages_response_style")
+
+
+def _ensure_verified_chat_validation_table(conn):
+    if _schema_already_ready("verified_chat_validations"):
+        return
+    execute(
+        conn,
+        """
+        CREATE TABLE IF NOT EXISTS verified_chat_validations (
+            message_id BIGINT PRIMARY KEY,
+            status TEXT NOT NULL,
+            failures TEXT NOT NULL DEFAULT '[]',
+            evidence_summary TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+    )
+    _mark_schema_ready("verified_chat_validations")
+
+
+def _record_verified_chat_validation(message_id: int, result: Dict[str, Any]) -> None:
+    """Persist non-blocking deterministic audit findings for Verified Chat."""
+    failures: list[Dict[str, Any]] = []
+    debug = result.get("instant_evidence_debug") if isinstance(result, dict) else None
+    debug = debug if isinstance(debug, dict) else {}
+    verification = debug.get("verification") if isinstance(debug.get("verification"), dict) else {}
+    if verification and not verification.get("passed", True):
+        failures.append({"code": "deterministic_contract_failed"})
+    graph_error = result.get("graph_fallback_error") if isinstance(result, dict) else None
+    if isinstance(graph_error, dict) and graph_error:
+        failures.append({"code": "graph_evidence_incomplete", "details": graph_error})
+    response = str((result or {}).get("response") or "")
+    response_without_allowed_cards = re.sub(
+        r"</?div(?:\s+class=[\"'](?:quick-answer-card|final-thoughts-card)[\"'])?\s*>",
+        "",
+        response,
+        flags=re.IGNORECASE,
+    )
+    if re.search(r"</?(?:div|span|br|h[1-6])\b", response_without_allowed_cards, re.IGNORECASE):
+        failures.append({"code": "unexpected_html"})
+    missing_language = re.findall(
+        r"[^.\n]{0,110}\b(?:supplied|provided|packet|data|calculations?|baseline|evidence)\b[^.\n]{0,110}"
+        r"\b(?:missing|unavailable|not supplied|not provided|not available|does not (?:have|contain|include))\b[^.\n]{0,110}",
+        response,
+        flags=re.IGNORECASE,
+    )
+    if missing_language:
+        failures.append({
+            "code": "user_facing_missing_evidence_language",
+            "excerpts": [str(value).strip()[:260] for value in missing_language[:3]],
+        })
+    internal_transport_language = re.findall(
+        r"[^.\n]{0,100}\b(?:supplied|provided|available|received|missing|incomplete)\b[^.\n]{0,100}"
+        r"\b(?:data|json|packet|input|calculation|evidence|branch|tool|calculator)\b[^.\n]{0,100}"
+        r"|[^.\n]{0,100}\b(?:data|json|packet|input|calculation|evidence|branch|tool|calculator)\b[^.\n]{0,100}"
+        r"\b(?:was|were|is|are|not)\b[^.\n]{0,70}\b(?:supplied|provided|available|received|missing|incomplete)\b[^.\n]{0,100}",
+        response,
+        flags=re.IGNORECASE,
+    )
+    if internal_transport_language:
+        failures.append({
+            "code": "user_facing_internal_transport_language",
+            "excerpts": [str(value).strip()[:260] for value in internal_transport_language[:3]],
+        })
+    packet_validation = result.get("verified_packet_validation") if isinstance(result, dict) else {}
+    packet_validation = packet_validation if isinstance(packet_validation, dict) else {}
+    missing_capabilities = packet_validation.get("missing_capabilities")
+    if isinstance(missing_capabilities, list) and missing_capabilities:
+        failures.append({
+            "code": "calculation_capability_missing",
+            "capabilities": [str(value) for value in missing_capabilities],
+        })
+    tool_events = packet_validation.get("tool_events") if isinstance(packet_validation, dict) else []
+    requested_tools = {
+        str(event.get("tool") or "")
+        for event in (tool_events or [])
+        if isinstance(event, dict) and event.get("success")
+    }
+    response_lower = response.lower()
+    if (
+        "chara dasha" in response_lower
+        and re.search(r"chara dasha[^.]{0,180}\b(?:not supplied|not provided|not available|cannot be made)\b", response_lower)
+        and "jaimini.chara_dasha" not in requested_tools
+    ):
+        failures.append({
+            "code": "requested_calculator_not_used",
+            "calculator": "jaimini.chara_dasha",
+            "reason": "The response discussed unavailable Chara Dasha timing instead of requesting it.",
+        })
+    summary = {
+        "answer_mode": ((debug.get("query_plan") or {}).get("answer_mode")),
+        "capabilities": [
+            item.get("capability")
+            for item in ((debug.get("evidence_plan") or {}).get("capability_requests") or [])
+            if isinstance(item, dict) and item.get("capability")
+        ],
+        "verification": verification,
+        "packet_validation": packet_validation,
+    }
+    with get_conn() as conn:
+        _ensure_verified_chat_validation_table(conn)
+        execute(
+            conn,
+            """
+            INSERT INTO verified_chat_validations (message_id, status, failures, evidence_summary)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (message_id) DO UPDATE SET
+                status = EXCLUDED.status,
+                failures = EXCLUDED.failures,
+                evidence_summary = EXCLUDED.evidence_summary,
+                created_at = CURRENT_TIMESTAMP
+            """,
+            (
+                message_id,
+                "failed" if failures else "passed",
+                json.dumps(failures, ensure_ascii=False),
+                json.dumps(summary, ensure_ascii=False, default=str),
+            ),
+        )
+        conn.commit()
 
 
 def _conversation_state_pending_gate_cols_exist(conn) -> bool:
@@ -1647,6 +1819,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
 
         _ensure_chat_messages_gate_metadata(conn)
         _ensure_chat_messages_chat_tier(conn)
+        _ensure_chat_messages_response_style(conn)
         _ensure_chat_messages_next_action_col(conn)
         conn.commit()
 
@@ -1655,7 +1828,7 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
             """
                 SELECT message_id, sender, content, timestamp, completed_at, terms, glossary, images,
                        message_type, gate_metadata, parallel_llm_usage, next_action, status, started_at,
-                       follow_up_questions, chat_tier
+                       follow_up_questions, chat_tier, response_style
                 FROM chat_messages
                 WHERE session_id = %s
                 ORDER BY timestamp ASC
@@ -1735,8 +1908,10 @@ async def get_chat_session(session_id: str, current_user = Depends(get_current_u
         started_at = msg[13] if len(msg) > 13 else None
         follow_up_questions = msg[14] if len(msg) > 14 else None
         chat_tier = msg[15] if len(msg) > 15 else "standard"
+        response_style = msg[16] if len(msg) > 16 else None
         message_data["message_type"] = mt
         message_data["chat_tier"] = str(chat_tier or "standard").strip().lower()
+        message_data["response_style"] = normalize_chat_answer_style(response_style)
         message_data["status"] = status
         message_data["started_at"] = started_at
         if gm:
@@ -1901,10 +2076,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         chat_subject_gate_enabled_for_user,
         get_chat_countdown_seconds,
         instant_chat_enabled_for_user,
+        verified_chat_enabled_for_user,
         speech_chat_enabled_for_user,
     )
 
     instant_chat_requested = requested_chat_tier == "instant"
+    verified_chat_requested = requested_chat_tier == "verified"
     instant_timeline_selection = bool(
         str(raw_query_context.get("follow_up_type") or "").strip().lower()
         == "marriage_timeline_selection"
@@ -1921,6 +2098,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         and not partnership_mode
         and instant_chat_enabled_for_user(current_user.userid)
     )
+    verified_chat_active = (
+        verified_chat_requested
+        and not premium_analysis
+        and not partnership_mode
+        and verified_chat_enabled_for_user(current_user.userid)
+    )
     if speech_chat_requested and not instant_chat_active:
         raise HTTPException(
             status_code=403,
@@ -1930,13 +2113,17 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         raise HTTPException(status_code=403, detail="Talk To Tara is not enabled for your account.")
     speech_billing_requested = request.get("speech_billing", request.get("speechBilling", True))
     speech_chat_billing = bool(speech_chat_requested and instant_chat_active and speech_billing_requested is not False)
-    effective_chat_tier = "instant" if instant_chat_active else ("premium" if premium_analysis else "standard")
+    effective_chat_tier = (
+        "instant" if instant_chat_active
+        else "verified" if verified_chat_active
+        else "premium" if premium_analysis else "standard"
+    )
     chat_worker_mode_active = chat_worker_mode_enabled_for_user(current_user.userid)
     # A free question is always a Standard single-chart answer. Do not open
     # the subject gate at all: free users must not be routed into Partnership
     # Analysis or asked to create/select another person's chart.
     free_question_gate_eligible = False
-    if not partnership_mode and not premium_analysis and not instant_chat_active:
+    if not partnership_mode and not premium_analysis and not instant_chat_active and not verified_chat_active:
         try:
             free_birth_hash_for_gate = CreditService.create_free_question_birth_hash(birth_details)
             free_question_gate_eligible = bool(
@@ -1952,9 +2139,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         and not partnership_mode
         and not premium_analysis
         and not instant_chat_active
+        and not verified_chat_active
     )
     skip_subject_gate_for_fast_chat = bool(
         instant_chat_active
+        or verified_chat_active
         or speech_chat_requested
         or fomo_chat_requested
         or free_question_gate_eligible
@@ -2294,6 +2483,8 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         chat_cost = credit_service.get_credit_setting('partnership_analysis_cost')
     elif premium_analysis:
         chat_cost = credit_service.get_credit_setting('premium_chat_cost')
+    elif verified_chat_active:
+        chat_cost = credit_service.get_credit_setting('verified_chat_cost')
     elif instant_chat_active:
         chat_cost = (
             credit_service.get_credit_setting('speech_chat_cost')
@@ -2306,7 +2497,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     else:
         chat_cost = credit_service.get_credit_setting('chat_question_cost')
     user_balance = credit_service.get_user_credits(current_user.userid)
-    is_standard_chat = not partnership_mode and not premium_analysis and not instant_chat_active
+    is_standard_chat = not partnership_mode and not premium_analysis and not instant_chat_active and not verified_chat_active
     free_birth_hash = credit_service.create_free_question_birth_hash(birth_details)
     # Eligibility only here — atomic reserve happens after death/fetal gates so refusals
     # never consume free. Race losers re-check paid cost just before enqueue.
@@ -2331,11 +2522,14 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         else (
             'premium_chat_cost' if premium_analysis
             else (
+                'verified_chat_cost' if verified_chat_active
+                else (
                 'speech_chat_cost' if instant_chat_active and speech_chat_billing
                 else 'speech_chat_per_minute_cost' if instant_chat_active and speech_chat_requested
                 else 'instant_chat_per_minute_cost' if instant_metered_billing
                 else 'instant_chat_cost' if instant_chat_active
                 else 'chat_question_cost'
+                )
             )
         )
     )
@@ -2354,6 +2548,8 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             analysis_type = "Partnership Analysis"
         elif premium_analysis:
             analysis_type = "Premium Deep Analysis"
+        elif verified_chat_active:
+            analysis_type = "Verified Chat"
         elif instant_chat_active:
             analysis_type = "Talk To Tara" if speech_chat_requested else "Instant Chat"
         else:
@@ -2618,7 +2814,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     )
 
     chart_insights = []
-    if effective_chat_tier != "instant" and not partnership_mode and isinstance(birth_details, dict):
+    # Verified Chat shows its own calculator process in the client. Generic
+    # rotating house insights are unrelated to the evidence Luna actually asks
+    # for and make the calculation flow look less trustworthy.
+    if effective_chat_tier not in {"instant", "verified"} and not partnership_mode and isinstance(birth_details, dict):
         try:
             chart_insights = build_chart_preview_insights(
                 birth_data=birth_details,
@@ -2640,7 +2839,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     log_ask_phase(
         "early_chart_insights",
         message_id=assistant_message_id,
-        skipped=bool(effective_chat_tier == "instant" or partnership_mode),
+        skipped=bool(effective_chat_tier in {"instant", "verified"} or partnership_mode),
         chart_insight_count=len(chart_insights or []),
     )
 
@@ -2905,6 +3104,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         db_start = time.time()
         with get_conn() as conn:
             _ensure_chat_messages_gate_metadata(conn)
+            _ensure_chat_messages_response_style(conn)
             _ensure_chat_messages_parallel_llm_usage(conn)
             _ensure_chat_messages_next_action_col(conn)
             _ensure_chat_messages_chart_insights(conn)
@@ -2919,7 +3119,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
             SELECT cm.status, cm.content, cm.error_message, cm.started_at, cm.completed_at,
                            cs.user_id, cm.message_type, cm.terms, cm.glossary, cm.images, cm.follow_up_questions,
                            cm.gate_metadata, cm.parallel_llm_usage, cm.next_action, cm.chart_insights, cm.engagement_updates,
-                           cm.task_claimed_until, cm.task_enqueued_at
+                           cm.task_claimed_until, cm.task_enqueued_at, cm.response_style
                     FROM chat_messages cm
                     JOIN chat_sessions cs ON cm.session_id = cs.session_id
                     WHERE cm.message_id = %s
@@ -2933,7 +3133,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         if not result:
             raise HTTPException(status_code=404, detail="Message not found")
         
-        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage, next_action_json, chart_insights_json, engagement_updates, task_claimed_until, task_enqueued_at = result
+        status, content, error_message, started_at, completed_at, user_id, message_type, terms, glossary, summary_image, follow_up_questions, gate_metadata, parallel_llm_usage, next_action_json, chart_insights_json, engagement_updates, task_claimed_until, task_enqueued_at, response_style = result
         
         # Verify message belongs to user
         if user_id != current_user.userid:
@@ -2951,6 +3151,7 @@ async def check_message_status(message_id: int, current_user = Depends(get_curre
         )
         
         response = {"status": status, "message_type": message_type or "answer",
+                    "response_style": normalize_chat_answer_style(response_style),
                     "instant_preview": read_instant_preview(engagement_updates)}
         wait_side_payload = None
         with get_conn() as conn:
@@ -3604,6 +3805,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     try:
         effective_chat_tier = str(chat_tier or "standard").strip().lower()
         is_instant_chat = effective_chat_tier == "instant"
+        is_verified_chat = effective_chat_tier == "verified"
+        is_deterministic_chat = is_instant_chat or is_verified_chat
         _chat_log_event(
             "chat_processing_started",
             message_id=message_id,
@@ -3651,6 +3854,29 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 conn.commit()
             _release_free_question_if_reserved(using_free_question, user_id, birth_details)
             return
+
+        non_astrology_response = _non_astrology_scope_response(question, language)
+        if non_astrology_response:
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                        UPDATE chat_messages
+                        SET content = %s, status = %s, message_type = %s, completed_at = %s,
+                            language = %s
+                        WHERE message_id = %s
+                    """,
+                    (sanitize_text(non_astrology_response), "completed", "answer", datetime.now(), language, message_id),
+                )
+                conn.commit()
+            _chat_log_event(
+                "chat_non_astrology_scope_response",
+                message_id=message_id,
+                session_id=session_id,
+                chat_tier=effective_chat_tier,
+            )
+            _release_free_question_if_reserved(using_free_question, user_id, birth_details)
+            return
         
         session_lookup_start = time.time()
         # Get birth_chart_id from session
@@ -3669,7 +3895,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         
         # Get user facts for intent routing
         all_user_facts = {}
-        if birth_chart_id and not is_instant_chat:
+        if birth_chart_id and not is_instant_chat and not is_verified_chat:
             fact_extractor = FactExtractor()
             facts_start = time.time()
             all_user_facts = await asyncio.to_thread(
@@ -3883,7 +4109,20 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 from prediction_engine.fomo_chat import build_fomo_chat_intent
 
                 intent = build_fomo_chat_intent(trusted_fomo_context)
-            elif is_instant_chat:
+            elif is_verified_chat:
+                # Verified Chat begins with a Luna question-only classifier.
+                # No chart facts are sent until Instant has selected and run
+                # the deterministic baseline calculators.
+                from chat.verified_chat_pipeline import classify_verified_question
+
+                verified_router_analyzer = GeminiChatAnalyzer()
+                intent = await classify_verified_question(
+                    verified_router_analyzer,
+                    question=combined_question,
+                    history=history,
+                    language=language,
+                )
+            elif is_deterministic_chat:
                 instant_dialogue_state = (
                     extracted_context.get("instant_dialogue")
                     if isinstance(extracted_context, dict)
@@ -3911,6 +4150,62 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     query_context=query_context,
                     clarification_count=clarification_count,
                 )
+
+            if (
+                isinstance(intent, dict)
+                and str(intent.get("route_action") or "").lower() == "out_of_scope"
+            ):
+                route_message = str(
+                    intent.get("user_message") or intent.get("clarification_question") or ""
+                ).strip()
+                if not route_message:
+                    route_message = _NON_ASTROLOGY_SCOPE_MESSAGES.get(
+                        str(language or "english").strip().lower(),
+                        _NON_ASTROLOGY_SCOPE_MESSAGES["english"],
+                    )
+                with get_conn() as conn:
+                    execute(
+                        conn,
+                        """
+                        UPDATE chat_messages
+                        SET content = %s, status = %s, message_type = %s, completed_at = %s,
+                            language = %s
+                        WHERE message_id = %s
+                        """,
+                        (sanitize_text(route_message), "completed", "answer", datetime.now(), language, message_id),
+                    )
+                    conn.commit()
+                return
+
+            if (
+                is_verified_chat
+                and isinstance(intent, dict)
+                and str(intent.get("route_action") or "").lower() in {"ack", "handoff", "out_of_scope"}
+            ):
+                route_message = str(intent.get("clarification_question") or "").strip()
+                if not route_message:
+                    route_message = (
+                        "Please use Partnership mode for a two-chart compatibility reading."
+                        if str(intent.get("route_action")).lower() == "handoff"
+                        else (
+                            "This is not an astrology question. Please ask about your chart or astrology."
+                            if str(intent.get("route_action")).lower() == "out_of_scope"
+                            else "What would you like to explore in your chart?"
+                        )
+                    )
+                with get_conn() as conn:
+                    execute(
+                        conn,
+                        """
+                        UPDATE chat_messages
+                        SET content = %s, status = %s, message_type = %s, completed_at = %s,
+                            language = %s
+                        WHERE message_id = %s
+                        """,
+                        (sanitize_text(route_message), "completed", "answer", datetime.now(), language, message_id),
+                    )
+                    conn.commit()
+                return
 
             # Bind user-stated India/abroad/both onto RECOMMEND_LOCATION (or an open
             # location-scope clarify reply). Never force cartography from keywords alone.
@@ -4181,6 +4476,29 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 and not intent["extracted_context"].get("location_scope")
                 and str(intent.get("status") or "").upper() == "CLARIFY"
             )
+            # A clarification without text gives the client nothing to render.
+            # Verified Chat's compact router is allowed to fail open here: its
+            # deterministic baseline can answer a complete question without a
+            # follow-up, whereas completing an empty clarification creates an
+            # empty assistant message that looks like a successful response.
+            if (
+                is_verified_chat
+                and str(intent.get("status") or "").upper() == "CLARIFY"
+                and not location_scope_clarify
+                and not str(intent.get("clarification_question") or "").strip()
+            ):
+                _chat_log_event(
+                    "verified_empty_clarification_failsafe",
+                    level=logging.WARNING,
+                    session_id=session_id,
+                    message_id=message_id,
+                    answer_mode=intent.get("answer_mode"),
+                )
+                intent["status"] = "READY"
+                intent["route_action"] = "answer"
+                if str(intent.get("answer_mode") or "").strip().lower() == "compound_plan":
+                    intent["answer_mode"] = "topic_reading"
+                    intent["mode"] = "ANALYZE_TOPIC"
             can_return_clarification = bool(
                 intent.get("status") == "CLARIFY"
                 and (
@@ -4296,7 +4614,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         context_start = time.time()
         # Locational cartography needs relocated city scoring — use full natal context, not instant slim pack.
         use_instant_slim_context = bool(
-            is_instant_chat and str(intent.get("mode") or "").upper() != "RECOMMEND_LOCATION"
+            is_deterministic_chat and str(intent.get("mode") or "").upper() != "RECOMMEND_LOCATION"
         )
         
         if use_instant_slim_context:
@@ -4541,6 +4859,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             if (
                 chat_wait_engagement_enabled()
                 and not is_instant_chat
+                and not is_verified_chat
                 and not partnership_mode
                 and not partner_birth_details
                 and not is_all_events_question
@@ -4620,7 +4939,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 if isinstance(context, dict):
                     context = {**context, "intent": intent}
 
-        if is_instant_chat:
+        if is_deterministic_chat:
             llm_start = time.time()
             instant_stream_state = {"last_flush": 0.0, "last_text": "", "preview": None}
             try:
@@ -4688,6 +5007,19 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         exc_info=True,
                     )
 
+            def _persist_verified_calculation_trace(trace: list[dict]) -> None:
+                updates = [
+                    {
+                        "id": str(item.get("id") or f"verified-calculation-{index}"),
+                        "type": "calculation",
+                        "text": str(item.get("title") or "Calculation completed"),
+                        "detail": str(item.get("detail") or ""),
+                    }
+                    for index, item in enumerate(trace or [])
+                    if isinstance(item, dict) and str(item.get("title") or "").strip()
+                ]
+                _store_engagement_updates_now(message_id, updates)
+
             result = await generate_instant_chat_response(
                 analyzer,
                 question=combined_question,
@@ -4700,6 +5032,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 response_style=response_style,
                 stream_callback=_persist_instant_stream_delta,
                 preview_callback=_persist_instant_preview,
+                response_validation_enabled_override=False if is_verified_chat else None,
+                model_name_override="gpt-5.6-luna" if is_verified_chat else None,
+                provider_override="openai" if is_verified_chat else None,
+                verified_evidence_review=is_verified_chat,
+                verified_calculation_callback=(
+                    _persist_verified_calculation_trace if is_verified_chat else None
+                ),
             )
             graph_fallback_error = result.get("graph_fallback_error")
             if isinstance(graph_fallback_error, dict) and graph_fallback_error:
@@ -4747,6 +5086,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 use_thinking_level_high=False,
                 user_id=user_id,
                 using_free_question=using_free_question,
+            )
+        if is_verified_chat:
+            # Auditing is intentionally detached from delivery: it must never
+            # delay, rewrite, retry, or hide a response the user is reading.
+            asyncio.create_task(
+                asyncio.to_thread(_record_verified_chat_validation, message_id, result)
             )
         raw_llm_response = str(
             result.get("raw_response")
@@ -4852,8 +5197,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 elif using_free_question:
                     free_birth_hash = credit_service.create_free_question_birth_hash(birth_details)
                     credit_service.mark_free_chat_question_used(user_id, birth_hash=free_birth_hash)
-                    if is_instant_chat:
+                    if is_deterministic_chat:
                         analysis_type = "Talk To Tara" if is_speech_chat else "Instant Chat"
+                    elif is_verified_chat:
+                        analysis_type = "Verified Chat"
                     else:
                         analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
                     from credits.transaction_receipt import chat_usage_metadata
@@ -4900,6 +5247,9 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     if is_instant_chat:
                         analysis_type = "Talk To Tara" if is_speech_chat else "Instant Chat"
                         spend_feature = "speech_chat" if is_speech_chat else "instant_chat"
+                    elif is_verified_chat:
+                        analysis_type = "Verified Chat"
+                        spend_feature = "chat_question"
                     else:
                         analysis_type = "Premium Deep Analysis" if premium_analysis else "Standard Chat"
                         spend_feature = "chat_question"
@@ -4983,10 +5333,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         if isinstance(cached_intent, dict) and isinstance(cached_intent.get("_llm_usage_stage"), dict):
                             first_stage = dict(cached_intent.get("_llm_usage_stage") or {})
                             first_stage["stage"] = "instant_intent_entry"
+                            first_stage["llm_provider"] = first_stage.get("llm_provider") or first_stage.get("provider") or ""
+                            first_stage["llm_model"] = first_stage.get("llm_model") or first_stage.get("model") or ""
                             instant_stages.append(first_stage)
                         if isinstance(intent, dict) and isinstance(intent.get("_llm_usage_stage"), dict):
                             second_stage = dict(intent.get("_llm_usage_stage") or {})
                             second_stage["stage"] = "instant_intent_background"
+                            second_stage["llm_provider"] = second_stage.get("llm_provider") or second_stage.get("provider") or ""
+                            second_stage["llm_model"] = second_stage.get("llm_model") or second_stage.get("model") or ""
                             instant_stages.append(second_stage)
                         result_stages = result.get("instant_llm_usage_stages")
                         if isinstance(result_stages, list):
@@ -5001,7 +5355,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             instant_stages.append(dict(result.get("instant_llm_usage_stage") or {}))
                         if instant_stages:
                             parallel_usage_blob = {
-                                "kind": "instant_chat_usage",
+                                "kind": "verified_chat_usage" if is_verified_chat else "instant_chat_usage",
                                 "stages": instant_stages,
                                 "totals": _compact_stage_totals(instant_stages),
                             }
@@ -5025,7 +5379,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     token_usage_to_store = result.get("token_usage") or {}
                     prompt_chars_to_store = result.get("llm_prompt_chars")
                     response_chars_to_store = result.get("llm_response_chars")
-                    if is_instant_chat and isinstance(parallel_usage_blob, dict):
+                    if is_deterministic_chat and isinstance(parallel_usage_blob, dict):
                         totals = parallel_usage_blob.get("totals") if isinstance(parallel_usage_blob.get("totals"), dict) else {}
                         token_usage_to_store = {
                             "input_tokens": int(totals.get("input_tokens") or 0),

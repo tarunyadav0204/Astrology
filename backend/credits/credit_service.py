@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 _CREDIT_SETTING_FALLBACKS = {
     "prashna_analysis_cost": 3,
     "partner_portrait_cost": 44,
+    "verified_chat_cost": 10,
 }
 
 # Admin ledger feature filter: equality on reference_id (indexed), plus a
@@ -23,6 +24,9 @@ LEDGER_FEATURE_FILTERS = {
     ),
     "premium_chat": (
         {"reference_ids": ("chat_question",), "description_prefix": "Premium Deep Analysis"},
+    ),
+    "verified_chat": (
+        {"reference_ids": ("chat_question",), "description_prefix": "Verified Chat"},
     ),
     "live_chat": (
         {"reference_ids": ("instant_chat", "instant_chat_minutes")},
@@ -46,6 +50,8 @@ _LEDGER_FEATURE_ALIASES = {
     "standard_chat": "standard_chat",
     "premium": "premium_chat",
     "premium_chat": "premium_chat",
+    "verified": "verified_chat",
+    "verified_chat": "verified_chat",
     "live": "live_chat",
     "live_chat": "live_chat",
     "instant": "live_chat",
@@ -67,7 +73,7 @@ def normalize_ledger_feature_filter(feature: Optional[str]) -> Optional[str]:
     mapped = _LEDGER_FEATURE_ALIASES.get(key)
     if mapped is None:
         raise ValueError(
-            "feature must be one of: standard_chat, live_chat, talk_to_tara, premium_chat, partnership_chat, partner_portrait"
+            "feature must be one of: standard_chat, live_chat, talk_to_tara, premium_chat, verified_chat, partnership_chat, partner_portrait"
         )
     return mapped
 
@@ -541,6 +547,7 @@ class CreditService:
                 ("health_analysis_cost", 3, "Credits per health analysis"),
                 ("education_analysis_cost", 3, "Credits per education analysis"),
                 ("premium_chat_cost", 10, "Credits per premium deep analysis chat"),
+                ("verified_chat_cost", 10, "Credits per Verified Chat answer"),
                 ("career_analysis_cost", 12, "Credits per career analysis"),
                 ("progeny_analysis_cost", 15, "Credits per progeny analysis"),
                 ("trading_daily_cost", 5, "Credits per daily trading forecast"),
@@ -4077,6 +4084,7 @@ class CreditService:
             "instant_chat_per_minute_cost": "Credits per following started minute of Instant Chat",
             "prashna_analysis_cost": "Credits per classical Prashna question chart",
             "partner_portrait_cost": "Credits per AI Partner Portrait with face and full-body views",
+            "verified_chat_cost": "Credits per Verified Chat answer",
         }
         description = descriptions.get(setting_key, setting_key.replace("_", " ").strip().capitalize())
         with get_conn() as conn:
@@ -4284,7 +4292,7 @@ class CreditService:
         """Get all credit settings (value = original cost, discount = discounted cost when set)."""
         from db import get_conn, execute
         keys = (
-            'chat_question_cost', 'instant_chat_cost', 'instant_chat_first_minute_cost', 'instant_chat_per_minute_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
+            'chat_question_cost', 'instant_chat_cost', 'instant_chat_first_minute_cost', 'instant_chat_per_minute_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'verified_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
             'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost',
             'progeny_analysis_cost', 'partnership_report_cost', 'career_report_cost', 'wealth_report_cost',
             'health_report_cost', 'janam_kundli_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
@@ -4328,6 +4336,27 @@ class CreditService:
                         "key": "speech_chat_cost",
                         "value": 1,
                         "description": "Credits per Talk To Tara turn",
+                        "discount": None,
+                    })
+                except Exception:
+                    pass
+            # This setting is independent from Premium and is exposed in the
+            # same admin Feature Costs table on installations upgraded in
+            # place, before a process restart has run the normal seed path.
+            if not any(s["key"] == "verified_chat_cost" for s in settings):
+                try:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (setting_key, setting_value, description)
+                        VALUES ('verified_chat_cost', 10, 'Credits per Verified Chat answer')
+                        """,
+                    )
+                    conn.commit()
+                    settings.append({
+                        "key": "verified_chat_cost",
+                        "value": 10,
+                        "description": "Credits per Verified Chat answer",
                         "discount": None,
                     })
                 except Exception:

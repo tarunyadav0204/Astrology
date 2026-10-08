@@ -3027,7 +3027,18 @@ def _is_retrospective_event_request(
         if isinstance(need, dict)
     ):
         return True
-    _ = (question, children_event)
+    # The compact Verified router deliberately receives no chart context.  If
+    # it omits direction, recover only unambiguous English historical-event
+    # wording here. This is a route guard, not an astrological conclusion.
+    question_normalized = str(question or "").strip().lower()
+    explicit_past_patterns = (
+        r"\bwhen\s+(?:did|was)\s+(?:i|we)\s+(?:get\s+)?married\b",
+        r"\bwhen\s+was\s+my\s+marriage\b",
+        r"\b(?:year|date)\s+(?:of|for)\s+(?:my\s+)?marriage\b",
+        r"\bwhen\s+did\s+(?:i|we)\s+(?:have|get)\s+(?:a\s+)?child\b",
+    )
+    if any(re.search(pattern, question_normalized, re.IGNORECASE) for pattern in explicit_past_patterns):
+        return True
     return False
 
 
@@ -5918,6 +5929,7 @@ Routing action:
 - `clarify`: a material fact is missing, or answer_mode is compound_plan. Write one short natural clarification in the user's language.
 - `handoff`: answer_mode is dedicated_partnership_flow. Write one short natural message in the user's language directing them to Partnership mode.
 - `ack`: the latest message is only a greeting, thanks, acknowledgement, deferral or says there is no question. Write one short natural reply in the user's language and do not run astrology.
+- `out_of_scope`: the latest message is not about astrology or the user's chart, such as asking what AI/model you are, general knowledge, writing, coding, or translation. Write one short same-language boundary that this chat answers astrology questions, and do not run astrology.
 - For dedicated_muhurat_flow, clarify if event, location/timezone, or date range is missing; otherwise answer through that dedicated flow.
 - For location_recommendation, clarify only when the goal or requested scope is materially missing.
 - Do not classify a question as compound merely because it needs several astrology calculations. It must contain materially different user asks.
@@ -5936,7 +5948,7 @@ Instant chat now handles open-ended event timing by scanning a bounded forward h
 - Set `needs_year_clarification=false` when a specific year/window is already given, or when the question is not event timing.
 
 Return JSON only:
-{{"answer_mode":"one_of_the_allowed_modes","route_action":"answer|clarify|handoff|ack","confidence":"high|medium|low","reason":"very short reason","target_subject_key":"first_allowed_target_or_self","target_subject_keys":["all compatible named targets in user order"],"needs_year_clarification":true_or_false,"user_message":"required for clarify, handoff or ack; same language as user"}}
+{{"answer_mode":"one_of_the_allowed_modes","route_action":"answer|clarify|handoff|ack|out_of_scope","confidence":"high|medium|low","reason":"very short reason","target_subject_key":"first_allowed_target_or_self","target_subject_keys":["all compatible named targets in user order"],"needs_year_clarification":true_or_false,"user_message":"required for clarify, handoff, ack or out_of_scope; same language as user"}}
 
 INPUT:
 {context_json}
@@ -6031,7 +6043,7 @@ async def _infer_answer_mode_with_llm(
             if target_subject is None:
                 target_subject = _fallback_target_subject(question)
             route_action = str(data.get("route_action") or "answer").strip().lower()
-            if route_action not in {"answer", "clarify", "handoff", "ack"}:
+            if route_action not in {"answer", "clarify", "handoff", "ack", "out_of_scope"}:
                 route_action = "answer"
             if mode == "compound_plan":
                 route_action = "clarify"
@@ -20359,6 +20371,11 @@ async def generate_instant_chat_response(
     response_style: str = "simple",
     stream_callback: Optional[Callable[[str, str], None]] = None,
     preview_callback: Optional[Callable[[Dict[str, Any]], bool]] = None,
+    response_validation_enabled_override: Optional[bool] = None,
+    model_name_override: Optional[str] = None,
+    provider_override: Optional[str] = None,
+    verified_evidence_review: bool = False,
+    verified_calculation_callback: Optional[Callable[[List[Dict[str, str]]], None]] = None,
 ) -> Dict[str, Any]:
     intent = apply_timeline_intent_guard(intent)
     # Some Wealth subtypes are more specific than the broad Wealth category.
@@ -20406,7 +20423,11 @@ async def generate_instant_chat_response(
             speech_mode=speech_mode,
         )
     pipeline_started = time.perf_counter()
-    response_validation_enabled = is_instant_response_validation_enabled()
+    response_validation_enabled = (
+        is_instant_response_validation_enabled()
+        if response_validation_enabled_override is None
+        else bool(response_validation_enabled_override)
+    )
     instant_stages: List[Dict[str, Any]] = []
     stage_timings_ms: Dict[str, float] = {}
 
@@ -20448,7 +20469,7 @@ async def generate_instant_chat_response(
         )
     _finish_local_stage("answer_mode", mode_started)
     route_action = str((mode_selection or {}).get("route_action") or "answer").strip().lower()
-    if route_action in {"clarify", "handoff", "ack"}:
+    if route_action in {"clarify", "handoff", "ack", "out_of_scope"}:
         return _instant_route_response(
             body=str((mode_selection or {}).get("user_message") or ""),
             answer_mode=str((mode_selection or {}).get("answer_mode") or "topic_reading"),
@@ -20557,7 +20578,7 @@ async def generate_instant_chat_response(
         except Exception:
             logger.warning("instant preview unavailable", exc_info=True)
     prompt_context = instant_context
-    if instant_v2_packet:
+    if instant_v2_packet and not verified_evidence_review:
         prompt_context = _build_instant_composer_context(instant_context, instant_v2_packet)
         fallback_language = str(language or "").strip().lower()
         if fallback_language:
@@ -20670,7 +20691,14 @@ async def generate_instant_chat_response(
         prompt_budget = max(prompt_budget, 36000)
     prompt_started = time.perf_counter()
     authoritative_prompt_context = prompt_context
-    prompt = _build_instant_prompt(question, prompt_context, language, speech_mode=speech_mode)
+    # Verified Chat uses its own fact packet and writer contract below.  Do
+    # not spend time constructing or compacting Instant's legacy composer
+    # prompt only to discard it before the provider call.
+    prompt = (
+        ""
+        if verified_evidence_review
+        else _build_instant_prompt(question, prompt_context, language, speech_mode=speech_mode)
+    )
     if len(prompt) > prompt_budget:
         # Fit against the complete prompt, not just the JSON brief.  The fixed
         # composer instructions are sizeable, so a 9.5k context can otherwise
@@ -20730,11 +20758,38 @@ async def generate_instant_chat_response(
             "[[MARRIED_LIFE_...]]. Express the supplied chart evidence only as natural "
             "user-facing prose."
         )
+    verified_review_metadata: Dict[str, Any] = {}
+    verified_agent_request: Dict[str, Any] | None = None
+    if verified_evidence_review:
+        # The Responses tool loop gives Luna the Instant baseline first and
+        # permits one calculator-request round before its streamed answer.
+        # Do not pre-build a giant cross-system packet here: that would make
+        # the writer a renderer and defeat the agentic selection step.
+        system_prompt = "Verified Chat agentic calculator loop"
+        user_prompt = question
+        prompt = user_prompt
+        verified_agent_request = {
+            "question": question,
+            "language": language,
+            "response_style": response_style,
+            "birth_data": birth_data,
+            "instant_context": instant_context,
+            "history": history,
+        }
+        verified_review_metadata = {
+            "verified_evidence_review": {"strategy": "agentic_calculator_loop", "tool_round_limit": "configurable"},
+            "global_context_version": "verified-chat-agentic-v1",
+            "user_context_version": "natal-v1",
+        }
+    else:
+        system_prompt = ""
+        user_prompt = ""
     _finish_local_stage("prompt_build", prompt_started)
-    model_name = get_instant_chat_model()
-    instant_provider = get_instant_chat_llm_provider()
-    system_prompt, user_prompt = _split_instant_prompt_for_cache(prompt)
-    if instant_v2_packet:
+    model_name = str(model_name_override or "").strip() or get_instant_chat_model()
+    instant_provider = str(provider_override or "").strip().lower() or get_instant_chat_llm_provider()
+    if not verified_evidence_review:
+        system_prompt, user_prompt = _split_instant_prompt_for_cache(prompt)
+    if instant_v2_packet and not verified_evidence_review:
         instant_v2_packet["composer_brief"] = prompt_context
         instant_v2_packet["composer_metrics"] = {
             "context_chars": _json_size(prompt_context),
@@ -20763,9 +20818,11 @@ async def generate_instant_chat_response(
     )
 
     answer_timeout_s = _instant_timeout_seconds(
-        "INSTANT_CHAT_ANSWER_TIMEOUT_SECONDS",
-        30.0,
-        maximum=45.0,
+        "VERIFIED_CHAT_ANSWER_TIMEOUT_SECONDS"
+        if verified_evidence_review
+        else "INSTANT_CHAT_ANSWER_TIMEOUT_SECONDS",
+        120.0 if verified_evidence_review else 30.0,
+        maximum=180.0 if verified_evidence_review else 45.0,
     )
     thinking_level = _instant_thinking_level(model_name)
     logger.info(
@@ -20847,22 +20904,44 @@ async def generate_instant_chat_response(
         else stream_callback
     )
     started_at = datetime.utcnow()
-    llm_result = await analyzer.generate_text_from_prompt(
-        user_prompt,
-        premium_analysis=False,
-        model_override=None,
-        model_name_override=model_name,
-        llm_log_tag="instant_chat",
-        request_timeout_s=answer_timeout_s,
-        force_gemini=False,
-        provider_override=instant_provider,
-        use_gemini_rest=instant_provider == CHAT_LLM_GEMINI,
-        gemini_thinking_level=(thinking_level if instant_provider == CHAT_LLM_GEMINI else None),
-        deepseek_thinking_enabled=(False if instant_provider == CHAT_LLM_DEEPSEEK else None),
-        openai_reasoning_effort=("none" if instant_provider == CHAT_LLM_OPENAI else None),
-        stream_callback=generation_stream_callback,
-        system_prompt=system_prompt,
-    )
+    if verified_agent_request is not None:
+        from chat.verified_chat_pipeline import run_verified_calculator_agent
+
+        try:
+            llm_result = await run_verified_calculator_agent(
+                **verified_agent_request,
+                model_name=model_name,
+                timeout_s=answer_timeout_s,
+                stream_callback=generation_stream_callback,
+                calculation_callback=verified_calculation_callback,
+            )
+            verified_review_metadata["verified_packet_validation"] = llm_result.get("packet_validation") or {}
+        except Exception as exc:
+            logger.exception("Verified Chat calculator agent failed")
+            llm_result = {
+                "success": False,
+                "error": str(exc),
+                "response": "",
+                "chat_llm_model": model_name,
+                "chat_llm_provider": CHAT_LLM_OPENAI,
+                "token_usage": {},
+            }
+    else:
+        llm_result = await analyzer.generate_text_from_prompt(
+            user_prompt,
+            premium_analysis=False,
+            model_override=None,
+            model_name_override=model_name,
+            llm_log_tag="instant_chat",
+            request_timeout_s=answer_timeout_s,
+            force_gemini=False,
+            provider_override=instant_provider,
+            use_gemini_rest=instant_provider == CHAT_LLM_GEMINI,
+            gemini_thinking_level=(thinking_level if instant_provider == CHAT_LLM_GEMINI else None),
+            deepseek_thinking_enabled=(False if instant_provider == CHAT_LLM_DEEPSEEK else None),
+            stream_callback=generation_stream_callback,
+            system_prompt=system_prompt,
+        )
     elapsed_s = max(0.0, (datetime.utcnow() - started_at).total_seconds())
     pipeline_elapsed_s = max(0.0, time.perf_counter() - pipeline_started)
     stage_timings_ms["answer_model"] = round(elapsed_s * 1000.0, 1)
@@ -20882,7 +20961,7 @@ async def generate_instant_chat_response(
         answer_usage_stage = _build_instant_usage_stage(
             "instant_answer",
             llm_result.get("chat_llm_model") or model_name,
-            len(prompt),
+            int(llm_result.get("prompt_chars") or len(prompt)),
             0,
             llm_result.get("token_usage") or {},
             False,
@@ -21809,7 +21888,7 @@ REJECTED ANSWER:
     response_content = parsed_response.get("content") or response_text
     response_content, prediction_anchor_meta = ResponseParser.parse_prediction_anchor_metadata(response_content)
     graph_fallback_error: Dict[str, Any] | None = None
-    if instant_v2_packet:
+    if instant_v2_packet and not verified_evidence_review:
         pre_enforcement_content = response_content
         graph_policy = ((instant_v2_packet.get("answer_spec") or {}).get("knowledge_graph_policy") or {})
         # Exact intraday windows are an immutable calculation ledger. The LLM
@@ -21891,8 +21970,8 @@ REJECTED ANSWER:
         "translated_astrology_validation_errors": translated_astrology_errors,
         "response_validation_enabled": response_validation_enabled,
         "unvalidated_speech_streaming_enabled": allow_unvalidated_speech_stream,
-    } if instant_v2_packet else None
-    if instant_v2_packet:
+    } if instant_v2_packet and not verified_evidence_review else None
+    if instant_v2_packet and not verified_evidence_review:
         instant_v2_packet = finalize_instant_v2_packet(
             instant_v2_packet,
             answer=response_content,
@@ -21929,6 +22008,15 @@ REJECTED ANSWER:
         suppress_remedy_cta=suppress_remedy_cta,
     )
     response_content = strip_internal_evidence_markers(response_content)
+    if verified_evidence_review:
+        # Verified Chat must read like a consultation, never a description of
+        # backend packets, tool branches, or evidence transport.
+        try:
+            from chat.verified_chat_pipeline import redact_verified_internal_transport
+
+            response_content = redact_verified_internal_transport(response_content)
+        except Exception:
+            logger.exception("Verified Chat internal-language redaction failed")
     if buffer_graph_delivery and not buffer_translated_delivery and stream_callback is not None:
         # This route may replace a plausible-sounding but non-adjudicated LLM
         # answer. Publish only the final graph-checked text so no client can
@@ -21941,7 +22029,8 @@ REJECTED ANSWER:
         else {}
     )
     if (
-        not speech_mode
+        not verified_evidence_review
+        and not speech_mode
         and str(graph_policy.get("runtime_key") or "").strip().lower() == "marriage_history"
     ):
         phase_action = build_phase_action((instant_v2_packet or {}).get("verdict"))
@@ -21963,12 +22052,13 @@ REJECTED ANSWER:
     answer_usage_stage = _build_instant_usage_stage(
         "instant_answer",
         llm_result.get("chat_llm_model") or model_name,
-        len(prompt),
+        int(llm_result.get("prompt_chars") or len(prompt)),
         len(response_text),
         llm_result.get("token_usage") or {},
         True,
         elapsed_s,
     )
+    answer_usage_stage["llm_provider"] = instant_provider
     event_timing_verdict = None
     try:
         ne = (prompt_context or {}).get("normalized_evidence") or {}
@@ -21976,6 +22066,21 @@ REJECTED ANSWER:
             event_timing_verdict = ne.get("event_timing_verdict")
     except Exception:
         event_timing_verdict = None
+    verified_terms: List[str] = []
+    verified_glossary: Dict[str, str] = {}
+    if verified_evidence_review:
+        # The mobile renderer already knows how to turn glossary matches into
+        # tappable term explanations. Verified Chat bypasses Gemini's normal
+        # response parser, so resolve the same authoritative glossary here.
+        try:
+            from ai.term_matcher import find_terms_in_text
+
+            verified_terms, verified_glossary = find_terms_in_text(
+                response_content,
+                language=language,
+            )
+        except Exception:
+            logger.exception("Verified Chat glossary matching failed")
     return {
         "success": True,
         "response": response_content,
@@ -22002,8 +22107,8 @@ REJECTED ANSWER:
         "llm_response_chars": len(response_content),
         "instant_llm_usage_stage": answer_usage_stage,
         "instant_llm_usage_stages": [*instant_stages, answer_usage_stage],
-        "terms": [],
-        "glossary": {},
+        "terms": verified_terms,
+        "glossary": verified_glossary,
         "follow_up_questions": combined_followups,
         "recommended_follow_up_questions": combined_followups,
         "next_best_need": next_action.get("type"),
@@ -22016,6 +22121,7 @@ REJECTED ANSWER:
         "faq_metadata": None,
         "raw_response": raw_response,
         "graph_fallback_error": graph_fallback_error,
+        **verified_review_metadata,
         "instant_context_summary": instant_context.get("intent_summary") or {},
         "instant_evidence_debug": (
             ({**instant_v2_packet, "contract_enforcement": contract_enforcement} if instant_v2_packet else None)

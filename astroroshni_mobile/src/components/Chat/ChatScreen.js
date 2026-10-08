@@ -583,12 +583,15 @@ export default function ChatScreen({ navigation, route }) {
   const [instantChatFirstMinuteCost, setInstantChatFirstMinuteCost] = useState(1);
   const [speechChatPerMinuteCost, setSpeechChatPerMinuteCost] = useState(5);
   const [premiumChatCost, setPremiumChatCost] = useState(3);
+  const [verifiedChatCost, setVerifiedChatCost] = useState(10);
   const [chatCostOriginal, setChatCostOriginal] = useState(null);
   const [instantChatCostOriginal, setInstantChatCostOriginal] = useState(null);
   const [premiumChatCostOriginal, setPremiumChatCostOriginal] = useState(null);
+  const [verifiedChatCostOriginal, setVerifiedChatCostOriginal] = useState(null);
   const [standardChatCountdownSeconds, setStandardChatCountdownSeconds] = useState(DEFAULT_STANDARD_CHAT_COUNTDOWN_SECONDS);
   const [premiumChatCountdownSeconds, setPremiumChatCountdownSeconds] = useState(DEFAULT_PREMIUM_CHAT_COUNTDOWN_SECONDS);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
+  const [verifiedChatEnabled, setVerifiedChatEnabled] = useState(false);
   const [speechChatEnabled, setSpeechChatEnabled] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showChatModeIntro, setShowChatModeIntro] = useState(false);
@@ -599,6 +602,7 @@ export default function ChatScreen({ navigation, route }) {
   const [pendingChatMode, setPendingChatMode] = useState(null);
   const [pendingAnswerStyle, setPendingAnswerStyle] = useState(null);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
+  const [isVerifiedAnalysis, setIsVerifiedAnalysis] = useState(false);
   const [showInstantEndConfirm, setShowInstantEndConfirm] = useState(false);
   const [pendingModeAfterInstantEnd, setPendingModeAfterInstantEnd] = useState(null);
   const [instantReceipt, setInstantReceipt] = useState(null);
@@ -801,6 +805,12 @@ export default function ChatScreen({ navigation, route }) {
       setIsInstantAnalysis(false);
     }
   }, [instantChatEnabled, isInstantAnalysis]);
+
+  useEffect(() => {
+    if (!verifiedChatEnabled && isVerifiedAnalysis) {
+      setIsVerifiedAnalysis(false);
+    }
+  }, [verifiedChatEnabled, isVerifiedAnalysis]);
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -1098,6 +1108,7 @@ export default function ChatScreen({ navigation, route }) {
     return message?.id || message?.message_id || null;
   }, [messages]);
   const [pendingMessages, setPendingMessages] = useState(new Set());
+  const [chatJumpControls, setChatJumpControls] = useState({ showTop: false, showBottom: false });
   const scrollViewRef = useRef(null);
   const lastMessageRef = useRef(null);
   const lastAnswerIndexRef = useRef(-1);
@@ -1454,15 +1465,15 @@ export default function ChatScreen({ navigation, route }) {
   const scrollToBottomReliably = (animated = true) => {
     stickMessagesToBottomRef.current = true;
     clearInstantScrollRetries();
-    // One scroll only — stacked scrollToEnd retries fight tall cells and look like bounce.
+    // The answer cell can still be growing when the user taps the down arrow.
+    // Retry after layout frames so the final offset is the real content end.
     const run = () => {
       if (!stickMessagesToBottomRef.current) return;
       scrollViewRef.current?.scrollToEnd({ animated: false });
     };
     run();
-    if (animated) {
-      instantScrollRetryRef.current = [setTimeout(run, 80)];
-    }
+    const retryDelays = animated ? [80, 220, 480] : [80];
+    instantScrollRetryRef.current = retryDelays.map((delay) => setTimeout(run, delay));
   };
 
   const maybeScrollMessagesToEnd = (animated = false) => {
@@ -1488,10 +1499,14 @@ export default function ChatScreen({ navigation, route }) {
       scrollToLastAnswerTop();
     };
     const handle = InteractionManager.runAfterInteractions(run);
-    const timers = [0, 80, 180, 360, 700].map((ms) => setTimeout(run, ms));
+    // A long answer can grow after the first FlatList layout as Markdown cards,
+    // fonts, and feedback controls finish measuring. Keep aligning to its top
+    // until that settling work has completed; otherwise the estimated fallback
+    // offset leaves the screen part-way through the answer.
+    const timers = [0, 80, 180, 360, 700, 1200, 1900].map((ms) => setTimeout(run, ms));
     const finish = setTimeout(() => {
       pendingScrollToLastAnswerRef.current = false;
-    }, 900);
+    }, 2400);
     return () => {
       cancelled = true;
       handle.cancel?.();
@@ -1533,6 +1548,7 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const getSelectedChatModeKey = () => {
+    if (verifiedChatEnabled && isVerifiedAnalysis) return 'verified';
     if (isPremiumAnalysis) return 'premium';
     if (instantChatEnabled && isInstantAnalysis) return 'instant';
     return 'standard';
@@ -1564,21 +1580,31 @@ export default function ChatScreen({ navigation, route }) {
     if (freeQuestionAvailable) {
       setIsInstantAnalysis(false);
       setIsPremiumAnalysis(false);
+      setIsVerifiedAnalysis(false);
       return;
     }
     const normalized = String(tier || '').trim().toLowerCase();
     if (normalized === 'premium') {
       setIsInstantAnalysis(false);
       setIsPremiumAnalysis(true);
+      setIsVerifiedAnalysis(false);
+      return;
+    }
+    if (normalized === 'verified' && verifiedChatEnabled) {
+      setIsInstantAnalysis(false);
+      setIsPremiumAnalysis(false);
+      setIsVerifiedAnalysis(true);
       return;
     }
     if (normalized === 'instant' && instantChatEnabled) {
       setIsInstantAnalysis(true);
       setIsPremiumAnalysis(false);
+      setIsVerifiedAnalysis(false);
       return;
     }
     setIsInstantAnalysis(false);
     setIsPremiumAnalysis(false);
+    setIsVerifiedAnalysis(false);
   };
 
   const restoreChatModeFromMessages = (messageList) => {
@@ -2580,6 +2606,7 @@ export default function ChatScreen({ navigation, route }) {
       Number.isFinite(speechMinuteVal) && speechMinuteVal > 0 ? speechMinuteVal : 5
     );
     setInstantChatEnabled(Boolean(features.instant_chat_enabled));
+    setVerifiedChatEnabled(Boolean(features.verified_chat_enabled));
     setSpeechChatEnabled(Boolean(features.speech_chat_enabled));
     const adminSuggestions = Array.isArray(features.chat_static_suggestions)
       ? features.chat_static_suggestions.map((item) => String(item || '').trim()).filter(Boolean)
@@ -2600,6 +2627,10 @@ export default function ChatScreen({ navigation, route }) {
     const premiumOriginal = origMap.premium_chat != null ? Number(origMap.premium_chat) : null;
     setPremiumChatCost(Number.isNaN(premiumVal) || premiumVal <= 0 ? 3 : premiumVal);
     setPremiumChatCostOriginal(Number.isNaN(premiumOriginal) ? null : premiumOriginal);
+    const verifiedVal = priceMap.verified_chat != null ? Number(priceMap.verified_chat) : 10;
+    const verifiedOriginal = origMap.verified_chat != null ? Number(origMap.verified_chat) : null;
+    setVerifiedChatCost(Number.isNaN(verifiedVal) || verifiedVal <= 0 ? 10 : verifiedVal);
+    setVerifiedChatCostOriginal(Number.isNaN(verifiedOriginal) ? null : verifiedOriginal);
     const standardCountdownVal = Number(countdown.standard);
     const premiumCountdownVal = Number(countdown.premium);
     setStandardChatCountdownSeconds(
@@ -3080,10 +3111,12 @@ export default function ChatScreen({ navigation, route }) {
   }, [currentPersonId, loading, isTyping, showGreeting, pendingMessages, sessionId, forceGreeting, route.params?.resetToGreeting, partnershipMode]);
 
   // First question free: standard chat only (not partnership, not mundane)
-  const effectiveChatCost = (!partnershipMode && !isMundane && !isInstantAnalysis && freeQuestionAvailable)
+  const effectiveChatCost = (!partnershipMode && !isMundane && !isInstantAnalysis && !isVerifiedAnalysis && freeQuestionAvailable)
     ? 0
     : (
-        isPremiumAnalysis
+        isVerifiedAnalysis
+          ? verifiedChatCost
+          : isPremiumAnalysis
           ? premiumChatCost
           : (instantChatEnabled && isInstantAnalysis)
             ? 0
@@ -3097,15 +3130,19 @@ export default function ChatScreen({ navigation, route }) {
     !partnershipMode &&
     !isMundane &&
     !isInstantAnalysis &&
+    !isVerifiedAnalysis &&
     !isPremiumAnalysis &&
     credits < effectiveChatCost;
 
-  const currentChatModeKey = isPremiumAnalysis
+  const currentChatModeKey = isVerifiedAnalysis
+    ? 'verified'
+    : isPremiumAnalysis
     ? 'premium'
     : (instantChatEnabled && isInstantAnalysis ? 'instant' : 'standard');
 
   const requiredCreditsForMode = (modeKey) => {
     if (modeKey === 'premium') return Number(premiumChatCost) || 0;
+    if (modeKey === 'verified') return Number(verifiedChatCost) || 0;
     if (modeKey === 'instant') return Number(instantChatFirstMinuteCost) || 0;
     if (modeKey === 'speech') return Number(speechChatPerMinuteCost) || 0;
     if (partnershipMode) return Number(partnershipCost) || 0;
@@ -3115,6 +3152,7 @@ export default function ChatScreen({ navigation, route }) {
 
   const canAffordChatMode = (modeKey) => {
     if (modeKey === 'instant' && (!instantChatEnabled || partnershipMode || isMundane)) return false;
+    if (modeKey === 'verified' && (!verifiedChatEnabled || partnershipMode || isMundane)) return false;
     if (modeKey === 'speech' && (!instantChatEnabled || !speechChatEnabled || !birthData || partnershipMode || isMundane)) {
       return false;
     }
@@ -4058,7 +4096,10 @@ export default function ChatScreen({ navigation, route }) {
       const local = localByMessageId.get(String(m.message_id)) || null;
       const serverStatus = String(m.status || '').trim().toLowerCase();
       const isProcessing = serverStatus === 'processing';
-      const restoredTier = String(local?.chatTier || '').trim().toLowerCase();
+      // Server metadata is the durable source after an app reload. Previously
+      // this used only local state, so a restored Verified message lost its
+      // tier and was rendered through the generic Premium-card path.
+      const restoredTier = String(local?.chatTier || m.chat_tier || '').trim().toLowerCase();
       const fallbackWaitSeconds = restoredTier === 'premium'
         ? premiumChatCountdownSeconds
         : standardChatCountdownSeconds;
@@ -4095,6 +4136,7 @@ export default function ChatScreen({ navigation, route }) {
           : fallbackWaitSeconds,
         chatTier: restoredTier || local?.chatTier,
         threadMode: restoredTier || local?.threadMode || local?.chatTier,
+        responseStyle: m.response_style || local?.responseStyle || null,
         userMessageId: local?.userMessageId,
         chartInsights: Array.isArray(local?.chartInsights) ? local.chartInsights : [],
         failedQuestion: local?.failedQuestion,
@@ -4547,13 +4589,17 @@ export default function ChatScreen({ navigation, route }) {
         id,
         type: item.type || 'insight',
         text,
+        detail: typeof item.detail === 'string' ? item.detail.trim() : '',
       });
     });
-    return Array.from(byId.values()).slice(0, 3);
+    return Array.from(byId.values()).slice(0, 8);
   };
 
   const renderEngagementUpdates = (updates = []) => {
-    if (!Array.isArray(updates) || updates.length === 0) return null;
+    const visibleUpdates = Array.isArray(updates)
+      ? updates.filter((item) => item?.type !== 'calculation')
+      : [];
+    if (visibleUpdates.length === 0) return null;
     const labelForType = (type) => {
       if (type === 'fact_question') return 'Quick question';
       if (type === 'curiosity') return 'Chart curiosity';
@@ -4561,7 +4607,7 @@ export default function ChatScreen({ navigation, route }) {
     };
     return (
       <View style={styles.engagementUpdatesWrap}>
-        {updates.map((update) => (
+        {visibleUpdates.map((update) => (
           <View
             key={update.id}
             style={[
@@ -4898,6 +4944,7 @@ export default function ChatScreen({ navigation, route }) {
                       message_type: status.message_type || 'answer',
                       chatTier: resolvedChatTier || msg.chatTier,
                       threadMode: resolvedChatTier || msg.threadMode || msg.chatTier,
+                      responseStyle: status.response_style || msg.responseStyle || null,
                       summary_image: status.summary_image || null,
                       follow_up_questions: paceContent ? [] : (status.follow_up_questions || []),
                       next_action: paceContent ? null : (status.next_action || null),
@@ -5105,6 +5152,9 @@ export default function ChatScreen({ navigation, route }) {
               const nextEngagement = hasEngagementIncoming
                 ? mergeEngagementUpdates(msg.engagementUpdates, status.engagement_updates)
                 : msg.engagementUpdates;
+              const nextCalculationTrace = (Array.isArray(nextEngagement) ? nextEngagement : [])
+                .filter((item) => item?.type === 'calculation')
+                .map((item) => ({ title: item.text, detail: item.detail }));
 
               const prevWaitFp = waitConversationFingerprint(msg.waitConversation);
               const nextWaitFp = waitConversationFingerprint(nextWait);
@@ -5143,6 +5193,9 @@ export default function ChatScreen({ navigation, route }) {
                 messageId: nextMessageId,
                 processingStartedAt: nextStartedAt,
                 chartInsights: nextInsights,
+                calculationTrace: nextCalculationTrace.length > 0
+                  ? nextCalculationTrace
+                  : msg.calculationTrace,
                 ...(waitConversation ? { waitConversation: nextWait } : {}),
                 ...(hasEngagementIncoming ? { engagementUpdates: nextEngagement } : {}),
               };
@@ -5363,11 +5416,12 @@ export default function ChatScreen({ navigation, route }) {
       try {
         // When using first question free, send as standard so backend applies free-question logic
         const useFreeQuestion =
-          !partnershipMode && !isMundane && !isInstantAnalysis && freeQuestionAvailable;
+          !partnershipMode && !isMundane && !isInstantAnalysis && !isVerifiedAnalysis && freeQuestionAvailable;
         const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
+        const useVerifiedChat = !useFreeQuestion && !partnershipMode && !isMundane && verifiedChatEnabled && isVerifiedAnalysis;
         const requestedTier = useFreeQuestion
           ? 'standard'
-          : (useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard'));
+          : (useInstantChat ? 'instant' : (useVerifiedChat ? 'verified' : (isPremiumAnalysis ? 'premium' : 'standard')));
 
         // Prepend relationship info to question for better backend context/logging
         const finalQuestion = (partnershipMode && partnershipRelation)
@@ -5400,7 +5454,7 @@ export default function ChatScreen({ navigation, route }) {
           query_context: requestQueryContext,
           language: language || 'english',
           response_style: answerStyle,
-          premium_analysis: useFreeQuestion ? false : (useInstantChat ? false : isPremiumAnalysis),
+          premium_analysis: useFreeQuestion ? false : ((useInstantChat || useVerifiedChat) ? false : isPremiumAnalysis),
           chat_tier: requestedTier,
           native_name: partnershipMode ? nativeChart?.name : birthData?.name,
           birth_details: partnershipMode ? {
@@ -5547,7 +5601,7 @@ export default function ChatScreen({ navigation, route }) {
         } = result;
         const rawServerTier = String(chat_tier || '').trim().toLowerCase();
         const serverTier = String(
-          rawServerTier || requestedTier || (useInstantChat ? 'instant' : (isPremiumAnalysis ? 'premium' : 'standard'))
+          rawServerTier || requestedTier || (useInstantChat ? 'instant' : (useVerifiedChat ? 'verified' : (isPremiumAnalysis ? 'premium' : 'standard')))
         ).trim().toLowerCase();
 
         console.log(`📦 [RESULT] Got messageId: ${assistantMessageId} at: ${new Date().toISOString()}`);
@@ -5667,12 +5721,14 @@ export default function ChatScreen({ navigation, route }) {
   );
 
   const getChatModeKey = () => {
+    if (verifiedChatEnabled && isVerifiedAnalysis) return 'verified';
     if (isPremiumAnalysis) return 'premium';
     if (instantChatEnabled && isInstantAnalysis) return 'instant';
     return 'standard';
   };
 
   const getChatModeName = (modeKey = getChatModeKey()) => {
+    if (modeKey === 'verified') return t('chat.verifiedMode.name', 'Verified Chat');
     if (modeKey === 'premium') return t('chat.modeIntro.premium.name', 'Premium');
     if (modeKey === 'speech') return t('chat.modeIntro.speech.name', 'Talk To Tara');
     if (modeKey === 'instant') return t('chat.modeIntro.instant.name', 'Live');
@@ -5733,12 +5789,19 @@ export default function ChatScreen({ navigation, route }) {
     } else if (modeKey === 'instant') {
       setIsInstantAnalysis(true);
       setIsPremiumAnalysis(false);
+      setIsVerifiedAnalysis(false);
+    } else if (modeKey === 'verified') {
+      setIsInstantAnalysis(false);
+      setIsPremiumAnalysis(false);
+      setIsVerifiedAnalysis(true);
     } else if (modeKey === 'premium') {
       setIsInstantAnalysis(false);
       setIsPremiumAnalysis(true);
+      setIsVerifiedAnalysis(false);
     } else {
       setIsInstantAnalysis(false);
       setIsPremiumAnalysis(false);
+      setIsVerifiedAnalysis(false);
     }
     setShowModeSelector(false);
     modeIntroSuppressOpenUntilRef.current = Date.now() + 900;
@@ -5813,6 +5876,7 @@ export default function ChatScreen({ navigation, route }) {
     if (!instantBilling.active) return;
     setIsInstantAnalysis(true);
     setIsPremiumAnalysis(false);
+    setIsVerifiedAnalysis(false);
     setShowGreeting(false);
   }, [instantBilling.active]);
 
@@ -5844,6 +5908,20 @@ export default function ChatScreen({ navigation, route }) {
       ],
       cost: speechChatPerMinuteCost,
       originalCost: null,
+    }] : []),
+    ...(verifiedChatEnabled ? [{
+      key: 'verified',
+      icon: 'shield-checkmark',
+      name: t('chat.verifiedMode.name', 'Verified Chat'),
+      benefit: t('chat.verifiedMode.benefit', 'Detailed answers grounded in deterministic chart evidence.'),
+      bestFor: t('chat.verifiedMode.bestFor', 'Best for important decisions where speed, accuracy, and detail all matter.'),
+      features: [
+        t('chat.verifiedMode.feature1', 'Uses the relevant chart calculations before answering'),
+        t('chat.verifiedMode.feature2', 'Requests extra astrology evidence only when needed'),
+        t('chat.verifiedMode.feature3', 'Keeps the detailed Premium response structure'),
+      ],
+      cost: verifiedChatCost,
+      originalCost: verifiedChatCostOriginal,
     }] : []),
     {
       key: 'standard',
@@ -6026,6 +6104,9 @@ export default function ChatScreen({ navigation, route }) {
     const forceTier = sendOptions.forceTier || null;
     const skipCreditGate = Boolean(sendOptions.skipCreditGate);
     const usingPremium = forceTier ? forceTier === 'premium' : isPremiumAnalysis;
+    const usingVerified = forceTier
+      ? forceTier === 'verified'
+      : Boolean(verifiedChatEnabled && isVerifiedAnalysis);
     const usingInstant = forceTier
       ? forceTier === 'instant'
       : Boolean(instantChatEnabled && isInstantAnalysis);
@@ -6035,12 +6116,14 @@ export default function ChatScreen({ navigation, route }) {
         required = instantBilling.active ? 0 : requiredCreditsForMode('instant');
       } else if (usingPremium) {
         required = requiredCreditsForMode('premium');
+      } else if (usingVerified) {
+        required = requiredCreditsForMode('verified');
       } else {
         required = requiredCreditsForMode('standard');
       }
       if (Number(credits) < required) {
         openCreditChoice(
-          usingPremium ? 'premium' : (usingInstant ? 'instant' : 'standard'),
+          usingVerified ? 'verified' : (usingPremium ? 'premium' : (usingInstant ? 'instant' : 'standard')),
           messageText,
         );
         return;
@@ -6080,7 +6163,7 @@ export default function ChatScreen({ navigation, route }) {
         original_question: originalQuestion,
         submitted_question: submittedQuestion,
         edited,
-        chat_mode: usingInstant ? 'instant' : (usingPremium ? 'premium' : 'standard'),
+        chat_mode: usingInstant ? 'instant' : (usingVerified ? 'verified' : (usingPremium ? 'premium' : 'standard')),
       }).finally(() => {
         loadEngagementSuggestions({ enqueueIfEmpty: false });
       });
@@ -6119,12 +6202,13 @@ export default function ChatScreen({ navigation, route }) {
     const userMessageId = Date.now().toString();
     const chartName = partnershipMode ? nativeChart?.name : birthData?.name;
     const useFreeQuestion =
-      !partnershipMode && !isMundane && !usingInstant && freeQuestionAvailable;
-    const isProModelFlow = !useFreeQuestion && usingPremium;
+      !partnershipMode && !isMundane && !usingInstant && !usingVerified && freeQuestionAvailable;
+    const isProModelFlow = !useFreeQuestion && (usingPremium || usingVerified);
     const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && usingInstant;
+    const useVerifiedChat = !useFreeQuestion && !partnershipMode && !isMundane && verifiedChatEnabled && usingVerified;
     const outgoingTier = useFreeQuestion
       ? 'standard'
-      : (useInstantChat ? 'instant' : (usingPremium ? 'premium' : 'standard'));
+      : (useInstantChat ? 'instant' : (useVerifiedChat ? 'verified' : (usingPremium ? 'premium' : 'standard')));
     const pendingSubjectGateOverride = subjectGateOverrideRef.current;
     subjectGateOverrideRef.current = null;
     const subjectGateOverride =
@@ -6143,6 +6227,7 @@ export default function ChatScreen({ navigation, route }) {
       native_name: chartName || null,
       chatTier: outgoingTier,
       threadMode: outgoingTier,
+      responseStyle: answerStyle,
     };
 
     // Track chat message sent event
@@ -6172,6 +6257,7 @@ export default function ChatScreen({ navigation, route }) {
       isTyping: true,
       chatTier: outgoingTier,
       threadMode: outgoingTier,
+      responseStyle: answerStyle,
       expectedWaitSeconds,
       processingStartedAt: new Date().toISOString(),
       userMessageId: userMessageId,
@@ -6182,6 +6268,7 @@ export default function ChatScreen({ navigation, route }) {
       contextChartKey: chatPersonStorageKey(birthData),
       instantStartedAt,
     };
+    if (outgoingTier === 'verified') processingMessage.calculationTrace = [];
     if (outgoingTier === 'instant') {
       Object.assign(processingMessage, applyInstantProgress(processingMessage, {
         preview: buildImmediateChartPreview(chartData, t('chat.calculatedContext', 'Selected chart · Calculated')),
@@ -6640,6 +6727,14 @@ export default function ChatScreen({ navigation, route }) {
     if (h > 0 && ch > 0) {
       // Tight threshold: reading mid/lower parts of a long last answer must not keep auto-follow on.
       stickMessagesToBottomRef.current = y + h >= ch - 48;
+      const isLongConversation = ch > h + 160;
+      const showTop = isLongConversation && y > 96;
+      const showBottom = isLongConversation && y + h < ch - 96;
+      setChatJumpControls((current) => (
+        current.showTop === showTop && current.showBottom === showBottom
+          ? current
+          : { showTop, showBottom }
+      ));
     }
     if (!ratingPromptStateLoaded) return;
     if (ratingPromptVisible) return;
@@ -6655,6 +6750,17 @@ export default function ChatScreen({ navigation, route }) {
   const handleMessagesScrollBeginDrag = () => {
     stickMessagesToBottomRef.current = false;
     pendingScrollToLastAnswerRef.current = false;
+  };
+
+  const jumpToConversationTop = () => {
+    pendingScrollToLastAnswerRef.current = false;
+    stickMessagesToBottomRef.current = false;
+    scrollMessageListToY(0, true);
+  };
+
+  const jumpToConversationBottom = () => {
+    pendingScrollToLastAnswerRef.current = false;
+    scrollToBottomReliably(true);
   };
 
   const showOlderMessages = () => {
@@ -7281,16 +7387,21 @@ export default function ChatScreen({ navigation, route }) {
               if (!pendingScrollToLastAnswerRef.current) return;
               const offset = Math.max(0, Number(info?.averageItemLength || 0) * Number(info?.index || 0));
               scrollMessageListToY(offset, false);
-              setTimeout(() => {
-                if (!pendingScrollToLastAnswerRef.current) return;
-                try {
-                  scrollViewRef.current?.scrollToIndex({
-                    index: info.index,
-                    viewPosition: 0,
-                    animated: false,
-                  });
-                } catch (_) {}
-              }, 80);
+              // The estimated offset above is only a bridge to get FlatList to
+              // measure the tall response. Retry through subsequent layouts so
+              // we end at the answer's actual top rather than that estimate.
+              [80, 240, 520, 980].forEach((delay) => {
+                setTimeout(() => {
+                  if (!pendingScrollToLastAnswerRef.current) return;
+                  try {
+                    scrollViewRef.current?.scrollToIndex({
+                      index: info.index,
+                      viewPosition: 0,
+                      animated: false,
+                    });
+                  } catch (_) {}
+                }, delay);
+              });
             }}
             scrollEventThrottle={16}
             keyboardShouldPersistTaps="handled"
@@ -7418,6 +7529,8 @@ export default function ChatScreen({ navigation, route }) {
                       key={`loading-${item.clientRequestId || item.id}`}
                       chartInsights={item.chartInsights}
                       chartData={chartData}
+                      calculationTrace={item.calculationTrace}
+                      compactVerified={item.chatTier === 'verified'}
                       expectedWaitSeconds={item.expectedWaitSeconds}
                       startedAt={item.processingStartedAt || item.timestamp}
                     />
@@ -7513,10 +7626,15 @@ export default function ChatScreen({ navigation, route }) {
                       podcastAutoLaunchKey={podcastAutoLaunchKey}
                       podcastAutoLaunchLang={podcastAutoLaunchLang}
                       onPodcastAutoLaunchConsumed={consumePodcastAutoLaunch}
-                      forceInstantPresentation={isInstantAnalysis}
+                      // Presentation belongs to the message that was produced,
+                      // not the mode currently selected for the next question.
+                      // Otherwise a previously completed Verified response is
+                      // rendered as a plain Instant message after mode changes,
+                      // losing its Premium cards, sentiment colours and terms.
+                      forceInstantPresentation={String(item.chatTier || item.chat_tier || '').trim().toLowerCase() === 'instant'}
                     />
                   </View>
-                  {!isInstantAnalysis ? (
+                  {String(item.chatTier || item.chat_tier || '').trim().toLowerCase() !== 'instant' ? (
                     <FeedbackComponent
                       message={item}
                       onFeedbackSubmitted={(messageId, rating) => {
@@ -7528,6 +7646,36 @@ export default function ChatScreen({ navigation, route }) {
               );
             }}
           />
+
+        {(chatJumpControls.showTop || chatJumpControls.showBottom) && (
+          <View
+            pointerEvents="box-none"
+            style={styles.chatJumpControls}
+          >
+            {chatJumpControls.showTop && (
+              <TouchableOpacity
+                style={[styles.chatJumpButton, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}
+                onPress={jumpToConversationTop}
+                accessibilityRole="button"
+                accessibilityLabel={t('chat.jumpToTop', 'Go to the first message')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="chevron-up" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+            {chatJumpControls.showBottom && (
+              <TouchableOpacity
+                style={[styles.chatJumpButton, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}
+                onPress={jumpToConversationBottom}
+                accessibilityRole="button"
+                accessibilityLabel={t('chat.jumpToBottom', 'Go to the latest message')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Suggestions + Input: lift by keyboard frame when open (Android needs this with edge-to-edge). */}
         <View
@@ -7685,14 +7833,14 @@ export default function ChatScreen({ navigation, route }) {
                   <TouchableOpacity
                     style={[
                       styles.modeSelectorPill,
-                      !isPremiumAnalysis && !isInstantAnalysis && styles.modeSelectorPillActive,
-                      !isPremiumAnalysis && !isInstantAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.35)' : 'rgba(255, 107, 53, 0.25)' },
-                      (isPremiumAnalysis || isInstantAnalysis) && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                      !isPremiumAnalysis && !isInstantAnalysis && !isVerifiedAnalysis && styles.modeSelectorPillActive,
+                      !isPremiumAnalysis && !isInstantAnalysis && !isVerifiedAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255, 107, 53, 0.35)' : 'rgba(255, 107, 53, 0.25)' },
+                      (isPremiumAnalysis || isInstantAnalysis || isVerifiedAnalysis) && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
                       !canAffordChatMode('standard') && { opacity: 0.72 },
                     ]}
                     onPress={() => switchChatMode('standard')}
                     accessibilityRole="radio"
-                    accessibilityState={{ selected: !isPremiumAnalysis && !isInstantAnalysis }}
+                    accessibilityState={{ selected: !isPremiumAnalysis && !isInstantAnalysis && !isVerifiedAnalysis }}
                     accessibilityLabel={t('chat.modeStandard', 'Standard')}
                   >
                     <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.modeStandard', 'Standard')}</Text>
@@ -7709,6 +7857,33 @@ export default function ChatScreen({ navigation, route }) {
                       </Text>
                     </View>
                   </TouchableOpacity>
+                  {verifiedChatEnabled && (
+                    <TouchableOpacity
+                      style={[
+                        styles.modeSelectorPill,
+                        isVerifiedAnalysis && styles.modeSelectorPillActivePremium,
+                        isVerifiedAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(56, 189, 248, 0.26)' : 'rgba(14, 116, 144, 0.18)' },
+                        !isVerifiedAnalysis && { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' },
+                        !canAffordChatMode('verified') && { opacity: 0.72 },
+                      ]}
+                      onPress={() => switchChatMode('verified')}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: isVerifiedAnalysis }}
+                      accessibilityLabel={t('chat.verifiedMode.name', 'Verified Chat')}
+                    >
+                      <Text style={[styles.modeSelectorLabel, { color: colors.text }]}>{t('chat.verifiedMode.shortName', 'Verified')}</Text>
+                      <View style={styles.modeSelectorCostCol}>
+                        <Text style={[styles.modeSelectorPrice, { color: colors.text }]}>{formatCreditsInr(verifiedChatCost)}</Text>
+                        <Text style={[styles.modeSelectorCreditLabel, { color: colors.textSecondary }]}>
+                          {canAffordChatMode('verified')
+                            ? t('premiumUi.chatScreen.creditCount', { count: verifiedChatCost })
+                            : t('chat.creditChoice.needsMore', 'Needs {{count}} more', {
+                                count: Math.max(0, Number(verifiedChatCost) - Number(credits || 0)),
+                              })}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={[
                       styles.modeSelectorPill,
@@ -10193,6 +10368,27 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     paddingHorizontal: 14,
     flexGrow: 1,
+  },
+  chatJumpControls: {
+    position: 'absolute',
+    top: '45%',
+    right: 18,
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 8,
+    elevation: 8,
+  },
+  chatJumpButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
   },
   historyWindowContainer: {
     alignItems: 'center',

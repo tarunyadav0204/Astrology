@@ -27,6 +27,7 @@ import AdminUserGrowthCharts from './AdminUserGrowthCharts';
 import AdminAcquisition from './AdminAcquisition';
 import AdminExpenses from './AdminExpenses';
 import AdminChatAnalysis from './AdminChatAnalysis';
+import AdminVerifiedChatValidation from './AdminVerifiedChatValidation';
 import AdminTerms from './AdminTerms';
 import AdminSupportInbox from './AdminSupportInbox';
 import BlogDashboard from '../Blog/BlogDashboard';
@@ -506,6 +507,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [deathQueryUnlockKeyword, setDeathQueryUnlockKeyword] = useState('');
   const [deathQueryUnlockSaving, setDeathQueryUnlockSaving] = useState(false);
   const [instantChatEnabled, setInstantChatEnabled] = useState(false);
+  const [verifiedChatEnabled, setVerifiedChatEnabled] = useState(false);
+  const [verifiedChatSaving, setVerifiedChatSaving] = useState(false);
   const [instantChatUserAllowlist, setInstantChatUserAllowlist] = useState('');
   const [instantResponseValidationEnabled, setInstantResponseValidationEnabled] = useState(true);
   const [speechAllowUnvalidatedStreaming, setSpeechAllowUnvalidatedStreaming] = useState(false);
@@ -1013,6 +1016,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       }
       setDeathQueryUnlockKeyword(deathUnlockKeyword?.value || '');
       setInstantChatEnabled(Boolean(data.instant_chat_enabled));
+      setVerifiedChatEnabled(Boolean(data.verified_chat_enabled));
       setInstantChatUserAllowlist(data.instant_chat_user_allowlist || '');
       setInstantResponseValidationEnabled(data.instant_response_validation_enabled !== false);
       setSpeechAllowUnvalidatedStreaming(Boolean(data.speech_allow_unvalidated_streaming));
@@ -1434,6 +1438,28 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       alert('Failed to save instant chat settings.');
     } finally {
       setGeminiModelsSaving(false);
+    }
+  };
+
+  const handleSaveVerifiedChatFlag = async () => {
+    setVerifiedChatSaving(true);
+    try {
+      const response = await fetch('/api/admin/settings/verified_chat_enabled', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAdminAuthHeaders() },
+        body: JSON.stringify({
+          key: 'verified_chat_enabled',
+          value: verifiedChatEnabled ? 'true' : 'false',
+          description: 'Feature flag for Verified Chat',
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to save Verified Chat setting');
+      alert(`Verified Chat ${verifiedChatEnabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.error('Error saving Verified Chat feature flag:', error);
+      alert('Failed to save Verified Chat setting.');
+    } finally {
+      setVerifiedChatSaving(false);
     }
   };
 
@@ -4101,6 +4127,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Remedy funnel
           </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'verifiedValidation' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('verifiedValidation')}
+          >
+            Verified validation
+          </button>
         </div>
       )}
 
@@ -5731,6 +5764,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           <AdminChatAnalysis />
         )}
 
+        {activeTab === 'chat' && activeSubTab === 'verifiedValidation' && (
+          <AdminVerifiedChatValidation />
+        )}
+
         {activeTab === 'chat' && activeSubTab === 'errors' && (
           <ChatErrors />
         )}
@@ -6695,6 +6732,25 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
             {settingsSubTab === 'featureFlags' && (
               <div className="settings-subtab-group">
+                <div className="settings-section">
+                  <h3>Verified Chat</h3>
+                  <p className="settings-hint">When enabled, eligible users see Verified Chat as an additional chat mode.</p>
+                  <div className="setting-item">
+                    <div className="setting-info">
+                      <strong>Enable Verified Chat</strong>
+                      <p>Uses Luna with deterministic chart evidence and background validation reporting.</p>
+                    </div>
+                    <label className="toggle-switch">
+                      <input type="checkbox" checked={verifiedChatEnabled} onChange={(event) => setVerifiedChatEnabled(event.target.checked)} />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div className="form-buttons" style={{ marginTop: '12px' }}>
+                    <button type="button" className="create-btn" onClick={handleSaveVerifiedChatFlag} disabled={verifiedChatSaving}>
+                      {verifiedChatSaving ? 'Saving…' : 'Save Verified Chat flag'}
+                    </button>
+                  </div>
+                </div>
                 <div className="settings-section">
                   <h3>Live answer validation</h3>
                   <p className="settings-hint">

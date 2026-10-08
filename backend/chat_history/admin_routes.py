@@ -78,6 +78,58 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 
 router = APIRouter()
 
+
+@router.get("/admin/chat/verified-validations")
+async def get_verified_chat_validations(
+    limit: int = Query(100, ge=1, le=500),
+    failures_only: bool = False,
+    current_user: dict = Depends(require_admin),
+):
+    """Recent non-blocking Verified Chat audits for the Chat admin subtab."""
+    _ = current_user
+    where = "WHERE v.status = 'failed'" if failures_only else ""
+    try:
+        with get_conn() as conn:
+            cur = execute(
+                conn,
+                f"""
+                SELECT v.message_id, v.status, v.failures, v.evidence_summary, v.created_at,
+                       m.content, m.chat_tier, s.user_id
+                FROM verified_chat_validations v
+                JOIN chat_messages m ON m.message_id = v.message_id
+                JOIN chat_sessions s ON s.session_id = m.session_id
+                {where}
+                ORDER BY v.created_at DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            rows = cur.fetchall() or []
+    except Exception as exc:
+        logger.warning("verified chat validation listing failed: %s", exc)
+        return {"items": []}
+    items = []
+    for row in rows:
+        try:
+            failures = json.loads(row[2] or "[]")
+        except Exception:
+            failures = []
+        try:
+            evidence_summary = json.loads(row[3] or "{}")
+        except Exception:
+            evidence_summary = {}
+        items.append({
+            "message_id": row[0],
+            "status": row[1],
+            "failures": failures,
+            "evidence_summary": evidence_summary,
+            "created_at": _timestamp_to_ist_iso(row[4]),
+            "response_preview": str(row[5] or "")[:700],
+            "chat_tier": row[6],
+            "user_id": row[7],
+        })
+    return {"items": items}
+
 APP_ROOT = Path(__file__).resolve().parents[2]
 CPU_SNAPSHOT_SCRIPT = APP_ROOT / "scripts" / "capture_cpu_snapshot.sh"
 CPU_SNAPSHOT_LOG = APP_ROOT / "logs" / "cpu-snapshots.log"
@@ -3038,6 +3090,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_deepseek_chat_model,
             get_deepseek_premium_model,
             is_instant_chat_enabled,
+            is_verified_chat_enabled,
             get_event_timeline_rollout_mode,
             get_event_timeline_rollout_user_ids,
             is_instant_response_validation_enabled,
@@ -3146,6 +3199,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "speech_tts_voice_en": get_speech_tts_voice("en"),
             "speech_tts_voice_hi": get_speech_tts_voice("hi"),
             "instant_chat_enabled": is_instant_chat_enabled(),
+            "verified_chat_enabled": is_verified_chat_enabled(),
             "event_timeline_rollout_mode": get_event_timeline_rollout_mode(),
             "event_timeline_rollout_user_ids": ",".join(
                 str(uid) for uid in sorted(get_event_timeline_rollout_user_ids())

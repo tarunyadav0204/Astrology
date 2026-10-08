@@ -17,6 +17,16 @@ def load_glossary_terms(language: str = "english") -> List[dict]:
     "aliases": [str, ...],
   }
   """
+  normalized_language = str(language or "english").strip().lower()
+  normalized_language = {
+      "en": "english",
+      "english": "english",
+      "hi": "hindi",
+      "hin": "hindi",
+      "hindi": "hindi",
+      "हिंदी": "hindi",
+      "हिन्दी": "hindi",
+  }.get(normalized_language, normalized_language)
   try:
     with get_conn() as conn:
       cur = execute(
@@ -24,9 +34,9 @@ def load_glossary_terms(language: str = "english") -> List[dict]:
         """
         SELECT term_id, display_text, definition, COALESCE(aliases, '[]') AS aliases_json
         FROM glossary_terms
-        WHERE language = %s OR language IS NULL
+        WHERE LOWER(language) = %s OR language IS NULL
         """,
-        (language,),
+        (normalized_language,),
       )
       rows = cur.fetchall() or []
   except Exception:
@@ -64,7 +74,7 @@ def find_terms_in_text(text: str, language: str = "english") -> Tuple[List[str],
   Scan arbitrary Gemini response text and return:
 
   - term_ids: list of matched term_id strings
-  - glossary: mapping term_id -> definition
+  - glossary: mapping term_id and the longest matched display label/alias -> definition
 
   Matching is done against display_text and any aliases, case‑insensitive,
   using whole‑word boundaries where possible.
@@ -77,6 +87,7 @@ def find_terms_in_text(text: str, language: str = "english") -> Tuple[List[str],
     return [], {}
 
   matches: Dict[str, str] = {}
+  matched_labels: Dict[str, List[str]] = {}
 
   # Build list of (term_id, label_to_match) pairs
   label_items: List[Tuple[str, str]] = []
@@ -93,13 +104,40 @@ def find_terms_in_text(text: str, language: str = "english") -> Tuple[List[str],
   lowered = text.lower()
 
   for term_id, label in label_items:
-    pattern = r"\b" + re.escape(label.lower()) + r"\b"
-    if re.search(pattern, lowered):
+    normalized_label = label.lower()
+    # ``\b`` is unreliable for Indic scripts because combining vowel marks
+    # are not consistently treated as word characters. Use exact substring
+    # matching for non-ASCII labels; the labels are sorted longest-first, so
+    # a longer term such as "नक्षत्र पाद" still wins over "नक्षत्र".
+    matches_label = (
+      normalized_label in lowered
+      if any(ord(char) > 127 for char in normalized_label)
+      else bool(re.search(r"\b" + re.escape(normalized_label) + r"\b", lowered))
+    )
+    if matches_label:
       if term_id not in matches:
         # Look up the full term object to get definition
         term_obj = next((t for t in glossary_terms if t["term_id"] == term_id), None)
         if term_obj and term_obj.get("definition"):
           matches[term_id] = term_obj["definition"]
+          matched_labels[term_id] = []
+      if term_id in matches:
+        labels = matched_labels.setdefault(term_id, [])
+        if label not in labels:
+          labels.append(label)
 
-  return list(matches.keys()), matches
+  # The mobile renderer receives only `terms` and `glossary`. It cannot look
+  # up a display label for an internal id such as `mahadasha`, especially when
+  # the visible answer says `महादशा`. Keep the id for tagged content and add
+  # the longest visible spelling as a key for automatic wrapping. A single
+  # label prevents an alias such as "महादशा काल" and its shorter display term
+  # "महादशा" from producing nested tooltip markers in the renderer.
+  glossary: Dict[str, str] = dict(matches)
+  for term_id, labels in matched_labels.items():
+    definition = matches.get(term_id)
+    if not definition:
+      continue
+    if labels:
+      glossary.setdefault(str(labels[0]).strip().lower(), definition)
 
+  return list(matches.keys()), glossary

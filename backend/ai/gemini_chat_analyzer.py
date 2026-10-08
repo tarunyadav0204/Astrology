@@ -588,6 +588,8 @@ class GeminiChatAnalyzer:
         stream_callback: Optional[Callable[[str, str], None]] = None,
         system_prompt: Optional[str] = None,
         reasoning_effort_override: Optional[str] = None,
+        previous_response_id: Optional[str] = None,
+        prompt_cache_key: Optional[str] = None,
     ) -> Dict[str, Any]:
         """OpenAI chat: Chat Completions (GPT-4 family) or Responses API (GPT-5 family)."""
         try:
@@ -624,6 +626,10 @@ class GeminiChatAnalyzer:
                 "input": prompt,
                 "max_output_tokens": 65536,
             }
+            if str(previous_response_id or "").strip():
+                request_args["previous_response_id"] = str(previous_response_id).strip()
+            if str(prompt_cache_key or "").strip():
+                request_args["prompt_cache_key"] = str(prompt_cache_key).strip()
             if reasoning is not None:
                 request_args["reasoning"] = reasoning
             if str(system_prompt or "").strip():
@@ -687,7 +693,7 @@ class GeminiChatAnalyzer:
             tt = getattr(u, "total_tokens", None)
             if tt is not None:
                 usage["total_tokens"] = int(tt)
-            return {"text": content, "usage": usage}
+            return {"text": content, "usage": usage, "response_id": getattr(resp, "id", None)}
 
         # Legacy Chat Completions (gpt-4o, gpt-4-turbo, etc.)
         temperature = 1.0 if mid.startswith("o") else 0.0
@@ -885,6 +891,8 @@ class GeminiChatAnalyzer:
         stream_callback: Optional[Callable[[str, str], None]] = None,
         system_prompt: Optional[str] = None,
         openai_reasoning_effort: Optional[str] = None,
+        previous_response_id: Optional[str] = None,
+        prompt_cache_key: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Single LLM completion for an arbitrary prompt (parallel chat branches + merge).
@@ -934,6 +942,7 @@ class GeminiChatAnalyzer:
         model_name = ""
         token_usage: Dict[str, Any] = {"input_tokens": 0, "output_tokens": 0}
         response_text: Optional[str] = None
+        openai_response_id: Optional[str] = None
 
         def _finish(out: Dict[str, Any]) -> Dict[str, Any]:
             usage = dict(out.get("token_usage") or {})
@@ -989,11 +998,14 @@ class GeminiChatAnalyzer:
                         stream_callback,
                         system_prompt,
                         openai_reasoning_effort,
+                        previous_response_id,
+                        prompt_cache_key,
                     ),
                     timeout=timeout_s,
                 )
                 response_text = (oa or {}).get("text")
                 token_usage = (oa or {}).get("usage") or token_usage
+                openai_response_id = (oa or {}).get("response_id")
             elif llm_provider == CHAT_LLM_DEEPSEEK:
                 model_name = (
                     str(model_name_override).strip()
@@ -1148,6 +1160,7 @@ class GeminiChatAnalyzer:
                     "chat_llm_model": model_name or None,
                     "token_usage": token_usage,
                     "elapsed_s": time.time() - t0,
+                    "response_id": openai_response_id if llm_provider == CHAT_LLM_OPENAI else None,
                 }
             )
         except asyncio.TimeoutError:

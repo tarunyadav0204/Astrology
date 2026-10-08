@@ -56,6 +56,8 @@ from utils.admin_settings import (
     CHAT_LLM_OPENAI,
     get_instant_chat_llm_provider,
     get_instant_chat_model,
+    get_chat_llm_provider,
+    get_openai_chat_model,
 )
 
 logger = logging.getLogger(__name__)
@@ -265,7 +267,7 @@ INPUT
 
 DECISIONS
 1. `turn_relation`: new_request, clarification_answer, or follow_up. A self-contained new topic abandons prior unresolved state. Semantically apply a clarification answer to known_facts and remove resolved facts.
-2. `route_action`: ack for greeting/thanks/no question; handoff for two-chart compatibility; clarify only when a missing event, subject, reference, required child order, location scope, or incompatible multi-domain choice changes the calculation; otherwise answer.
+2. `route_action`: ack for greeting/thanks/no question; handoff for two-chart compatibility; out_of_scope when the request is not about astrology or the user's chart; clarify only when a missing event, subject, reference, required child order, location scope, or incompatible multi-domain choice changes the calculation; otherwise answer.
 3. Multiple related facets of one event stay READY. Promise plus timing for the same event stays READY. Multiple unrelated domains use CLARIFY + compound_plan and 2-5 same-language choices faithfully preserving each question.
 4. Follow the latest user's language and the script actually typed for response_language, response_script, user_message, and clarification text. Romanized Hindi/Hinglish written in Latin letters must be response_language=hinglish and response_script=latn. Use deva only when the latest message itself uses Devanagari. Examples: `Mera visa kab aayega?` => hinglish/latn; `मेरा visa कब आएगा?` => hindi/deva.
 5. Resolve relative dates only from current_user_local_date. An exact day is PREDICT_DAILY; a range/season/month/year is PREDICT_PERIOD_OUTLOOK; asking when/if one event occurs is LIFESPAN_EVENT_TIMING; traits are ANALYZE_PERSONALITY; static promise/suitability/topic is ANALYZE_TOPIC_POTENTIAL; open-ended place selection is RECOMMEND_LOCATION; an explicit astrology-remedy request is RECOMMEND_REMEDY_FOR_PROBLEM.
@@ -3486,6 +3488,7 @@ LATEST USER MESSAGE (answer this turn): "{latest_user_reply}"
 Task:
 1. Semantically understand the user's question in any language/script.
    If LATEST USER MESSAGE is only a greeting, thanks, acknowledgement, deferral, or says there is no question, set route_action=ack, status=READY, and write one short natural `user_message` in that same language/script. Do not request astrology evidence.
+   If LATEST USER MESSAGE is not an astrology or chart question (for example, asking what AI/model you are, general knowledge, writing, coding, or translation), set route_action=out_of_scope, status=READY, and write one short natural `user_message` in the same language/script saying this chat answers astrology questions. Do not request astrology evidence.
    MEDICAL SAFETY OVERRIDE: Use `medical_triage.urgency=clinical` for any request asking astrology to diagnose a condition, predict or pre-judge a pending medical test/report, determine whether a pregnancy/baby is medically healthy, assess genetic abnormality, miscarriage or treatment/procedure success, or decide whether a current symptom is medically harmless. `clinical` is a hybrid-answer safety flag, not a refusal or handoff: Live should still calculate and explain only a general astrological health, pregnancy, or parenthood climate, while explicitly separating that symbolism from every clinical claim. Use `urgent` or `emergency` instead when the latest message describes a potentially urgent active symptom such as chest pain/pressure, serious breathing difficulty, stroke signs, fainting, severe bleeding or another possible emergency; those routes bypass astrology. For `clinical`, write `medical_triage.user_message` as a concise same-language boundary and appropriate clinical next step, not the whole answer. Plainly state what cannot be known before examination/results and distinguish screening from diagnosis when relevant. Never imply that a supportive chart predicts a normal report, healthy baby, normal growth, absence of genetic conditions, harmless symptoms, or treatment success; never imply that a pressured chart predicts abnormality, loss, disease, poor growth, or complications. Never mention an internal flow, routing, missing astrology evidence, Standard/Premium mode, or offer a paid/deeper astrology reading. Do not use `clinical` for ordinary non-diagnostic questions about general health tendencies, prevention or a future health outlook.
    First classify `turn_relation`:
    - When a pending spoken follow-up invitation is supplied, use the exact invitation, its canonical offered question, recent conversation, and LATEST USER MESSAGE together. If the user semantically accepts that invitation in any language, set turn_relation=follow_up, accepted_speech_follow_up=true, and resolved_question to the complete standalone question that must now be answered. Classify every remaining field from resolved_question, not from the acknowledgement alone. If the user declines or asks something different, set accepted_speech_follow_up=false and resolved_question=null.
@@ -3624,7 +3627,7 @@ Return exactly this JSON shape:
   "status": "CLARIFY" or "READY",
   "clarification_question": "same language/script as user, only when CLARIFY; for compound_plan explain that answering several questions together makes each reading weaker, then ask them to choose one card, without listing options in prose",
   "clarification_choices": [{{"id":"q1","label":"short theme in user's language","submit_text":"complete standalone question preserving the user's exact intent"}}] only for CLARIFY + compound_plan, otherwise [],
-  "route_action": "answer" or "clarify" or "handoff" or "ack",
+  "route_action": "answer" or "clarify" or "handoff" or "ack" or "out_of_scope",
   "user_message": "LLM-authored same-language clarification or handoff message, otherwise empty",
   "dialogue_state": {{
     "request_summary": "concise resolved meaning so far",
@@ -3992,7 +3995,7 @@ Return ONLY this JSON shape:
   "status": "CLARIFY" or "READY",
   "clarification_question": "short question only when status=CLARIFY; for compound_plan explain that answering several questions together makes each reading weaker, then ask them to choose one card, without listing options in prose",
   "clarification_choices": [{{"id":"q1","label":"short theme in user's language","submit_text":"complete standalone question preserving the user's exact intent"}}] only for CLARIFY + compound_plan, otherwise [],
-  "route_action": "answer" or "clarify" or "handoff" or "ack",
+  "route_action": "answer" or "clarify" or "handoff" or "ack" or "out_of_scope",
   "user_message": "same-language clarification or handoff message, otherwise empty",
   "dialogue_state": {{
     "request_summary": "concise resolved meaning so far",
@@ -4939,6 +4942,38 @@ CLARIFICATION FORMAT RULE:
         Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, learning, travel, visa, foreign, gain, wish, general, son, daughter, mother, father, spouse, siblings, children, family, soul, spirituality, purpose, dharma, vehicles, nakshatra, birth_star, timing
         """
         
+        # Standard Chat follows its Admin provider/model setting too.  This
+        # keeps the classifier aligned with parallel branches and the merge
+        # writer when Standard Chat is switched to Luna.
+        if get_chat_llm_provider() == CHAT_LLM_OPENAI:
+            from ai.gemini_chat_analyzer import GeminiChatAnalyzer
+
+            routed = await GeminiChatAnalyzer().generate_text_from_prompt(
+                prompt,
+                premium_analysis=False,
+                model_name_override=get_openai_chat_model(),
+                provider_override=CHAT_LLM_OPENAI,
+                openai_reasoning_effort="none",
+                llm_log_tag="standard_intent_router",
+                request_timeout_s=30.0,
+                system_prompt="Classify the request. Return only the required JSON object.",
+            )
+            if not routed.get("success"):
+                raise RuntimeError(str(routed.get("error") or "standard_intent_router_failed"))
+            cleaned = str(routed.get("response") or "").replace("```json", "").replace("```", "").strip()
+            return self._finalize_router_result(
+                json.loads(cleaned),
+                user_question=user_question,
+                current_year=current_year,
+                current_month=current_month,
+                resolved_now=resolved_now,
+                normalized_query_context=normalized_query_context,
+                include_chart_insights=False,
+                d1_chart=d1_chart,
+                force_ready=force_ready,
+                language=language,
+            )
+
         model = self._get_model()
         model_name = model._model_name if hasattr(model, '_model_name') else 'Unknown'
         

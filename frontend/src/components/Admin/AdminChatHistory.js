@@ -1565,7 +1565,7 @@ const AdminChatHistory = () => {
       };
     }
 
-    if (usage.kind === 'instant_chat_usage') {
+    if (usage.kind === 'instant_chat_usage' || usage.kind === 'verified_chat_usage') {
       for (let i = stages.length - 1; i >= 0; i--) {
         const st = stages[i];
         if (st && String(st.llm_model || '').trim()) {
@@ -2167,6 +2167,7 @@ const AdminChatHistory = () => {
                     : null;
 	                  const showPdfButton = role === 'assistant' && Array.isArray(exportBlock) && exportBlock.length > 0;
 	                  const isInstantUsage = message.parallel_llm_usage?.kind === 'instant_chat_usage';
+	                  const isVerifiedUsage = message.parallel_llm_usage?.kind === 'verified_chat_usage';
 	                  const parallelModelInfo = hasParallelStages ? parallelModelSummary(message.parallel_llm_usage) : null;
 	                  const parallelBranchPlan = hasParallelStages ? parallelBranchPlanSummary(message.parallel_llm_usage) : null;
 	                  const answerModelLabel =
@@ -2207,6 +2208,7 @@ const AdminChatHistory = () => {
                       {message.response_style === 'simple' ? <span className="admin-instant-message-badge">Simple</span> : null}
                       {message.response_style === 'technical' ? <span className="admin-instant-message-badge">Technical</span> : null}
                       {isInstantUsage ? <span className="admin-instant-message-badge">⚡ Instant</span> : null}
+	                      {isVerifiedUsage ? <span className="admin-instant-message-badge">✓ Verified Chat</span> : null}
                     </div>
                     <div
                       className="message-content"
@@ -2223,7 +2225,7 @@ const AdminChatHistory = () => {
                           Astrology QA
                         </button>
                       )}
-                      {role === 'assistant' && Number.isFinite(Number(message.message_id)) && !isInstantUsage && (
+                      {role === 'assistant' && Number.isFinite(Number(message.message_id)) && !isInstantUsage && !isVerifiedUsage && (
                         <button
                           type="button"
                           className="message-branch-btn"

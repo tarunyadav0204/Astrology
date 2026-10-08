@@ -244,8 +244,16 @@ from ai.response_parser import ResponseParser
 from ai.term_matcher import find_terms_in_text
 from chat.system_instruction_config import build_merge_synthesis_instruction
 from utils.admin_settings import (
+    CHAT_LLM_DEEPSEEK,
+    CHAT_LLM_GEMMA,
+    CHAT_LLM_GEMINI,
+    CHAT_LLM_OPENAI,
     get_parallel_branch_gemini_model,
     get_parallel_branch_planner_model,
+    get_openai_chat_model,
+    get_openai_premium_model,
+    get_deepseek_chat_model,
+    get_deepseek_premium_model,
     is_free_question_parashari_only_enabled,
     is_parallel_branch_planner_enabled,
 )
@@ -565,6 +573,7 @@ async def _run_branch_json(
                 model_name_override=model_name_override,
                 llm_log_tag=f"parallel_{branch_label}",
                 request_timeout_s=branch_timeout_s,
+                provider_override=stage_provider,
             )
             elapsed_ms_acc += (time.time() - t0) * 1000
             last_res = res
@@ -778,54 +787,62 @@ async def run_parallel_chat_pipeline(
 
     t_parallel = time.time()
     standard_provider = get_chat_llm_provider()
-    standard_gemini_model_name = get_gemini_chat_model()
+
+    def model_for_provider(provider: str, *, premium: bool) -> str:
+        if provider == CHAT_LLM_OPENAI:
+            return get_openai_premium_model() if premium else get_openai_chat_model()
+        if provider == CHAT_LLM_DEEPSEEK:
+            return get_deepseek_premium_model() if premium else get_deepseek_chat_model()
+        if provider == CHAT_LLM_GEMMA:
+            return "gemma-http"
+        return get_gemini_premium_model() if premium else get_gemini_chat_model()
+
+    standard_model_name = model_for_provider(standard_provider, premium=False)
     premium_provider = (
         get_chat_llm_provider_premium() if premium_analysis else standard_provider
     )
-    premium_gemini_model_name = (
-        get_gemini_premium_model() if premium_analysis else standard_gemini_model_name
-    )
+    premium_model_name = model_for_provider(premium_provider, premium=premium_analysis)
     # Non-premium (incl. free questions): merge/final must use the Standard chat model
     # (admin gemini_chat_model), not a separate parallel-merge override or premium fallback.
     if premium_analysis:
         merge_provider = premium_provider
         merge_model_name = (
-            get_parallel_branch_gemini_model("merge", premium_gemini_model_name)
+            get_parallel_branch_gemini_model("merge", premium_model_name)
             if premium_provider == "gemini"
-            else premium_gemini_model_name
+            else premium_model_name
         )
     else:
         merge_provider = standard_provider
-        merge_model_name = standard_gemini_model_name
+        merge_model_name = standard_model_name
 
     branch_runtime = {
         "parashari": {
             "provider": premium_provider,
-            "model_name": get_parallel_branch_gemini_model("parashari", premium_gemini_model_name) if premium_provider == "gemini" else premium_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("parashari", premium_model_name) if premium_provider == "gemini" else premium_model_name,
         },
         "jaimini": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("jaimini", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("jaimini", standard_model_name) if standard_provider == "gemini" else standard_model_name,
         },
         "nadi": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("nadi", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("nadi", standard_model_name) if standard_provider == "gemini" else standard_model_name,
         },
         "nakshatra": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("nakshatra", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("nakshatra", standard_model_name) if standard_provider == "gemini" else standard_model_name,
         },
         "kp": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("kp", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("kp", standard_model_name) if standard_provider == "gemini" else standard_model_name,
         },
         "ashtakavarga": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("ashtakavarga", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("ashtakavarga", standard_model_name) if standard_provider == "gemini" else standard_model_name,
         },
         "sudarshan": {
             "provider": standard_provider,
-            "model_name": get_parallel_branch_gemini_model("sudarshan", standard_gemini_model_name) if standard_provider == "gemini" else standard_gemini_model_name,
+            "model_name": get_parallel_branch_gemini_model("sudarshan", standard_model_name) if standard_provider == "gemini" else standard_model_name,
         },
         "merge": {
             "provider": merge_provider,
@@ -1186,6 +1203,7 @@ async def run_parallel_chat_pipeline(
             premium_analysis=premium_analysis,
             model_override=final_runtime["cached_model"],
             model_name_override=final_runtime["model_name"],
+            provider_override=final_runtime["provider"],
             llm_log_tag="parallel_parashari_final",
         )
         synthesis_ms = round((time.time() - t_final) * 1000, 1)
@@ -1556,6 +1574,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         premium_analysis=premium_analysis,
         model_override=merge_runtime["cached_model"],
         model_name_override=merge_runtime["model_name"],
+        provider_override=merge_runtime["provider"],
         llm_log_tag="parallel_merge",
     )
     synthesis_ms = round((time.time() - t_syn) * 1000, 1)

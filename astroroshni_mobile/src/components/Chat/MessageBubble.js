@@ -285,6 +285,15 @@ function MessageBubble({
   const slideAnim = useRef(new Animated.Value(entryAlreadyPlayed ? 0 : 50)).current;
   const isPartnership = partnership || message.partnership_mode;
   const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
+  const messageResponseStyle = String(message?.responseStyle || message?.response_style || '').trim().toLowerCase();
+  // Simple Verified answers are intentionally a continuous, readable consultation.
+  // Do not turn a model heading into the large Premium quick-answer card: that
+  // card can swallow the rest of a Markdown response when the model uses nested
+  // headings for its timing or evidence sections.
+  // Old messages did not persist response_style. Verified defaults to the
+  // readable presentation unless it explicitly says Technical, so those older
+  // responses cannot fall back into an oversized Quick Answer card either.
+  const isVerifiedSimpleMessage = messageChatTier === 'verified' && messageResponseStyle !== 'technical';
   const isInstantChatMessage = forceInstantPresentation || messageChatTier === 'instant';
   const isPremiumChatMessage = messageChatTier === 'premium' || message?.premium_analysis === true;
   const instantEvidence = message?.instant_evidence_debug
@@ -1085,7 +1094,15 @@ function MessageBubble({
       // If no tags found, auto-wrap terms from glossary keys (first occurrence only per term)
       if (termCount === 0) {
         Object.keys(message.glossary).forEach(termKey => {
-          const termPattern = new RegExp(`\\b(${termKey.replace(/[()]/g, '\\$&')})\\b`, 'gi');
+          const escapedTerm = termKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          // JavaScript word boundaries do not reliably recognize Indic scripts
+          // with combining vowel marks. The backend only sends keys that were
+          // matched in this response, so exact substring matching is safe for
+          // non-Latin glossary labels.
+          const usesNonLatinScript = /[^\u0000-\u007f]/.test(termKey);
+          const termPattern = usesNonLatinScript
+            ? new RegExp(`(${escapedTerm})`, 'gi')
+            : new RegExp(`\\b(${escapedTerm})\\b`, 'gi');
           formatted = formatted.replace(termPattern, (match) => {
             const key = termKey.toLowerCase();
             if (wrappedTermIds.has(key)) return match;
@@ -1111,28 +1128,38 @@ function MessageBubble({
       return `<finalthoughts>${cleanContent}</finalthoughts>`;
     });
 
-    // Partnership/relational merges often use "Direct Answer" style headings instead of quick-answer-card HTML.
-    // Normalize these to the same yellow quick-answer card UX used in single-chart responses.
-    formatted = formatted.replace(
-      /(###\s*(?:Direct Answer|Quick Answer|Short Answer|Bottom Line|Answer)\s*[\s\S]*?)(?=###|$)/gi,
-      (match) => {
-        const cleanContent = match.replace(/^###\s*(?:Direct Answer|Quick Answer|Short Answer|Bottom Line|Answer)\s*\n?/i, '').trim();
-        return `<quickanswer>${cleanContent}</quickanswer>`;
-      }
-    );
+    if (!isVerifiedSimpleMessage) {
+      // Partnership/relational merges often use "Direct Answer" style headings instead of quick-answer-card HTML.
+      // Normalize these to the same yellow quick-answer card UX used in single-chart responses.
+      formatted = formatted.replace(
+        /(###\s*(?:Direct Answer|Quick Answer|Short Answer|Bottom Line|Answer)\s*[\s\S]*?)(?=###|$)/gi,
+        (match) => {
+          const cleanContent = match.replace(/^###\s*(?:Direct Answer|Quick Answer|Short Answer|Bottom Line|Answer)\s*\n?/i, '').trim();
+          return `<quickanswer>${cleanContent}</quickanswer>`;
+        }
+      );
 
-    // Normalize common closing section names from partnership branches to Final Thoughts card.
-    formatted = formatted.replace(
-      /(###\s*(?:Final Thought|Final Thoughts|Closing Thoughts|Closing Guidance|Final Guidance|Practical Guidance|Takeaway)\s*[\s\S]*?)(?=###|$)/gi,
-      (match) => {
-        const cleanContent = match.replace(/^###\s*(?:Final Thought|Final Thoughts|Closing Thoughts|Closing Guidance|Final Guidance|Practical Guidance|Takeaway)\s*\n?/i, '').trim();
-        return `<finalthoughts>${cleanContent}</finalthoughts>`;
-      }
-    );
+      // Normalize common closing section names from partnership branches to Final Thoughts card.
+      formatted = formatted.replace(
+        /(###\s*(?:Final Thought|Final Thoughts|Closing Thoughts|Closing Guidance|Final Guidance|Practical Guidance|Takeaway)\s*[\s\S]*?)(?=###|$)/gi,
+        (match) => {
+          const cleanContent = match.replace(/^###\s*(?:Final Thought|Final Thoughts|Closing Thoughts|Closing Guidance|Final Guidance|Practical Guidance|Takeaway)\s*\n?/i, '').trim();
+          return `<finalthoughts>${cleanContent}</finalthoughts>`;
+        }
+      );
 
-    // Handle Quick Answer sections
-    formatted = formatted.replace(/<div class="quick-answer-card">(.*?)<\/div>/gs, '<quickanswer>$1</quickanswer>');
-    formatted = formatted.replace(/<div class="final-thoughts-card">(.*?)<\/div>/gs, '<finalthoughts>$1</finalthoughts>');
+      // Handle Quick Answer sections
+      formatted = formatted.replace(/<div class="quick-answer-card">(.*?)<\/div>/gs, '<quickanswer>$1</quickanswer>');
+      formatted = formatted.replace(/<div class="final-thoughts-card">(.*?)<\/div>/gs, '<finalthoughts>$1</finalthoughts>');
+    } else {
+      // Be defensive with responses created before the Simple prompt rollout too.
+      // The content is still useful; it just belongs in the normal reading flow.
+      formatted = formatted
+        .replace(/<div class="quick-answer-card">([\s\S]*?)<\/div>/gi, '\n\n$1\n\n')
+        .replace(/<div class="final-thoughts-card">([\s\S]*?)<\/div>/gi, '\n\n$1\n\n')
+        .replace(/<\/?quickanswer>/gi, '')
+        .replace(/<\/?finalthoughts>/gi, '');
+    }
 
     // Normalize over-duplicated markdown header hashes while keeping a single header marker
     // Example: "#### #### Health" -> "#### Health" so our header parsing still works
@@ -1195,6 +1222,21 @@ function MessageBubble({
           .replace(/^\n*:/, '')
           .replace(/^\s*:\s*/, '')
           .trim();
+
+        // A quick-answer card must contain one compact summary. Some model
+        // responses (and a few legacy responses) wrap the entire Markdown
+        // answer in that tag. Later headings or sentiment markers are a clear
+        // signal that it is a full reading, so render it in the normal flow
+        // instead of trapping every section inside one oversized card.
+        const containsNestedSections = /(^|\n)\s*#{2,}\s+/m.test(cardContent);
+        const containsSentimentMarkers = /(?:\[|【)(?:POS|NEG)_(?:START|END)(?:\]|】)/i.test(cardContent);
+        const isOversizedCard = cardContent.length > 650;
+        if (containsNestedSections || containsSentimentMarkers || isOversizedCard) {
+          elements.push(...parseRegularText(cardContent, currentIndex));
+          currentIndex += 100;
+          lastIndex = item.lastIndex;
+          continue;
+        }
 
         const quickKey = currentIndex;
         currentIndex += 1;
@@ -1636,6 +1678,14 @@ function MessageBubble({
     out = out.replace(/<div[^>]*>/gi, '\n');
     out = out.replace(/<(?!\/?tooltip\b)[^>]+>/gi, '');
     out = sanitizeVisibleChatContent(out, { asHtmlSpans: false });
+    // Recover Standard Simple structure when a provider puts its section emoji
+    // or the next numbered rank at the end of a prose line. Keeping these as
+    // distinct lines lets the regular renderer create readable sections and
+    // list rows instead of one dense paragraph.
+    out = out
+      .replace(/([.!?])\s*([✨🕐])\s*/g, '$1\n\n$2\n')
+      .replace(/([.!?])\s+(?=\d+\.\s+)/g, '$1\n')
+      .replace(/(^|\n)\s*([✨🕐])\s*\n\s*([^\n]{2,110})(?=\n|$)/g, '$1\n\n## $3\n');
     return out;
   };
 
@@ -1672,6 +1722,28 @@ function MessageBubble({
         let headerText = part.replace(/<h3>(.*?)<\/h3>/, '$1');
         headerText = headerText.replace(/^#+\s*/, '').trim();
         headerText = headerText.replace(/<tooltip[^>]*>([^<]+)<\/tooltip>/g, '$1');
+        const inlineBodyAt = headerText.search(/\s+\*\*/);
+        if (headerText.length > 140 && inlineBodyAt >= 16) {
+          const headerLabel = headerText.slice(0, inlineBodyAt).trim();
+          const inlineBody = headerText.slice(inlineBodyAt).trim();
+          const symbol = getHeaderSymbol(headerLabel);
+          elements.push(
+            <View key={`header-${currentIndex++}`} style={styles.headerContainer}>
+              <Text style={styles.headerIcon}>{symbol}</Text>
+              <Text style={[styles.headerText, { color: colors.text }]}>{headerLabel}</Text>
+            </View>
+          );
+          const bodyElements = renderTextWithBold(inlineBody, currentIndex, message.role);
+          elements.push(...bodyElements);
+          currentIndex += bodyElements.length;
+          continue;
+        }
+        if (headerText.length > 220) {
+          const bodyElements = renderTextWithBold(headerText, currentIndex, message.role);
+          elements.push(...bodyElements);
+          currentIndex += bodyElements.length;
+          continue;
+        }
         const symbol = getHeaderSymbol(headerText);
         elements.push(
           <View key={`header-${currentIndex++}`} style={styles.headerContainer}>
@@ -1683,6 +1755,33 @@ function MessageBubble({
         listCounter = 0; // Reset counter for new section
         let headerText = part.replace(/^#+\s*/, '').trim();
         headerText = headerText.replace(/<tooltip[^>]*>([^<]+)<\/tooltip>/g, '$1');
+        // Models occasionally emit `## Heading **The entire explanation...**`
+        // on one line. Rendering that line as a heading turns a full answer
+        // into an enormous all-caps card and also bypasses inline formatting.
+        // Keep the actual label, then move the attached explanation back into
+        // the normal text renderer.
+        const inlineBodyAt = headerText.search(/\s+\*\*/);
+        if (headerText.length > 140 && inlineBodyAt >= 16) {
+          const headerLabel = headerText.slice(0, inlineBodyAt).trim();
+          const inlineBody = headerText.slice(inlineBodyAt).trim();
+          const symbol = getHeaderSymbol(headerLabel);
+          elements.push(
+            <View key={`header-${currentIndex++}`} style={styles.headerContainer}>
+              <Text style={styles.headerIcon}>{symbol}</Text>
+              <Text style={[styles.headerText, { color: colors.text }]}>{headerLabel}</Text>
+            </View>
+          );
+          const bodyElements = renderTextWithBold(inlineBody, currentIndex, message.role);
+          elements.push(...bodyElements);
+          currentIndex += bodyElements.length;
+          continue;
+        }
+        if (headerText.length > 220) {
+          const bodyElements = renderTextWithBold(headerText, currentIndex, message.role);
+          elements.push(...bodyElements);
+          currentIndex += bodyElements.length;
+          continue;
+        }
         const symbol = getHeaderSymbol(headerText);
         elements.push(
           <View key={`header-${currentIndex++}`} style={styles.headerContainer}>
@@ -1693,6 +1792,28 @@ function MessageBubble({
       } else if (part.match(/^####\s+(.+)$/m)) {
         let headerText = part.split('\n')[0].replace(/^#+\s*/, '').trim();
         headerText = headerText.replace(/<tooltip[^>]*>([^<]+)<\/tooltip>/g, '$1');
+        const inlineBodyAt = headerText.search(/\s+\*\*/);
+        if (headerText.length > 140 && inlineBodyAt >= 16) {
+          const headerLabel = headerText.slice(0, inlineBodyAt).trim();
+          const inlineBody = headerText.slice(inlineBodyAt).trim();
+          const symbol = getHeaderSymbol(headerLabel);
+          elements.push(
+            <View key={`subheader-${currentIndex++}`} style={styles.subHeaderContainer}>
+              <Text style={styles.subHeaderIcon}>{symbol}</Text>
+              <Text style={[styles.subHeaderText, { color: colors.text }]}>{headerLabel}</Text>
+            </View>
+          );
+          const bodyElements = renderTextWithBold(inlineBody, currentIndex, message.role);
+          elements.push(...bodyElements);
+          currentIndex += bodyElements.length;
+          continue;
+        }
+        if (headerText.length > 220) {
+          const bodyElements = renderTextWithBold(headerText, currentIndex, message.role);
+          elements.push(...bodyElements);
+          currentIndex += bodyElements.length;
+          continue;
+        }
         const symbol = getHeaderSymbol(headerText);
         elements.push(
           <View key={`subheader-${currentIndex++}`} style={styles.subHeaderContainer}>

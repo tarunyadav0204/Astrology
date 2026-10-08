@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Image, Platform, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import NorthIndianChart from './Chart/NorthIndianChart';
 import { useTheme } from '../context/ThemeContext';
@@ -20,6 +20,8 @@ function getInsightPlanets(chartData, houseNumber) {
 const LoadingBubble = ({
     chartInsights,
     chartData,
+    calculationTrace = [],
+    compactVerified = false,
     expectedWaitSeconds = 80,
     startedAt = null,
 }) => {
@@ -38,11 +40,81 @@ const LoadingBubble = ({
     const waitStartMsRef = useRef(null);
     const [remainingSeconds, setRemainingSeconds] = useState(Math.max(0, Number(expectedWaitSeconds) || 0));
     const [zodiacIndex, setZodiacIndex] = useState(0);
+    const [typedCalculationLengths, setTypedCalculationLengths] = useState({});
+    const [compositionDots, setCompositionDots] = useState(0);
+    const calculationScrollRef = useRef(null);
     const zodiacSymbols = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
 
     const hasChartInsights = chartInsights && Array.isArray(chartInsights) && chartInsights.length > 0;
+    const hasCalculationTrace = Array.isArray(calculationTrace) && calculationTrace.length > 0;
     const hasChartData = chartData && (chartData.planets || chartData.houses);
     const chartInsightsCount = Array.isArray(chartInsights) ? chartInsights.length : 0;
+    const verifiedCalculationMessages = compactVerified && hasCalculationTrace
+        ? calculationTrace.map((step, index) => {
+            const title = String(step?.title || step || '').trim();
+            const detail = String(step?.detail || '').trim();
+            const id = String(step?.id || `${title}-${index}`);
+            return { id, content: detail ? `${title} · ${detail}` : title };
+        }).filter((step) => step.content)
+        : [];
+    const verifiedCalculationSignature = verifiedCalculationMessages
+        .map((step) => `${step.id}:${step.content}`)
+        .join('|');
+    const isCalculationTraceTyping = verifiedCalculationMessages.some(
+        (step) => (typedCalculationLengths[step.id] || 0) < step.content.length
+    );
+    const isComposingVerifiedAnswer = compactVerified
+        && verifiedCalculationMessages.length > 0
+        && !isCalculationTraceTyping;
+
+    // Preserve completed lines while a new model calculation arrives; only the
+    // newest material starts its typewriter reveal from the beginning.
+    useEffect(() => {
+        if (!compactVerified) return;
+        setTypedCalculationLengths((previous) => {
+            const next = {};
+            verifiedCalculationMessages.forEach((step) => {
+                next[step.id] = Math.min(Number(previous[step.id]) || 0, step.content.length);
+            });
+            return next;
+        });
+    }, [compactVerified, verifiedCalculationSignature]);
+
+    useEffect(() => {
+        if (!compactVerified || verifiedCalculationMessages.length === 0) return undefined;
+        const pending = verifiedCalculationMessages.find(
+            (step) => (typedCalculationLengths[step.id] || 0) < step.content.length
+        );
+        if (!pending) return undefined;
+        const timer = setTimeout(() => {
+            setTypedCalculationLengths((previous) => ({
+                ...previous,
+                [pending.id]: Math.min((previous[pending.id] || 0) + 1, pending.content.length),
+            }));
+        }, 16);
+        return () => clearTimeout(timer);
+    }, [compactVerified, verifiedCalculationSignature, typedCalculationLengths]);
+
+    useEffect(() => {
+        if (!isComposingVerifiedAnswer) {
+            setCompositionDots(0);
+            return undefined;
+        }
+        const timer = setInterval(() => {
+            setCompositionDots((current) => (current + 1) % 4);
+        }, 420);
+        return () => clearInterval(timer);
+    }, [isComposingVerifiedAnswer]);
+
+    // This fixed-height stream follows the newest calculation, so earlier
+    // completed lines move out through the top like a thinking panel.
+    useEffect(() => {
+        if (!compactVerified || verifiedCalculationMessages.length === 0) return undefined;
+        const timer = setTimeout(() => {
+            calculationScrollRef.current?.scrollToEnd?.({ animated: true });
+        }, 0);
+        return () => clearTimeout(timer);
+    }, [compactVerified, verifiedCalculationSignature, typedCalculationLengths]);
 
     useEffect(() => {
         if (!hasChartInsights) {
@@ -200,6 +272,91 @@ const LoadingBubble = ({
         ? "High traffic right now - your study is still being prepared and may take a little longer than usual."
         : null;
     const showZodiacLoop = remainingSeconds === 0;
+
+    if (compactVerified) {
+        return (
+            <View style={styles.compactVerifiedWrap}>
+                <View style={styles.compactVerifiedHeader}>
+                    <Text style={[styles.compactVerifiedTitle, { color: colors.text }]}>{t('premiumUi.chat.synthesizing')}</Text>
+                    <Text style={[styles.compactVerifiedTimer, { color: colors.primary }]}>
+                        {remainingSeconds > 0 ? timerText : '…'}
+                    </Text>
+                </View>
+                <ScrollView
+                    ref={calculationScrollRef}
+                    style={styles.compactVerifiedStream}
+                    contentContainerStyle={styles.compactVerifiedStreamContent}
+                    showsVerticalScrollIndicator={false}
+                    scrollEnabled={false}
+                    onContentSizeChange={() => calculationScrollRef.current?.scrollToEnd?.({ animated: true })}
+                >
+                    {verifiedCalculationMessages.map((step) => {
+                        const displayedLength = typedCalculationLengths[step.id] || 0;
+                        const isTyping = displayedLength < step.content.length;
+                        return (
+                            <Text key={step.id} style={[styles.compactVerifiedMessage, { color: colors.textMuted }]}>
+                                {step.content.slice(0, displayedLength)}{isTyping ? <Text style={{ color: colors.primary }}>▍</Text> : ''}
+                            </Text>
+                        );
+                    })}
+                </ScrollView>
+                {isComposingVerifiedAnswer && (
+                    <Text style={[styles.compactVerifiedComposing, { color: colors.primary }]}>
+                        {t('chat.verifiedMode.composingAnswer', 'Tara is composing your answer')}{'.'.repeat(compositionDots + 1)}
+                    </Text>
+                )}
+            </View>
+        );
+    }
+
+    if (hasCalculationTrace) {
+        return (
+            <View style={styles.container}>
+                <LinearGradient
+                    colors={[colors.cosmicSurface, colors.cosmicRaised]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.chartBubble, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicSurface }]}
+                >
+                    <Text style={[styles.chartTitle, { color: colors.accent }]}>{t('chat.verifiedMode.calculationTitle', 'Model calculations')}</Text>
+                    <Text style={[styles.calculationIntro, { color: colors.textInverseMuted }]}>
+                        {t('chat.verifiedMode.calculationIntro', 'Your answer is being built from deterministic chart calculations for this question.')}
+                    </Text>
+                    <View style={[styles.calculationList, { borderColor: colors.cosmicLine, backgroundColor: colors.cosmicGlow }]}>
+                        {calculationTrace.map((step, index) => (
+                            <View key={`${step.title || step}-${index}`} style={styles.calculationRow}>
+                                <View style={[styles.calculationMarker, { backgroundColor: index === 0 ? colors.accent : colors.primary }]}>
+                                    <Text style={styles.calculationMarkerText}>{index === 0 ? '✓' : index + 1}</Text>
+                                </View>
+                                <View style={styles.calculationCopy}>
+                                    <Text style={[styles.calculationTitle, { color: colors.textInverse }]}>{step.title || step}</Text>
+                                    {!!step.detail && (
+                                        <Text style={[styles.calculationDetail, { color: colors.textInverseMuted }]}>{step.detail}</Text>
+                                    )}
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                    <View style={[styles.timerCard, { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine }]}>
+                        <View style={styles.timerTopRow}>
+                            <Text style={[styles.timerTitle, { color: colors.textInverseMuted }]}>{t('premiumUi.chat.timeRemaining')}</Text>
+                        </View>
+                        <View style={styles.timerCountdownWrap}>
+                            <Text style={[styles.timerText, { color: colors.textInverse }]}>{timerText}</Text>
+                        </View>
+                        <View style={styles.timerProgressTrack}>
+                            <LinearGradient
+                                colors={[colors.accent, colors.primary]}
+                                start={{ x: 0, y: 0.5 }}
+                                end={{ x: 1, y: 0.5 }}
+                                style={[styles.timerProgressFill, { width: `${Math.max(6, timerProgress * 100)}%` }]}
+                            />
+                        </View>
+                    </View>
+                </LinearGradient>
+            </View>
+        );
+    }
 
     if (hasChartInsights) {
         const currentInsight = chartInsights[currentIndex];
@@ -431,6 +588,46 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
+    compactVerifiedWrap: {
+        alignSelf: 'stretch',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        marginHorizontal: 16,
+        marginVertical: 8,
+    },
+    compactVerifiedHeader: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+    },
+    compactVerifiedTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+    },
+    compactVerifiedTimer: {
+        fontSize: 14,
+        fontVariant: ['tabular-nums'],
+        fontWeight: '700',
+    },
+    compactVerifiedMessage: {
+        fontSize: 12,
+        lineHeight: 18,
+        marginTop: 8,
+    },
+    compactVerifiedStream: {
+        maxHeight: 126,
+        marginTop: 2,
+        overflow: 'hidden',
+    },
+    compactVerifiedStreamContent: {
+        paddingBottom: 2,
+    },
+    compactVerifiedComposing: {
+        fontSize: 12,
+        fontWeight: '700',
+        lineHeight: 18,
+        marginTop: 8,
+    },
     welcomeBubble: {
         borderRadius: 24,
         padding: 32,
@@ -587,6 +784,51 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontWeight: '700',
         marginTop: 8,
+    },
+    calculationIntro: {
+        fontSize: 13,
+        lineHeight: 19,
+        textAlign: 'center',
+        marginBottom: 16,
+    },
+    calculationList: {
+        width: '100%',
+        borderWidth: 1,
+        borderRadius: 16,
+        padding: 14,
+        marginBottom: 16,
+        gap: 13,
+    },
+    calculationRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+    },
+    calculationMarker: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 1,
+    },
+    calculationMarkerText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    calculationCopy: {
+        flex: 1,
+    },
+    calculationTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+        lineHeight: 19,
+    },
+    calculationDetail: {
+        fontSize: 12,
+        lineHeight: 17,
+        marginTop: 2,
     },
     chartBubble: {
         borderRadius: 24,
