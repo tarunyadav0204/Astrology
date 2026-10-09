@@ -15,7 +15,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional
 
 from chat.instant_chat_pipeline import ANSWER_MODES, TARGET_SUBJECTS
-from utils.admin_settings import CHAT_LLM_OPENAI, DEFAULT_OPENAI_INSTANT_MODEL
+from utils.admin_settings import CHAT_LLM_OPENAI, get_verified_planner_model, get_verified_router_model
 
 
 _CATEGORY_VALUES = [
@@ -32,7 +32,7 @@ CAPABILITY_REGISTRY = {
     "parashari.natal_foundation": "D1 placements, house lordships and topic-house evidence.",
     "parashari.dasha_timing": "Current and relevant Vimshottari dasha timing.",
     "parashari.transit_activation": "Current transit activation for the selected topic.",
-    "parashari.divisional_confirmation": "Relevant divisional-chart confirmation already calculated for the topic.",
+    "parashari.divisional_confirmation": "Divisional-chart placements. Optional parameters.divisions specifies chart numbers (e.g. [9,10]); otherwise uses topic defaults.",
     "parashari.dignity_and_special_points": "Dignity, strength, Yogi, Avayogi and connected special-point evidence.",
     "parashari.ashtakavarga": "Sarvashtakavarga, Bhinnashtakavarga and advanced Ashtakavarga evidence.",
     "parashari.shadbala": "Calculated Shadbala strength evidence.",
@@ -43,6 +43,11 @@ CAPABILITY_REGISTRY = {
     "nakshatra.topic_links": "Available nakshatra and dispositorship evidence.",
     "kp.cusp_significators": "Available KP cusp and significator evidence.",
 }
+
+
+from chat.calculator_menu import EXTRA_CALCULATORS, CalculatorParameters, run_calculator
+LEGACY_CAPABILITIES = tuple(CAPABILITY_REGISTRY)
+CAPABILITY_REGISTRY.update(EXTRA_CALCULATORS)
 
 
 _PARASHARI_EVIDENCE_DENSITY_CONTRACT = """
@@ -252,8 +257,11 @@ def build_verified_baseline(instant_context: Dict[str, Any]) -> Dict[str, Any]:
     topic_raw = topic
     return {
         "calculation_packet_version": "verified-raw-calculations-v2",
+        "daily_calculations": _raw_calculations(instant_context.get("daily_prediction_spine") or {}),
         "question_scope": {
             "category": intent.get("category"),
+            "mode": _verified_presentation_mode(instant_context),
+            "period_window": intent.get("period_window"),
             "answer_mode": intent.get("answer_mode"),
             "time_relation": intent.get("time_relation"),
             "target_subject": intent.get("target_subject"),
@@ -382,11 +390,20 @@ def _verified_ashtakavarga_payload(ashtakavarga: Any, chart: Dict[str, Any]) -> 
 
 
 def _calculate_requested_capabilities(
-    birth_data: Dict[str, Any], requested: List[str], baseline: Dict[str, Any], instant_context: Dict[str, Any]
+    birth_data: Dict[str, Any], requested: List[str], baseline: Dict[str, Any], instant_context: Dict[str, Any], parameters=None
 ) -> Dict[str, Any]:
     """One bounded deterministic augmentation pass for registered IDs only."""
     if not requested:
         return {}
+    if parameters:
+        parsed_parameters = CalculatorParameters.model_validate(parameters)
+        if parsed_parameters.topic:
+            instant_context = {**instant_context, 'intent_summary': {
+                **(instant_context.get('intent_summary') or {}), 'category': parsed_parameters.topic}}
+    extra = {c: run_calculator(c, birth_data, parameters) for c in requested if c in EXTRA_CALCULATORS}
+    requested = [c for c in requested if c not in EXTRA_CALCULATORS]
+    if not requested:
+        return extra
     # Imports stay local so the question router remains small and does not
     # create an import cycle with Instant Chat.
     from types import SimpleNamespace
@@ -439,6 +456,10 @@ def _calculate_requested_capabilities(
             "property": (("D4", 4),),
         }
         selected_divisions = topic_divisions.get(category, (("D9", 9), ("D10", 10)))
+        if parameters:
+            requested_parameters = CalculatorParameters.model_validate(parameters)
+            if requested_parameters.divisions:
+                selected_divisions = [(f'D{n}', n) for n in requested_parameters.divisions]
         divisions = DivisionalChartCalculator(chart)
         output["parashari.divisional_confirmation"] = _json_limit({
             code: divisions.calculate_divisional_chart(number)
@@ -474,7 +495,7 @@ def _calculate_requested_capabilities(
     ):
         if capability in requested and baseline.get(capability) not in (None, {}, []):
             output[capability] = baseline[capability]
-    return output
+    return {**output, **extra}
 
 
 def _response_usage(response: Any) -> Dict[str, int]:
@@ -500,6 +521,24 @@ def _function_calls(response: Any) -> List[Any]:
     ]
 
 
+def _verified_emphasis_instruction() -> str:
+    return """IMPORTANT TEXT EMPHASIS (mandatory for Simple and Technical answers):
+Use Markdown **bold** throughout the answer to make its important points easy to scan,
+not only in headings. Bold the main conclusion in the opening, the leading recommendation
+or ranked option, important supported dates or timing windows, the core reason a conclusion
+follows, and material cautions or qualifications. In each substantive section, emphasize
+one or two short key phrases when there is a clear takeaway. For a brief answer, bold its
+central takeaway. Examples of formatting: **the strongest option**, **September to November**,
+**progress may require patience**. These are formatting examples, not facts to copy.
+Keep connective prose normal weight. Never bold entire paragraphs, every sentence, or
+routine planet names merely because they are technical terms. Bold uncertainty together
+with the conclusion it qualifies; do not make tentative evidence look certain. Preserve
+all existing headings, lists and sentiment spans. Keep sentiment-span contents plain text:
+apply bold to other key phrases rather than nesting Markdown inside sentiment spans.
+Before sending, check that the answer contains meaningful inline **bold** emphasis in
+its opening and major takeaways, rather than leaving the whole body at one visual weight."""
+
+
 def _verified_sentiment_instruction() -> str:
     return """Sentiment highlighting is an intentional exception to the HTML restriction: wrap short,
 evidence-grounded favorable phrases in
@@ -511,6 +550,22 @@ sentiment tag merely to make the answer look balanced. Before finalizing, check 
 answer: if you state a support/opportunity, it must have at least one positive span; if you
 state a caution/delay/risk, it must have at least one negative span. Do not leave eligible
 sentiment as untagged plain text."""
+
+
+def _verified_presentation_mode(instant_context):
+    """Exact-day scope wins over stale broad-event presentation metadata."""
+    intent = instant_context.get('intent_summary') or {}
+    window = intent.get('period_window') or {}
+    plan = instant_context.get('query_plan') or {}
+    mode = str(intent.get('mode') or 'DEFAULT').upper()
+    # A specifically routed event on one date is not an overall daily outlook.
+    if mode == 'PREDICT_EVENT_TIMING' and plan.get('forecast_shape') != 'daily_forecast':
+        return mode
+    if mode == 'PREDICT_DAILY' or str(window.get('kind') or '').lower() == 'day' or plan.get('forecast_shape') == 'daily_forecast':
+        return 'PREDICT_DAILY'
+    if mode == 'DEFAULT' and intent.get('answer_mode') == 'event_prediction':
+        return 'PREDICT_EVENT_TIMING'
+    return mode
 
 
 def _premium_writer_system(
@@ -543,12 +598,16 @@ creating a detailed Parashari or other method section."""
             + build_simple_final_precedence_block("simple", premium_analysis=True)
         )
         sentiment_instruction = """SIMPLE OUTPUT MARKUP RULE: Use short Markdown `##` section headings
-and optional `**bold**` emphasis for a field name or a short conclusion. Sentiment spans
+and deliberate `**bold**` emphasis for important phrases and conclusions. Sentiment spans
 are the only permitted HTML exception. Do not emit cards, XML,
 POS_START/POS_END/NEG_START/NEG_END markers, or any other presentation token. The final
 user message supplies the exact Standard Simple layout."""
     else:
-        evidence_density_contract = _PARASHARI_EVIDENCE_DENSITY_CONTRACT
+        evidence_density_contract = (
+            "DAILY EVIDENCE: Explain the requested day's short-period and fast-transit triggers, "
+            "connecting each supported factor to practical events. Broad natal factors are background."
+            if str(intent_mode).upper() == 'PREDICT_DAILY' else _PARASHARI_EVIDENCE_DENSITY_CONTRACT
+        )
         evidence_depth_instruction = """These are evidence requirements for a detailed Parashari
 section; do not request a capability only when it is genuinely unrelated to the user's question."""
         response_start_instruction = "Start the Quick Answer immediately after this sentence; do not add any other preamble."
@@ -559,9 +618,35 @@ elements in that contract are intentional. Do not add CSS, XML, internal impleme
 or other HTML.
 
 PREMIUM OUTPUT FORMAT:
-{premium_output_format}"""
+{premium_output_format}
+
+{_verified_emphasis_instruction()}"""
         sentiment_instruction = ""
-    sentiment_instruction += "\n\n" + _verified_sentiment_instruction()
+    if str(intent_mode).upper() == 'PREDICT_DAILY':
+        from chat.verified_daily import daily_contract
+        output_presentation_instruction = daily_contract(presentation_style)
+        evidence_density_contract = 'DAILY EVIDENCE REQUIREMENT: Panchang and Navatara are mandatory; connect all relevant day-specific facts to their practical meaning.'
+        evidence_depth_instruction = 'Keep the complete daily breadth; specialist evidence is optional according to relevance.'
+        response_start_instruction = 'Start the direct daily answer immediately after the greeting, with the requested date.'
+    from chat.verified_event_timing import EVENT_TIMING_MODES, event_timing_contract
+    if str(intent_mode).upper() in EVENT_TIMING_MODES:
+        output_presentation_instruction = event_timing_contract(presentation_style)
+        evidence_density_contract = 'EVENT EVIDENCE: Explain event promise, activation, realization and obstacles with concrete reasons.'
+        evidence_depth_instruction = 'Use the approved event-focused Dive Deep sections only where relevant.'
+        response_start_instruction = 'Start the direct event answer immediately after the greeting, with the strongest supported outcome and timing.'
+    sentiment_instruction += "\n\n" + _verified_sentiment_instruction() + "\n\n" + _verified_emphasis_instruction()
+    calculation_depth_requirement = (
+        'For a daily reading, inspect the mandatory daily foundations and request additional systems only when relevant. '
+        'Do not require a divisional, Shadbala or Ashtakavarga report for every ordinary day.'
+        if str(intent_mode).upper() == 'PREDICT_DAILY' else """For any non-trivial chart reading, do not stop after the Instant baseline. Before the final
+answer, inspect `parashari.divisional_confirmation` and
+`parashari.dignity_and_special_points` when they return evidence. For timing, career, business,
+marriage, health, or other consequential questions, also inspect the relevant available
+`parashari.shadbala`, `parashari.panchadha_maitri`, and `parashari.ashtakavarga` calculations.
+"""
+    )
+    if str(intent_mode).upper() in EVENT_TIMING_MODES:
+        calculation_depth_requirement = 'Inspect the event evidence checklist in the approved contract. Choose additional systems by relevance; do not force every strength or specialist report.'
     display_name = str(native_name or "").strip()[:80]
     greeting_subject = f"the chart of {display_name}" if display_name else "the user's chart"
     return (
@@ -572,7 +657,14 @@ Nakshatra, KP, Ashtakavarga, Shadbala and Panchadha Maitri. Resolve agreement an
 honestly. Do not invent chart facts.
 
 After the Instant baseline, you may request these deterministic calculators exactly by their
-registered capability ID. Choose what the question needs; do not request a calculator merely to
+registered capability ID. Request as many relevant calculators as needed, including several in one round.
+The deterministic baseline is a starting point, not a restriction on which systems to examine.
+Every menu description states required parameters; supply them in parameters. Never guess missing
+dates, houses, event type or location. If a calculation cannot run, state the limitation rather than inventing its result.
+Use exact date ranges for timing and house numbers 1–12; sign numbers are 1=Aries through 12=Pisces.
+For topic-aware tools, parameters.topic can override the inferred topic for that calculation;
+parameters.divisions can explicitly choose divisional charts instead of the inferred defaults.
+Choose what the question needs; do not request a calculator merely to
 mention its system:
 {json.dumps(CAPABILITY_REGISTRY, ensure_ascii=False)}
 
@@ -582,11 +674,7 @@ user, so write both in {language}. State one or two concrete computed facts from
 such as a placement, period, strength, or exact timing window. Never describe model selection,
 prompting, packets, or tools; never publish a generic process update.
 
-For any non-trivial chart reading, do not stop after the Instant baseline. Before the final
-answer, inspect `parashari.divisional_confirmation` and
-`parashari.dignity_and_special_points` when they return evidence. For timing, career, business,
-marriage, health, or other consequential questions, also inspect the relevant available
-`parashari.shadbala`, `parashari.panchadha_maitri`, and `parashari.ashtakavarga` calculations.
+{calculation_depth_requirement}
 {evidence_depth_instruction}
 
 Ashtakavarga rule: raw SAV rows are in zodiac-sign order, not house order. For a statement
@@ -650,7 +738,7 @@ def build_verified_conversation_context(history: List[Dict[str, Any]], intent: D
     }
 
 
-def _verified_final_writer_instruction(response_style: str) -> str:
+def _verified_final_writer_instruction(response_style: str, intent_mode: str = "") -> str:
     """Put the visible-response contract in the final writer turn itself.
 
     Calculator turns need detailed analysis instructions, but they should not
@@ -658,8 +746,18 @@ def _verified_final_writer_instruction(response_style: str) -> str:
     """
     from ai.parallel_chat.presentation_style import normalize_merge_response_style
 
+    from chat.verified_event_timing import EVENT_TIMING_MODES, event_timing_contract
+    if str(intent_mode).upper() in EVENT_TIMING_MODES:
+        return ('Write the final event timing answer now.\n\n'
+                + event_timing_contract(normalize_merge_response_style(response_style))
+                + '\n' + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction())
+    if str(intent_mode).upper() == 'PREDICT_DAILY':
+        from chat.verified_daily import daily_contract
+        return ('Write the final daily answer now, using the requested date and calculated daily evidence.\n\n'
+                + daily_contract(normalize_merge_response_style(response_style)) + '\n' + _verified_emphasis_instruction()
+                + '\n' + _verified_sentiment_instruction())
     if normalize_merge_response_style(response_style) != "simple":
-        return "Write the final answer now using the deterministic evidence already supplied."
+        return "Write the final answer now using the deterministic evidence already supplied.\n\n" + _verified_emphasis_instruction()
     return """Write the final answer now using the deterministic evidence already supplied.
 
 This is a Standard Simple response. Output only the user-facing answer. Use short Markdown
@@ -667,7 +765,7 @@ level-2 headings (`## Heading`) to create visible sections. Every heading must b
 line, followed by a blank line and its body. Sentiment spans described below are the only
 permitted HTML exception. Do not use other HTML, cards, XML, POS/NEG markers,
 implementation language, or any other Markdown structure besides `##` headings and optional
-short `**bold**` emphasis.
+short `**bold**` emphasis for important phrases and conclusions.
 
 Use this exact readable layout. Keep every heading and every paragraph on separate lines, with
 a blank line between sections:
@@ -701,7 +799,7 @@ DEPTH REQUIREMENT: For a broad decision, career, education, relationship, wealth
 reading, write a detailed answer of roughly 2,500 to 4,000 English characters when the evidence
 supports that depth. Give each ranked option a short explanation, give the reasoning section at
 least two substantial paragraphs, and give both the qualification and final verdict their own
-substantive paragraph. Do not shorten the answer merely because the language is Simple.""" + "\n\n" + _verified_sentiment_instruction()
+substantive paragraph. Do not shorten the answer merely because the language is Simple.""" + "\n\n" + _verified_sentiment_instruction() + "\n\n" + _verified_emphasis_instruction()
 
 
 async def run_verified_calculator_agent(
@@ -748,11 +846,12 @@ async def run_verified_calculator_agent(
     }
     baseline_payloads = _capability_payloads(instant_context)
     try:
-        max_calculator_rounds = int(os.getenv("VERIFIED_CHAT_MAX_CALCULATOR_ROUNDS", "4"))
+        max_calculator_rounds = int(os.getenv("VERIFIED_CHAT_MAX_CALCULATOR_ROUNDS", "8"))
     except (TypeError, ValueError):
-        max_calculator_rounds = 4
-    max_calculator_rounds = max(1, min(8, max_calculator_rounds))
+        max_calculator_rounds = 8
+    max_calculator_rounds = max(1, min(16, max_calculator_rounds))
     tool_events: List[Dict[str, Any]] = []
+    information_rounds: List[Dict[str, Any]] = []
     model_calculations: List[Dict[str, str]] = []
     calculated: Dict[str, Any] = {}
     unavailable: List[Dict[str, str]] = []
@@ -784,9 +883,10 @@ async def run_verified_calculator_agent(
                         "type": "string",
                         "enum": list(CAPABILITY_REGISTRY),
                         "description": "The registered calculator to run.",
-                    }
+                    },
+                    "parameters": {"anyOf": [CalculatorParameters.model_json_schema(), {"type": "null"}]},
                 },
-                "required": ["capability_id"],
+                "required": ["capability_id", "parameters"],
                 "additionalProperties": False,
             },
             "strict": True,
@@ -808,13 +908,20 @@ async def run_verified_calculator_agent(
             "strict": True,
         },
     ]
-    intent_mode = str((instant_context.get("intent_summary") or {}).get("mode") or "DEFAULT")
+    # OpenAI strict tools require all nested properties, with nullable optionals.
+    from chat.conflict_contract import strictify_schema
+    tools = strictify_schema(tools)
+    intent_mode = _verified_presentation_mode(instant_context)
     instructions = _premium_writer_system(
         intent_mode,
         language,
         native_name=str(birth_data.get("name") or ""),
         response_style=response_style,
     )
+    from ai.gemini_chat_analyzer import resolve_openai_reasoning_effort
+    effort = resolve_openai_reasoning_effort(model_name, "none")
+    reasoning_kwargs = {"reasoning": {"effort": effort}} if effort else {}
+    output_limit = 16384 if model_name.startswith("gpt-4") else 65536
     sent_chars = len(question) + len(instructions)
     client = AsyncOpenAI(api_key=api_key, timeout=timeout_s)
 
@@ -830,8 +937,8 @@ async def run_verified_calculator_agent(
             input=outputs,
             tools=tools,
             tool_choice=tool_choice,
-            reasoning={"effort": "none"},
-            max_output_tokens=65536,
+            **reasoning_kwargs,
+            max_output_tokens=output_limit,
         )
         _add_usage(usage, response)
         return response
@@ -846,13 +953,36 @@ async def run_verified_calculator_agent(
         ),
         tools=tools,
         tool_choice={"type": "function", "name": "get_instant_baseline"},
-        reasoning={"effort": "none"},
+        **reasoning_kwargs,
         max_output_tokens=4096,
     )
     _add_usage(usage, first)
     baseline_calls = _function_calls(first)
     if not baseline_calls:
         raise RuntimeError("verified_agent_did_not_request_baseline")
+    if intent_mode == 'PREDICT_DAILY':
+        from chat.verified_daily import daily_inputs
+        from chat.calculator_menu import run_calculator
+        try:
+            daily_parameters, location_basis = daily_inputs(birth_data, instant_context)
+            baseline['daily_location_basis'] = location_basis
+            baseline['daily_required_calculations'] = {}
+            for capability in ('election.navatara', 'election.panchang'):
+                try:
+                    result = await asyncio.to_thread(run_calculator, capability, birth_data, daily_parameters)
+                    success = True
+                    calculated[capability] = result
+                    calculated[capability + ':' + json.dumps(daily_parameters, sort_keys=True)] = result
+                except Exception:
+                    result = {'error': 'calculation_unavailable', 'capability_id': capability}
+                    success = False
+                    unavailable.append({'code':'calculation_unavailable','capability_id':capability})
+                baseline['daily_required_calculations'][capability] = result
+                tool_events.append({'round':0,'tool':capability,'success':success})
+                information_rounds.append({'round':0,'kind':'mandatory_daily_calculation','calculator':capability,
+                    'requested':daily_parameters,'requested_by':'daily_contract','provided':result,'success':success})
+        except ValueError:
+            baseline['daily_required_calculations'] = {'clarification_required':'Ask for the requested date or location/timezone before a daily prediction.'}
     baseline_outputs = []
     for call in baseline_calls:
         tool_events.append({"round": 1, "tool": "get_instant_baseline", "success": True})
@@ -861,6 +991,8 @@ async def run_verified_calculator_agent(
             "call_id": str(getattr(call, "call_id", "")),
             "output": json.dumps(baseline, ensure_ascii=False, default=str),
         })
+        information_rounds.append({"round": 0, "kind": "baseline", "calculator": "get_instant_baseline",
+            "requested": {}, "provided": json.loads(baseline_outputs[-1]["output"]), "success": True})
         sent_chars += len(baseline_outputs[-1]["output"])
     await publish_trace()
 
@@ -891,18 +1023,29 @@ async def run_verified_calculator_agent(
                     "type": "function_call_output", "call_id": call_id,
                     "output": json.dumps(result, ensure_ascii=False),
                 })
+                information_rounds.append({
+                    "round": calculator_round, "kind": "progress_update",
+                    "tool": "report_calculation", "requested": args,
+                    "provided": result, "success": bool(result.get("accepted")),
+                })
                 continue
             if capability not in CAPABILITY_REGISTRY:
                 result: Dict[str, Any] = {"error": "unavailable_calculator", "capability_id": capability}
                 unavailable.append({"code": "unavailable_calculator", "capability_id": capability})
                 tool_events.append({"round": calculator_round, "tool": capability or "invalid", "success": False})
             else:
-                if capability not in calculated:
-                    calculated.update(_calculate_requested_capabilities(
-                        birth_data, [capability], baseline_payloads, instant_context
-                    ))
+                cache_key = capability + ":" + json.dumps(args.get("parameters") or {}, sort_keys=True)
+                if cache_key not in calculated:
+                    try:
+                        result_map = await asyncio.to_thread(_calculate_requested_capabilities,
+                            birth_data, [capability], baseline_payloads, instant_context, args.get("parameters"))
+                        calculated[cache_key] = result_map.get(capability)
+                    except Exception:
+                        calculated[cache_key] = {"error": "invalid_or_unavailable_calculation", "requirements": CAPABILITY_REGISTRY[capability]}
+                calculated[capability] = calculated.get(cache_key)
                 result = calculated.get(capability)
-                if result in (None, {}, []):
+                if result in (None, {}, []) or (isinstance(result, dict) and result.get("error")):
+                    calculated.pop(cache_key, None)
                     result = {"error": "calculation_unavailable", "capability_id": capability}
                     unavailable.append({"code": "calculation_unavailable", "capability_id": capability})
                     tool_events.append({"round": calculator_round, "tool": capability, "success": False})
@@ -912,6 +1055,9 @@ async def run_verified_calculator_agent(
                 "type": "function_call_output", "call_id": call_id,
                 "output": json.dumps(result, ensure_ascii=False, default=str),
             })
+            information_rounds.append({"round": calculator_round, "kind": "calculation", "calculator": capability,
+                "requested": args, "provided": json.loads(outputs[-1]["output"]),
+                "success": not (isinstance(result, dict) and result.get("error"))})
             sent_chars += len(outputs[-1]["output"])
         await publish_trace()
         return outputs
@@ -938,7 +1084,7 @@ async def run_verified_calculator_agent(
         "role": "user",
         "content": [{
             "type": "input_text",
-            "text": _verified_final_writer_instruction(response_style),
+            "text": _verified_final_writer_instruction(response_style, intent_mode),
         }],
     })
     # This final turn writes only the response. If the round ceiling is reached,
@@ -951,8 +1097,8 @@ async def run_verified_calculator_agent(
         input=final_input,
         tools=tools,
         tool_choice="none",
-        reasoning={"effort": "none"},
-        max_output_tokens=65536,
+        **reasoning_kwargs,
+        max_output_tokens=output_limit,
     )
     parts: List[str] = []
     published = ""
@@ -988,9 +1134,10 @@ async def run_verified_calculator_agent(
         "token_usage": usage,
         "elapsed_s": max(0.0, time.perf_counter() - started),
         "prompt_chars": sent_chars,
+        "information_rounds": {"type": "verified", "max_rounds": max_calculator_rounds, "events": information_rounds},
         "packet_validation": {
             "missing_capabilities": [],
-            "calculated_capabilities": list(calculated),
+            "calculated_capabilities": [c for c in calculated if c in CAPABILITY_REGISTRY],
             "unavailable_requirements": unavailable,
             "tool_events": tool_events,
             "calculation_trace": trace(),
@@ -1044,7 +1191,7 @@ async def build_verified_generation_request(
     planner = await analyzer.generate_text_from_prompt(
         json.dumps(planner_prompt, ensure_ascii=False),
         premium_analysis=False,
-        model_name_override=DEFAULT_OPENAI_INSTANT_MODEL,
+        model_name_override=get_verified_planner_model(),
         provider_override=CHAT_LLM_OPENAI,
         openai_reasoning_effort="none",
         llm_log_tag="verified_chat_evidence_planner",
@@ -1075,7 +1222,7 @@ async def build_verified_generation_request(
     # system cannot disappear merely because an earlier model did not ask for
     # it.
     supplemental_capabilities = [
-        capability for capability in CAPABILITY_REGISTRY
+        capability for capability in LEGACY_CAPABILITIES
         if capability not in {
             "parashari.natal_foundation",
             "parashari.dasha_timing",
@@ -1085,7 +1232,7 @@ async def build_verified_generation_request(
     additional = _calculate_requested_capabilities(
         birth_data, supplemental_capabilities, capability_payloads, instant_context
     )
-    expected_capabilities = list(CAPABILITY_REGISTRY)
+    expected_capabilities = list(LEGACY_CAPABILITIES)
     available_baseline = {
         "parashari.natal_foundation",
         "parashari.dasha_timing",
@@ -1113,7 +1260,7 @@ async def build_verified_generation_request(
     }
     from ai.output_schema import get_response_schema_for_mode
 
-    intent_mode = str((instant_context.get("intent_summary") or {}).get("mode") or "DEFAULT")
+    intent_mode = _verified_presentation_mode(instant_context)
     premium_output_format = get_response_schema_for_mode(
         intent_mode,
         premium_analysis=True,
@@ -1138,7 +1285,9 @@ Raw BAV sign rows are intentionally absent; never reconstruct or infer a house B
 Use the following Premium Chat output format exactly. It is a presentation contract only: do not treat it as evidence or a requested conclusion. The permitted HTML card elements in that contract are intentional. Do not add CSS, XML, internal implementation details, or other HTML.
 
 PREMIUM OUTPUT FORMAT:
-{premium_output_format}"""
+{premium_output_format}
+
+{_verified_emphasis_instruction()}"""
     writer_prompt = f"""Answer the user's question in {language}.
 
 Question: {question}
@@ -1155,7 +1304,7 @@ Raw deterministic calculation packet:
             "planner_reason": str(planner_decision.get("reason") or ""),
         },
         "review_usage": {
-            "model": planner.get("chat_llm_model") or DEFAULT_OPENAI_INSTANT_MODEL,
+            "model": planner.get("chat_llm_model") or get_verified_planner_model(),
             "provider": planner.get("chat_llm_provider") or CHAT_LLM_OPENAI,
             "token_usage": planner.get("token_usage") or {},
             "prompt_chars": len(json.dumps(planner_prompt, ensure_ascii=False)),
@@ -1207,9 +1356,13 @@ async def classify_verified_question(
     question: str,
     history: List[Dict[str, Any]],
     language: str,
+    query_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    from utils.query_context import resolve_query_now
+    now_local = resolve_query_now(query_context)
     recent = [
-        {"question": str(row.get("question") or "")[:220]}
+        {"question": str(row.get("question") or "")[:600],
+         "response": re.sub(r"<[^>]+>", " ", str(row.get("response") or ""))[:600]}
         for row in (history or [])[-2:]
         if isinstance(row, dict) and str(row.get("question") or "").strip()
     ]
@@ -1232,12 +1385,30 @@ Never classify a question about resignation, an offer, joining, career timing, m
 or any other life-event timing as out_of_scope merely because it is phrased as a follow-up.
 If its earlier subject is genuinely unavailable from RECENT CONVERSATION, use route_action clarify
 and ask one short question that identifies the life event; keep answer_mode topic_reading.
+Clarification replies such as "both together", "yes", or "the first one" must be interpreted with
+RECENT CONVERSATION, including the assistant's clarification. Do not ask what "both" means when
+its two referents are already present. Resume the original event and retain its timeframe.
+Only genuinely unrelated life areas are compound. Different stages, reasons, strongest windows,
+increased responsibility and formal recognition for ONE promotion are ONE integrated event request.
+For example, "Will I get promoted in the next 12 months? Tell me the strongest timing windows,
+whether increased responsibility will come before formal promotion, and the astrological reasons"
+MUST use event_prediction, category career, route_action answer. Never ask the user to choose
+between promotion timing, responsibilities, windows or astrological reasons for this same event.
 For compound questions use answer_mode compound_plan and route_action clarify. A question that asks both
 for an overall reading and its timing in the SAME life area is one integrated question, not compound:
 answer it. For example, "How will my wealth be overall and when will I earn the maximum?" must use
 route_action answer, category wealth, and a timing-capable answer mode. Never return route_action clarify
 with an empty user_message.
-Set needs_transits true only when present/future timing materially matters.
+Event routing: whether or when a specific milestone occurs (promotion, marriage, job offer, joining,
+relocation or property purchase) uses event_prediction, including questions bounded to a month/year.
+Do not classify these as an overall period outlook merely because a timeframe is given.
+Daily routing: an overall outlook for today, tomorrow, yesterday, or one specified calendar day
+uses answer_mode timing_window and forecast_scope daily. This is not a life-event timeline.
+Resolve its target_date as YYYY-MM-DD using USER LOCAL NOW below. Use the latest question's scope,
+not a career or other subject from previous questions. A specific event asked about on a date
+is still event timing, not automatically an overall daily reading.
+For other questions set forecast_scope other and target_date null.
+Set needs_transits true for daily readings and when present/future timing materially matters.
 Set time_relation to past for a request to identify an event that already happened
 (for example, "when was I married?"); current for a present situation; future for
 a future outlook; otherwise none.
@@ -1251,15 +1422,16 @@ life-event timeline.
 
 RECENT CONVERSATION: {json.dumps(recent, ensure_ascii=False)}
 USER LANGUAGE: {language}
+USER LOCAL NOW: {now_local.isoformat()}
 QUESTION: {question}
 
 Schema:
-{{"answer_mode":"...","category":"...","target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","user_message":""}}
+{{"answer_mode":"...","category":"...","target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","forecast_scope":"daily|other","target_date":null,"user_message":""}}
 """.strip()
     out = await analyzer.generate_text_from_prompt(
         prompt,
         premium_analysis=False,
-        model_name_override=DEFAULT_OPENAI_INSTANT_MODEL,
+        model_name_override=get_verified_router_model(),
         provider_override=CHAT_LLM_OPENAI,
         openai_reasoning_effort="none",
         llm_log_tag="verified_chat_router",
@@ -1304,9 +1476,22 @@ Schema:
         # question needs a clinical-safety-constrained health reading, or a bounded outlook when
         # the user actually asks for pace/timing; it must never receive a life-event timeline.
         answer_mode = "topic_reading" if time_relation in {"current", "none"} else "timing_window"
+    daily = str(parsed.get("forecast_scope") or "").lower() == "daily"
+    period_window = None
+    if daily:
+        from datetime import date
+        try:
+            target_date = date.fromisoformat(str(parsed.get("target_date") or "")).isoformat()
+            period_window = {"kind": "day", "start": target_date, "end": target_date}
+        except ValueError:
+            action = "clarify"
+            clarification_question = clarification_question or "Which date would you like the daily reading for?"
+        answer_mode = "timing_window"
     return {
+        "period_window": period_window,
+        "query_context": query_context or {},
         "status": "CLARIFY" if action == "clarify" else "READY",
-        "mode": _mode_to_intent_mode(answer_mode),
+        "mode": "PREDICT_DAILY" if daily else _mode_to_intent_mode(answer_mode),
         "answer_mode": answer_mode,
         "category": category,
         "target_subject_key": target,

@@ -1,3 +1,4 @@
+import { appendConflictResolution } from '../../hooks/useConflictResolution';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,6 +15,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import MessageBubble from './MessageBubble';
+import ChatSummary from './ChatSummary';
 import { storage } from '../../services/storage';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
@@ -208,6 +210,7 @@ export default function ChatViewScreen({ route, navigation }) {
             <Text style={[styles.headerEyebrow, { color: colors.accent }]}>{t('historyDetail.privateArchive')}</Text>
             <Text style={[styles.headerTitle, { color: colors.textInverse }]} numberOfLines={1}>{session.native_name || t('historyDetail.title')}</Text>
           </View>
+          <ChatSummary key={session.session_id} messages={messages} header onResolved={result => { if (result.session_id === session.session_id) setMessages(previous => appendConflictResolution(previous, result)); }} />
           <TouchableOpacity onPress={shareChat} style={[styles.headerButton, { borderColor: colors.cosmicLine || colors.cardBorder }]} accessibilityLabel={t('historyDetail.share')}>
             <Ionicons name="share-outline" size={20} color={colors.textInverse} />
           </TouchableOpacity>

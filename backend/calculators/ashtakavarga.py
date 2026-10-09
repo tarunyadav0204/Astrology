@@ -878,7 +878,7 @@ Provide predictions in this JSON format (fill every top-level key; use substanti
 """
             
             # Generate predictions with error logging (try admin model, then stable fallbacks for Gemini)
-            use_deepseek = get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK
+            use_deepseek = get_analysis_llm_vendor() in (CHAT_LLM_DEEPSEEK, "openai")
             print(
                 f"🔮 Calling {'DeepSeek' if use_deepseek else 'Gemini'} API for life predictions..."
             )

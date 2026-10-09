@@ -3793,6 +3793,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     from credits.credit_service import CreditService
     from ai.intent_router import IntentRouter
     from charts.house_insight_service import build_chart_preview_insights
+    from utils.admin_settings import get_verified_chat_model
     from chat.fact_extractor import FactExtractor
     from ai.death_query_guard import is_death_override_unlocked, is_death_related, REFUSAL_MESSAGE
     from chat.instant_chat_pipeline import (
@@ -4059,6 +4060,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 query_context,
                 extracted_context if int(clarification_count or 0) > 0 else None,
             )
+            # Verified's semantic classifier must see the original request when
+            # interpreting a free-text clarification, including "both together".
+            # Other tiers retain their explicit pick-one topic isolation.
+            if is_verified_chat:
+                compound_choice_followup = False
             if compound_choice_followup:
                 query_context = dict(query_context or {})
                 if str(query_context.get("follow_up_type") or "").strip().lower() != "clarification_choice":
@@ -4121,6 +4127,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     question=combined_question,
                     history=history,
                     language=language,
+                    query_context=query_context,
                 )
             elif is_deterministic_chat:
                 instant_dialogue_state = (
@@ -5033,7 +5040,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 stream_callback=_persist_instant_stream_delta,
                 preview_callback=_persist_instant_preview,
                 response_validation_enabled_override=False if is_verified_chat else None,
-                model_name_override="gpt-5.6-luna" if is_verified_chat else None,
+                model_name_override=get_verified_chat_model() if is_verified_chat else None,
                 provider_override="openai" if is_verified_chat else None,
                 verified_evidence_review=is_verified_chat,
                 verified_calculation_callback=(
@@ -5302,6 +5309,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     if is_instant_chat and result.get("instant_preview"):
                         answer_gate_metadata = dict(answer_gate_metadata or {})
                         answer_gate_metadata["instant_preview"] = result["instant_preview"]
+
+                    if is_verified_chat and result.get('information_rounds'):
+                        from chat.calculation_audit import store_audit
+                        store_audit(conn, message_id, result.pop('information_rounds'))
 
                     if is_instant_chat and isinstance(result.get("instant_evidence_debug"), dict):
                         answer_gate_metadata = dict(answer_gate_metadata or {})

@@ -1,0 +1,20 @@
+.conflict-resolution { color:var(--color-text); }
+.conflict-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:12px 0; }
+.conflict-resolution button { border:1px solid var(--color-border); background:var(--color-surface-muted); color:var(--color-text); border-radius:var(--radius-md); padding:8px 12px; cursor:pointer; }
+.conflict-resolution button:disabled { opacity:.5; cursor:default; }
+.conflict-resolution button[aria-pressed=true],.conflict-resolution button.conflict-primary { background:var(--color-brand); color:var(--color-text-inverse); }
+.conflict-resolution input:not([type=checkbox]),.conflict-resolution textarea { width:100%; box-sizing:border-box; padding:12px; margin:8px 0; border:1px solid var(--color-border); border-radius:var(--radius-md); color:var(--color-text); background:var(--color-surface); font:inherit; }
+.conflict-resolution textarea { min-height:80px; resize:vertical; }
+.conflict-answer-list { max-height:32vh; overflow:auto; margin:12px 0; }
+.conflict-answer-list section { padding:12px; border:1px solid var(--color-border); margin-bottom:8px; border-radius:var(--radius-md); }
+.conflict-answer-list label { display:flex; align-items:flex-start; gap:10px; }
+.conflict-answer-list input[type=checkbox] { width:auto; flex-shrink:0; }
+.conflict-answer-list p,.conflict-answer-list small { color:var(--color-text-muted); }
+.conflict-source-text { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.6; margin:12px 0; }
+.conflict-selected,.conflict-clarification { padding:12px; background:var(--color-surface-muted); border-radius:var(--radius-md); margin:12px 0; }
+.conflict-selected>div { margin:6px 0; }
+.conflict-resolution article { border-top:1px solid var(--color-border); margin-top:16px; }
+.conflict-resolution article h3 { margin:18px 0 10px; }
+.conflict-resolution .conflict-recent { display:block; width:100%; text-align:left; margin:8px 0; }
+.conflict-resolution [role=alert] { color:var(--color-danger,var(--color-text)); }
+.conflict-resolution button:focus-visible,.conflict-resolution input:focus-visible,.conflict-resolution textarea:focus-visible { outline:2px solid var(--color-brand); outline-offset:2px; }

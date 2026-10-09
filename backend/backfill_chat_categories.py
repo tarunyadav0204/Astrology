@@ -172,8 +172,8 @@ def main():
 
     from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
 
-    if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
-        if not os.getenv("DEEPSEEK_API_KEY"):
+    if get_analysis_llm_vendor() in (CHAT_LLM_DEEPSEEK, "openai"):
+        if not os.getenv("OPENAI_API_KEY" if get_analysis_llm_vendor() == "openai" else "DEEPSEEK_API_KEY"):
             print("❌ DEEPSEEK_API_KEY not set")
             sys.exit(1)
         try:

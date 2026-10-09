@@ -177,13 +177,16 @@ async def plan_parallel_branches(
         context_summary=_question_summary(context),
         allowed_branches=allowed_branches,
     )
-    model = analyzer.get_named_gemini_model(model_name, premium_analysis=False)
+    from utils.admin_settings import is_openai_model
+    use_openai = is_openai_model(model_name)
+    model = None if use_openai else analyzer.get_named_gemini_model(model_name, premium_analysis=False)
     llm_out = await analyzer.generate_text_from_prompt(
         prompt,
         premium_analysis=False,
         model_override=model,
         model_name_override=model_name,
-        force_gemini=True,
+        force_gemini=not use_openai,
+        provider_override="openai" if use_openai else "gemini",
         llm_log_tag="parallel_branch_planner",
         request_timeout_s=20.0,
     )

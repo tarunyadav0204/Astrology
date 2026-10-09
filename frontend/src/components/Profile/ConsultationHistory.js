@@ -1,6 +1,8 @@
+import { appendConflictResolution } from '../../hooks/useConflictResolution';
 import React, { useState, useEffect } from 'react';
 import { formatChatMessageHtml } from '../../utils/markdown';
 import './ConsultationHistory.css';
+import ChatSummary from '../Chat/ChatSummary';
 import SavedAnswers, { SaveAnswerButton } from '../Chat/SavedAnswers';
 
 const ConsultationHistory = ({ user, onStartConsultation }) => {
@@ -121,7 +123,7 @@ const ConsultationHistory = ({ user, onStartConsultation }) => {
           {selectedSession && (
             <div className="session-details">
               <div className="session-header">
-                <h3>Consultation Details</h3>
+                <h3>Consultation Details</h3><ChatSummary key={selectedSession.session_id} messages={selectedSession.messages} onResolved={result => { if (result.session_id === selectedSession.session_id) setSelectedSession(previous => ({ ...previous, messages: appendConflictResolution(previous.messages, result) })); }} />
                 <button 
                   className="close-btn"
                   onClick={() => setSelectedSession(null)}

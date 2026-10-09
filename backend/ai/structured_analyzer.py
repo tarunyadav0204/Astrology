@@ -54,9 +54,9 @@ class StructuredAnalysisAnalyzer:
         use_report = lane == "report"
         vendor = get_report_llm_vendor() if use_report else get_analysis_llm_vendor()
 
-        if vendor == CHAT_LLM_DEEPSEEK:
-            if not os.getenv("DEEPSEEK_API_KEY"):
-                raise ValueError("DEEPSEEK_API_KEY not set")
+        if vendor in (CHAT_LLM_DEEPSEEK, "openai"):
+            if not os.getenv("OPENAI_API_KEY" if vendor == "openai" else "DEEPSEEK_API_KEY"):
+                raise ValueError(f"{'OPENAI_API_KEY' if vendor == 'openai' else 'DEEPSEEK_API_KEY'} not set")
         else:
             api_key = os.getenv('GEMINI_API_KEY')
             if not api_key:

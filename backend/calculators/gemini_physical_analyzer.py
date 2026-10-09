@@ -27,9 +27,9 @@ class GeminiPhysicalAnalyzer:
 
         from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
 
-        if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
-            if not os.getenv("DEEPSEEK_API_KEY"):
-                raise ValueError("DEEPSEEK_API_KEY environment variable not set")
+        if get_analysis_llm_vendor() in (CHAT_LLM_DEEPSEEK, "openai"):
+            if not os.getenv("OPENAI_API_KEY" if get_analysis_llm_vendor() == "openai" else "DEEPSEEK_API_KEY"):
+                raise ValueError("Selected analysis provider API key is not set")
         else:
             api_key = os.getenv('GEMINI_API_KEY')
             if not api_key:

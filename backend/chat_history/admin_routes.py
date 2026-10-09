@@ -379,6 +379,14 @@ def _get_branch_outputs_bigquery_table() -> Optional[str]:
     return f"`{project}.{dataset}.{table}`"
 
 
+def _parse_conflict_resolution_metadata(raw: Any) -> Optional[Dict[str, Any]]:
+    try:
+        value = json.loads(raw) if isinstance(raw, str) else raw
+        return value if isinstance(value, dict) and value.get("type") == "conflict_resolution" else None
+    except Exception:
+        return None
+
+
 def _parse_parallel_llm_usage(raw: Any) -> Optional[Dict[str, Any]]:
     if not raw or not isinstance(raw, str):
         return None
@@ -1278,6 +1286,7 @@ async def get_admin_chat_user_thread(
                 "cm.parallel_llm_usage" if has_parallel_llm_usage else "CAST(NULL AS TEXT)"
             )
             select_response_style = "cm.response_style" if has_response_style else "CAST(NULL AS TEXT)"
+            select_conflict_metadata = "cm.gate_metadata" if "gate_metadata" in msg_cols else "CAST(NULL AS TEXT)"
             select_chat_tier = "cm.chat_tier" if "chat_tier" in msg_cols else "CAST(NULL AS TEXT)"
             has_message_type = "message_type" in msg_cols
             select_message_type = "COALESCE(cm.message_type, '')" if has_message_type else "''"
@@ -1303,7 +1312,7 @@ async def get_admin_chat_user_thread(
                     {select_parallel_llm_usage},
                     {select_message_type},
                     {select_response_style},
-                    {select_chat_tier}
+                    {select_chat_tier}, {select_conflict_metadata}
                 FROM chat_messages cm
                 INNER JOIN chat_sessions cs ON cm.session_id = cs.session_id
                 LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
@@ -1338,9 +1347,6 @@ async def get_admin_chat_user_thread(
 
             provider = (row[6] or "").strip() if len(row) > 6 and row[6] else ""
             model = (row[7] or "").strip() if len(row) > 7 and row[7] else ""
-            if provider or model:
-                key = (provider, model)
-                model_counts[key] = model_counts.get(key, 0) + 1
 
             sender_key = str(row[2] or "").strip().lower()
             llm_input_tokens = _row_optional_int(row[8]) if len(row) > 8 else None
@@ -1350,6 +1356,13 @@ async def get_admin_chat_user_thread(
             llm_prompt_chars = _row_optional_int(row[12]) if len(row) > 12 else None
             llm_response_chars = _row_optional_int(row[13]) if len(row) > 13 else None
             parallel_llm_usage = _parse_parallel_llm_usage(row[14]) if len(row) > 14 else None
+            stages = (parallel_llm_usage or {}).get("stages") or []
+            if len(stages) == 1 and isinstance(stages[0], dict) and stages[0].get("stage") == "conflict_resolution":
+                provider = str(stages[0].get("llm_provider") or provider)
+                model = str(stages[0].get("llm_model") or model)
+            if provider or model:
+                key = (provider, model)
+                model_counts[key] = model_counts.get(key, 0) + 1
             message_type = (row[15] or "").strip() if len(row) > 15 and row[15] else ""
             response_style = (row[16] or "").strip().lower() if len(row) > 16 and row[16] else None
             if response_style not in {"simple", "technical"}:
@@ -1400,6 +1413,7 @@ async def get_admin_chat_user_thread(
                     "content": row[3],
                     "timestamp": _timestamp_to_ist_iso(row[4]),
                     "message_type": message_type or None,
+                    "conflict_resolution": _parse_conflict_resolution_metadata(row[18]) if len(row) > 18 else None,
                     "response_style": response_style,
                     "chat_tier": str(row[17] or "").strip().lower() or None if len(row) > 17 else None,
                     "native_name": native_name,
@@ -2188,6 +2202,7 @@ async def get_session_details(
                 select_parallel_llm_usage = (
                     "parallel_llm_usage" if has_parallel_llm_usage else "CAST(NULL AS TEXT)"
                 )
+                select_conflict_metadata = "gate_metadata" if "gate_metadata" in msg_cols else "CAST(NULL AS TEXT)"
                 select_chat_tier = "chat_tier" if "chat_tier" in msg_cols else "CAST(NULL AS TEXT)"
                 select_response_style = "response_style" if "response_style" in msg_cols else "CAST(NULL AS TEXT)"
                 cur = execute(
@@ -2208,7 +2223,7 @@ async def get_session_details(
                            {select_llm_input_tokens}, {select_llm_output_tokens},
                            {select_llm_cached_input_tokens}, {select_llm_non_cached_input_tokens},
                            {select_llm_prompt_chars}, {select_llm_response_chars},
-                           {select_parallel_llm_usage}, {select_chat_tier}, {select_response_style}
+                           {select_parallel_llm_usage}, {select_chat_tier}, {select_response_style}, {select_conflict_metadata}
                     FROM chat_messages
                     WHERE session_id = %s
                     ORDER BY message_id ASC
@@ -2344,6 +2359,7 @@ async def get_session_details(
                         "content": content,
                         "timestamp": _timestamp_to_ist_iso(r[3]),
                         "chat_tier": str(r[12] or "").strip().lower() or None if len(r) > 12 else None,
+                        "conflict_resolution": _parse_conflict_resolution_metadata(r[14]) if len(r) > 14 else None,
                         "response_style": str(r[13] or "").strip().lower() or None if len(r) > 13 else None,
                         "native_name": native_name,
                         "llm_input_tokens": llm_in_display,
@@ -3072,11 +3088,14 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_gemini_chat_model,
             get_gemini_premium_model,
             get_gemini_analysis_model,
+            get_openai_feature_model,
+            get_event_timeline_narration_model,
             get_gemini_report_model,
             get_gemini_instant_model,
             get_instant_chat_llm_provider,
             get_deepseek_instant_model,
             get_openai_instant_model,
+            get_verified_chat_model, get_verified_router_model, get_verified_planner_model, get_chat_summary_model, get_conflict_resolution_model,
             get_event_timeline_model,
             get_parallel_branch_gemini_model,
             get_parallel_branch_planner_model,
@@ -3161,7 +3180,13 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "instant_chat_llm_provider": get_instant_chat_llm_provider(),
             "deepseek_instant_chat_model": get_deepseek_instant_model(),
             "openai_instant_chat_model": get_openai_instant_model(),
+            "verified_chat_model": get_verified_chat_model(),
+            "verified_router_model": get_verified_router_model(),
+            "verified_planner_model": get_verified_planner_model(),
+            "chat_summary_model": get_chat_summary_model(),
+            "conflict_resolution_model": get_conflict_resolution_model(),
             "event_timeline_model": get_event_timeline_model(),
+            "event_timeline_narration_model": get_event_timeline_narration_model(),
             "parallel_branch_gemini_models": {
                 "parashari": get_parallel_branch_gemini_model("parashari"),
                 "jaimini": get_parallel_branch_gemini_model("jaimini"),
@@ -3184,6 +3209,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
                 "sudarshan": get_parallel_branch_word_limit("sudarshan"),
                 "merge": get_parallel_branch_word_limit("merge"),
             },
+            **{f"openai_{feature}_model": get_openai_feature_model(feature) for feature in ("analysis", "report", "timeline")},
             "analysis_llm_vendor": get_analysis_llm_vendor(),
             "report_llm_vendor": get_report_llm_vendor(),
             "timeline_llm_vendor": get_timeline_llm_vendor(),
@@ -3434,6 +3460,17 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
             is_credits_setting_key,
             update_setting_cache,
         )
+        if key in {"conflict_resolution_model", "openai_analysis_model", "openai_report_model", "openai_timeline_model", "verified_chat_model", "verified_router_model", "verified_planner_model", "chat_summary_model"}:
+            from utils.admin_settings import OPENAI_CHAT_MODEL_OPTIONS
+            if setting.value not in {model for model, label in OPENAI_CHAT_MODEL_OPTIONS if model != "gpt-4-turbo"}:
+                raise HTTPException(400, "Select a supported OpenAI model")
+        if key in {"analysis_llm_vendor", "report_llm_vendor", "timeline_llm_vendor"} and setting.value not in {"gemini", "deepseek", "openai"}:
+            raise HTTPException(400, "Select Gemini, OpenAI or DeepSeek")
+        if key in {"speech_processing_bridge_model", "parallel_branch_planner_model", "event_timeline_narration_model"} or key.startswith("parallel_branch_gemini_model_"):
+            from utils.admin_settings import GEMINI_MODEL_OPTIONS, OPENAI_CHAT_MODEL_OPTIONS
+            supported = {model for model, _ in GEMINI_MODEL_OPTIONS} | {model for model, _ in OPENAI_CHAT_MODEL_OPTIONS if model != "gpt-4-turbo"}
+            if setting.value not in supported:
+                raise HTTPException(400, "Select a supported Gemini or OpenAI model")
         if key == "event_timeline_rollout_mode" and setting.value not in {
             "deterministic", "legacy_ai",
         }:
@@ -3974,3 +4011,13 @@ async def get_chat_performance_stats(
     ]
 
     return {"buckets": buckets, "by_user": by_user, "slow_by_hour": slow_by_hour_list}
+
+
+@router.get('/admin/chat/information-rounds/{message_id}')
+async def get_information_rounds(message_id: int, current_user: dict = Depends(require_admin)):
+    from chat.calculation_audit import read_audit
+    with get_conn() as conn:
+        payload = read_audit(conn, message_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail='Answer not found')
+    return {'available': bool(payload), 'audit': payload or {}}

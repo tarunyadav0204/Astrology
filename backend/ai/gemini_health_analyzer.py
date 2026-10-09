@@ -28,7 +28,7 @@ class GeminiHealthAnalyzer:
         from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
 
         print(f"Current working directory: {os.getcwd()}")
-        if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
+        if get_analysis_llm_vendor() in (CHAT_LLM_DEEPSEEK, "openai"):
             print(f"DEEPSEEK_API_KEY found: {bool(os.getenv('DEEPSEEK_API_KEY'))}")
         else:
             api_key = os.getenv('GEMINI_API_KEY')

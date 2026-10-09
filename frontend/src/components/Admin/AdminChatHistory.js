@@ -4,6 +4,7 @@ import { getAdminAuthHeaders } from '../../services/adminService';
 import { formatChatMessageHtml as formatMessageContent } from '../../utils/markdown';
 import { extractChatSectionDrafts } from '../../utils/chatPdfSections';
 import './AdminChatHistory.css';
+import InformationRounds from './InformationRounds';
 
 const USER_PAGE_SIZE = 10;
 const SESSION_MESSAGE_PAGE_SIZE = 20;
@@ -2216,6 +2217,12 @@ const AdminChatHistory = () => {
                       {message.response_style === 'simple' ? <span className="admin-instant-message-badge">Simple</span> : null}
                       {message.response_style === 'technical' ? <span className="admin-instant-message-badge">Technical</span> : null}
                     </div>
+                    {role === 'assistant' && (isVerifiedUsage || message.chat_tier === 'verified' || message.conflict_resolution) && <InformationRounds key={message.message_id} messageId={message.message_id} />}
+                    {message.conflict_resolution && <details className="message-meta"><summary>Conflict resolution · {message.conflict_resolution.rounds}/{message.conflict_resolution.max_rounds || 3} information rounds</summary>
+                      <p>Model: {message.conflict_resolution.model}</p>
+                      <p>Original answers: {(message.conflict_resolution.source_answers || []).map(source => `#${source.answer_id}`).join(', ')}</p>
+                      {(message.conflict_resolution.events || []).map((event, eventIndex) => <p key={eventIndex}>Round {event.round} · {event.kind === 'calculation' ? 'Verified calculations: ' + (event.requests || []).flatMap(request => request.capabilities || []).join(', ') : event.kind === 'question' ? 'Clarification: ' + event.text : 'User reply: ' + event.text}</p>)}
+                    </details>}
                     <div
                       className="message-content"
                       dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }}

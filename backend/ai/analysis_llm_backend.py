@@ -1,5 +1,5 @@
 """
-Non-chat analysis, Reports Studio, & event-timeline LLM routing (Gemini vs DeepSeek) from admin_settings.
+Non-chat analysis, Reports Studio, & event-timeline LLM routing (Gemini, OpenAI or DeepSeek) from admin_settings.
 
 Provides a small adapter so existing code can keep calling ``.generate_content`` /
 ``.generate_content_async`` while honoring ``analysis_llm_vendor``, ``report_llm_vendor``,
@@ -14,6 +14,9 @@ from types import SimpleNamespace
 from typing import Any, Dict, Optional, Tuple
 
 from utils.admin_settings import (
+    CHAT_LLM_OPENAI,
+    get_openai_feature_model,
+    is_openai_model,
     CHAT_LLM_DEEPSEEK,
     CHAT_LLM_GEMINI,
     GEMINI_MODEL_OPTIONS,
@@ -114,6 +117,35 @@ class DeepSeekGenerativeAdapter:
         return await asyncio.to_thread(self.generate_content, prompt, **kwargs)
 
 
+class OpenAIGenerativeAdapter(DeepSeekGenerativeAdapter):
+    """Text/JSON adapter for existing feature generation callers."""
+
+    def generate_content(self, prompt, generation_config=None, safety_settings=None, **kwargs):
+        from openai import OpenAI
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
+        config = generation_config if isinstance(generation_config, dict) else {}
+        timeout = (kwargs.get("request_options") or {}).get("timeout", 600)
+        params = dict(model=self.model_name, input=str(prompt), store=False,
+                      max_output_tokens=int(config.get("max_output_tokens") or 8192))
+        if config.get("response_mime_type") == "application/json":
+            params["text"] = {"format": {"type": "json_object"}}
+        from ai.gemini_chat_analyzer import resolve_openai_reasoning_effort
+        effort = resolve_openai_reasoning_effort(self.model_name, "none")
+        if effort:
+            params["reasoning"] = {"effort": effort}
+        response = OpenAI(api_key=api_key, timeout=timeout).responses.create(**params)
+        if getattr(response, "status", "completed") != "completed":
+            raise RuntimeError("OpenAI generation did not complete")
+        text = (response.output_text or "").strip()
+        if not text:
+            raise RuntimeError("Blank OpenAI response")
+        usage = getattr(response, "usage", None)
+        return SimpleNamespace(text=text, usage_metadata=_GeminiUsageMetadata(
+            getattr(usage, "input_tokens", 0), getattr(usage, "output_tokens", 0)))
+
+
 class GeminiRestGenerativeAdapter:
     """Small Gemini 3 REST adapter with explicit thinking-level control."""
 
@@ -183,9 +215,12 @@ def build_analysis_llm_model() -> Tuple[Any, str, str]:
     Model for health/wealth/karma/structured analysis/etc.
 
     Returns:
-        (model, resolved_model_id, vendor) where vendor is ``gemini`` or ``deepseek``.
+        (model, resolved_model_id, vendor) where vendor is ``gemini``, ``openai`` or ``deepseek``.
     """
     vendor = get_analysis_llm_vendor()
+    if vendor == CHAT_LLM_OPENAI:
+        mid = get_openai_feature_model("analysis")
+        return OpenAIGenerativeAdapter(mid), mid, vendor
     if vendor == CHAT_LLM_DEEPSEEK:
         mid = get_deepseek_analysis_model()
         return DeepSeekGenerativeAdapter(mid), mid, CHAT_LLM_DEEPSEEK
@@ -199,9 +234,12 @@ def build_report_llm_model() -> Tuple[Any, str, str]:
     Model for Reports Studio PDF chapters (partnership, wealth, etc.).
 
     Returns:
-        (model, resolved_model_id, vendor) where vendor is ``gemini`` or ``deepseek``.
+        (model, resolved_model_id, vendor) where vendor is ``gemini``, ``openai`` or ``deepseek``.
     """
     vendor = get_report_llm_vendor()
+    if vendor == CHAT_LLM_OPENAI:
+        mid = get_openai_feature_model("report")
+        return OpenAIGenerativeAdapter(mid), mid, vendor
     if vendor == CHAT_LLM_DEEPSEEK:
         mid = get_deepseek_report_model()
         return DeepSeekGenerativeAdapter(mid), mid, CHAT_LLM_DEEPSEEK
@@ -215,9 +253,12 @@ def build_timeline_llm_model() -> Tuple[Any, str, str]:
     Model for yearly/monthly event timeline (EventPredictor).
 
     Returns:
-        (model, resolved_model_id, vendor) where vendor is ``gemini`` or ``deepseek``.
+        (model, resolved_model_id, vendor) where vendor is ``gemini``, ``openai`` or ``deepseek``.
     """
     vendor = get_timeline_llm_vendor()
+    if vendor == CHAT_LLM_OPENAI:
+        mid = get_openai_feature_model("timeline")
+        return OpenAIGenerativeAdapter(mid), mid, vendor
     if vendor == CHAT_LLM_DEEPSEEK:
         mid = get_deepseek_timeline_model()
         return DeepSeekGenerativeAdapter(mid), mid, CHAT_LLM_DEEPSEEK
@@ -227,8 +268,10 @@ def build_timeline_llm_model() -> Tuple[Any, str, str]:
 
 
 def build_timeline_narration_llm_model() -> Tuple[Any, str, str]:
-    """Dedicated fast Gemini lane for V3 Event Timeline presentation text."""
+    """Dedicated text-generation lane for V3 Event Timeline presentation."""
     model_id = get_event_timeline_narration_model()
+    if is_openai_model(model_id):
+        return OpenAIGenerativeAdapter(model_id), model_id, CHAT_LLM_OPENAI
     thinking_level = get_event_timeline_narration_thinking_level()
     return (
         GeminiRestGenerativeAdapter(model_id, thinking_level),

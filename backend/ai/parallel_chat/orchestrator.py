@@ -815,6 +815,7 @@ async def run_parallel_chat_pipeline(
         merge_provider = standard_provider
         merge_model_name = standard_model_name
 
+    from utils.admin_settings import is_openai_model
     branch_runtime = {
         "parashari": {
             "provider": premium_provider,
@@ -849,6 +850,14 @@ async def run_parallel_chat_pipeline(
             "model_name": merge_model_name,
         },
     }
+    # Explicit OpenAI branch choices override the chat lane's provider/model.
+    for branch, runtime in branch_runtime.items():
+        selected = get_parallel_branch_gemini_model(branch, runtime["model_name"])
+        if is_openai_model(selected):
+            runtime.update(provider="openai", model_name=selected)
+        elif selected.startswith(("gemini", "models/gemini")):
+            runtime.update(provider="gemini", model_name=selected)
+
 
     cache_resources_by_key: Dict[Tuple[str, str], Optional[Any]] = {}
     cached_models_by_key: Dict[Tuple[str, str], Optional[Any]] = {}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMe
 import { useNavigate } from 'react-router-dom';
 import { adminService, getAdminAuthHeaders, getDeviceId } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
+import ModelSettings from './ModelSettings';
 import AdminEventTimelineHistory from './AdminEventTimelineHistory';
 import AdminReportHistory from './AdminReportHistory';
 import AdminCreditLedger from './AdminCreditLedger';
@@ -292,7 +293,7 @@ function getPackBonusPreviewForPack(pack, packOverrides, globalPercent, globalFi
 
 const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, onHomeClick }) => {
   const navigate = useNavigate();
-  
+
   const handleHomeClick = () => {
     if (onHomeClick) {
       onHomeClick();
@@ -302,6 +303,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   };
   const [activeTab, setActiveTab] = useState('users');
   const [activeSubTab, setActiveSubTab] = useState('management');
+  const [extraModels, setExtraModels] = useState({});
   const [settingsSubTab, setSettingsSubTab] = useState('chat');
   const [users, setUsers] = useState([]);
   const [usersSearchPhone, setUsersSearchPhone] = useState('');
@@ -942,6 +944,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setChatCountdownStandardSeconds((timerStandard?.value ?? '110').toString());
       setChatCountdownPremiumSeconds((timerPremium?.value ?? '210').toString());
       setChatStaticSuggestions(staticSuggestions?.value ?? '');
+      setExtraModels(Object.fromEntries(["verified_chat_model", "verified_router_model", "verified_planner_model", "chat_summary_model", "conflict_resolution_model", "openai_analysis_model", "openai_report_model", "openai_timeline_model", "event_timeline_narration_model"].map(key => [key, data[key] || (key === "event_timeline_narration_model" ? "models/gemini-2.5-flash" : "gpt-5.6-luna")])));
       setGeminiModelOptions(data.gemini_model_options || []);
       setGeminiChatModel(data.gemini_chat_model || '');
       setGeminiPremiumModel(data.gemini_premium_model || '');
@@ -1167,172 +1170,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     }
   };
 
-  const handleSaveGeminiModels = async () => {
-    setGeminiModelsSaving(true);
-    try {
-      const headers = { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' };
-      // Prod API DB pool is small (~4). Saving ~30 settings via Promise.all exhausts it
-      // and returns 500s. Batch with limited concurrency instead.
-      const ADMIN_SETTINGS_SAVE_CONCURRENCY = 3;
-      const settingPayloads = [
-        {
-          key: 'gemini_chat_model',
-          value: geminiChatModel,
-          description: 'Gemini model for standard chat',
-        },
-        {
-          key: 'gemini_premium_model',
-          value: geminiPremiumModel,
-          description: 'Gemini model for premium chat',
-        },
-        {
-          key: 'gemini_analysis_model',
-          value: geminiAnalysisModel,
-          description: 'Gemini model for analysis (health, wealth, career, karma, physical, events, etc.)',
-        },
-        {
-          key: 'gemini_report_model',
-          value: geminiReportModel,
-          description: 'Gemini model for Reports Studio PDF chapters (partnership, wealth, etc.)',
-        },
-        {
-          key: 'event_timeline_model',
-          value: eventTimelineModel,
-          description: 'Gemini model for yearly/monthly event timeline generation',
-        },
-        {
-          key: 'analysis_llm_vendor',
-          value: analysisLlmVendor,
-          description: 'Vendor for non-chat analysis: gemini or deepseek',
-        },
-        {
-          key: 'report_llm_vendor',
-          value: reportLlmVendor,
-          description: 'Vendor for Reports Studio PDF generation: gemini or deepseek',
-        },
-        {
-          key: 'timeline_llm_vendor',
-          value: timelineLlmVendor,
-          description: 'Vendor for event timeline generation: gemini or deepseek',
-        },
-        {
-          key: 'deepseek_analysis_model',
-          value: deepseekAnalysisModel,
-          description: 'DeepSeek model id when analysis vendor is deepseek',
-        },
-        {
-          key: 'deepseek_report_model',
-          value: deepseekReportModel,
-          description: 'DeepSeek model id when report vendor is deepseek',
-        },
-        {
-          key: 'deepseek_timeline_model',
-          value: deepseekTimelineModel,
-          description: 'DeepSeek model id when timeline vendor is deepseek',
-        },
-        {
-          key: 'chat_llm_provider',
-          value: chatLlmProvider,
-          description: 'Chat LLM vendor for standard (non-premium) chat: gemini, openai, deepseek, or gemma',
-        },
-        {
-          key: 'chat_llm_provider_premium',
-          value: chatLlmProviderPremium,
-          description: 'Chat LLM vendor for premium chat; empty = same as standard (gemini, openai, deepseek, gemma)',
-        },
-        {
-          key: 'openai_chat_model',
-          value: openaiChatModel,
-          description: 'OpenAI model id for standard chat',
-        },
-        {
-          key: 'openai_premium_model',
-          value: openaiPremiumModel,
-          description: 'OpenAI model id for premium chat',
-        },
-        {
-          key: 'deepseek_chat_model',
-          value: deepseekChatModel,
-          description: 'DeepSeek model id for standard chat',
-        },
-        {
-          key: 'deepseek_premium_model',
-          value: deepseekPremiumModel,
-          description: 'DeepSeek model id for premium chat',
-        },
-        {
-          key: 'gemma_chat_generate_url',
-          value: gemmaChatGenerateUrl.trim(),
-          description:
-            'Full URL for self-hosted Gemma chat POST (e.g. http://host:8000/generate-analysis). Empty = use built-in default; env GEMMA_CHAT_GENERATE_URL overrides when set.',
-        },
-        ...PARALLEL_BRANCH_MODEL_CONFIG.map((branch) => ({
-          key: `parallel_branch_gemini_model_${branch.key}`,
-          value: parallelBranchGeminiModels[branch.key],
-          description: `Gemini model override for parallel ${branch.label} branch`,
-        })),
-        {
-          key: 'parallel_branch_planner_enabled',
-          value: parallelBranchPlannerEnabled ? 'true' : 'false',
-          description: 'Enable multilingual LLM planner that selects which parallel specialist branches to run',
-        },
-        {
-          key: 'parallel_branch_planner_model',
-          value: parallelBranchPlannerModel,
-          description: 'Gemini model used for the parallel branch planner step',
-        },
-        ...PARALLEL_BRANCH_MODEL_CONFIG.map((branch) => ({
-          key: `parallel_branch_word_limit_${branch.key}`,
-          value: String(parallelBranchWordLimits[branch.key] || DEFAULT_PARALLEL_BRANCH_WORD_LIMITS[branch.key]),
-          description: `Target output word budget for parallel ${branch.label} branch`,
-        })),
-      ];
 
-      const putSetting = async (payload) => {
-        const response = await fetch(`/api/admin/settings/${encodeURIComponent(payload.key)}`, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify(payload),
-        });
-        if (response.ok) {
-          return { ok: true, key: payload.key };
-        }
-        const err = await response.json().catch(() => ({}));
-        return {
-          ok: false,
-          key: payload.key,
-          status: response.status,
-          detail: err.detail || err.message || `HTTP ${response.status}`,
-        };
-      };
-
-      const failures = [];
-      for (let i = 0; i < settingPayloads.length; i += ADMIN_SETTINGS_SAVE_CONCURRENCY) {
-        const batch = settingPayloads.slice(i, i + ADMIN_SETTINGS_SAVE_CONCURRENCY);
-        const results = await Promise.all(batch.map(putSetting));
-        failures.push(...results.filter((result) => !result.ok));
-      }
-
-      if (failures.length) {
-        console.error('Save failed:', failures);
-        alert(
-          `Failed to save ${failures.length} setting(s): ${failures
-            .slice(0, 3)
-            .map((f) => `${f.key} (${f.detail})`)
-            .join('; ')}${failures.length > 3 ? '…' : ''}`
-        );
-        return;
-      }
-      alert(
-        'Chat vendors, chat models, branch planner, parallel branch models, branch word limits, Gemma URL, analysis/report/timeline vendors, and model picks saved. New requests use them immediately.'
-      );
-    } catch (error) {
-      console.error('Error saving Gemini models:', error);
-      alert('Failed to save Gemini models.');
-    } finally {
-      setGeminiModelsSaving(false);
-    }
-  };
 
   const handleToggleDebugLogging = async () => {
     const newValue = !debugLogging;
@@ -3047,7 +2885,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         },
         body: JSON.stringify(newPromoCode)
       });
-      
+
       if (response.ok) {
         setNewPromoCode({ code: '', credits: 100, max_uses: 1 });
         fetchPromoCodes();
@@ -3062,7 +2900,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     const prefix = prompt('Enter prefix for bulk codes (e.g., SPECIAL):');
     const count = parseInt(prompt('How many codes to create?', '10'));
     const credits = parseInt(prompt('Credits per code:', '50'));
-    
+
     if (prefix && count && credits) {
       try {
         const response = await fetch('/api/credits/admin/bulk-promo-codes', {
@@ -3073,7 +2911,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           },
           body: JSON.stringify({ prefix, count, credits, max_uses: 1, max_uses_per_user: 1 })
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           alert(`Created ${data.codes.length} promo codes`);
@@ -3108,7 +2946,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         },
         body: JSON.stringify({ settings: creditSettings })
       });
-      
+
       if (response.ok) {
         alert('Settings updated successfully');
         fetchCreditSettings();
@@ -3190,7 +3028,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         },
         body: JSON.stringify(payload)
       });
-      
+
       if (response.ok) {
         fetchPromoCodes();
         fetchCreditStats();
@@ -3223,7 +3061,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const confirmDelete = async () => {
     const code = deleteConfirmation;
     setDeleteConfirmation(null);
-    
+
     try {
       const response = await fetch('/api/credits/admin/delete-promo-code', {
         method: 'POST',
@@ -3233,7 +3071,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         },
         body: JSON.stringify({ code: code })
       });
-      
+
       if (response.ok) {
         fetchPromoCodes();
         fetchCreditStats();
@@ -3602,16 +3440,16 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           admin_notes: notes
         })
       });
-      
+
       if (response.ok) {
         fetchCreditRequests();
         setShowApprovalModal(false);
         setSelectedRequest(null);
         setApprovalData({ amount: 0, notes: '' });
-        
+
         // Trigger credit update event for the user whose credits were approved
         window.dispatchEvent(new CustomEvent('creditUpdated'));
-        
+
         alert('Request approved successfully');
       }
     } catch (error) {
@@ -3638,7 +3476,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           admin_notes: notes
         })
       });
-      
+
       if (response.ok) {
         fetchCreditRequests();
         alert('Request rejected');
@@ -3654,10 +3492,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     if (v === 'gemma') return 'self-hosted Gemma (HTTP)';
     return 'Google Gemini';
   };
-  const premiumVendorEffective =
-    chatLlmProviderPremium && String(chatLlmProviderPremium).trim()
-      ? String(chatLlmProviderPremium).trim()
-      : chatLlmProvider;
+
 
   const navigationHeaderNode = (
     <ModernNavigationHeader
@@ -3729,6 +3564,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
     );
   }
 
+
+  const modelOptionsFor = provider => provider === 'mixed' ? [...geminiModelOptions, ...openaiModelOptions.filter(option => option.value !== 'gpt-4-turbo')] : provider === 'openai' ? openaiModelOptions : provider === 'deepseek' ? deepseekModelOptions : geminiModelOptions;
+  const modelField = (key, label, value, set, provider) => ({ key, label, value, set, options: modelOptionsFor(provider) });
+  const modelProvider = (key, value, set, gemma = false, inherit = false, analysis = false) => ({ key, label: 'Provider', value, set, required: !inherit, options: [...(inherit ? [{ value: '', label: 'Same as Standard chat' }] : []), { value: 'gemini', label: 'Google Gemini' }, { value: 'openai', label: 'OpenAI (ChatGPT)' }, { value: 'deepseek', label: 'DeepSeek' }, ...(gemma ? [{ value: 'gemma', label: 'Self-hosted Gemma' }] : [])] });
+  const extraModelField = (key, label) => ({ key, label, value: extraModels[key] || '', set: value => setExtraModels(previous => ({ ...previous, [key]: value })), options: openaiModelOptions.filter(option => option.value !== 'gpt-4-turbo') });
+  const chatModelField = premium => {
+    const provider = premium ? (chatLlmProviderPremium || chatLlmProvider) : chatLlmProvider;
+    if (provider === 'gemma') return [{ key: 'gemma_chat_generate_url', label: 'Server URL', value: gemmaChatGenerateUrl, set: setGemmaChatGenerateUrl, required: false, hint: 'Leave blank to use the configured server default.' }];
+    const key = provider === 'openai' ? (premium ? 'openai_premium_model' : 'openai_chat_model') : provider === 'deepseek' ? (premium ? 'deepseek_premium_model' : 'deepseek_chat_model') : (premium ? 'gemini_premium_model' : 'gemini_chat_model');
+    const value = provider === 'openai' ? (premium ? openaiPremiumModel : openaiChatModel) : provider === 'deepseek' ? (premium ? deepseekPremiumModel : deepseekChatModel) : (premium ? geminiPremiumModel : geminiChatModel);
+    const set = provider === 'openai' ? (premium ? setOpenaiPremiumModel : setOpenaiChatModel) : provider === 'deepseek' ? (premium ? setDeepseekPremiumModel : setDeepseekChatModel) : (premium ? setGeminiPremiumModel : setGeminiChatModel);
+    return [modelField(key, 'Model', value, set, provider)];
+  };
   return (
     <>
       {navigationHeaderNode}
@@ -4693,7 +4541,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         {activeTab === 'users' && activeSubTab === 'facts' && (
           <div className="facts-management">
             <h2>User Facts</h2>
-            
+
             <div className="facts-search">
               <input
                 type="text"
@@ -4959,7 +4807,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 </button>
               </div>
             </div>
-            
+
             <div className="credit-settings">
               <h3>Feature Costs</h3>
               <p className="credit-settings-hint">Set original price and optional discounted price (credits). VIP columns show auto-calculated price for plan holders (updates as you type).</p>
@@ -5670,7 +5518,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         {activeTab === 'credits' && activeSubTab === 'requests' && (
             <div className="credit-requests-management">
             <h2>Credit Requests</h2>
-            
+
             {/* Status Filter */}
             <div className="filter-section">
               <label htmlFor="statusFilter">Filter by Status:</label>
@@ -5686,7 +5534,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 <option value="rejected">Rejected</option>
               </select>
             </div>
-            
+
             {creditRequests.filter(request => 
               statusFilter === 'all' || request.status === statusFilter
             ).length === 0 ? (
@@ -6632,6 +6480,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               >
                 Chat
               </button>
+              <button type="button" className={`subtab ${settingsSubTab === 'models' ? 'active' : ''}`} onClick={() => setSettingsSubTab('models')}>Models</button>
               <button
                 className={`subtab ${settingsSubTab === 'speech' ? 'active' : ''}`}
                 onClick={() => setSettingsSubTab('speech')}
@@ -6670,6 +6519,24 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </button>
             </div>
 
+
+            {settingsSubTab === 'models' && <ModelSettings groups={[
+  { id: 'standard', title: 'Standard chat', description: 'Answers in Standard mode.', fields: [modelProvider('chat_llm_provider', chatLlmProvider, setChatLlmProvider, true), ...chatModelField(false)] },
+  { id: 'premium', title: 'Premium chat', description: 'Detailed answers in Premium mode.', fields: [modelProvider('chat_llm_provider_premium', chatLlmProviderPremium, setChatLlmProviderPremium, true, true), ...chatModelField(true)] },
+  { id: 'verified', title: 'Verified chat', description: 'Writes the final answer using the reviewed evidence.', providerLabel: 'OpenAI', fields: [extraModelField('verified_chat_model', 'Answer model')] },
+  { id: 'instant', title: 'Instant chat', description: 'Handles routing and answers in Instant mode.', fields: [modelProvider('instant_chat_llm_provider', instantChatLlmProvider, setInstantChatLlmProvider), modelField(instantChatLlmProvider === 'openai' ? 'openai_instant_chat_model' : instantChatLlmProvider === 'deepseek' ? 'deepseek_instant_chat_model' : 'gemini_instant_chat_model', 'Model', instantChatLlmProvider === 'openai' ? openaiInstantChatModel : instantChatLlmProvider === 'deepseek' ? deepseekInstantChatModel : geminiInstantChatModel, instantChatLlmProvider === 'openai' ? setOpenaiInstantChatModel : instantChatLlmProvider === 'deepseek' ? setDeepseekInstantChatModel : setGeminiInstantChatModel, instantChatLlmProvider)] },
+  { id: 'summary', title: 'Answer summaries', description: 'Summarizes 1–3 selected answers from any chat mode.', providerLabel: 'OpenAI', fields: [extraModelField('chat_summary_model', 'Summary model')] },
+  { id: 'conflict', title: 'Conflict resolution', description: 'Compares two answers against Verified context, with up to eight information rounds.', providerLabel: 'OpenAI', fields: [extraModelField('conflict_resolution_model', 'Resolution model')] },
+  { id: 'speech', title: 'Speech progress narration', description: 'Short spoken updates while the main answer is being prepared. Does not write the final answer.', providerLabel: 'Gemini / OpenAI', fields: [modelField('speech_processing_bridge_model', 'Progress narration model', speechProcessingBridgeModel, setSpeechProcessingBridgeModel, 'mixed')] },
+  { id: 'analysis', title: 'Chart analysis', description: 'Health, career, wealth and other analysis features.', fields: [modelProvider('analysis_llm_vendor', analysisLlmVendor, setAnalysisLlmVendor, false, false, true), analysisLlmVendor === 'openai' ? extraModelField('openai_analysis_model', 'Model') : modelField(analysisLlmVendor === 'deepseek' ? 'deepseek_analysis_model' : 'gemini_analysis_model', 'Model', analysisLlmVendor === 'deepseek' ? deepseekAnalysisModel : geminiAnalysisModel, analysisLlmVendor === 'deepseek' ? setDeepseekAnalysisModel : setGeminiAnalysisModel, analysisLlmVendor)] },
+  { id: 'reports', title: 'Reports Studio', description: 'Writes chapters for generated PDF reports.', fields: [modelProvider('report_llm_vendor', reportLlmVendor, setReportLlmVendor, false, false, true), reportLlmVendor === 'openai' ? extraModelField('openai_report_model', 'Model') : modelField(reportLlmVendor === 'deepseek' ? 'deepseek_report_model' : 'gemini_report_model', 'Model', reportLlmVendor === 'deepseek' ? deepseekReportModel : geminiReportModel, reportLlmVendor === 'deepseek' ? setDeepseekReportModel : setGeminiReportModel, reportLlmVendor)] },
+  { id: 'timeline', title: 'Event timeline', description: 'Model used by the AI event timeline lane. The deterministic timeline keeps its existing settings.', fields: [modelProvider('timeline_llm_vendor', timelineLlmVendor, setTimelineLlmVendor, false, false, true), timelineLlmVendor === 'openai' ? extraModelField('openai_timeline_model', 'Model') : modelField(timelineLlmVendor === 'deepseek' ? 'deepseek_timeline_model' : 'event_timeline_model', 'Model', timelineLlmVendor === 'deepseek' ? deepseekTimelineModel : eventTimelineModel, timelineLlmVendor === 'deepseek' ? setDeepseekTimelineModel : setEventTimelineModel, timelineLlmVendor)] },
+  { id: 'timelineNarration', title: 'Timeline presentation', description: 'Writes the presentation text for the calculated V3 timeline.', providerLabel: 'Gemini / OpenAI', fields: [{ ...extraModelField('event_timeline_narration_model', 'Narration model'), options: modelOptionsFor('mixed') }] },
+]} advanced={[
+  { id: 'verifiedPreparation', title: 'Verified preparation', description: 'Choose the question router and evidence planner independently from the Verified answer model.', providerLabel: 'OpenAI', fields: [extraModelField('verified_router_model', 'Question router'), extraModelField('verified_planner_model', 'Evidence planner')] },
+  { id: 'branchPlanner', title: 'Specialist selection', description: 'Chooses which specialist branches run in the parallel chat pipeline.', providerLabel: 'Gemini / OpenAI', fields: [{ key: 'parallel_branch_planner_enabled', label: 'Enable specialist selection', type: 'checkbox', value: parallelBranchPlannerEnabled, set: setParallelBranchPlannerEnabled }, modelField('parallel_branch_planner_model', 'Planner model', parallelBranchPlannerModel, setParallelBranchPlannerModel, 'mixed')] },
+  ...PARALLEL_BRANCH_MODEL_CONFIG.map(branch => ({ id: branch.key, title: branch.label, description: 'Choose a Gemini or OpenAI model for this specialist branch.', providerLabel: 'Gemini / OpenAI', fields: [modelField('parallel_branch_gemini_model_' + branch.key, 'Model', parallelBranchGeminiModels[branch.key], value => setParallelBranchGeminiModels(previous => ({ ...previous, [branch.key]: value })), 'mixed'), { key: 'parallel_branch_word_limit_' + branch.key, label: 'Target word limit', type: 'number', min: 80, max: 4000, value: parallelBranchWordLimits[branch.key], set: value => setParallelBranchWordLimits(previous => ({ ...previous, [branch.key]: value })) }] })),
+]} />}
             {settingsSubTab === 'speech' && (
               <div className="settings-subtab-group">
                 <div className="settings-section">
@@ -6717,10 +6584,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   <div className="setting-item"><div className="setting-info"><strong>Maximum lines</strong><p>One to four brief lines per question.</p></div><input type="number" min="1" max="4" value={speechProcessingBridgeMaxLines} onChange={(e) => setSpeechProcessingBridgeMaxLines(e.target.value)} style={{ width: '120px' }} /></div>
                   <div className="setting-item"><div className="setting-info"><strong>Initial delay (ms)</strong><p>Minimum time after submission before the first bridge line starts.</p></div><input type="number" min="0" max="5000" step="50" value={speechProcessingBridgeInitialDelayMs} onChange={(e) => setSpeechProcessingBridgeInitialDelayMs(e.target.value)} style={{ width: '140px' }} /></div>
                   <div className="setting-item"><div className="setting-info"><strong>Gap between lines (ms)</strong><p>Silence after one bridge line before the next begins.</p></div><input type="number" min="0" max="5000" step="50" value={speechProcessingBridgeLineGapMs} onChange={(e) => setSpeechProcessingBridgeLineGapMs(e.target.value)} style={{ width: '140px' }} /></div>
-                  <div className="setting-item">
-                    <div className="setting-info"><strong>Bridge model</strong><p>A fast Gemini model is recommended because this generation runs beside the main answer.</p></div>
-                    <select value={speechProcessingBridgeModel} onChange={(e) => setSpeechProcessingBridgeModel(e.target.value)} style={{ minWidth: '280px' }}>{geminiModelOptions.map((opt) => <option key={`speech-bridge-${opt.value}`} value={opt.value}>{opt.label}</option>)}</select>
-                  </div>
+
                   <div className="setting-item">
                     <div className="setting-info"><strong>Narration detail</strong><p>Controls how specifically Tara describes the analysis she is preparing, without revealing a verdict.</p></div>
                     <select value={speechProcessingBridgeDetailLevel} onChange={(e) => setSpeechProcessingBridgeDetailLevel(e.target.value)} style={{ minWidth: '180px' }}><option value="simple">Simple</option><option value="balanced">Balanced</option><option value="technical">Technical</option></select>
@@ -7006,239 +6870,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
             {settingsSubTab === 'chat' && (
               <div className="settings-subtab-group">
-            <div className="settings-section">
-              <h3>Chat LLM vendors</h3>
-              <p className="settings-hint">
-                Pick who runs each tier first. Model choices in the next section follow these vendors (Gemma uses a configurable HTTP URL instead). Non-chat analysis and timelines use the <strong>Analysis &amp; event timeline models</strong> section below (same save). Set <code>GEMINI_API_KEY</code>, <code>OPENAI_API_KEY</code>, and <code>DEEPSEEK_API_KEY</code> as needed for those vendors.
-              </p>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Vendor — standard chat</strong>
-                  <p>Used for normal (non-premium) astrological chat.</p>
-                </div>
-                <select
-                  value={chatLlmProvider}
-                  onChange={(e) => setChatLlmProvider(e.target.value)}
-                  style={{ minWidth: '240px' }}
-                >
-                  <option value="gemini">Google Gemini</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="deepseek">DeepSeek</option>
-                  <option value="gemma">Self-hosted Gemma (HTTP)</option>
-                </select>
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Vendor — premium chat</strong>
-                  <p>Used when the user enables premium / deeper chat. Same as standard keeps one vendor for both tiers.</p>
-                </div>
-                <select
-                  value={chatLlmProviderPremium}
-                  onChange={(e) => setChatLlmProviderPremium(e.target.value)}
-                  style={{ minWidth: '240px' }}
-                >
-                  <option value="">Same as standard</option>
-                  <option value="gemini">Google Gemini</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="deepseek">DeepSeek</option>
-                  <option value="gemma">Self-hosted Gemma (HTTP)</option>
-                </select>
-              </div>
-              {(chatLlmProvider === 'gemma' || premiumVendorEffective === 'gemma') && (
-                <div className="setting-item" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                  <div className="setting-info">
-                    <strong>Gemma generate URL</strong>
-                    <p>
-                      Full URL for <code>POST</code> (JSON body). Leave blank to use the server default; set env{' '}
-                      <code>GEMMA_CHAT_GENERATE_URL</code> to override everything for quick tests.
-                    </p>
-                  </div>
-                  <input
-                    type="text"
-                    value={gemmaChatGenerateUrl}
-                    onChange={(e) => setGemmaChatGenerateUrl(e.target.value)}
-                    placeholder="http://8.231.104.209:8000/generate-analysis"
-                    style={{ width: '100%', maxWidth: '520px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
-                  />
-                </div>
-              )}
-            </div>
 
-            <div className="settings-section">
-              <h3>Chat models</h3>
-              <p className="settings-hint">
-                Standard uses the standard vendor&apos;s model list; premium uses the premium vendor&apos;s list. If premium vendor is &quot;Same as standard&quot;, the premium model row reuses the standard vendor&apos;s options.
-              </p>
-              <p className="settings-hint" style={{ marginTop: '-6px', fontSize: '13px', opacity: 0.95 }}>
-                These values are persisted when you click{' '}
-                <strong>Save chat vendors, models, analysis &amp; timeline</strong> in the{' '}
-                <strong>Gemini analysis &amp; timeline models</strong> section below (same save also stores vendors, OpenAI/DeepSeek chat picks, analysis model, and timeline model).
-              </p>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Model — standard chat</strong>
-                  <p>Maps to {vendorLabel(chatLlmProvider)} for non-premium messages.</p>
-                </div>
-                {chatLlmProvider === 'gemini' && (
-                  <select
-                    value={geminiChatModel}
-                    onChange={(e) => setGeminiChatModel(e.target.value)}
-                    style={{ minWidth: '280px' }}
-                  >
-                    {geminiModelOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                )}
-                {chatLlmProvider === 'openai' && (
-                  <select
-                    value={openaiChatModel}
-                    onChange={(e) => setOpenaiChatModel(e.target.value)}
-                    style={{ minWidth: '280px' }}
-                  >
-                    {(openaiModelOptions.length ? openaiModelOptions : [{ value: 'gpt-4o-mini', label: 'GPT-4o mini' }]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                )}
-                {chatLlmProvider === 'deepseek' && (
-                  <select
-                    value={deepseekChatModel}
-                    onChange={(e) => setDeepseekChatModel(e.target.value)}
-                    style={{ minWidth: '280px' }}
-                  >
-                    {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
-                      <option key={`ds-${opt.value}`} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                )}
-                {chatLlmProvider === 'gemma' && (
-                  <p className="settings-hint" style={{ margin: 0 }}>
-                    No model id — answers come from the Gemma HTTP service (URL above).
-                  </p>
-                )}
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Model — premium chat</strong>
-                  <p>Maps to {vendorLabel(premiumVendorEffective)} when premium mode is on.</p>
-                </div>
-                {premiumVendorEffective === 'gemini' && (
-                  <select
-                    value={geminiPremiumModel}
-                    onChange={(e) => setGeminiPremiumModel(e.target.value)}
-                    style={{ minWidth: '280px' }}
-                  >
-                    {geminiModelOptions.map((opt) => (
-                      <option key={`gp-${opt.value}`} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                )}
-                {premiumVendorEffective === 'openai' && (
-                  <select
-                    value={openaiPremiumModel}
-                    onChange={(e) => setOpenaiPremiumModel(e.target.value)}
-                    style={{ minWidth: '280px' }}
-                  >
-                    {(openaiModelOptions.length ? openaiModelOptions : [{ value: 'gpt-4o', label: 'GPT-4o' }]).map((opt) => (
-                      <option key={`op-${opt.value}`} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                )}
-                {premiumVendorEffective === 'deepseek' && (
-                  <select
-                    value={deepseekPremiumModel}
-                    onChange={(e) => setDeepseekPremiumModel(e.target.value)}
-                    style={{ minWidth: '280px' }}
-                  >
-                    {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' }]).map((opt) => (
-                      <option key={`dsp-${opt.value}`} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                )}
-                {premiumVendorEffective === 'gemma' && (
-                  <p className="settings-hint" style={{ margin: 0 }}>
-                    No model id — premium tier uses the same Gemma HTTP endpoint.
-                  </p>
-                )}
-              </div>
-            </div>
 
-            <div className="settings-section">
-              <h3>Parallel branch Gemini models</h3>
-              <p className="settings-hint">
-                These are used only by the parallel astrology chat pipeline when the active branch provider is Gemini.
-                Leaving a branch on its current value preserves today&apos;s behavior: Parashari and merge follow the premium lane,
-                while the other specialist branches follow the standard lane.
-              </p>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Enable branch planner</strong>
-                  <p>
-                    Runs a small multilingual planning step after pregate and after intent router, before branch fan-out.
-                    It chooses the minimum specialist set needed for the current question. This is sequential, not parallel to intent routing.
-                  </p>
-                </div>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={parallelBranchPlannerEnabled}
-                    onChange={(e) => setParallelBranchPlannerEnabled(e.target.checked)}
-                  />
-                  <span className="toggle-slider"></span>
-                </label>
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Planner model</strong>
-                  <p>
-                    Recommended: a lite Gemini model. This step is just multilingual reasoning for branch selection, not the final astrology answer.
-                  </p>
-                </div>
-                <select
-                  value={parallelBranchPlannerModel}
-                  onChange={(e) => setParallelBranchPlannerModel(e.target.value)}
-                  style={{ minWidth: '280px' }}
-                >
-                  {geminiModelOptions.map((opt) => (
-                    <option key={`planner-${opt.value}`} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              {PARALLEL_BRANCH_MODEL_CONFIG.map((branch) => (
-                <div className="setting-item" key={`parallel-branch-${branch.key}`}>
-                  <div className="setting-info">
-                    <strong>{branch.label}</strong>
-                    <p>Fallback is {branch.fallbackLabel} if this setting is ever cleared later.</p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <select
-                      value={parallelBranchGeminiModels[branch.key] || ''}
-                      onChange={(e) => setParallelBranchGeminiModels((prev) => ({ ...prev, [branch.key]: e.target.value }))}
-                      style={{ minWidth: '280px' }}
-                    >
-                      {geminiModelOptions.map((opt) => (
-                        <option key={`parallel-${branch.key}-${opt.value}`} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 700 }}>Word limit</span>
-                      <input
-                        type="number"
-                        min="80"
-                        max="4000"
-                        value={parallelBranchWordLimits[branch.key] || ''}
-                        onChange={(e) => setParallelBranchWordLimits((prev) => ({ ...prev, [branch.key]: e.target.value }))}
-                        style={{ width: '100px', padding: '8px' }}
-                      />
-                    </label>
-                  </div>
-                </div>
-              ))}
-              <p className="settings-hint" style={{ marginTop: '6px' }}>
-                These save together with the main chat vendor/model button below. Word limits are target budgets for branch outputs, not hard truncation.
-              </p>
-            </div>
+
+
+
 
             <div className="settings-section">
               <h3>Chat pre-question gate</h3>
@@ -8004,46 +7640,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   style={{ width: '100%', maxWidth: '420px', minHeight: '88px', padding: '8px', fontFamily: 'inherit', fontSize: '14px' }}
                 />
               </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>LLM provider — instant chat</strong>
-                  <p>Instant Chat has its own provider and model, independent from standard and premium chat.</p>
-                </div>
-                <select
-                  value={instantChatLlmProvider}
-                  onChange={(e) => setInstantChatLlmProvider(e.target.value)}
-                  style={{ minWidth: '280px' }}
-                >
-                  <option value="gemini">Gemini</option>
-                  <option value="openai">OpenAI (GPT)</option>
-                  <option value="deepseek">DeepSeek</option>
-                </select>
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>{instantChatLlmProvider === 'deepseek' ? 'DeepSeek' : instantChatLlmProvider === 'openai' ? 'OpenAI GPT' : 'Gemini'} model — instant chat</strong>
-                  <p>The selected model is used for both Instant routing and its final conversational answer.</p>
-                </div>
-                {instantChatLlmProvider === 'deepseek' ? (
-                  <select value={deepseekInstantChatModel} onChange={(e) => setDeepseekInstantChatModel(e.target.value)} style={{ minWidth: '280px' }}>
-                    {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
-                      <option key={`dsi-${opt.value}`} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                ) : instantChatLlmProvider === 'openai' ? (
-                  <select value={openaiInstantChatModel} onChange={(e) => setOpenaiInstantChatModel(e.target.value)} style={{ minWidth: '280px' }}>
-                    {(openaiModelOptions.length ? openaiModelOptions : [{ value: 'gpt-5.6-luna', label: 'OpenAI GPT-5.6 Luna' }]).map((opt) => (
-                      <option key={`oai-${opt.value}`} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <select value={geminiInstantChatModel} onChange={(e) => setGeminiInstantChatModel(e.target.value)} style={{ minWidth: '280px' }}>
-                    {geminiModelOptions.map((opt) => (
-                      <option key={`gi-${opt.value}`} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
+
+
               <div className="form-buttons" style={{ marginTop: '12px' }}>
                 <button
                   type="button"
@@ -8250,152 +7848,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               </div>
             </div>
 
-            <div className="settings-section">
-              <h3>Analysis, Reports Studio &amp; event timeline models</h3>
-              <p className="settings-hint">
-                <strong>Vendor</strong> picks which API is active for that lane (independent from chat vendors above).{' '}
-                <strong>Model rows below are always shown</strong> so you can keep e.g. DeepSeek for chat while choosing and saving Gemini and DeepSeek model ids for analysis/reports/timeline without switching vendor to edit the other list. Only the vendor matching the active lane is used at runtime. Requires{' '}
-                <code>GEMINI_API_KEY</code> and/or <code>DEEPSEEK_API_KEY</code> on the backend. If timeline vendor is DeepSeek, Gemini-only parallel cache flags (<code>EVENT_TIMELINE_PARALLEL_*</code>) are skipped automatically.
-              </p>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Analysis — vendor</strong>
-                  <p>Which API runs non-chat analysis features (health, career, karma tools, etc.).</p>
-                </div>
-                <select
-                  value={analysisLlmVendor}
-                  onChange={(e) => setAnalysisLlmVendor(e.target.value)}
-                  style={{ minWidth: '200px' }}
-                >
-                  <option value="gemini">Gemini</option>
-                  <option value="deepseek">DeepSeek</option>
-                </select>
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Analysis — Gemini model</strong>
-                  <p>Used when analysis vendor is Gemini (saved even if vendor is DeepSeek).</p>
-                </div>
-                <select
-                  value={geminiAnalysisModel}
-                  onChange={(e) => setGeminiAnalysisModel(e.target.value)}
-                  style={{ minWidth: '280px' }}
-                >
-                  {geminiModelOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Analysis — DeepSeek model</strong>
-                  <p>Used when analysis vendor is DeepSeek (saved even if vendor is Gemini).</p>
-                </div>
-                <select
-                  value={deepseekAnalysisModel}
-                  onChange={(e) => setDeepseekAnalysisModel(e.target.value)}
-                  style={{ minWidth: '280px' }}
-                >
-                  {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
-                    <option key={`dsa-${opt.value}`} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Reports Studio — vendor</strong>
-                  <p>Which API runs Partnership, Wealth, and other PDF report chapters.</p>
-                </div>
-                <select
-                  value={reportLlmVendor}
-                  onChange={(e) => setReportLlmVendor(e.target.value)}
-                  style={{ minWidth: '200px' }}
-                >
-                  <option value="gemini">Gemini</option>
-                  <option value="deepseek">DeepSeek</option>
-                </select>
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Reports Studio — Gemini model</strong>
-                  <p>Used when report vendor is Gemini (independent from analysis).</p>
-                </div>
-                <select
-                  value={geminiReportModel}
-                  onChange={(e) => setGeminiReportModel(e.target.value)}
-                  style={{ minWidth: '280px' }}
-                >
-                  {geminiModelOptions.map((opt) => (
-                    <option key={`rpt-${opt.value}`} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Reports Studio — DeepSeek model</strong>
-                  <p>Used when report vendor is DeepSeek (independent from analysis).</p>
-                </div>
-                <select
-                  value={deepseekReportModel}
-                  onChange={(e) => setDeepseekReportModel(e.target.value)}
-                  style={{ minWidth: '280px' }}
-                >
-                  {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)' }]).map((opt) => (
-                    <option key={`dsr-${opt.value}`} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Timeline — vendor</strong>
-                  <p>Which API runs yearly/monthly event timeline generation.</p>
-                </div>
-                <select
-                  value={timelineLlmVendor}
-                  onChange={(e) => setTimelineLlmVendor(e.target.value)}
-                  style={{ minWidth: '200px' }}
-                >
-                  <option value="gemini">Gemini</option>
-                  <option value="deepseek">DeepSeek</option>
-                </select>
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Timeline — Gemini model</strong>
-                  <p>Used when timeline vendor is Gemini (saved even if vendor is DeepSeek).</p>
-                </div>
-                <select
-                  value={eventTimelineModel}
-                  onChange={(e) => setEventTimelineModel(e.target.value)}
-                  style={{ minWidth: '280px' }}
-                >
-                  {geminiModelOptions.map((opt) => (
-                    <option key={`etl-${opt.value}`} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="setting-item">
-                <div className="setting-info">
-                  <strong>Timeline — DeepSeek model</strong>
-                  <p>Used when timeline vendor is DeepSeek (saved even if vendor is Gemini).</p>
-                </div>
-                <select
-                  value={deepseekTimelineModel}
-                  onChange={(e) => setDeepseekTimelineModel(e.target.value)}
-                  style={{ minWidth: '280px' }}
-                >
-                  {(deepseekModelOptions.length ? deepseekModelOptions : [{ value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' }]).map((opt) => (
-                    <option key={`dst-${opt.value}`} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-buttons" style={{ marginTop: '12px' }}>
-                <button type="button" className="create-btn" onClick={handleSaveGeminiModels} disabled={geminiModelsSaving}>
-                  {geminiModelsSaving ? 'Saving…' : 'Save chat vendors, models, analysis, reports & timeline'}
-                </button>
-              </div>
-            </div>
-            
+
+
             <div className="settings-section">
               <h3>Podcast</h3>
               <p className="settings-hint">
@@ -9023,7 +8477,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               <strong>Requested:</strong> {selectedRequest.requested_amount} credits<br/>
               <strong>Reason:</strong> {selectedRequest.reason}
             </div>
-            
+
             <div style={{ marginBottom: '15px' }}>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Amount to Approve:</label>
               <input
@@ -9040,7 +8494,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 }}
               />
             </div>
-            
+
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Admin Notes (optional):</label>
               <textarea
@@ -9057,7 +8511,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                 }}
               />
             </div>
-            
+
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button 
                 onClick={() => {
@@ -9093,7 +8547,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           </div>
         </div>
       )}
-      
+
       {deleteConfirmation && (
         <div style={{
           position: 'fixed',

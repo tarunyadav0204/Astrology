@@ -64,6 +64,7 @@ const protectedFiles = [
   'src/components/Chat/ChatScreen.js',
   'src/components/Chat/MessageBubble.js',
   'src/components/Chat/FeedbackComponent.js',
+  'src/components/Chat/ConflictResolution.js',
   'src/components/LoadingBubble.js',
   'src/components/Analysis/AnalysisHubScreen.js',
   'src/components/Analysis/AnalysisDetailScreen.js',

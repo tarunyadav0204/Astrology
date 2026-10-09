@@ -28,11 +28,11 @@ class BlankChartGeminiPredictor:
     def __init__(self):
         from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
 
-        if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
+        if get_analysis_llm_vendor() in (CHAT_LLM_DEEPSEEK, "openai"):
             self.api_key = None
-            if not os.getenv("DEEPSEEK_API_KEY"):
-                logger.error("DEEPSEEK_API_KEY not found in environment variables")
-                raise ValueError("DEEPSEEK_API_KEY not found in environment variables")
+            if not os.getenv("OPENAI_API_KEY" if get_analysis_llm_vendor() == "openai" else "DEEPSEEK_API_KEY"):
+                logger.error("Selected analysis provider API key not found")
+                raise ValueError("Selected analysis provider API key not found")
         else:
             self.api_key = os.getenv('GEMINI_API_KEY')
             if not self.api_key:

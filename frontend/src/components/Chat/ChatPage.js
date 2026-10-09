@@ -1,8 +1,10 @@
+import { appendConflictResolution } from '../../hooks/useConflictResolution';
 import { applyInstantProgress, buildImmediateChartPreview, mergeChartContext } from '../../utils/instantProgress';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import MessageList from './MessageList';
 import ChatMemory from './ChatMemory';
+import ChatSummary from './ChatSummary';
 import { scrollChatThreadAfterMessagesChange } from './chatScrollUtils';
 import ChatChartEssence from './ChatChartEssence';
 import ChatInput from './ChatInput';
@@ -3318,6 +3320,7 @@ const ChatPage = ({ onLogin }) => {
                                     </button>
                                 )}
                             {!isMundaneMode && !isPartnershipMode && birthData?.id && <ChatMemory key={birthData.id} chartId={birthData.id} name={birthData.name} />}
+                            <ChatSummary key={isMundaneMode ? mundaneSessionId : chatV2SessionId} messages={messages} onResolved={result => { if (result.session_id === chatV2SessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
                             </h1>
                             {(isMundaneMode || isPartnershipMode) && (
                                 <p className="chat-header-toolbar__meta chat-header-toolbar__meta--desktop">

@@ -296,8 +296,12 @@ async def _generate_voice_guide_lines(
     from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
 
     try:
-        if not is_processing and get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
-            if not (os.getenv("DEEPSEEK_API_KEY") or "").strip():
+        from utils.admin_settings import is_openai_model
+        if is_processing and is_openai_model(get_speech_processing_bridge_model()):
+            from ai.analysis_llm_backend import OpenAIGenerativeAdapter
+            model = OpenAIGenerativeAdapter(get_speech_processing_bridge_model())
+        elif not is_processing and get_analysis_llm_vendor() in (CHAT_LLM_DEEPSEEK, "openai"):
+            if not (os.getenv("OPENAI_API_KEY" if get_analysis_llm_vendor() == "openai" else "DEEPSEEK_API_KEY") or "").strip():
                 return _fallback_voice_guide(
                     normalized_scene,
                     language=normalized_lang,

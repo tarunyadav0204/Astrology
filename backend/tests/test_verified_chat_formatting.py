@@ -68,3 +68,15 @@ def test_verified_cleanup_preserves_both_sentiment_colors_and_sections():
     parsed = ResponseParser.parse_images_in_chat_response(answer)
     final = redact_verified_internal_transport(strip_internal_evidence_markers(parsed['content']))
     assert final == answer
+
+
+@pytest.mark.parametrize('style', ['simple', 'technical'])
+def test_verified_emphasis_is_required_in_system_and_final_turn(style):
+    from chat.verified_chat_pipeline import _verified_emphasis_instruction
+    contract = _verified_emphasis_instruction()
+    assert contract in _premium_writer_system('default', 'english', response_style=style)
+    assert contract in _verified_final_writer_instruction(style)
+    assert 'main conclusion in the opening' in contract
+    assert 'material cautions or qualifications' in contract
+    assert 'Never bold entire paragraphs' in contract
+    assert 'Keep sentiment-span contents plain text' in contract

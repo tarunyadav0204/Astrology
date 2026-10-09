@@ -27,7 +27,7 @@ class KarmaGeminiAnalyzer:
     def __init__(self, api_key: str):
         from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
 
-        if get_analysis_llm_vendor() != CHAT_LLM_DEEPSEEK:
+        if get_analysis_llm_vendor() not in (CHAT_LLM_DEEPSEEK, "openai"):
             genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY") or "")
         from ai.analysis_llm_backend import build_analysis_llm_model
 

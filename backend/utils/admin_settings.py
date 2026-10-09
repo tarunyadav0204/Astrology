@@ -549,6 +549,22 @@ def get_openai_instant_model() -> str:
     return DEFAULT_OPENAI_INSTANT_MODEL
 
 
+def get_verified_chat_model() -> str:
+    return (get_setting("verified_chat_model") or DEFAULT_OPENAI_INSTANT_MODEL).strip()
+
+
+def get_verified_router_model() -> str:
+    return (get_setting("verified_router_model") or DEFAULT_OPENAI_INSTANT_MODEL).strip()
+
+
+def get_verified_planner_model() -> str:
+    return (get_setting("verified_planner_model") or DEFAULT_OPENAI_INSTANT_MODEL).strip()
+
+
+def get_chat_summary_model() -> str:
+    return (get_setting("chat_summary_model") or os.getenv("CHAT_SUMMARY_MODEL") or DEFAULT_OPENAI_INSTANT_MODEL).strip()
+
+
 def get_instant_chat_model() -> str:
     """Resolved model for the currently selected Instant Chat vendor."""
     provider = get_instant_chat_llm_provider()
@@ -568,10 +584,10 @@ def get_event_timeline_model() -> str:
 
 
 def get_event_timeline_narration_model() -> str:
-    """Gemini model dedicated to V3 Event Timeline wording."""
+    """Selected text model dedicated to V3 Event Timeline wording."""
     value = (
-        os.getenv("EVENT_TIMELINE_V3_NARRATION_MODEL")
-        or get_setting("event_timeline_narration_model")
+        get_setting("event_timeline_narration_model")
+        or os.getenv("EVENT_TIMELINE_V3_NARRATION_MODEL")
     )
     if value and value.strip():
         return value.strip()
@@ -638,18 +654,18 @@ def get_parallel_branch_planner_model() -> str:
 
 
 def get_analysis_llm_vendor() -> str:
-    """Vendor for non-chat analysis (health, wealth, karma, career tools, etc.): gemini or deepseek."""
+    """Vendor for non-chat analysis (health, wealth, karma, career tools, etc.): Gemini, OpenAI or DeepSeek."""
     value = (get_setting("analysis_llm_vendor") or "").strip().lower()
-    if value == CHAT_LLM_DEEPSEEK:
-        return CHAT_LLM_DEEPSEEK
+    if value in (CHAT_LLM_DEEPSEEK, CHAT_LLM_OPENAI):
+        return value
     return CHAT_LLM_GEMINI
 
 
 def get_report_llm_vendor() -> str:
-    """Vendor for Reports Studio PDF generation: gemini or deepseek."""
+    """Vendor for Reports Studio PDF generation: Gemini, OpenAI or DeepSeek."""
     value = (get_setting("report_llm_vendor") or "").strip().lower()
-    if value == CHAT_LLM_DEEPSEEK:
-        return CHAT_LLM_DEEPSEEK
+    if value in (CHAT_LLM_DEEPSEEK, CHAT_LLM_OPENAI):
+        return value
     if value == CHAT_LLM_GEMINI:
         return CHAT_LLM_GEMINI
     # Until an explicit report vendor is saved, keep prior behavior (analysis vendor).
@@ -657,10 +673,10 @@ def get_report_llm_vendor() -> str:
 
 
 def get_timeline_llm_vendor() -> str:
-    """Vendor for yearly/monthly event timeline generation: gemini or deepseek."""
+    """Vendor for yearly/monthly event timeline generation: Gemini, OpenAI or DeepSeek."""
     value = (get_setting("timeline_llm_vendor") or "").strip().lower()
-    if value == CHAT_LLM_DEEPSEEK:
-        return CHAT_LLM_DEEPSEEK
+    if value in (CHAT_LLM_DEEPSEEK, CHAT_LLM_OPENAI):
+        return value
     return CHAT_LLM_GEMINI
 
 
@@ -1675,3 +1691,15 @@ def get_podcast_tts_voices(lang: str = "en") -> tuple[str, str]:
     female = (get_setting("podcast_tts_voice_en_female") or "").strip() or DEFAULT_PODCAST_VOICE_EN_FEMALE
     male = (get_setting("podcast_tts_voice_en_male") or "").strip() or DEFAULT_PODCAST_VOICE_EN_MALE
     return female, male
+
+
+def get_openai_feature_model(feature: str) -> str:
+    return (get_setting(f"openai_{feature}_model") or DEFAULT_OPENAI_INSTANT_MODEL).strip()
+
+
+def is_openai_model(model: str) -> bool:
+    return str(model).startswith(("gpt-", "o1", "o3", "o4"))
+
+
+def get_conflict_resolution_model() -> str:
+    return (get_setting("conflict_resolution_model") or DEFAULT_OPENAI_INSTANT_MODEL).strip()

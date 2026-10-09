@@ -665,8 +665,8 @@ def _prepare_spoken_tts_text(text: str, lang: str) -> str:
   try:
     from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
 
-    if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
-      if not os.getenv("DEEPSEEK_API_KEY"):
+    if get_analysis_llm_vendor() in (CHAT_LLM_DEEPSEEK, "openai"):
+      if not os.getenv("OPENAI_API_KEY" if get_analysis_llm_vendor() == "openai" else "DEEPSEEK_API_KEY"):
         return base_text
       from ai.analysis_llm_backend import build_analysis_llm_model
 

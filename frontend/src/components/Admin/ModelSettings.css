@@ -1,0 +1,23 @@
+.model-settings { color:var(--color-text); }
+.model-settings-intro { margin-bottom:20px; }
+.model-settings-intro h2 { margin:0 0 8px; }
+.model-settings-intro p,.model-settings-card header p,.model-settings-advanced>p { color:var(--color-text-muted); font-size:14px; line-height:1.5; }
+.model-settings-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.model-settings-card { padding:20px; border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface-raised); min-width:0; }
+.model-settings-card header { display:flex; gap:12px; justify-content:space-between; align-items:flex-start; }
+.model-settings-card h3 { margin:0; font-size:18px; }
+.model-settings-card header p { margin:8px 0 18px; }
+.model-settings-provider { font-size:12px; white-space:nowrap; padding:5px 9px; border-radius:var(--radius-pill); color:var(--color-brand); background:var(--color-surface-muted); }
+.model-settings-fields { display:grid; gap:14px; }
+.model-settings-fields label { display:grid; gap:7px; }
+.model-settings-fields label>span { font-size:13px; font-weight:600; }
+.model-settings-fields select,.model-settings-fields input:not([type=checkbox]) { width:100%; box-sizing:border-box; min-height:42px; padding:10px; color:var(--color-text); background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:var(--radius-md); font:inherit; }
+.model-settings-fields small { color:var(--color-text-muted); line-height:1.4; }
+.model-settings-card footer { margin-top:20px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+.model-settings-card footer button { color:var(--color-text-inverse); background:var(--color-brand); border:0; border-radius:var(--radius-md); padding:10px 14px; cursor:pointer; }
+.model-settings-card footer button:disabled { opacity:.5; cursor:default; }
+.model-settings-card footer span { font-size:13px; }
+.model-settings-advanced { margin-top:24px; padding:18px; border:1px solid var(--color-border); border-radius:var(--radius-lg); }
+.model-settings-advanced summary { cursor:pointer; font-weight:600; }
+.model-settings select:focus-visible,.model-settings input:focus-visible,.model-settings button:focus-visible,.model-settings summary:focus-visible { outline:2px solid var(--color-brand); outline-offset:3px; }
+@media(max-width:900px) { .model-settings-grid { grid-template-columns:1fr; } }

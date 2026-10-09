@@ -1,0 +1,6 @@
+.information-rounds { margin:12px 0; padding:12px; border:1px solid var(--color-border); border-radius:12px; background:var(--color-surface); color:var(--color-text); }
+.information-rounds summary { cursor:pointer; font-weight:600; }
+.information-rounds section { margin-top:12px; border-top:1px solid var(--color-border); }
+.information-rounds-event { margin:10px 0; }
+.information-rounds pre { max-height:360px; overflow:auto; padding:12px; white-space:pre-wrap; overflow-wrap:anywhere; background:var(--color-surface-raised); color:var(--color-text); border-radius:8px; }
+.information-rounds button { background:var(--color-surface-raised); color:var(--color-text); border:1px solid var(--color-border); border-radius:8px; padding:6px 10px; cursor:pointer; }

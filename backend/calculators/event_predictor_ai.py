@@ -165,7 +165,7 @@ class EventPredictor:
             )
             self.model, self.model_name, self._timeline_llm_vendor = builder()
             self._timeline_log_provider = (
-                "deepseek" if self._timeline_llm_vendor == CHAT_LLM_DEEPSEEK else "gemini"
+                self._timeline_llm_vendor
             )
             print(f"✅ EventPredictor using {self._timeline_log_provider} model {self.model_name}")
         except Exception as e:
@@ -456,7 +456,7 @@ class EventPredictor:
             )
             from utils.admin_settings import CHAT_LLM_DEEPSEEK
 
-            if use_parallel_yearly and self._timeline_llm_vendor != CHAT_LLM_DEEPSEEK:
+            if use_parallel_yearly and self._timeline_llm_vendor == "gemini":
                 print("\n⚡ Parallel yearly timeline enabled (with context cache)")
                 ai_response = await self._predict_yearly_events_parallel_cached(
                     raw_data=raw_data,
@@ -469,7 +469,7 @@ class EventPredictor:
                 await report_progress(94, "resolving_events")
                 ai_response = {}
             else:
-                if use_parallel_yearly and self._timeline_llm_vendor == CHAT_LLM_DEEPSEEK:
+                if use_parallel_yearly and self._timeline_llm_vendor != "gemini":
                     print(
                         "\n⚠️ EVENT_TIMELINE_PARALLEL_YEARLY is ignored for DeepSeek "
                         "(Gemini context cache only). Using single-call timeline."
@@ -994,7 +994,7 @@ class EventPredictor:
             )
             from utils.admin_settings import CHAT_LLM_DEEPSEEK
 
-            if use_parallel_monthly and self._timeline_llm_vendor != CHAT_LLM_DEEPSEEK:
+            if use_parallel_monthly and self._timeline_llm_vendor == "gemini":
                 print("\n⚡ Parallel monthly deep enabled (with context cache + domain shards)")
                 ai_response = await self._predict_monthly_deep_parallel_cached(
                     raw_data=raw_data,
@@ -1009,7 +1009,7 @@ class EventPredictor:
                 await report_progress(94, "resolving_events")
                 ai_response = {}
             else:
-                if use_parallel_monthly and self._timeline_llm_vendor == CHAT_LLM_DEEPSEEK:
+                if use_parallel_monthly and self._timeline_llm_vendor != "gemini":
                     print(
                         "\n⚠️ EVENT_TIMELINE_PARALLEL_MONTHLY is ignored for DeepSeek "
                         "(Gemini context cache only). Using single-call monthly deep."

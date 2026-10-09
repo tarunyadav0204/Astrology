@@ -1464,6 +1464,7 @@ def _slim_event_prediction_payload(
     named_dasha_lookup: Optional[Dict[str, Any]] = None,
     evidence_plan: Optional[Dict[str, Any]] = None,
     daily_prediction_spine: Optional[Dict[str, Any]] = None,
+    source_intent_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     focus_houses = list((instant_parashari or {}).get("focus_houses") or [])
     historical_scan = (
@@ -1982,7 +1983,10 @@ def _slim_event_prediction_payload(
             "nakshatra_subtype": nakshatra_subtype if is_nakshatra_category(category) else None,
             "nakshatra_target_planet": nakshatra_target_planet if is_nakshatra_category(category) else None,
             "nakshatra_topic": nakshatra_topic if is_nakshatra_category(category) else None,
-            "mode": "LIFESPAN_EVENT_TIMING",
+            "mode": (
+                "PREDICT_DAILY" if _structured_exact_day({"mode": source_intent_mode}, period_window)
+                else source_intent_mode or "LIFESPAN_EVENT_TIMING"
+            ),
             "answer_mode": "event_prediction",
             "period_window": period_window,
             "time_relation": (
@@ -14360,6 +14364,7 @@ def _build_instant_context(
             named_dasha_lookup=named_dasha_lookup,
             evidence_plan=evidence_plan,
             daily_prediction_spine=daily_prediction_spine,
+            source_intent_mode=(intent or {}).get("mode"),
         )
 
     is_general_month_window = (
@@ -20773,7 +20778,7 @@ async def generate_instant_chat_response(
             "language": language,
             "response_style": response_style,
             "birth_data": birth_data,
-            "instant_context": instant_context,
+            "instant_context": {**instant_context, "query_context": (intent or {}).get("query_context") or instant_context.get("query_context") or {}},
             "history": history,
         }
         verified_review_metadata = {
@@ -20916,6 +20921,7 @@ async def generate_instant_chat_response(
                 calculation_callback=verified_calculation_callback,
             )
             verified_review_metadata["verified_packet_validation"] = llm_result.get("packet_validation") or {}
+            verified_review_metadata["information_rounds"] = llm_result.get("information_rounds") or {}
         except Exception as exc:
             logger.exception("Verified Chat calculator agent failed")
             llm_result = {

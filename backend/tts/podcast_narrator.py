@@ -41,8 +41,8 @@ def generate_podcast_script(message_content: str, language: str = "en") -> str:
         from utils.admin_settings import CHAT_LLM_DEEPSEEK, get_analysis_llm_vendor
 
         model = None
-        if get_analysis_llm_vendor() == CHAT_LLM_DEEPSEEK:
-            if not os.getenv("DEEPSEEK_API_KEY"):
+        if get_analysis_llm_vendor() in (CHAT_LLM_DEEPSEEK, "openai"):
+            if not os.getenv("OPENAI_API_KEY" if get_analysis_llm_vendor() == "openai" else "DEEPSEEK_API_KEY"):
                 return _fallback_script(message_content)
             from ai.analysis_llm_backend import build_analysis_llm_model
 

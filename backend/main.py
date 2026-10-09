@@ -75,6 +75,8 @@ from longevity.routes import router as longevity_router
 from chat.chat_routes import router as chat_router
 from chat.feedback_routes import router as chat_feedback_router
 from chat.bookmark_routes import router as chat_bookmark_router
+from chat.summary_routes import router as chat_summary_router
+from chat.conflict_routes import router as chat_conflict_router
 from calculators.event_predictor.routes import router as event_prediction_router
 from nakshatra.nakshatra_routes import router as nakshatra_router
 from festivals.routes import router as festivals_router
@@ -1061,6 +1063,8 @@ app.include_router(longevity_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(chat_feedback_router, prefix="/api")
 app.include_router(chat_bookmark_router, prefix="/api")
+app.include_router(chat_summary_router, prefix="/api")
+app.include_router(chat_conflict_router, prefix="/api")
 app.include_router(nakshatra_router, prefix="/api")
 app.include_router(festivals_router, prefix="/api")
 app.include_router(chat_history_router, prefix="/api")

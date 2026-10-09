@@ -1,3 +1,4 @@
+import { appendConflictResolution } from '../../hooks/useConflictResolution';
 import { applyInstantProgress, buildImmediateChartPreview, mergeChartContext } from '../../utils/instantProgress';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
@@ -62,6 +63,7 @@ import { Image } from 'react-native';
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import ChatMemory from './ChatMemory';
+import ChatSummary from './ChatSummary';
 import AppAlertModal from '../Common/AppAlertModal';
 import QuickThemePickerModal from '../Common/QuickThemePickerModal';
 import { useCredits } from '../../credits/CreditContext';
@@ -6932,6 +6934,7 @@ export default function ChatScreen({ navigation, route }) {
               )}
             </View>
 
+            <ChatSummary key={sessionId} messages={messages} header onResolved={result => { if (result.session_id === sessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
             <View style={[
               styles.headerRight,
               compactHeaderChrome && styles.headerRightCompact,
