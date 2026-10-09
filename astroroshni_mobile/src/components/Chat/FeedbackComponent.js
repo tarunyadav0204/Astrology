@@ -66,12 +66,7 @@ function FeedbackPlayStoreRow({ colors, t }) {
   );
 }
 
-const FEEDBACK_PLACEHOLDERS = {
-  helpful: 'What was most helpful? (optional)',
-  unclear: 'Which part was unclear? (optional)',
-  wrong_personal_detail: 'Which personal detail was wrong, and what should it be? (optional)',
-  contradicts_earlier_answer: 'What contradicts an earlier answer? Include the earlier statement if possible. (optional)',
-};
+const FEEDBACK_REASON_KEYS = { helpful: 'helpful', unclear: 'unclear', wrong_personal_detail: 'wrongPersonalDetail', contradicts_earlier_answer: 'contradictsEarlierAnswer' };
 
 export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
   const { colors } = useTheme();
@@ -187,10 +182,10 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
             </TouchableOpacity>
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'helpful' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'helpful', rating: 5 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'helpful' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>Helpful</Text></TouchableOpacity>
-            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'unclear' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'unclear', rating: 2 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'unclear' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>Unclear</Text></TouchableOpacity>
-            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'wrong_personal_detail' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'wrong_personal_detail', rating: 1 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'wrong_personal_detail' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>Wrong personal detail</Text></TouchableOpacity>
-            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'contradicts_earlier_answer' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'contradicts_earlier_answer', rating: 1 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'contradicts_earlier_answer' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>Contradicts an earlier answer</Text></TouchableOpacity>
+            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'helpful' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'helpful', rating: 5 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'helpful' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>{t('premiumUi.chat.feedbackReasons.helpful')}</Text></TouchableOpacity>
+            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'unclear' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'unclear', rating: 2 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'unclear' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>{t('premiumUi.chat.feedbackReasons.unclear')}</Text></TouchableOpacity>
+            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'wrong_personal_detail' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'wrong_personal_detail', rating: 1 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'wrong_personal_detail' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>{t('premiumUi.chat.feedbackReasons.wrongPersonalDetail')}</Text></TouchableOpacity>
+            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'contradicts_earlier_answer' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'contradicts_earlier_answer', rating: 1 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'contradicts_earlier_answer' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>{t('premiumUi.chat.feedbackReasons.contradictsEarlierAnswer')}</Text></TouchableOpacity>
           </View>
           {feedback.rating > 0 && (
             <>
@@ -200,8 +195,8 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
                   borderColor: colors.cardBorder,
                   backgroundColor: colors.surfaceMuted,
                 }]}
-                placeholder={FEEDBACK_PLACEHOLDERS[feedback.reason]}
-                accessibilityLabel={FEEDBACK_PLACEHOLDERS[feedback.reason]}
+                placeholder={t(`premiumUi.chat.feedbackPrompts.${FEEDBACK_REASON_KEYS[feedback.reason]}`)}
+                accessibilityLabel={t(`premiumUi.chat.feedbackPrompts.${FEEDBACK_REASON_KEYS[feedback.reason]}`)}
                 placeholderTextColor={colors.textTertiary}
                 multiline
                 value={feedback.comment}
