@@ -2249,13 +2249,13 @@ class ChatContextBuilder:
         is_in_maraka_house = (p_sign == maraka_house_2) or (p_sign == maraka_house_7)
         
         if is_maraka_lord and is_in_maraka_house:
-            return "Strong Maraka Influence (Requires Remedies)"
+            return "Maraka lord occupying a maraka house (lordship and placement, not MD/AD confluence)"
         elif is_maraka_lord:
-            return "Maraka Activation (Sensitivity)"
+            return "Maraka lordship (traditional role)"
         elif is_in_maraka_house:
-            return "Maraka Placement (Stress)"
+            return "Occupant of a maraka house"
             
-        return "Safe"
+        return "No 2nd/7th-house lordship or occupation"
     
     def _minify_data(self, data: Any) -> Any:
         """Recursively rounds floats to 2 decimal places to save tokens"""

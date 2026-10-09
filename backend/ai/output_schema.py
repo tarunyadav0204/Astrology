@@ -477,7 +477,7 @@ This is a restricted classical longevity research answer. Keep it evidence-first
 - **Kharesh / 22nd Drekkana**: [D3 ascendant sign if supplied -> 8th from D3 ascendant / danger sign -> Kharesh lord -> D1 condition. Do not merely say "Kharesh is X" without this path.]
 - **64th Navamsa from Moon**: [D9 Moon sign if supplied -> 4th from D9 Moon / danger sign -> lord -> D1 condition. Do not merely say "64th Navamsa lord is X" without this path.]
 - **Bhrigu Bindu / Mrityu Bhaga**: [Point, sign, lord, planets/degree rows if supplied]
-- **D8 / D3 / D30 Availability**: [Present or missing. If D8 is not supplied, write "D8 not supplied; longevity divisional confirmation is incomplete" and reduce D8/D3/D30 score accordingly.]
+- **D8 / D3 / D30 Availability**: [Present or missing. If D8 is not supplied, write "D8 not supplied; longevity divisional confirmation is incomplete" do not invent missing confirmations.]
 
 5. ### Confluence Matrix
 [MANDATORY: Do NOT use markdown tables or pipe-separated table rows. Mobile chat cannot render wide tables. Use stacked window blocks exactly like this.]
@@ -490,9 +490,7 @@ This is a restricted classical longevity research answer. Keep it evidence-first
 - **Sniper Points**: [Present/Weak/Missing + 64th Navamsa, Mrityu Bhaga, Bhrigu Bindu, Kharesh sign]
 - **Ashtakavarga Filter**: [Present/Weak/Missing + SAV/BAV from provided data only]
 - **Transit Trigger**: [Present/Weak/Missing + Saturn/Jupiter/Rahu-Ketu over sensitive points]
-- **Score Breakdown**: [Dasha 0-2; Maraka/Badhaka/Kharesh 0-2; 8th/12th 0-1.5; D8/D3/D30 0-1.5; Sniper 0-1.5; AV 0-1; Transit 0-1. If D8 is missing, D8/D3/D30 score cannot exceed 0.8.]
-- **Confluence Score**: [0-10 total, based only on the score breakdown above]
-- **Confluence Grade**: [Only one of: High / Medium / Low. Do not write "Medium-High". High requires 6+ score and 3+ independent categories including dasha.]
+- **Evidence Agreement and Conflicts**: [Describe supplied layers; no numeric risk score or medical-risk grade]
 - **Classification**: [health stress-test / critical transition risk / classical terminal candidate]
 
 [Repeat the same stacked block for Window 2, Window 3, etc. Never output a table.]
@@ -502,8 +500,7 @@ This is a restricted classical longevity research answer. Keep it evidence-first
 - **Window [1/2/3]**: [Name + date range]
   - **Promise Window**: [Broader period]
   - **Execution Band**: [Narrower period only if evidence supports it]
-  - **Confluence Score / Grade**: [0-10 + exactly one of High/Medium/Low; do not write Medium-High]
-  - **Score Breakdown**: [Repeat compact score components; never give a score without this]
+  - **Evidence Agreement and Conflicts**: [Supplied astrological factors only; no medical risk score or grade]
   - **Why It Ranks Here**: [Evidence categories that agree]
   - **What Protects**: [Contradictory/protective factors]
   - **What Is Missing**: [Required evidence not present]

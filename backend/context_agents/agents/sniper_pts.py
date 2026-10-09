@@ -42,7 +42,9 @@ def _compress_kharesh(d: Dict[str, Any]) -> Dict[str, Any]:
     if e:
         return {"e": e}
     s = _sign_1_12_from_name(d.get("danger_sign"))
-    out: Dict[str, Any] = {"kl": d.get("kharesh_lord")}
+    out: Dict[str, Any] = {"kl": d.get("kharesh_lord"), "coordinate_frame": "D3_mapped_sign"}
+    if d.get('d1_sector'):
+        out['d1_sector'] = d['d1_sector']
     src = _sign_1_12_from_name(d.get("d3_ascendant_sign"))
     if src is not None:
         out["d3as"] = src
@@ -60,7 +62,9 @@ def _compress_navamsa_64(d: Dict[str, Any]) -> Dict[str, Any]:
     if e:
         return {"e": e}
     s = _sign_1_12_from_name(d.get("danger_sign"))
-    out: Dict[str, Any] = {"l": d.get("danger_lord")}
+    out: Dict[str, Any] = {"l": d.get("danger_lord"), "coordinate_frame": "D9_mapped_sign"}
+    if d.get('d1_sector'):
+        out['d1_sector'] = d['d1_sector']
     moon_s = _sign_1_12_from_name(d.get("moon_d9_sign"))
     if moon_s is not None:
         out["m9s"] = moon_s

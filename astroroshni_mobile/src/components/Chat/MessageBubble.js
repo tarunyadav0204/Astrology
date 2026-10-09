@@ -2493,7 +2493,7 @@ function MessageBubble({
                 ? t('chat.inquiry', 'AstroRoshni Inquiry')
                 : isNativeGate
                   ? t('chat.nativeGateBadge', 'Saved profile needed')
-                  : message.gate_metadata?.workflow_changed ? t('premiumUi.chat.prashna.natalBadge', 'Tara · birth chart') : message.gate_metadata?.reading_mode === 'PRASHNA' ? t('premiumUi.chat.prashna.answerBadge', 'Tara · Prashna') : t('chat.verified', 'Tara · chart synthesis')}
+                  : message.gate_metadata?.reading_mode === 'ELECT_MUHURAT' ? t('premiumUi.chat.muhurat.badge') : message.gate_metadata?.workflow_changed ? t('premiumUi.chat.prashna.natalBadge', 'Tara · birth chart') : message.gate_metadata?.reading_mode === 'PRASHNA' ? t('premiumUi.chat.prashna.answerBadge', 'Tara · Prashna') : t('chat.verified', 'Tara · chart synthesis')}
             </Text>
           </LinearGradient>
             {chartName ? (
@@ -2813,7 +2813,7 @@ function MessageBubble({
             ]}
           >
             <Text style={[styles.clarificationChoiceEyebrow, { color: colors.primary }]}>
-              {['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind) ? t('premiumUi.chat.prashna.chooseMethod', 'Choose your reading') : t('chat.chooseTheme', 'Choose a theme')}
+              {nextAction?.choice_kind?.startsWith('muhurat_') ? t('premiumUi.chat.muhurat.options') : ['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind) ? t('premiumUi.chat.prashna.chooseMethod', 'Choose your reading') : t('chat.chooseTheme', 'Choose a theme')}
             </Text>
             {clarificationChoices.map((option, index) => {
               const optionId = String(option.id);
@@ -2836,7 +2836,7 @@ function MessageBubble({
                   ]}
                   onPress={() => {
                     if (selectedClarificationChoice || !onFollowUpClick) return;
-                    if (!['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind)) setSelectedClarificationChoice(optionId);
+                    if (!['prashna_method', 'prashna_scope', 'muhurat_setup', 'muhurat_refine'].includes(nextAction?.choice_kind)) setSelectedClarificationChoice(optionId);
                     const sourceMessageId = message.messageId || message.id;
                     const submitText = String(option.submit_text || option.label).trim();
                     onFollowUpClick(submitText, {
@@ -2872,7 +2872,7 @@ function MessageBubble({
               );
             })}
             <Text style={[styles.clarificationChoiceHint, { color: colors.textTertiary }]}>
-              {['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind) ? t('premiumUi.chat.prashna.choiceHint', 'Your question will be kept. Choose a card to continue.') : t('chat.themeChoiceHint', 'Answering several questions together thins each reading. Pick one theme and I’ll go deep.')}
+              {['prashna_method', 'prashna_scope', 'muhurat_setup', 'muhurat_refine'].includes(nextAction?.choice_kind) ? t('premiumUi.chat.prashna.choiceHint', 'Your question will be kept. Choose a card to continue.') : t('chat.themeChoiceHint', 'Answering several questions together thins each reading. Pick one theme and I’ll go deep.')}
             </Text>
           </View>
         )}

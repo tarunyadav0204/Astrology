@@ -20,9 +20,9 @@ class YoginiDashaRequest(BaseModel):
     def timezone(self):
         """Auto-detect timezone from coordinates"""
         try:
-            return parse_timezone_offset('', self.latitude, self.longitude)
+            return parse_timezone_offset('', self.latitude, self.longitude, for_date=self.date)
         except Exception:
-            return 5.5  # IST fallback
+            raise ValueError('Unable to establish the birth timezone')
 
 @router.post("/yogini-dasha")
 async def get_yogini_dasha(request: YoginiDashaRequest):
@@ -76,8 +76,8 @@ async def get_yogini_dasha(request: YoginiDashaRequest):
                 period['start'] == current_maha['start'] and 
                 period['end'] == current_maha['end']):
                 # Convert string dates back to datetime objects for calculation
-                p_start = datetime.strptime(period['start'], '%Y-%m-%d')
-                p_end = datetime.strptime(period['end'], '%Y-%m-%d')
+                p_start = datetime.fromisoformat(period.get('start_iso', period['start']))
+                p_end = datetime.fromisoformat(period.get('end_iso', period['end']))
                 
                 # Use the new helper method to get the list
                 period['sub_periods'] = yogini_calc.get_sub_periods_list(
@@ -88,12 +88,13 @@ async def get_yogini_dasha(request: YoginiDashaRequest):
                 break
         
         # Calculate progress percentage for current Antardasha
-        ad_start = datetime.strptime(current_yogini['antardasha']['start'], '%Y-%m-%d')
-        ad_end = datetime.strptime(current_yogini['antardasha']['end'], '%Y-%m-%d')
-        now = target_date if target_date else datetime.now()
+        ad_start = datetime.fromisoformat(current_yogini['antardasha']['start_iso'])
+        ad_end = datetime.fromisoformat(current_yogini['antardasha']['end_iso'])
+        from calculators.dasha_time import normalize_focus
+        now = normalize_focus(target_date, yogini_calc._parse_birth_date(birth_data))
         
-        total_days = (ad_end - ad_start).days
-        elapsed_days = (now - ad_start).days
+        total_days = (ad_end - ad_start).total_seconds() / 86400
+        elapsed_days = (now - ad_start).total_seconds() / 86400
         progress = (elapsed_days / total_days * 100) if total_days > 0 else 0
         progress = max(0, min(100, progress))  # Clamp between 0-100
         

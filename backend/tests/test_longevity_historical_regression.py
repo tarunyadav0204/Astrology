@@ -8,8 +8,9 @@ from reports.context.base_context_builder import calculate_chart_for_birth
 
 # Public Astro-Databank records (Rodden A/AA). These fixtures guard deterministic
 # date evaluation; they are not statistical proof and are not used to tune rules.
+# JFK Shoola is False after correcting standard Shoola to always-forward order.
 CASES = [
-    ({"name": "John F. Kennedy", "date": "1917-05-29", "time": "15:00", "place": "Brookline, Massachusetts, USA", "latitude": 42.3334, "longitude": -71.1200, "timezone": "America/New_York", "gender": "Male"}, datetime(1963, 11, 22), {"vimshottari": True, "shoola": True, "transit_bav": True}),
+    ({"name": "John F. Kennedy", "date": "1917-05-29", "time": "15:00", "place": "Brookline, Massachusetts, USA", "latitude": 42.3334, "longitude": -71.1200, "timezone": "America/New_York", "gender": "Male"}, datetime(1963, 11, 22), {"vimshottari": True, "shoola": False, "transit_bav": True}),
     ({"name": "Elvis Presley", "date": "1935-01-08", "time": "04:35", "place": "Tupelo, Mississippi, USA", "latitude": 34.2576, "longitude": -88.7034, "timezone": "America/Chicago", "gender": "Male"}, datetime(1977, 8, 16), {"vimshottari": True, "shoola": False, "transit_bav": True}),
     ({"name": "Steve Jobs", "date": "1955-02-24", "time": "19:15", "place": "San Francisco, California, USA", "latitude": 37.7749, "longitude": -122.4194, "timezone": "America/Los_Angeles", "gender": "Male"}, datetime(2011, 10, 5), {"vimshottari": True, "shoola": False, "transit_bav": False}),
     ({"name": "Diana, Princess of Wales", "date": "1961-07-01", "time": "19:45", "place": "Sandringham, England", "latitude": 52.8333, "longitude": 0.5000, "timezone": "Europe/London", "gender": "Female"}, datetime(1997, 8, 31), {"vimshottari": True, "shoola": False, "transit_bav": True}),

@@ -10,7 +10,7 @@ def apply_prashna_transition(intent: Dict[str, Any], question: str, context: Dic
     transition = str(intent.get('reading_transition') or 'none')
     selected_method = qc.get('prashna_choice')
     # Explicit natal contracts and non-analysis routes cannot inherit question-chart evidence.
-    if (selected_method == 'natal' or intent.get('reading_type') == 'chart_dasha_analysis' or intent.get('mode') == 'PREDICT_DAILY'
+    if (selected_method == 'natal' or intent.get('reading_type') in {'chart_dasha_analysis', 'muhurat'} or intent.get('mode') == 'PREDICT_DAILY'
             or intent.get('route_action') in {'ack', 'handoff', 'out_of_scope'}):
         transition = 'natal'
     if transition == 'none' and qc.get('_prashna_previous') and not qc.get('prashna'):

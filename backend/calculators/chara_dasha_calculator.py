@@ -43,6 +43,8 @@ class CharaDashaCalculator:
                 "duration_years": years,
                 "start_date": start_date.strftime("%Y-%m-%d"),
                 "end_date": end_date.strftime("%Y-%m-%d"),
+                "start_iso": start_date.isoformat(),
+                "end_iso": end_date.isoformat(),
                 "is_current": is_current,
                 "antardashas": antardashas
             })
@@ -176,12 +178,14 @@ class CharaDashaCalculator:
 
     # --- HELPERS ---
     def _get_planet_sign(self, pname: str) -> int:
-        return self.planets.get(pname, {}).get('sign', 0)
+        if pname not in self.planets or 'sign' not in self.planets[pname]:
+            raise ValueError(f'Missing natal sign for {pname}')
+        return self.planets[pname]['sign']
         
     def _count_planets_in_sign(self, sign_idx: int) -> int:
         count = 0
-        for p in self.planets.values():
-            if p.get('sign') == sign_idx: count += 1
+        for name, p in self.planets.items():
+            if name in {'Sun','Moon','Mars','Mercury','Jupiter','Venus','Saturn','Rahu','Ketu'} and p.get('sign') == sign_idx: count += 1
         return count
 
     def _get_sign_name(self, idx: int) -> str:
@@ -239,6 +243,8 @@ class CharaDashaCalculator:
                 "sign_name": self._get_sign_name(sign_id),
                 "start_date": current_period_start.strftime("%Y-%m-%d"),
                 "end_date": end_date.strftime("%Y-%m-%d"),
+                "start_iso": current_period_start.isoformat(),
+                "end_iso": end_date.isoformat(),
                 "months": ad_months,
                 "years": round(ad_months / 12, 2),
                 "is_current": current_period_start <= current_time < end_date

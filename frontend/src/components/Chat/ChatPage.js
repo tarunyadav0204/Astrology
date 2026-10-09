@@ -6,6 +6,7 @@ import MessageList from './MessageList';
 import ChatMemory from './ChatMemory';
 import ChatSummary from './ChatSummary';
 import PrashnaSetup from './PrashnaSetup';
+import MuhuratSetup from './MuhuratSetup';
 import { scrollChatThreadAfterMessagesChange } from './chatScrollUtils';
 import ChatChartEssence from './ChatChartEssence';
 import ChatInput from './ChatInput';
@@ -266,10 +267,11 @@ const ChatPage = ({ onLogin }) => {
     }, [headerUser, location.state?.openLogin, location.search, onLogin, navigate, location.pathname]);
 
     const [isPartnershipMode, setIsPartnershipMode] = useState(false);
+    const [pendingMuhuratQuestion, setPendingMuhuratQuestion] = useState(null);
     const [prashnaLocation, setPrashnaLocation] = useState(null);
     const [verifiedConversationMode, setVerifiedConversationMode] = useState(false);
     const [pendingPrashnaQuestion, setPendingPrashnaQuestion] = useState(null);
-    useEffect(() => { setPrashnaLocation(null); setPendingPrashnaQuestion(null); }, [birthData?.id]);
+    useEffect(() => { setPrashnaLocation(null); setPendingPrashnaQuestion(null); setPendingMuhuratQuestion(null); }, [birthData?.id]);
     const [selectedPartnerChart, setSelectedPartnerChart] = useState(null);
     const [showPartnerModal, setShowPartnerModal] = useState(false);
     const messagesEndRef = useRef(null);
@@ -552,6 +554,15 @@ const ChatPage = ({ onLogin }) => {
             followUpOptions,
             queryContextExtras,
         });
+        if (queryContextExtras?.muhurat_setup_requested) {
+            setPendingMuhuratQuestion({ question: queryContextExtras.original_question || text, queryContext: queryContextExtras });
+            return;
+        }
+        if (queryContextExtras?.muhurat_choice) {
+            setVerifiedConversationMode(true); setPrashnaLocation(null);
+            handleSendMessageChatV2(queryContextExtras.original_question || text, { chat_tier: 'verified', premium_analysis: false, query_context: queryContextExtras });
+            return;
+        }
         if (queryContextExtras?.prashna_choice === 'prashna') {
             setVerifiedConversationMode(true);
             setPendingPrashnaQuestion({ question: queryContextExtras.original_question || text, queryContext: queryContextExtras });
@@ -2843,6 +2854,16 @@ const ChatPage = ({ onLogin }) => {
 
     return (
         <>
+            {pendingMuhuratQuestion && <div className="chat-memory-overlay"><section className="chat-memory-panel" role="dialog" aria-modal="true" aria-label="Muhurat details">
+                <header><h2>Muhurat details</h2><button aria-label="Close" onClick={() => setPendingMuhuratQuestion(null)}>✕</button></header>
+                <MuhuratSetup initial={pendingMuhuratQuestion.queryContext.muhurat_request} onSubmit={request => {
+                    if (isLoading) return;
+                    const pending = pendingMuhuratQuestion;
+                    setPendingMuhuratQuestion(null); setPrashnaLocation(null); setVerifiedConversationMode(true); setIsInstantAnalysis(false);
+                    handleSendMessageChatV2(pending.question, { chat_tier: 'verified', premium_analysis: false,
+                        query_context: { ...pending.queryContext, muhurat_setup_requested: false, muhurat_request: request } });
+                }} />
+            </section></div>}
             {pendingPrashnaQuestion && <div className="chat-memory-overlay"><section className="chat-memory-panel" role="dialog" aria-modal="true" aria-label="Ask with Prashna">
                 <header><h2>Ask with Prashna</h2><button aria-label="Close" onClick={() => setPendingPrashnaQuestion(null)}>✕</button></header>
                 <PrashnaSetup onSelect={place => {

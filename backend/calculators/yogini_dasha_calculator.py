@@ -25,17 +25,13 @@ class YoginiDashaCalculator:
 
     def calculate_current_yogini(self, birth_data: dict, moon_longitude: float, target_date: datetime = None) -> dict:
         """Calculates the Yogini Dasha running on a specific date."""
-        if target_date is None:
-            target_date = datetime.now()
-
         # Parse birth date safely handling timezones
         birth_date_obj = self._parse_birth_date(birth_data)
 
-        # Ensure target_date and birth_date are compatible (Timezone safe)
-        if target_date.tzinfo is not None and birth_date_obj.tzinfo is None:
-            birth_date_obj = birth_date_obj.replace(tzinfo=target_date.tzinfo)
-        elif target_date.tzinfo is None and birth_date_obj.tzinfo is not None:
-            target_date = target_date.replace(tzinfo=birth_date_obj.tzinfo)
+        from .dasha_time import normalize_focus
+        target_date = normalize_focus(target_date, birth_date_obj)
+        if target_date < birth_date_obj:
+            raise ValueError('Yogini target date precedes birth')
 
         # 1. Calculate Birth Yogini & Balance
         start_dasha = self._calculate_birth_dasha_balance(moon_longitude, birth_date_obj)
@@ -44,13 +40,13 @@ class YoginiDashaCalculator:
         current_date = start_dasha['end_date']
         
         # If target is within the first dasha (balance period)
-        if target_date <= current_date:
+        if target_date < current_date:
             return self._calculate_sub_periods(start_dasha, target_date, is_balance=True)
 
         # Loop through 36-year cycles until we reach target
         current_index = self._get_index_by_name(start_dasha['name'])
         
-        while current_date < target_date:
+        while current_date <= target_date:
             current_index = (current_index + 1) % 8
             yogini = self.YOGINIS[current_index]
             
@@ -72,8 +68,43 @@ class YoginiDashaCalculator:
 
         return {}
 
+    def get_periods_in_range(self, birth_data, moon_longitude, start, end):
+        """Bounded MD/AD facts with exact instants; birth balance clips the full AD schedule."""
+        from .dasha_time import normalize_focus
+        birth = self._parse_birth_date(birth_data)
+        start, end = normalize_focus(start, birth), normalize_focus(end, birth)
+        if end <= start:
+            raise ValueError('Yogini end must follow start')
+        balance = self._calculate_birth_dasha_balance(moon_longitude, birth)
+        idx = self._get_index_by_name(balance['name'])
+        cursor, finish = birth, balance['end_date']
+        rows = []
+        while cursor < end:
+            yogini = self.YOGINIS[idx]
+            if finish > start:
+                full_start = finish - timedelta(days=yogini['years'] * self.year_length)
+                ad_cursor = full_start
+                subs = []
+                for i in range(8):
+                    ad = self.YOGINIS[(idx + i) % 8]
+                    ad_end = full_start + (finish - full_start) * sum(self.YOGINIS[(idx+j)%8]['years'] for j in range(i+1)) / 36
+                    if ad_end > max(start, birth) and ad_cursor < end:
+                        subs.append({'name': ad['name'], 'lord': ad['lord'],
+                                     'start_iso': max(ad_cursor, birth).isoformat(), 'end_iso': ad_end.isoformat()})
+                    ad_cursor = ad_end
+                rows.append({'name': yogini['name'], 'lord': yogini['lord'],
+                             'start_iso': cursor.isoformat(), 'end_iso': finish.isoformat(),
+                             'antardashas': subs})
+            cursor = finish
+            idx = (idx + 1) % 8
+            finish = cursor + timedelta(days=self.YOGINIS[idx]['years'] * self.year_length)
+        return {'method': 'nakshatra_yogini_36_year_cycle', 'year_days': self.year_length,
+                'boundary_type': 'start_inclusive_end_exclusive', 'periods': rows}
+
     def _calculate_birth_dasha_balance(self, moon_lon: float, birth_date: datetime) -> dict:
         """Determines the starting Yogini and the remaining time (Balance) at birth."""
+        if not math.isfinite(moon_lon):
+            raise ValueError('Moon longitude must be finite')
         moon_lon = moon_lon % 360
         nakshatra_span = 360 / 27 
         nakshatra_idx = int(moon_lon / nakshatra_span) 
@@ -117,6 +148,9 @@ class YoginiDashaCalculator:
             theoretical_start = md_data['end_date'] - timedelta(days=full_md_days)
             current_date = theoretical_start
         
+        full_start = current_date
+        full_duration = timedelta(days=md_years * self.year_length)
+        cumulative_years = 0
         sub_periods = []
         
         for i in range(8):
@@ -127,7 +161,8 @@ class YoginiDashaCalculator:
             ad_days = ad_years * self.year_length
             
             start = current_date
-            end = start + timedelta(days=ad_days)
+            cumulative_years += ad_yogini['years']
+            end = full_start + full_duration * cumulative_years / 36
             
             ad_obj = {
                 'planet': ad_yogini['lord'],
@@ -146,8 +181,8 @@ class YoginiDashaCalculator:
                 active_ad = ad
                 break
         
-        if not active_ad and sub_periods:
-            active_ad = sub_periods[-1]
+        if not active_ad:
+            raise ValueError('No Yogini antardasha covers the requested timestamp')
                 
         return {
             "mahadasha": {
@@ -155,12 +190,16 @@ class YoginiDashaCalculator:
                 "lord": md_data['lord'] if is_balance else md_data['mahadasha']['lord'],
                 "vibe": md_data['vibe'] if is_balance else md_data['mahadasha']['vibe'],
                 "start": md_data['start_date'].strftime("%Y-%m-%d"),
+                "start_iso": md_data['start_date'].isoformat(),
+                "end_iso": md_data['end_date'].isoformat(),
                 "end": md_data['end_date'].strftime("%Y-%m-%d")
             },
             "antardasha": {
                 "name": active_ad['dasha_name'],
                 "lord": active_ad['planet'],
                 "start": active_ad['start_date'].strftime("%Y-%m-%d"),
+                "start_iso": active_ad['start_date'].isoformat(),
+                "end_iso": active_ad['end_date'].isoformat(),
                 "end": active_ad['end_date'].strftime("%Y-%m-%d"),
                 "vibe": active_ad['vibe']
             },
@@ -173,17 +212,11 @@ class YoginiDashaCalculator:
     def _get_index_by_name(self, name):
         for i, y in enumerate(self.YOGINIS):
             if y['name'] == name: return i
-        return 0
+        raise ValueError(f'Unknown Yogini: {name}')
 
     def _parse_birth_date(self, birth_data: dict) -> datetime:
-        """Robust date parsing"""
-        try:
-            date_str = f"{birth_data['date']} {birth_data.get('time', '00:00')}"
-            if len(birth_data.get('time', '').split(':')) == 3:
-                return datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
-            return datetime.strptime(date_str, '%Y-%m-%d %H:%M')
-        except:
-            return datetime.now()
+        from .dasha_time import parse_birth_datetime
+        return parse_birth_datetime(birth_data)
 
     def _get_combined_prediction(self, md_name, ad_name):
         """Professional predictive tags"""
@@ -209,7 +242,8 @@ class YoginiDashaCalculator:
         md_yogini = next(y for y in self.YOGINIS if y['name'] == md_name)
         start_index = self._get_index_by_name(md_name)
         
-        current_date = start_date
+        # Reconstruct the full MD origin when start_date is birth balance.
+        current_date = end_date - timedelta(days=md_yogini['years'] * self.year_length)
         subs = []
         
         for i in range(8):
@@ -221,11 +255,16 @@ class YoginiDashaCalculator:
             
             end = current_date + timedelta(days=ad_days)
             
+            if end <= start_date:
+                current_date = end
+                continue
             subs.append({
                 'name': ad_yogini['name'],
                 'lord': ad_yogini['lord'],
-                'start': current_date.strftime("%Y-%m-%d"),
-                'end': end.strftime("%Y-%m-%d"),
+                'start': max(current_date, start_date).strftime("%Y-%m-%d"),
+                'end': min(end, end_date).strftime("%Y-%m-%d"),
+                'start_iso': max(current_date, start_date).isoformat(),
+                'end_iso': min(end, end_date).isoformat(),
                 'vibe': ad_yogini['vibe']
             })
             
@@ -245,6 +284,8 @@ class YoginiDashaCalculator:
             'lord': start_dasha['lord'],
             'start': start_dasha['start_date'].strftime("%Y-%m-%d"),
             'end': start_dasha['end_date'].strftime("%Y-%m-%d"),
+            'start_iso': start_dasha['start_date'].isoformat(),
+            'end_iso': start_dasha['end_date'].isoformat(),
             'vibe': start_dasha['vibe'],
             'is_balance': True
         })
@@ -267,6 +308,8 @@ class YoginiDashaCalculator:
                 'lord': yogini['lord'],
                 'start': start_date.strftime("%Y-%m-%d"),
                 'end': end_date.strftime("%Y-%m-%d"),
+                'start_iso': start_date.isoformat(),
+                'end_iso': end_date.isoformat(),
                 'vibe': yogini['vibe'],
                 'is_balance': False
             })

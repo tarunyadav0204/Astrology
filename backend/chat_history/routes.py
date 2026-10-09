@@ -2211,6 +2211,10 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 except ValueError: last_metadata = None
             if isinstance(last_metadata, dict):
                 prior_chart = last_metadata.get('prashna_context')
+        raw_query_context.pop('_muhurat_previous', None)
+        prior_muhurat = previous.get('muhurat_request') if state_row and state_row[0] else previous.get('last_muhurat')
+        if effective_chat_tier == 'verified' and prior_muhurat:
+            raw_query_context['_muhurat_previous'] = prior_muhurat
         raw_query_context.pop('prashna', None)
         raw_query_context.pop('_prashna_previous', None)
         raw_query_context['_question_received_at'] = datetime.fromtimestamp(ask_started_at, tz=timezone.utc).isoformat()
@@ -4166,6 +4170,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 )
                 from chat.prashna_workflow import apply_prashna_transition
                 intent = apply_prashna_transition(intent, question, query_context)
+                from chat.verified_muhurat import prepare_muhurat_intent
+                intent = prepare_muhurat_intent(intent, question, intent['query_context'])
                 query_context = intent['query_context']
                 combined_question = intent['resolved_question']
             elif is_deterministic_chat:
@@ -4576,6 +4582,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     else None
                 )
                 clarification_extracted = dict(intent.get("extracted_context") or {})
+                if intent.get("reading_type") == "muhurat":
+                    clarification_extracted["muhurat_request"] = query_context.get("muhurat_draft") or query_context.get("muhurat_request") or {}
                 if (query_context or {}).get('prashna_choice'):
                     clarification_extracted['prashna_choice'] = query_context['prashna_choice']
                 if (query_context or {}).get('prashna'):
@@ -5368,6 +5376,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     routed_intent = cached_intent if isinstance(cached_intent, dict) else {}
                     audit_mode = (result.get('information_rounds') or {}).get('reading_mode')
                     answer_gate_metadata['reading_mode'] = audit_mode or routed_intent.get('mode') or intent.get('mode')
+                    if result.get('muhurat_context'):
+                        answer_gate_metadata['muhurat_context'] = result['muhurat_context']
                     if result.get('prashna_context'):
                         answer_gate_metadata['prashna_context'] = result['prashna_context']
                     # A completed answer in any mode ends the previous Prashna workflow.
@@ -5380,6 +5390,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         saved_context = dict(saved_context or {})
                         saved_context.pop('prashna', None)
                         saved_context.pop('prashna_choice', None)
+                        saved_context.pop('muhurat_request', None)
+                        saved_context.pop('last_muhurat', None)
+                        if result.get('muhurat_context'):
+                            saved_context['last_muhurat'] = result['muhurat_context']
                         saved_context.pop('last_prashna', None)
                         if result.get('prashna_context'):
                             saved_context['last_prashna'] = result['prashna_context']

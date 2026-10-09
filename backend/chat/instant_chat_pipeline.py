@@ -20420,6 +20420,11 @@ async def generate_instant_chat_response(
             localized_message=str(medical_triage.get("user_message") or ""),
             source=str(medical_triage.get("source") or "safety_gate"),
         )
+    if verified_evidence_review and (intent or {}).get('mode') == 'ELECT_MUHURAT':
+        from chat.verified_muhurat import generate_muhurat_response
+        return await generate_muhurat_response(question=question, intent=intent, birth=birth_data, history=history,
+            language=language, response_style=response_style, model_name=model_name_override or get_instant_chat_model(),
+            stream_callback=stream_callback, calculation_callback=verified_calculation_callback)
     if verified_evidence_review and ((intent or {}).get('query_context') or {}).get('prashna'):
         from chat.verified_prashna import generate_prashna_response
         return await generate_prashna_response(question=question, intent=intent, history=history,

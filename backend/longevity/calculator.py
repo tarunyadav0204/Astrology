@@ -7,7 +7,7 @@ import swisseph as swe
 
 from calculators.ashtakavarga import AshtakavargaCalculator
 from calculators.chara_karaka_calculator import CharaKarakaCalculator
-from calculators.chart_calculator import _SWISSEPH_CHART_LOCK
+from calculators.chart_calculator import _SWISSEPH_CHART_LOCK, resolve_ayanamsha_mode
 from calculators.divisional_chart_calculator import DivisionalChartCalculator
 from calculators.shadbala_calculator import ShadbalaCalculator
 from calculators.shoola_dasha_calculator import ShoolaDashaCalculator
@@ -189,6 +189,7 @@ class LongevityCalculator:
                 "ranked_planets": marakas,
                 "sensitive_points": self.sensitive,
             },
+            "activation_calculation_status": self._activation_calculation_status,
             "activation_windows": windows,
             # Compatibility alias for v1 clients. Entries use the v2 activation contract.
             "crisis_windows": windows,
@@ -807,11 +808,11 @@ class LongevityCalculator:
         }
 
     def _sensitive_points(self) -> Dict[str, Any]:
-        d3_asc = int(self.d3.get("ascendant", 0) / 30) % 12
+        d3_asc = int(self.d3["ascendant"] / 30) % 12
         kharesh_sign = (d3_asc + 7) % 12
         d9_planets = self.d9.get("planets", {})
-        moon_64_sign = (int(d9_planets.get("Moon", {}).get("sign", 0)) + 3) % 12
-        d9_asc = int(self.d9.get("ascendant", 0) / 30) % 12
+        moon_64_sign = (int(d9_planets["Moon"]["sign"]) + 3) % 12
+        d9_asc = int(self.d9["ascendant"] / 30) % 12
         lagna_64_sign = (d9_asc + 3) % 12
         badhaka_house = 11 if self.asc_sign % 3 == 0 else 9 if self.asc_sign % 3 == 1 else 7
         badhaka_sign = (self.asc_sign + badhaka_house - 1) % 12
@@ -833,14 +834,17 @@ class LongevityCalculator:
             ("Sun", 9)
         )
         shodhya_timing = self.ashtakavarga.calculate_shodhya_timing(timing_planet, timing_house)
+        from calculators.sniper_points_calculator import SniperPointsCalculator
+        native_lagna = self.chart['ascendant']
+        native_moon = self.planets['Moon']['longitude']
         common = {
-            "kharesh_22nd_drekkana": {"sign_id": kharesh_sign, "sign": SIGN_NAMES[kharesh_sign], "lord": SIGN_LORDS[kharesh_sign], "derivation": "8th sign from D3 ascendant"},
-            "navamsha_64_moon": {"sign_id": moon_64_sign, "sign": SIGN_NAMES[moon_64_sign], "lord": SIGN_LORDS[moon_64_sign], "derivation": "4th sign from Moon in D9"},
-            "navamsha_64_lagna": {"sign_id": lagna_64_sign, "sign": SIGN_NAMES[lagna_64_sign], "lord": SIGN_LORDS[lagna_64_sign], "derivation": "4th sign from Lagna in D9"},
+            "kharesh_22nd_drekkana": {"sign_id": kharesh_sign, "sign": SIGN_NAMES[kharesh_sign], "lord": SIGN_LORDS[kharesh_sign], "derivation": "8th sign from D3 ascendant", "coordinate_frame": "D3_mapped_sign", "reference": "native_lagna", **SniperPointsCalculator._physical_sector(native_lagna, 3, 22)},
+            "navamsha_64_moon": {"sign_id": moon_64_sign, "sign": SIGN_NAMES[moon_64_sign], "lord": SIGN_LORDS[moon_64_sign], "derivation": "4th sign from Moon in D9", "coordinate_frame": "D9_mapped_sign", "reference": "native_moon", **SniperPointsCalculator._physical_sector(native_moon, 9, 64)},
+            "navamsha_64_lagna": {"sign_id": lagna_64_sign, "sign": SIGN_NAMES[lagna_64_sign], "lord": SIGN_LORDS[lagna_64_sign], "derivation": "4th sign from Lagna in D9", "coordinate_frame": "D9_mapped_sign", "reference": "native_lagna", **SniperPointsCalculator._physical_sector(native_lagna, 9, 64)},
             "badhaka": {"house": badhaka_house, "native_house": self._native_house_for_subject_house(badhaka_house), "sign_id": badhaka_sign, "sign": SIGN_NAMES[badhaka_sign], "lord": SIGN_LORDS[badhaka_sign], "derivation": f"House {badhaka_house} from derived {self.subject['label']} Lagna"},
             "mrityu_pada_a8": {"sign_id": a8_sign, "sign": SIGN_NAMES[a8_sign], "lord": SIGN_LORDS[a8_sign]},
-            "maheshwara": {"planet": maheshwara, "reference_karaka": reference, "sign": SIGN_NAMES[maheshwara_sign]},
-            "rudra": {"planet": rudra, "candidates": list(dict.fromkeys((second_lord, eighth_lord)))},
+            "maheshwara": {"planet": maheshwara, "reference_karaka": reference, "sign": SIGN_NAMES[maheshwara_sign], "method_status": "simplified_reference_eighth_lord", "limitation": "Not a complete method-certified Maheshwara calculation"},
+            "rudra": {"planet": rudra, "candidates": list(dict.fromkeys((second_lord, eighth_lord))), "method_status": "simplified_basic_dignity_strength", "limitation": "Not a complete method-certified Rudra calculation"},
             "ashtakavarga_timing": {
                 **shodhya_timing,
                 "sign": shodhya_timing.get("rashi"),
@@ -996,14 +1000,17 @@ class LongevityCalculator:
 
     def _activation_windows(self, compartment: Dict[str, Any], safeguards: Dict[str, Any], as_of: datetime, horizon_years: int) -> List[Dict[str, Any]]:
         end = as_of + timedelta(days=365.25 * max(1, min(horizon_years, 30)))
+        self._activation_calculation_status = {'vimshottari': 'completed', 'shoola': 'completed', 'resolution': 'calendar_day_samples_not_exact_transit_contacts'}
         try:
-            dasha_rows = DashaCalculator().iter_ad_periods(self.birth, as_of, end)
+            dasha_rows = DashaCalculator((self.birth.get('calculation_profile') or {}).get('ayanamsha', self.birth.get('ayanamsha') or 'lahiri')).iter_ad_periods(self.birth, as_of, end)
         except Exception:
+            self._activation_calculation_status['vimshottari'] = 'unavailable'
             dasha_rows = []
         try:
             relative_house_idx = self.subject["offset"] if self.subject_key != "self" else None
             shoola = ShoolaDashaCalculator(self.chart).calculate_shoola_dasha(self.birth, relative_house_idx=relative_house_idx).get("all_periods", [])
         except Exception:
+            self._activation_calculation_status['shoola'] = 'unavailable'
             shoola = []
         windows: List[Dict[str, Any]] = []
         birth_date = datetime.strptime(str(self.birth["date"])[:10], "%Y-%m-%d") if self.subject_key == "self" else None
@@ -1014,7 +1021,7 @@ class LongevityCalculator:
             cursor = start
             while cursor <= finish:
                 stamp = cursor.strftime("%Y-%m-%d")
-                active_shoola = next((p for p in shoola if p["start_date"] <= stamp <= p["end_date"]), None)
+                active_shoola = next((p for p in shoola if datetime.fromisoformat(p["start_iso"]).date() <= cursor.date() < datetime.fromisoformat(p["end_iso"]).date()), None)
                 meso = self._shoola_activation(active_shoola)
                 micro = self._transit_activation(cursor)
                 systems = {"macro_vimshottari": macro["hit"], "meso_shoola": meso["hit"], "micro_transit_bav": micro["hit"]}
@@ -1050,7 +1057,7 @@ class LongevityCalculator:
                         "confirmed_systems": confirmation_count,
                         "systems_considered": 3,
                         "systems": systems,
-                        "classification_basis": "Descriptive count of independently calculated classical systems; not a probability, percentage, or classical numerical score",
+                        "classification_basis": "Descriptive count of separately calculated layers; they are not statistically independent; not a probability, percentage, or classical numerical score",
                         "macro": macro, "meso": meso, "micro": micro,
                     },
                     "khanda_boundary": {
@@ -1115,19 +1122,30 @@ class LongevityCalculator:
 
     def _transit_activation(self, when: datetime) -> Dict[str, Any]:
         try:
+            profile = self.birth.get('calculation_profile') or {}
+            ayanamsha, sid_mode = resolve_ayanamsha_mode(profile.get('ayanamsha', self.birth.get('ayanamsha') or 'lahiri'))
+            node_type = profile.get('node_type', 'mean')
+            if node_type not in {'mean', 'true'}:
+                raise ValueError('Unsupported node type')
             with _SWISSEPH_CHART_LOCK:
-                swe.set_sid_mode(swe.SIDM_LAHIRI)
-                jd = swe.julday(when.year, when.month, when.day, 12.0)
-                flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL
-                saturn_longitude = swe.calc_ut(jd, swe.SATURN, flags)[0][0] % 360
-                rahu_longitude = swe.calc_ut(jd, swe.MEAN_NODE, flags)[0][0] % 360
-                sun_longitude = swe.calc_ut(jd, swe.SUN, flags)[0][0] % 360
-                saturn_sign = int(saturn_longitude / 30)
-                rahu_sign = int(rahu_longitude / 30)
-                sun_sign = int(sun_longitude / 30)
+                try:
+                    swe.set_sid_mode(sid_mode)
+                    jd = swe.julday(when.year, when.month, when.day, 12.0)
+                    flags = swe.FLG_SWIEPH | swe.FLG_SIDEREAL
+                    saturn_longitude = swe.calc_ut(jd, swe.SATURN, flags)[0][0] % 360
+                    rahu_longitude = swe.calc_ut(jd, swe.TRUE_NODE if node_type == 'true' else swe.MEAN_NODE, flags)[0][0] % 360
+                    sun_longitude = swe.calc_ut(jd, swe.SUN, flags)[0][0] % 360
+                    saturn_sign = int(saturn_longitude / 30)
+                    rahu_sign = int(rahu_longitude / 30)
+                    sun_sign = int(sun_longitude / 30)
+                finally:
+                    swe.set_sid_mode(swe.SIDM_LAHIRI)
         except Exception:
-            return {"hit": False, "primary": [], "confirmers": [], "evidence": [], "non_qualifying_observations": ["Transit calculation unavailable"]}
-        primary, confirmers = [], []
+            if hasattr(self, '_activation_calculation_status'):
+                self._activation_calculation_status['transit_bav'] = 'unavailable'
+            return {'status': 'unavailable', 'hit': False, 'evidence': [], 'primary': [], 'confirmers': []}
+        primary: List[str] = []
+        confirmers: List[str] = []
         if self.subject_key == "self":
             sensitive_signs = {self.sensitive["kharesh_22nd_drekkana"]["sign_id"], self.sensitive["navamsha_64_moon"]["sign_id"], int(self.planets[SIGN_LORDS[(self.asc_sign + 7) % 12]]["sign"])}
         else:
@@ -1154,7 +1172,7 @@ class LongevityCalculator:
                 primary.append(f"Saturn occupies natal {karaka} sign, the {self.subject['label'].lower()} karaka")
             if karaka_sign in {rahu_sign, ketu_sign}:
                 confirmers.append(f"Nodal axis occupies natal {karaka} sign")
-        trigger_roots = {self.sensitive["badhaka"]["sign_id"], (self.asc_sign + 7) % 12, self.sensitive["kharesh_22nd_drekkana"]["sign_id"]}
+        trigger_roots = {self.sensitive["badhaka"]["sign_id"], (self.asc_sign + 7) % 12, int(self.sensitive["kharesh_22nd_drekkana"]["d1_sector"]["start_longitude"] / 30)}
         trigger_trines = {((root + offset) % 12) for root in trigger_roots for offset in (0, 4, 8)}
         if sun_sign in trigger_trines:
             confirmers.append("Solar-month trigger is active")
@@ -1166,6 +1184,11 @@ class LongevityCalculator:
             "confirmers": confirmers,
             "evidence": observations if hit else [],
             "non_qualifying_observations": [] if hit else observations,
+            "status": "completed",
+            "sample_time_utc": "12:00:00",
+            "ayanamsha": ayanamsha,
+            "node_type": node_type,
+            "scope": "Daily sign/kakshya snapshot; solar trines are a product linkage, not an exact sensitive-degree transit contact",
             "saturn_sign": SIGN_NAMES[saturn_sign],
             "rahu_sign": SIGN_NAMES[rahu_sign],
             "sun_sign": SIGN_NAMES[sun_sign],

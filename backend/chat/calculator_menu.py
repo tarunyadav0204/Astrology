@@ -9,8 +9,8 @@ EXTRA_CALCULATORS = {
  'dasha.kalachakra_bphs': 'BPHS Kalachakra sign periods, Deha/Jeeva and gati transitions. Requires start_date, end_date; current periods evaluated at start_date. Distinct from Jaimini Kalachakra.',
  'dasha.kalachakra_jaimini': 'Jaimini Kalachakra sign-period variant. Requires start_date, end_date; current periods evaluated at start_date. Not BPHS Kalachakra.',
  'dasha.sudarshana': 'Sudarshana annual progression triggers from Lagna, Moon and Sun. Requires year. Returns yearly triggers, not a complete nested dasha-period schedule.',
- 'dasha.yogini': 'Yogini planetary periods. Requires start_date and end_date; returns overlapping periods.',
- 'dasha.shoola': 'Specialist Niryana Shoola periods, not a general career timer. Requires start_date, end_date; optional reference_house for a relative.',
+ 'dasha.yogini': 'Yogini MD/AD planetary periods with exact instants and declared year length. Requires start_date and end_date (UTC end exclusive).',
+ 'dasha.shoola': 'Standard nine-year forward Shoola periods (not Niryana Shoola; simplified starting-sign strength is disclosed), not a general career timer. Requires start_date, end_date; optional reference_house for a relative.',
  'annual.varshphal': 'Solar return chart, Muntha and Mudda periods. Requires year; optional location overrides birth location.',
  'annual.tajika': 'Tajika configurations on the annual chart. Requires year, exactly two planets, one matter house; optional location.',
  'annual.nakshatra': 'Annual nakshatra periods. Requires year and location.',
@@ -32,7 +32,7 @@ EXTRA_CALCULATORS = {
  'conditions.nodal_enclosure': 'Exact Rahu–Ketu enclosure geometry, with boundary cases.',
  'points.indu_lagna': 'Indu Lagna calculation and connected planets.',
  'points.mudakku': 'Tamil Siddhar Mudakku rule; specialist system.',
- 'points.sniper': 'Kharesh, 64th Navamsa, Bhrigu Bindu and critical degrees; no standalone event guarantee.',
+ 'points.sniper': 'Natal Kharesh (22nd Drekkana), Moon/Lagna 64th Navamsa with separate mapped-varga signs and physical D1 sectors, Bhrigu Bindu and critical degrees. No transit timing or standalone event guarantee.',
  'points.kota_chakra': 'Kota Chakra structure and planetary connections.',
  'strength.house': 'House strength breakdown. Requires houses.',
  'strength.bhava_bala': 'Classical Bhava Bala components. Optional houses.',
@@ -42,6 +42,20 @@ EXTRA_CALCULATORS = {
  'election.navatara': 'Transit nakshatra relationship to natal Moon. Requires start_date; optional location/time sets the local snapshot (default noon at saved birth location).',
  'location.analysis': 'Relocation evidence for specified destinations. Requires topic and cities with coordinates/timezones.',
 }
+
+CALCULATOR_EVIDENCE_INTEGRITY = """
+Respect each calculator's method, reference, coordinate_frame, boundary_type and limitations.
+Standard Shoola is not Niryana Shoola. Its disclosed simplified starting-sign strength is not a
+fully audited Ayur strength method. Never substitute it when Niryana Shoola is requested.
+Treat simplified Rudra/Maheshwara outputs as partial evidence, not verified full classical identities.
+D3/D9 mapped signs are not physical D1 transit signs. Physical contacts require d1_sector or natal
+D1 longitudes AND a separately calculated dated transit result. The natal points tool supplies no timing.
+A current transit snapshot cannot establish arbitrary future contacts. No requested but unsupported
+method may be invented. Do not count Chara and Jaimini as independent dashas, or double-count
+Kharesh under both maraka and sensitive-point categories. A calculator error or unavailable status
+is missing evidence, not absence of an astrological condition. These astrological combinations do
+not establish medical or mortality risk; do not turn them into a probability, risk score or diagnosis.
+"""
 
 class Location(BaseModel):
  model_config = ConfigDict(extra='forbid')
@@ -116,7 +130,7 @@ def run_calculator(capability, birth, raw=None):
  def instant(d): return datetime.combine(d,time.min,tzinfo=timezone.utc)
  if capability == 'parashari.double_transit':
   from charts.double_transit_service import calculate_double_transits
-  result=calculate_double_transits(chart,instant(p.start_date),instant(p.end_date),ayanamsha=birth.get('ayanamsha') or 'lahiri')
+  result=calculate_double_transits(chart,instant(p.start_date),instant(p.end_date),ayanamsha=profile.get('ayanamsha',birth.get('ayanamsha') or 'lahiri'))
   result['windows']=[w for w in result['windows'] if w['house'] in p.houses]
   result.update(focus_houses=p.houses,window_count=len(result['windows']))
  elif capability.startswith('yogas.'):
@@ -136,9 +150,9 @@ def run_calculator(capability, birth, raw=None):
  elif capability == 'dasha.sudarshana':
   result=instance('sudarshana_dasha_calculator','SudarshanaDashaCalculator',chart,birth).calculate_precision_triggers(p.year)
  elif capability == 'dasha.yogini':
-  result=instance('yogini_dasha_calculator','YoginiDashaCalculator').get_full_timeline(birth,chart['planets']['Moon']['longitude'],years=120)
+  result=instance('yogini_dasha_calculator','YoginiDashaCalculator').get_periods_in_range(birth,chart['planets']['Moon']['longitude'],instant(p.start_date),instant(p.end_date))
  elif capability == 'dasha.shoola':
-  result=instance('shoola_dasha_calculator','ShoolaDashaCalculator',chart).calculate_shoola_dasha(birth,relative_house_idx=p.reference_house-1 if p.reference_house else None)
+  result=instance('shoola_dasha_calculator','ShoolaDashaCalculator',chart).calculate_shoola_dasha(birth,relative_house_idx=p.reference_house-1 if p.reference_house else None,focus_date=instant(p.start_date))
  elif capability.startswith('annual.'):
   annual_birth={**birth}
   if p.location: annual_birth.update(p.location.model_dump(exclude={'name'}))
@@ -168,7 +182,7 @@ def run_calculator(capability, birth, raw=None):
  elif capability == 'conditions.nodal_enclosure':
   from calculators.nodal_enclosure_calculator import calculate_nodal_enclosure
   result=calculate_nodal_enclosure(chart)
- elif capability == 'points.sniper': result=instance('sniper_points_calculator','SniperPointsCalculator',chart,divisions.calculate_divisional_chart(3),divisions.calculate_divisional_chart(9)).get_all_sniper_points()
+ elif capability == 'points.sniper': result=instance('sniper_points_calculator','SniperPointsCalculator',chart,divisions.calculate_divisional_chart(3),divisions.calculate_divisional_chart(9)).get_all_sniper_points(include_transits=False)
  elif capability == 'strength.house':
   obj=instance('house_strength_calculator','HouseStrengthCalculator',chart)
   result={str(h):obj.calculate_house_strength(h) for h in p.houses}
@@ -186,7 +200,7 @@ def run_calculator(capability, birth, raw=None):
   from calculators.chart_calculator import ChartCalculator
   transit_birth={**birth,'date':str(p.start_date),'time':p.time or '12:00:00'}
   if p.location: transit_birth.update(p.location.model_dump(exclude={'name'}))
-  transit=calc.calculate_chart(SimpleNamespace(**transit_birth))
+  transit=calc.calculate_chart(SimpleNamespace(**transit_birth),ayanamsha=profile.get('ayanamsha',birth.get('ayanamsha') or 'lahiri'),node_type=profile.get('node_type','mean'))
   obj=instance('navatara_calculator','NavataraCalculator',int(chart['planets']['Moon']['longitude']/(360/27)))
   result=obj.get_transit_tara_analysis({k:int(v['longitude']/(360/27)) for k,v in transit['planets'].items()})
   result={'snapshot_date':str(p.start_date),'snapshot_time':p.time or '12:00:00','timezone':transit_birth['timezone'],
@@ -198,7 +212,9 @@ def run_calculator(capability, birth, raw=None):
  elif capability == 'election.muhurat':
   obj=instance('muhurat_calculator','MuhuratCalculator')
   method={'vehicle':'vehicle','home':'griha_pravesh','gold':'gold','business':'business','childbirth':'childbirth'}[p.event_type]
-  result=getattr(obj,'calculate_'+method+'_muhurat')(str(p.start_date),str(p.end_date),p.location.latitude,p.location.longitude,int(chart['planets']['Moon']['longitude']/(360/27)),tz=p.location.timezone)
+  result=getattr(obj,'calculate_'+method+'_muhurat')(str(p.start_date),str(p.end_date),p.location.latitude,p.location.longitude,int(chart['planets']['Moon']['longitude']/(360/27))+1,tz=p.location.timezone)
+  if isinstance(result,dict):
+   result={**result,'candidate_samples':result.get('recommendations',[]),'coverage':'Legacy hourly samples; not validated whole-interval windows. Use dedicated Muhurat for interval elections.'}
  elif capability == 'location.analysis':
   result=instance('locational_calculator','LocationalCalculator').analyze(birth,category=p.topic,location_scope='both',natal_chart=chart,metros=[c.model_dump() for c in p.cities],top_n=len(p.cities))
  else:
@@ -211,7 +227,19 @@ def run_calculator(capability, birth, raw=None):
   result=[{k:row[k] for k in ('nakshatra','start_datetime','end_datetime','nakshatra_index') if k in row} for row in result]
  if capability in {'dasha.yogini','dasha.shoola','dasha.kalachakra_bphs','dasha.kalachakra_jaimini'}:
   def scope_periods(value):
-   if isinstance(value,list): return [scope_periods(v) for v in value if not isinstance(v,dict) or not (v.get('start',v.get('start_date',v.get('start_iso'))) and v.get('end',v.get('end_date',v.get('end_iso')))) or (str(v.get('start',v.get('start_date',v.get('start_iso'))))[:10] < str(p.end_date) and str(v.get('end',v.get('end_date',v.get('end_iso'))))[:10] > str(p.start_date))]
+   if isinstance(value,list):
+    rows=[]
+    for row in value:
+     if isinstance(row,dict):
+      left=row.get('start_iso',row.get('start',row.get('start_date')))
+      right=row.get('end_iso',row.get('end',row.get('end_date')))
+      if left and right:
+       left=datetime.fromisoformat(str(left)); right=datetime.fromisoformat(str(right))
+       if left.tzinfo is None: left=left.replace(tzinfo=timezone.utc)
+       if right.tzinfo is None: right=right.replace(tzinfo=timezone.utc)
+       if left >= instant(p.end_date) or right <= instant(p.start_date): continue
+     rows.append(scope_periods(row))
+    return rows
    if isinstance(value,dict): return {k:scope_periods(v) for k,v in value.items()}
    return value
   result=scope_periods(result)

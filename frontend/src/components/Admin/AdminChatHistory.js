@@ -2215,7 +2215,7 @@ const AdminChatHistory = () => {
                       {label}
                       {role === 'assistant' ? <span className="admin-instant-message-badge">{modeLabel}</span> : null}
                       {role === 'assistant' && message.reading_mode && <span className="admin-instant-message-badge" title={`Selected reading mode: ${message.reading_mode}`}>
-                        {{ PRASHNA: 'Prashna', CHART_DASHA_ANALYSIS: 'Chart & Dasha Analysis', FACTUAL_LOOKUP: 'Factual Lookup', PREDICT_DAILY: 'Daily', PREDICT_EVENT_TIMING: 'Event Timing', LIFESPAN_EVENT_TIMING: 'Lifespan / Event Timing', PREDICT_PERIOD_OUTLOOK: 'Period Outlook', ANALYZE_TOPIC: 'Topic Reading', ANALYZE_TOPIC_POTENTIAL: 'Potential', RECOMMEND_LOCATION: 'Location', RECOMMEND_REMEDY_FOR_PROBLEM: 'Remedies' }[message.reading_mode] || message.reading_mode.replace(/_/g, ' ')}
+                        {{ ELECT_MUHURAT: 'Muhurat', PRASHNA: 'Prashna', CHART_DASHA_ANALYSIS: 'Chart & Dasha Analysis', FACTUAL_LOOKUP: 'Factual Lookup', PREDICT_DAILY: 'Daily', PREDICT_EVENT_TIMING: 'Event Timing', LIFESPAN_EVENT_TIMING: 'Lifespan / Event Timing', PREDICT_PERIOD_OUTLOOK: 'Period Outlook', ANALYZE_TOPIC: 'Topic Reading', ANALYZE_TOPIC_POTENTIAL: 'Potential', RECOMMEND_LOCATION: 'Location', RECOMMEND_REMEDY_FOR_PROBLEM: 'Remedies' }[message.reading_mode] || message.reading_mode.replace(/_/g, ' ')}
                       </span>}
                       {message.response_style === 'simple' ? <span className="admin-instant-message-badge">Simple</span> : null}
                       {message.response_style === 'technical' ? <span className="admin-instant-message-badge">Technical</span> : null}

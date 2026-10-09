@@ -286,7 +286,7 @@ def _historical_vimshottari_timeline(birth_data: Dict[str, Any]) -> Dict[str, An
     from shared.dasha_calculator import DashaCalculator
 
     try:
-        calculator = DashaCalculator()
+        calculator = DashaCalculator((birth_data.get('calculation_profile') or {}).get('ayanamsha', birth_data.get('ayanamsha') or 'lahiri'))
         dashas = calculator.calculate_current_dashas(birth_data, strict=True)
         periods = []
         for maha in dashas.get("maha_dashas") or []:
@@ -423,7 +423,8 @@ def _calculate_requested_capabilities(
         _instant_real_nadi_evidence,
     )
 
-    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth_data))
+    profile = birth_data.get('calculation_profile') or {}
+    chart = ChartCalculator({}).calculate_chart(SimpleNamespace(**birth_data), ayanamsha=profile.get('ayanamsha', birth_data.get('ayanamsha') or 'lahiri'), node_type=profile.get('node_type', 'mean'))
     output: Dict[str, Any] = {}
     if "parashari.dignity_and_special_points" in requested:
         output["parashari.dignity_and_special_points"] = _json_limit({
@@ -468,16 +469,31 @@ def _calculate_requested_capabilities(
     if "jaimini.significators_and_arudhas" in requested:
         output["jaimini.significators_and_arudhas"] = _json_limit(_instant_real_karaka_evidence(chart))
     if "jaimini.chara_dasha" in requested:
-        dob = datetime.strptime(str(birth_data["date"]), "%Y-%m-%d")
+        from calculators.dasha_time import parse_birth_datetime
+        dob = parse_birth_datetime(birth_data)
         from utils.query_context import resolve_query_now
-        focus_date = resolve_query_now(instant_context.get('query_context')).replace(tzinfo=None)
+        focus_date = resolve_query_now(instant_context.get('query_context'))
+        if dob.tzinfo is None:
+            focus_date = focus_date.replace(tzinfo=None)
         requested_parameters = CalculatorParameters.model_validate(parameters or {})
         if requested_parameters.start_date:
-            focus_date = datetime.combine(requested_parameters.start_date, datetime.min.time())
-        output["jaimini.chara_dasha"] = _json_limit(
-            CharaDashaCalculator(dict(chart)).calculate_dasha(dob, focus_date=focus_date),
-            30000,
-        )
+            from datetime import timezone
+            focus_date = datetime.combine(requested_parameters.start_date, datetime.min.time(), tzinfo=timezone.utc)
+            if dob.tzinfo is None: focus_date = focus_date.replace(tzinfo=None)
+        result = CharaDashaCalculator(dict(chart)).calculate_dasha(dob, focus_date=focus_date)
+        if requested_parameters.start_date and requested_parameters.end_date:
+            from datetime import timezone
+            from calculators.dasha_time import normalize_focus
+            begin = datetime.combine(requested_parameters.start_date, datetime.min.time(), tzinfo=timezone.utc)
+            finish = datetime.combine(requested_parameters.end_date, datetime.min.time(), tzinfo=timezone.utc)
+            if dob.tzinfo is None:
+                begin, finish = begin.replace(tzinfo=None), finish.replace(tzinfo=None)
+            begin, finish = normalize_focus(begin, dob), normalize_focus(finish, dob)
+            def overlaps(row):
+                return datetime.fromisoformat(row['start_iso']) < finish and datetime.fromisoformat(row['end_iso']) > begin
+            result['periods'] = [{**row, 'antardashas': [ad for ad in row['antardashas'] if overlaps(ad)]}
+                                 for row in result['periods'] if overlaps(row)]
+        output["jaimini.chara_dasha"] = _json_limit(result, 30000)
     if "nadi.linkages" in requested:
         output["nadi.linkages"] = _json_limit(_instant_real_nadi_evidence(chart))
     if "kp.cusp_significators" in requested:
@@ -891,8 +907,13 @@ async def run_verified_calculator_agent(
     prashna_context = (instant_context.get('query_context') or {}).get('prashna')
     is_prashna = bool(prashna_context and instant_context.get('prashna_baseline'))
     from chat.verified_prashna import PRASHNA_CAPABILITIES, prashna_contract, calculate_prashna
-    capability_registry = PRASHNA_CAPABILITIES if is_prashna else CAPABILITY_REGISTRY
-    baseline = instant_context['prashna_baseline'] if is_prashna else build_verified_baseline(instant_context)
+    from chat.verified_muhurat import MUHURAT_CAPABILITIES, muhurat_contract, calculate_muhurat_tool
+    muhurat_request = (instant_context.get('query_context') or {}).get('muhurat_request')
+    is_muhurat = bool(muhurat_request and instant_context.get('muhurat_baseline'))
+    capability_registry = MUHURAT_CAPABILITIES if is_muhurat else PRASHNA_CAPABILITIES if is_prashna else CAPABILITY_REGISTRY
+    baseline = instant_context['muhurat_baseline'] if is_muhurat else instant_context['prashna_baseline'] if is_prashna else build_verified_baseline(instant_context)
+    if is_muhurat and (baseline.get('search') or {}).get('not_before_utc'):
+        muhurat_request = {**muhurat_request, 'not_before_utc': baseline['search']['not_before_utc']}
     conversation_context = build_verified_conversation_context(
         history,
         {
@@ -908,7 +929,11 @@ async def run_verified_calculator_agent(
             'rounds in this request are preparation for one answer, not previously delivered readings. '
             'Only successful calculations from this request establish the methods used in this reading.'
         )
-    if not is_prashna:
+    if is_muhurat:
+        conversation_context['rule'] = ('Keep history for references and user constraints only. This is a fresh answer. '
+            'Calculator rounds in this request are not previously delivered answers. Never imply a previous '
+            'recommendation unless the user explicitly requests comparing an actual earlier answer.')
+    if not is_prashna and not is_muhurat:
         baseline["historical_timing_evidence"] = {
             "vimshottari_md_ad_timeline": _historical_vimshottari_timeline(birth_data),
         }
@@ -992,6 +1017,14 @@ async def run_verified_calculator_agent(
                         + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction()
                         + '\nAfter inspecting evidence call report_calculation with a factual title and summary in the user language. Never expose tools or model details.')
         tools[0]['description'] = 'Get the fixed Parashari question chart. No natal chart or natal dasha.'
+    if is_muhurat:
+        intent_mode = 'ELECT_MUHURAT'
+        instructions = (muhurat_contract(response_style) + '\nCalculator requirements: ' + json.dumps(MUHURAT_CAPABILITIES) + '\nWrite in ' + language + '\n'
+            + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction()
+            + '\nAfter inspecting evidence call report_calculation with a factual title and summary. Never expose model details.')
+        tools[0]['description'] = 'Get the confirmed bounded Muhurat search and evaluated candidate windows.'
+    from chat.calculator_menu import CALCULATOR_EVIDENCE_INTEGRITY
+    instructions += '\n' + CALCULATOR_EVIDENCE_INTEGRITY
     from ai.gemini_chat_analyzer import resolve_openai_reasoning_effort
     effort = resolve_openai_reasoning_effort(model_name, "none")
     reasoning_kwargs = {"reasoning": {"effort": effort}} if effort else {}
@@ -1065,8 +1098,8 @@ async def run_verified_calculator_agent(
             "call_id": str(getattr(call, "call_id", "")),
             "output": json.dumps(baseline, ensure_ascii=False, default=str),
         })
-        information_rounds.append({"round": 0, "kind": "baseline", "calculator": "prashna.parashari" if is_prashna else "get_instant_baseline",
-            "requested": prashna_context if is_prashna else {}, "provided": json.loads(baseline_outputs[-1]["output"]), "success": True})
+        information_rounds.append({"round": 0, "kind": "baseline", "calculator": "election.muhurat" if is_muhurat else "prashna.parashari" if is_prashna else "get_instant_baseline",
+            "requested": muhurat_request if is_muhurat else prashna_context if is_prashna else {}, "provided": json.loads(baseline_outputs[-1]["output"]), "success": baseline.get("status") != "unsupported" if is_muhurat else True})
         sent_chars += len(baseline_outputs[-1]["output"])
     await publish_trace()
 
@@ -1111,7 +1144,12 @@ async def run_verified_calculator_agent(
                 cache_key = capability + ":" + json.dumps(args.get("parameters") or {}, sort_keys=True)
                 if cache_key not in calculated:
                     try:
-                        if is_prashna:
+                        if is_muhurat:
+                            parameters = args.get('parameters') or {}
+                            if capability == 'election.muhurat' and any(v is not None for v in parameters.values()):
+                                raise ValueError('Search changes require user confirmation')
+                            calculated[cache_key] = baseline if capability == 'election.muhurat' else await asyncio.to_thread(calculate_muhurat_tool, capability, muhurat_request, birth_data, parameters)
+                        elif is_prashna:
                             calculated[cache_key] = await asyncio.to_thread(calculate_prashna, capability, prashna_context, args.get('parameters'))
                         else:
                             result_map = await asyncio.to_thread(_calculate_requested_capabilities,
@@ -1161,7 +1199,13 @@ async def run_verified_calculator_agent(
         "role": "user",
         "content": [{
             "type": "input_text",
-            "text": _verified_final_writer_instruction(response_style, intent_mode),
+            "text": (muhurat_contract(response_style) + "\nAUTHORITATIVE CURRENT SEARCH RESULT:\n" + json.dumps({
+                'status':baseline.get('status'), 'result_meaning':baseline.get('result_meaning'),
+                'candidate_count':len(baseline.get('candidates') or []),
+                'total_candidates':baseline.get('total_candidates'), 'days_evaluated':baseline.get('days_evaluated'),
+                'search':baseline.get('search'), 'rejection_counts':baseline.get('rejection_counts'),
+                'errors':baseline.get('errors'), 'limitation':baseline.get('limitation'),
+            }, ensure_ascii=False, default=str)) if is_muhurat else _verified_final_writer_instruction(response_style, intent_mode),
         }],
     })
     # This final turn writes only the response. If the round ceiling is reached,
@@ -1540,6 +1584,24 @@ They need full subject interpretation, not a narrow
 fact or generic life-area report. Recognize equivalent wording and spellings in every language.
 Narrow "What is my Karakamsa sign?" or "Which Yogini period am I running?" uses factual_chart_lookup,
 reading_type default. A specific milestone with D9 evidence still uses event_prediction, reading_type default.
+Muhurat routing: choosing/checking an auspicious time to BEGIN an action uses reading_type muhurat,
+answer_mode topic_reading, category general, prashna_intent none, reading_transition natal.
+Distinguish choosing a wedding date from predicting when marriage occurs, and choosing a purchase time
+from predicting whether a purchase happens. Understand intent semantically in every language.
+Return muhurat_transition new|continue|exit and partial muhurat_request with event_type,
+start_date/end_date (inclusive ISO dates), allowed_start/end (HH:MM), check_time for a fixed instant,
+weekdays (0 Monday through 6 Sunday), excluded_dates, personalized, retrospective and minimum_duration_minutes.
+For a planned action, "this month" means remaining dates from USER LOCAL NOW through month-end, not
+elapsed dates earlier in the month. Set retrospective true ONLY for an explicitly historical assessment;
+never for buying, booking, signing or another planned future action.
+Only include fields explicitly requested or unambiguously resolved from the question. Never invent city
+coordinates, availability or dates. Supported activities: vehicle, home (griha pravesh), gold, business.
+Preserve other activity names (marriage/property/travel etc.) so the workflow can explain its limitations.
+Ask a specific clarification if the activity/action is unclear; do not guess another activity.
+Continue prior Muhurat constraints ONLY for a clear follow-up to the SAME activity. A new activity must
+collect its own constraints. Latest unrelated questions exit Muhurat and use the appropriate contract.
+A confirmed request/refinement card is an explicit Muhurat request; use its original question and fields.
+MUHURAT CONTEXT: {json.dumps({k:(query_context or {}).get(k) for k in ('muhurat_request','_muhurat_previous','muhurat_choice')}, ensure_ascii=False)}
 For all other contracts use reading_type default.
 Factual routing: a requested placement, house lord, chart position, nakshatra, retrograde/combustion
 status, strength value, yoga presence or dasha schedule uses factual_chart_lookup. "Which dashas run
@@ -1581,21 +1643,37 @@ USER LOCAL NOW: {now_local.isoformat()}
 QUESTION: {question}
 
 Schema:
-{{"location_intent":"relocation|object_search|other","requires_new_location":false,"reading_transition":"none|continue_prashna|new_prashna|natal|clarify_workflow","resolved_question":"...","prashna_intent":"none|offer|explicit","answer_mode":"...","category":"...","target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","reading_type":"default|chart_dasha_analysis","forecast_scope":"daily|other","target_date":null,"period_start":null,"period_end":null,"user_message":""}}
+{{"location_intent":"relocation|object_search|other","requires_new_location":false,"reading_transition":"none|continue_prashna|new_prashna|natal|clarify_workflow","resolved_question":"...","prashna_intent":"none|offer|explicit","answer_mode":"...","category":"...","target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","reading_type":"default|chart_dasha_analysis|muhurat","muhurat_transition":"new|continue|exit","muhurat_request":{{}},"forecast_scope":"daily|other","target_date":null,"period_start":null,"period_end":null,"user_message":""}}
 """.strip()
-    out = await analyzer.generate_text_from_prompt(
-        prompt,
-        premium_analysis=False,
-        model_name_override=get_verified_router_model(),
-        provider_override=CHAT_LLM_OPENAI,
-        openai_reasoning_effort="none",
-        llm_log_tag="verified_chat_router",
-        request_timeout_s=20.0,
-        system_prompt="You are a compact routing classifier. Return JSON only. Never generate HTML.",
-    )
-    if not out.get("success"):
-        raise RuntimeError(str(out.get("error") or "verified_router_failed"))
-    parsed = _json_object(str(out.get("response") or ""))
+    # A routing timeout must not fall through to a guessed/default workflow.
+    # The former 20-second ceiling cancelled slow but otherwise valid responses.
+    # Retry only transient failures or unusable JSON; keep the configured model.
+    usage_totals: Dict[str, int] = {}
+    out: Dict[str, Any] = {}
+    parsed: Dict[str, Any] = {}
+    for attempt, timeout_s in enumerate((60.0, 30.0)):
+        out = await analyzer.generate_text_from_prompt(
+            prompt,
+            premium_analysis=False,
+            model_name_override=get_verified_router_model(),
+            provider_override=CHAT_LLM_OPENAI,
+            openai_reasoning_effort="none",
+            llm_log_tag="verified_chat_router",
+            request_timeout_s=timeout_s,
+            system_prompt="You are a compact routing classifier. Return JSON only. Never generate HTML.",
+        )
+        for key, value in (out.get("token_usage") or {}).items():
+            if isinstance(value, int):
+                usage_totals[key] = usage_totals.get(key, 0) + value
+        parsed = _json_object(str(out.get("response") or "")) if out.get("success") else {}
+        if parsed and parsed.get("answer_mode"):
+            break
+        error = str(out.get("error") or "invalid_router_response")
+        transient = any(word in error.lower() for word in (
+            "timeout", "timed out", "connection", "429", "rate limit", "502", "503", "504", "invalid_router_response"))
+        if attempt or not transient:
+            raise RuntimeError(error)
+    out = {**out, "token_usage": usage_totals}
     action = str(parsed.get("route_action") or "answer").strip().lower()
     if action not in {"answer", "clarify", "handoff", "ack", "out_of_scope"}:
         action = "answer"
@@ -1641,8 +1719,9 @@ Schema:
         # question needs a clinical-safety-constrained health reading, or a bounded outlook when
         # the user actually asks for pace/timing; it must never receive a life-event timeline.
         answer_mode = "topic_reading" if time_relation in {"current", "none"} else "timing_window"
+    is_muhurat = parsed.get('reading_type') == 'muhurat' and action not in {'ack', 'handoff', 'out_of_scope'}
     chart_analysis = parsed.get('reading_type') == 'chart_dasha_analysis' and answer_mode == 'topic_reading'
-    daily = not chart_analysis and answer_mode != "factual_chart_lookup" and str(parsed.get("forecast_scope") or "").lower() == "daily"
+    daily = not is_muhurat and not chart_analysis and answer_mode != "factual_chart_lookup" and str(parsed.get("forecast_scope") or "").lower() == "daily"
     period_window = None
     if not daily and parsed.get('period_start') and parsed.get('period_end'):
         from datetime import date
@@ -1665,6 +1744,9 @@ Schema:
     transition = str(parsed.get('reading_transition') or 'none').strip().lower()
     if transition not in {'none', 'continue_prashna', 'new_prashna', 'natal', 'clarify_workflow'}:
         transition = 'none'
+    if is_muhurat:
+        transition = 'natal'
+        parsed['prashna_intent'] = 'none'
     prashna_intent = str(parsed.get('prashna_intent') or 'none').lower()
     if transition in {'continue_prashna', 'new_prashna', 'natal', 'clarify_workflow'} or (query_context or {}).get('prashna') or (query_context or {}).get('prashna_choice') in {'natal', 'prashna'}:
         if prashna_intent in {'offer', 'explicit'}:
@@ -1685,8 +1767,10 @@ Schema:
         "period_window": period_window,
         "query_context": query_context or {},
         "status": "CLARIFY" if action == "clarify" else "READY",
-        "mode": "CHART_DASHA_ANALYSIS" if chart_analysis else "PREDICT_DAILY" if daily else _mode_to_intent_mode(answer_mode),
-        "reading_type": "chart_dasha_analysis" if chart_analysis else "default",
+        "mode": "ELECT_MUHURAT" if is_muhurat else "CHART_DASHA_ANALYSIS" if chart_analysis else "PREDICT_DAILY" if daily else _mode_to_intent_mode(answer_mode),
+        "reading_type": "muhurat" if is_muhurat else "chart_dasha_analysis" if chart_analysis else "default",
+        "muhurat_transition": parsed.get("muhurat_transition"),
+        "muhurat_request": parsed.get("muhurat_request") or {},
         "answer_mode": answer_mode,
         "category": category,
         "target_subject_key": target,

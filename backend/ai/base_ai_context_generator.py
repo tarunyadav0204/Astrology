@@ -649,10 +649,10 @@ For every user query, structure your response exactly as follows:
         is_in_maraka_house = (p_sign == maraka_house_2) or (p_sign == maraka_house_7)
         
         if is_maraka_lord and is_in_maraka_house:
-            return "Double Maraka (Critical Danger)"
+            return "Maraka lord occupying a maraka house (lordship and placement, not MD/AD confluence)"
         elif is_maraka_lord:
-            return "Maraka Lord (Health Threat)"
+            return "Maraka lordship (traditional role, not a medical threat)"
         elif is_in_maraka_house:
-            return "Placed in Maraka House (Stress)"
+            return "Occupant of a maraka house"
             
-        return "Safe"
+        return "No 2nd/7th-house lordship or occupation"

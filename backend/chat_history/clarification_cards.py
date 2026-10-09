@@ -67,6 +67,8 @@ def build_clarification_next_action(
         return None
     if str(intent.get("status") or "").upper() != "CLARIFY":
         return None
+    if intent.get('muhurat_setup'):
+        return intent['muhurat_setup']
     if intent.get('workflow_choice'):
         question = str(original_question or '').strip()
         return {'type': 'clarification_choice', 'choice_kind': 'prashna_scope',

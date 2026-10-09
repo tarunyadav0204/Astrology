@@ -41,7 +41,9 @@ class SniperPointsCalculator(BaseCalculator):
             if 'planets' not in self.d1_chart:
                 return {'error': 'Kharesh calculation failed: D1 chart structure invalid'}
             
-            lord_in_d1 = self.d1_chart['planets'].get(kharesh_lord, {})
+            lord_in_d1 = self.d1_chart['planets'].get(kharesh_lord)
+            if not lord_in_d1 or 'sign' not in lord_in_d1:
+                raise ValueError(f'Missing natal placement for {kharesh_lord}')
             
             return {
                 'point_name': '22nd Drekkana (Kharesh)',
@@ -50,8 +52,10 @@ class SniperPointsCalculator(BaseCalculator):
                 'danger_sign': self.sign_names[drekkana_22_sign_idx],
                 'kharesh_lord': kharesh_lord,
                 'lord_location_d1': f"{self.sign_names[lord_in_d1.get('sign', 0)]} ({lord_in_d1.get('house', 0)}th House)",
-                'significance': 'Sensitive point for health and sudden events.',
-                'transit_watch': f"Watch when Saturn/Rahu transits {self.sign_names[drekkana_22_sign_idx]} or crosses {kharesh_lord}."
+                'coordinate_frame': 'D3_mapped_sign',
+                'reference': 'Lagna',
+                **self._physical_sector(self.d1_chart['ascendant'], 3, 22),
+                'interpretation_scope': 'Traditional sensitive sector; not a standalone prediction of disease or death.'
             }
         except Exception as e:
             return {'error': f'Kharesh calculation failed: {e}'}
@@ -73,7 +77,7 @@ class SniperPointsCalculator(BaseCalculator):
             moon_d9_sign = moon_d9.get('sign')
             
             if moon_d9_sign is None:
-                moon_d9_sign = int(moon_d9.get('longitude', 0) / 30)
+                moon_d9_sign = int(moon_d9['longitude'] / 30)
             
             navamsa_64_sign_idx = (moon_d9_sign + 3) % 12
             navamsa_lord = self.sign_lords[navamsa_64_sign_idx]
@@ -84,13 +88,41 @@ class SniperPointsCalculator(BaseCalculator):
                 'derivation': '4th sign from Moon in D9',
                 'danger_sign': self.sign_names[navamsa_64_sign_idx],
                 'danger_lord': navamsa_lord,
-                'significance': 'Critical point for mental stress and transformation.',
-                'transit_watch': f"Watch when Saturn/Rahu transits {self.sign_names[navamsa_64_sign_idx]}."
+                'coordinate_frame': 'D9_mapped_sign',
+                'reference': 'Moon',
+                **self._physical_sector(self.d1_chart['planets']['Moon']['longitude'], 9, 64),
+                'interpretation_scope': 'Traditional sensitive sector; not a standalone prediction of disease or death.'
             }
         except Exception as e:
             return {'error': f'64th Navamsa calculation failed: {e}'}
     
-    def calculate_bhrigu_bindu(self) -> Dict[str, Any]:
+    @staticmethod
+    def _physical_sector(longitude, division, ordinal):
+        import math
+        longitude = float(longitude)
+        if not math.isfinite(longitude) or not 0 <= longitude < 360:
+            raise ValueError('A valid natal longitude is required')
+        width = 30 / division
+        sector = (int(longitude / width) + ordinal - 1) % (12 * division)
+        start = sector * width
+        return {'d1_sector': {'start_longitude': start,
+                              'end_longitude': start + width,
+                              'boundary_type': 'start_inclusive_end_exclusive'},
+                'reference_longitude_d1': longitude,
+                'transit_scope': 'Use the D1 sector for physical transit contacts; the mapped varga sign is not a D1 transit sign.'}
+
+    def calculate_lagna_64th_navamsa(self):
+        try:
+            chart = self.d9_chart.get('divisional_chart', self.d9_chart)
+            sign = (int(chart['ascendant'] / 30) + 3) % 12
+            return {'point_name': '64th Navamsa from Lagna', 'reference': 'Lagna',
+                    'coordinate_frame': 'D9_mapped_sign', 'danger_sign': self.sign_names[sign],
+                    'danger_lord': self.sign_lords[sign], 'derivation': '4th sign from Lagna in D9',
+                    **self._physical_sector(self.d1_chart['ascendant'], 9, 64)}
+        except (KeyError, ValueError, TypeError) as exc:
+            return {'error': f'Lagna 64th Navamsa unavailable: {exc}'}
+
+    def calculate_bhrigu_bindu(self, include_transits=True) -> Dict[str, Any]:
         """Calculate Bhrigu Bindu - midpoint between Moon and Rahu"""
         try:
             if 'planets' not in self.d1_chart:
@@ -117,7 +149,7 @@ class SniperPointsCalculator(BaseCalculator):
             # ascendant sign.  Subtracting the ascendant's exact degree before
             # dividing by 30 can incorrectly move the point into the previous
             # house when it lies earlier within its sign.
-            ascendant = self.d1_chart.get('ascendant', 0)
+            ascendant = self.d1_chart['ascendant']
             ascendant_sign = int(float(ascendant) % 360 / 30)
             bb_house = ((bb_sign - ascendant_sign) % 12) + 1
 
@@ -135,7 +167,7 @@ class SniperPointsCalculator(BaseCalculator):
             ]
             
             # Calculate when slow-moving planets will transit this point
-            transit_timing = self._calculate_bhrigu_bindu_transits(bhrigu_bindu, bb_sign)
+            transit_timing = self._calculate_bhrigu_bindu_transits(bhrigu_bindu, bb_sign) if include_transits else {'status': 'not_requested', 'scope': 'Natal point only; no transit search calculated'}
             
             return {
                 'point_name': 'Bhrigu Bindu',
@@ -320,7 +352,7 @@ class SniperPointsCalculator(BaseCalculator):
         try:
             afflicted_points = []
             table_key = 'jataka_parijata_sarvartha_chintamani'
-            asc_result = evaluate_mrityu_bhaga('Ascendant', self.d1_chart.get('ascendant', 0), table_key=table_key)
+            asc_result = evaluate_mrityu_bhaga('Ascendant', self.d1_chart['ascendant'], table_key=table_key)
             if asc_result['is_mrityu_bhaga']:
                 afflicted_points.append({
                     **asc_result,
@@ -332,7 +364,7 @@ class SniperPointsCalculator(BaseCalculator):
                 })
 
             for planet, data in self.d1_chart.get('planets', {}).items():
-                result = evaluate_mrityu_bhaga(planet, data.get('longitude', 0), table_key=table_key)
+                result = evaluate_mrityu_bhaga(planet, data['longitude'], table_key=table_key)
                 if result.get('is_mrityu_bhaga'):
                     afflicted_points.append({
                         **result,
@@ -357,11 +389,12 @@ class SniperPointsCalculator(BaseCalculator):
         except Exception as e:
             return {'error': f'Mrityu Bhaga calculation failed: {e}'}
     
-    def get_all_sniper_points(self) -> Dict[str, Any]:
+    def get_all_sniper_points(self, include_transits=True) -> Dict[str, Any]:
         """Get all sniper points"""
         return {
             'kharesh': self.calculate_kharesh_point(),
             'navamsa_64th': self.calculate_64th_navamsa(),
-            'bhrigu_bindu': self.calculate_bhrigu_bindu(),
+            'navamsa_64th_lagna': self.calculate_lagna_64th_navamsa(),
+            'bhrigu_bindu': self.calculate_bhrigu_bindu(include_transits=include_transits),
             'mrityu_bhaga': self.calculate_mrityu_bhaga()
         }

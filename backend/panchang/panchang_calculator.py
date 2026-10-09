@@ -531,11 +531,11 @@ class PanchangCalculator:
         weekday = (sunrise.weekday() + 1) % 7
         day, current = [], sunrise
         for i in range(8):
-            end = current + timedelta(hours=day_chunk); idx = (weekday + i) % 7
+            end = current + timedelta(hours=day_chunk); idx = (weekday + 5 * i) % 7
             day.append({'name': names[idx], 'quality': qualities[idx], 'start_time': current.isoformat(), 'end_time': end.isoformat(), 'start_clock': current.strftime('%H:%M'), 'end_clock': end.strftime('%H:%M')}); current = end
         night, current = [], sunset
         for i in range(8):
-            end = current + timedelta(hours=night_chunk); idx = (weekday + 4 + i) % 7
+            end = current + timedelta(hours=night_chunk); idx = (weekday + 4 + 4 * i) % 7
             night.append({'name': names[idx], 'quality': qualities[idx], 'start_time': current.isoformat(), 'end_time': end.isoformat(), 'start_clock': current.strftime('%H:%M'), 'end_clock': end.strftime('%H:%M')}); current = end
         return {'date': date_str, 'location': {'latitude': latitude, 'longitude': longitude}, 'timezone': tz, 'day_choghadiya': day, 'night_choghadiya': night}
 

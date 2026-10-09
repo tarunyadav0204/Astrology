@@ -2,6 +2,7 @@
 
 from .base_calculator import BaseCalculator
 import logging
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +14,7 @@ class DivisionalChartCalculator(BaseCalculator):
         
         def get_divisional_sign(sign, degree_in_sign, division):
             """Calculate divisional sign using proper Vedic formulas with boundary buffer"""
-            EPS = 1e-9  # Prevent 10.0 becoming 9.999
-            part = int((degree_in_sign + EPS) / (30.0/division))
+            part = min(division - 1, int(degree_in_sign / (30.0/division)))
             
             # --- MISSING CHARTS ADDED ---
             
@@ -37,6 +37,13 @@ class DivisionalChartCalculator(BaseCalculator):
                 # 1st part: Self, 2nd: 4th, 3rd: 7th, 4th: 10th
                 return (sign + (part * 3)) % 12
 
+            elif division == 1:
+                return sign
+            elif division == 5:  # PVR 6.2.5
+                return ((0,10,8,2,6) if sign % 2 == 0 else (1,5,11,9,7))[part]
+            elif division == 6:  # PVR 6.2.6
+                return ((0 if sign % 2 == 0 else 6) + part) % 12
+
             # --- EXISTING CHARTS ---
 
             elif division == 7:  # Saptamsa (D7) - CORRECTED
@@ -48,6 +55,10 @@ class DivisionalChartCalculator(BaseCalculator):
                     start_sign = (sign + 6) % 12  # 7th sign from current
                 return (start_sign + part) % 12
 
+            elif division == 8:  # P.V.R. Narasimha Rao, section 6.2.8
+                start = (0, 8, 4)[sign % 3]
+                return (start + part) % 12
+
             elif division == 9:  # Navamsa (D9)
                 if sign in [0, 3, 6, 9]: start = sign            # Movable: Self
                 elif sign in [1, 4, 7, 10]: start = (sign + 8)   # Fixed: 9th
@@ -57,6 +68,9 @@ class DivisionalChartCalculator(BaseCalculator):
             elif division == 10:  # Dasamsa (D10)
                 if sign % 2 == 0: return (sign + part) % 12      # Odd: Self
                 else: return ((sign + 8) + part) % 12            # Even: 9th
+
+            elif division == 11:  # PVR 6.2.11, reverse seed then forward parts
+                return (-sign + part) % 12
 
             elif division == 12:  # Dwadasamsa (D12)
                 return (sign + part) % 12                        # Start from self
@@ -119,9 +133,21 @@ class DivisionalChartCalculator(BaseCalculator):
                 return (sign + part) % 12
 
             else:
-                # Default for D5, D6, D8, D11 etc if ever passed
-                return (sign + part) % 12
+                raise ValueError(f'Unsupported divisional chart D{division}')
         
+        if not isinstance(division_number, int) or division_number <= 0:
+            raise ValueError('Division must be a positive integer')
+
+        def scaled_part(degree, sign):
+            if division_number == 30:
+                boundaries = (0, 5, 10, 18, 25, 30) if sign % 2 == 0 else (0, 5, 12, 20, 25, 30)
+                lo, hi = next((lo, hi) for lo, hi in zip(boundaries, boundaries[1:]) if lo <= degree < hi)
+                return degree - lo, (degree - lo) / (hi - lo) * 30
+            width = 30 / division_number
+            index = min(division_number - 1, int(degree / width))
+            arc = degree - index * width
+            return arc, arc / width * 30
+
         # Calculate divisional chart
         divisional_data = {
             'planets': {},
@@ -134,15 +160,8 @@ class DivisionalChartCalculator(BaseCalculator):
         asc_degree = self.chart_data['ascendant'] % 30
         divisional_asc_sign = get_divisional_sign(asc_sign, asc_degree, division_number)
         
-        # Scaled degree calculation - Keep standard 0-30° format
-        EPS = 1e-9
-        part_size = 30.0 / division_number
-        part_index = int((asc_degree + EPS) / part_size)
-        # FIXED: Calculate degree within part correctly (not using modulo)
-        degree_within_part = (asc_degree + EPS) - (part_index * part_size)
-        # Scale the degree within part to full sign (0-30 degrees)
-        scaled_asc_degree = (degree_within_part / part_size) * 30.0
-        divisional_data['ascendant'] = (divisional_asc_sign * 30) + scaled_asc_degree
+        degree_within_part, scaled_asc_degree = scaled_part(asc_degree, asc_sign)
+        divisional_data['ascendant'] = min((divisional_asc_sign * 30) + scaled_asc_degree, math.nextafter((divisional_asc_sign + 1) * 30.0, -math.inf))
         
         # For D60: Store raw arc position for deity analysis
         if division_number == 60:
@@ -170,20 +189,12 @@ class DivisionalChartCalculator(BaseCalculator):
                 
                 divisional_sign = get_divisional_sign(planet_sign, planet_degree, division_number)
                 
-                # Calculate the actual degree within the divisional sign with proper scaling
-                EPS = 1e-9
-                part_size = 30.0 / division_number
-                part_index = int((planet_degree + EPS) / part_size)
-                # FIXED: Calculate degree within part correctly (not using modulo)
-                degree_within_part = (planet_degree + EPS) - (part_index * part_size)
-                
-                # Scale the degree within part to full sign (0-30 degrees)
-                actual_degree = (degree_within_part / part_size) * 30.0
-                
+                degree_within_part, actual_degree = scaled_part(planet_degree, planet_sign)
+
                 # For D60: Also store the raw arc position for deity analysis
                 varga_arc_position = degree_within_part if division_number == 60 else None
                 
-                divisional_longitude = divisional_sign * 30 + actual_degree
+                divisional_longitude = min(divisional_sign * 30 + actual_degree, math.nextafter((divisional_sign + 1) * 30.0, -math.inf))
                 
                 # Calculate house position relative to divisional ascendant
                 house_number = ((divisional_sign - divisional_asc_sign) % 12) + 1
@@ -209,7 +220,9 @@ class DivisionalChartCalculator(BaseCalculator):
         return {
             'divisional_chart': divisional_data,
             'division_number': division_number,
-            'chart_name': f'D{division_number}'
+            'chart_name': f'D{division_number}',
+            'method': 'pvr_ashtamsa_movable_aries_fixed_sagittarius_dual_leo' if division_number == 8 else 'parashara_unequal_trimsamsa' if division_number == 30 else 'explicit_varga_rule' if division_number in {1,2,3,4,5,6,7,9,10,11,12,16,20,24,27,40,45,60} else 'legacy_generic_mapping',
+            'coordinate_frame': 'mapped_varga_not_physical_D1_longitude'
         }
     
     def calculate_all_divisional_charts(self):

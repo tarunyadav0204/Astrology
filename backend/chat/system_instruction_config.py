@@ -187,18 +187,13 @@ LIFE_TERMINATION_RESEARCH_STRUCTURE = """
     5. Divisional layer: D8 is mandatory when present; D30 is mandatory when present; D9 shows resilience/maturation; D3/22nd Drekkana is used for Kharesh context. Missing divisionals must be named as missing instead of silently replaced.
     6. Ashtakavarga layer: Cite SAV/BAV only from provided data for Lagna, 3rd, 6th, 8th, 12th, and relevant dasha/transit planets. Low 8th/Lagna support increases vulnerability, but strong 6th/12th can show survival/medical support.
     7. Transit layer: Saturn/Jupiter/Rahu-Ketu over 8th, 2nd/7th, 12th, Kharesh sign, 64th Navamsa sign, Mrityu Bhaga planets/degrees, and dasha lord natal positions. Transits alone never outrank dasha.
-[LTERM-3] CONFLUENCE SCORING DISCIPLINE:
-    - First produce a Calculation Audit: Badhaka derivation, Maraka lords, Kharesh derivation, 64th Navamsa derivation, Bhrigu Bindu/Mrityu Bhaga rows, and D8/D3/D30 availability. This audit must precede ranking.
-    - Use a 0-10 confluence score for each window: dasha activation (0-2), Maraka/Badhaka/Kharesh (0-2), 8th/12th/longevity houses (0-1.5), D8/D3/D30 confirmation (0-1.5), sniper points including 64th/Kharesh/MB/BB (0-1.5), Ashtakavarga weakness/protection (0-1), transit trigger (0-1). Do not exceed 10.
-    - Every score must show its component breakdown. Never output only "8.5/10" without showing how the score was assigned.
-    - D8 is the core longevity divisional. If D8 is missing/unavailable, say so explicitly in the Calculation Audit, Confluence Matrix, Technical Deep Dive, and Evidence Limitations. If D8 is missing, the D8/D3/D30 score component cannot exceed 0.8/1.5, and the row must not say "D8/D3/D30 Confirmation: Yes"; write "D3/D30 present, D8 missing" or similar.
-    - Candidate windows require 3+ independent categories before they can be called "high concern"; "High" additionally requires score >= 6 and active dasha support.
-    - Confluence grade must be exactly one of High, Medium, or Low. Do not use hybrid grades like Medium-High.
-    - If only one or two categories activate, label it as health stress / vulnerability / recovery-test, not terminal.
-    - Separate "major health stress-test", "critical transition risk", and "classical terminal candidate"; do not flatten them.
-    - If evidence conflicts, say what protects the native and what weakens the candidate.
-    - Never write "Yes" in a confluence row without naming the evidence. Write "Present: [evidence]" / "Weak: [why]" / "Missing: [what is absent]".
-    - Bhrigu Bindu and Mrityu Bhaga are sensitive-point evidence only. Do not claim they "ensure" protection or determine outcome unless a supplied dasha/transit layer actively touches them; otherwise list them descriptively.
+[LTERM-3] CONFLUENCE EVIDENCE DISCIPLINE:
+    - First produce a Calculation Audit with the source, variant, coordinates and availability of every calculator.
+    - Do not assign numeric risk/confluence scores, probabilities or High/Medium/Low medical-risk grades. These calculations do not establish medical or mortality risk.
+    - Describe each supplied layer and its actual date bounds. Name conflicting or missing evidence. Do not count Kharesh again as an independent sniper factor or count Chara and Jaimini as two independent systems.
+    - Standard Shoola is not Niryana Shoola. A simplified starting-sign strength or Rudra/Maheshwara profile must be disclosed, not described as fully verified.
+    - D3/D9 mapped signs are not physical D1 transit longitudes. Use explicitly supplied D1 sectors or natal degree contacts for transit claims.
+    - Missing D8 or missing sensitive-point derivations must remain missing, never guessed. An astrology confluence is not evidence of extreme medical vulnerability.
 [LTERM-4] OUTPUT SAFETY:
     - Use technical, evidence-first language. Forbidden deterministic phrases include: "guarantee", "ensure", "will successfully", "certain", "unavoidable", "will die", "projecting a lifespan", "final exit", "death date", and exact fatal medical mechanism.
     - Do not promise peaceful death, spiritual release, manner of death, disease type, accident type, or medical diagnosis. Avoid phrases like "peaceful release", "spiritually oriented release", "merges back with source", or "life force gracefully releases".
@@ -209,7 +204,7 @@ LIFE_TERMINATION_RESEARCH_STRUCTURE = """
 """
 
 LIFE_TERMINATION_MERGE_RULE = """
-[MERGE-LIFE-TERMINATION] For LIFE_TERMINATION_RESEARCH, the final answer MUST preserve the calculation audit and confluence matrix as stacked window blocks, not a table. Do NOT output markdown tables, pipe-separated rows, or any wide table-like layout. A window may be ranked high only if branch evidence includes several independent layers: dasha activation, Maraka/Badhaka/Kharesh, 8th/12th/longevity houses, D8/D3/D30, sniper points (64th Navamsa/Mrityu Bhaga/Bhrigu Bindu), Ashtakavarga weakness, and transits. Every score must include a component breakdown. If D8 is missing, say "D3/D30 present, D8 missing" and cap the D8/D3/D30 score component at 0.8/1.5; do not write "D8/D3/D30: Yes". Grade must be exactly High, Medium, or Low; rewrite Medium-High to Medium unless it meets the High rule. If the branches did not provide Kharesh/64th/D8/D3/D30/AV derivation, state that limitation instead of inventing it. Do not allow contradictions such as calling Jupiter a sub-lord unless Jupiter is actually present in the active dasha/CSL/sub-lord evidence; if Jupiter is only Kharesh/64th/dispositor/transit, name that exact mechanism. Remove or rewrite deterministic/poetic phrases such as guarantee, ensure, will successfully, peaceful release, final exit, or merges back with source.
+[MERGE-LIFE-TERMINATION] For LIFE_TERMINATION_RESEARCH, the final answer MUST preserve the calculation audit and confluence matrix as stacked window blocks, not a table. Do NOT output markdown tables, pipe-separated rows, or any wide table-like layout. A window may be ranked high only if branch evidence includes several independent layers: dasha activation, Maraka/Badhaka/Kharesh, 8th/12th/longevity houses, D8/D3/D30, sniper points (64th Navamsa/Mrityu Bhaga/Bhrigu Bindu), Ashtakavarga weakness, and transits. Use descriptive evidence only; never invent a numerical risk score or medical-risk grade. If D8 is missing, say "D3/D30 present, D8 missing" ; do not write "D8/D3/D30: Yes". Do not emit medical-risk grades. If the branches did not provide Kharesh/64th/D8/D3/D30/AV derivation, state that limitation instead of inventing it. Do not allow contradictions such as calling Jupiter a sub-lord unless Jupiter is actually present in the active dasha/CSL/sub-lord evidence; if Jupiter is only Kharesh/64th/dispositor/transit, name that exact mechanism. Remove or rewrite deterministic/poetic phrases such as guarantee, ensure, will successfully, peaceful release, final exit, or merges back with source.
 """
 
 # 5. ASHTAKAVARGA GATEKEEPER (Enhanced)

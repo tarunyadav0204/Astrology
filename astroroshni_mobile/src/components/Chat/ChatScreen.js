@@ -65,6 +65,7 @@ import NativeSelectorChip from '../Common/NativeSelectorChip';
 import ChatMemory from './ChatMemory';
 import ChatSummary from './ChatSummary';
 import PrashnaSetup from './PrashnaSetup';
+import MuhuratSetup from './MuhuratSetup';
 import AppAlertModal from '../Common/AppAlertModal';
 import QuickThemePickerModal from '../Common/QuickThemePickerModal';
 import { useCredits } from '../../credits/CreditContext';
@@ -607,6 +608,7 @@ export default function ChatScreen({ navigation, route }) {
   const [pendingAnswerStyle, setPendingAnswerStyle] = useState(null);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
   const [isVerifiedAnalysis, setIsVerifiedAnalysis] = useState(false);
+  const [pendingMuhuratQuestion, setPendingMuhuratQuestion] = useState(null);
   const [prashnaLocation, setPrashnaLocation] = useState(null);
   const [pendingPrashnaQuestion, setPendingPrashnaQuestion] = useState(null);
   const [showInstantEndConfirm, setShowInstantEndConfirm] = useState(false);
@@ -1089,7 +1091,7 @@ export default function ChatScreen({ navigation, route }) {
   const [isAppStartup, setIsAppStartup] = useState(true);
   const [birthData, setBirthData] = useState(null);
   const [sessionId, setSessionId] = useState(null);
-  useEffect(() => { setPrashnaLocation(null); setPendingPrashnaQuestion(null); }, [birthData?.id, sessionId]);
+  useEffect(() => { setPrashnaLocation(null); setPendingPrashnaQuestion(null); setPendingMuhuratQuestion(null); }, [birthData?.id, sessionId]);
   const [renderedMessageCount, setRenderedMessageCount] = useState(CHAT_RENDER_WINDOW_DEFAULT);
   const [currentPersonId, setCurrentPersonId] = useState(null);
   const suggestionBirthChartId = birthData?.id ?? birthData?.birth_chart_id ?? null;
@@ -6484,13 +6486,17 @@ export default function ChatScreen({ navigation, route }) {
     const chosen = String(questionText || '').trim();
     if (!chosen) return;
     const queryContext = options.query_context || options.queryContext || {};
+    if (queryContext.muhurat_setup_requested) {
+      setPendingMuhuratQuestion({ question:queryContext.original_question || chosen, queryContext });
+      return;
+    }
     if (queryContext.prashna_choice === 'prashna') {
       setPendingPrashnaQuestion({ question: queryContext.original_question || chosen, queryContext });
       return;
     }
-    if (queryContext.prashna_choice === 'natal' || queryContext.prashna_workflow_choice) setPrashnaLocation(null);
+    if (queryContext.muhurat_choice || queryContext.prashna_choice === 'natal' || queryContext.prashna_workflow_choice) setPrashnaLocation(null);
     await sendMessageRef.current?.(chosen, {
-      ...((queryContext.prashna_choice || queryContext.prashna_workflow_choice) ? { forceTier: 'verified' } : {}),
+      ...((queryContext.prashna_choice || queryContext.prashna_workflow_choice || queryContext.muhurat_choice) ? { forceTier: 'verified' } : {}),
       queryContext: {
         follow_up_type: 'clarification_choice',
         ...queryContext,
@@ -6813,6 +6819,17 @@ export default function ChatScreen({ navigation, route }) {
         edges={['top']}
       >
         <View style={styles.safeAreaInner}>
+        <Modal visible={Boolean(pendingMuhuratQuestion)} transparent animationType="slide" onRequestClose={() => setPendingMuhuratQuestion(null)}>
+          <View style={{ flex:1, justifyContent:'flex-end', backgroundColor:colors.overlay }}><View accessibilityViewIsModal style={{ height:'85%', padding:20, borderTopLeftRadius:28, borderTopRightRadius:28, backgroundColor:colors.surfaceRaised }}>
+            <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}><Text style={{ color:colors.text, fontSize:20, fontWeight:'700' }}>{t('premiumUi.chat.muhurat.title')}</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel={t('common.close','Close')} onPress={() => setPendingMuhuratQuestion(null)} style={{ padding:12 }}><Ionicons name="close" size={24} color={colors.text} /></TouchableOpacity></View>
+            {pendingMuhuratQuestion && <MuhuratSetup initial={pendingMuhuratQuestion.queryContext.muhurat_request} onSubmit={request => {
+              if (loading) return;
+              const pending=pendingMuhuratQuestion;
+              setPendingMuhuratQuestion(null); setPrashnaLocation(null); applyChatModeFromTier('verified');
+              sendMessageRef.current?.(pending.question,{ forceTier:'verified',queryContext:{ ...pending.queryContext,muhurat_setup_requested:false,muhurat_request:request } });
+            }} />}
+          </View></View>
+        </Modal>
         <Modal visible={Boolean(pendingPrashnaQuestion)} transparent animationType="slide" onRequestClose={() => setPendingPrashnaQuestion(null)}>
           <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
             <View accessibilityViewIsModal style={{ height: '65%', padding: 20, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: colors.surfaceRaised }}>

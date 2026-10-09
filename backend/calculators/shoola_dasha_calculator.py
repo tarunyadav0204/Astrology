@@ -4,8 +4,8 @@ from .base_calculator import BaseCalculator
 
 class ShoolaDashaCalculator(BaseCalculator):
     """
-    Calculates Jaimini Shoola Dasha (Niryana Shoola Dasha).
-    Used specifically for longevity and death timing.
+    Calculates standard nine-year Shoola, not Niryana Shoola.
+    Period arithmetic follows P.V.R. Narasimha Rao, chapter 23.
     """
     
     def __init__(self, chart_data: Dict):
@@ -30,7 +30,7 @@ class ShoolaDashaCalculator(BaseCalculator):
             'Sun': 0, 'Moon': 1, 'Mars': 9, 'Mercury': 5, 'Jupiter': 3, 'Venus': 11, 'Saturn': 6
         }
 
-    def calculate_shoola_dasha(self, birth_details: Dict, relative_house_idx: Optional[int] = None) -> Dict[str, Any]:
+    def calculate_shoola_dasha(self, birth_details: Dict, relative_house_idx: Optional[int] = None, focus_date: Optional[datetime] = None) -> Dict[str, Any]:
         """
         Calculate Shoola Dasha.
         :param relative_house_idx: If provided (e.g., 3 for Mother's 4th house), 
@@ -47,12 +47,13 @@ class ShoolaDashaCalculator(BaseCalculator):
         # 2. Determine Start Sign (Stronger of Base vs 7th from Base)
         start_sign_idx = self._determine_stronger_sign(base_sign, (base_sign + 6) % 12)
         
-        # 3. Determine Direction (Odd = Forward, Even = Backward)
-        is_forward = (start_sign_idx + 1) % 2 != 0
+        # Standard Shoola always progresses in zodiacal order.
+        is_forward = True
         
         # 4. Generate Periods
-        birth_date = datetime.strptime(birth_details['date'], "%Y-%m-%d")
-        current_date = datetime.now()
+        from .dasha_time import parse_birth_datetime, normalize_focus
+        birth_date = parse_birth_datetime(birth_details)
+        current_date = normalize_focus(focus_date, birth_date)
         
         periods = []
         start_time = birth_date
@@ -72,7 +73,10 @@ class ShoolaDashaCalculator(BaseCalculator):
                 "sign_name": self.sign_names[current_sign_idx],
                 "start_date": start_time.strftime("%Y-%m-%d"),
                 "end_date": end_time.strftime("%Y-%m-%d"),
-                "order": i + 1
+                "order": i + 1,
+                "start_iso": start_time.isoformat(),
+                "end_iso": end_time.isoformat(),
+                "antardashas": self._antardashas(current_sign_idx, start_time, end_time)
             }
             
             periods.append(dasha_entry)
@@ -87,8 +91,25 @@ class ShoolaDashaCalculator(BaseCalculator):
             "start_sign": self.sign_names[start_sign_idx],
             "direction": "Forward" if is_forward else "Backward",
             "current_period": current_period_info,
-            "all_periods": periods
+            "all_periods": periods,
+            "method": "standard_shoola_9_years_forward",
+            "year_days": 365.25,
+            "boundary_type": "start_inclusive_end_exclusive",
+            "strength_profile": "legacy_classical_seven_graha_count_then_lord_dignity",
+            "limitations": ["Starting-sign strength is a simplified declared profile, not a certified full Ayur rashi-strength implementation.", "Niryana Shoola is a different system and is not calculated here."],
+            "source": "P.V.R. Narasimha Rao, Vedic Astrology: An Integrated Approach, 23.2"
         }
+
+    def _antardashas(self, sign, start, end):
+        first = self._determine_stronger_sign(sign, (sign + 6) % 12)
+        duration = end - start
+        return [{"sign_id": (first + i) % 12,
+                 "sign_name": self.sign_names[(first + i) % 12],
+                 "start_date": (start + duration * (i / 12)).strftime("%Y-%m-%d"),
+                 "end_date": (start + duration * ((i + 1) / 12)).strftime("%Y-%m-%d"),
+                 "start_iso": (start + duration * (i / 12)).isoformat(),
+                 "end_iso": (start + duration * ((i + 1) / 12)).isoformat()}
+                for i in range(12)]
 
     def _determine_stronger_sign(self, sign1_idx: int, sign2_idx: int) -> int:
         """
@@ -127,7 +148,7 @@ class ShoolaDashaCalculator(BaseCalculator):
     def _count_planets_in_sign(self, sign_idx: int) -> int:
         count = 0
         for planet, data in self.planets.items():
-            if planet in ['Rahu', 'Ketu', 'Gulika', 'Mandi', 'InduLagna']:
+            if planet not in {'Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'}:
                 continue
             if data['sign'] == sign_idx:
                 count += 1

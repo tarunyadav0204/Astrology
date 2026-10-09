@@ -5,6 +5,11 @@ from panchang.panchang_calculator import PanchangCalculator
 from utils.timezone_service import parse_timezone_offset
 
 
+# Zero-based daylight eighths, weekdays 0=Monday through 6=Sunday.
+RAHU_SEGMENTS = {0:1,1:6,2:4,3:5,4:3,5:2,6:7}
+YAMAGANDA_SEGMENTS = {0:3,1:2,2:1,3:0,4:6,5:5,6:4}
+GULIKA_SEGMENTS = {0:5,1:4,2:3,3:2,4:1,5:0,6:6}
+
 def _ordinal(number):
     """Return a grammatically correct ordinal for a positive integer."""
     try:
@@ -675,9 +680,9 @@ class MuhuratCalculator:
         if day_duration < 0: day_duration += 24 
         
         weekday = date_obj.weekday()
-        rahu_map = {0: 1, 1: 6, 2: 4, 3: 5, 4: 3, 5: 2, 6: 7} 
-        yama_map = {0: 4, 1: 3, 2: 2, 3: 1, 4: 0, 5: 5, 6: 6}
-        gulika_map = {0: 6, 1: 5, 2: 4, 3: 3, 4: 2, 5: 1, 6: 7}
+        rahu_map = RAHU_SEGMENTS
+        yama_map = YAMAGANDA_SEGMENTS
+        gulika_map = GULIKA_SEGMENTS
 
         def get_window(idx, is_day=True):
             duration = day_duration if is_day else (24-day_duration)

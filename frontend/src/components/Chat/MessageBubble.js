@@ -620,7 +620,7 @@ const MessageBubble = ({
         ) return null;
 
         const eyebrow = isClarificationChoice
-            ? (['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind) ? 'Choose your reading' : 'Choose a theme')
+            ? (nextAction?.choice_kind?.startsWith('muhurat_') ? 'Muhurat options' : ['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind) ? 'Choose your reading' : 'Choose a theme')
             : `Marriage date finder · ${String(nextAction?.selection_stage || 'period')}`;
         const fallbackTitle = isClarificationChoice
             ? ''
@@ -660,7 +660,7 @@ const MessageBubble = ({
                                 disabled={isDisabled}
                                 onClick={() => {
                                     if (selectedStructuredOption || !onFollowUpClick) return;
-                                    if (!['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind)) setSelectedStructuredOption(optionId);
+                                    if (!['prashna_method', 'prashna_scope', 'muhurat_setup', 'muhurat_refine'].includes(nextAction?.choice_kind)) setSelectedStructuredOption(optionId);
                                     const sourceMessageId = message.messageId || message.id;
                                     const queryContext = isTimelineSelection
                                         ? {
@@ -716,7 +716,7 @@ const MessageBubble = ({
                 </div>
                 <div className="marriage-timeline-card__trust-note">
                     {isClarificationChoice
-                        ? (['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind) ? 'Your question will be kept. Choose a card to continue.' : 'Answering several questions together thins each reading. Pick one theme and I’ll go deep.')
+                        ? (['prashna_method', 'prashna_scope', 'muhurat_setup', 'muhurat_refine'].includes(nextAction?.choice_kind) ? 'Your question will be kept. Choose a card to continue.' : 'Answering several questions together thins each reading. Pick one theme and I’ll go deep.')
                         : 'Your choice narrows the calculation; it is not treated as a date predicted independently.'}
                 </div>
             </div>
