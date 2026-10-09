@@ -19,6 +19,7 @@ import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { goBackOrHome } from '../../navigation/navHelpers';
+import SavedAnswers from './SavedAnswers';
 import FocusedStatusBar from '../Common/FocusedStatusBar';
 
 const getDateKey = (timestamp) => {
@@ -32,6 +33,7 @@ export default function ChatHistoryScreen({ navigation }) {
   useAnalytics('ChatHistoryScreen');
   const { t, i18n } = useTranslation();
   const { colors } = useTheme();
+  const [view, setView] = useState('all');
   const [historyRows, setHistoryRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -193,6 +195,10 @@ export default function ChatHistoryScreen({ navigation }) {
           <Text style={[styles.introBody, { color: colors.textSecondary }]}>{t('historyUi.chat.heroBody')}</Text>
         </View>
 
+        <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 12 }}>
+          {['all', 'saved'].map(value => <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: view === value }} onPress={() => setView(value)} style={{ padding: 10, borderRadius: 12, backgroundColor: view === value ? colors.surfaceMuted : colors.background }}><Text style={{ color: colors.text }}>{value === 'all' ? 'All chats' : 'Saved answers'}</Text></TouchableOpacity>)}
+        </View>
+        {view === 'saved' ? <SavedAnswers navigation={navigation} /> : <>
         <View
           style={[styles.search, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}
         >
@@ -236,6 +242,7 @@ export default function ChatHistoryScreen({ navigation }) {
             ) : null}
           />
         )}
+        </>}
         </View>
       </SafeAreaView>
     </View>

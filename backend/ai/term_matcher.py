@@ -52,7 +52,7 @@ def load_glossary_terms(language: str = "english") -> List[dict]:
     definition = row[2]
     aliases_json = row[3] if len(row) > 3 else "[]"
     try:
-      aliases = json.loads(aliases_json) if aliases_json else []
+      aliases = json.loads(aliases_json) if isinstance(aliases_json, str) else (aliases_json or [])
       if not isinstance(aliases, list):
         aliases = []
     except Exception:
@@ -118,7 +118,7 @@ def find_terms_in_text(text: str, language: str = "english") -> Tuple[List[str],
       if term_id not in matches:
         # Look up the full term object to get definition
         term_obj = next((t for t in glossary_terms if t["term_id"] == term_id), None)
-        if term_obj and term_obj.get("definition"):
+        if term_obj and str(term_obj.get("definition") or "").strip():
           matches[term_id] = term_obj["definition"]
           matched_labels[term_id] = []
       if term_id in matches:
@@ -126,18 +126,15 @@ def find_terms_in_text(text: str, language: str = "english") -> Tuple[List[str],
         if label not in labels:
           labels.append(label)
 
-  # The mobile renderer receives only `terms` and `glossary`. It cannot look
-  # up a display label for an internal id such as `mahadasha`, especially when
-  # the visible answer says `महादशा`. Keep the id for tagged content and add
-  # the longest visible spelling as a key for automatic wrapping. A single
-  # label prevents an alias such as "महादशा काल" and its shorter display term
-  # "महादशा" from producing nested tooltip markers in the renderer.
+  # Keep stable ids for explicitly tagged content and every spelling actually
+  # present in the answer for automatic wrapping. Clients match longest-first
+  # in one pass so a shorter term cannot nest inside a longer term's tooltip.
   glossary: Dict[str, str] = dict(matches)
   for term_id, labels in matched_labels.items():
     definition = matches.get(term_id)
     if not definition:
       continue
-    if labels:
-      glossary.setdefault(str(labels[0]).strip().lower(), definition)
+    for label in labels:
+      glossary.setdefault(str(label).strip().lower(), definition)
 
   return list(matches.keys()), glossary

@@ -1,0 +1,13 @@
+.saved-answers { color:var(--color-text); font-family:var(--font-body); }
+.saved-answers input { color:var(--color-text); background:var(--color-surface-raised); border:1px solid var(--color-border-strong); border-radius:var(--radius-md); font:inherit; }
+.saved-answers input::placeholder { color:var(--color-text-muted); }
+.saved-answers button { color:var(--color-brand); background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:var(--radius-md); padding:8px 12px; margin:8px 8px 0 0; font:inherit; cursor:pointer; }
+.saved-answers button:disabled { opacity:.5; cursor:default; }
+.saved-answers button:focus-visible,.saved-answers input:focus-visible,.saved-answers summary:focus-visible { outline:2px solid var(--color-brand); outline-offset:3px; }
+.saved-answer-card { color:var(--color-text); background:var(--color-surface-raised); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:16px; margin:12px 0; }
+.saved-answer-card small { color:var(--color-text-muted); }
+.saved-answer-card summary { color:var(--color-brand); cursor:pointer; }
+.save-answer-button[aria-pressed="true"] { color:var(--color-brand); background:var(--color-surface-muted); border-color:var(--color-brand); }
+.save-answer-button[aria-pressed="true"] svg { fill:currentColor; }
+
+.message-action-buttons .save-answer-button { border-radius:50%; }

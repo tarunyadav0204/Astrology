@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -28,8 +28,14 @@ const CATEGORIES = ['family', 'career', 'health', 'education', 'finance', 'perso
 const FactsScreen = ({ route, navigation }) => {
   const params = route.params || {};
   const { birthChartId: paramChartId, nativeName: paramNativeName, birthData: paramBirthData } = params;
+  const [memoryNotice, setMemoryNotice] = useState('');
   const { theme, colors } = useTheme();
   const [selectedBirthData, setSelectedBirthData] = useState(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [matched, setMatched] = useState(0);
+  const requestId = useRef(0);
   const [facts, setFacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -73,12 +79,13 @@ const FactsScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     if (selectedBirthData?.id) {
-      fetchFacts();
+      const timer = setTimeout(() => fetchFacts(), 250);
+      return () => { clearTimeout(timer); requestId.current += 1; };
     } else {
       setFacts([]);
       setLoading(false);
     }
-  }, [selectedBirthData?.id]);
+  }, [selectedBirthData?.id, search, page]);
 
   const fetchFacts = async () => {
     const chartId = selectedBirthData?.id;
@@ -87,26 +94,30 @@ const FactsScreen = ({ route, navigation }) => {
       setLoading(false);
       return;
     }
+    const currentRequest = ++requestId.current;
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
-      const response = await axios.get(`${API_BASE_URL}/api/facts/${chartId}`, {
+      const response = await axios.get(`${API_BASE_URL}/api/facts/${chartId}?q=${encodeURIComponent(search)}&page=${page}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (currentRequest !== requestId.current) return;
       if (response.data.success) {
-        const sortedFacts = (response.data.facts || []).sort((a, b) =>
-          new Date(b.extracted_at) - new Date(a.extracted_at)
-        );
+        const sortedFacts = response.data.facts || [];
         setFacts(sortedFacts);
+        setHasMore(Boolean(response.data.has_more));
+        setMatched(response.data.matched ?? sortedFacts.length);
+        params.onFactsChanged?.(sortedFacts, response.data.total);
       } else {
         setFacts([]);
       }
     } catch (error) {
+      if (currentRequest !== requestId.current) return;
       console.error('Error fetching facts:', error);
       Alert.alert('Error', 'Failed to load facts');
       setFacts([]);
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
   };
 
@@ -133,6 +144,7 @@ const FactsScreen = ({ route, navigation }) => {
           headers: { Authorization: `Bearer ${token}` }
         });
       }
+      setMemoryNotice('Memory updated. Future answers can use your saved details.');
       setModalVisible(false);
       setEditingFact(null);
       setFormData({ category: 'personal', fact: '' });
@@ -157,6 +169,7 @@ const FactsScreen = ({ route, navigation }) => {
             await axios.delete(`${API_BASE_URL}/api/facts/${fact.id}`, {
               headers: { Authorization: `Bearer ${token}` }
             });
+            setMemoryNotice('Detail removed from saved memory. Conversation history remains.');
             fetchFacts();
           } catch (error) {
             console.error('Error deleting fact:', error);
@@ -181,7 +194,7 @@ const FactsScreen = ({ route, navigation }) => {
   };
 
   const renderFact = ({ item }) => (
-    <View style={[styles.factCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={[styles.factCard, { backgroundColor: colors.cardBackground, borderColor: colors.cardBorder }]}>
       <View style={styles.factHeader}>
         <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '20' }]}>
           <Text style={[styles.categoryText, { color: colors.primary }]}>{item.category}</Text>
@@ -204,39 +217,6 @@ const FactsScreen = ({ route, navigation }) => {
 
   const nativeName = selectedBirthData?.name || 'Native';
 
-  if (loading && selectedBirthData?.id) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <View style={styles.headerCenter}>
-            {selectedBirthData ? (
-              <NativeSelectorChip
-                birthData={selectedBirthData}
-                onPress={() => navigation.navigate('SelectNative', { returnTo: 'Facts' })}
-                maxLength={10}
-                showIcon={false}
-              />
-            ) : (
-              <TouchableOpacity
-                style={[styles.selectNativeChip, { backgroundColor: colors.primary + '25', borderColor: colors.primary + '50' }]}
-                onPress={() => navigation.navigate('SelectNative', { returnTo: 'Facts' })}
-              >
-                <Text style={[styles.selectNativeChipText, { color: colors.primary }]}>Select native</Text>
-                <Ionicons name="chevron-down" size={16} color={colors.primary} />
-              </TouchableOpacity>
-            )}
-          </View>
-          <View style={styles.addButtonPlaceholder} />
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -245,7 +225,7 @@ const FactsScreen = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          {selectedBirthData ? (
+          {params.memory ? <Text style={{ color: colors.text, fontWeight: '600' }}>Remembered about {paramNativeName || paramBirthData?.name}</Text> : selectedBirthData ? (
             <NativeSelectorChip
               birthData={selectedBirthData}
               onPress={() => navigation.navigate('SelectNative', { returnTo: 'Facts' })}
@@ -265,12 +245,14 @@ const FactsScreen = ({ route, navigation }) => {
         <TouchableOpacity
           onPress={openAddModal}
           disabled={!selectedBirthData?.id}
-          style={[styles.addButton, { backgroundColor: selectedBirthData?.id ? colors.primary : colors.border }]}
+          style={[styles.addButton, { backgroundColor: selectedBirthData?.id ? colors.primary : colors.cardBorder }]}
         >
           <Text style={styles.addButtonText}>+ Add</Text>
         </TouchableOpacity>
       </View>
 
+      {params.memory && <View style={{ paddingHorizontal: 20, paddingVertical: 12 }}><Text style={{ color: colors.textSecondary }}>These details help personalize future answers. You can correct or remove them anytime.</Text><Text style={{ color: colors.textSecondary, marginTop: 6 }}>Editing memory does not change your conversation history.</Text>{memoryNotice ? <Text accessibilityLiveRegion="polite" style={{ color: colors.text, marginTop: 8 }}>{memoryNotice}</Text> : null}</View>}
+      {selectedBirthData?.id && <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}><TextInput accessibilityLabel="Search memory facts" value={search} onChangeText={value => { setSearch(value); setPage(1); }} placeholder="Search facts, e.g. career or studying abroad" placeholderTextColor={colors.textSecondary} style={{ padding: 12, borderRadius: 12, backgroundColor: colors.surfaceRaised, color: colors.text, borderWidth: 1, borderColor: colors.cardBorder }} />{loading ? <ActivityIndicator color={colors.primary} /> : <Text style={{ color: colors.textSecondary, marginTop: 6 }}>{matched} {search ? 'matching facts' : 'facts'}</Text>}</View>}
       {!selectedBirthData?.id ? (
         <View style={styles.emptyState}>
           <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
@@ -283,22 +265,23 @@ const FactsScreen = ({ route, navigation }) => {
         renderItem={renderFact}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.list}
+        ListFooterComponent={<View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 16 }}>{page > 1 && <TouchableOpacity disabled={loading} onPress={() => setPage(value => value - 1)}><Text style={{ color: colors.primary }}>Previous</Text></TouchableOpacity>}{hasMore && <TouchableOpacity disabled={loading} onPress={() => setPage(value => value + 1)}><Text style={{ color: colors.primary }}>Next</Text></TouchableOpacity>}</View>}
         ListEmptyComponent={
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            No facts yet for this native. Add your first fact!
+            {search ? 'No facts match your search.' : 'No facts yet for this native. Add your first fact!'}
           </Text>
         }
       />
       )}
 
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}
         >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={styles.modalLayout}>
+            <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
               <ScrollView
                 contentContainerStyle={styles.modalScrollContent}
                 keyboardShouldPersistTaps="handled"
@@ -315,7 +298,7 @@ const FactsScreen = ({ route, navigation }) => {
                       onPress={() => setFormData({ ...formData, category: cat })}
                       style={[
                         styles.categoryChip,
-                        { borderColor: colors.border },
+                        { borderColor: colors.cardBorder },
                         formData.category === cat && { backgroundColor: colors.primary, borderColor: colors.primary },
                       ]}
                     >
@@ -334,10 +317,11 @@ const FactsScreen = ({ route, navigation }) => {
 
                 <Text style={[styles.label, { color: colors.text }]}>Fact</Text>
                 <TextInput
-                  style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                  style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.cardBorder }]}
                   value={formData.fact}
                   onChangeText={(text) => setFormData({ ...formData, fact: text })}
-                  placeholder="Enter fact..."
+                  placeholder="For example: Considering a master’s abroad"
+                  accessibilityLabel="Remembered detail"
                   placeholderTextColor={colors.textSecondary}
                   multiline
                   numberOfLines={4}
@@ -349,7 +333,7 @@ const FactsScreen = ({ route, navigation }) => {
                       setModalVisible(false);
                       setEditingFact(null);
                     }}
-                    style={[styles.modalButton, { backgroundColor: colors.border }]}
+                    style={[styles.modalButton, { backgroundColor: colors.surfaceMuted }]}
                   >
                     <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
                   </TouchableOpacity>
@@ -408,8 +392,9 @@ const styles = StyleSheet.create({
   actionButton: { paddingVertical: 4 },
   actionText: { fontSize: 14, fontWeight: '600' },
   emptyText: { textAlign: 'center', marginTop: 40, fontSize: 16 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', padding: 20 },
-  modalContent: { borderRadius: 16, padding: 20 },
+  modalOverlay: { flex: 1, justifyContent: 'center' },
+  modalLayout: { flex: 1, justifyContent: 'center', padding: 20 },
+  modalContent: { borderRadius: 20, padding: 20, width: '100%', maxWidth: 520, maxHeight: '90%', alignSelf: 'center' },
   modalScrollContent: {
     paddingBottom: 16,
   },

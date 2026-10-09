@@ -61,6 +61,7 @@ import { Image } from 'react-native';
 
 import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
+import ChatMemory from './ChatMemory';
 import AppAlertModal from '../Common/AppAlertModal';
 import QuickThemePickerModal from '../Common/QuickThemePickerModal';
 import { useCredits } from '../../credits/CreditContext';
@@ -6893,6 +6894,7 @@ export default function ChatScreen({ navigation, route }) {
                         {t('premiumUi.home.askTara')}
                       </Text>
                     )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
                     {birthData ? (
                       <NativeSelectorChip
                         birthData={birthData}
@@ -6901,6 +6903,7 @@ export default function ChatScreen({ navigation, route }) {
                         showIcon={false}
                         style={[
                           styles.instantNativeSelectorChip,
+                          { flexShrink: 1, marginTop: 0 },
                           wideHeader && styles.instantNativeSelectorChipWide,
                           { backgroundColor: colors.cosmicGlow, borderColor: colors.cosmicLine },
                         ]}
@@ -6912,6 +6915,8 @@ export default function ChatScreen({ navigation, route }) {
                         {birthData?.name || 'Private consultation'}
                       </Text>
                     )}
+                    {birthData?.id && <ChatMemory key={birthData.id} birthData={birthData} navigation={navigation} />}
+                    </View>
                   </View>
                 </View>
               ) : (

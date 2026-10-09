@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime
 from auth import get_current_user, User
 from db import get_conn, execute
@@ -9,6 +9,7 @@ class FeedbackRequest(BaseModel):
     message_id: int
     rating: int = Field(..., ge=1, le=5)
     comment: Optional[str] = None
+    reason: Optional[Literal["unclear", "wrong_personal_detail", "contradicts_earlier_answer", "helpful"]] = None
 
 router = APIRouter(prefix="/chat/feedback", tags=["chat_feedback"])
 
@@ -29,6 +30,8 @@ def _ensure_feedback_table(conn):
         """,
         (),
     )
+
+    execute(conn, "ALTER TABLE message_feedback ADD COLUMN IF NOT EXISTS reason TEXT", ())
 
 @router.post("/submit")
 async def submit_feedback(request: FeedbackRequest, current_user: User = Depends(get_current_user)):
@@ -63,19 +66,19 @@ async def submit_feedback(request: FeedbackRequest, current_user: User = Depends
                     conn,
                     """
                     UPDATE message_feedback
-                    SET rating = %s, comment = %s, created_at = %s
+                    SET rating = %s, comment = %s, created_at = %s, reason = %s
                     WHERE message_id = %s
                     """,
-                    (request.rating, request.comment, datetime.now(), request.message_id),
+                    (request.rating, request.comment, datetime.now(), request.reason, request.message_id),
                 )
             else:
                 execute(
                     conn,
                     """
-                    INSERT INTO message_feedback (message_id, rating, comment, created_at)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO message_feedback (message_id, rating, comment, created_at, reason)
+                    VALUES (%s, %s, %s, %s, %s)
                     """,
-                    (request.message_id, request.rating, request.comment, datetime.now()),
+                    (request.message_id, request.rating, request.comment, datetime.now(), request.reason),
                 )
 
             conn.commit()
@@ -97,6 +100,7 @@ async def get_feedback_stats(
     limit: int = 10,
     username: Optional[str] = None,
     rating: Optional[int] = None,
+    reason: Optional[Literal["unclear", "wrong_personal_detail", "contradicts_earlier_answer", "helpful"]] = None,
     current_user: User = Depends(get_current_user)
 ):
     """Get feedback statistics with pagination and search (admin only)"""
@@ -107,15 +111,18 @@ async def get_feedback_stats(
         with get_conn() as conn:
             _ensure_feedback_table(conn)
             conn.commit()
-            cur = execute(conn, "SELECT COUNT(*), AVG(rating) FROM message_feedback", ())
+            cur = execute(conn, "SELECT COUNT(*), AVG(CASE WHEN reason IS NULL THEN rating END) FROM message_feedback", ())
             total_feedback, avg_rating = cur.fetchone() or (0, None)
 
             cur = execute(
                 conn,
-                "SELECT rating, COUNT(*) FROM message_feedback GROUP BY rating ORDER BY rating",
+                "SELECT rating, COUNT(*) FROM message_feedback WHERE reason IS NULL GROUP BY rating ORDER BY rating",
                 (),
             )
             rating_distribution = {row[0]: row[1] for row in (cur.fetchall() or [])}
+
+            cur = execute(conn, "SELECT reason, COUNT(*) FROM message_feedback WHERE reason IS NOT NULL GROUP BY reason", ())
+            reason_distribution = {row[0]: row[1] for row in (cur.fetchall() or [])}
 
             where_conditions = []
             params = []
@@ -129,6 +136,10 @@ async def get_feedback_stats(
             if rating:
                 where_conditions.append("mf.rating = %s")
                 params.append(rating)
+
+            if reason:
+                where_conditions.append("mf.reason = %s")
+                params.append(reason)
 
             where_clause = " AND ".join(where_conditions)
             if where_clause:
@@ -154,7 +165,8 @@ async def get_feedback_stats(
                     mf.created_at,
                     COALESCE(u.name, 'Unknown User') as user_name,
                     u.phone as user_phone,
-                    question_msg.content as feedback_question
+                    question_msg.content as feedback_question,
+                    mf.reason, cm.content as answer
                 FROM message_feedback mf
                 LEFT JOIN chat_messages cm ON mf.message_id = cm.message_id
                 LEFT JOIN chat_sessions cs ON cm.session_id = cs.session_id
@@ -186,6 +198,8 @@ async def get_feedback_stats(
                 "user_name": row[3],
                 "user_phone": row[4] or '',
                 "question": row[5] or '',
+                "reason": row[6],
+                "answer": row[7] or '',
             }
             for row in feedback_results
         ]
@@ -194,6 +208,7 @@ async def get_feedback_stats(
             "total_feedback": total_feedback or 0,
             "average_rating": round(avg_rating or 0, 2),
             "rating_distribution": rating_distribution,
+            "reason_distribution": reason_distribution,
             "feedback": feedback_with_users,
             "pagination": {
                 "page": page,
@@ -217,12 +232,15 @@ async def get_user_feedback(current_user: User = Depends(get_current_user)):
             cur = execute(
                 conn,
                 """
-                SELECT message_id, rating, comment, created_at
-                FROM message_feedback
-                ORDER BY created_at DESC
+                SELECT mf.message_id, mf.rating, mf.comment, mf.created_at, mf.reason
+                FROM message_feedback mf
+                JOIN chat_messages cm ON cm.message_id = mf.message_id
+                JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                WHERE cs.user_id = %s
+                ORDER BY mf.created_at DESC
                 LIMIT 20
                 """,
-                (),
+                (current_user.userid,),
             )
             feedback_list = cur.fetchall() or []
 
@@ -232,7 +250,8 @@ async def get_user_feedback(current_user: User = Depends(get_current_user)):
                     "message_id": row[0],
                     "rating": row[1],
                     "comment": row[2],
-                    "created_at": row[3]
+                    "created_at": row[3],
+                    "reason": row[4]
                 }
                 for row in feedback_list
             ]

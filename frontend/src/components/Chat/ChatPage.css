@@ -4434,3 +4434,5 @@ button.chat-header-credits.credits-display:focus-visible {
     border-color: #f59e0b;
     background: color-mix(in srgb, #fef3c7 24%, var(--color-surface-raised));
 }
+
+.chat-sentiment-label { font-size:0.75em; font-weight:600; white-space:nowrap; opacity:0.9; }

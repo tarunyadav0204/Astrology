@@ -74,6 +74,12 @@ export default function ChatViewScreen({ route, navigation }) {
   const isDayTranscript = daySessionIds.length > 0;
   const [loadedSessionCount, setLoadedSessionCount] = useState(isDayTranscript && session.messages?.length ? daySessionIds.length : 0);
 
+  useEffect(() => {
+    setMessages(session.messages || []);
+    setLoadedSessionCount(session.session_ids?.length && session.messages?.length ? session.session_ids.length : 0);
+    setLoadError('');
+  }, [session]);
+
   const isUserMessage = (message) => (message?.sender || message?.role) === 'user';
   const isAssistantMessage = (message) => (message?.sender || message?.role) === 'assistant';
   const answerCount = messages.filter((message) => isAssistantMessage(message) && message?.message_type === 'answer').length;
@@ -92,7 +98,8 @@ export default function ChatViewScreen({ route, navigation }) {
       navigation.replace('Login');
       return [];
     }
-    const sessions = await Promise.all(responses.filter((response) => response.ok).map((response) => response.json()));
+    if (responses.some(response => !response.ok)) throw new Error('Unable to load conversation');
+    const sessions = await Promise.all(responses.map((response) => response.json()));
     return sessions.flatMap((sessionData) => mapSessionMessages(sessionData, session?.date_key));
   }, [navigation, session?.date_key]);
 

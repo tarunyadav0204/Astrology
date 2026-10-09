@@ -66,10 +66,18 @@ function FeedbackPlayStoreRow({ colors, t }) {
   );
 }
 
+const FEEDBACK_PLACEHOLDERS = {
+  helpful: 'What was most helpful? (optional)',
+  unclear: 'Which part was unclear? (optional)',
+  wrong_personal_detail: 'Which personal detail was wrong, and what should it be? (optional)',
+  contradicts_earlier_answer: 'What contradicts an earlier answer? Include the earlier statement if possible. (optional)',
+};
+
 export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const [feedback, setFeedback] = useState({ rating: 0, comment: '', submitted: false });
+  const [feedback, setFeedback] = useState({ reason: null, rating: 0, comment: '', submitted: false });
+  const [submitting, setSubmitting] = useState(false);
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -94,10 +102,13 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
   }, [eligible, dismissed, fadeAnim]);
 
   const submitFeedback = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       await chatAPI.submitFeedback({
         message_id: Number(message.messageId),
         rating: feedback.rating,
+        reason: feedback.reason,
         comment: feedback.comment.trim() || null,
       });
 
@@ -119,12 +130,9 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
       const detail = error?.response?.data?.detail || error?.message || 'Failed to submit feedback';
       if (__DEV__) console.warn('[Feedback] submit failed:', detail);
       Alert.alert('Error', detail);
-    }
+    } finally { setSubmitting(false); }
   };
 
-  const handleStarPress = (rating) => {
-    setFeedback(prev => ({ ...prev, rating }));
-  };
 
   const handleSkip = () => {
     Animated.timing(fadeAnim, {
@@ -168,24 +176,6 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
               <Text style={[styles.eyebrow, { color: colors.primary }]}>{t('premiumUi.chat.answerFeedback')}</Text>
               <Text style={[styles.title, { color: colors.text }]}>{t('premiumUi.chat.wasUseful')}</Text>
             </View>
-            <View style={styles.starsContainer}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => handleStarPress(star)}
-                  style={styles.starButton}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('premiumUi.chat.rateAnswer', { rating: star })}
-                  accessibilityState={{ selected: star <= feedback.rating }}
-                >
-                  <Ionicons
-                    name={star <= feedback.rating ? 'star' : 'star-outline'}
-                    size={22}
-                    color={star <= feedback.rating ? colors.accent : colors.textTertiary}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
             <TouchableOpacity
               onPress={handleSkip}
               style={styles.dismissButton}
@@ -196,6 +186,12 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
               <Ionicons name="close" size={17} color={colors.textTertiary} />
             </TouchableOpacity>
           </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'helpful' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'helpful', rating: 5 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'helpful' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>Helpful</Text></TouchableOpacity>
+            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'unclear' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'unclear', rating: 2 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'unclear' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>Unclear</Text></TouchableOpacity>
+            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'wrong_personal_detail' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'wrong_personal_detail', rating: 1 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'wrong_personal_detail' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>Wrong personal detail</Text></TouchableOpacity>
+            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityState={{ selected: feedback.reason === 'contradicts_earlier_answer' }} onPress={() => setFeedback(prev => ({ ...prev, reason: 'contradicts_earlier_answer', rating: 1 }))} style={{ padding: 10, borderWidth: 1, borderRadius: 16, borderColor: feedback.reason === 'contradicts_earlier_answer' ? colors.primary : colors.cardBorder }}><Text style={{ color: colors.text }}>Contradicts an earlier answer</Text></TouchableOpacity>
+          </View>
           {feedback.rating > 0 && (
             <>
               <TextInput
@@ -204,14 +200,15 @@ export default function FeedbackComponent({ message, onFeedbackSubmitted }) {
                   borderColor: colors.cardBorder,
                   backgroundColor: colors.surfaceMuted,
                 }]}
-                placeholder={t('premiumUi.chat.tellMore')}
+                placeholder={FEEDBACK_PLACEHOLDERS[feedback.reason]}
+                accessibilityLabel={FEEDBACK_PLACEHOLDERS[feedback.reason]}
                 placeholderTextColor={colors.textTertiary}
                 multiline
                 value={feedback.comment}
                 onChangeText={(text) => setFeedback(prev => ({ ...prev, comment: text }))}
               />
               <View style={styles.buttonsContainer}>
-                <TouchableOpacity style={[styles.submitButton, { backgroundColor: colors.primary }]} onPress={submitFeedback}>
+                <TouchableOpacity style={[styles.submitButton, { backgroundColor: colors.primary }]} disabled={submitting} onPress={submitFeedback}>
                   <Text style={[styles.submitButtonText, { color: colors.onPrimary }]}>{t('premiumUi.chat.sendFeedback')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.skipButton, { borderColor: colors.cardBorder }]} onPress={handleSkip}>

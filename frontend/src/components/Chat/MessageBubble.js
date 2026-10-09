@@ -20,6 +20,8 @@ import PodcastGenerationExperience from './PodcastGenerationExperience';
 import { buildInstantTypingLines, INSTANT_LOADER_TAKING_LONGER } from '../../constants/instantChatLoader';
 import { buildReadableEvidence, buildRoutingSummary } from '../../utils/instantEvidence';
 import { autoWrapGlossaryTermsInHtml, buildGlossaryTooltipHtml } from '../../utils/chatGlossary';
+import { labelChatSentiment } from '../../utils/chatSentiment';
+import { SaveAnswerButton } from './SavedAnswers';
 import { formatChatHeadings } from '../../utils/chatFormatting';
 
 const premiumPodcastReadyKeys = new Set();
@@ -1563,22 +1565,18 @@ const MessageBubble = ({
         if (Object.keys(glossary).length > 0) {
             // First try to find existing <term> tags
             const termRegex = /<term\s+id=["']([^"']+)["']\s*>([^<]+)<\/term>/gi;
-            let termCount = 0;
             formatted = formatted.replace(termRegex, (match, termId, termText) => {
                 const resolved = getGlossaryDefinition(glossary, termId);
                 if (resolved && resolved.definition != null && String(resolved.definition).trim() !== '') {
-                    termCount++;
                     return buildGlossaryTooltipHtml(termText, resolved.key, resolved.definition);
                 }
                 return termText;
             });
 
-            // Auto-wrap plain-text mentions when the model did not emit <term> tags (longer phrases first)
-            if (termCount === 0) {
-                const wrapped = autoWrapGlossaryTermsInHtml(formatted, glossary);
-                formatted = wrapped.html;
-                termCount += wrapped.count;
-            }
+            // Models may tag only some terms. Complete the remaining mentions
+            // without wrapping the tooltips already created above.
+            const wrapped = autoWrapGlossaryTermsInHtml(formatted, glossary);
+            formatted = wrapped.html;
         }
         
         // 8. Headings (lighter, non-overwhelming)
@@ -1599,7 +1597,7 @@ const MessageBubble = ({
 
         // 10. Wrap into a single response container to avoid many "cards"
         formatted = `<div class="chat-response">${formatted}</div>`;
-        return formatted;
+        return labelChatSentiment(formatted);
     };
 
     // Handle tooltip clicks with event delegation
@@ -1726,6 +1724,7 @@ const MessageBubble = ({
                     </div>
                     {message.role === 'assistant' && showMessageToolbar ? (
                         <div className="message-action-buttons message-action-buttons--bottom message-action-buttons--instant" role="toolbar" aria-label="Message actions">
+                        <SaveAnswerButton message={message} />
                         <button
                             type="button"
                             className={`action-btn action-btn--podcast${podcastReady ? ' action-btn--podcast-ready' : ''}`}
@@ -1827,6 +1826,7 @@ const MessageBubble = ({
                 role="toolbar"
                 aria-label="Message actions"
             >
+                <SaveAnswerButton message={message} />
                 {message.showRestartButton && message.messageId && (
                     <button
                         type="button"

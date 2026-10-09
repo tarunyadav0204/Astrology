@@ -40,3 +40,16 @@ test('existing HTML attributes are never modified', () => {
     expect(result.html).toContain('<strong data-note="Lagna lord"><span class="tooltip-wrapper"');
     expect(result.count).toBe(1);
 });
+
+test('overlapping aliases and partial model tagging do not nest tooltips', () => {
+    const tagged = buildGlossaryTooltipHtml('Lagna lord', 'Lagna lord', 'Ruler');
+    const result = autoWrapGlossaryTermsInHtml(`${tagged} and Lagna. Fourth house and House 4.`, {
+        Lagna: 'Ascendant', 'Lagna lord': 'Ruler',
+        'fourth house': 'Home', 'House 4': 'Home',
+    });
+    const rendered = document.createElement('div');
+    rendered.innerHTML = result.html;
+    expect(rendered.textContent).toBe('Lagna lord and Lagna. Fourth house and House 4.');
+    expect(rendered.querySelectorAll('.tooltip-wrapper')).toHaveLength(4);
+    expect(rendered.querySelector('.tooltip-wrapper .tooltip-wrapper')).toBeNull();
+});

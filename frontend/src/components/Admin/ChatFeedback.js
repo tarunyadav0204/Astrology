@@ -52,6 +52,7 @@ const ChatFeedback = () => {
         total_feedback: data.total_feedback,
         average_rating: data.average_rating,
         rating_distribution: data.rating_distribution,
+        reason_distribution: data.reason_distribution,
       });
 
       const rowTotal = Number(data.pagination?.total) || 0;
@@ -123,7 +124,10 @@ const ChatFeedback = () => {
         <div className="feedback-meta">
           <strong>{stats.total_feedback || 0}</strong> feedback
           <span className="feedback-meta-sep">·</span>
-          avg <strong>{avgDisplay}</strong>
+          legacy avg <strong>{avgDisplay}</strong>
+        </div>
+        <div className="feedback-rating-row" aria-label="Feedback reasons">
+          {Object.entries(stats.reason_distribution || {}).map(([reason, count]) => <span key={reason} className="feedback-rating-chip">{({unclear: 'Unclear', wrong_personal_detail: 'Wrong personal detail', contradicts_earlier_answer: 'Contradicts an earlier answer', helpful: 'Helpful'}[reason] || reason)}: {count}</span>)}
         </div>
         <div className="feedback-rating-row" aria-label="Rating distribution">
           {RATING_ORDER.map((rating) => {
@@ -176,7 +180,7 @@ const ChatFeedback = () => {
                 <th>User</th>
                 <th>Phone</th>
                 <th>Question</th>
-                <th>Rating</th>
+                <th>Feedback reason / legacy rating</th>
                 <th>Comment</th>
                 <th>Created</th>
               </tr>
@@ -191,10 +195,7 @@ const ChatFeedback = () => {
                       {feedback.question || 'Question not found'}
                     </td>
                     <td className="rating-cell">
-                      <span className="cf-rating-stars" aria-hidden="true">
-                        {renderStars(feedback.rating)}
-                      </span>
-                      <span className="rating-number">{feedback.rating}/5</span>
+                      {feedback.reason ? ({unclear: 'Unclear', wrong_personal_detail: 'Wrong personal detail', contradicts_earlier_answer: 'Contradicts an earlier answer', helpful: 'Helpful'}[feedback.reason] || feedback.reason) : `${feedback.rating}/5`}
                     </td>
                     <td className="comment-cell">
                       {feedback.comment || '—'}

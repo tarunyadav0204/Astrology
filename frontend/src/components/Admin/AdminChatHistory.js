@@ -2168,6 +2168,13 @@ const AdminChatHistory = () => {
 	                  const showPdfButton = role === 'assistant' && Array.isArray(exportBlock) && exportBlock.length > 0;
 	                  const isInstantUsage = message.parallel_llm_usage?.kind === 'instant_chat_usage';
 	                  const isVerifiedUsage = message.parallel_llm_usage?.kind === 'verified_chat_usage';
+                      const chatTier = String(message.chat_tier || '').trim().toLowerCase();
+                      const modeLabel = {
+                        standard: 'Standard',
+                        premium: 'Premium',
+                        verified: 'Verified',
+                        instant: 'Instant',
+                      }[chatTier] || (isVerifiedUsage ? 'Verified' : isInstantUsage ? 'Instant' : 'Unknown mode');
 	                  const parallelModelInfo = hasParallelStages ? parallelModelSummary(message.parallel_llm_usage) : null;
 	                  const parallelBranchPlan = hasParallelStages ? parallelBranchPlanSummary(message.parallel_llm_usage) : null;
 	                  const answerModelLabel =
@@ -2205,10 +2212,9 @@ const AdminChatHistory = () => {
                 <div key={index} className={`message message--${role}`}>
                     <div className="message-label">
                       {label}
+                      {role === 'assistant' ? <span className="admin-instant-message-badge">{modeLabel}</span> : null}
                       {message.response_style === 'simple' ? <span className="admin-instant-message-badge">Simple</span> : null}
                       {message.response_style === 'technical' ? <span className="admin-instant-message-badge">Technical</span> : null}
-                      {isInstantUsage ? <span className="admin-instant-message-badge">⚡ Instant</span> : null}
-	                      {isVerifiedUsage ? <span className="admin-instant-message-badge">✓ Verified Chat</span> : null}
                     </div>
                     <div
                       className="message-content"

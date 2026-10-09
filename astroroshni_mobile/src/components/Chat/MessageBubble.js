@@ -28,6 +28,7 @@ import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule, userFacingPdfExportError } from '../../utils/pdfGenerator';
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { buildReadableEvidence } from '../../utils/instantEvidence';
+import { wrapGlossaryTerms } from '../../utils/chatGlossary';
 
 const WHY_TARA_SAYS_THIS = {
   english: 'Why Tara says this',
@@ -95,6 +96,7 @@ const InstantEvidenceDetails = ({ evidence, colors, t }) => {
     </>
   );
 };
+import { SaveAnswerButton } from './SavedAnswers';
 import { chatAPI } from '../../services/api';
 import { storage } from '../../services/storage';
 import { useTranslation } from 'react-i18next';
@@ -1076,41 +1078,21 @@ function MessageBubble({
       .replace(/#+\s*$/, '');
 
     // Process term tooltips FIRST, after HTML entity decoding (only first occurrence per term per message)
-    if (message.terms && message.glossary && Object.keys(message.glossary).length > 0) {
+    if (message.glossary && Object.keys(message.glossary).length > 0) {
       const wrappedTermIds = new Set();
       // First try to find existing <term> tags
-      let termCount = 0;
       formatted = formatted.replace(/<term\s+id=["']([^"']+)["']\s*>([^<]+)<\/term>/gi, (match, termId, termText) => {
         const normalizedId = termId.toLowerCase().trim();
         if (message.glossary[normalizedId]) {
           if (wrappedTermIds.has(normalizedId)) return termText;
           wrappedTermIds.add(normalizedId);
-          termCount++;
           return `<tooltip data-term="${normalizedId}">${termText}</tooltip>`;
         }
         return termText;
       });
 
-      // If no tags found, auto-wrap terms from glossary keys (first occurrence only per term)
-      if (termCount === 0) {
-        Object.keys(message.glossary).forEach(termKey => {
-          const escapedTerm = termKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          // JavaScript word boundaries do not reliably recognize Indic scripts
-          // with combining vowel marks. The backend only sends keys that were
-          // matched in this response, so exact substring matching is safe for
-          // non-Latin glossary labels.
-          const usesNonLatinScript = /[^\u0000-\u007f]/.test(termKey);
-          const termPattern = usesNonLatinScript
-            ? new RegExp(`(${escapedTerm})`, 'gi')
-            : new RegExp(`\\b(${escapedTerm})\\b`, 'gi');
-          formatted = formatted.replace(termPattern, (match) => {
-            const key = termKey.toLowerCase();
-            if (wrappedTermIds.has(key)) return match;
-            wrappedTermIds.add(key);
-            return `<tooltip data-term="${termKey}">${match}</tooltip>`;
-          });
-        });
-      }
+      // Complete partial model tagging without nesting existing tooltips.
+      formatted = wrapGlossaryTerms(formatted, message.glossary, wrappedTermIds);
     }
 
     // Normalize line breaks
@@ -1562,6 +1544,7 @@ function MessageBubble({
               key={`sentiment-${keyPrefix}-${i}-${m.index}`}
               style={[baseTextStyle, styles.sentimentEmphasis, { color: sentimentColor }]}
             >
+              <Text style={{ fontSize: 11, fontWeight: '600' }}>{isPos ? '✓ Support · ' : '! Caution · '}</Text>
               {innerEls}
             </Text>
           );
@@ -2218,6 +2201,7 @@ function MessageBubble({
             accessibilityRole="toolbar"
             accessibilityLabel={t('chat.messageActions', 'Message actions')}
           >
+            <SaveAnswerButton message={message} style={[styles.actionButton, messageActionStyle]} />
             {!(isPlayingPodcast || isPausedPodcast) ? (
               <TouchableOpacity
                 style={[
@@ -2997,6 +2981,7 @@ function MessageBubble({
         {/* Action buttons (podcast, share, copy, etc.) - show for assistant messages with content (incl. chat history) */}
         {!message.isTyping && !message.instantStreaming && message.role === 'assistant' && !message.isWelcome && !isNativeGate && (message.messageId || message.content) && (
           <View style={[styles.actionButtons, { borderTopColor: colors.cardBorder }]}>
+            <SaveAnswerButton message={message} style={[styles.actionButton, messageActionStyle]} />
             {/* Restart Button for timeout messages */}
             {message.showRestartButton && message.messageId && (
               <TouchableOpacity

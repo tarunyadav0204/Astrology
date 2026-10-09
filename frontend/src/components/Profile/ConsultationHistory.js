@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { formatChatMessageHtml } from '../../utils/markdown';
 import './ConsultationHistory.css';
+import SavedAnswers, { SaveAnswerButton } from '../Chat/SavedAnswers';
 
 const ConsultationHistory = ({ user, onStartConsultation }) => {
+  const [view, setView] = useState('all');
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -87,7 +89,8 @@ const ConsultationHistory = ({ user, onStartConsultation }) => {
         <div><span>Private archive</span><h3>Past consultations</h3></div>
         <button type="button" onClick={onStartConsultation}>New consultation <span aria-hidden>↗</span></button>
       </header>
-      {sessions.length === 0 ? (
+      <div role="group" aria-label="History view" style={{ display: 'flex', gap: 8, marginBottom: 16 }}><button type="button" aria-pressed={view === 'all'} onClick={() => setView('all')}>All chats</button><button type="button" aria-pressed={view === 'saved'} onClick={() => { setSelectedSession(null); setView('saved'); }}>Saved answers</button></div>
+      {view === 'saved' ? <SavedAnswers onOpenConversation={id => { setView('all'); fetchSessionDetails(id); }} /> : sessions.length === 0 ? (
         <div className="no-history">
           <div className="no-history-icon" aria-hidden>त</div>
           <h3>No Consultations Yet</h3>
@@ -137,6 +140,7 @@ const ConsultationHistory = ({ user, onStartConsultation }) => {
                       className="message-content"
                       dangerouslySetInnerHTML={{ __html: formatChatMessageHtml(message.content) }}
                     />
+                    <SaveAnswerButton message={{ ...message, role: message.sender, messageId: message.message_id }} />
                     <div className="message-time">
                       {new Date(message.timestamp).toLocaleTimeString()}
                     </div>

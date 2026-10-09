@@ -1,0 +1,955 @@
+[
+  {
+    "term_id": "Atmakarka",
+    "display_text": "Atmakaraka",
+    "definition": "In Jaimini astrology, the planet with the highest degree within its sign among the planets included in the chosen chara-karaka scheme. It represents a central life lesson and inner direction.",
+    "language": "english",
+    "aliases": [
+      "Atmakaraka",
+      "Atma Karaka"
+    ],
+    "correct_display_text": true
+  },
+  {
+    "term_id": "Cusp Sub Lord",
+    "display_text": "Cusp Sub Lord",
+    "definition": "In KP astrology, the planet ruling the subdivision containing a house cusp. Its house connections help assess whether that house can deliver the event being examined.",
+    "language": "english",
+    "aliases": [
+      "Cusp Sub-Lord",
+      "Cuspal Sub-Lord",
+      "Cuspal Sub Lord"
+    ]
+  },
+  {
+    "term_id": "KP",
+    "display_text": "KP Astrology",
+    "definition": "Krishnamurti Paddhati: an astrology method using house cusps, nakshatra rulers and sub-lords to assess events and their timing.",
+    "language": "english",
+    "aliases": [
+      "KP",
+      "KP system",
+      "Krishnamurti Paddhati"
+    ]
+  },
+  {
+    "term_id": "D1 Chart",
+    "display_text": "D1 Chart",
+    "definition": "The main birth chart, calculated for the birth time and place. It provides the basic planetary, sign and house placements used to interpret the other charts.",
+    "language": "english",
+    "aliases": [
+      "D1",
+      "D-1",
+      "Natal chart",
+      "Birth chart",
+      "Lagna chart"
+    ]
+  },
+  {
+    "term_id": "Lagna",
+    "display_text": "Lagna",
+    "definition": "The zodiac point rising on the eastern horizon at birth. It establishes the first-house reference and the orientation of the birth chart.",
+    "language": "english",
+    "aliases": [
+      "Ascendant",
+      "Rising sign"
+    ]
+  },
+  {
+    "term_id": "Lagna lord",
+    "display_text": "Lagna lord",
+    "definition": "The planet ruling the ascendant sign. Its position and condition connect the person and their overall life direction with the houses it influences.",
+    "language": "english",
+    "aliases": [
+      "Ascendant lord",
+      "Ascendant ruler",
+      "Lagna-lord"
+    ]
+  },
+  {
+    "term_id": "dasamsa",
+    "display_text": "Dashamsa (D10)",
+    "definition": "The tenth divisional chart, used to refine career, responsibility and professional achievement shown in the main birth chart.",
+    "language": "english",
+    "aliases": [
+      "D10",
+      "D-10",
+      "Dasamsa",
+      "Dashamsa"
+    ]
+  },
+  {
+    "term_id": "D24",
+    "display_text": "Siddhamsa (D24)",
+    "definition": "The twenty-fourth divisional chart, traditionally examined for education, scholarship and learning. It refines the birth-chart promise and is sensitive to birth-time accuracy.",
+    "language": "english",
+    "aliases": [
+      "D-24",
+      "Siddhamsa",
+      "Siddhamsha",
+      "Chaturvimshamsa",
+      "Chaturvimshamsha",
+      "Education chart",
+      "D24"
+    ]
+  },
+  {
+    "term_id": "Parashari",
+    "display_text": "Parashari",
+    "definition": "The approach associated with Parashara, using planetary placements, house rulerships, aspects, strengths and dashas to interpret a chart.",
+    "language": "english",
+    "aliases": [
+      "Parashari astrology",
+      "Parashari View",
+      "Parashara astrology"
+    ]
+  },
+  {
+    "term_id": "Jaimini",
+    "display_text": "Jaimini",
+    "definition": "The approach associated with Jaimini, using chara karakas, sign-based relationships, arudhas and sign dashas as interpretive tools.",
+    "language": "english",
+    "aliases": [
+      "Jaimini astrology",
+      "Jaimini View"
+    ]
+  },
+  {
+    "term_id": "Nadi",
+    "display_text": "Nadi",
+    "definition": "A family of astrological traditions. In this app, Nadi analysis examines planetary connections and sequences to relate different life themes.",
+    "language": "english",
+    "aliases": [
+      "Nadi astrology",
+      "Nadi Interpretation",
+      "Nadi sequence"
+    ]
+  },
+  {
+    "term_id": "Sudarshana",
+    "display_text": "Sudarshana",
+    "definition": "A perspective that compares houses from the ascendant, Moon and Sun to examine the same life topic from three reference points.",
+    "language": "english",
+    "aliases": [
+      "Sudarshana Chakra",
+      "Sudarshana chart",
+      "Sudarshan",
+      "Triple Perspective"
+    ]
+  },
+  {
+    "term_id": "Dasha",
+    "display_text": "Dasha",
+    "definition": "An astrological timing period ruled by a planet or sign. A dasha indicates which existing chart themes may become active during that period.",
+    "language": "english",
+    "aliases": [
+      "Dashas",
+      "Dasa",
+      "Dasas",
+      "Dasha hierarchy"
+    ]
+  },
+  {
+    "term_id": "Vimshottari",
+    "display_text": "Vimshottari",
+    "definition": "A 120-year planetary dasha cycle based on the Moon’s birth nakshatra, subdivided into successively shorter periods.",
+    "language": "english",
+    "aliases": [
+      "Vimshottari Dasha",
+      "Vimsottari",
+      "Vimshottari sequence"
+    ]
+  },
+  {
+    "term_id": "Mahadasha",
+    "display_text": "Mahadasha",
+    "definition": "The main planetary period in a dasha system. Its planet sets the broad themes of that stage of life.",
+    "language": "english",
+    "aliases": [
+      "Maha dasha"
+    ]
+  },
+  {
+    "term_id": "antardasha",
+    "display_text": "antardasha",
+    "definition": "A sub-period within a mahadasha. Its planet works with the main-period ruler to refine the themes and timing.",
+    "language": "english",
+    "aliases": [
+      "Antardasha",
+      "Antar dasha",
+      "Bhukti"
+    ]
+  },
+  {
+    "term_id": "Pratyantardasha",
+    "display_text": "Pratyantardasha",
+    "definition": "A sub-period within an antardasha, used to examine a shorter timing window.",
+    "language": "english",
+    "aliases": [
+      "Pratyantar dasha",
+      "Pratyantara dasha"
+    ]
+  },
+  {
+    "term_id": "Chara Dasha",
+    "display_text": "Chara Dasha",
+    "definition": "A Jaimini sign-based timing system. Each zodiac sign becomes the reference for a period, interpreted using its planetary and house connections.",
+    "language": "english",
+    "aliases": [
+      "Chara dasa",
+      "Jaimini Chara Dasha"
+    ]
+  },
+  {
+    "term_id": "Kashta Phala",
+    "display_text": "Kashta Phala",
+    "definition": "A traditional measure of a planet’s capacity to give difficult or frustrating results. It is interpreted alongside strength, house rulership and active timing.",
+    "language": "english",
+    "aliases": [
+      "Kashta",
+      "Kashta component",
+      "Kashta bala",
+      "Kashta phala"
+    ]
+  },
+  {
+    "term_id": "Own sign",
+    "display_text": "Own sign",
+    "definition": "A zodiac sign ruled by the planet placed in it. This is a dignity condition that supports the planet’s capacity, while the outcome still depends on its role in the chart.",
+    "language": "english",
+    "aliases": [
+      "Own-sign",
+      "Own sign dignity",
+      "Swakshetra"
+    ]
+  },
+  {
+    "term_id": "Moolatrikona",
+    "display_text": "Moolatrikona",
+    "definition": "A particularly supportive sign region for a planet, traditionally distinguished from its ordinary own-sign placement. It describes dignity rather than a guaranteed outcome.",
+    "language": "english",
+    "aliases": [
+      "Moola trikona",
+      "Mulatrikona"
+    ]
+  },
+  {
+    "term_id": "Benefic",
+    "display_text": "Benefic",
+    "definition": "A planet or influence considered supportive in an astrological context. Natural benefic status and a planet’s functional role for a particular ascendant are separate considerations.",
+    "language": "english",
+    "aliases": [
+      "Benefics"
+    ]
+  },
+  {
+    "term_id": "Functional benefic",
+    "display_text": "Functional benefic",
+    "definition": "A planet considered constructive because of the houses it rules for the particular ascendant. This role can differ from its natural benefic or malefic classification.",
+    "language": "english",
+    "aliases": [
+      "Functionally benefic",
+      "Functionally beneficial"
+    ]
+  },
+  {
+    "term_id": "Yogi point",
+    "display_text": "Yogi point",
+    "definition": "A calculated point derived from the Sun and Moon. Its nakshatra ruler is the Yogi planet, a special indicator of supportive potential.",
+    "language": "english",
+    "aliases": [
+      "Yogi",
+      "Yoga Sphuta"
+    ]
+  },
+  {
+    "term_id": "Avayogi",
+    "display_text": "Avayogi",
+    "definition": "The nakshatra ruler of a point offset from the Yogi point, traditionally examined for obstruction. In this app, its contribution is assessed with placement, aspects and cancellation or reversal rules.",
+    "language": "english",
+    "aliases": [
+      "Avayogi planet",
+      "Avayogi point",
+      "Avayogi calculation"
+    ]
+  },
+  {
+    "term_id": "Reversal house",
+    "display_text": "Reversal house",
+    "definition": "In this app’s Avayogi rule, houses 3, 6, 8 and 12 can reverse the Avayogi contribution from obstructive to supportive. This changes only that contribution, not other difficult chart factors.",
+    "language": "english",
+    "aliases": [
+      "Reversal houses",
+      "Avayogi reversal"
+    ]
+  },
+  {
+    "term_id": "Tithi Dagdha Rashis",
+    "display_text": "Tithi Dagdha Rashis",
+    "definition": "Zodiac signs classified as dagdha, or burnt, from the birth lunar day under the selected traditional rule. These are additional constraints, interpreted with the full chart.",
+    "language": "english",
+    "aliases": [
+      "Tithi Dagdha Rashi",
+      "Dagdha Rashi",
+      "Dagdha Rashis",
+      "Tithi Dagdha signs"
+    ]
+  },
+  {
+    "term_id": "House cusp",
+    "display_text": "House cusp",
+    "definition": "The boundary or reference point used to define an astrological house. The specific definition depends on the house system; KP interprets the cusp’s sign, star and subdivisions.",
+    "language": "english",
+    "aliases": [
+      "Cusp",
+      "Cusps",
+      "House cusps"
+    ]
+  },
+  {
+    "term_id": "Star Lord",
+    "display_text": "Star Lord",
+    "definition": "The planet ruling the nakshatra occupied by a planet or cusp. In KP, that ruler’s house connections contribute to the significations.",
+    "language": "english",
+    "aliases": [
+      "Star-lord",
+      "Nakshatra lord",
+      "Nakshatra ruler"
+    ]
+  },
+  {
+    "term_id": "Sub-lord",
+    "display_text": "Sub-lord",
+    "definition": "In KP, the ruler of the proportional subdivision of a nakshatra containing a planet or cusp. It refines how the associated house themes are interpreted.",
+    "language": "english",
+    "aliases": [
+      "Sub lord",
+      "Sub-lords",
+      "Sub lords"
+    ]
+  },
+  {
+    "term_id": "Sub-sub-lord",
+    "display_text": "Sub-sub-lord",
+    "definition": "In KP, the ruler of a further subdivision within a sub-lord segment, used for finer distinctions and timing.",
+    "language": "english",
+    "aliases": [
+      "Sub sub lord",
+      "Sub-sub lord",
+      "Sub sub-lord",
+      "Sub-sub-lords"
+    ]
+  },
+  {
+    "term_id": "Four-step theory",
+    "display_text": "Four-step theory",
+    "definition": "A KP-related method that evaluates a planet and its stellar and subdivision connections to identify relevant houses. The exact four-step convention should be stated because implementations differ.",
+    "language": "english",
+    "aliases": [
+      "Four step theory",
+      "4-step theory",
+      "4 step theory"
+    ]
+  },
+  {
+    "term_id": "Signification",
+    "display_text": "Signification",
+    "definition": "A planet’s or cusp’s connection with houses and their life themes through placement, rulership and the rules of the selected astrology method.",
+    "language": "english",
+    "aliases": [
+      "Significator",
+      "Significators",
+      "Significations",
+      "Signifies",
+      "Signify"
+    ]
+  },
+  {
+    "term_id": "Aspect",
+    "display_text": "Aspect",
+    "definition": "A relationship through which a planet or sign is considered to influence another chart location. Aspect rules differ between Parashari, Jaimini and other methods.",
+    "language": "english",
+    "aliases": [
+      "Aspects",
+      "Aspected",
+      "Aspecting"
+    ]
+  },
+  {
+    "term_id": "Opposition",
+    "display_text": "Opposition",
+    "definition": "A relationship between placements roughly 180 degrees apart. Its astrological meaning depends on the method and the specific planets involved.",
+    "language": "english",
+    "aliases": [
+      "Opposition/linkage",
+      "Oppositions"
+    ]
+  },
+  {
+    "term_id": "Pushya",
+    "display_text": "Pushya",
+    "definition": "A nakshatra in Cancer, ruled by Saturn in Vimshottari timing and associated traditionally with nourishment, support and growth. Its meaning depends on the planet occupying it.",
+    "language": "english",
+    "aliases": [
+      "Pushyami",
+      "Pushya nakshatra"
+    ]
+  },
+  {
+    "term_id": "Uttara Ashadha",
+    "display_text": "Uttara Ashadha",
+    "definition": "A nakshatra spanning late Sagittarius and early Capricorn, ruled by the Sun in Vimshottari timing. Its traditional themes include enduring achievement and responsibility.",
+    "language": "english",
+    "aliases": [
+      "Uttarashadha",
+      "Uttara Ashada",
+      "Uttarashada",
+      "Uttara Ashadha nakshatra"
+    ]
+  },
+  {
+    "term_id": "Fixed nakshatra",
+    "display_text": "Fixed nakshatra",
+    "definition": "A traditional nakshatra classification associated with stable or enduring activities in electional astrology. It does not mean every planet placed there produces an unchanging life outcome.",
+    "language": "english",
+    "aliases": [
+      "Fixed nakshatras",
+      "Dhruva nakshatra",
+      "Sthira nakshatra"
+    ]
+  },
+  {
+    "term_id": "Vishve Devas",
+    "display_text": "Vishve Devas",
+    "definition": "The collective deities traditionally associated with Uttara Ashadha. Their symbolism is used as one interpretive layer of that nakshatra.",
+    "language": "english",
+    "aliases": [
+      "Vishwadevas",
+      "Vishvadevas",
+      "Vishvedevas",
+      "Vishva Devas"
+    ]
+  },
+  {
+    "term_id": "Nakshatra",
+    "display_text": "Nakshatra",
+    "definition": "One of the 27 lunar mansions used in Vedic astrology. It adds a finer positional and interpretive layer and helps determine several timing systems.",
+    "language": "english",
+    "aliases": [
+      "Lunar mansion",
+      "Lunar mansions",
+      "Birth star"
+    ]
+  },
+  {
+    "term_id": "Pada",
+    "display_text": "Pada",
+    "definition": "One of the four quarters of a nakshatra, used to refine its subdivision and divisional connection.",
+    "language": "english",
+    "aliases": [
+      "Nakshatra Pada",
+      "Padas"
+    ]
+  },
+  {
+    "term_id": "Gochar",
+    "display_text": "Transit (Gochar)",
+    "definition": "The current movement of planets relative to the birth chart, used to examine activation and timing of chart themes.",
+    "language": "english",
+    "aliases": [
+      "Transit",
+      "Transits",
+      "Gochara"
+    ]
+  },
+  {
+    "term_id": "Divisional chart",
+    "display_text": "Divisional chart",
+    "definition": "A chart formed by subdividing zodiac signs under a specified rule. It refines a particular life topic and should be read alongside the main birth chart.",
+    "language": "english",
+    "aliases": [
+      "Divisional charts",
+      "Divisional Chart Analysis",
+      "Varga",
+      "Vargas"
+    ]
+  },
+  {
+    "term_id": "1st House",
+    "display_text": "1st House",
+    "definition": "The first house is a chart area traditionally associated with identity, body and overall life direction. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "first house",
+      "first-house",
+      "House 1",
+      "1st-house"
+    ]
+  },
+  {
+    "term_id": "2nd House",
+    "display_text": "2nd House",
+    "definition": "The second house is a chart area traditionally associated with resources, speech and family. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "second house",
+      "second-house",
+      "House 2",
+      "2nd-house"
+    ]
+  },
+  {
+    "term_id": "2nd Lord",
+    "display_text": "2nd Lord",
+    "definition": "The planet ruling the sign assigned to the second house. Its placement and condition connect that house’s themes with other areas of the chart.",
+    "language": "english",
+    "aliases": [
+      "second lord",
+      "second-house lord",
+      "2nd house lord",
+      "Lord of the second house",
+      "Ruler of the second house"
+    ]
+  },
+  {
+    "term_id": "3rd House",
+    "display_text": "3rd House",
+    "definition": "The third house is a chart area traditionally associated with initiative, communication and effort. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "third house",
+      "third-house",
+      "House 3",
+      "3rd-house"
+    ]
+  },
+  {
+    "term_id": "3rd Lord",
+    "display_text": "3rd Lord",
+    "definition": "The planet ruling the sign assigned to the third house. Its placement and condition connect that house’s themes with other areas of the chart.",
+    "language": "english",
+    "aliases": [
+      "third lord",
+      "third-house lord",
+      "3rd house lord",
+      "Lord of the third house",
+      "Ruler of the third house"
+    ]
+  },
+  {
+    "term_id": "4th House",
+    "display_text": "4th House",
+    "definition": "The fourth house is a chart area traditionally associated with home, foundational education and inner security. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "fourth house",
+      "fourth-house",
+      "House 4",
+      "4th-house"
+    ]
+  },
+  {
+    "term_id": "4th Lord",
+    "display_text": "4th Lord",
+    "definition": "The planet ruling the sign assigned to the fourth house. Its placement and condition connect that house’s themes with other areas of the chart.",
+    "language": "english",
+    "aliases": [
+      "fourth lord",
+      "fourth-house lord",
+      "4th house lord",
+      "Lord of the fourth house",
+      "Ruler of the fourth house"
+    ]
+  },
+  {
+    "term_id": "5th House",
+    "display_text": "5th House",
+    "definition": "The fifth house is a chart area traditionally associated with learning, creativity and children. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "fifth house",
+      "fifth-house",
+      "House 5",
+      "5th-house"
+    ]
+  },
+  {
+    "term_id": "5th Lord",
+    "display_text": "5th Lord",
+    "definition": "The planet ruling the sign assigned to the fifth house. Its placement and condition connect that house’s themes with other areas of the chart.",
+    "language": "english",
+    "aliases": [
+      "fifth lord",
+      "fifth-house lord",
+      "5th house lord",
+      "Lord of the fifth house",
+      "Ruler of the fifth house"
+    ]
+  },
+  {
+    "term_id": "6th House",
+    "display_text": "6th House",
+    "definition": "The sixth house is a chart area traditionally associated with service, competition, debts and health challenges. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "sixth house",
+      "sixth-house",
+      "House 6",
+      "6th-house"
+    ]
+  },
+  {
+    "term_id": "6th Lord",
+    "display_text": "6th Lord",
+    "definition": "The planet ruling the sign assigned to the sixth house. Its placement and condition connect that house’s themes with other areas of the chart.",
+    "language": "english",
+    "aliases": [
+      "sixth lord",
+      "sixth-house lord",
+      "6th house lord",
+      "Lord of the sixth house",
+      "Ruler of the sixth house"
+    ]
+  },
+  {
+    "term_id": "7th House",
+    "display_text": "7th House",
+    "definition": "The seventh house is a chart area traditionally associated with partnerships, marriage and agreements. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "seventh house",
+      "seventh-house",
+      "House 7",
+      "7th-house"
+    ]
+  },
+  {
+    "term_id": "7th Lord",
+    "display_text": "7th Lord",
+    "definition": "The planet ruling the sign assigned to the seventh house. Its placement and condition connect that house’s themes with other areas of the chart.",
+    "language": "english",
+    "aliases": [
+      "seventh lord",
+      "seventh-house lord",
+      "7th house lord",
+      "Lord of the seventh house",
+      "Ruler of the seventh house"
+    ]
+  },
+  {
+    "term_id": "8th house",
+    "display_text": "8th house",
+    "definition": "The eighth house is a chart area traditionally associated with shared resources, change and hidden matters. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "eighth house",
+      "eighth-house",
+      "House 8",
+      "8th-house"
+    ]
+  },
+  {
+    "term_id": "8th Lord",
+    "display_text": "8th Lord",
+    "definition": "The planet ruling the sign assigned to the eighth house. Its placement and condition connect that house’s themes with other areas of the chart.",
+    "language": "english",
+    "aliases": [
+      "eighth lord",
+      "eighth-house lord",
+      "8th house lord",
+      "Lord of the eighth house",
+      "Ruler of the eighth house"
+    ]
+  },
+  {
+    "term_id": "9th House",
+    "display_text": "9th House",
+    "definition": "The ninth house is a chart area traditionally associated with higher learning, teachers, beliefs and fortune. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "ninth house",
+      "ninth-house",
+      "House 9",
+      "9th-house"
+    ]
+  },
+  {
+    "term_id": "9th Lord",
+    "display_text": "9th Lord",
+    "definition": "The planet ruling the sign assigned to the ninth house. Its placement and condition connect that house’s themes with other areas of the chart.",
+    "language": "english",
+    "aliases": [
+      "ninth lord",
+      "ninth-house lord",
+      "9th house lord",
+      "Lord of the ninth house",
+      "Ruler of the ninth house"
+    ]
+  },
+  {
+    "term_id": "10th House",
+    "display_text": "10th House",
+    "definition": "The tenth house is a chart area traditionally associated with career, responsibilities and public activity. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "tenth house",
+      "tenth-house",
+      "House 10",
+      "10th-house"
+    ]
+  },
+  {
+    "term_id": "10th Lord",
+    "display_text": "10th Lord",
+    "definition": "The planet ruling the sign assigned to the tenth house. Its placement and condition connect that house’s themes with other areas of the chart.",
+    "language": "english",
+    "aliases": [
+      "tenth lord",
+      "tenth-house lord",
+      "10th house lord",
+      "Lord of the tenth house",
+      "Ruler of the tenth house"
+    ]
+  },
+  {
+    "term_id": "11th House",
+    "display_text": "11th House",
+    "definition": "The eleventh house is a chart area traditionally associated with gains, networks and goals. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "eleventh house",
+      "eleventh-house",
+      "House 11",
+      "11th-house"
+    ]
+  },
+  {
+    "term_id": "11th Lord",
+    "display_text": "11th Lord",
+    "definition": "The planet ruling the sign assigned to the eleventh house. Its placement and condition connect that house’s themes with other areas of the chart.",
+    "language": "english",
+    "aliases": [
+      "eleventh lord",
+      "eleventh-house lord",
+      "11th house lord",
+      "Lord of the eleventh house",
+      "Ruler of the eleventh house"
+    ]
+  },
+  {
+    "term_id": "12th House",
+    "display_text": "12th House",
+    "definition": "The twelfth house is a chart area traditionally associated with expenses, withdrawal, institutions and foreign connections. Its outcome depends on its ruler, occupants, aspects and timing.",
+    "language": "english",
+    "aliases": [
+      "twelfth house",
+      "twelfth-house",
+      "House 12",
+      "12th-house"
+    ]
+  },
+  {
+    "term_id": "12th Lord",
+    "display_text": "12th Lord",
+    "definition": "The planet ruling the sign assigned to the twelfth house. Its placement and condition connect that house’s themes with other areas of the chart.",
+    "language": "english",
+    "aliases": [
+      "twelfth lord",
+      "twelfth-house lord",
+      "12th house lord",
+      "Lord of the twelfth house",
+      "Ruler of the twelfth house"
+    ]
+  },
+  {
+    "term_id": "Sun",
+    "display_text": "Sun",
+    "definition": "In Vedic astrology, Sun is associated with identity, vitality, authority and purpose. Its actual role depends on house rulership, placement, strength and timing.",
+    "language": "english",
+    "aliases": [
+      "Surya"
+    ]
+  },
+  {
+    "term_id": "Moon",
+    "display_text": "Moon",
+    "definition": "In Vedic astrology, Moon is associated with mind, feelings, receptivity and everyday experience. Its actual role depends on house rulership, placement, strength and timing.",
+    "language": "english",
+    "aliases": [
+      "Chandra"
+    ]
+  },
+  {
+    "term_id": "Mars",
+    "display_text": "Mars",
+    "definition": "In Vedic astrology, Mars is associated with initiative, energy, courage, technical action and conflict. Its actual role depends on house rulership, placement, strength and timing.",
+    "language": "english",
+    "aliases": [
+      "Mangala"
+    ]
+  },
+  {
+    "term_id": "Mercury",
+    "display_text": "Mercury",
+    "definition": "In Vedic astrology, Mercury is associated with reasoning, communication, trade and information. Its actual role depends on house rulership, placement, strength and timing.",
+    "language": "english",
+    "aliases": [
+      "Budha"
+    ]
+  },
+  {
+    "term_id": "Jupiter",
+    "display_text": "Jupiter",
+    "definition": "In Vedic astrology, Jupiter is associated with knowledge, teaching, guidance, growth and judgment. Its actual role depends on house rulership, placement, strength and timing.",
+    "language": "english",
+    "aliases": [
+      "Guru"
+    ]
+  },
+  {
+    "term_id": "Venus",
+    "display_text": "Venus",
+    "definition": "In Vedic astrology, Venus is associated with relationships, enjoyment, aesthetics and material comforts. Its actual role depends on house rulership, placement, strength and timing.",
+    "language": "english",
+    "aliases": [
+      "Shukra"
+    ]
+  },
+  {
+    "term_id": "Saturn",
+    "display_text": "Saturn",
+    "definition": "In Vedic astrology, Saturn is associated with discipline, sustained effort, limits, responsibility and delay. Its actual role depends on house rulership, placement, strength and timing.",
+    "language": "english",
+    "aliases": [
+      "Shani"
+    ]
+  },
+  {
+    "term_id": "Rahu",
+    "display_text": "Rahu",
+    "definition": "The ascending lunar node, a calculated intersection of the Moon’s orbit with the ecliptic rather than a physical planet. In Vedic interpretation it is associated with amplification, unconventional interests and worldly ambition.",
+    "language": "english",
+    "aliases": [
+      "North node",
+      "Ascending lunar node"
+    ]
+  },
+  {
+    "term_id": "Ketu",
+    "display_text": "Ketu",
+    "definition": "The descending lunar node, opposite Rahu. It is a calculated point, traditionally associated with detachment, inward focus, specialization and separation.",
+    "language": "english",
+    "aliases": [
+      "South node",
+      "Descending lunar node"
+    ]
+  },
+  {
+    "term_id": "Aries",
+    "display_text": "Aries",
+    "definition": "The zodiac’s 1st sign, ruled by Mars in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Mesha"
+    ]
+  },
+  {
+    "term_id": "Taurus",
+    "display_text": "Taurus",
+    "definition": "The zodiac’s 2nd sign, ruled by Venus in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Vrishabha"
+    ]
+  },
+  {
+    "term_id": "Gemini",
+    "display_text": "Gemini",
+    "definition": "The zodiac’s 3rd sign, ruled by Mercury in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Mithuna"
+    ]
+  },
+  {
+    "term_id": "Cancer",
+    "display_text": "Cancer",
+    "definition": "The zodiac’s 4th sign, ruled by Moon in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Karka"
+    ]
+  },
+  {
+    "term_id": "Leo",
+    "display_text": "Leo",
+    "definition": "The zodiac’s 5th sign, ruled by Sun in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Simha"
+    ]
+  },
+  {
+    "term_id": "Virgo",
+    "display_text": "Virgo",
+    "definition": "The zodiac’s 6th sign, ruled by Mercury in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Kanya"
+    ]
+  },
+  {
+    "term_id": "Libra",
+    "display_text": "Libra",
+    "definition": "The zodiac’s 7th sign, ruled by Venus in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Tula"
+    ]
+  },
+  {
+    "term_id": "Scorpio",
+    "display_text": "Scorpio",
+    "definition": "The zodiac’s 8th sign, ruled by Mars in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Vrischika"
+    ]
+  },
+  {
+    "term_id": "Sagittarius",
+    "display_text": "Sagittarius",
+    "definition": "The zodiac’s 9th sign, ruled by Jupiter in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Dhanu"
+    ]
+  },
+  {
+    "term_id": "Capricorn",
+    "display_text": "Capricorn",
+    "definition": "The zodiac’s 10th sign, ruled by Saturn in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Makara"
+    ]
+  },
+  {
+    "term_id": "Aquarius",
+    "display_text": "Aquarius",
+    "definition": "The zodiac’s 11th sign, ruled by Saturn in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Kumbha"
+    ]
+  },
+  {
+    "term_id": "Pisces",
+    "display_text": "Pisces",
+    "definition": "The zodiac’s 12th sign, ruled by Jupiter in classical Vedic astrology. Its meaning depends on the planet or house being interpreted.",
+    "language": "english",
+    "aliases": [
+      "Meena"
+    ]
+  }
+]

@@ -22,8 +22,16 @@ const FeedbackPlayStoreLink = () => (
   </div>
 );
 
+const FEEDBACK_PLACEHOLDERS = {
+  helpful: 'What was most helpful? (optional)',
+  unclear: 'Which part was unclear? (optional)',
+  wrong_personal_detail: 'Which personal detail was wrong, and what should it be? (optional)',
+  contradicts_earlier_answer: 'What contradicts an earlier answer? Include the earlier statement if possible. (optional)',
+};
+
 const FeedbackComponent = ({ message, onFeedbackSubmitted }) => {
-  const [feedback, setFeedback] = useState({ rating: 0, comment: '', submitted: false });
+  const [feedback, setFeedback] = useState({ reason: null, rating: 0, comment: '', submitted: false });
+  const [submitting, setSubmitting] = useState(false);
   const [visible, setVisible] = useState(false);
   const [fadeClass, setFadeClass] = useState('');
 
@@ -42,6 +50,8 @@ const FeedbackComponent = ({ message, onFeedbackSubmitted }) => {
   }, [message.isProcessing, message.message_type]);
 
   const submitFeedback = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/chat/feedback/submit', {
@@ -53,6 +63,7 @@ const FeedbackComponent = ({ message, onFeedbackSubmitted }) => {
         body: JSON.stringify({
           message_id: String(message.messageId),
           rating: feedback.rating,
+          reason: feedback.reason,
           comment: feedback.comment.trim() || null
         })
       });
@@ -71,12 +82,9 @@ const FeedbackComponent = ({ message, onFeedbackSubmitted }) => {
       }
     } catch (error) {
       alert('Failed to submit feedback');
-    }
+    } finally { setSubmitting(false); }
   };
 
-  const handleStarPress = (rating) => {
-    setFeedback(prev => ({ ...prev, rating }));
-  };
 
   const handleSkip = () => {
     setFadeClass('fade-out');
@@ -95,30 +103,24 @@ const FeedbackComponent = ({ message, onFeedbackSubmitted }) => {
       ) : (
         <>
           <div className="feedback-title">How was this answer?</div>
-          <div className="feedback-stars">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                onClick={() => handleStarPress(star)}
-                className={`feedback-star${star <= feedback.rating ? ' is-selected' : ''}`}
-                aria-label={`${star} star${star === 1 ? '' : 's'}`}
-                aria-pressed={star <= feedback.rating}
-              >
-                <span aria-hidden="true">★</span>
-              </button>
-            ))}
+          <div className="feedback-reasons" role="group" aria-label="Answer feedback">
+            <button type="button" disabled={submitting} aria-pressed={feedback.reason === 'helpful'} onClick={() => setFeedback(prev => ({ ...prev, reason: 'helpful', rating: 5 }))}>Helpful</button>
+            <button type="button" disabled={submitting} aria-pressed={feedback.reason === 'unclear'} onClick={() => setFeedback(prev => ({ ...prev, reason: 'unclear', rating: 2 }))}>Unclear</button>
+            <button type="button" disabled={submitting} aria-pressed={feedback.reason === 'wrong_personal_detail'} onClick={() => setFeedback(prev => ({ ...prev, reason: 'wrong_personal_detail', rating: 1 }))}>Wrong personal detail</button>
+            <button type="button" disabled={submitting} aria-pressed={feedback.reason === 'contradicts_earlier_answer'} onClick={() => setFeedback(prev => ({ ...prev, reason: 'contradicts_earlier_answer', rating: 1 }))}>Contradicts an earlier answer</button>
           </div>
           {feedback.rating > 0 && (
             <>
               <textarea
                 className="feedback-comment"
-                placeholder="Tell us more (optional)"
+                placeholder={FEEDBACK_PLACEHOLDERS[feedback.reason]}
+                aria-label={FEEDBACK_PLACEHOLDERS[feedback.reason]}
                 value={feedback.comment}
                 onChange={(e) => setFeedback(prev => ({ ...prev, comment: e.target.value }))}
                 rows={3}
               />
               <div className="feedback-buttons">
-                <button className="feedback-submit" onClick={submitFeedback}>
+                <button className="feedback-submit" disabled={submitting} onClick={submitFeedback}>
                   Submit
                 </button>
                 <button className="feedback-skip" onClick={handleSkip}>

@@ -250,3 +250,7 @@
     font-size: 13px;
   }
 }
+
+.feedback-reasons { display:flex; flex-wrap:wrap; gap:8px; }
+.feedback-reasons button { border:1px solid #c9b6bd; border-radius:16px; padding:8px 12px; background:transparent; color:inherit; cursor:pointer; }
+.feedback-reasons button[aria-pressed="true"] { background:#f1dfe7; border-color:#781f43; color:#57132d; }

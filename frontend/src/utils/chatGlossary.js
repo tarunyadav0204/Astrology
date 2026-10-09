@@ -27,10 +27,22 @@ export const autoWrapGlossaryTermsInHtml = (html, glossary) => {
     if (!keys.length) return { html, count: 0 };
 
     const keyByLowerCase = new Map(keys.map((key) => [key.toLowerCase(), key]));
-    const termPattern = new RegExp(`\\b(${keys.map(escapeRegExp).join('|')})\\b`, 'gi');
+    const termPattern = new RegExp(keys.map((key) => (
+        /[^\u0000-\u007f]/.test(key) ? escapeRegExp(key) : `\\b${escapeRegExp(key)}\\b`
+    )).join('|'), 'gi');
     let count = 0;
+    let tooltipSpanDepth = 0;
     const wrapped = String(html || '').split(/(<[^>]*>)/g).map((part) => {
-        if (!part || part.startsWith('<')) return part;
+        if (!part) return part;
+        if (part.startsWith('<')) {
+            if (/^<span\b/i.test(part) && (tooltipSpanDepth || /\bclass=["'][^"']*\btooltip-wrapper\b/i.test(part))) {
+                tooltipSpanDepth += 1;
+            } else if (/^<\/span\b/i.test(part) && tooltipSpanDepth) {
+                tooltipSpanDepth -= 1;
+            }
+            return part;
+        }
+        if (tooltipSpanDepth) return part;
         return part.replace(termPattern, (match) => {
             const key = keyByLowerCase.get(match.toLowerCase());
             if (!key) return match;

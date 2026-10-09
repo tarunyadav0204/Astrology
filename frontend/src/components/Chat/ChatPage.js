@@ -2,6 +2,7 @@ import { applyInstantProgress, buildImmediateChartPreview, mergeChartContext } f
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import MessageList from './MessageList';
+import ChatMemory from './ChatMemory';
 import { scrollChatThreadAfterMessagesChange } from './chatScrollUtils';
 import ChatChartEssence from './ChatChartEssence';
 import ChatInput from './ChatInput';
@@ -3316,6 +3317,7 @@ const ChatPage = ({ onLogin }) => {
                                         <span className="native-selector-chip__chevron" aria-hidden="true">▾</span>
                                     </button>
                                 )}
+                            {!isMundaneMode && !isPartnershipMode && birthData?.id && <ChatMemory key={birthData.id} chartId={birthData.id} name={birthData.name} />}
                             </h1>
                             {(isMundaneMode || isPartnershipMode) && (
                                 <p className="chat-header-toolbar__meta chat-header-toolbar__meta--desktop">

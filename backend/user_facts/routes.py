@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
 import logging
@@ -41,22 +41,25 @@ def verify_chart_ownership(birth_chart_id: int, user_id: int):
         raise HTTPException(status_code=403, detail="Access denied")
 
 @router.get("/facts/{birth_chart_id}")
-async def get_facts(birth_chart_id: int, current_user: dict = Depends(get_current_user)):
+async def get_facts(birth_chart_id: int, current_user: dict = Depends(get_current_user), q: str = Query('', max_length=300), page: int = Query(1, ge=1), limit: int = Query(50, ge=1, le=100)):
     """Get all facts for a birth chart"""
     try:
         verify_chart_ownership(birth_chart_id, current_user.userid)
         with get_db_connection() as conn:
-            cur = execute(
-                conn,
-                """
-                SELECT id, category, fact, confidence, extracted_at
-                FROM user_facts
-                WHERE birth_chart_id = %s
-                ORDER BY category, extracted_at DESC
-                """,
-                (birth_chart_id,),
-            )
-            rows = cur.fetchall() or []
+            vector = "(to_tsvector('english', COALESCE(fact, '') || ' ' || COALESCE(category, '')) || to_tsvector('simple', COALESCE(fact, '') || ' ' || COALESCE(category, '')))"
+            search = "(websearch_to_tsquery('english', %s) || websearch_to_tsquery('simple', %s))"
+            where = 'birth_chart_id = %s'
+            params = [birth_chart_id]
+            if q.strip():
+                where += f' AND {vector} @@ {search}'
+                params.extend([q.strip(), q.strip()])
+            total = execute(conn, 'SELECT COUNT(*) FROM user_facts WHERE birth_chart_id = %s', (birth_chart_id,)).fetchone()[0]
+            matched = execute(conn, f'SELECT COUNT(*) FROM user_facts WHERE {where}', tuple(params)).fetchone()[0]
+            order = 'extracted_at DESC, id DESC'
+            if q.strip():
+                order = f'ts_rank({vector}, {search}) DESC, ' + order
+                params.extend([q.strip(), q.strip()])
+            rows = execute(conn, f'SELECT id, category, fact, confidence, extracted_at FROM user_facts WHERE {where} ORDER BY {order} LIMIT %s OFFSET %s', tuple(params) + (limit, (page - 1) * limit)).fetchall() or []
 
         facts = [
             {
@@ -69,7 +72,7 @@ async def get_facts(birth_chart_id: int, current_user: dict = Depends(get_curren
             for row in rows
         ]
         
-        return {"success": True, "facts": facts}
+        return {"success": True, "facts": facts, "total": total, "matched": matched, "has_more": page * limit < matched, "page": page}
     except HTTPException:
         raise
     except Exception as e:
