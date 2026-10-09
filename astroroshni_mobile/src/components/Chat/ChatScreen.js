@@ -64,6 +64,7 @@ import CascadingDashaBrowser from '../Dasha/CascadingDashaBrowser';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
 import ChatMemory from './ChatMemory';
 import ChatSummary from './ChatSummary';
+import PrashnaSetup from './PrashnaSetup';
 import AppAlertModal from '../Common/AppAlertModal';
 import QuickThemePickerModal from '../Common/QuickThemePickerModal';
 import { useCredits } from '../../credits/CreditContext';
@@ -606,6 +607,8 @@ export default function ChatScreen({ navigation, route }) {
   const [pendingAnswerStyle, setPendingAnswerStyle] = useState(null);
   const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
   const [isVerifiedAnalysis, setIsVerifiedAnalysis] = useState(false);
+  const [prashnaLocation, setPrashnaLocation] = useState(null);
+  const [pendingPrashnaQuestion, setPendingPrashnaQuestion] = useState(null);
   const [showInstantEndConfirm, setShowInstantEndConfirm] = useState(false);
   const [pendingModeAfterInstantEnd, setPendingModeAfterInstantEnd] = useState(null);
   const [instantReceipt, setInstantReceipt] = useState(null);
@@ -1086,6 +1089,7 @@ export default function ChatScreen({ navigation, route }) {
   const [isAppStartup, setIsAppStartup] = useState(true);
   const [birthData, setBirthData] = useState(null);
   const [sessionId, setSessionId] = useState(null);
+  useEffect(() => { setPrashnaLocation(null); setPendingPrashnaQuestion(null); }, [birthData?.id, sessionId]);
   const [renderedMessageCount, setRenderedMessageCount] = useState(CHAT_RENDER_WINDOW_DEFAULT);
   const [currentPersonId, setCurrentPersonId] = useState(null);
   const suggestionBirthChartId = birthData?.id ?? birthData?.birth_chart_id ?? null;
@@ -4910,6 +4914,7 @@ export default function ChatScreen({ navigation, route }) {
         // console.log(`📊 [POLL END] messageId: ${messageId}, status: ${status.status}, pollCount: ${pollCount}, startTime: ${pollStartTime}, endTime: ${pollEndTime}`);
 
         if (status.status === 'completed') {
+          setPrashnaLocation(null);
           trackEvent('chat_response_received', {
             source: 'chat_screen',
             message_type: status.message_type || 'answer',
@@ -5128,7 +5133,7 @@ export default function ChatScreen({ navigation, route }) {
                 messageTierByIdRef.current[messageId] ||
                 ''
               ).trim().toLowerCase();
-              if (messageTier === 'instant') {
+              if (['instant', 'verified'].includes(messageTier)) {
                 const partialContent = String(status.partial_content || '');
                 const progressed = applyInstantProgress(msg, {
                   partial_content: partialContent,
@@ -5205,7 +5210,7 @@ export default function ChatScreen({ navigation, route }) {
             });
             return changed ? next : prev;
           });
-          if (String(status.partial_content || '').trim() && fallbackTier === 'instant') {
+          if (String(status.partial_content || '').trim() && ['instant', 'verified'].includes(fallbackTier)) {
             setIsTyping(false);
           }
           if (shouldScrollForContentGrowth) {
@@ -5409,6 +5414,7 @@ export default function ChatScreen({ navigation, route }) {
     subjectGateOverride = null,
     queryContextOverride = null,
     instantBillingSessionIdOverride = null,
+    forceTier = null,
   }) => {
     const token = await AsyncStorage.getItem('authToken');
     let activeSessionId = currentSessionId;
@@ -5419,9 +5425,9 @@ export default function ChatScreen({ navigation, route }) {
       try {
         // When using first question free, send as standard so backend applies free-question logic
         const useFreeQuestion =
-          !partnershipMode && !isMundane && !isInstantAnalysis && !isVerifiedAnalysis && freeQuestionAvailable;
-        const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && isInstantAnalysis;
-        const useVerifiedChat = !useFreeQuestion && !partnershipMode && !isMundane && verifiedChatEnabled && isVerifiedAnalysis;
+          !partnershipMode && !isMundane && !forceTier && !isInstantAnalysis && !isVerifiedAnalysis && freeQuestionAvailable;
+        const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && (forceTier ? forceTier === 'instant' : isInstantAnalysis);
+        const useVerifiedChat = !useFreeQuestion && !partnershipMode && !isMundane && verifiedChatEnabled && (forceTier ? forceTier === 'verified' : isVerifiedAnalysis);
         const requestedTier = useFreeQuestion
           ? 'standard'
           : (useInstantChat ? 'instant' : (useVerifiedChat ? 'verified' : (isPremiumAnalysis ? 'premium' : 'standard')));
@@ -5433,6 +5439,7 @@ export default function ChatScreen({ navigation, route }) {
 
         const requestQueryContext = {
           ...buildQueryContext(),
+          ...(prashnaLocation && useVerifiedChat ? { prashna_requested: true, prashna_location: prashnaLocation } : {}),
           ...(queryContextOverride && typeof queryContextOverride === 'object' ? queryContextOverride : {}),
         };
         // Intraday Muhurta depends on the trader's present place, not the
@@ -5622,6 +5629,7 @@ export default function ChatScreen({ navigation, route }) {
           result.status === 'completed' &&
           (result.message_type === 'native_gate' || result.message_type === 'clarification')
         ) {
+          setPrashnaLocation(null);
           freeUsedThisSendRef.current = false;
           setLoading(false);
           setIsTyping(false);
@@ -5699,7 +5707,7 @@ export default function ChatScreen({ navigation, route }) {
 
         // Instant mode renders Gemini's live tokens over WebSocket. The status
         // poll always runs too, providing reconnect recovery and final metadata.
-        if (serverTier === 'instant') {
+        if (['instant', 'verified'].includes(serverTier)) {
           streamInstantResponse(assistantMessageId, processingMessageId).catch(() => {
             // Polling is already active and remains the durable fallback.
           });
@@ -6390,6 +6398,7 @@ export default function ChatScreen({ navigation, route }) {
         subjectGateOverride,
         queryContextOverride,
         instantBillingSessionIdOverride: startedInstantBillingSessionId,
+        forceTier,
       });
       if (queryContextOverride?.fomo_snapshot_id && queryContextOverride?.fomo_presentation_id) {
         pendingFomoQueryContextRef.current = null;
@@ -6475,7 +6484,13 @@ export default function ChatScreen({ navigation, route }) {
     const chosen = String(questionText || '').trim();
     if (!chosen) return;
     const queryContext = options.query_context || options.queryContext || {};
+    if (queryContext.prashna_choice === 'prashna') {
+      setPendingPrashnaQuestion({ question: queryContext.original_question || chosen, queryContext });
+      return;
+    }
+    if (queryContext.prashna_choice === 'natal' || queryContext.prashna_workflow_choice) setPrashnaLocation(null);
     await sendMessageRef.current?.(chosen, {
+      ...((queryContext.prashna_choice || queryContext.prashna_workflow_choice) ? { forceTier: 'verified' } : {}),
       queryContext: {
         follow_up_type: 'clarification_choice',
         ...queryContext,
@@ -6798,6 +6813,24 @@ export default function ChatScreen({ navigation, route }) {
         edges={['top']}
       >
         <View style={styles.safeAreaInner}>
+        <Modal visible={Boolean(pendingPrashnaQuestion)} transparent animationType="slide" onRequestClose={() => setPendingPrashnaQuestion(null)}>
+          <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
+            <View accessibilityViewIsModal style={{ height: '65%', padding: 20, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: colors.surfaceRaised }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{t('premiumUi.chat.prashna.ask', 'Ask with Prashna')}</Text>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('common.close', 'Close')} onPress={() => setPendingPrashnaQuestion(null)} style={{ padding: 12 }}><Ionicons name="close" size={24} color={colors.text} /></TouchableOpacity>
+              </View>
+              <PrashnaSetup onSelect={place => {
+                const pending = pendingPrashnaQuestion;
+                if (!pending || loading) return;
+                setPendingPrashnaQuestion(null);
+                setPrashnaLocation(place);
+                applyChatModeFromTier('verified');
+                sendMessageRef.current?.(pending.question, { forceTier: 'verified', queryContext: { ...pending.queryContext, prashna_choice: 'prashna', prashna_requested: true, prashna_location: place } });
+              }} />
+            </View>
+          </View>
+        </Modal>
         {/* Header - outside KeyboardAvoidingView so home/greeting layout is never affected by keyboard */}
         <View style={styles.headerContainer}>
           <LinearGradient
@@ -6918,6 +6951,7 @@ export default function ChatScreen({ navigation, route }) {
                       </Text>
                     )}
                     {birthData?.id && <ChatMemory key={birthData.id} birthData={birthData} navigation={navigation} />}
+                    <ChatSummary key={sessionId} messages={messages} header onDisablePrashna={prashnaLocation ? () => setPrashnaLocation(null) : undefined} onPrashna={verifiedChatEnabled && !instantBilling.active && !loading && !freeQuestionAvailable && !partnershipMode && !isMundane ? place => { setPrashnaLocation(place); applyChatModeFromTier('verified'); } : undefined} onResolved={result => { if (result.session_id === sessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
                     </View>
                   </View>
                 </View>
@@ -6934,7 +6968,6 @@ export default function ChatScreen({ navigation, route }) {
               )}
             </View>
 
-            <ChatSummary key={sessionId} messages={messages} header onResolved={result => { if (result.session_id === sessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
             <View style={[
               styles.headerRight,
               compactHeaderChrome && styles.headerRightCompact,
@@ -7030,7 +7063,7 @@ export default function ChatScreen({ navigation, route }) {
                         maxFontSizeMultiplier={1.15}
                         style={[styles.headerModeChipText, wideHeader && styles.headerModeChipTextWide, { color: colors.textInverse }]}
                       >
-                        {`${getChatModeName()} · ${getAnswerStyleName(getAnswerStyleForMode())}`}
+                        {`${prashnaLocation && isVerifiedAnalysis ? t('premiumUi.chat.prashna.active', 'Prashna · {{city}}', { city: '' }).replace(/·\s*$/, '').trim() : getChatModeName()} · ${getAnswerStyleName(getAnswerStyleForMode())}`}
                       </Text>
                       <Ionicons name="chevron-down" size={wideHeader ? 20 : 14} color={colors.textInverseMuted || colors.textInverse} />
                     </TouchableOpacity>

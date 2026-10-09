@@ -26,7 +26,7 @@ def test_registered_adapter_returns_json_facts_from_real_chart(capability):
     if capability == 'dasha.shoola':
         assert all(row['start_date'] < PARAMS['end_date'] and row['end_date'] > PARAMS['start_date'] for row in result['facts']['all_periods'])
 
-@pytest.mark.parametrize('capability', ['dasha.yogini','annual.varshphal','annual.tajika','annual.nakshatra','jaimini.rashi_strength','strength.house','election.panchang','election.muhurat','election.navatara','location.analysis'])
+@pytest.mark.parametrize('capability', ['dasha.yogini','dasha.kalachakra_bphs','dasha.kalachakra_jaimini','dasha.sudarshana','annual.varshphal','annual.tajika','annual.nakshatra','jaimini.rashi_strength','strength.house','election.panchang','election.muhurat','election.navatara','location.analysis'])
 def test_required_parameters_cannot_be_guessed(capability):
     with pytest.raises(ValueError): validate_parameters(capability,{})
 
@@ -57,3 +57,15 @@ def test_model_can_override_deterministic_divisional_choice():
     from chat.verified_chat_pipeline import _calculate_requested_capabilities
     result=_calculate_requested_capabilities(BIRTH,['parashari.divisional_confirmation'],{}, {'intent_summary':{'category':'career'}}, {'divisions':[7,24]})
     assert set(result['parashari.divisional_confirmation']) == {'D7','D24'}
+
+
+@pytest.mark.parametrize('capability', ['dasha.kalachakra_bphs', 'dasha.kalachakra_jaimini'])
+def test_kalachakra_returns_named_variant_and_scoped_calculated_periods(capability):
+    result = run_calculator(capability, BIRTH, PARAMS)
+    facts = result['facts']
+    assert 'error' not in facts
+    assert ('BPHS' if capability.endswith('bphs') else 'Jaimini') in facts['system']
+    assert 'wheel_data' not in facts
+    for row in facts['mahadashas']:
+        assert row.get('start', row.get('start_iso'))[:10] < PARAMS['end_date']
+        assert row.get('end', row.get('end_iso'))[:10] > PARAMS['start_date']

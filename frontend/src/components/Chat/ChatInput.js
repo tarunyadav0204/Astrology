@@ -24,6 +24,8 @@ const ChatInput = ({
     onShowEnhancedPopup,
     isPartnershipMode = false,
     isMundaneMode = false,
+    prashnaMode = false,
+    verifiedMode = false,
     isLocked = false, // when true, composer is disabled until guided steps are completed
     isAssistantSpeaking = false,
     onInterruptAssistantSpeech = () => {},
@@ -38,6 +40,7 @@ const ChatInput = ({
     const {
         credits,
         chatCost,
+        verifiedChatCost,
         premiumChatCost,
         partnershipCost,
         loading: creditsLoading,
@@ -102,9 +105,9 @@ const ChatInput = ({
         }
     }, [isPartnershipMode, isMundaneMode, onInstantModeChange]);
 
-    const showPremiumControls = !isPartnershipMode && !isMundaneMode;
+    const showPremiumControls = !prashnaMode && !isPartnershipMode && !isMundaneMode;
     const useCompactPremium = showPremiumControls && isMobileLayout;
-    const useFreeQuestionEligible = showPremiumControls && freeQuestionAvailable;
+    const useFreeQuestionEligible = showPremiumControls && !verifiedMode && freeQuestionAvailable;
 
     useEffect(() => {
         if (useFreeQuestionEligible && isPremiumAnalysis) {
@@ -157,7 +160,7 @@ const ChatInput = ({
         && !isPartnershipMode
         && !isMundaneMode;
 
-    const effectiveCost =
+    const effectiveCost = (prashnaMode || (verifiedMode && !isPremiumAnalysis && !instantMode)) ? verifiedChatCost :
         useFreeQuestionEligible && !isPremiumAnalysis && !instantMode
             ? 0
             : isPremiumAnalysis
@@ -186,7 +189,7 @@ const ChatInput = ({
         if (!trimmed) return false;
         if (isInstantSend && !canSendInstantMessage) return false;
         if (!isInstantSend && !canSendMessage) return false;
-        const premiumForSend = useFreeQuestionEligible ? false : (premiumOverride ?? isPremiumAnalysis);
+        const premiumForSend = (prashnaMode || useFreeQuestionEligible) ? false : (premiumOverride ?? isPremiumAnalysis);
         console.log('[ChatInput] commitSend unconditional', {
             trimmed,
             premiumForSend,
@@ -206,6 +209,7 @@ const ChatInput = ({
         }
         onSendMessage(trimmed, {
             premium_analysis: premiumForSend,
+            ...(verifiedMode && !premiumForSend && !instantMode ? { chat_tier: 'verified' } : {}),
             ...sendOptions,
         });
         setMessage('');
@@ -456,9 +460,10 @@ const ChatInput = ({
             >
                 {useCompactPremium && showModeSelector && (
                     <div className="chat-premium-mode-expanded" role="group" aria-label="Question mode">
+                        {verifiedMode && <button type="button" className="chat-premium-mode-pill chat-premium-mode-pill--active" disabled={isLocked} onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('verified'); }}><span className="chat-premium-mode-pill__label">Verified</span><span className="chat-premium-mode-pill__cost">{verifiedChatCost} credits</span></button>}
                         <button
                             type="button"
-                            className={`chat-premium-mode-pill ${!isPremiumAnalysis && !instantMode ? 'chat-premium-mode-pill--active' : ''}`}
+                            className={`chat-premium-mode-pill ${!verifiedMode && !isPremiumAnalysis && !instantMode ? 'chat-premium-mode-pill--active' : ''}`}
                             disabled={isLocked}
                             onClick={() => {
                                 setIsPremiumAnalysis(false);
@@ -513,7 +518,7 @@ const ChatInput = ({
                     </div>
                 )}
 
-                {!useCompactPremium && (
+                {!prashnaMode && !useCompactPremium && (
                     isInstantSendMode && !showDesktopModeSelector ? (
                         instantHeaderControls ? null : (
                         <div className="chat-instant-mode-bar" role="status" aria-label={`Live conversation mode, first minute ${instantFirstMinuteCost} credits, then ${instantPerMinuteCost} credits per started minute`}>
@@ -533,9 +538,10 @@ const ChatInput = ({
                         )
                     ) : (
                     <div className="chat-mode-selector-web" role="group" aria-label="Answer mode">
+                        {verifiedMode && <button type="button" className="chat-mode-option chat-mode-option--active" disabled={isLocked} onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('verified'); }}><span className="chat-mode-option__label">Verified</span><span className="chat-mode-option__cost">{verifiedChatCost} credits</span></button>}
                         <button
                             type="button"
-                            className={`chat-mode-option ${!isPremiumAnalysis && !instantMode ? 'chat-mode-option--active' : ''}`}
+                            className={`chat-mode-option ${!verifiedMode && !isPremiumAnalysis && !instantMode ? 'chat-mode-option--active' : ''}`}
                             disabled={isLocked}
                             onClick={() => {
                                 setIsPremiumAnalysis(false);
@@ -713,7 +719,7 @@ const ChatInput = ({
                                     ? 'Premium analysis selected. Open mode picker'
                                     : instantMode
                                         ? 'Live chat selected. Open mode picker'
-                                        : 'Standard analysis. Open mode picker'
+                                        : verifiedMode ? 'Verified analysis. Open mode picker' : 'Standard analysis. Open mode picker'
                             }
                         >
                             {isPremiumAnalysis ? (
@@ -721,7 +727,7 @@ const ChatInput = ({
                             ) : instantMode ? (
                                 <span className="chat-premium-sp-toggle__inner chat-premium-sp-toggle__inner--i">L</span>
                             ) : (
-                                <span className="chat-premium-sp-toggle__inner chat-premium-sp-toggle__inner--s">S</span>
+                                <span className="chat-premium-sp-toggle__inner chat-premium-sp-toggle__inner--s">{verifiedMode ? 'V' : 'S'}</span>
                             )}
                         </button>
                         {isPremiumAnalysis && onShowEnhancedPopup && (
@@ -806,7 +812,7 @@ const ChatInput = ({
             {!creditsLoading && (
                 <div className="credit-info chat-composer-footnote">
                     Credits: {credits} |{' '}
-                    {isPremiumAnalysis
+                    {prashnaMode ? `Verified Prashna: ${verifiedChatCost}` : isPremiumAnalysis
                         ? `Premium: ${premiumChatCost}`
                         : isPartnershipMode
                             ? `Partnership: ${partnershipCost}`
@@ -814,7 +820,7 @@ const ChatInput = ({
                                 ? 'Standard: free (first question)'
                                 : isInstantSendMode
                                     ? `Live: ${instantFirstMinuteCost} first · ${instantPerMinuteCost}/min after`
-                                    : `Standard: ${chatCost}`}{' '}
+                                    : verifiedMode ? `Verified: ${verifiedChatCost}` : `Standard: ${chatCost}`}{' '}
                     {isInstantSendMode ? 'credits per started minute' : (!useFreeQuestionEligible || isPremiumAnalysis || isPartnershipMode ? 'credits per question' : '')}
                 </div>
             )}

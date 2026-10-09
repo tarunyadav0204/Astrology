@@ -8,7 +8,7 @@ from utils.response_transport import visible_instant_stream_text
 
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query, Header, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import uuid
 import json
@@ -2195,6 +2195,40 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                     ),
                 )
 
+        # Current clock and prior reading are trusted routing inputs, never sticky method overrides.
+        state_row = execute(conn, 'SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = %s', (session_id,)).fetchone()
+        previous = state_row[1] if state_row else None
+        if isinstance(previous, str):
+            try: previous = json.loads(previous)
+            except ValueError: previous = None
+        previous = previous if isinstance(previous, dict) else {}
+        prior_chart = previous.get('prashna') if state_row and state_row[0] else previous.get('last_prashna')
+        if effective_chat_tier == 'verified' and not prior_chart and not (state_row and state_row[0]):
+            last_answer = execute(conn, "SELECT gate_metadata FROM chat_messages WHERE session_id = %s AND sender = 'assistant' AND status = 'completed' AND message_type = 'answer' ORDER BY message_id DESC LIMIT 1", (session_id,)).fetchone()
+            last_metadata = last_answer[0] if last_answer else None
+            if isinstance(last_metadata, str):
+                try: last_metadata = json.loads(last_metadata)
+                except ValueError: last_metadata = None
+            if isinstance(last_metadata, dict):
+                prior_chart = last_metadata.get('prashna_context')
+        raw_query_context.pop('prashna', None)
+        raw_query_context.pop('_prashna_previous', None)
+        raw_query_context['_question_received_at'] = datetime.fromtimestamp(ask_started_at, tz=timezone.utc).isoformat()
+        if effective_chat_tier == 'verified' and prior_chart:
+            raw_query_context['_prashna_previous'] = prior_chart
+        if raw_query_context.get('prashna_choice') == 'natal':
+            raw_query_context['prashna_requested'] = False
+        if raw_query_context.get('prashna_requested'):
+            if effective_chat_tier != 'verified' or partnership_mode or speech_chat_requested:
+                raise HTTPException(status_code=422, detail='Prashna is available in Verified chat. Select Verified and try again.')
+            from chat.verified_prashna import freeze_prashna
+            try:
+                fixed = freeze_prashna(raw_query_context.get('prashna_location'), datetime.fromtimestamp(ask_started_at, tz=timezone.utc))
+            except (ValueError, TypeError, KeyError) as exc:
+                raise HTTPException(status_code=422, detail='Unable to set up the question chart. Please select your current city and try again.') from exc
+            fixed['original_question'] = question
+            raw_query_context['prashna'] = fixed
+
         if client_request_id:
             cur = execute(
                 conn,
@@ -4109,7 +4143,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 force_ready = True
 
             max_clarifications = 0 if (is_whatsapp_plain_text or fomo_chat_active) else (
-                INSTANT_MAX_CLARIFICATIONS if is_instant_chat else STANDARD_MAX_CLARIFICATIONS
+                INSTANT_MAX_CLARIFICATIONS if is_deterministic_chat else STANDARD_MAX_CLARIFICATIONS
             )
             if fomo_chat_active:
                 from prediction_engine.fomo_chat import build_fomo_chat_intent
@@ -4121,14 +4155,19 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 # the deterministic baseline calculators.
                 from chat.verified_chat_pipeline import classify_verified_question
 
+                query_context = {**(query_context or {}), '_clarification_context': combined_question}
                 verified_router_analyzer = GeminiChatAnalyzer()
                 intent = await classify_verified_question(
                     verified_router_analyzer,
-                    question=combined_question,
+                    question=question,
                     history=history,
                     language=language,
                     query_context=query_context,
                 )
+                from chat.prashna_workflow import apply_prashna_transition
+                intent = apply_prashna_transition(intent, question, query_context)
+                query_context = intent['query_context']
+                combined_question = intent['resolved_question']
             elif is_deterministic_chat:
                 instant_dialogue_state = (
                     extracted_context.get("instant_dialogue")
@@ -4222,7 +4261,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 and
                 text_scope_raw
                 and isinstance(intent, dict)
-                and (awaiting_location_scope or mode_u_early == "RECOMMEND_LOCATION")
+                and (mode_u_early == "RECOMMEND_LOCATION" or (awaiting_location_scope and not is_verified_chat))
             ):
                 intent.setdefault("extracted_context", {})
                 if isinstance(intent.get("extracted_context"), dict):
@@ -4428,7 +4467,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             # Do not apply this to compound_plan: the user packed unrelated asks and must pick a card.
             timing_keywords = ['when', 'year', 'which year', 'what year', 'kab', 'saal', 'samay']
             if (
-                not is_instant_chat
+                not is_deterministic_chat
                 and str(intent.get("answer_mode") or "").strip().lower() != "compound_plan"
                 and
                 any(kw in question.lower() for kw in timing_keywords)
@@ -4511,6 +4550,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 and (
                     MAX_CLARIFICATIONS is None
                     or clarification_count < MAX_CLARIFICATIONS
+                    or (is_verified_chat and (intent.get('prashna_intent') in {'offer', 'explicit'} or intent.get('workflow_choice')))
                     or location_scope_clarify
                 )
             )
@@ -4536,6 +4576,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     else None
                 )
                 clarification_extracted = dict(intent.get("extracted_context") or {})
+                if (query_context or {}).get('prashna_choice'):
+                    clarification_extracted['prashna_choice'] = query_context['prashna_choice']
+                if (query_context or {}).get('prashna'):
+                    clarification_extracted['prashna'] = query_context['prashna']
+                elif intent.get('workflow_choice') and (query_context or {}).get('_prashna_previous'):
+                    clarification_extracted['prashna'] = query_context['_prashna_previous']
                 if str(intent.get("answer_mode") or "").strip().lower() == "compound_plan":
                     clarification_extracted["answer_mode"] = "compound_plan"
                 with get_conn() as conn:
@@ -4589,6 +4635,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         ready_ctx = merged_ready
                     if str(intent.get("answer_mode") or "").strip().lower() != "compound_plan":
                         ready_ctx.pop("answer_mode", None)
+                    if is_verified_chat:
+                        ready_ctx.pop('prashna', None)
+                        ready_ctx.pop('prashna_choice', None)
+                        if intent.get('mode') != 'RECOMMEND_LOCATION':
+                            ready_ctx.pop('awaiting_location_scope', None)
+                            ready_ctx.pop('location_scope', None)
+                        if (query_context or {}).get('prashna'):
+                            ready_ctx['prashna'] = query_context['prashna']
                     execute(
                         conn,
                         """
@@ -4942,7 +4996,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             existing_qc = intent.get("query_context") if isinstance(intent.get("query_context"), dict) else {}
             cached_qc = qc_merge if isinstance(qc_merge, dict) else {}
             if cached_qc or existing_qc:
-                intent = {**intent, "query_context": {**cached_qc, **existing_qc}}
+                intent = {**intent, "query_context": existing_qc if is_verified_chat else {**cached_qc, **existing_qc}}
                 if isinstance(context, dict):
                     context = {**context, "intent": intent}
 
@@ -5309,6 +5363,30 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     if is_instant_chat and result.get("instant_preview"):
                         answer_gate_metadata = dict(answer_gate_metadata or {})
                         answer_gate_metadata["instant_preview"] = result["instant_preview"]
+
+                    answer_gate_metadata = dict(answer_gate_metadata or {})
+                    routed_intent = cached_intent if isinstance(cached_intent, dict) else {}
+                    audit_mode = (result.get('information_rounds') or {}).get('reading_mode')
+                    answer_gate_metadata['reading_mode'] = audit_mode or routed_intent.get('mode') or intent.get('mode')
+                    if result.get('prashna_context'):
+                        answer_gate_metadata['prashna_context'] = result['prashna_context']
+                    # A completed answer in any mode ends the previous Prashna workflow.
+                    if isinstance(intent, dict):
+                        saved_state = execute(conn, 'SELECT extracted_context FROM conversation_state WHERE session_id = %s', (session_id,)).fetchone()
+                        saved_context = saved_state[0] if saved_state else {}
+                        if isinstance(saved_context, str):
+                            try: saved_context = json.loads(saved_context)
+                            except ValueError: saved_context = {}
+                        saved_context = dict(saved_context or {})
+                        saved_context.pop('prashna', None)
+                        saved_context.pop('prashna_choice', None)
+                        saved_context.pop('last_prashna', None)
+                        if result.get('prashna_context'):
+                            saved_context['last_prashna'] = result['prashna_context']
+                        execute(conn, 'UPDATE conversation_state SET extracted_context = %s WHERE session_id = %s', (json.dumps(saved_context), session_id))
+                        answer_gate_metadata['reading_transition'] = intent.get('reading_transition')
+                        answer_gate_metadata['workflow_changed'] = bool(intent.get('reading_transition') == 'natal' and ((query_context or {}).get('_prashna_previous') or (cached_intent or {}).get('query_context', {}).get('prashna')))
+
 
                     if is_verified_chat and result.get('information_rounds'):
                         from chat.calculation_audit import store_audit

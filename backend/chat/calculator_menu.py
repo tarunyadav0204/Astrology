@@ -6,6 +6,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # Each entry describes both its scope and required inputs to the model.
 EXTRA_CALCULATORS = {
  'parashari.double_transit': 'Exact Jupiter–Saturn overlaps. Requires houses, start_date, end_date (UTC end exclusive).',
+ 'dasha.kalachakra_bphs': 'BPHS Kalachakra sign periods, Deha/Jeeva and gati transitions. Requires start_date, end_date; current periods evaluated at start_date. Distinct from Jaimini Kalachakra.',
+ 'dasha.kalachakra_jaimini': 'Jaimini Kalachakra sign-period variant. Requires start_date, end_date; current periods evaluated at start_date. Not BPHS Kalachakra.',
+ 'dasha.sudarshana': 'Sudarshana annual progression triggers from Lagna, Moon and Sun. Requires year. Returns yearly triggers, not a complete nested dasha-period schedule.',
  'dasha.yogini': 'Yogini planetary periods. Requires start_date and end_date; returns overlapping periods.',
  'dasha.shoola': 'Specialist Niryana Shoola periods, not a general career timer. Requires start_date, end_date; optional reference_house for a relative.',
  'annual.varshphal': 'Solar return chart, Muntha and Mudda periods. Requires year; optional location overrides birth location.',
@@ -78,6 +81,7 @@ def validate_parameters(capability, raw):
  p = CalculatorParameters.model_validate(raw or {})
  required = {
   'parashari.double_transit': ('houses','start_date','end_date'), 'dasha.yogini': ('start_date','end_date'),
+  'dasha.kalachakra_bphs': ('start_date','end_date'), 'dasha.kalachakra_jaimini': ('start_date','end_date'), 'dasha.sudarshana': ('year',),
   'dasha.shoola': ('start_date','end_date'), 'annual.varshphal': ('year',), 'annual.tajika': ('year','planets','houses'),
   'annual.nakshatra': ('year','location'), 'jaimini.rashi_strength': ('signs',), 'strength.house': ('houses',),
   'election.panchang': ('start_date','location'), 'election.muhurat': ('start_date','end_date','location','event_type'),
@@ -119,6 +123,18 @@ def run_calculator(capability, birth, raw=None):
   yoga=instance('yoga_calculator','YogaCalculator',SimpleNamespace(**birth),chart)
   methods={'general':'calculate_all_yogas','classical_core':'calculate_all_yogas','career':'calculate_career_specific_yogas','pancha_mahapurusha':'calculate_panch_mahapurusha_yogas','neecha_bhanga':'calculate_neecha_bhanga_yogas'}
   result=getattr(yoga,methods[capability.split('.')[1]])()
+ elif capability in {'dasha.kalachakra_bphs','dasha.kalachakra_jaimini'}:
+  from utils.timezone_service import parse_timezone_offset
+  dasha_birth={**birth,'timezone_offset':parse_timezone_offset(birth.get('timezone',''),birth.get('latitude'),birth.get('longitude'),for_date=birth.get('date'))}
+  if capability == 'dasha.kalachakra_bphs':
+   obj=instance('bphs_kalachakra_calculator','BPHSKalachakraCalculator',profile.get('ayanamsha',birth.get('ayanamsha') or 'lahiri'))
+   result=obj.calculate_kalchakra_dasha(dasha_birth,current_date=instant(p.start_date))
+  else:
+   result=instance('jaimini_kalachakra_calculator','JaiminiKalachakraCalculator',chart).calculate_jaimini_kalachakra_dasha(dasha_birth,current_date=instant(p.start_date))
+  if result.get('error'): raise ValueError('Requested Kalachakra calculation unavailable')
+  result={k:v for k,v in result.items() if k not in {'wheel_data','paramayus_note'}}
+ elif capability == 'dasha.sudarshana':
+  result=instance('sudarshana_dasha_calculator','SudarshanaDashaCalculator',chart,birth).calculate_precision_triggers(p.year)
  elif capability == 'dasha.yogini':
   result=instance('yogini_dasha_calculator','YoginiDashaCalculator').get_full_timeline(birth,chart['planets']['Moon']['longitude'],years=120)
  elif capability == 'dasha.shoola':
@@ -193,9 +209,9 @@ def run_calculator(capability, birth, raw=None):
   if p.start_date and p.end_date:
    result=[row for row in result if row['start_datetime'].date() < p.end_date and row['end_datetime'].date() > p.start_date]
   result=[{k:row[k] for k in ('nakshatra','start_datetime','end_datetime','nakshatra_index') if k in row} for row in result]
- if capability in {'dasha.yogini','dasha.shoola'}:
+ if capability in {'dasha.yogini','dasha.shoola','dasha.kalachakra_bphs','dasha.kalachakra_jaimini'}:
   def scope_periods(value):
-   if isinstance(value,list): return [scope_periods(v) for v in value if not isinstance(v,dict) or not (v.get('start',v.get('start_date')) and v.get('end',v.get('end_date'))) or (str(v.get('start',v.get('start_date')))[:10] < str(p.end_date) and str(v.get('end',v.get('end_date')))[:10] > str(p.start_date))]
+   if isinstance(value,list): return [scope_periods(v) for v in value if not isinstance(v,dict) or not (v.get('start',v.get('start_date',v.get('start_iso'))) and v.get('end',v.get('end_date',v.get('end_iso')))) or (str(v.get('start',v.get('start_date',v.get('start_iso'))))[:10] < str(p.end_date) and str(v.get('end',v.get('end_date',v.get('end_iso'))))[:10] > str(p.start_date))]
    if isinstance(value,dict): return {k:scope_periods(v) for k,v in value.items()}
    return value
   result=scope_periods(result)

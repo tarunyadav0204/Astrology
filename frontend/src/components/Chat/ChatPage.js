@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import MessageList from './MessageList';
 import ChatMemory from './ChatMemory';
 import ChatSummary from './ChatSummary';
+import PrashnaSetup from './PrashnaSetup';
 import { scrollChatThreadAfterMessagesChange } from './chatScrollUtils';
 import ChatChartEssence from './ChatChartEssence';
 import ChatInput from './ChatInput';
@@ -205,6 +206,7 @@ const ChatPage = ({ onLogin }) => {
     const {
         credits,
         chatCost,
+        verifiedChatCost,
         partnershipCost,
         fetchBalance,
         freeQuestionAvailable,
@@ -213,7 +215,9 @@ const ChatPage = ({ onLogin }) => {
         instantChatFirstMinuteCost,
         instantChatPerMinuteCost,
         speechChatEnabled,
+        features,
     } = useCredits();
+    const verifiedChatEnabled = features?.verified_chat_enabled === true;
     const { birthData: initialBirthData } = location.state || {};
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -262,6 +266,10 @@ const ChatPage = ({ onLogin }) => {
     }, [headerUser, location.state?.openLogin, location.search, onLogin, navigate, location.pathname]);
 
     const [isPartnershipMode, setIsPartnershipMode] = useState(false);
+    const [prashnaLocation, setPrashnaLocation] = useState(null);
+    const [verifiedConversationMode, setVerifiedConversationMode] = useState(false);
+    const [pendingPrashnaQuestion, setPendingPrashnaQuestion] = useState(null);
+    useEffect(() => { setPrashnaLocation(null); setPendingPrashnaQuestion(null); }, [birthData?.id]);
     const [selectedPartnerChart, setSelectedPartnerChart] = useState(null);
     const [showPartnerModal, setShowPartnerModal] = useState(false);
     const messagesEndRef = useRef(null);
@@ -544,6 +552,23 @@ const ChatPage = ({ onLogin }) => {
             followUpOptions,
             queryContextExtras,
         });
+        if (queryContextExtras?.prashna_choice === 'prashna') {
+            setVerifiedConversationMode(true);
+            setPendingPrashnaQuestion({ question: queryContextExtras.original_question || text, queryContext: queryContextExtras });
+            return;
+        }
+        if (queryContextExtras?.prashna_workflow_choice) {
+            setVerifiedConversationMode(true);
+            setPrashnaLocation(null);
+            handleSendMessageChatV2(queryContextExtras.original_question || text, { chat_tier: 'verified', premium_analysis: false, query_context: { ...queryContextExtras, prashna_requested: false } });
+            return;
+        }
+        if (queryContextExtras?.prashna_choice === 'natal') {
+            setVerifiedConversationMode(true);
+            setPrashnaLocation(null);
+            handleSendMessageChatV2(queryContextExtras.original_question || text, { chat_tier: 'verified', premium_analysis: false, query_context: { ...queryContextExtras, prashna_requested: false } });
+            return;
+        }
         if (followUpOptions?.directSend) {
             const isClarificationChoice = String(
                 queryContextExtras?.follow_up_type
@@ -1277,6 +1302,9 @@ const ChatPage = ({ onLogin }) => {
     ]);
 
     const resetThreadForWizard = (nextMode) => {
+        setPendingPrashnaQuestion(null);
+        setPrashnaLocation(null);
+        setVerifiedConversationMode(false);
         void endInstantForContextChange('consultation_context_changed');
         setMessages([]);
         subjectGateOverrideRef.current = null;
@@ -1668,6 +1696,7 @@ const ChatPage = ({ onLogin }) => {
                 });
 
                 if (status.status === 'completed') {
+                    setPrashnaLocation(null);
                     const raw =
                         status.content != null && String(status.content).trim() !== ''
                             ? status.content
@@ -1785,6 +1814,13 @@ const ChatPage = ({ onLogin }) => {
                     setMessages((prev) =>
                         prev.map((m) => {
                             if (m.processingClientId !== processingClientId) return m;
+                            const streamingTier = String(status.chat_tier || status.chatTier || m.chatTier || '').toLowerCase();
+                            if (['instant', 'verified'].includes(streamingTier) && String(status.partial_content || '').trim()) {
+                                return applyInstantProgress({ ...m, chatTier: streamingTier }, {
+                                    partial_content: status.partial_content, replace: true,
+                                });
+                            }
+                            if (streamingTier === 'verified' && m.instantStreaming && String(m.content || '').trim()) return m;
                             if (String(m.chatTier || '').toLowerCase() === 'instant') {
                                 // Polling still reports `processing` until the first
                                 // real answer arrives. Preserve the visible wait state;
@@ -1952,9 +1988,10 @@ const ChatPage = ({ onLogin }) => {
         const chartDataForMessage = personalChartData;
 
         const processingClientId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const useFreeQuestion = !isPartnershipMode && !isMundaneMode && freeQuestionAvailable;
+        const useFreeQuestion = options?.chat_tier !== 'verified' && !prashnaLocation && !isPartnershipMode && !isMundaneMode && freeQuestionAvailable;
         const useInstantChat =
             !useFreeQuestion
+            && !prashnaLocation
             && !isPartnershipMode
             && !isMundaneMode
             && instantChatEnabled
@@ -2059,6 +2096,7 @@ const ChatPage = ({ onLogin }) => {
             session_id: askSessionId,
             question: questionForApi,
             query_context: buildQueryContext({
+                ...(prashnaLocation && options?.query_context?.prashna_choice !== 'natal' ? { prashna_requested: true, prashna_location: prashnaLocation } : {}),
                 ...(pendingFollowUpQueryContext || {}),
                 ...(options?.query_context || {}),
                 ...(options?.queryContext || {}),
@@ -2070,6 +2108,7 @@ const ChatPage = ({ onLogin }) => {
             native_name: partnershipBirth?.name,
             birth_details: birthForAsk,
         };
+        if (prashnaLocation) requestData.chat_tier = 'verified';
         if (subjectGateMemoryRef.current.length > 0) {
             requestData.subject_gate_memory = subjectGateMemoryRef.current.slice(-8);
         }
@@ -2085,6 +2124,8 @@ const ChatPage = ({ onLogin }) => {
         } else if (options?.chat_tier) {
             requestData.chat_tier = options.chat_tier;
         }
+
+        if (prashnaLocation && options?.query_context?.prashna_choice !== 'natal') { requestData.chat_tier = 'verified'; requestData.premium_analysis = false; }
 
         if (isPartnershipMode && partnershipSecond) {
             const partnerNorm = normalizeBirthDetailsForChat(partnershipSecond);
@@ -2262,6 +2303,9 @@ const ChatPage = ({ onLogin }) => {
         }
         if (!birthData) return;
 
+        if (prashnaLocation || (verifiedConversationMode && !options?.premium_analysis && !options?.instant_chat)) {
+            return handleSendMessageChatV2(message, { ...options, instant_chat: false, chat_tier: 'verified', premium_analysis: false });
+        }
         const requestedInstant = Boolean(
             options?.instant_chat || String(options?.chat_tier || '').toLowerCase() === 'instant'
         );
@@ -2799,6 +2843,15 @@ const ChatPage = ({ onLogin }) => {
 
     return (
         <>
+            {pendingPrashnaQuestion && <div className="chat-memory-overlay"><section className="chat-memory-panel" role="dialog" aria-modal="true" aria-label="Ask with Prashna">
+                <header><h2>Ask with Prashna</h2><button aria-label="Close" onClick={() => setPendingPrashnaQuestion(null)}>✕</button></header>
+                <PrashnaSetup onSelect={place => {
+                    const pending = pendingPrashnaQuestion;
+                    if (isLoading) return;
+                    setPendingPrashnaQuestion(null); setPrashnaLocation(place); setIsInstantAnalysis(false);
+                    handleSendMessageChatV2(pending.question, { chat_tier: 'verified', premium_analysis: false, query_context: { ...pending.queryContext, prashna_choice: 'prashna', prashna_requested: true, prashna_location: place } });
+                }} />
+            </section></div>}
             <ModernNavigationHeader
                 user={headerUser}
                 sticky
@@ -3320,7 +3373,8 @@ const ChatPage = ({ onLogin }) => {
                                     </button>
                                 )}
                             {!isMundaneMode && !isPartnershipMode && birthData?.id && <ChatMemory key={birthData.id} chartId={birthData.id} name={birthData.name} />}
-                            <ChatSummary key={isMundaneMode ? mundaneSessionId : chatV2SessionId} messages={messages} onResolved={result => { if (result.session_id === chatV2SessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
+                            {prashnaLocation && <button className="chat-memory-trigger" onClick={() => setPrashnaLocation(null)} title={`Prashna · ${prashnaLocation.name}. Turn off Prashna`}>Prashna ×</button>}
+                            <ChatSummary key={isMundaneMode ? mundaneSessionId : chatV2SessionId} messages={messages} onPrashna={verifiedChatEnabled && !instantBilling.active && !isLoading && !freeQuestionAvailable && !isPartnershipMode && !isMundaneMode ? place => { setVerifiedConversationMode(true); setPrashnaLocation(place); setIsInstantAnalysis(false); } : undefined} onResolved={result => { if (result.session_id === chatV2SessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
                             </h1>
                             {(isMundaneMode || isPartnershipMode) && (
                                 <p className="chat-header-toolbar__meta chat-header-toolbar__meta--desktop">
@@ -3484,7 +3538,7 @@ const ChatPage = ({ onLogin }) => {
                             >
                                 <span className="credits-full">
                                     {credits} ·{' '}
-                                    {isPartnershipMode
+                                    {prashnaLocation || verifiedConversationMode ? `${verifiedChatCost}/q` : isPartnershipMode
                                         ? `${partnershipCost}/q`
                                         : instantChatEnabled && isInstantAnalysis && !isPartnershipMode && !isMundaneMode
                                             ? `${instantChatFirstMinuteCost} first · ${instantChatPerMinuteCost}/min`
@@ -3611,6 +3665,9 @@ const ChatPage = ({ onLogin }) => {
             {(wizardCompleted || wizardMode) && (
                 <>
                 <ChatInput
+                    prashnaMode={Boolean(prashnaLocation)}
+                    verifiedMode={verifiedConversationMode}
+                    onModeChange={mode => setVerifiedConversationMode(mode === 'verified')}
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading}
                     followUpQuestion={pendingFollowUpQuestion}
@@ -3630,6 +3687,7 @@ const ChatPage = ({ onLogin }) => {
                             setShowInstantEndConfirm(true);
                             return;
                         }
+                        if (next) { setVerifiedConversationMode(false); setPrashnaLocation(null); }
                         setIsInstantAnalysis(next);
                     }}
                     instantPerMinuteCost={instantChatPerMinuteCost}

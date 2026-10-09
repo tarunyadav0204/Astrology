@@ -19,3 +19,25 @@ test('caps selection at three and submits only selected IDs', async () => {
     expect(document.querySelector('strong').textContent).toBe('A focused summary');
   } finally { act(() => root.unmount()); host.remove(); global.fetch = originalFetch; }
 });
+
+test('Prashna setup selects a searched current city and closes tools', async () => {
+  const { locationService } = require('../../services/locationService');
+  const place = { id: 12, name: 'Gurugram', latitude: 28.4595, longitude: 77.0266 };
+  const search = jest.spyOn(locationService, 'searchPlaces').mockResolvedValue([place]);
+  const onPrashna = jest.fn();
+  const host = document.createElement('div'); document.body.appendChild(host); const root = createRoot(host);
+  try {
+    act(() => root.render(<ChatSummary onPrashna={onPrashna} />));
+    act(() => host.querySelector('button').click());
+    act(() => [...document.querySelectorAll('button')].find(button => button.textContent === 'Ask with Prashna').click());
+    const input = document.querySelector('input[placeholder="Search your current city"]');
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Gurugram');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent === 'Find city').click());
+    act(() => [...document.querySelectorAll('button')].find(button => button.textContent === 'Gurugram').click());
+    expect(onPrashna).toHaveBeenCalledWith(place);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  } finally { act(() => root.unmount()); host.remove(); search.mockRestore(); }
+});

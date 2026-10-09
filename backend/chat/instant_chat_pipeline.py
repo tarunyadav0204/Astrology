@@ -20420,6 +20420,12 @@ async def generate_instant_chat_response(
             localized_message=str(medical_triage.get("user_message") or ""),
             source=str(medical_triage.get("source") or "safety_gate"),
         )
+    if verified_evidence_review and ((intent or {}).get('query_context') or {}).get('prashna'):
+        from chat.verified_prashna import generate_prashna_response
+        return await generate_prashna_response(question=question, intent=intent, history=history,
+            language=language, response_style=response_style,
+            model_name=model_name_override or get_instant_chat_model(),
+            stream_callback=stream_callback, calculation_callback=verified_calculation_callback)
     timeline_result = build_selection_response(birth_data=birth_data, intent=intent)
     if timeline_result:
         return _marriage_timeline_selection_response(
@@ -20778,7 +20784,11 @@ async def generate_instant_chat_response(
             "language": language,
             "response_style": response_style,
             "birth_data": birth_data,
-            "instant_context": {**instant_context, "query_context": (intent or {}).get("query_context") or instant_context.get("query_context") or {}},
+            "instant_context": {**instant_context,
+                "intent_summary": {**(instant_context.get("intent_summary") or {}),
+                    **({"mode": "CHART_DASHA_ANALYSIS", "reading_type": "chart_dasha_analysis"}
+                       if (intent or {}).get("mode") == "CHART_DASHA_ANALYSIS" else {})},
+                "query_context": (intent or {}).get("query_context") or instant_context.get("query_context") or {}},
             "history": history,
         }
         verified_review_metadata = {

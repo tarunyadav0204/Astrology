@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 def is_compound_choice_followup(
     query_context: dict | None = None,
     extracted_context: dict | None = None,
@@ -65,6 +67,24 @@ def build_clarification_next_action(
         return None
     if str(intent.get("status") or "").upper() != "CLARIFY":
         return None
+    if intent.get('workflow_choice'):
+        question = str(original_question or '').strip()
+        return {'type': 'clarification_choice', 'choice_kind': 'prashna_scope',
+                'original_question': question, 'source': 'verified_intent_router',
+                'options': [
+                    {'id': 'continue', 'label': 'Continue this question', 'submit_text': question,
+                     'query_context': {'prashna_workflow_choice': 'continue'}},
+                    {'id': 'new', 'label': 'Start a new reading', 'submit_text': question,
+                     'query_context': {'prashna_workflow_choice': 'new'}}]}
+    if intent.get('prashna_intent') in {'offer', 'explicit'}:
+        question = str(original_question or '').strip()
+        options = [{'id': 'prashna', 'label': 'Use Prashna', 'submit_text': question,
+                    'query_context': {'prashna_choice': 'prashna'}}]
+        if intent['prashna_intent'] == 'offer':
+            options.append({'id': 'natal', 'label': 'Continue with my birth chart', 'submit_text': question,
+                            'query_context': {'prashna_choice': 'natal'}})
+        return {'type': 'clarification_choice', 'choice_kind': 'prashna_method',
+                'options': options, 'original_question': question, 'source': 'verified_intent_router'}
     if str(intent.get("answer_mode") or "").lower() != "compound_plan":
         return None
 

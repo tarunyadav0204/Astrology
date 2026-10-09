@@ -620,7 +620,7 @@ const MessageBubble = ({
         ) return null;
 
         const eyebrow = isClarificationChoice
-            ? 'Choose a theme'
+            ? (['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind) ? 'Choose your reading' : 'Choose a theme')
             : `Marriage date finder · ${String(nextAction?.selection_stage || 'period')}`;
         const fallbackTitle = isClarificationChoice
             ? ''
@@ -660,7 +660,7 @@ const MessageBubble = ({
                                 disabled={isDisabled}
                                 onClick={() => {
                                     if (selectedStructuredOption || !onFollowUpClick) return;
-                                    setSelectedStructuredOption(optionId);
+                                    if (!['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind)) setSelectedStructuredOption(optionId);
                                     const sourceMessageId = message.messageId || message.id;
                                     const queryContext = isTimelineSelection
                                         ? {
@@ -669,7 +669,8 @@ const MessageBubble = ({
                                             marriage_timeline_source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
                                         }
                                         : {
-                                            follow_up_type: 'clarification_choice',
+                                            ...(option.query_context || {}),
+                        follow_up_type: 'clarification_choice',
                                             clarification_choice_id: optionId,
                                             source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
                                             original_question: String(nextAction?.original_question || '').trim() || undefined,
@@ -695,7 +696,7 @@ const MessageBubble = ({
                                     {(isClarificationChoice || option.technical_label || option.evidence_hint || option.detail) && (
                                         <small>
                                             {isClarificationChoice
-                                                ? String(option.submit_text || '').trim()
+                                                ? (nextAction?.choice_kind === 'prashna_method' ? (optionId === 'natal' ? 'Use your saved birth chart.' : 'Choose your current city to set up the question chart.') : String(option.submit_text || '').trim())
                                                 : (
                                                     <>
                                                         {option.technical_label ? `Astrology: ${option.technical_label}` : ''}
@@ -715,7 +716,7 @@ const MessageBubble = ({
                 </div>
                 <div className="marriage-timeline-card__trust-note">
                     {isClarificationChoice
-                        ? 'Answering several questions together thins each reading. Pick one theme and I’ll go deep.'
+                        ? (['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind) ? 'Your question will be kept. Choose a card to continue.' : 'Answering several questions together thins each reading. Pick one theme and I’ll go deep.')
                         : 'Your choice narrows the calculation; it is not treated as a date predicted independently.'}
                 </div>
             </div>
@@ -1929,6 +1930,7 @@ const MessageBubble = ({
                 {message.role === 'user' && message.native_name && !message.isTyping && !message.isProcessing && (
                     <div className="message-native-chip message-native-chip--user">{message.native_name}</div>
                 )}
+                {isAssistant && !message.isTyping && !message.isProcessing && (message.gate_metadata?.reading_mode === 'PRASHNA' || message.gate_metadata?.workflow_changed) && <div className="message-native-chip">{message.gate_metadata?.reading_mode === 'PRASHNA' ? 'Prashna · question chart' : 'Using your birth chart for this question'}</div>}
                 {/* Mobile share/delete overlay (positioned inside card so layout does not shift) */}
                 {showActions && !message.isTyping && !message.isProcessing && isMobile() && (
                     <div className="message-bubble-mobile-actions" role="toolbar" aria-label="Message quick actions">

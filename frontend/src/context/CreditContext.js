@@ -13,6 +13,7 @@ export const useCredits = () => {
 export const CreditProvider = ({ children }) => {
     const [credits, setCredits] = useState(0);
     const [chatCost, setChatCost] = useState(1);
+    const [verifiedChatCost, setVerifiedChatCost] = useState(10);
     const [premiumChatCost, setPremiumChatCost] = useState(10);
     const [partnershipCost, setPartnershipCost] = useState(2);
     const [partnershipReportCost, setPartnershipReportCost] = useState(9);
@@ -138,6 +139,7 @@ export const CreditProvider = ({ children }) => {
                 }
             }
             if (pricing.chat != null) setChatCost(Number(pricing.chat) || 1);
+            if (pricing.verified_chat != null) setVerifiedChatCost(Number(pricing.verified_chat) || 10);
             if (pricing.premium_chat != null) setPremiumChatCost(Number(pricing.premium_chat) || 10);
             if (pricing.partnership != null) setPartnershipCost(Number(pricing.partnership) || 2);
             if (pricing.partnership_report != null) setPartnershipReportCost(Number(pricing.partnership_report) || 9);
@@ -268,6 +270,7 @@ export const CreditProvider = ({ children }) => {
         <CreditContext.Provider value={{
             credits,
             chatCost,
+            verifiedChatCost,
             premiumChatCost,
             partnershipCost,
             partnershipReportCost,

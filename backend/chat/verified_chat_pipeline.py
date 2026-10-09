@@ -38,7 +38,7 @@ CAPABILITY_REGISTRY = {
     "parashari.shadbala": "Calculated Shadbala strength evidence.",
     "parashari.panchadha_maitri": "Panchadha Maitri friendship matrix and planet positions.",
     "jaimini.significators_and_arudhas": "Jaimini Chara Karaka significator evidence for the selected topic.",
-    "jaimini.chara_dasha": "Jaimini Chara Dasha sign-period and antardasha timing evidence.",
+    "jaimini.chara_dasha": "Jaimini Chara Dasha sign-period and antardasha timing evidence. Optional start_date selects the focus date (otherwise user-local query date).",
     "nadi.linkages": "Available Nadi linkage evidence.",
     "nakshatra.topic_links": "Available nakshatra and dispositorship evidence.",
     "kp.cusp_significators": "Available KP cusp and significator evidence.",
@@ -469,8 +469,13 @@ def _calculate_requested_capabilities(
         output["jaimini.significators_and_arudhas"] = _json_limit(_instant_real_karaka_evidence(chart))
     if "jaimini.chara_dasha" in requested:
         dob = datetime.strptime(str(birth_data["date"]), "%Y-%m-%d")
+        from utils.query_context import resolve_query_now
+        focus_date = resolve_query_now(instant_context.get('query_context')).replace(tzinfo=None)
+        requested_parameters = CalculatorParameters.model_validate(parameters or {})
+        if requested_parameters.start_date:
+            focus_date = datetime.combine(requested_parameters.start_date, datetime.min.time())
         output["jaimini.chara_dasha"] = _json_limit(
-            CharaDashaCalculator(dict(chart)).calculate_dasha(dob, focus_date=datetime.now()),
+            CharaDashaCalculator(dict(chart)).calculate_dasha(dob, focus_date=focus_date),
             30000,
         )
     if "nadi.linkages" in requested:
@@ -559,6 +564,10 @@ def _verified_presentation_mode(instant_context):
     plan = instant_context.get('query_plan') or {}
     mode = str(intent.get('mode') or 'DEFAULT').upper()
     # A specifically routed event on one date is not an overall daily outlook.
+    if mode == 'CHART_DASHA_ANALYSIS' or intent.get('reading_type') == 'chart_dasha_analysis':
+        return 'CHART_DASHA_ANALYSIS'
+    if intent.get('answer_mode') == 'factual_chart_lookup':
+        return 'FACTUAL_LOOKUP'
     if mode == 'PREDICT_EVENT_TIMING' and plan.get('forecast_shape') != 'daily_forecast':
         return mode
     if mode == 'PREDICT_DAILY' or str(window.get('kind') or '').lower() == 'day' or plan.get('forecast_shape') == 'daily_forecast':
@@ -634,6 +643,28 @@ PREMIUM OUTPUT FORMAT:
         evidence_density_contract = 'EVENT EVIDENCE: Explain event promise, activation, realization and obstacles with concrete reasons.'
         evidence_depth_instruction = 'Use the approved event-focused Dive Deep sections only where relevant.'
         response_start_instruction = 'Start the direct event answer immediately after the greeting, with the strongest supported outcome and timing.'
+    from chat.verified_period_outlook import PERIOD_OUTLOOK_MODES, period_outlook_contract
+    if str(intent_mode).upper() in PERIOD_OUTLOOK_MODES:
+        output_presentation_instruction = period_outlook_contract(presentation_style)
+        evidence_density_contract = 'PERIOD EVIDENCE: Explain the strongest themes and developments throughout the requested horizon with concrete calculated reasons.'
+        evidence_depth_instruction = 'Use relevant period-focused Dive Deep subsections; do not force unrelated life areas or methods.'
+        response_start_instruction = 'Start the direct period outlook immediately after the greeting, naming the requested horizon and leading developments.'
+    from chat.verified_factual_lookup import FACTUAL_LOOKUP_MODES, factual_lookup_contract
+    if str(intent_mode).upper() in FACTUAL_LOOKUP_MODES:
+        output_presentation_instruction = factual_lookup_contract(presentation_style)
+        evidence_density_contract = 'FACTUAL EVIDENCE: Verify the specifically requested calculated facts; preserve explicit placements, numbers and dates in both styles.'
+        evidence_depth_instruction = 'Use the relevant source calculation; do not require unrelated specialist or predictive analysis.'
+        response_start_instruction = 'State the requested fact immediately after the greeting.'
+        if presentation_style == 'simple':
+            sentiment_instruction = 'Preserve explicitly requested technical facts; sentiment markup applies only to actual interpretation, not neutral facts.'
+    from chat.verified_chart_analysis import CHART_ANALYSIS_MODES, chart_analysis_contract
+    if str(intent_mode).upper() in CHART_ANALYSIS_MODES:
+        output_presentation_instruction = chart_analysis_contract(presentation_style)
+        evidence_density_contract = 'NAMED SUBJECT EVIDENCE: Explain the requested chart or dasha using its actual calculated foundation and relevant confirmation.'
+        evidence_depth_instruction = 'Adapt the analysis to the subject; avoid generic reports from every school.'
+        response_start_instruction = 'Start the strongest overall interpretation immediately after the greeting.'
+        if presentation_style == 'simple':
+            sentiment_instruction = 'Preserve the named chart/system and explicitly requested facts, explaining terms naturally.'
     sentiment_instruction += "\n\n" + _verified_sentiment_instruction() + "\n\n" + _verified_emphasis_instruction()
     calculation_depth_requirement = (
         'For a daily reading, inspect the mandatory daily foundations and request additional systems only when relevant. '
@@ -647,6 +678,12 @@ marriage, health, or other consequential questions, also inspect the relevant av
     )
     if str(intent_mode).upper() in EVENT_TIMING_MODES:
         calculation_depth_requirement = 'Inspect the event evidence checklist in the approved contract. Choose additional systems by relevance; do not force every strength or specialist report.'
+    if str(intent_mode).upper() in PERIOD_OUTLOOK_MODES:
+        calculation_depth_requirement = 'Inspect dasha and transit coverage over the whole requested period, then choose divisional, annual and specialist evidence according to the leading themes.'
+    if str(intent_mode).upper() in FACTUAL_LOOKUP_MODES:
+        calculation_depth_requirement = 'Inspect the requested factual source; baseline evidence is sufficient when it directly establishes the fact. Request additional calculations only as needed.'
+    if str(intent_mode).upper() in CHART_ANALYSIS_MODES:
+        calculation_depth_requirement = 'Inspect the mandatory subject evidence in the approved chart/dasha contract before interpreting; choose independent confirmation according to relevance.'
     display_name = str(native_name or "").strip()[:80]
     greeting_subject = f"the chart of {display_name}" if display_name else "the user's chart"
     return (
@@ -746,6 +783,24 @@ def _verified_final_writer_instruction(response_style: str, intent_mode: str = "
     """
     from ai.parallel_chat.presentation_style import normalize_merge_response_style
 
+    if str(intent_mode).upper() == 'PRASHNA':
+        from chat.verified_prashna import prashna_contract
+        return prashna_contract(normalize_merge_response_style(response_style)) + '\n' + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction()
+    from chat.verified_chart_analysis import CHART_ANALYSIS_MODES, chart_analysis_contract
+    if str(intent_mode).upper() in CHART_ANALYSIS_MODES:
+        return ('Write the final named-chart or dasha analysis now.\n\n'
+                + chart_analysis_contract(normalize_merge_response_style(response_style))
+                + '\n' + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction())
+    from chat.verified_factual_lookup import FACTUAL_LOOKUP_MODES, factual_lookup_contract
+    if str(intent_mode).upper() in FACTUAL_LOOKUP_MODES:
+        return ('Write the final factual lookup answer now.\n\n'
+                + factual_lookup_contract(normalize_merge_response_style(response_style))
+                + '\n' + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction())
+    from chat.verified_period_outlook import PERIOD_OUTLOOK_MODES, period_outlook_contract
+    if str(intent_mode).upper() in PERIOD_OUTLOOK_MODES:
+        return ('Write the final period outlook now.\n\n'
+                + period_outlook_contract(normalize_merge_response_style(response_style))
+                + '\n' + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction())
     from chat.verified_event_timing import EVENT_TIMING_MODES, event_timing_contract
     if str(intent_mode).upper() in EVENT_TIMING_MODES:
         return ('Write the final event timing answer now.\n\n'
@@ -833,7 +888,11 @@ async def run_verified_calculator_agent(
 
     started = time.perf_counter()
     timeout_s = max(15.0, min(180.0, float(timeout_s)))
-    baseline = build_verified_baseline(instant_context)
+    prashna_context = (instant_context.get('query_context') or {}).get('prashna')
+    is_prashna = bool(prashna_context and instant_context.get('prashna_baseline'))
+    from chat.verified_prashna import PRASHNA_CAPABILITIES, prashna_contract, calculate_prashna
+    capability_registry = PRASHNA_CAPABILITIES if is_prashna else CAPABILITY_REGISTRY
+    baseline = instant_context['prashna_baseline'] if is_prashna else build_verified_baseline(instant_context)
     conversation_context = build_verified_conversation_context(
         history,
         {
@@ -841,9 +900,18 @@ async def run_verified_calculator_agent(
             "_session_extracted_context": instant_context.get("session_extracted_context"),
         },
     )
-    baseline["historical_timing_evidence"] = {
-        "vimshottari_md_ad_timeline": _historical_vimshottari_timeline(birth_data),
-    }
+    if is_prashna:
+        conversation_context['rule'] = (
+            'History is retained to understand references and user facts, not as question-chart evidence. '
+            'Give a fresh, self-contained conclusion for the current question. Do not reaffirm an earlier '
+            'answer unless the current question explicitly requests revisiting or comparison. Calculator '
+            'rounds in this request are preparation for one answer, not previously delivered readings. '
+            'Only successful calculations from this request establish the methods used in this reading.'
+        )
+    if not is_prashna:
+        baseline["historical_timing_evidence"] = {
+            "vimshottari_md_ad_timeline": _historical_vimshottari_timeline(birth_data),
+        }
     baseline_payloads = _capability_payloads(instant_context)
     try:
         max_calculator_rounds = int(os.getenv("VERIFIED_CHAT_MAX_CALCULATOR_ROUNDS", "8"))
@@ -881,7 +949,7 @@ async def run_verified_calculator_agent(
                 "properties": {
                     "capability_id": {
                         "type": "string",
-                        "enum": list(CAPABILITY_REGISTRY),
+                        "enum": list(capability_registry),
                         "description": "The registered calculator to run.",
                     },
                     "parameters": {"anyOf": [CalculatorParameters.model_json_schema(), {"type": "null"}]},
@@ -898,7 +966,7 @@ async def run_verified_calculator_agent(
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "source": {"type": "string", "enum": ["instant_baseline", *list(CAPABILITY_REGISTRY)]},
+                    "source": {"type": "string", "enum": ["instant_baseline", *list(capability_registry)]},
                     "title": {"type": "string"},
                     "summary": {"type": "string"},
                 },
@@ -918,6 +986,12 @@ async def run_verified_calculator_agent(
         native_name=str(birth_data.get("name") or ""),
         response_style=response_style,
     )
+    if is_prashna:
+        intent_mode = 'PRASHNA'
+        instructions = (prashna_contract(response_style) + '\nWrite in ' + language + '\n'
+                        + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction()
+                        + '\nAfter inspecting evidence call report_calculation with a factual title and summary in the user language. Never expose tools or model details.')
+        tools[0]['description'] = 'Get the fixed Parashari question chart. No natal chart or natal dasha.'
     from ai.gemini_chat_analyzer import resolve_openai_reasoning_effort
     effort = resolve_openai_reasoning_effort(model_name, "none")
     reasoning_kwargs = {"reasoning": {"effort": effort}} if effort else {}
@@ -991,8 +1065,8 @@ async def run_verified_calculator_agent(
             "call_id": str(getattr(call, "call_id", "")),
             "output": json.dumps(baseline, ensure_ascii=False, default=str),
         })
-        information_rounds.append({"round": 0, "kind": "baseline", "calculator": "get_instant_baseline",
-            "requested": {}, "provided": json.loads(baseline_outputs[-1]["output"]), "success": True})
+        information_rounds.append({"round": 0, "kind": "baseline", "calculator": "prashna.parashari" if is_prashna else "get_instant_baseline",
+            "requested": prashna_context if is_prashna else {}, "provided": json.loads(baseline_outputs[-1]["output"]), "success": True})
         sent_chars += len(baseline_outputs[-1]["output"])
     await publish_trace()
 
@@ -1012,7 +1086,7 @@ async def run_verified_calculator_agent(
                 source = str(args.get("source") or "")
                 title = _compact_visible_calculation_summary(args.get("title"), limit=90)
                 summary = _compact_visible_calculation_summary(args.get("summary"), limit=260)
-                if source in {"instant_baseline", *CAPABILITY_REGISTRY} and title and summary:
+                if source in {"instant_baseline", *capability_registry} and title and summary:
                     update_id = f"verified-calculation-{source}"
                     model_calculations[:] = [row for row in model_calculations if row.get("id") != update_id]
                     model_calculations.append({"id": update_id, "title": title, "detail": summary})
@@ -1029,7 +1103,7 @@ async def run_verified_calculator_agent(
                     "provided": result, "success": bool(result.get("accepted")),
                 })
                 continue
-            if capability not in CAPABILITY_REGISTRY:
+            if capability not in capability_registry:
                 result: Dict[str, Any] = {"error": "unavailable_calculator", "capability_id": capability}
                 unavailable.append({"code": "unavailable_calculator", "capability_id": capability})
                 tool_events.append({"round": calculator_round, "tool": capability or "invalid", "success": False})
@@ -1037,11 +1111,14 @@ async def run_verified_calculator_agent(
                 cache_key = capability + ":" + json.dumps(args.get("parameters") or {}, sort_keys=True)
                 if cache_key not in calculated:
                     try:
-                        result_map = await asyncio.to_thread(_calculate_requested_capabilities,
-                            birth_data, [capability], baseline_payloads, instant_context, args.get("parameters"))
-                        calculated[cache_key] = result_map.get(capability)
+                        if is_prashna:
+                            calculated[cache_key] = await asyncio.to_thread(calculate_prashna, capability, prashna_context, args.get('parameters'))
+                        else:
+                            result_map = await asyncio.to_thread(_calculate_requested_capabilities,
+                                birth_data, [capability], baseline_payloads, instant_context, args.get("parameters"))
+                            calculated[cache_key] = result_map.get(capability)
                     except Exception:
-                        calculated[cache_key] = {"error": "invalid_or_unavailable_calculation", "requirements": CAPABILITY_REGISTRY[capability]}
+                        calculated[cache_key] = {"error": "invalid_or_unavailable_calculation", "requirements": capability_registry[capability]}
                 calculated[capability] = calculated.get(cache_key)
                 result = calculated.get(capability)
                 if result in (None, {}, []) or (isinstance(result, dict) and result.get("error")):
@@ -1134,7 +1211,7 @@ async def run_verified_calculator_agent(
         "token_usage": usage,
         "elapsed_s": max(0.0, time.perf_counter() - started),
         "prompt_chars": sent_chars,
-        "information_rounds": {"type": "verified", "max_rounds": max_calculator_rounds, "events": information_rounds},
+        "information_rounds": {"type": "verified", "reading_mode": intent_mode, "max_rounds": max_calculator_rounds, "events": information_rounds},
         "packet_validation": {
             "missing_capabilities": [],
             "calculated_capabilities": [c for c in calculated if c in CAPABILITY_REGISTRY],
@@ -1342,6 +1419,7 @@ def _json_object(raw: str) -> Dict[str, Any]:
 
 def _mode_to_intent_mode(answer_mode: str) -> str:
     return {
+        "factual_chart_lookup": "FACTUAL_LOOKUP",
         "event_prediction": "PREDICT_EVENT_TIMING",
         "timing_window": "PREDICT_PERIOD_OUTLOOK",
         "potential_capacity": "ANALYZE_TOPIC_POTENTIAL",
@@ -1369,6 +1447,61 @@ async def classify_verified_question(
     prompt = f"""
 Classify one astrology chat question. Do not answer it and do not use astrology knowledge to infer chart facts.
 Return JSON only.
+Prashna intent: set prashna_intent to explicit, offer, or none. Explicit means the user asks for
+Prashna/horary/a chart of the question moment. Infer offer SEMANTICALLY when the user has a concrete,
+situational concern whose outcome or resolution is naturally assessed from the moment of asking:
+something unresolved, missing, pending, or dependent on a specific current circumstance or decision.
+Judge the underlying concern and its immediacy, not a keyword list or a catalog of example questions.
+The user need not know the word Prashna, request a question-moment method, or lack birth details.
+Having a saved birth chart does not rule out Prashna. Yes/no grammar alone is insufficient:
+distinguish a specific situational uncertainty from a broad natal life pattern or long-term outlook.
+Use none for chart/system explanations, factual natal lookups, overall daily forecasts and general
+natal readings. Understand natural phrasing, paraphrases, implicit intent and all languages.
+A situational question suitable for Prashna is within this astrology chat's scope, even when no
+astrology terminology appears; do not reject it as general knowledge merely for that reason.
+When explicit/offer, user_message must briefly invite the user to select one of the displayed cards.
+For offer, ask them to choose Use Prashna or Continue with my birth chart. For explicit, ask them to
+select the Use Prashna card to continue. Do NOT ask them to type a choice, share a city, provide a
+location, or select a city in this message. The UI opens city selection AFTER the Use Prashna card
+is selected. You may briefly explain why a question chart suits the concern, without predicting the
+answer. Keep this invitation short and natural in the user's language.
+Do not answer or invent location.
+LOCATION MEANING: Set location_intent to relocation, object_search, or other by interpreting WHAT
+is being located. location_recommendation is ONLY choosing places/cities to live, work, study, settle,
+travel to, or relocate to. Locating a missing possession, reconstructing where it was lost, or asking
+where it may be recovered is object_search, a concrete Prashna concern, NOT relocation or city advice.
+Words like "where", "find", "place" and "location" do not by themselves imply city recommendations.
+Understand typos, paraphrases and all languages. For object_search use prashna_intent offer unless
+this concern's method is already selected, answer_mode event_prediction, category general. Do not ask
+India/abroad/both or city preferences. The location UI is only for calculating a confirmed Prashna
+question chart. Never claim a calculated chart proves an exact street, room or whereabouts without
+supporting evidence. A follow-up location-scope choice applies only to its original relocation concern;
+it must not override a new concern in the latest question.
+QUESTION-SCOPED WORKFLOW: Reassess the LATEST question on EVERY turn, even during clarification rounds.
+A method selection belongs to one concern, never the entire conversation. Output reading_transition:
+- none: no active Prashna concern and no confirmed Prashna selection; apply normal routing/offers.
+- continue_prashna: a genuine follow-up or clarification of the SAME Prashna concern. Keep its chart clock.
+- new_prashna: a DIFFERENT concrete Prashna concern when the previous method was Prashna, or a newly
+  confirmed Prashna question. Use a fresh question timestamp, not the previous concern's chart.
+- natal: the latest request is a natal chart/system explanation, natal lookup, broad natal outlook,
+  or clearly another natal question. Switch without asking the user to manage modes. This overrides
+  old Prashna selections and pending clarifications. Never combine the abandoned concern into it.
+- clarify_workflow: there is a previous Prashna concern but the latest short/ambiguous reply could mean
+  continuing it or starting another reading. Invite selecting the displayed Continue this question /
+  Start a new reading cards. Do not ask the user to type a workflow choice.
+For a selected natal card, honor that choice for its question; do not offer Prashna again for that
+same question. A selection of Prashna similarly suppresses repeated method offers for that concern,
+but does NOT force a clearly natal question through Prashna. When the scope card says continue,
+resolve its references against the previous concern; when it says new, do not inherit that concern.
+Set requires_new_location true only if the user indicates their current city has changed or explicitly
+requests a new question chart at a different place. Never reuse the old city in that case: the UI must
+ask for city selection via a card. Set false otherwise.
+Set resolved_question to a self-contained rendering of the latest request, using prior context only
+for genuine references/clarifications of that SAME concern. Do not change meaning or invent facts.
+Never merge two unrelated questions merely because a clarification was pending. Never describe
+natal routing as Prashna. Missing birth details/other person/compatibility still use normal clarifications
+or handoff, never substitution with the selected person's chart. Preserve all existing safety routing.
+METHOD CONTEXT: {json.dumps({'selected': (query_context or {}).get('prashna_choice'), 'scope_choice': (query_context or {}).get('prashna_workflow_choice'), 'selected_question_chart': (query_context or {}).get('prashna'), 'previous_question_chart': (query_context or {}).get('_prashna_previous'), 'pending_clarification_context': (query_context or {}).get('_clarification_context')}, ensure_ascii=False)}
 
 Choose one answer_mode from: {json.dumps(ANSWER_MODES)}.
 Choose one category from: {json.dumps(_CATEGORY_VALUES)}.
@@ -1399,15 +1532,37 @@ for an overall reading and its timing in the SAME life area is one integrated qu
 answer it. For example, "How will my wealth be overall and when will I earn the maximum?" must use
 route_action answer, category wealth, and a timing-capable answer mode. Never return route_action clarify
 with an empty user_message.
+Named-chart/system explanation routing: "Explain my D9 chart", "Explain my Karakamsa/Karkamsha
+chart", "Analyze my D10" and explanations of ANY named dasha (Yogini, Chara, Kalachakra, Vimshottari,
+Shoola, Sudarshana, or an unsupported system) use reading_type chart_dasha_analysis,
+answer_mode topic_reading, route_action answer. Unsupported systems still route here for a clear limitation, never fabricated personal periods.
+They need full subject interpretation, not a narrow
+fact or generic life-area report. Recognize equivalent wording and spellings in every language.
+Narrow "What is my Karakamsa sign?" or "Which Yogini period am I running?" uses factual_chart_lookup,
+reading_type default. A specific milestone with D9 evidence still uses event_prediction, reading_type default.
+For all other contracts use reading_type default.
+Factual routing: a requested placement, house lord, chart position, nakshatra, retrograde/combustion
+status, strength value, yoga presence or dasha schedule uses factual_chart_lookup. "Which dashas run
+during 2027?" is factual, while "What will those dashas bring during 2027?" is timing_window.
+"Where is my Mars?" is factual; its career meaning is explanation/topic reading; promotion timing is
+event_prediction. A date in a factual question does not make it a daily or period prediction.
 Event routing: whether or when a specific milestone occurs (promotion, marriage, job offer, joining,
 relocation or property purchase) uses event_prediction, including questions bounded to a month/year.
 Do not classify these as an overall period outlook merely because a timeframe is given.
+Period outlook routing: "What major developments can I expect over the next six months?", "How will 2027
+be for my career, finances and family?", and "What will happen in my career over the next year?" use
+timing_window, forecast_scope other, route_action answer. Multiple life areas within ONE requested
+period form one integrated period outlook, not a compound pick-one request. A specific milestone
+such as "Will I get promoted this November?" remains event_prediction. One overall day remains daily.
 Daily routing: an overall outlook for today, tomorrow, yesterday, or one specified calendar day
 uses answer_mode timing_window and forecast_scope daily. This is not a life-event timeline.
 Resolve its target_date as YYYY-MM-DD using USER LOCAL NOW below. Use the latest question's scope,
 not a career or other subject from previous questions. A specific event asked about on a date
 is still event timing, not automatically an overall daily reading.
-For other questions set forecast_scope other and target_date null.
+For non-daily questions set forecast_scope other and target_date null.
+For bounded period outlooks or bounded event timing, resolve period_start and period_end as YYYY-MM-DD
+using USER LOCAL NOW. Preserve explicit years and horizons. Use null when no bounded horizon is requested.
+A calendar year spans January 1 through December 31. Do not replace a requested period with only today.
 Set needs_transits true for daily readings and when present/future timing materially matters.
 Set time_relation to past for a request to identify an event that already happened
 (for example, "when was I married?"); current for a present situation; future for
@@ -1426,7 +1581,7 @@ USER LOCAL NOW: {now_local.isoformat()}
 QUESTION: {question}
 
 Schema:
-{{"answer_mode":"...","category":"...","target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","forecast_scope":"daily|other","target_date":null,"user_message":""}}
+{{"location_intent":"relocation|object_search|other","requires_new_location":false,"reading_transition":"none|continue_prashna|new_prashna|natal|clarify_workflow","resolved_question":"...","prashna_intent":"none|offer|explicit","answer_mode":"...","category":"...","target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","reading_type":"default|chart_dasha_analysis","forecast_scope":"daily|other","target_date":null,"period_start":null,"period_end":null,"user_message":""}}
 """.strip()
     out = await analyzer.generate_text_from_prompt(
         prompt,
@@ -1453,6 +1608,16 @@ Schema:
         # non-analysis routes; the same fallback also keeps malformed answer
         # routes recoverable instead of failing the entire chat request.
         answer_mode = "topic_reading"
+    location_intent = str(parsed.get('location_intent') or 'other').lower()
+    if location_intent == 'object_search':
+        answer_mode = 'event_prediction'
+        parsed['category'] = 'general'
+        parsed['forecast_scope'] = 'other'
+        parsed['reading_type'] = 'default'
+        if not ((query_context or {}).get('prashna') or (query_context or {}).get('_prashna_previous') or (query_context or {}).get('prashna_choice')):
+            parsed['prashna_intent'] = 'offer'
+            parsed['user_message'] = 'Choose a card below to explore this question.'
+            action = 'answer'
     category = str(parsed.get("category") or "general").strip().lower()
     if category not in _CATEGORY_VALUES:
         category = "general"
@@ -1476,8 +1641,18 @@ Schema:
         # question needs a clinical-safety-constrained health reading, or a bounded outlook when
         # the user actually asks for pace/timing; it must never receive a life-event timeline.
         answer_mode = "topic_reading" if time_relation in {"current", "none"} else "timing_window"
-    daily = str(parsed.get("forecast_scope") or "").lower() == "daily"
+    chart_analysis = parsed.get('reading_type') == 'chart_dasha_analysis' and answer_mode == 'topic_reading'
+    daily = not chart_analysis and answer_mode != "factual_chart_lookup" and str(parsed.get("forecast_scope") or "").lower() == "daily"
     period_window = None
+    if not daily and parsed.get('period_start') and parsed.get('period_end'):
+        from datetime import date
+        try:
+            period_start = date.fromisoformat(str(parsed['period_start']))
+            period_end = date.fromisoformat(str(parsed['period_end']))
+            if period_end >= period_start:
+                period_window = {'kind': 'window', 'start': period_start.isoformat(), 'end': period_end.isoformat()}
+        except ValueError:
+            pass
     if daily:
         from datetime import date
         try:
@@ -1487,11 +1662,31 @@ Schema:
             action = "clarify"
             clarification_question = clarification_question or "Which date would you like the daily reading for?"
         answer_mode = "timing_window"
+    transition = str(parsed.get('reading_transition') or 'none').strip().lower()
+    if transition not in {'none', 'continue_prashna', 'new_prashna', 'natal', 'clarify_workflow'}:
+        transition = 'none'
+    prashna_intent = str(parsed.get('prashna_intent') or 'none').lower()
+    if transition in {'continue_prashna', 'new_prashna', 'natal', 'clarify_workflow'} or (query_context or {}).get('prashna') or (query_context or {}).get('prashna_choice') in {'natal', 'prashna'}:
+        if prashna_intent in {'offer', 'explicit'}:
+            action = 'answer'
+            clarification_question = ''
+        prashna_intent = 'none'
+    if prashna_intent in {'offer', 'explicit'} and action not in {'ack', 'handoff', 'out_of_scope'}:
+        action = 'clarify'
+        clarification_question = clarification_question or 'Select a card below to continue.'
+    else:
+        prashna_intent = 'none'
     return {
+        "location_intent": location_intent,
+        "requires_new_location": parsed.get('requires_new_location') is True,
+        "reading_transition": transition,
+        "resolved_question": str(parsed.get('resolved_question') or '').strip(),
+        "prashna_intent": prashna_intent,
         "period_window": period_window,
         "query_context": query_context or {},
         "status": "CLARIFY" if action == "clarify" else "READY",
-        "mode": "PREDICT_DAILY" if daily else _mode_to_intent_mode(answer_mode),
+        "mode": "CHART_DASHA_ANALYSIS" if chart_analysis else "PREDICT_DAILY" if daily else _mode_to_intent_mode(answer_mode),
+        "reading_type": "chart_dasha_analysis" if chart_analysis else "default",
         "answer_mode": answer_mode,
         "category": category,
         "target_subject_key": target,

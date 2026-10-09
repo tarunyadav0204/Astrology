@@ -41,3 +41,15 @@ test('unsupported language adds no invented prose; RTL context stays separate', 
     const rtl=applyInstantProgress(message,{preview:{...preview,direction:'rtl'}});
     expect(applyInstantProgress(rtl,{content:'شرح'}).responseDirection).toBe('rtl');
 });
+
+test('verified answer becomes visible before completion and grows across sections', () => {
+    const waiting = { ...pending(), chatTier: 'verified' };
+    const opening = applyInstantProgress(waiting, { partial_content: '**Your strongest window is November.**', replace: true });
+    expect(opening.isTyping).toBe(false);
+    expect(opening.instantStreaming).toBe(true);
+    expect(opening.chatTier).toBe('verified');
+    const next = applyInstantProgress(opening, { partial_content: `${opening.content}\n\n## Why\nYour active period supports recognition.`, replace: true });
+    expect(next.content).toContain('## Why');
+    const completed = { ...next, instantStreaming: false };
+    expect(applyInstantProgress(completed, { partial_content: 'Late chunk', replace: true })).toBe(completed);
+});

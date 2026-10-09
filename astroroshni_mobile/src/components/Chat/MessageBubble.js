@@ -2493,7 +2493,7 @@ function MessageBubble({
                 ? t('chat.inquiry', 'AstroRoshni Inquiry')
                 : isNativeGate
                   ? t('chat.nativeGateBadge', 'Saved profile needed')
-                  : t('chat.verified', 'Tara · chart synthesis')}
+                  : message.gate_metadata?.workflow_changed ? t('premiumUi.chat.prashna.natalBadge', 'Tara · birth chart') : message.gate_metadata?.reading_mode === 'PRASHNA' ? t('premiumUi.chat.prashna.answerBadge', 'Tara · Prashna') : t('chat.verified', 'Tara · chart synthesis')}
             </Text>
           </LinearGradient>
             {chartName ? (
@@ -2813,7 +2813,7 @@ function MessageBubble({
             ]}
           >
             <Text style={[styles.clarificationChoiceEyebrow, { color: colors.primary }]}>
-              {t('chat.chooseTheme', 'Choose a theme')}
+              {['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind) ? t('premiumUi.chat.prashna.chooseMethod', 'Choose your reading') : t('chat.chooseTheme', 'Choose a theme')}
             </Text>
             {clarificationChoices.map((option, index) => {
               const optionId = String(option.id);
@@ -2836,13 +2836,14 @@ function MessageBubble({
                   ]}
                   onPress={() => {
                     if (selectedClarificationChoice || !onFollowUpClick) return;
-                    setSelectedClarificationChoice(optionId);
+                    if (!['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind)) setSelectedClarificationChoice(optionId);
                     const sourceMessageId = message.messageId || message.id;
                     const submitText = String(option.submit_text || option.label).trim();
                     onFollowUpClick(submitText, {
                       directSend: true,
                       originalQuestion: String(nextAction?.original_question || '').trim() || undefined,
                       query_context: {
+                        ...(option.query_context || {}),
                         follow_up_type: 'clarification_choice',
                         clarification_choice_id: optionId,
                         source_message_id: sourceMessageId ? String(sourceMessageId) : undefined,
@@ -2858,9 +2859,9 @@ function MessageBubble({
                   </View>
                   <View style={styles.clarificationChoiceCopy}>
                     <Text style={[styles.clarificationChoiceLabel, { color: selected ? colors.selectionText : colors.text }]}>
-                      {option.label}
+                      {nextAction?.choice_kind === 'prashna_scope' ? t(`premiumUi.chat.prashna.${optionId === 'continue' ? 'continueQuestion' : 'newReading'}`, option.label) : nextAction?.choice_kind === 'prashna_method' ? t(`premiumUi.chat.prashna.${optionId === 'natal' ? 'continueNatal' : 'usePrashna'}`, option.label) : option.label}
                     </Text>
-                    {String(option.submit_text || '').trim() ? (
+                    {nextAction?.choice_kind === 'prashna_method' ? <Text style={[styles.clarificationChoiceQuestion, { color: colors.textSecondary }]}>{t(`premiumUi.chat.prashna.${optionId === 'natal' ? 'natalDetail' : 'questionDetail'}`, optionId === 'natal' ? 'Use your saved birth chart.' : 'Choose your current city to set up the question chart.')}</Text> : String(option.submit_text || '').trim() ? (
                       <Text style={[styles.clarificationChoiceQuestion, { color: colors.textSecondary }]}>
                         {option.submit_text}
                       </Text>
@@ -2871,7 +2872,7 @@ function MessageBubble({
               );
             })}
             <Text style={[styles.clarificationChoiceHint, { color: colors.textTertiary }]}>
-              {t('chat.themeChoiceHint', 'Answering several questions together thins each reading. Pick one theme and I’ll go deep.')}
+              {['prashna_method', 'prashna_scope'].includes(nextAction?.choice_kind) ? t('premiumUi.chat.prashna.choiceHint', 'Your question will be kept. Choose a card to continue.') : t('chat.themeChoiceHint', 'Answering several questions together thins each reading. Pick one theme and I’ll go deep.')}
             </Text>
           </View>
         )}

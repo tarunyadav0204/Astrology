@@ -379,6 +379,15 @@ def _get_branch_outputs_bigquery_table() -> Optional[str]:
     return f"`{project}.{dataset}.{table}`"
 
 
+def _parse_reading_mode(raw: Any) -> Optional[str]:
+    try:
+        value = json.loads(raw) if isinstance(raw, str) else raw
+        mode = value.get('reading_mode') if isinstance(value, dict) else None
+        return str(mode).strip() or None if mode is not None else None
+    except (ValueError, TypeError):
+        return None
+
+
 def _parse_conflict_resolution_metadata(raw: Any) -> Optional[Dict[str, Any]]:
     try:
         value = json.loads(raw) if isinstance(raw, str) else raw
@@ -1414,6 +1423,7 @@ async def get_admin_chat_user_thread(
                     "timestamp": _timestamp_to_ist_iso(row[4]),
                     "message_type": message_type or None,
                     "conflict_resolution": _parse_conflict_resolution_metadata(row[18]) if len(row) > 18 else None,
+                    "reading_mode": _parse_reading_mode(row[18]) if len(row) > 18 else None,
                     "response_style": response_style,
                     "chat_tier": str(row[17] or "").strip().lower() or None if len(row) > 17 else None,
                     "native_name": native_name,
