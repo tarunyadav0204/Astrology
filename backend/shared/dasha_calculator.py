@@ -286,7 +286,7 @@ class DashaCalculator:
         try:
             # Calculate birth Julian Day
             time_parts = birth_data['time'].split(':')
-            hour = float(time_parts[0]) + float(time_parts[1])/60
+            hour = float(time_parts[0]) + float(time_parts[1])/60 + (float(time_parts[2])/3600 if len(time_parts) > 2 else 0.0)
             
             # Get timezone offset - it's already a float from BirthData.timezone property
             tz_offset = birth_data.get('timezone', 5.5)

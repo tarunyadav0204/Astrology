@@ -111,7 +111,7 @@ class ChartCalculator(BaseCalculator):
         # Calculate Julian Day with high precision for exact AstroSage matching
         jd_start = time.time()
         time_parts = birth_data.time.split(':')
-        hour = float(time_parts[0]) + float(time_parts[1])/60.0
+        hour = float(time_parts[0]) + float(time_parts[1])/60.0 + (float(time_parts[2])/3600.0 if len(time_parts) > 2 else 0.0)
         
         # Get timezone offset using centralized service
         tz_start = time.time()

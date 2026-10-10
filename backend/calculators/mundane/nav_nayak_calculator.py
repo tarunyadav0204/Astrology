@@ -16,28 +16,37 @@ class NavNayakCalculator:
         'putra', 'ari', 'roga', 'dharma', 'karma'
     ]
 
-    def calculate_nav_nayak(self, ingress_datetime: datetime) -> Dict[str, Any]:
-        """Compute Nav Nayak from Aries Ingress moment."""
-        py_weekday = ingress_datetime.weekday()
-        classical_weekday = (py_weekday + 1) % 7
-        raja_lord = self.WEEKDAY_LORDS[classical_weekday]
-        start_idx = self.NAYAK_ORDER.index(raja_lord) if raja_lord in self.NAYAK_ORDER else 0
+    def calculate_nav_nayak(self, ingress_datetime: datetime, *, latitude=None, longitude=None) -> Dict[str, Any]:
+        """Partial cabinet: Aries ingress determines Minister, NOT King.
 
-        nav_nayak = {}
-        for i in range(10):
-            lord = self.NAYAK_ORDER[(start_idx + i) % 9]
-            nav_nayak[self.NAYAK_TITLES[i]] = {
-                'lord': lord,
-                'title': self._get_title_label(self.NAYAK_TITLES[i]),
-                'interpretation': self._get_interpretation(lord, self.NAYAK_TITLES[i])
-            }
-
-        return {
-            'raja': nav_nayak['raja']['lord'],
-            'nav_nayak': nav_nayak,
-            'ingress_weekday': classical_weekday,
-            'interpretation_summary': self._year_flavor_summary(nav_nayak['raja']['lord'])
-        }
+        Other offices require independent calendrical anchors and a declared
+        regional tradition. Preserve legacy keys, returning null for uncomputed
+        roles instead of fabricating a nine-planet rotation.
+        """
+        from calculators.mundane.astronomy import utc_naive
+        from utils.timezone_service import get_iana_timezone
+        import pytz
+        local = None
+        if latitude is not None and longitude is not None:
+            utc = pytz.UTC.localize(utc_naive(ingress_datetime))
+            local = utc.astimezone(pytz.timezone(get_iana_timezone(latitude, longitude)))
+        elif ingress_datetime.tzinfo is not None:
+            local = ingress_datetime
+        weekday = (local.weekday() + 1) % 7 if local else None
+        minister = self.WEEKDAY_LORDS[weekday] if weekday is not None else None
+        roles = {key: {'lord': None, 'title': self._get_title_label(key),
+                       'available': False, 'interpretation': '',
+                       'reason': 'Independent calendrical anchor and tradition not implemented'}
+                 for key in self.NAYAK_TITLES}
+        roles['mantri'].update(lord=minister, available=minister is not None,
+            reason=None if minister else 'Location/timezone required',
+            interpretation=self._get_interpretation(minister, 'mantri') if minister else '')
+        return {'available': False, 'status': 'partial' if minister else 'unavailable',
+                'raja': None, 'mantri': minister, 'nav_nayak': roles,
+                'ingress_weekday': weekday,
+                'interpretation_summary': 'Only the Aries-ingress Minister is computed. King and other offices are unresolved.',
+                'method': 'aries_ingress_local_civil_weekday_minister_only',
+                'source': 'https://www.drikpanchang.com/festivals/samvat-newyear/info/about-new-samvata-mantri-mandala.html'}
 
     def _get_title_label(self, key: str) -> str:
         labels = {

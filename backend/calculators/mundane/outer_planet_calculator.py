@@ -1,18 +1,16 @@
 import swisseph as swe
 from typing import Dict, Any
 from datetime import datetime
+from calculators.mundane.astronomy import julian, position, validate_location
 
 class OuterPlanetCalculator:
     """Calculates positions of Uranus, Neptune, and Pluto - the Era Markers"""
     
-    def __init__(self):
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
-    
     def calculate_outer_planets(self, date: datetime, latitude: float, longitude: float) -> Dict[str, Any]:
         """Calculate positions of outer planets for a given date and location"""
-        jd = swe.julday(date.year, date.month, date.day, 
-                       date.hour + date.minute/60.0 + date.second/3600.0)
-        
+        validate_location(latitude, longitude)
+        jd = julian(date)
+
         planets = {}
         planet_ids = {
             'Uranus': swe.URANUS,
@@ -21,7 +19,7 @@ class OuterPlanetCalculator:
         }
         
         for name, planet_id in planet_ids.items():
-            pos = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL)[0]
+            pos = position(jd, planet_id)
             longitude_deg = pos[0]
             speed = pos[3]
             

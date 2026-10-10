@@ -22,6 +22,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { prepareAndSharePdf } from '../../utils/pdfPreparation';
 import * as Clipboard from 'expo-clipboard';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
@@ -956,19 +957,19 @@ function MessageBubble({
   };
 
   const sharePDF = async () => {
+    if (isGeneratingPDF) return;
     try {
-      setIsGeneratingPDF(true);
-      console.log('📄 Starting PDF generation...');
-      const logoDataUri = await getLogoDataUriForModule(require('../../../assets/logo.png'));
-      const pdfUri = await generatePDF(message, { logoDataUri });
-      console.log('✅ PDF generated:', pdfUri);
-      await sharePDFOnWhatsApp(pdfUri);
-      console.log('✅ PDF shared');
+      await prepareAndSharePdf({
+        setPreparing: setIsGeneratingPDF,
+        prepare: async () => {
+          const logoDataUri = await getLogoDataUriForModule(require('../../../assets/logo.png'));
+          return generatePDF(message, { logoDataUri, forSharing: true });
+        },
+        share: sharePDFOnWhatsApp,
+      });
     } catch (error) {
-      console.error('❌ PDF generation error:', error);
+      console.error('PDF export error:', error);
       Alert.alert('Export failed', userFacingPdfExportError(error));
-    } finally {
-      setIsGeneratingPDF(false);
     }
   };
 

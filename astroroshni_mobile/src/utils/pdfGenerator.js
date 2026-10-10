@@ -4,6 +4,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Asset } from 'expo-asset';
 import { COLORS } from './constants';
+import { withPdfTimeout } from './pdfPreparation';
 
 const logoCacheByModuleId = new Map();
 
@@ -160,12 +161,7 @@ async function printHtmlToPdfFile({ html, base64 = false, timeoutMs = 45000 }) {
       }
     : { html, base64 };
 
-  const result = await Promise.race([
-    Print.printToFileAsync(printOptions),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('PDF generation timeout')), timeoutMs)
-    ),
-  ]);
+  const result = await withPdfTimeout(() => Print.printToFileAsync(printOptions), timeoutMs);
 
   const uri = result?.uri;
   if (!uri) {
@@ -183,12 +179,12 @@ export async function getLogoDataUriForModule(assetModule) {
   if (logoCacheByModuleId.get(id)) return logoCacheByModuleId.get(id);
   try {
     const asset = Asset.fromModule(assetModule);
-    await asset.downloadAsync();
+    await withPdfTimeout(() => asset.downloadAsync(), 5000, 'PDF logo loading timeout');
     let base64 = null;
     if (asset.localUri) {
-      base64 = await FileSystem.readAsStringAsync(asset.localUri, {
+      base64 = await withPdfTimeout(() => FileSystem.readAsStringAsync(asset.localUri, {
         encoding: FileSystem.EncodingType.Base64,
-      });
+      }), 5000, 'PDF logo loading timeout');
     }
     const dataUri = base64 ? `data:image/png;base64,${base64}` : null;
     if (dataUri) logoCacheByModuleId.set(id, dataUri);
@@ -496,7 +492,12 @@ export const generatePDF = async (message, options = {}) => {
     console.log('📄 [PDF] HTML generated, length:', html.length);
     console.log('📄 [PDF] Calling Print.printToFileAsync...');
 
-    const uri = await printHtmlToPdfFile({ html, base64: false });
+    const uri = Platform.OS === 'web' && options.forSharing
+      ? await withPdfTimeout(async () => {
+          const { renderShareablePdfOnWeb } = await import('./pdfWebShare');
+          return renderShareablePdfOnWeb(html);
+        }, 45000)
+      : await printHtmlToPdfFile({ html, base64: false });
 
     console.log('✅ [PDF] Generated successfully:', uri || '(web print dialog)');
     return uri;
@@ -925,6 +926,12 @@ export const sharePDFOnWhatsApp = async (pdfUri, options = {}) => {
 
     if (!pdfUri) {
       // Web/PWA: browser print/save dialog already handled export.
+      return;
+    }
+
+    if (Platform.OS === 'web' && typeof Blob !== 'undefined' && pdfUri instanceof Blob) {
+      const { sharePdfBlobOnWeb } = await import('./pdfWebShare');
+      await sharePdfBlobOnWeb(pdfUri, options);
       return;
     }
 

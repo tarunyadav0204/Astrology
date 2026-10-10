@@ -1,6 +1,7 @@
 from typing import Dict, Any, List
+from itertools import combinations
 
-# Nakshatra list in order (index 0..26) for Vedha calculation
+# Nakshatra list in order (index 0..26) for direct sector associations
 NAKSHATRAS_ORDER = [
     'Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra', 'Punarvasu',
     'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni', 'Hasta',
@@ -14,7 +15,7 @@ class MundaneYogaCalculator:
     """Detects specialized yogas for war, famine, inflation, and economic events"""
 
     def __init__(self):
-        # Sarvatobhadra Chakra: Nakshatra-Commodity mapping
+        # Heuristic nakshatra-ruler to commodity mapping; not SBC geometry
         self.commodity_nakshatras = {
             'Gold': ['Krittika', 'Uttara Phalguni', 'Uttara Ashadha'],  # Sun-ruled
             'Silver': ['Rohini', 'Hasta', 'Shravana'],  # Moon-ruled
@@ -52,41 +53,48 @@ class MundaneYogaCalculator:
         if revolution_yoga:
             yogas.append(revolution_yoga)
 
-        # Commodity impacts (direct + Vedha)
+        # Direct commodity associations only; no invented Vedha
         commodity_impacts = self._check_commodity_impacts(chart_data)
 
+        for row in yogas:
+            if row.get('type') != 'planetary_war':
+                row['method'] = 'unvalidated_mundane_heuristic'
+                row['classical_yoga_verified'] = False
+                row['severity'] = 'unassessed'
+                row['description'] = 'Calculated configuration only; does not establish the suggested external event.'
         return {
+            'methodology_limits': ['No Sanghatta or Sarvatobhadra Chakra geometry is implemented.', 'Sector associations are heuristics, not verified price/event forecasts.'],
             'yogas': yogas,
             'commodity_impacts': commodity_impacts,
             'overall_assessment': self._generate_assessment(yogas, commodity_impacts)
         }
 
     def _check_graha_yuddha(self, chart_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Graha Yuddha: two planets within 1° - sudden shocks, leadership events, market crashes."""
+        """Longitude-proximity candidates; neither victory nor outcomes are computed."""
         results = []
         planets = chart_data.get('planets', {})
-        planet_names = [p for p in planets if p not in ('Rahu', 'Ketu') or True]
-        # Pairs that matter for mundane (all classical + nodes)
-        pairs = [
-            ('Mars', 'Saturn'), ('Sun', 'Mars'), ('Sun', 'Mercury'), ('Mars', 'Mercury'),
-            ('Jupiter', 'Saturn'), ('Venus', 'Saturn'), ('Venus', 'Mars'),
-            ('Sun', 'Venus'), ('Mercury', 'Jupiter'), ('Moon', 'Mars'), ('Moon', 'Saturn'),
-            ('Rahu', 'Mars'), ('Rahu', 'Saturn'), ('Rahu', 'Jupiter'), ('Ketu', 'Mars'), ('Ketu', 'Saturn'),
-        ]
+        # Classical longitude-proximity screening of the five tara grahas.
+        # This detects candidates; victory requires a separate declared doctrine.
+        pairs = combinations(['Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'], 2)
         for p1, p2 in pairs:
             a, b = planets.get(p1), planets.get(p2)
             if not a or not b:
                 continue
-            long1 = a.get('longitude', 0)
-            long2 = b.get('longitude', 0)
+            long1, long2 = a.get('longitude'), b.get('longitude')
+            if long1 is None or long2 is None:
+                continue
             diff = abs((long1 - long2 + 180) % 360 - 180)
             if diff <= 1.0:
                 results.append({
-                    'name': f'Graha Yuddha ({p1}-{p2})',
+                    'name': f'Graha Yuddha proximity candidate ({p1}-{p2})',
                     'type': 'planetary_war',
-                    'severity': 'critical',
+                    'severity': 'unassessed',
                     'graha_yuddha': True,
-                    'description': f'{p1} and {p2} within 1° (Graha Yuddha). High-intensity trigger for sudden shocks, leadership events, or market volatility.',
+                    'status': 'proximity_candidate',
+                    'separation_degrees': round(diff, 6),
+                    'winner': None,
+                    'method': 'five_tara_grahas_longitude_separation_at_most_one_degree',
+                    'description': f'{p1} and {p2} are within 1° longitude. Proximity screen only; no winner, defeat or external outcome is established.',
                     'planets': [p1, p2],
                 })
         return results
@@ -100,14 +108,15 @@ class MundaneYogaCalculator:
         if not mars or not saturn:
             return None
         
-        mars_long = mars.get('longitude', 0)
-        saturn_long = saturn.get('longitude', 0)
+        mars_long, saturn_long = mars.get('longitude'), saturn.get('longitude')
+        if mars_long is None or saturn_long is None:
+            return None
         diff = abs(mars_long - saturn_long)
         
         # Conjunction (within 10 degrees)
         if diff < 10 or diff > 350:
             return {
-                'name': 'Sanghatta Yoga (War Indicator)',
+                'name': 'Mars–Saturn conjunction (heuristic)',
                 'type': 'conflict',
                 'severity': 'high',
                 'description': 'Mars-Saturn conjunction indicates military conflicts, violence, or political tensions',
@@ -131,7 +140,7 @@ class MundaneYogaCalculator:
         
         if moon_house in [6, 8, 12] and jupiter_house in [6, 8, 12]:
             return {
-                'name': 'Durbhiksha Yoga (Famine Indicator)',
+                'name': 'Moon/Jupiter dusthana placement (heuristic)',
                 'type': 'scarcity',
                 'severity': 'medium',
                 'description': 'Afflicted Moon and Jupiter indicate agricultural issues, food scarcity, or water problems',
@@ -154,9 +163,9 @@ class MundaneYogaCalculator:
         
         # Venus-Rahu in wealth houses (2nd or 11th)
         if (venus_house in [2, 11] and rahu_house in [2, 11]) or \
-           (abs(venus.get('longitude', 0) - rahu.get('longitude', 0)) < 15):
+           (venus.get('longitude') is not None and rahu.get('longitude') is not None and abs((venus['longitude'] - rahu['longitude'] + 180) % 360 - 180) < 15):
             return {
-                'name': 'Mahargha Yoga (Inflation Indicator)',
+                'name': 'Venus–Rahu association (heuristic)',
                 'type': 'economic',
                 'severity': 'medium',
                 'description': 'Venus-Rahu combination indicates price rises, currency devaluation, or market speculation',
@@ -176,14 +185,15 @@ class MundaneYogaCalculator:
         if not uranus or not pluto:
             return None
         
-        uranus_long = uranus.get('longitude', 0)
-        pluto_long = pluto.get('longitude', 0)
-        diff = abs(uranus_long - pluto_long) % 360
+        uranus_long, pluto_long = uranus.get('longitude'), pluto.get('longitude')
+        if uranus_long is None or pluto_long is None:
+            return None
+        diff = abs((uranus_long - pluto_long + 180) % 360 - 180)
         
         # Square (90°) or Opposition (180°)
         if (85 < diff < 95) or (175 < diff < 185):
             return {
-                'name': 'Parivartan Yoga (Revolution Indicator)',
+                'name': 'Uranus–Pluto hard aspect (modern heuristic)',
                 'type': 'transformation',
                 'severity': 'high',
                 'description': 'Uranus-Pluto hard aspect indicates revolutionary changes, regime shifts, or major social upheavals',
@@ -193,7 +203,7 @@ class MundaneYogaCalculator:
         return None
     
     def _check_commodity_impacts(self, chart_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Sarvatobhadra Chakra: direct (planet in nakshatra) + Vedha (aspect to commodity nakshatra)."""
+        """Direct planetary-rulership sector analogy; no Sarvatobhadra Vedha."""
         impacts = []
         planets = chart_data.get('planets', {})
         malefics = ['Mars', 'Saturn', 'Rahu', 'Ketu']
@@ -202,7 +212,8 @@ class MundaneYogaCalculator:
             planet = planets.get(planet_name, {})
             if not planet:
                 continue
-            nakshatra = planet.get('nakshatra', {}).get('name', '') or self._nakshatra_from_longitude(planet.get('longitude', 0))
+            nak = planet.get('nakshatra')
+            nakshatra = (nak.get('name', '') if isinstance(nak, dict) else nak if isinstance(nak, str) else '') or self._nakshatra_from_longitude(planet.get('longitude'))
             if not nakshatra:
                 continue
             try:
@@ -217,22 +228,10 @@ class MundaneYogaCalculator:
                         'planet': planet_name,
                         'nakshatra': nakshatra,
                         'impact_type': 'direct',
+                        'method': 'planetary_rulership_sector_analogy',
+                        'classical_sarvatobhadra_vedha': False,
                         'impact': 'price_volatility',
                         'prediction': f"{planet_name} in {nakshatra} suggests volatility in {commodity} prices"
-                    })
-            # Vedha: 7th aspect in SBC = nakshatra (index + 14) mod 27
-            vedha_index = (nak_index + 14) % 27
-            vedha_nakshatra = NAKSHATRAS_ORDER[vedha_index]
-            for commodity, nakshatras in self.commodity_nakshatras.items():
-                if vedha_nakshatra in nakshatras:
-                    impacts.append({
-                        'commodity': commodity,
-                        'planet': planet_name,
-                        'nakshatra': nakshatra,
-                        'vedha_nakshatra': vedha_nakshatra,
-                        'impact_type': 'vedha',
-                        'impact': 'price_affliction_by_aspect',
-                        'prediction': f"{planet_name} in {nakshatra} aspects (Vedha) {vedha_nakshatra} → {commodity} afflicted"
                     })
         return impacts
     
@@ -246,15 +245,5 @@ class MundaneYogaCalculator:
     def _generate_assessment(self, yogas: List[Dict], commodity_impacts: List[Dict]) -> str:
         """Generate overall mundane assessment"""
         if not yogas and not commodity_impacts:
-            return "Stable period with no major mundane indicators"
-        
-        severity_count = sum(1 for y in yogas if y.get('severity') == 'high')
-        
-        if severity_count >= 2:
-            return "Critical period: Multiple high-severity yogas indicate major global events"
-        elif severity_count == 1:
-            return "Significant period: Important events likely in indicated sectors"
-        elif yogas:
-            return "Moderate period: Some challenges in specific areas"
-        else:
-            return "Commodity volatility expected, but no major crisis indicators"
+            return "No configured indicators detected; this is not evidence of stability."
+        return "Configurations detected; external-event severity and predictive validity are unassessed."

@@ -63,7 +63,15 @@ def get_nation_birth_dict_for_dasha(country_name: str) -> Optional[Dict[str, Any
     rec = get_nation_foundation(country_name)
     if not rec:
         return None
-    time_str = rec.get('time', '00:00:00')
+    # Missing times/offsets cannot silently become midnight/UTC.
+    for field in ('date', 'time', 'timezone', 'lat', 'lon'):
+        if rec.get(field) in (None, ''):
+            raise ValueError(f'National foundation missing {field}')
+    from datetime import datetime
+    datetime.fromisoformat(f"{rec['date']}T{rec['time']}")
+    from calculators.mundane.astronomy import validate_location
+    validate_location(float(rec['lat']), float(rec['lon']))
+    time_str = rec['time']
     if len(time_str.split(':')) == 2:
         time_str = time_str + ':00'
     return {

@@ -5,18 +5,16 @@ class GeodeticCalculator:
     
     def __init__(self):
         # Koorma Chakra: Map 27 Nakshatras to geographic directions
-        self.nakshatra_directions = {
-            'Ashwini': 'East', 'Bharani': 'Southeast', 'Krittika': 'South',
-            'Rohini': 'Central', 'Mrigashira': 'Southwest', 'Ardra': 'West',
-            'Punarvasu': 'Northwest', 'Pushya': 'North', 'Ashlesha': 'Northeast',
-            'Magha': 'East', 'Purva Phalguni': 'Southeast', 'Uttara Phalguni': 'South',
-            'Hasta': 'Central', 'Chitra': 'Southwest', 'Swati': 'West',
-            'Vishakha': 'Northwest', 'Anuradha': 'North', 'Jyeshtha': 'Northeast',
-            'Mula': 'East', 'Purva Ashadha': 'Southeast', 'Uttara Ashadha': 'South',
-            'Shravana': 'Central', 'Dhanishta': 'Southwest', 'Shatabhisha': 'West',
-            'Purva Bhadrapada': 'Northwest', 'Uttara Bhadrapada': 'North', 'Revati': 'Northeast'
-        }
-        
+        # Brihat Samhita 14: groups of THREE beginning with Krittika;
+        # centre, east, southeast, south, southwest, west, northwest, north, northeast.
+        nakshatras = ['Krittika', 'Rohini', 'Mrigashira', 'Ardra', 'Punarvasu', 'Pushya',
+                     'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni', 'Hasta', 'Chitra',
+                     'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha', 'Mula', 'Purva Ashadha',
+                     'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada',
+                     'Uttara Bhadrapada', 'Revati', 'Ashwini', 'Bharani']
+        directions = ['Central', 'East', 'Southeast', 'South', 'Southwest', 'West', 'Northwest', 'North', 'Northeast']
+        self.nakshatra_directions = {name: directions[index // 3] for index, name in enumerate(nakshatras)}
+
         # Regional mapping for major countries (keys must match app COUNTRIES name)
         self.regional_mapping = {
             'India': {
@@ -482,12 +480,17 @@ class GeodeticCalculator:
             'direction': direction,
             'country': country,
             'affected_regions': regions,
+            'method': 'kurma_nakshatra_triplets_with_modern_region_mapping',
+            'regional_mapping_basis': 'modern_editorial_analogy_not_classical_geographic_prediction',
+            'source': 'https://www.siva.sh/brihat-samhita/14/1',
+            'limitation': 'Classical division concerns Bharatavarsha; application to modern countries is an analogy, not verified impact evidence.',
             'interpretation': f"{nakshatra} influences {direction} regions of {country}"
         }
     
     def analyze_planetary_impact(self, planet_data: Dict[str, Any], country: str = 'India') -> Dict[str, Any]:
         """Analyze geographic impact of a planet's position"""
-        nakshatra = planet_data.get('nakshatra', {}).get('name', 'Unknown')
+        nak = planet_data.get('nakshatra')
+        nakshatra = nak.get('name', 'Unknown') if isinstance(nak, dict) else nak if isinstance(nak, str) else 'Unknown'
         planet_name = planet_data.get('name', 'Unknown')
         
         region_data = self.get_affected_regions(nakshatra, country)
@@ -526,5 +529,5 @@ class GeodeticCalculator:
         ]
         
         nakshatra_span = 360 / 27
-        nak_index = int(longitude / nakshatra_span)
+        nak_index = int((longitude % 360) / nakshatra_span)
         return nakshatras[nak_index % 27]

@@ -105,8 +105,11 @@ class SportsMundaneScorecard:
         event_time: str,
         timezone_offset: float,
     ) -> Optional[Dict[str, Any]]:
-        if len(entities) < 2 or not event_chart:
-            return None
+        if len(entities) != 2 or len(set(entities)) != 2 or not event_chart:
+            return {'available': False, 'reason': 'Exactly two distinct sides are required'}
+        ascendant = event_chart.get('ascendant')
+        if not isinstance(ascendant, (int, float)):
+            return {'available': False, 'reason': 'Event ascendant is unavailable'}
 
         team_a = entities[0]
         team_b = entities[1]
@@ -114,7 +117,7 @@ class SportsMundaneScorecard:
         seventh_sign = (asc_sign + 6) % 12
 
         jd = self._julian_day(event_date, event_time, timezone_offset)
-        birth_data = {"latitude": latitude, "longitude": longitude}
+        birth_data = {"latitude": latitude, "longitude": longitude, "timezone": timezone_offset, "date": event_date, "time": event_time}
         day_lord = self._day_lord_from_panchang(event_panchang)
         hora_lord = get_hora_lord(jd, birth_data)
 
@@ -147,14 +150,21 @@ class SportsMundaneScorecard:
         predicted_winner = side_a.entity if side_a.score >= side_b.score else side_b.entity
         confidence = self._confidence_from_margin(closeness, volatility)
         if closeness <= 2:
-            result_type = "draw_or_extra_time" if volatility >= 2 else "narrow_edge"
-        if closeness <= 1 and volatility >= 2:
+            result_type = "narrow_edge"
+        if closeness == 0:
+            result_type = "balanced"
+            predicted_winner = None
+            confidence = 50
+        elif closeness <= 2 and volatility >= 2:
+            result_type = "draw_or_extra_time"
             predicted_winner = None
 
         return {
             "available": True,
             "category": "sports",
-            "method": "deterministic_event_chart_scorecard_v2",
+            "method": "deterministic_event_chart_scorecard_v3",
+            "calibration": "unvalidated_heuristic_not_probability",
+            "side_assignment": "first_input_side_to_ascendant_second_to_seventh_unverified_convention",
             "sides": [
                 {
                     "entity": side_a.entity,
@@ -183,6 +193,7 @@ class SportsMundaneScorecard:
                 "margin_points": closeness,
                 "result_type": result_type,
                 "confidence_percent": confidence,
+                "confidence_kind": "legacy_heuristic_index_not_win_probability",
             },
         }
 
@@ -224,7 +235,7 @@ class SportsMundaneScorecard:
         elif lord_sign == DEBILITATION_SIGNS.get(lord):
             score -= 3
             reasons.append(f"{lord} is debilitated in the event chart")
-        elif lord_sign == side_sign:
+        elif lord_sign in {sign for sign, ruler in SIGN_LORDS.items() if ruler == lord}:
             score += 2
             reasons.append(f"{lord} holds its own sign, stabilizing the side")
 
@@ -343,7 +354,7 @@ class SportsMundaneScorecard:
 
     def _day_lord_from_panchang(self, event_panchang: Optional[Dict[str, Any]]) -> str:
         vara_name = ((event_panchang or {}).get("vara") or {}).get("name")
-        return VARA_LORDS.get(vara_name, "Sun")
+        return VARA_LORDS.get(vara_name, "")
 
     def _confidence_from_margin(self, margin: int, volatility: int) -> int:
         base = 50 + min(28, margin * 6)
@@ -356,7 +367,8 @@ class SportsMundaneScorecard:
         return ((int(target_sign) - int(base_sign)) % 12) + 1
 
     def _is_friend(self, planet_a: str, planet_b: str) -> bool:
-        return planet_b in NATURAL_FRIENDS.get(planet_a, set()) or planet_a in NATURAL_FRIENDS.get(planet_b, set())
+        # Friendship is directional: A being friendly to B does not imply the reverse.
+        return planet_b in NATURAL_FRIENDS.get(planet_a, set())
 
     def _julian_day(self, event_date: str, event_time: str, timezone_offset: float) -> float:
         dt = datetime.fromisoformat(f"{event_date}T{event_time}")

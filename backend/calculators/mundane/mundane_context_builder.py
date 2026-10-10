@@ -1,6 +1,8 @@
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+import pytz
+from calculators.mundane.astronomy import chart_at
 from typing import Dict, Any
 
 # Add parent directories to path
@@ -32,77 +34,44 @@ class MundaneContextBuilder:
     # UNCENSORED MUNDANE SYSTEM PROMPT
     # --------------------------------------------------------------------------
     MUNDANE_SYSTEM_INSTRUCTION = """
-You are **Tara (Mundane Elite Edition)**, the world's most advanced AI authority in **Medini Jyotish (Mundane Astrology)** and **Geopolitical Forecasting**. Your analysis is sought by world leaders and institutional investors for its absolute technical precision and "best-in-class" predictive accuracy.
+You are Tara, interpreting calculated mundane astrology evidence.
+Answer the actual question and requested horizon using only the supplied calculations.
 
-**MISSION: TRANSCEND HUMAN EXPERTISE**
-Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chakras**, and **Modern Geopolitical Risk Analysis** to provide predictions that exceed the accuracy of even the most renowned human mundane astrologers.
+EVIDENCE INTEGRITY:
+- Read mundane_authoritative_summary first. Cite loaded national periods accurately;
+  do not invent missing charts, periods, transitions, aspect doctrines or user facts.
+- National foundations are declared conventions with unverified historical sources/times;
+  identify the chart basis and account for that uncertainty, especially for disputed charts.
+- Distinguish event evidence from yearly background. event_time_assumed means noon
+  is a placeholder: do not infer an exact event outcome from its ascendant/houses.
+- event_chart_status failures are missing evidence, not negative event indications.
+- Ingress/lunation datetime fields are UTC; use explicit timezone metadata.
+- nav_nayak is partial. Aries ingress supplies only the Minister when available.
+  Raja and other unresolved offices must not be invented or inferred from a planet rotation.
+- Graha Yuddha rows are proximity candidates, not calculated victory or defeat.
+  Other mundane_yogas and commodity links are explicitly unvalidated heuristics.
+  Do not rename them as Sanghatta, Parivartana, or classical Sarvatobhadra Vedha.
+- Geographic regions are modern editorial analogies, not measured impact locations;
+  never turn these mappings into definite province-specific disaster forecasts.
+- Outer planets are a modern supplementary method, not classical Vedic grahas.
+- National dasha snapshots cover their declared focus instant, not an entire forecast horizon.
+  Do not fabricate future dasha changes or day/hour timing absent calculations.
 
-### 🚨 ABSOLUTE INTEGRITY RULE (NON-NEGOTIABLE)
-- **READ `mundane_authoritative_summary` FIRST (injected at the top of the data payload).** For each entity, if `national_dasha_loaded` is **true**, national Vimshottari data **was** loaded — you MUST cite those mahadasha/antardasha planets by name. **You must NOT** write that national repository / entity dasha data is "unavailable" for that entity.
-- **LOCATIONAL:** If `locational_chart_loaded` is **true** for an entity, a locational chart for that capital **was** computed — do not claim locational data is missing for that capital.
-- **NO HALLUCINATION:** Only if `national_dasha_loaded` is **false** or `entity_charts[entity].available` is **false** may you say national chart data is missing for that entity (cite the given `reason` if present). DO NOT invent dashas not shown in the summary or JSON.
-- **DATA ANCHORING:** Every prediction must be anchored in the provided JSON fields. If you cite a planetary position, it MUST match the data.
+SPORTS:
+- sports_scorecard is a heuristic comparison, not an empirically calibrated probability.
+  When available, explain the score reasons and retain its stated relative edge.
+- confidence_percent is a legacy heuristic index. Never present it as a win probability.
+- balanced means no favored side; draw_or_extra_time is a legacy balanced hint,
+  not proof that the sporting rules allow a draw or that extra time will occur.
+- If sides have no explicit verified ascendant assignment, identify the input-order
+  assumption and keep the conclusion conditional. Missing scorecard is not a winner.
+- Do not invent minute-by-minute events, VAR, red cards or turning-point times.
 
-### 1. THE MUNDANE ELITE PROTOCOL (Technical Depth)
-
-**A. SPATIAL & GEOGRAPHIC PRECISION (`geographic_impacts`):**
-- **Koorma Chakra (Tortoise Chart):** Use the provided impacts to pinpoint which regions of a nation are under stress. If Saturn is in Rohini (Shakata Bheda), predict severe agricultural or leadership crises for that specific direction.
-- **Geodetic Equivalents:** Use the geodetic data to link planetary degrees to terrestrial longitudes for market-moving events.
-- **CRITICAL REQUIREMENT:** You MUST cite specific provinces/regions from the `geographic_impacts` array by name (e.g., "The affliction in Gilan and Kurdistan provinces indicates...").
-
-**B. THE EVENT MOMENT (`event_chart` & `event_panchang`):**
-- **Panchang Synergy:** Analyze the Tithi, Nakshatra, and Yoga of the match/event start from `event_panchang`.
-  - *Example:* A match starting on a 'Rikta' Tithi (4, 9, 14) with an afflicted Moon indicates a chaotic, low-quality, or controversial outcome.
-  - **CRITICAL REQUIREMENT:** You MUST explicitly analyze the specific `Tithi`, `Nakshatra`, and `Yoga` provided in `event_panchang` and explain their collective impact on the event's "Soul."
-
-**C. MULTI-LAYERED DASHA SYNTHESIS (`entity_charts`):**
-- **National Dasha vs Transit:** A nation in a strong Mahadasha (e.g., India in Moon MD) is resilient even under harsh transits. Conversely, a weak dasha (e.g., Rahu MD) makes them vulnerable to even minor malefic transits (like Mars crossing natal Rahu).
-- **Dasha Synchronization:** In conflict/competition, if Entity A has a 'Yogakaraka' dasha and Entity B has a 'Maraka' or 'Badhaka' dasha, the outcome is certain.
-- **CRITICAL REQUIREMENT:** You MUST use the specific `dasha` and `mahadasha` values provided for each entity in `entity_charts`. Hallucinating "Global Dashas" is strictly forbidden.
-
-**C2. SPORTS DECISION LAYER (`sports_scorecard`):**
-- If `sports_scorecard.available` is true, it is the authoritative deterministic verdict spine for a sports matchup.
-- You MUST anchor the winner / draw / extra-time call to `sports_scorecard.edge`.
-- You MUST explain the strongest reasons from `sports_scorecard.sides[*].reasons` before adding any broader narrative.
-- Do NOT invent a different probability if `sports_scorecard.edge.confidence_percent` is present; use that number and explain it.
-- Do NOT invent minute-by-minute windows, red-card windows, VAR windows, or intra-match turning-point times unless such timing data is explicitly present in the JSON.
-- Do NOT claim classical technical statuses such as `Dig Bala`, `Neecha Bhanga`, `Vargottama`, or exact aspect doctrines unless they are explicitly present in the provided data or directly derivable from the provided scorecard reasons.
-- If `event_panchang.vara.name` is present, weekday rulership must follow that value; do not contradict it with a different day lord.
-- If `sports_scorecard.edge.result_type` is `narrow_edge`, your language must stay narrow and competitive: use phrases like "slight edge", "narrow edge", or "lean". You must NOT use words like "decisive", "dominant", "certain", or "comfortable".
-- If `sports_scorecard.edge.result_type` is `draw_or_extra_time`, you must present the match as balanced or level and must NOT predict a regulation-time winner.
-- If `sports_scorecard.edge.result_type` is `winner`, you may say one side has the edge, but you still must not exaggerate beyond the confidence percentage shown.
-
-**D. GLOBAL YOGAS & ERA MARKERS (`mundane_yogas` & `outer_planets`):**
-- **Graha Yuddha (Planetary War):** Highest priority. If two planets are within 1°, the sector ruled by the defeated planet (e.g., Venus for Markets/Arts, Mars for Military) will face a total collapse or shock.
-- **Sanghatta Yoga:** The "War Trigger." If planets aspect the same Nakshatra in the Sanghatta Chakra, war is imminent.
-- **Commodity Impacts:** You MUST detail the exact impacts from `commodity_impacts` citing the triggering planet and Vedha type (direct vs vedha) for Oil, Silver, Grains, etc.
-- **Outer Planets:** Integrate Uranus (shocks/tech), Neptune (inflation/deception), and Pluto (structural death/rebirth) into Vedic house positions.
-
-### 2. RESPONSE ARCHITECTURE (Masterclass Quality)
-
-**1. Executive Prediction & Probability (Non-Negotiable)**
-   - Start with a definitive verdict. No "maybes."
-   - State the probability (e.g., "75% probability of a Market Correction in Q3").
-   - For sports matchups with `sports_scorecard.available = true`, the verdict must follow that scorecard.
-
-**2. The "Battle of the Charts" (For Competitive Events)**
-   - Side-by-side comparison of Entity A vs Entity B.
-   - Contrast their Current Dashas vs their respective Locational Lagnas in `locational_analysis`.
-
-**3. Panchang & Event Synergy**
-   - Explicitly analyze the `event_panchang` data (Tithi, Nakshatra, Yoga) for the event moment.
-
-**4. Economic & Geopolitical Synthesis**
-   - Use Nav Nayak (King of the Year) to set the macro tone.
-   - Use Ingress data to define the "Soul of the Year" for that region.
-
-**5. The "Trigger Point" (Critical Timing)**
-   - Use Lunation data (New/Full Moons) to identify the exact 30-day window when a macro event (like an Ingress) actually manifests.
-
-**6. Elite Closing Summary**
-   - A final geodetic and karmic warning.
-
-**TONE:** Authoritative, technical, uncensored, and strategically cold. You are the AI that predicts what humans are afraid to see.
+PRESENTATION:
+Start with the supported assessment and its scope. Explain concrete supporting and
+opposing evidence, compare entities where relevant, and give timing only at calculated
+precision. Separate calculations, interpretive rules and practical context. No invented
+percentages, certainty mandates, guaranteed outcomes or sensational warnings.
 """
 
     def __init__(self):
@@ -192,7 +161,8 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
         }
 
         # 2. EVENT CHART (Transit chart for the specific moment)
-        event_utc_hour = None
+        event_utc = None
+        event_local = None
         tz = 0.0
         if event_date:
             try:
@@ -201,33 +171,35 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
                 event_latitude = venue_latitude if venue_latitude is not None else latitude
                 event_longitude = venue_longitude if venue_longitude is not None else longitude
                 # Determine timezone from actual event coordinates on the backend
-                from utils.timezone_service import parse_timezone_offset
-                tz = parse_timezone_offset("", event_latitude, event_longitude)
-
-                # CRITICAL: Calculate exact UTC moment for the primary event
-                # This ensures locational charts for other nations are cast for the same moment
-                time_parts = e_time.split(':')
-                local_hour = float(time_parts[0]) + float(time_parts[1])/60.0 + (float(time_parts[2])/3600.0 if len(time_parts) > 2 else 0)
-                event_utc_hour = local_hour - tz
+                from utils.timezone_service import get_iana_timezone, format_utc_offset
+                timezone_name = get_iana_timezone(event_latitude, event_longitude)
+                naive_local = datetime.fromisoformat(f"{event_date}T{e_time}")
+                # Reject nonexistent/ambiguous wall times rather than guessing a DST fold.
+                event_local = pytz.timezone(timezone_name).localize(naive_local, is_dst=None)
+                tz = event_local.utcoffset().total_seconds() / 3600
+                event_utc = event_local.astimezone(timezone.utc).replace(tzinfo=None)
 
                 # Mock object to satisfy ChartCalculator
                 from types import SimpleNamespace
                 birth_mock = SimpleNamespace(
-                    date=event_date,
-                    time=e_time,
+                    date=event_utc.date().isoformat(),
+                    time=event_utc.time().isoformat(),
                     latitude=event_latitude,
                     longitude=event_longitude,
-                    timezone=tz
+                    timezone=0.0
                 )
                 
                 event_chart = self.chart_calc.calculate_chart(birth_mock)
                 context["event_chart"] = event_chart
-                context["event_datetime"] = f"{event_date} {e_time} (TZ: {tz})"
+                context["event_datetime"] = event_local.isoformat()
+                context["event_datetime_utc"] = event_utc.isoformat() + "Z"
+                context["event_time_assumed"] = not bool(event_time)
                 context["event_location"] = {
                     "name": venue_name or country_name,
                     "latitude": event_latitude,
                     "longitude": event_longitude,
                     "timezone_offset": tz,
+                    "timezone": timezone_name,
                 }
                 
                 # Add Panchang for the event moment
@@ -237,30 +209,34 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
                         time_str=e_time,
                         latitude=event_latitude,
                         longitude=event_longitude,
-                        timezone=f"UTC{'+' if tz >= 0 else ''}{tz}"
+                        timezone=format_utc_offset(tz)
                     )
                     context["event_panchang"] = event_panchang
                 except Exception as pe:
                     print(f"⚠️ Failed to calculate event panchang: {pe}")
             except Exception as e:
+                context['event_chart_status'] = {'available': False, 'reason': 'event_time_or_timezone_unresolved'}
+                event_utc = None
                 print(f"⚠️ Failed to build event chart: {e}")
 
         # 3. ERA MARKERS (Outer Planets)
         # Use event_date if available, else Jan 1 of the year
-        calc_date = datetime.fromisoformat(event_date) if event_date else datetime(year, 1, 1)
+        calc_date = event_utc if event_utc is not None else datetime(year, 1, 1)
         event_latitude = venue_latitude if venue_latitude is not None else latitude
         event_longitude = venue_longitude if venue_longitude is not None else longitude
         outer_data = self.outer_calc.calculate_outer_planets(calc_date, event_latitude, event_longitude)
         context["outer_planets"] = outer_data
+        context["outer_planets_datetime_utc"] = calc_date.isoformat() + 'Z'
+        context["calculation_contract_version"] = 2
 
         # 4. STRATEGIC OUTLOOK (Ingress Charts)
         ingress_data = self.ingress_calc.calculate_yearly_ingresses(year, event_latitude, event_longitude)
-        # Nav Nayak: Ten Lords of the Year from Aries Ingress moment
+        # Only the independently supported Aries-ingress Minister is supplied.
         aries_dt_str = ingress_data.get('ingresses', {}).get('Aries', {}).get('datetime')
         if aries_dt_str:
             try:
                 aries_dt = datetime.fromisoformat(aries_dt_str.replace('Z', '+00:00'))
-                ingress_data['nav_nayak'] = self.nav_nayak_calc.calculate_nav_nayak(aries_dt)
+                ingress_data['nav_nayak'] = self.nav_nayak_calc.calculate_nav_nayak(aries_dt, latitude=event_latitude, longitude=event_longitude)
             except Exception:
                 ingress_data['nav_nayak'] = {}
         context["ingress_data"] = ingress_data
@@ -285,6 +261,7 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
         else:
             target_entities = [self._resolve_nation_name(country_name)]
 
+        sports_entities = list(target_entities)
         primary_resolved = self._resolve_nation_name(country_name)
         if primary_resolved and primary_resolved not in target_entities:
             target_entities.insert(0, primary_resolved)
@@ -293,16 +270,22 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
         context["entities_involved"] = target_entities
         
         for ent in target_entities:
-            ent_birth = get_nation_birth_dict_for_dasha(ent)
             foundation = get_nation_foundation(ent)
+            try:
+                ent_birth = get_nation_birth_dict_for_dasha(ent)
+            except ValueError as exc:
+                context['entity_charts'][ent] = {'available': False, 'reason': str(exc)}
+                ent_birth = None
             
             # 5a. Natal Chart & Dasha
             if ent_birth:
                 try:
                     from shared.dasha_calculator import DashaCalculator
                     dasha_calc = DashaCalculator()
-                    dasha_target = datetime.fromisoformat(event_date) if event_date else datetime(year, 6, 15)
-                    ent_dasha = dasha_calc.calculate_current_dashas(ent_birth, dasha_target)
+                    # Dasha calculator uses the foundation's civil time scale.
+                    focus_utc = event_utc if event_utc is not None else datetime(year, 6, 15)
+                    dasha_target = focus_utc + timedelta(hours=ent_birth['timezone'])
+                    ent_dasha = dasha_calc.calculate_current_dashas(ent_birth, dasha_target, strict=True)
                     
                     from types import SimpleNamespace
                     ent_mock = SimpleNamespace(
@@ -321,45 +304,45 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
                             "mahadasha": ent_dasha.get("mahadasha", {}),
                             "antardasha": ent_dasha.get("antardasha", {}),
                             "moon_lord": ent_dasha.get("moon_lord"),
+                            "as_of": dasha_target.isoformat(),
+                            "time_basis": "foundation_fixed_offset_civil_time",
+                            "timezone_offset": ent_birth['timezone'],
                         },
                         "foundation": {
                             "date": foundation.get("date"),
                             "event": foundation.get("event"),
+                            "source": foundation.get("source"),
+                            "time": ent_birth['time'],
+                            "latitude": ent_birth['latitude'],
+                            "longitude": ent_birth['longitude'],
+                            "timezone_offset": ent_birth['timezone'],
+                            "reliability": "unverified_foundation_record",
+                            "warning": "Foundation chart is a declared convention; historical time/source require independent verification.",
                         }
                     }
                 except Exception as e:
                     context["entity_charts"][ent] = {"available": False, "reason": str(e)}
             else:
-                context["entity_charts"][ent] = {"available": False, "reason": "Nation chart not found in database"}
+                context["entity_charts"].setdefault(ent, {"available": False, "reason": "Nation chart not found in database"})
 
             # 5b. Locational Analysis (Cast a chart for the nation's capital at the event time)
-            if event_date and foundation:
+            if event_utc is not None and foundation:
                 try:
-                    # Use capital's coordinates
-                    cap_lat = float(foundation.get('lat', latitude))
-                    cap_lon = float(foundation.get('lon', longitude))
-                    
-                    # CRITICAL: Use the SAME UTC moment calculated for the primary event
-                    # We pass timezone=0 and the calculated event_utc_hour
-                    from types import SimpleNamespace
-                    
-                    # Formatting UTC hour back to HH:MM:SS for the mock
-                    h = int(event_utc_hour)
-                    m = int((abs(event_utc_hour) % 1) * 60)
-                    s = int(((abs(event_utc_hour) * 60) % 1) * 60)
-                    utc_time_str = f"{h:02d}:{m:02d}:{s:02d}"
-
-                    cap_mock = SimpleNamespace(
-                        date=event_date,
-                        time=utc_time_str,
-                        latitude=cap_lat,
-                        longitude=cap_lon,
-                        timezone=0.0 # Moment is already in UTC
-                    )
+                    # Foundation cities can differ from capitals (USA, Israel).
+                    from pathlib import Path
+                    import json
+                    countries = json.loads((Path(__file__).resolve().parents[2] / 'data' / 'mundane_countries.json').read_text())
+                    capital_record = next((row for row in countries if self._resolve_nation_name(row['name']) == ent), None)
+                    if not capital_record:
+                        raise ValueError('Capital coordinates unavailable')
+                    cap_lat, cap_lon = float(capital_record['lat']), float(capital_record['lng'])
+                    cap_mock = SimpleNamespace(date=event_utc.date().isoformat(), time=event_utc.time().isoformat(),
+                                               latitude=cap_lat, longitude=cap_lon, timezone=0.0)
                     cap_event_chart = self.chart_calc.calculate_chart(cap_mock)
                     context["locational_analysis"][ent] = {
                         "available": True,
-                        "location": foundation.get('capital', ent),
+                        "location": capital_record.get('capital') or foundation.get('capital', ent),
+                        "datetime_utc": event_utc.isoformat() + 'Z',
                         "coordinates": {"lat": cap_lat, "lon": cap_lon},
                         "lagna_chart": cap_event_chart
                     }
@@ -371,7 +354,7 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
                     reason = "no_event_date"
                 elif not foundation:
                     reason = "nation_foundation_missing"
-                elif event_utc_hour is None:
+                elif event_utc is None:
                     reason = "event_utc_not_computed"
                 context["locational_analysis"][ent] = {"available": False, "reason": reason or "locational_skipped"}
 
@@ -413,8 +396,12 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
             l_end = (l_start.replace(month=l_start.month % 12 + 1, year=l_start.year + (l_start.month // 12))).replace(day=1)
         else:
             l_start = datetime(year, 1, 1)
-            l_end = datetime(year, 12, 31)
+            l_end = datetime(year + 1, 1, 1)
 
+        if event_local is not None:
+            local_zone = pytz.timezone(timezone_name)
+            l_start = local_zone.localize(l_start).astimezone(timezone.utc)
+            l_end = local_zone.localize(l_end).astimezone(timezone.utc)
         lunations = self.lunation_calc.calculate_lunations(l_start, l_end, event_latitude, event_longitude)
         context["lunation_data"] = lunations
 
@@ -425,7 +412,9 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
         if base_chart_for_yoga:
             # Merge outer planets into chart for yoga analysis
             full_planets = base_chart_for_yoga['planets'].copy()
-            full_planets.update(outer_data)
+            # Outer positions must match the base chart instant, not a different date.
+            yoga_datetime = event_utc if context.get('event_chart') else datetime.fromisoformat(ingress_data['ingresses']['Aries']['datetime'])
+            full_planets.update(self.outer_calc.calculate_outer_planets(yoga_datetime, event_latitude, event_longitude))
             
             yoga_analysis_chart = {
                 **base_chart_for_yoga,
@@ -438,12 +427,13 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
         if (
             str(category or "").strip().lower() == "sports"
             and event_date
-            and len(target_entities) >= 2
+            and event_time
+            and len(sports_entities) == 2
             and context.get("event_chart")
         ):
             try:
                 context["sports_scorecard"] = self.sports_scorecard.build(
-                    entities=target_entities,
+                    entities=sports_entities,
                     event_chart=context.get("event_chart"),
                     event_panchang=context.get("event_panchang"),
                     entity_charts=context.get("entity_charts") or {},
@@ -457,10 +447,14 @@ Your task is to integrate **Classical Vedic Principles**, **Advanced Medini Chak
             except Exception as e:
                 context["sports_scorecard"] = {"available": False, "reason": str(e)}
 
+        if str(category or '').strip().lower() == 'sports' and 'sports_scorecard' not in context:
+            context['sports_scorecard'] = {'available': False,
+                'reason': 'Two confirmed sides and an actual event date/time/chart are required'}
+
         # 8. GEOGRAPHIC MAP (Koorma Chakra)
         geo_impacts = []
         slow_movers = ['Saturn', 'Mars', 'Rahu', 'Ketu', 'Jupiter']
-        p_source = context.get("event_chart", {}).get('planets', ingress_data['aries_ingress_chart']['planets'])
+        p_source = context.get("event_chart", {}).get('planets') or ingress_data['aries_ingress_chart']['planets']
         
         for p_name in slow_movers:
             if p_name in p_source:

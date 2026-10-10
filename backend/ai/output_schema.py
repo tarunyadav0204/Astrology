@@ -557,37 +557,20 @@ Use this structure when the user explicitly asks to analyze a specific chart or 
 
 # Special Template for Mundane Astrology
 TEMPLATE_MUNDANE = """
-### 🏛️ MUNDANE ELITE ANALYSIS (MANDATORY)
-Your response MUST follow this exact sequence and adhere to the strict technical rules below:
-
-1. <div class="quick-answer-card">**Executive Prediction & Probability**: [Direct verdict with a specific probability percentage (e.g. 80%). No ambiguity.]</div>
-   - [If `sports_scorecard.available` is true, the verdict MUST follow `sports_scorecard.edge.predicted_winner` / `result_type` and the probability MUST match `sports_scorecard.edge.confidence_percent`.]
-   - [If `sports_scorecard.edge.result_type = narrow_edge`, use explicitly narrow wording such as "slight edge", "narrow edge", or "lean". Do NOT use "decisive", "dominant", "certain", or equivalent.]
-   - [If `sports_scorecard.edge.result_type = draw_or_extra_time`, present the match as balanced and do NOT name a regulation-time winner.]
-
-2. ### Key Astrological Triggers & Macro Trends: [Cite 3-4 high-impact triggers from the event chart. You MUST also explicitly state the Nav Nayak (King of the Year) and the impact of the Aries Ingress from the `ingress_data`.]
-
-3. ### Panchang & Event Synergy:
-   - [Analyze the `Tithi`, `Nakshatra`, and `Yoga` from `event_panchang`. Explain how this specific combination influences the "auspiciousness" or "volatility" of the event start.]
-   - [If `event_panchang.vara.name` is present, weekday rulership must match it exactly. Do not assign a conflicting day lord.]
-
-4. ### Battle of the Charts (Side-by-Side Analysis):
-   - #### Deterministic Scorecard: [If `sports_scorecard.available` is true, compare the two sides using `sports_scorecard.sides`, their anchor lords, scores, and reasons. This is the primary match-outcome spine.]
-   - #### Entity Dashas: [Detail the exact Vimshottari Mahadasha/Antardasha for EACH nation involved. Cite them by name. If data is unavailable for an entity, state it clearly.]
-   - #### Locational Analysis: [Contrast the Lagna/House placements for the capitals of each entity from `locational_analysis`.]
-   - [For sports answers, clearly separate deterministic evidence from broader interpretive color. The deterministic scorecard must come first.]
-
-5. ### Regional & Geographic Citations:
-   - #### Strategic Impacts: [You MUST cite specific provinces or regions by name from the `geographic_impacts` data (e.g. "Gilan", "Kurdistan"). Generic regional terms are forbidden.]
-
-6. ### Market & Commodity Precision:
-   - #### Vedha Analysis: [Detail the exact triggers for Oil, Silver, or Grains from `commodity_impacts`. Specify the triggering planet and if it is a 'direct' or 'vedha' impact.]
-
-7. ### Critical Timing & Tipping Points:
-   - [For non-sports mundane answers: exact dates/hours of peak volatility.]
-   - [For sports answers: if no explicit timing sub-data is present in the JSON, write exactly one short line stating that no intra-match turning-point windows were computed in the current model, so the judgment is based on the kickoff chart and the deterministic scorecard.]
-
-8. <div class="final-thoughts-card">**Strategic Verdict**: [Final authoritative conclusion and warning.]</div>
+### Mundane Analysis
+1. **Direct Assessment**: Answer the actual question and horizon with the strongest supported interpretation.
+   Explain confidence in words. Do not invent probabilities; sports confidence_percent is a legacy heuristic index.
+2. **Chart Basis and Timing**: Identify the event/venue, timezone, chosen foundation conventions, date coverage and assumed times.
+   If exact event time or national foundation is unresolved, explain how that limits the reading.
+3. **Relevant Calculated Factors**: Explain event chart/Panchang where available, relevant ingresses and lunations,
+   national periods and modern outer-planet context. Omit unsupported or irrelevant layers.
+   The partial nav_nayak provides Minister only; never invent King or other offices.
+4. **Comparison and Counter-Evidence**: Compare confirmed entities where relevant.
+   For sports explain supplied scorecard reasons and conditional input-order side assignment.
+   balanced means no favored side. Heuristic scores are not validated outcome probabilities.
+5. **Supported Windows**: Use actual supplied dates and transitions; do not invent precise hours or future periods.
+6. **Final Judgment**: Prioritize agreement/disagreement and material uncertainty.
+   Geographic regions are editorial analogies; yoga/commodity heuristics do not establish disasters, wars or prices.
 """
 
 # Developer-focused, high-density event log

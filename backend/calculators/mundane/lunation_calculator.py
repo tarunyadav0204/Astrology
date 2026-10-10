@@ -1,143 +1,60 @@
 import swisseph as swe
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
+from calculators.mundane.astronomy import (chart_at, forward_crossing, from_julian, julian, position, utc_naive, validate_location)
 
 class LunationCalculator:
     """Calculates exact New Moons and Full Moons for monthly trend forecasting"""
     
-    def __init__(self):
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
-    
-    def calculate_lunations(self, start_date: datetime, end_date: datetime, latitude: float, longitude: float) -> List[Dict[str, Any]]:
-        """Calculate all lunations (New Moon and Full Moon) in date range"""
-        print(f"\n🌙 Calculating lunations from {start_date.date()} to {end_date.date()}")
+    def calculate_lunations(self, start_date, end_date, latitude, longitude):
+        """All new/full moons in [start, end). Naive datetimes are UTC."""
+        start_date, end_date = utc_naive(start_date), utc_naive(end_date)
+        if end_date < start_date:
+            raise ValueError('End must not precede start')
+        validate_location(latitude, longitude)
         lunations = []
-        current_date = start_date
-        
-        while current_date < end_date:
-            # Find next New Moon
-            new_moon = self._find_next_syzygy(current_date, 0, latitude, longitude)
-            if new_moon:
-                nm_dt = datetime.fromisoformat(new_moon['datetime'])
-                if nm_dt < end_date and not any(l['datetime'] == new_moon['datetime'] for l in lunations):
-                    print(f"  ✅ Found New Moon: {new_moon['datetime']}")
-                    lunations.append(new_moon)
-                    # Move past this lunation
-                    current_date = nm_dt + timedelta(days=1)
-                    continue
-            
-            # Find next Full Moon
-            full_moon = self._find_next_syzygy(current_date, 180, latitude, longitude)
-            if full_moon:
-                fm_dt = datetime.fromisoformat(full_moon['datetime'])
-                if fm_dt < end_date and not any(l['datetime'] == full_moon['datetime'] for l in lunations):
-                    print(f"  ✅ Found Full Moon: {full_moon['datetime']}")
-                    lunations.append(full_moon)
-                    # Move past this lunation
-                    current_date = fm_dt + timedelta(days=1)
-                    continue
-            
-            # If nothing found, move forward 14 days
-            current_date += timedelta(days=14)
-        
-        print(f"  📊 Total lunations found: {len(lunations)}")
-        return sorted(lunations, key=lambda x: x['datetime'])
-    
-    def _find_next_syzygy(self, start_date: datetime, target_diff: float, latitude: float, longitude: float) -> Dict[str, Any]:
-        """Find next syzygy with high precision (Newton-Raphson convergence)"""
-        
-        # 1. Initial Estimate (Move forward to get close)
-        jd = swe.julday(start_date.year, start_date.month, start_date.day, start_date.hour + start_date.minute/60.0)
-        sun_pos = swe.calc_ut(jd, swe.SUN, swe.FLG_SIDEREAL)[0][0]
-        moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
-        
-        # Calculate current separation
-        current_diff = (moon_pos - sun_pos + 360) % 360
-        
-        # Calculate degrees to target (Forward only)
-        degrees_to_go = (target_diff - current_diff + 360) % 360
-        
-        # If we are practically ON the target (< 1 degree), assume we want the NEXT one
-        if degrees_to_go < 1:
-            degrees_to_go += 360
-            
-        # Moon moves ~12.19 degrees/day relative to Sun
-        days_to_add = degrees_to_go / 12.19
-        search_date = start_date + timedelta(days=days_to_add)
-        
-        # 2. Refine with Iteration
-        for _ in range(20):
-            jd = swe.julday(search_date.year, search_date.month, search_date.day,
-                           search_date.hour + search_date.minute/60.0)
-            
-            sun_pos = swe.calc_ut(jd, swe.SUN, swe.FLG_SIDEREAL)[0][0]
-            moon_pos = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)[0][0]
-            
-            # Calculate error (Target - Current)
-            current_diff = (moon_pos - sun_pos + 360) % 360
-            error = (target_diff - current_diff + 180) % 360 - 180
-            
-            # Check precision (0.001 degrees = ~7 seconds of time)
-            if abs(error) < 0.001:
-                lunation_type = 'New Moon' if target_diff == 0 else 'Full Moon'
-                chart = self._calculate_lunation_chart(search_date, latitude, longitude)
-                jd = swe.julday(search_date.year, search_date.month, search_date.day,
-                               search_date.hour + search_date.minute/60.0)
-                eclipse_visibility = self._get_eclipse_visibility(
-                    jd, latitude, longitude, lunation_type
-                )
-                out = {
-                    'type': lunation_type,
-                    'datetime': search_date.isoformat(),
-                    'sun_longitude': round(sun_pos, 4),
-                    'moon_longitude': round(moon_pos, 4),
-                    'nakshatra': self._get_nakshatra(moon_pos),
-                    'chart': chart,
-                    'paksha': 'Shukla' if lunation_type == 'New Moon' else 'Krishna',
-                    'valid_until': (search_date + timedelta(days=14)).isoformat()
-                }
-                if eclipse_visibility:
-                    out['eclipse_visibility'] = eclipse_visibility
-                return out
-            
-            # Adjust time: Error / Relative Speed
-            search_date += timedelta(days=error / 12.19)
-            
-        return None
-    
-    def _calculate_lunation_chart(self, dt: datetime, latitude: float, longitude: float) -> Dict[str, Any]:
-        """Calculate chart for lunation moment"""
-        jd = swe.julday(dt.year, dt.month, dt.day, dt.hour + dt.minute/60.0)
-        
-        asc_data = swe.houses_ex(jd, latitude, longitude, b'P')
-        ascendant = asc_data[0][0]
-        
-        planets = {}
-        planet_ids = {
-            'Sun': swe.SUN, 'Moon': swe.MOON, 'Mars': swe.MARS,
-            'Mercury': swe.MERCURY, 'Jupiter': swe.JUPITER, 'Venus': swe.VENUS,
-            'Saturn': swe.SATURN, 'Rahu': swe.MEAN_NODE
-        }
-        
-        for name, planet_id in planet_ids.items():
-            pos = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL)[0]
-            planets[name] = {
-                'longitude': round(pos[0], 4),
-                'sign': int(pos[0] / 30),
-                'house': self._calculate_house(pos[0], ascendant)
-            }
-        
-        planets['Ketu'] = {
-            'longitude': round((planets['Rahu']['longitude'] + 180) % 360, 4),
-            'sign': int(((planets['Rahu']['longitude'] + 180) % 360) / 30),
-            'house': self._calculate_house((planets['Rahu']['longitude'] + 180) % 360, ascendant)
-        }
-        
-        return {
-            'ascendant': round(ascendant, 4),
-            'planets': planets
-        }
-    
+        current = start_date
+        while current < end_date:
+            candidates = [self._find_next_syzygy(current, phase, latitude, longitude) for phase in (0, 180)]
+            next_event = min(candidates, key=lambda row: row['datetime'])
+            moment = datetime.fromisoformat(next_event['datetime'])
+            if moment >= end_date:
+                break
+            lunations.append(next_event)
+            current = moment + timedelta(seconds=1)
+        # The actual next syzygy closes the half-cycle, not an arbitrary 14 days.
+        for index, row in enumerate(lunations):
+            if index + 1 < len(lunations):
+                row['valid_until'] = lunations[index + 1]['datetime']
+            else:
+                next_phase = 180 if row['type'] == 'New Moon' else 0
+                next_jd = self._syzygy_jd(datetime.fromisoformat(row['datetime']) + timedelta(seconds=1), next_phase)
+                row['valid_until'] = from_julian(next_jd).isoformat()
+        return lunations
+
+    def _syzygy_jd(self, start_date, target_diff):
+        return forward_crossing(julian(start_date),
+            lambda jd: (position(jd, swe.MOON)[0] - position(jd, swe.SUN)[0]) % 360,
+            target_diff, max_days=32)
+
+    def _find_next_syzygy(self, start_date, target_diff, latitude, longitude):
+        jd = self._syzygy_jd(start_date, target_diff)
+        moment = from_julian(jd)
+        sun, moon = position(jd, swe.SUN)[0], position(jd, swe.MOON)[0]
+        kind = 'New Moon' if target_diff == 0 else 'Full Moon'
+        out = {'type': kind, 'datetime': moment.isoformat(), 'datetime_utc': moment.isoformat() + 'Z',
+               'timezone': 'UTC', 'sun_longitude': round(sun, 6), 'moon_longitude': round(moon, 6),
+               'nakshatra': self._get_nakshatra(moon), 'chart': self._calculate_lunation_chart(moment, latitude, longitude),
+               'paksha': 'Shukla' if target_diff == 0 else 'Krishna',
+               'valid_until': from_julian(self._syzygy_jd(moment + timedelta(seconds=1), 180 if target_diff == 0 else 0)).isoformat()}
+        eclipse = self._get_eclipse_visibility(jd, latitude, longitude, kind)
+        if eclipse:
+            out['eclipse_visibility'] = eclipse
+        return out
+
+    def _calculate_lunation_chart(self, dt, latitude, longitude):
+        return chart_at(dt, latitude, longitude)
+
     def _calculate_house(self, planet_long: float, ascendant: float) -> int:
         asc_sign = int(ascendant / 30)
         planet_sign = int(planet_long / 30)
@@ -161,47 +78,24 @@ class LunationCalculator:
             'pada': pada
         }
 
-    def _get_eclipse_visibility(self, jd: float, lat: float, lon: float, lunation_type: str) -> Dict[str, Any]:
-        """Check if this lunation is an eclipse and whether it is visible from the given location."""
+    def _get_eclipse_visibility(self, jd, lat, lon, lunation_type):
+        """Global event identity plus local visibility over all eclipse phases."""
+        geopos = (float(lon), float(lat), 0.0)
         try:
-            geopos = (float(lon), float(lat), 0.0)
-            if lunation_type == 'New Moon':
-                res = swe.sol_eclipse_when_glob(jd - 1, swe.FLG_SWIEPH)
-                if res[0] < 0:
-                    return {}
-                jd_max = res[1][0]
-                if abs(jd_max - jd) > 1.5:
-                    return {}
-                how = swe.sol_eclipse_how(jd_max, geopos)
-                if how[0] < 0:
-                    return {'is_eclipse': True, 'visible_from_location': False, 'reason': 'solar_eclipse_not_visible'}
-                attr = how[1] if len(how) > 1 else ()
-                magn = attr[8] if len(attr) > 8 else (attr[0] if attr else 0)
-                return {
-                    'is_eclipse': True,
-                    'eclipse_type': 'solar',
-                    'visible_from_location': how[0] != 0 or (magn > 0.001 if isinstance(magn, (int, float)) else False),
-                    'magnitude_at_location': round(magn, 4) if isinstance(magn, (int, float)) else 0,
-                    'note': 'Effect lasts up to 6 months; interpret mainly for regions where visible.'
-                }
-            else:
-                res = swe.lun_eclipse_when(jd - 1, swe.FLG_SWIEPH)
-                if res[0] < 0:
-                    return {}
-                jd_max = res[1][0]
-                if abs(jd_max - jd) > 1.5:
-                    return {}
-                how = swe.lun_eclipse_how(jd_max, geopos)
-                if how[0] < 0:
-                    return {'is_eclipse': True, 'visible_from_location': False, 'reason': 'lunar_eclipse_how_failed'}
-                attr = how[1] if len(how) > 1 else ()
-                magn = attr[0] if attr else 0
-                return {
-                    'is_eclipse': True,
-                    'eclipse_type': 'lunar',
-                    'visible_from_location': how[0] != 0 or (magn > 0.001 if isinstance(magn, (int, float)) else False),
-                    'magnitude_at_location': round(magn, 4) if isinstance(magn, (int, float)) else 0,
-                    'note': 'Lunar eclipse visible where Moon is above horizon; interpret for visible regions.'
-                }
-        except (AttributeError, TypeError, Exception):
-            return {}
+            solar = lunation_type == 'New Moon'
+            global_result = (swe.sol_eclipse_when_glob(jd - 1, swe.FLG_SWIEPH) if solar
+                             else swe.lun_eclipse_when(jd - 1, swe.FLG_SWIEPH))
+            if global_result[0] <= 0 or abs(global_result[1][0] - jd) > 1.5:
+                return {}
+            local_result = (swe.sol_eclipse_when_loc(jd - 1, geopos, swe.FLG_SWIEPH) if solar
+                            else swe.lun_eclipse_when_loc(jd - 1, geopos, swe.FLG_SWIEPH))
+            visible = bool(local_result[0] > 0 and abs(local_result[1][0] - global_result[1][0]) < 1)
+            attr = local_result[2] if visible else ()
+            magnitude = (attr[8] if solar else max(attr[0], attr[1])) if attr else 0.0
+            return {'is_eclipse': True, 'eclipse_type': 'solar' if solar else 'lunar',
+                    'visible_from_location': visible, 'magnitude_at_location': round(magnitude, 4),
+                    'magnitude_kind': 'solar' if solar else 'maximum_of_umbral_and_penumbral',
+                    'maximum_datetime_utc': from_julian(global_result[1][0]).isoformat() + 'Z',
+                    'note': 'Visibility is evaluated across the local eclipse phases, including rise/set.'}
+        except swe.Error as exc:
+            return {'available': False, 'reason': 'eclipse_calculation_failed'}
