@@ -80,3 +80,12 @@ def test_verified_emphasis_is_required_in_system_and_final_turn(style):
     assert 'material cautions or qualifications' in contract
     assert 'Never bold entire paragraphs' in contract
     assert 'Keep sentiment-span contents plain text' in contract
+
+
+def test_consultation_voice_removes_delivery_nouns_but_keeps_user_history():
+    text = "Based on the supplied information, your Moon supports communication. The supplied package does not establish an exact date. In the provided D9 chart, Venus is strong. You mentioned that you married in 2020."
+    result = redact_verified_internal_transport(text)
+    assert 'supplied' not in result and 'provided' not in result
+    assert 'does not establish an exact date' in result
+    assert 'In the D9 chart, Venus is strong.' in result
+    assert 'You mentioned that you married in 2020.' in result

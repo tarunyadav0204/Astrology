@@ -4436,3 +4436,16 @@ button.chat-header-credits.credits-display:focus-visible {
 }
 
 .chat-sentiment-label { font-size:0.75em; font-weight:600; white-space:nowrap; opacity:0.9; }
+
+/* Partnership choices must fit narrow composers and enlarged text. */
+.chat-partnership-tiers .chat-mode-option__label,
+.chat-partnership-tiers .chat-mode-option__cost {
+    display: block;
+    overflow-wrap: anywhere;
+}
+.chat-partnership-tiers .chat-mode-option {
+    padding: 9px 6px;
+}
+@media (max-width: 360px) {
+    .chat-partnership-tiers { gap: 4px; }
+}

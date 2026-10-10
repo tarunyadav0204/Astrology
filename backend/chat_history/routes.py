@@ -2101,9 +2101,14 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     verified_chat_active = (
         verified_chat_requested
         and not premium_analysis
-        and not partnership_mode
         and verified_chat_enabled_for_user(current_user.userid)
     )
+    if verified_chat_active and partnership_mode:
+        from chat.verified_partnership import validate_partner_birth_data
+        try:
+            validate_partner_birth_data(partner_birth_details or {})
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     if speech_chat_requested and not instant_chat_active:
         raise HTTPException(
             status_code=403,
@@ -2517,7 +2522,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
 
     # Check credit cost and user balance (first question free for standard chat)
     credit_service = CreditService()
-    if partnership_mode:
+    if partnership_mode and not verified_chat_active and not premium_analysis:
         chat_cost = credit_service.get_credit_setting('partnership_analysis_cost')
     elif premium_analysis:
         chat_cost = credit_service.get_credit_setting('premium_chat_cost')
@@ -2556,7 +2561,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     using_free_question = False
     chat_key = (
         'partnership_analysis_cost'
-        if partnership_mode
+        if partnership_mode and not verified_chat_active and not premium_analysis
         else (
             'premium_chat_cost' if premium_analysis
             else (
@@ -3991,12 +3996,21 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             has_timezone=bool(birth_data.get("timezone")),
         )
         
+        if is_verified_chat and partnership_mode:
+            birth_data = {**birth_details, **birth_data}
+            partner = partner_birth_details or {}
+            partner_obj = BirthData(
+                name=partner.get('name', 'Partner'), date=partner['date'], time=partner['time'],
+                latitude=float(partner['latitude']), longitude=float(partner['longitude']),
+                place=partner.get('place') or 'Unknown',
+            )
+            partner_birth_details = {**partner, 'timezone': partner_obj.timezone}
         # DEBUG: Log birth data being used in chat
         # Validate partnership mode data
         if partnership_mode and partner_birth_details:
             required_fields = ['name', 'date', 'time', 'latitude', 'longitude']
             for field in required_fields:
-                if not partner_birth_details.get(field):
+                if partner_birth_details.get(field) is None or partner_birth_details.get(field) == '':
                     raise Exception(f"Partner {field} is required for partnership analysis")
             
             # Ensure time is not None
@@ -4039,7 +4053,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
         fomo_chat_active = is_supported_fomo_chat_context(trusted_fomo_context)
 
-        if not partnership_mode:
+        if not partnership_mode or is_verified_chat:
             intent_router = IntentRouter()
             cached_delivery_channel = (
                 str(cached_intent.get("delivery_channel") or "").strip().lower()
@@ -4160,6 +4174,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 from chat.verified_chat_pipeline import classify_verified_question
 
                 query_context = {**(query_context or {}), '_clarification_context': combined_question}
+                if partnership_mode:
+                    # An explicit two-chart request must not become single-chart Prashna.
+                    query_context = {key: value for key, value in query_context.items() if not key.startswith('prashna')}
+                    query_context['verified_partnership'] = True
+                    query_context['partnership_relationship'] = (partner_birth_details or {}).get('partnership_relationship')
+                    query_context['chart_names'] = [birth_data.get('name'), (partner_birth_details or {}).get('name')]
                 verified_router_analyzer = GeminiChatAnalyzer()
                 intent = await classify_verified_question(
                     verified_router_analyzer,
@@ -4168,10 +4188,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     language=language,
                     query_context=query_context,
                 )
-                from chat.prashna_workflow import apply_prashna_transition
-                intent = apply_prashna_transition(intent, question, query_context)
-                from chat.verified_muhurat import prepare_muhurat_intent
-                intent = prepare_muhurat_intent(intent, question, intent['query_context'])
+                if not partnership_mode:
+                    from chat.prashna_workflow import apply_prashna_transition
+                    intent = apply_prashna_transition(intent, question, query_context)
+                    from chat.verified_muhurat import prepare_muhurat_intent
+                    intent = prepare_muhurat_intent(intent, question, intent['query_context'])
+                else:
+                    intent['prashna_intent'] = 'none'
+                    intent.pop('workflow_choice', None)
                 query_context = intent['query_context']
                 combined_question = intent['resolved_question']
             elif is_deterministic_chat:
@@ -5105,6 +5129,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 model_name_override=get_verified_chat_model() if is_verified_chat else None,
                 provider_override="openai" if is_verified_chat else None,
                 verified_evidence_review=is_verified_chat,
+                verified_partner_birth_data=partner_birth_details if is_verified_chat and partnership_mode else None,
                 verified_calculation_callback=(
                     _persist_verified_calculation_trace if is_verified_chat else None
                 ),

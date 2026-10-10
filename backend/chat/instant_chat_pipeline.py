@@ -20380,8 +20380,18 @@ async def generate_instant_chat_response(
     model_name_override: Optional[str] = None,
     provider_override: Optional[str] = None,
     verified_evidence_review: bool = False,
+    verified_partner_birth_data: Optional[Dict[str, Any]] = None,
     verified_calculation_callback: Optional[Callable[[List[Dict[str, str]]], None]] = None,
 ) -> Dict[str, Any]:
+    if verified_evidence_review and verified_partner_birth_data is not None:
+        from chat.verified_partnership import generate_verified_partnership_response
+        return await generate_verified_partnership_response(
+            question=question, birth_data=birth_data, partner_birth_data=verified_partner_birth_data,
+            intent=intent, history=history,
+            language=_instant_response_language(latest_user_question or question, intent, str(language or 'english').strip().lower()),
+            model_name=model_name_override, response_style=response_style, stream_callback=stream_callback,
+            calculation_callback=verified_calculation_callback,
+        )
     intent = apply_timeline_intent_guard(intent)
     # Some Wealth subtypes are more specific than the broad Wealth category.
     # Normalize them before chart focus and graph selection so a router category

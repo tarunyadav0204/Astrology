@@ -47,9 +47,11 @@ const ChatInput = ({
         freeQuestionAvailable,
         freeQuestionRequiresNotifications,
         fetchBalance,
+        features,
         instantChatEnabled,
         speechChatEnabled,
     } = useCredits();
+    const verifiedChatEnabled = features?.verified_chat_enabled === true;
     const [message, setMessage] = useState('');
     const [isPremiumAnalysis, setIsPremiumAnalysis] = useState(false);
     const [showModeSelector, setShowModeSelector] = useState(false);
@@ -99,7 +101,7 @@ const ChatInput = ({
 
     useEffect(() => {
         if (isPartnershipMode || isMundaneMode) {
-            setIsPremiumAnalysis(false);
+            if (isMundaneMode) setIsPremiumAnalysis(false);
             setShowModeSelector(false);
             onInstantModeChange(false);
         }
@@ -107,13 +109,7 @@ const ChatInput = ({
 
     const showPremiumControls = !prashnaMode && !isPartnershipMode && !isMundaneMode;
     const useCompactPremium = showPremiumControls && isMobileLayout;
-    const useFreeQuestionEligible = showPremiumControls && !verifiedMode && freeQuestionAvailable;
-
-    useEffect(() => {
-        if (useFreeQuestionEligible && isPremiumAnalysis) {
-            setIsPremiumAnalysis(false);
-        }
-    }, [useFreeQuestionEligible, isPremiumAnalysis]);
+    const useFreeQuestionEligible = showPremiumControls && !verifiedMode && !isPremiumAnalysis && freeQuestionAvailable;
 
     useEffect(() => {
         if (!instantChatEnabled && instantMode) {
@@ -371,6 +367,22 @@ const ChatInput = ({
 
     return (
         <div className="chat-input-container chat-composer">
+            {isPartnershipMode && (
+                <div className="chat-mode-selector-web chat-partnership-tiers" role="group" aria-label="Partnership answer mode">
+                    <button type="button" className={`chat-mode-option ${!verifiedMode && !isPremiumAnalysis ? 'chat-mode-option--active' : ''}`} disabled={isLoading || isLocked}
+                        onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('standard'); }}>
+                        <span className="chat-mode-option__label">Standard</span><span className="chat-mode-option__cost">{partnershipCost} credits</span>
+                    </button>
+                    {verifiedChatEnabled && <button type="button" className={`chat-mode-option ${verifiedMode ? 'chat-mode-option--active' : ''}`} disabled={isLoading || isLocked}
+                        onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('verified'); }}>
+                        <span className="chat-mode-option__label">Verified</span><span className="chat-mode-option__cost">{verifiedChatCost} credits</span>
+                    </button>}
+                    <button type="button" className={`chat-mode-option ${isPremiumAnalysis ? 'chat-mode-option--active' : ''}`} disabled={isLoading || isLocked}
+                        onClick={() => { setIsPremiumAnalysis(true); onInstantModeChange(false); onModeChange('premium'); }}>
+                        <span className="chat-mode-option__label">Premium</span><span className="chat-mode-option__cost">{premiumChatCost} credits</span>
+                    </button>
+                </div>
+            )}
             {!creditsLoading && useFreeQuestionEligible && (
                 <div className="credit-warning credit-warning--success">
                     <span>Your first standard chart question is free. Premium uses credits.</span>

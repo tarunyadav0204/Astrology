@@ -114,6 +114,18 @@ def redact_verified_internal_transport(text: Any) -> str:
         value,
         flags=re.IGNORECASE,
     )
+    # Delivery nouns can leak into two-chart prose even without "shows" after
+    # them. Replace only internal evidence phrasing; retain user-stated history.
+    value = re.sub(
+        r"\b(?:the\s+)?(?:supplied|provided)\s+(?:information|package|packet|data|json|inputs?|calculations?)(?![\w-])",
+        "the chart evidence",
+        value,
+        flags=re.IGNORECASE,
+    )
+    value = re.sub(
+        r"\b(?:supplied|provided)\s+(?=(?:D\d+|divisional|natal|synastry|Jaimini|Nadi|nakshatra)\b)",
+        "", value, flags=re.IGNORECASE,
+    )
     # This is the final response persisted and returned to every client.
     # Collapsing whitespace here also collapses Markdown section boundaries,
     # paragraphs and ranked choices, even when the writer formatted them correctly.
@@ -910,8 +922,16 @@ async def run_verified_calculator_agent(
     from chat.verified_muhurat import MUHURAT_CAPABILITIES, muhurat_contract, calculate_muhurat_tool
     muhurat_request = (instant_context.get('query_context') or {}).get('muhurat_request')
     is_muhurat = bool(muhurat_request and instant_context.get('muhurat_baseline'))
-    capability_registry = MUHURAT_CAPABILITIES if is_muhurat else PRASHNA_CAPABILITIES if is_prashna else CAPABILITY_REGISTRY
+    pair = instant_context.get('verified_partnership')
+    from chat.verified_partnership import (
+        PARTNERSHIP_CAPABILITIES, PARTNERSHIP_CONTRACT, build_partnership_baseline,
+        calculate_partnership_capability,
+    )
+    capability_registry = ({**CAPABILITY_REGISTRY, **PARTNERSHIP_CAPABILITIES} if pair
+                           else MUHURAT_CAPABILITIES if is_muhurat else PRASHNA_CAPABILITIES if is_prashna else CAPABILITY_REGISTRY)
     baseline = instant_context['muhurat_baseline'] if is_muhurat else instant_context['prashna_baseline'] if is_prashna else build_verified_baseline(instant_context)
+    if pair:
+        baseline = await asyncio.to_thread(build_partnership_baseline, pair)
     if is_muhurat and (baseline.get('search') or {}).get('not_before_utc'):
         muhurat_request = {**muhurat_request, 'not_before_utc': baseline['search']['not_before_utc']}
     conversation_context = build_verified_conversation_context(
@@ -933,7 +953,7 @@ async def run_verified_calculator_agent(
         conversation_context['rule'] = ('Keep history for references and user constraints only. This is a fresh answer. '
             'Calculator rounds in this request are not previously delivered answers. Never imply a previous '
             'recommendation unless the user explicitly requests comparing an actual earlier answer.')
-    if not is_prashna and not is_muhurat:
+    if not pair and not is_prashna and not is_muhurat:
         baseline["historical_timing_evidence"] = {
             "vimshottari_md_ad_timeline": _historical_vimshottari_timeline(birth_data),
         }
@@ -1001,6 +1021,14 @@ async def run_verified_calculator_agent(
             "strict": True,
         },
     ]
+    if pair:
+        tools[0]['description'] = 'Get labelled core D1/D9, Vimshottari and transit evidence for both actual birth charts plus mutual geometry.'
+        for tool in tools[1:]:
+            tool['parameters']['properties']['chart_subject'] = {
+                'type': 'string', 'enum': ['native', 'partner', 'both'],
+                'description': 'The actual chart owner(s) to calculate or report on.',
+            }
+            tool['parameters']['required'].append('chart_subject')
     # OpenAI strict tools require all nested properties, with nullable optionals.
     from chat.conflict_contract import strictify_schema
     tools = strictify_schema(tools)
@@ -1011,6 +1039,12 @@ async def run_verified_calculator_agent(
         native_name=str(birth_data.get("name") or ""),
         response_style=response_style,
     )
+    if pair:
+        intent_mode = 'VERIFIED_PARTNERSHIP'
+        instructions = (PARTNERSHIP_CONTRACT + '\nAvailable registered calculators and requirements:\n' + json.dumps(capability_registry) + '\nWrite in ' + language
+                        + '\nAnswer style: ' + response_style
+                        + '\nAfter inspecting calculations, call report_calculation with a factual title and summary in the user language. Never expose tools or model details.'
+                        + '\n' + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction())
     if is_prashna:
         intent_mode = 'PRASHNA'
         instructions = (prashna_contract(response_style) + '\nWrite in ' + language + '\n'
@@ -1113,15 +1147,19 @@ async def run_verified_calculator_agent(
             except json.JSONDecodeError:
                 args = {}
             capability = str(args.get("capability_id") or "")
+            chart_subject = str(args.get("chart_subject") or "") if pair else ""
             call_id = str(getattr(call, "call_id", ""))
             tool_name = str(getattr(call, "name", "") or "")
             if tool_name == "report_calculation":
                 source = str(args.get("source") or "")
                 title = _compact_visible_calculation_summary(args.get("title"), limit=90)
                 summary = _compact_visible_calculation_summary(args.get("summary"), limit=260)
-                if source in {"instant_baseline", *capability_registry} and title and summary:
-                    update_id = f"verified-calculation-{source}"
+                if source in {"instant_baseline", *capability_registry} and title and summary and (not pair or chart_subject in {"native", "partner", "both"}):
+                    update_id = f"verified-calculation-{source}" + (f"-{chart_subject}" if pair else "")
                     model_calculations[:] = [row for row in model_calculations if row.get("id") != update_id]
+                    if pair:
+                        label = '' if chart_subject == 'both' else str(pair['birth_data'][chart_subject].get('name') or chart_subject)
+                        title = f'{label}: {title}' if label else title
                     model_calculations.append({"id": update_id, "title": title, "detail": summary})
                     result = {"accepted": True}
                 else:
@@ -1141,10 +1179,13 @@ async def run_verified_calculator_agent(
                 unavailable.append({"code": "unavailable_calculator", "capability_id": capability})
                 tool_events.append({"round": calculator_round, "tool": capability or "invalid", "success": False})
             else:
-                cache_key = capability + ":" + json.dumps(args.get("parameters") or {}, sort_keys=True)
+                cache_key = (chart_subject + ":" if pair else "") + capability + ":" + json.dumps(args.get("parameters") or {}, sort_keys=True)
                 if cache_key not in calculated:
                     try:
-                        if is_muhurat:
+                        if pair:
+                            calculated[cache_key] = await asyncio.to_thread(calculate_partnership_capability,
+                                pair, capability, chart_subject, args.get('parameters'))
+                        elif is_muhurat:
                             parameters = args.get('parameters') or {}
                             if capability == 'election.muhurat' and any(v is not None for v in parameters.values()):
                                 raise ValueError('Search changes require user confirmation')
@@ -1157,15 +1198,26 @@ async def run_verified_calculator_agent(
                             calculated[cache_key] = result_map.get(capability)
                     except Exception:
                         calculated[cache_key] = {"error": "invalid_or_unavailable_calculation", "requirements": capability_registry[capability]}
-                calculated[capability] = calculated.get(cache_key)
-                result = calculated.get(capability)
+                result = calculated.get(cache_key)
+                if pair:
+                    calculated.setdefault(capability, {})[chart_subject] = result
+                else:
+                    calculated[capability] = result
                 if result in (None, {}, []) or (isinstance(result, dict) and result.get("error")):
                     calculated.pop(cache_key, None)
-                    result = {"error": "calculation_unavailable", "capability_id": capability}
+                    result = ({**result, "error": "calculation_unavailable", "capability_id": capability,
+                               "chart_subject": chart_subject} if pair and isinstance(result, dict)
+                              else {"error": "calculation_unavailable", "capability_id": capability})
                     unavailable.append({"code": "calculation_unavailable", "capability_id": capability})
                     tool_events.append({"round": calculator_round, "tool": capability, "success": False})
                 else:
                     tool_events.append({"round": calculator_round, "tool": capability, "success": True})
+            if pair and tool_events:
+                tool_events[-1]['chart_subject'] = chart_subject
+            if pair and isinstance(result, dict):
+                for subject, payload in (result.get('subjects') or {}).items():
+                    if isinstance(payload, dict) and payload.get('error'):
+                        unavailable.append({'code': 'calculation_unavailable', 'capability_id': capability, 'chart_subject': subject})
             outputs.append({
                 "type": "function_call_output", "call_id": call_id,
                 "output": json.dumps(result, ensure_ascii=False, default=str),
@@ -1199,13 +1251,13 @@ async def run_verified_calculator_agent(
         "role": "user",
         "content": [{
             "type": "input_text",
-            "text": (muhurat_contract(response_style) + "\nAUTHORITATIVE CURRENT SEARCH RESULT:\n" + json.dumps({
+            "text": (PARTNERSHIP_CONTRACT + "\nWrite the final answer now in the requested language and answer style, using the evidence supplied for both charts." if pair else muhurat_contract(response_style) + "\nAUTHORITATIVE CURRENT SEARCH RESULT:\n" + json.dumps({
                 'status':baseline.get('status'), 'result_meaning':baseline.get('result_meaning'),
                 'candidate_count':len(baseline.get('candidates') or []),
                 'total_candidates':baseline.get('total_candidates'), 'days_evaluated':baseline.get('days_evaluated'),
                 'search':baseline.get('search'), 'rejection_counts':baseline.get('rejection_counts'),
                 'errors':baseline.get('errors'), 'limitation':baseline.get('limitation'),
-            }, ensure_ascii=False, default=str)) if is_muhurat else _verified_final_writer_instruction(response_style, intent_mode),
+            }, ensure_ascii=False, default=str)) if (pair or is_muhurat) else _verified_final_writer_instruction(response_style, intent_mode),
         }],
     })
     # This final turn writes only the response. If the round ceiling is reached,
@@ -1258,7 +1310,7 @@ async def run_verified_calculator_agent(
         "information_rounds": {"type": "verified", "reading_mode": intent_mode, "max_rounds": max_calculator_rounds, "events": information_rounds},
         "packet_validation": {
             "missing_capabilities": [],
-            "calculated_capabilities": [c for c in calculated if c in CAPABILITY_REGISTRY],
+            "calculated_capabilities": [c for c in calculated if c in capability_registry],
             "unavailable_requirements": unavailable,
             "tool_events": tool_events,
             "calculation_trace": trace(),
@@ -1545,6 +1597,10 @@ for genuine references/clarifications of that SAME concern. Do not change meanin
 Never merge two unrelated questions merely because a clarification was pending. Never describe
 natal routing as Prashna. Missing birth details/other person/compatibility still use normal clarifications
 or handoff, never substitution with the selected person's chart. Preserve all existing safety routing.
+TWO-CHART CONTEXT: {json.dumps({'enabled': bool((query_context or {}).get('verified_partnership')), 'relationship': (query_context or {}).get('partnership_relationship'), 'chart_names': (query_context or {}).get('chart_names')}, ensure_ascii=False)}
+When TWO-CHART CONTEXT is enabled, the two actual birth charts are already supplied. Route
+this as a natal two-person question, not an unknown-person/spouse-details lookup, Prashna offer,
+or request to add the partner chart. Choose the question's topic and timing scope normally.
 METHOD CONTEXT: {json.dumps({'selected': (query_context or {}).get('prashna_choice'), 'scope_choice': (query_context or {}).get('prashna_workflow_choice'), 'selected_question_chart': (query_context or {}).get('prashna'), 'previous_question_chart': (query_context or {}).get('_prashna_previous'), 'pending_clarification_context': (query_context or {}).get('_clarification_context')}, ensure_ascii=False)}
 
 Choose one answer_mode from: {json.dumps(ANSWER_MODES)}.
@@ -1552,7 +1608,10 @@ Choose one category from: {json.dumps(_CATEGORY_VALUES)}.
 Choose target_subject_key from: {json.dumps(sorted(TARGET_SUBJECTS))}.
 
 route_action is answer, clarify, handoff, ack, or out_of_scope. Use clarify only for a material missing fact.
-Use handoff for two-person compatibility. Use ack for greetings, thanks, or no question.
+Use handoff for two-person compatibility ONLY when TWO-CHART CONTEXT is disabled.
+When enabled, Partnership is already active: use answer for compatibility analysis and never
+ask the user to enable Partnership or supply the already selected partner chart.
+Use ack for greetings, thanks, or no question.
 Use out_of_scope for a question that is not about astrology or the user's chart (for example,
 asking what AI/model you are, general knowledge, writing, coding, or translation). Put one
 short boundary in user_message in the user's language: say this chat answers astrology questions.
@@ -1747,6 +1806,14 @@ Schema:
     if is_muhurat:
         transition = 'natal'
         parsed['prashna_intent'] = 'none'
+    if (query_context or {}).get('verified_partnership'):
+        transition = 'natal'
+        parsed['prashna_intent'] = 'none'
+        # Compatibility handoff opens Partnership from single-chart chat.
+        # Both charts are already validated here; never re-open setup.
+        if action == 'handoff':
+            action = 'answer'
+            clarification_question = ''
     prashna_intent = str(parsed.get('prashna_intent') or 'none').lower()
     if transition in {'continue_prashna', 'new_prashna', 'natal', 'clarify_workflow'} or (query_context or {}).get('prashna') or (query_context or {}).get('prashna_choice') in {'natal', 'prashna'}:
         if prashna_intent in {'offer', 'explicit'}:

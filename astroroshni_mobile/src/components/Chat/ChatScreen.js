@@ -1596,7 +1596,7 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const applyChatModeFromTier = (tier) => {
-    if (freeQuestionAvailable) {
+    if (freeQuestionAvailable && String(tier || '').trim().toLowerCase() !== 'verified') {
       setIsInstantAnalysis(false);
       setIsPremiumAnalysis(false);
       setIsVerifiedAnalysis(false);
@@ -1664,6 +1664,12 @@ export default function ChatScreen({ navigation, route }) {
 
   // Partnership mode state (declared before effects that read partnershipMode)
   const [partnershipMode, setPartnershipMode] = useState(false);
+  useEffect(() => {
+    if (partnershipMode) {
+      setPrashnaLocation(null);
+      setIsInstantAnalysis(false);
+    }
+  }, [partnershipMode]);
 
   const recordEngagementSuggestionInteraction = useCallback(async (
     suggestion,
@@ -3047,7 +3053,6 @@ export default function ChatScreen({ navigation, route }) {
     keepChatOpenAfterAskEntryRef.current = true;
     setPartnershipMode(false);
     setIsInstantAnalysis(false);
-    setIsPremiumAnalysis(false);
     setShowModeSelector(false);
     setShowPartnershipSetupModal(false);
     setNativeChart(null);
@@ -3171,7 +3176,7 @@ export default function ChatScreen({ navigation, route }) {
 
   const canAffordChatMode = (modeKey) => {
     if (modeKey === 'instant' && (!instantChatEnabled || partnershipMode || isMundane)) return false;
-    if (modeKey === 'verified' && (!verifiedChatEnabled || partnershipMode || isMundane)) return false;
+    if (modeKey === 'verified' && (!verifiedChatEnabled || isMundane)) return false;
     if (modeKey === 'speech' && (!instantChatEnabled || !speechChatEnabled || !birthData || partnershipMode || isMundane)) {
       return false;
     }
@@ -3311,7 +3316,6 @@ export default function ChatScreen({ navigation, route }) {
 
     setPartnershipMode(true);
     setIsInstantAnalysis(false);
-    setIsPremiumAnalysis(false);
     setShowModeSelector(false);
     setShowGreeting(false);
     setShowMenu(false);
@@ -3347,7 +3351,6 @@ export default function ChatScreen({ navigation, route }) {
     setShowPartnershipModal(false);
     setPartnershipMode(true);
     setIsInstantAnalysis(false);
-    setIsPremiumAnalysis(false); // No premium in partnership
     setShowModeSelector(false);
     setPartnershipStep(entryNative ? 1 : 0);
     setPartnershipSubStep(0);
@@ -5442,7 +5445,7 @@ export default function ChatScreen({ navigation, route }) {
         const useFreeQuestion =
           !partnershipMode && !isMundane && !forceTier && !isInstantAnalysis && !isVerifiedAnalysis && freeQuestionAvailable;
         const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && (forceTier ? forceTier === 'instant' : isInstantAnalysis);
-        const useVerifiedChat = !useFreeQuestion && !partnershipMode && !isMundane && verifiedChatEnabled && (forceTier ? forceTier === 'verified' : isVerifiedAnalysis);
+        const useVerifiedChat = !useFreeQuestion && !isMundane && verifiedChatEnabled && (forceTier ? forceTier === 'verified' : isVerifiedAnalysis);
         const requestedTier = useFreeQuestion
           ? 'standard'
           : (useInstantChat ? 'instant' : (useVerifiedChat ? 'verified' : (isPremiumAnalysis ? 'premium' : 'standard')));
@@ -5960,8 +5963,8 @@ export default function ChatScreen({ navigation, route }) {
         t('chat.modeIntro.standard.feature2', 'Complete answer in AstroRoshni’s structured format'),
         t('chat.modeIntro.standard.feature3', 'Balanced depth and response time'),
       ],
-      cost: chatCost,
-      originalCost: chatCostOriginal,
+      cost: partnershipMode ? partnershipCost : chatCost,
+      originalCost: partnershipMode ? null : chatCostOriginal,
     },
     {
       key: 'premium',
@@ -6231,7 +6234,7 @@ export default function ChatScreen({ navigation, route }) {
       !partnershipMode && !isMundane && !usingInstant && !usingVerified && freeQuestionAvailable;
     const isProModelFlow = !useFreeQuestion && (usingPremium || usingVerified);
     const useInstantChat = !useFreeQuestion && !partnershipMode && !isMundane && instantChatEnabled && usingInstant;
-    const useVerifiedChat = !useFreeQuestion && !partnershipMode && !isMundane && verifiedChatEnabled && usingVerified;
+    const useVerifiedChat = !useFreeQuestion && !isMundane && verifiedChatEnabled && usingVerified;
     const outgoingTier = useFreeQuestion
       ? 'standard'
       : (useInstantChat ? 'instant' : (useVerifiedChat ? 'verified' : (usingPremium ? 'premium' : 'standard')));
@@ -6985,7 +6988,7 @@ export default function ChatScreen({ navigation, route }) {
                 <View style={styles.activeChatTitleWrap}>
                   <View style={[styles.activeChatDot, { backgroundColor: colors.accent }]} />
                   <View style={styles.activeChatTitleCopy}>
-                    <Text style={[styles.activeChatTitle, wideHeader && styles.activeChatTitleWide, { color: colors.textInverse }]}>{t('premiumUi.chatScreen.partnershipAnalysis')}</Text>
+                    <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.activeChatTitle, wideHeader && styles.activeChatTitleWide, { color: colors.textInverse }]}>{t('premiumUi.chatScreen.partnershipAnalysis')}</Text>
                     <Text style={[styles.activeChatSubtitle, wideHeader && styles.activeChatSubtitleWide, { color: colors.textInverseMuted }]} numberOfLines={1}>
                       {nativeChart?.name || t('premiumUi.chatScreen.native')} × {partnerChart?.name || t('premiumUi.chatScreen.partner')}
                     </Text>
@@ -7064,9 +7067,9 @@ export default function ChatScreen({ navigation, route }) {
               ) : (
                 <>
                   {!partnershipMode && !isMundane ? (
-                    <ChatSummary key={sessionId} messages={messages} header headerSize={wideHeader ? 48 : 36} onDisablePrashna={prashnaLocation ? () => setPrashnaLocation(null) : undefined} onPrashna={verifiedChatEnabled && !instantBilling.active && !loading && !freeQuestionAvailable && !partnershipMode && !isMundane ? place => { setPrashnaLocation(place); applyChatModeFromTier('verified'); } : undefined} onResolved={result => { if (result.session_id === sessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
+                    <ChatSummary key={sessionId} messages={messages} onPartnership={!instantBilling.active && !loading ? () => openPartnershipModal(partnershipCost) : undefined} header headerSize={wideHeader ? 48 : 36} onDisablePrashna={prashnaLocation ? () => setPrashnaLocation(null) : undefined} onPrashna={verifiedChatEnabled && !instantBilling.active && !loading && !freeQuestionAvailable && !partnershipMode && !isMundane ? place => { setPrashnaLocation(place); applyChatModeFromTier('verified'); } : undefined} onResolved={result => { if (result.session_id === sessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
                   ) : null}
-                  {!partnershipMode && !isMundane && !(isInstantAnalysis && instantBilling.active) ? (
+                  {!isMundane && !(isInstantAnalysis && instantBilling.active) ? (
                     <TouchableOpacity
                       style={[
                         styles.headerModeChip,
@@ -7397,9 +7400,9 @@ export default function ChatScreen({ navigation, route }) {
           >
           {(partnershipMode || isMundane) && (
             <View style={[styles.modeContextCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
-              <View style={[styles.modeContextIcon, { backgroundColor: colors.accentSoft }]}>
+              {!compactHeaderChrome && <View style={[styles.modeContextIcon, { backgroundColor: colors.accentSoft }]}>
                 <Ionicons name={partnershipMode ? 'people-outline' : 'earth-outline'} size={20} color={colors.accent} />
-              </View>
+              </View>}
               <View style={styles.modeContextCopy}>
                 <Text style={[styles.modeContextEyebrow, { color: colors.accent }]}>
                   {partnershipMode ? t('premiumUi.chatScreen.partnershipAnalysis') : t('premiumUi.chatScreen.globalMarkets')}
@@ -7411,7 +7414,7 @@ export default function ChatScreen({ navigation, route }) {
                 </Text>
                 <Text style={[styles.modeContextMeta, { color: colors.textSecondary }]} numberOfLines={1}>
                   {partnershipMode
-                    ? (partnershipRelation || t('premiumUi.chatScreen.relationshipStatus'))
+                    ? `${isVerifiedAnalysis ? t('chat.verifiedMode.shortName', 'Verified') : isPremiumAnalysis ? t('chat.modeIntro.premium.name', 'Premium') : t('chat.modeIntro.standard.name', 'Standard')} · ${partnershipRelation || t('premiumUi.chatScreen.relationshipStatus')}`
                     : [mundaneContext?.entities?.join(', '), mundaneContext?.period || selectedYear].filter(Boolean).join(' · ')}
                 </Text>
               </View>
@@ -7426,7 +7429,9 @@ export default function ChatScreen({ navigation, route }) {
                 <Ionicons name="options-outline" size={18} color={colors.text} />
               </TouchableOpacity>
               <TouchableOpacity
-                  style={styles.modeContextClose}
+                  style={[styles.modeContextClose, partnershipMode && { width: 64, height: 44 }]}
+                  disabled={loading}
+                  accessibilityLabel={partnershipMode ? t('partnershipExit.exitLabel') : t('partnershipExit.exitGlobalLabel')}
                   onPress={() => {
                     if (isMundane) {
                       setIsMundane(false);
@@ -7436,6 +7441,7 @@ export default function ChatScreen({ navigation, route }) {
                   }}
                 >
                   <Ionicons name="close" size={19} color={colors.textSecondary} />
+                  {partnershipMode && <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{t('partnershipExit.singleChat')}</Text>}
                 </TouchableOpacity>
             </View>
           )}
@@ -8438,7 +8444,7 @@ export default function ChatScreen({ navigation, route }) {
                 showsVerticalScrollIndicator={false}
                 nestedScrollEnabled
               >
-                {chatModeOptions.map((option) => {
+                {chatModeOptions.filter(option => !partnershipMode || ['standard', 'verified', 'premium'].includes(option.key)).map((option) => {
                   const isSelected = option.key === (pendingChatMode || getChatModeKey());
                   const isCurrent = option.key === getChatModeKey();
                   const hasDiscount = option.originalCost != null && Number(option.originalCost) > Number(option.cost || 0);
@@ -9887,11 +9893,11 @@ export default function ChatScreen({ navigation, route }) {
           setShowPartnershipModal(false);
         }}
         onConfirm={confirmPartnershipMode}
-        title={t('premiumUi.chatScreen.partnershipMode')}
+        title={`${t('premiumUi.chatScreen.partnershipMode')} · ${isVerifiedAnalysis ? t('chat.verifiedMode.shortName', 'Verified') : isPremiumAnalysis ? t('chat.modeIntro.premium.name', 'Premium') : t('chat.modeIntro.standard.name', 'Standard')}`}
         description={Platform.OS === 'ios'
           ? 'Partnership mode uses credits per question for detailed compatibility study between two charts.'
           : 'Partnership mode uses credits per question for compatibility study between two charts.'}
-        cost={partnershipModalCost}
+        cost={isVerifiedAnalysis ? verifiedChatCost : isPremiumAnalysis ? premiumChatCost : partnershipModalCost}
         credits={credits}
         iconName="people-outline"
       />

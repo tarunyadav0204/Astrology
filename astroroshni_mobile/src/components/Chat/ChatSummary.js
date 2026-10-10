@@ -10,13 +10,14 @@ import { useTheme } from '../../context/ThemeContext';
 import { storage } from '../../services/storage';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 
-export default function ChatSummary({ messages = [], onResolved, header = false, headerSize = 36, onPrashna, onDisablePrashna }) {
+export default function ChatSummary({ messages = [], onResolved, header = false, headerSize = 36, onPrashna, onDisablePrashna, onPartnership }) {
   const { colors } = useTheme(); const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const [tool, setTool] = useState(null);
   const tr = (key, fallback) => t(`premiumUi.chat.tools.${key}`, fallback);
   const close = () => { if (!busy) setOpen(false); };
   const cards = [
+    ...(onPartnership ? [{ key: 'partnership', icon: 'people-outline', title: t('quickActions.partnershipChat', 'Partnership Chat'), description: t('partnershipExit.toolsDescription') }] : []),
     { key: 'summary', icon: 'reader-outline', title: t('premiumUi.chat.summarizeChat', 'Summarize chat'), description: tr('summaryDescription', 'Bring up to three answers together into one clear summary.') },
     { key: 'conflict', icon: 'git-compare-outline', title: t('premiumUi.chat.conflict.title', 'Resolve conflicting answers'), description: tr('conflictDescription', 'Compare two answers and understand why the guidance differs.') },
     ...(onPrashna ? [{ key: 'prashna', icon: 'sparkles-outline', title: t('premiumUi.chat.prashna.ask', 'Ask with Prashna'), description: tr('prashnaDescription', 'Explore a specific question using the chart for the moment you ask.') }] : []),
@@ -47,7 +48,7 @@ export default function ChatSummary({ messages = [], onResolved, header = false,
             <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={close} accessibilityLabel={t('common.close', 'Close')} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.cardBorder, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="close" size={21} color={colors.textSecondary} /></TouchableOpacity>
           </View>
           {!tool ? <ScrollView style={{ flexGrow: 0 }} bounces={false} contentContainerStyle={{ gap: 12, paddingBottom: 12 }}>
-            {cards.map(card => <TouchableOpacity key={card.key} accessibilityRole="button" onPress={() => setTool(card.key)} activeOpacity={0.75} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 18, borderWidth: 1, borderColor: colors.cardBorder, backgroundColor: colors.surface }}>
+            {cards.map(card => <TouchableOpacity key={card.key} accessibilityRole="button" onPress={() => { if (card.key === 'partnership') { setOpen(false); onPartnership(); } else setTool(card.key); }} activeOpacity={0.75} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 18, borderWidth: 1, borderColor: colors.cardBorder, backgroundColor: colors.surface }}>
               <View style={{ width: 48, height: 48, borderRadius: 15, backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.cardBorder, alignItems: 'center', justifyContent: 'center' }}><Ionicons name={card.icon} size={23} color={colors.primary} /></View>
               <View style={{ flex: 1 }}><Text style={{ color: colors.text, fontSize: 16, fontWeight: '600', lineHeight: 23 }}>{card.title}</Text><Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 20, marginTop: 4 }}>{card.description}</Text></View>
               <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />

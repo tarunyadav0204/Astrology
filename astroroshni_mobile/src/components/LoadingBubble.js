@@ -51,12 +51,17 @@ const LoadingBubble = ({
     const chartInsightsCount = Array.isArray(chartInsights) ? chartInsights.length : 0;
     const verifiedCalculationMessages = compactVerified && hasCalculationTrace
         ? calculationTrace.map((step, index) => {
-            const title = String(step?.title || step || '').trim();
+            const title = String(typeof step === 'string' ? step : step?.title || '').trim();
             const detail = String(step?.detail || '').trim();
             const id = String(step?.id || `${title}-${index}`);
             return { id, content: detail ? `${title} · ${detail}` : title };
         }).filter((step) => step.content)
         : [];
+    // Queued typewriter steps have no revealed text yet. Rendering them creates
+    // empty cursor rows and scrolls the readable active step out of view.
+    const visibleCalculationMessages = verifiedCalculationMessages.filter(
+        (step) => (typedCalculationLengths[step.id] || 0) > 0
+    );
     const verifiedCalculationSignature = verifiedCalculationMessages
         .map((step) => `${step.id}:${step.content}`)
         .join('|');
@@ -290,12 +295,12 @@ const LoadingBubble = ({
                     scrollEnabled={false}
                     onContentSizeChange={() => calculationScrollRef.current?.scrollToEnd?.({ animated: true })}
                 >
-                    {verifiedCalculationMessages.length === 0 && (
+                    {visibleCalculationMessages.length === 0 && (
                         <Text style={[styles.compactVerifiedMessage, { color: colors.textSecondary }]}>
                             {t('chat.preparingInsights')}
                         </Text>
                     )}
-                    {verifiedCalculationMessages.map((step) => {
+                    {visibleCalculationMessages.map((step) => {
                         const displayedLength = typedCalculationLengths[step.id] || 0;
                         const isTyping = displayedLength < step.content.length;
                         return (

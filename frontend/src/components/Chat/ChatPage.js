@@ -208,6 +208,7 @@ const ChatPage = ({ onLogin }) => {
         credits,
         chatCost,
         verifiedChatCost,
+        premiumChatCost,
         partnershipCost,
         fetchBalance,
         freeQuestionAvailable,
@@ -269,7 +270,14 @@ const ChatPage = ({ onLogin }) => {
     const [isPartnershipMode, setIsPartnershipMode] = useState(false);
     const [pendingMuhuratQuestion, setPendingMuhuratQuestion] = useState(null);
     const [prashnaLocation, setPrashnaLocation] = useState(null);
+    const [selectedChatTier, setSelectedChatTier] = useState('standard');
     const [verifiedConversationMode, setVerifiedConversationMode] = useState(false);
+    useEffect(() => {
+        if (isPartnershipMode) {
+            setPrashnaLocation(null);
+            setIsInstantAnalysis(false);
+        }
+    }, [isPartnershipMode]);
     const [pendingPrashnaQuestion, setPendingPrashnaQuestion] = useState(null);
     useEffect(() => { setPrashnaLocation(null); setPendingPrashnaQuestion(null); setPendingMuhuratQuestion(null); }, [birthData?.id]);
     const [selectedPartnerChart, setSelectedPartnerChart] = useState(null);
@@ -1315,7 +1323,6 @@ const ChatPage = ({ onLogin }) => {
     const resetThreadForWizard = (nextMode) => {
         setPendingPrashnaQuestion(null);
         setPrashnaLocation(null);
-        setVerifiedConversationMode(false);
         void endInstantForContextChange('consultation_context_changed');
         setMessages([]);
         subjectGateOverrideRef.current = null;
@@ -1999,7 +2006,7 @@ const ChatPage = ({ onLogin }) => {
         const chartDataForMessage = personalChartData;
 
         const processingClientId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const useFreeQuestion = options?.chat_tier !== 'verified' && !prashnaLocation && !isPartnershipMode && !isMundaneMode && freeQuestionAvailable;
+        const useFreeQuestion = !options?.premium_analysis && options?.chat_tier !== 'verified' && !prashnaLocation && !isPartnershipMode && !isMundaneMode && freeQuestionAvailable;
         const useInstantChat =
             !useFreeQuestion
             && !prashnaLocation
@@ -3395,7 +3402,7 @@ const ChatPage = ({ onLogin }) => {
                                 )}
                             {!isMundaneMode && !isPartnershipMode && birthData?.id && <ChatMemory key={birthData.id} chartId={birthData.id} name={birthData.name} />}
                             {prashnaLocation && <button className="chat-memory-trigger" onClick={() => setPrashnaLocation(null)} title={`Prashna · ${prashnaLocation.name}. Turn off Prashna`}>Prashna ×</button>}
-                            <ChatSummary key={isMundaneMode ? mundaneSessionId : chatV2SessionId} messages={messages} onPrashna={verifiedChatEnabled && !instantBilling.active && !isLoading && !freeQuestionAvailable && !isPartnershipMode && !isMundaneMode ? place => { setVerifiedConversationMode(true); setPrashnaLocation(place); setIsInstantAnalysis(false); } : undefined} onResolved={result => { if (result.session_id === chatV2SessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
+                            <ChatSummary key={isMundaneMode ? mundaneSessionId : chatV2SessionId} messages={messages} onPartnership={!isPartnershipMode && !isMundaneMode && !instantBilling.active && !isLoading ? () => resetThreadForWizard('partnership') : undefined} onPrashna={verifiedChatEnabled && !instantBilling.active && !isLoading && !freeQuestionAvailable && !isPartnershipMode && !isMundaneMode ? place => { setVerifiedConversationMode(true); setPrashnaLocation(place); setIsInstantAnalysis(false); } : undefined} onResolved={result => { if (result.session_id === chatV2SessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
                             </h1>
                             {(isMundaneMode || isPartnershipMode) && (
                                 <p className="chat-header-toolbar__meta chat-header-toolbar__meta--desktop">
@@ -3559,7 +3566,7 @@ const ChatPage = ({ onLogin }) => {
                             >
                                 <span className="credits-full">
                                     {credits} ·{' '}
-                                    {prashnaLocation || verifiedConversationMode ? `${verifiedChatCost}/q` : isPartnershipMode
+                                    {prashnaLocation || verifiedConversationMode ? `${verifiedChatCost}/q` : selectedChatTier === 'premium' ? `${premiumChatCost}/q` : isPartnershipMode
                                         ? `${partnershipCost}/q`
                                         : instantChatEnabled && isInstantAnalysis && !isPartnershipMode && !isMundaneMode
                                             ? `${instantChatFirstMinuteCost} first · ${instantChatPerMinuteCost}/min`
@@ -3601,7 +3608,7 @@ const ChatPage = ({ onLogin }) => {
                                         : (mundaneForm.country || 'Mundane context')}
                                 </strong>
                                 <small>
-                                    {isPartnershipMode ? 'Partnership synthesis' : 'Mundane astrology'}
+                                    {isPartnershipMode ? `Partnership · ${verifiedConversationMode ? 'Verified' : selectedChatTier === 'premium' ? 'Premium' : 'Standard'}` : 'Mundane astrology'}
                                 </small>
                             </>
                         )}
@@ -3613,6 +3620,15 @@ const ChatPage = ({ onLogin }) => {
                     </div>
 
                     <div className="chat-consultation-rail__actions">
+                        {isPartnershipMode && <button type="button" disabled={isLoading} onClick={() => {
+                            setIsPartnershipMode(false);
+                            setSelectedPartnerChart(null);
+                            setWizardMode('single');
+                            setWizardCompleted(true);
+                            setMessages([]);
+                            setChatV2SessionId(null);
+                            threadInitializedRef.current = false;
+                        }}>Exit partnership · Single chat</button>}
                         {!isPartnershipMode && !isMundaneMode && (
                             <button type="button" onClick={openBirthModalEmpty}>
                                 Change chart
@@ -3688,7 +3704,8 @@ const ChatPage = ({ onLogin }) => {
                 <ChatInput
                     prashnaMode={Boolean(prashnaLocation)}
                     verifiedMode={verifiedConversationMode}
-                    onModeChange={mode => setVerifiedConversationMode(mode === 'verified')}
+                    initialMode={verifiedConversationMode ? 'verified' : selectedChatTier}
+                    onModeChange={mode => { setSelectedChatTier(mode); setVerifiedConversationMode(mode === 'verified'); }}
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading}
                     followUpQuestion={pendingFollowUpQuestion}
