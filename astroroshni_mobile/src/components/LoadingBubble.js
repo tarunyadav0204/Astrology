@@ -275,7 +275,7 @@ const LoadingBubble = ({
 
     if (compactVerified) {
         return (
-            <View style={styles.compactVerifiedWrap}>
+            <View style={[styles.compactVerifiedWrap, { backgroundColor: colors.cardBackground }]}>
                 <View style={styles.compactVerifiedHeader}>
                     <Text style={[styles.compactVerifiedTitle, { color: colors.text }]}>{t('premiumUi.chat.synthesizing')}</Text>
                     <Text style={[styles.compactVerifiedTimer, { color: colors.primary }]}>
@@ -284,17 +284,22 @@ const LoadingBubble = ({
                 </View>
                 <ScrollView
                     ref={calculationScrollRef}
-                    style={styles.compactVerifiedStream}
+                    style={[styles.compactVerifiedStream, { height: 126 }]}
                     contentContainerStyle={styles.compactVerifiedStreamContent}
                     showsVerticalScrollIndicator={false}
                     scrollEnabled={false}
                     onContentSizeChange={() => calculationScrollRef.current?.scrollToEnd?.({ animated: true })}
                 >
+                    {verifiedCalculationMessages.length === 0 && (
+                        <Text style={[styles.compactVerifiedMessage, { color: colors.textSecondary }]}>
+                            {t('chat.preparingInsights')}
+                        </Text>
+                    )}
                     {verifiedCalculationMessages.map((step) => {
                         const displayedLength = typedCalculationLengths[step.id] || 0;
                         const isTyping = displayedLength < step.content.length;
                         return (
-                            <Text key={step.id} style={[styles.compactVerifiedMessage, { color: colors.textMuted }]}>
+                            <Text key={step.id} style={[styles.compactVerifiedMessage, { color: colors.textSecondary }]}>
                                 {step.content.slice(0, displayedLength)}{isTyping ? <Text style={{ color: colors.primary }}>▍</Text> : ''}
                             </Text>
                         );

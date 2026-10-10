@@ -10,7 +10,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { storage } from '../../services/storage';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 
-export default function ChatSummary({ messages = [], onResolved, header = false, onPrashna, onDisablePrashna }) {
+export default function ChatSummary({ messages = [], onResolved, header = false, headerSize = 36, onPrashna, onDisablePrashna }) {
   const { colors } = useTheme(); const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const [tool, setTool] = useState(null);
@@ -33,7 +33,7 @@ export default function ChatSummary({ messages = [], onResolved, header = false,
       setSummary(data.summary);
     } catch (err) { setError(t('premiumUi.chat.summaryError', 'Unable to summarize these answers.')); } finally { setBusy(false); }
   };
-  return <><TouchableOpacity accessibilityRole="button" accessibilityLabel={t('premiumUi.chat.conflict.tools', 'Chat tools')} hitSlop={header ? { top: 6, bottom: 6, left: 3, right: 6 } : undefined} onPress={() => { setTool(null); setOpen(true); }} style={{ width: header ? 32 : 40, height: header ? 32 : 40, borderRadius: header ? 16 : 20, borderWidth: header ? 0 : 1, borderColor: colors.cardBorder, alignItems: 'center', justifyContent: 'center', backgroundColor: header ? colors.cosmicGlow : colors.surface }}><Ionicons name="construct-outline" size={header ? 17 : 20} color={header ? colors.textInverseMuted : colors.primary} /></TouchableOpacity>
+  return <><TouchableOpacity accessibilityRole="button" accessibilityLabel={t('premiumUi.chat.conflict.tools', 'Chat tools')} hitSlop={header ? { top: 6, bottom: 6, left: 3, right: 6 } : undefined} onPress={() => { setTool(null); setOpen(true); }} style={{ width: header ? headerSize : 40, height: header ? headerSize : 40, borderRadius: header ? headerSize / 2 : 20, flexShrink: 0, borderWidth: header ? 0 : 1, borderColor: colors.cardBorder, alignItems: 'center', justifyContent: 'center', backgroundColor: header ? colors.cosmicGlow : colors.surface }}><Ionicons name="construct-outline" size={header ? (headerSize >= 48 ? 24 : 20) : 20} color={header ? colors.textInverseMuted : colors.primary} /></TouchableOpacity>
     <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable onPress={close} accessibilityRole="button" accessibilityLabel={t('common.close', 'Close')} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.overlay }} />

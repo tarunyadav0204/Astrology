@@ -54,3 +54,19 @@ export function applyInstantProgress(message, payload = {}) {
         responseDirection: incoming?.direction || message.responseDirection,
     };
 }
+
+// Verified calculator updates arrive through status polling, independently of
+// answer streaming. Keep the loader active until actual answer text arrives.
+export function applyVerifiedCalculationProgress(message, updates) {
+    if (!message.isTyping && !message.isProcessing && !message.instantStreaming) return message;
+    if (!Array.isArray(updates)) return message;
+    const calculationTrace = updates
+        .filter(step => step?.type === 'calculation' && typeof step.text === 'string' && step.text.trim())
+        .map((step, index) => ({
+            id: String(step.id || `verified-calculation-${index}`),
+            title: step.text.trim(),
+            detail: typeof step.detail === 'string' ? step.detail.trim() : '',
+        }));
+    if (!calculationTrace.length || JSON.stringify(calculationTrace) === JSON.stringify(message.calculationTrace)) return message;
+    return { ...message, calculationTrace };
+}

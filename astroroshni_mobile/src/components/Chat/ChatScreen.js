@@ -1,5 +1,6 @@
 import { appendConflictResolution } from '../../hooks/useConflictResolution';
-import { applyInstantProgress, buildImmediateChartPreview, mergeChartContext } from '../../utils/instantProgress';
+import { applyInstantProgress, applyVerifiedCalculationProgress, buildImmediateChartPreview, mergeChartContext } from '../../utils/instantProgress';
+import { createChatJumpControlScheduler } from '../../utils/chatJumpControls';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
@@ -1118,6 +1119,15 @@ export default function ChatScreen({ navigation, route }) {
   }, [messages]);
   const [pendingMessages, setPendingMessages] = useState(new Set());
   const [chatJumpControls, setChatJumpControls] = useState({ showTop: false, showBottom: false });
+  const chatJumpSchedulerRef = useRef(null);
+  useEffect(() => {
+    const scheduler = createChatJumpControlScheduler(setChatJumpControls, requestAnimationFrame, cancelAnimationFrame);
+    chatJumpSchedulerRef.current = scheduler;
+    return () => {
+      scheduler.dispose();
+      chatJumpSchedulerRef.current = null;
+    };
+  }, []);
   const scrollViewRef = useRef(null);
   const lastMessageRef = useRef(null);
   const lastAnswerIndexRef = useRef(-1);
@@ -5137,7 +5147,10 @@ export default function ChatScreen({ navigation, route }) {
               ).trim().toLowerCase();
               if (['instant', 'verified'].includes(messageTier)) {
                 const partialContent = String(status.partial_content || '');
-                const progressed = applyInstantProgress(msg, {
+                const withCalculations = messageTier === 'verified'
+                  ? applyVerifiedCalculationProgress(msg, status.engagement_updates)
+                  : msg;
+                const progressed = applyInstantProgress(withCalculations, {
                   partial_content: partialContent,
                   preview: status.instant_preview,
                   replace: true,
@@ -6754,11 +6767,7 @@ export default function ChatScreen({ navigation, route }) {
       const isLongConversation = ch > h + 160;
       const showTop = isLongConversation && y > 96;
       const showBottom = isLongConversation && y + h < ch - 96;
-      setChatJumpControls((current) => (
-        current.showTop === showTop && current.showBottom === showBottom
-          ? current
-          : { showTop, showBottom }
-      ));
+      chatJumpSchedulerRef.current?.update({ showTop, showBottom });
     }
     if (!ratingPromptStateLoaded) return;
     if (ratingPromptVisible) return;
@@ -6946,7 +6955,7 @@ export default function ChatScreen({ navigation, route }) {
                         {t('premiumUi.home.askTara')}
                       </Text>
                     )}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <View style={styles.headerContextRow}>
                     {birthData ? (
                       <NativeSelectorChip
                         birthData={birthData}
@@ -6968,7 +6977,7 @@ export default function ChatScreen({ navigation, route }) {
                       </Text>
                     )}
                     {birthData?.id && <ChatMemory key={birthData.id} birthData={birthData} navigation={navigation} />}
-                    <ChatSummary key={sessionId} messages={messages} header onDisablePrashna={prashnaLocation ? () => setPrashnaLocation(null) : undefined} onPrashna={verifiedChatEnabled && !instantBilling.active && !loading && !freeQuestionAvailable && !partnershipMode && !isMundane ? place => { setPrashnaLocation(place); applyChatModeFromTier('verified'); } : undefined} onResolved={result => { if (result.session_id === sessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
+
                     </View>
                   </View>
                 </View>
@@ -7054,6 +7063,9 @@ export default function ChatScreen({ navigation, route }) {
                 </>
               ) : (
                 <>
+                  {!partnershipMode && !isMundane ? (
+                    <ChatSummary key={sessionId} messages={messages} header headerSize={wideHeader ? 48 : 36} onDisablePrashna={prashnaLocation ? () => setPrashnaLocation(null) : undefined} onPrashna={verifiedChatEnabled && !instantBilling.active && !loading && !freeQuestionAvailable && !partnershipMode && !isMundane ? place => { setPrashnaLocation(place); applyChatModeFromTier('verified'); } : undefined} onResolved={result => { if (result.session_id === sessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
+                  ) : null}
                   {!partnershipMode && !isMundane && !(isInstantAnalysis && instantBilling.active) ? (
                     <TouchableOpacity
                       style={[
@@ -7080,7 +7092,11 @@ export default function ChatScreen({ navigation, route }) {
                         maxFontSizeMultiplier={1.15}
                         style={[styles.headerModeChipText, wideHeader && styles.headerModeChipTextWide, { color: colors.textInverse }]}
                       >
-                        {`${prashnaLocation && isVerifiedAnalysis ? t('premiumUi.chat.prashna.active', 'Prashna · {{city}}', { city: '' }).replace(/·\s*$/, '').trim() : getChatModeName()} · ${getAnswerStyleName(getAnswerStyleForMode())}`}
+                        {prashnaLocation && isVerifiedAnalysis
+                          ? t('premiumUi.chat.prashna.active', 'Prashna · {{city}}', { city: '' }).replace(/·\s*$/, '').trim()
+                          : getChatModeKey() === 'verified'
+                            ? t('chat.verifiedMode.shortName', 'Verified')
+                            : getChatModeName()}
                       </Text>
                       <Ionicons name="chevron-down" size={wideHeader ? 20 : 14} color={colors.textInverseMuted || colors.textInverse} />
                     </TouchableOpacity>
@@ -10011,6 +10027,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  headerContextRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0, marginTop: 3 },
   activeChatTitleWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -10246,7 +10263,8 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   headerRightChat: {
-    flexShrink: 1,
+    marginLeft: 12,
+    flexShrink: 0,
     maxWidth: '58%',
   },
   headerModeChip: {

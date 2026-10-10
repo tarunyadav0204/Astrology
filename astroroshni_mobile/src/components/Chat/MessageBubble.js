@@ -3784,6 +3784,9 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    maxWidth: '100%',
+    minWidth: 0,
+    flexShrink: 1,
     marginTop: 24,
     marginBottom: 12,
     paddingVertical: 10,
@@ -3797,8 +3800,11 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   headerIcon: {
     fontSize: 18,
     marginRight: 10,
+    flexShrink: 0,
   },
   headerText: {
+    minWidth: 0,
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: '800',
     color: '#ff6b35',
@@ -3808,6 +3814,8 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   subHeaderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    maxWidth: '100%',
+    minWidth: 0,
     marginTop: 20,
     marginBottom: 10,
     paddingVertical: 8,
@@ -3820,8 +3828,10 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
   subHeaderIcon: {
     fontSize: 16,
     marginRight: 10,
+    flexShrink: 0,
   },
   subHeaderText: {
+    minWidth: 0,
     fontSize: 15,
     fontWeight: '700',
     color: '#ff6b35',

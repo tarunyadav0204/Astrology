@@ -26,7 +26,8 @@ export default function ChatMemory({ birthData, navigation }) {
     </TouchableOpacity>
     <Modal visible={open} transparent animationType="slide" onRequestClose={() => { setOpen(false); refresh(); }}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
-        <View accessibilityViewIsModal style={{ height: '85%', borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: 'hidden', backgroundColor: colors.background }}>
+        <View accessibilityViewIsModal style={{ height: '85%', borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden', backgroundColor: colors.background }}>
+          <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 2, backgroundColor: colors.cardBackground }}><View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.cardBorder }} /></View>
           <FactsScreen route={{ params: { birthData, memory: true, onFactsChanged: (facts, total) => setCount(total ?? facts.length) } }} navigation={{ ...navigation, goBack: () => { setOpen(false); refresh(); } }} />
         </View>
       </View>
