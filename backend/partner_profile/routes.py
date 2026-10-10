@@ -21,7 +21,7 @@ from credits.credit_service import CreditService
 from db import execute, get_conn
 from encryption_utils import EncryptionManager
 
-from .image_provider import GooglePartnerPortraitProvider, partner_portrait_provider_configured
+from .image_provider import OpenAIPartnerPortraitProvider, partner_portrait_provider_configured
 from .art_direction import derive_art_direction
 from .prompt_builder import build_full_body_prompt, build_portrait_prompt
 from .service import build_partner_profile
@@ -336,7 +336,7 @@ async def _run_generation(job_id: str, user_id: int, request_data: dict[str, Any
             raise RuntimeError("The chart does not provide enough repeated visual testimony for a responsible portrait")
 
         seed = int(hashlib.sha256(f"{job_id}:{profile['ruleset_version']}".encode()).hexdigest()[:8], 16)
-        provider = GooglePartnerPortraitProvider()
+        provider = OpenAIPartnerPortraitProvider()
         profile["generation"] = provider.metadata
         profile["art_direction"] = {
             "presentation": request_data["presentation"],

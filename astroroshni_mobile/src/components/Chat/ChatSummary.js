@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, View, Text, TouchableOpacity, FlatList, ActivityIndicator, ScrollView, Pressable } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, FlatList, ActivityIndicator, ScrollView, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ConflictResolution from './ConflictResolution';
 import PrashnaSetup from './PrashnaSetup';
@@ -35,7 +35,7 @@ export default function ChatSummary({ messages = [], onResolved, header = false,
   };
   return <><TouchableOpacity accessibilityRole="button" accessibilityLabel={t('premiumUi.chat.conflict.tools', 'Chat tools')} hitSlop={header ? { top: 6, bottom: 6, left: 3, right: 6 } : undefined} onPress={() => { setTool(null); setOpen(true); }} style={{ width: header ? headerSize : 40, height: header ? headerSize : 40, borderRadius: header ? headerSize / 2 : 20, flexShrink: 0, borderWidth: header ? 0 : 1, borderColor: colors.cardBorder, alignItems: 'center', justifyContent: 'center', backgroundColor: header ? colors.cosmicGlow : colors.surface }}><Ionicons name="construct-outline" size={header ? (headerSize >= 48 ? 24 : 20) : 20} color={header ? colors.textInverseMuted : colors.primary} /></TouchableOpacity>
     <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <KeyboardAvoidingView enabled={tool === 'prashna'} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable onPress={close} accessibilityRole="button" accessibilityLabel={t('common.close', 'Close')} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.overlay }} />
         <View accessibilityViewIsModal style={{ ...(tool ? { height: '85%' } : { maxHeight: '85%' }), paddingHorizontal: 20, paddingBottom: Math.max(insets.bottom, 16), borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.cardBorder }}>
           <View accessible={false} style={{ alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: colors.cardBorder, marginTop: 10, marginBottom: 16 }} />
@@ -63,7 +63,7 @@ export default function ChatSummary({ messages = [], onResolved, header = false,
       </>}
           </View>}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   </>;
 }

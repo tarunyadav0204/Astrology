@@ -1,4 +1,4 @@
-"""Google Gemini image generation for Partner Portrait.
+"""OpenAI GPT image generation for Partner Portrait.
 
 The provider receives only the resolved visual prompt produced by the classical
 profile engine. Birth data, chart identifiers and the native's name are never
@@ -22,10 +22,8 @@ class GeneratedImage:
 
 
 def _api_key() -> str:
-    # The feature-specific key permits independent rotation in production. The
-    # existing Gemini key remains a documented credential alias for deployments
-    # that use one Google AI project.
-    return (os.getenv("PARTNER_PORTRAIT_GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY") or "").strip()
+    # Reuse the chat credential unless a dedicated image key is configured.
+    return (os.getenv("PARTNER_PORTRAIT_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
 
 
 def partner_portrait_provider_configured() -> bool:
@@ -42,71 +40,61 @@ def _decode_data_uri(uri: str) -> tuple[bytes, str] | None:
         raise RuntimeError("Stored portrait is not a valid image") from exc
 
 def _extract_image(payload: dict[str, Any]) -> GeneratedImage:
-    candidates = payload.get("candidates") or []
-    for candidate in candidates:
-        parts = ((candidate or {}).get("content") or {}).get("parts") or []
-        for part in parts:
-            inline_data = (part or {}).get("inlineData") or (part or {}).get("inline_data")
-            if not inline_data or not inline_data.get("data"):
-                continue
-            try:
-                content = base64.b64decode(inline_data["data"], validate=True)
-            except (ValueError, TypeError) as exc:
-                raise RuntimeError("Google returned invalid image data") from exc
-            return GeneratedImage(content=content, content_type=inline_data.get("mimeType") or "image/png")
-
-    block_reason = ((payload.get("promptFeedback") or {}).get("blockReason") or "").strip()
-    if block_reason:
-        raise RuntimeError(f"Google did not generate the image: {block_reason}")
-    raise RuntimeError("Google returned no image")
+    for item in payload.get("data") or []:
+        encoded = (item or {}).get("b64_json")
+        if not encoded:
+            continue
+        try:
+            content = base64.b64decode(encoded, validate=True)
+        except (ValueError, TypeError) as exc:
+            raise RuntimeError("OpenAI returned invalid image data") from exc
+        if content:
+            return GeneratedImage(content=content)
+    raise RuntimeError("OpenAI returned no image")
 
 
-class GooglePartnerPortraitProvider:
+class OpenAIPartnerPortraitProvider:
     """Generate a portrait and an identity-consistent full-body companion image."""
 
-    provider_name = "google_gemini"
+    provider_name = "openai"
 
     def __init__(self) -> None:
         self.api_key = _api_key()
         if not self.api_key:
             raise RuntimeError("Partner Portrait image provider is not configured")
-        self.model = os.getenv("PARTNER_PORTRAIT_IMAGE_MODEL", "gemini-3.1-flash-image").strip()
-        self.image_size = os.getenv("PARTNER_PORTRAIT_IMAGE_SIZE", "1K").strip().upper()
-        self.base_url = os.getenv("GEMINI_API_BASE_URL", "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
+        self.model = os.getenv("PARTNER_PORTRAIT_IMAGE_MODEL", "gpt-image-2").strip()
+        self.image_size = os.getenv("PARTNER_PORTRAIT_IMAGE_SIZE", "1024x1536").strip()
+        self.quality = os.getenv("PARTNER_PORTRAIT_IMAGE_QUALITY", "medium").strip().lower()
+        self.base_url = "https://api.openai.com/v1"
 
     @property
     def metadata(self) -> dict[str, str]:
-        return {"provider": self.provider_name, "model": self.model, "image_size": self.image_size}
+        return {"provider": self.provider_name, "model": self.model,
+                "image_size": self.image_size, "quality": self.quality}
 
-    async def _generate(self, prompt: str, aspect_ratio: str, reference: tuple[bytes, str] | None = None) -> GeneratedImage:
-        parts: list[dict[str, Any]] = [{"text": prompt}]
-        if reference:
-            content, mime_type = reference
-            parts.append(
-                {
-                    "inlineData": {
-                        "mimeType": mime_type,
-                        "data": base64.b64encode(content).decode("ascii"),
-                    }
-                }
-            )
-        request = {
-            "contents": [{"role": "user", "parts": parts}],
-            "generationConfig": {
-                "responseModalities": ["TEXT", "IMAGE"],
-                "imageConfig": {"aspectRatio": aspect_ratio, "imageSize": self.image_size},
-            },
-        }
-        url = f"{self.base_url}/models/{self.model}:generateContent"
+    async def _generate(self, prompt: str, reference: tuple[bytes, str] | None = None) -> GeneratedImage:
+        request = {"model": self.model, "prompt": prompt, "size": self.image_size,
+                   "quality": self.quality, "n": 1, "output_format": "png"}
+        headers = {"Authorization": f"Bearer {self.api_key}"}
         async with httpx.AsyncClient(timeout=httpx.Timeout(240.0), follow_redirects=True) as client:
-            response = await client.post(url, headers={"x-goog-api-key": self.api_key}, json=request)
+            if reference:
+                content, mime_type = reference
+                extension = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}.get(mime_type, "png")
+                response = await client.post(
+                    f"{self.base_url}/images/edits", headers=headers,
+                    data={key: str(value) for key, value in request.items()},
+                    files={"image": (f"portrait.{extension}", content, mime_type)},
+                )
+            else:
+                response = await client.post(
+                    f"{self.base_url}/images/generations", headers=headers, json=request,
+                )
         if response.is_error:
             try:
                 message = ((response.json().get("error") or {}).get("message") or "").strip()
             except (ValueError, AttributeError):
                 message = ""
-            detail = message or f"HTTP {response.status_code}"
-            raise RuntimeError(f"Google image generation failed: {detail}")
+            raise RuntimeError(f"OpenAI image generation failed: {message or f'HTTP {response.status_code}'}")
         return _extract_image(response.json())
 
     async def _load_reference(self, portrait_uri: str) -> tuple[bytes, str]:
@@ -122,10 +110,10 @@ class GooglePartnerPortraitProvider:
         return response.content, content_type
 
     async def generate_portrait(self, prompt: str, seed: int) -> GeneratedImage:
-        # Gemini image generation currently does not expose a seed. Identity is
+        # GPT image generation does not expose a seed. Identity is
         # established by passing this generated image into the second request.
         del seed
-        return await self._generate(prompt, "4:5")
+        return await self._generate(prompt)
 
     async def generate_full_body(self, prompt: str, portrait_uri: str, seed: int) -> GeneratedImage:
         del seed
@@ -134,4 +122,4 @@ class GooglePartnerPortraitProvider:
             f"{prompt}\n\nUse the supplied portrait as the identity reference. Preserve the same adult person's "
             "facial structure, skin tone, hair, apparent age and overall identity exactly."
         )
-        return await self._generate(identity_prompt, "3:4", reference)
+        return await self._generate(identity_prompt, reference)

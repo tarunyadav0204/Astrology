@@ -6840,8 +6840,8 @@ export default function ChatScreen({ navigation, route }) {
           </View></View>
         </Modal>
         <Modal visible={Boolean(pendingPrashnaQuestion)} transparent animationType="slide" onRequestClose={() => setPendingPrashnaQuestion(null)}>
-          <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
-            <View accessibilityViewIsModal style={{ height: '65%', padding: 20, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: colors.surfaceRaised }}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay }}>
+            <View accessibilityViewIsModal style={{ height: '85%', padding: 20, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: colors.surfaceRaised }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <Text style={{ color: colors.text, fontSize: 20, fontWeight: '700' }}>{t('premiumUi.chat.prashna.ask', 'Ask with Prashna')}</Text>
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('common.close', 'Close')} onPress={() => setPendingPrashnaQuestion(null)} style={{ padding: 12 }}><Ionicons name="close" size={24} color={colors.text} /></TouchableOpacity>
@@ -6855,7 +6855,7 @@ export default function ChatScreen({ navigation, route }) {
                 sendMessageRef.current?.(pending.question, { forceTier: 'verified', queryContext: { ...pending.queryContext, prashna_choice: 'prashna', prashna_requested: true, prashna_location: place } });
               }} />
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
         {/* Header - outside KeyboardAvoidingView so home/greeting layout is never affected by keyboard */}
         <View style={styles.headerContainer}>
