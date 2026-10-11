@@ -16,7 +16,7 @@ export function SaveAnswerButton({ message }) {
   const [saved, setSaved] = useState(false), [busy, setBusy] = useState(false);
   useEffect(() => { if (!eligible) return; const controller = new AbortController(); request(`/${id}`, 'GET', controller.signal).then(data => setSaved(data.saved)).catch(() => {}); return () => controller.abort(); }, [id, eligible]);
   if (!eligible) return null;
-  return <><button type="button" className="action-btn save-answer-button" disabled={busy} aria-pressed={saved} aria-label={saved ? 'Remove saved answer' : 'Save answer'} title={saved ? 'Remove saved answer' : 'Save answer'} onClick={async () => { setBusy(true); try { const data = await request(`/${id}`, saved ? 'DELETE' : 'PUT'); setSaved(data.saved); } catch (err) { showToast(err.message, 'error', 4000); } finally { setBusy(false); } }}>{icon}</button></>;
+  return <><button type="button" className="action-btn save-answer-button" disabled={busy} aria-pressed={saved} aria-label={saved ? 'Remove saved answer' : 'Save answer'} title={saved ? 'Remove saved answer' : 'Save answer'} onClick={async () => { setBusy(true); try { const data = await request(`/${id}`, saved ? 'DELETE' : 'PUT'); setSaved(data.saved); showToast(data.saved ? 'Message bookmarked' : 'Bookmark removed', 'success', 2500); } catch (err) { showToast(err.message, 'error', 4000); } finally { setBusy(false); } }}>{icon}</button></>;
 }
 
 export default function SavedAnswers({ onOpenConversation }) {

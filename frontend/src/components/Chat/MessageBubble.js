@@ -17,7 +17,7 @@ import {
 } from './podcastPlayback';
 import PodcastLanguageModal from './PodcastLanguageModal';
 import PodcastGenerationExperience from './PodcastGenerationExperience';
-import { buildInstantTypingLines, INSTANT_LOADER_TAKING_LONGER } from '../../constants/instantChatLoader';
+import { INSTANT_LOADER_TAKING_LONGER } from '../../constants/instantChatLoader';
 import { buildReadableEvidence, buildRoutingSummary } from '../../utils/instantEvidence';
 import { autoWrapGlossaryTermsInHtml, buildGlossaryTooltipHtml } from '../../utils/chatGlossary';
 import { labelChatSentiment } from '../../utils/chatSentiment';
@@ -725,8 +725,13 @@ const MessageBubble = ({
     const isInstantTypingBubble =
         (message.isTyping || message.isProcessing) && messageChatTier === 'instant';
     const instantTypingState = useMemo(
-        () => (isInstantTypingBubble ? buildInstantTypingLines(Math.max(1, instantLoaderRevealWords)) : null),
-        [isInstantTypingBubble, instantLoaderRevealWords]
+        () => (isInstantTypingBubble ? {
+            lines: message.calculationTrace?.length
+                ? message.calculationTrace.map(step => ({ key: step.id, text: step.detail || step.title }))
+                : [{ key: 'waiting', text: 'Reading your question…' }],
+            isTakingLonger: false,
+        } : null),
+        [isInstantTypingBubble, message.calculationTrace]
     );
 
     useEffect(() => {
@@ -1989,7 +1994,7 @@ const MessageBubble = ({
                     {(message.isTyping || message.isProcessing) ? (
                         isInstantTypingBubble && instantTypingState ? (
                             <div className="instant-typing-bubble" aria-live="polite">
-                                <div className="instant-typing-bubble__label">Tara is thinking</div>
+                                <div className="instant-typing-bubble__label">Luna is reading</div>
                                 {instantTypingState.lines.map((line, index) => {
                                     return (
                                         <div

@@ -20379,10 +20379,22 @@ async def generate_instant_chat_response(
     response_validation_enabled_override: Optional[bool] = None,
     model_name_override: Optional[str] = None,
     provider_override: Optional[str] = None,
+    calculator_first: bool = False,
+    instant_conversation: bool = False,
     verified_evidence_review: bool = False,
     verified_partner_birth_data: Optional[Dict[str, Any]] = None,
     verified_calculation_callback: Optional[Callable[[List[Dict[str, str]]], None]] = None,
 ) -> Dict[str, Any]:
+    if calculator_first:
+        from chat.calculator_first import generate_calculator_first_response
+        return await generate_calculator_first_response(
+            question=latest_user_question or question, birth_data=birth_data, history=history,
+            language=language, response_style=response_style,
+            query_context=(intent or {}).get("query_context") or {},
+            session_facts=(intent or {}).get("_session_extracted_context") or {},
+            stream_callback=stream_callback, calculation_callback=verified_calculation_callback,
+            model_name=model_name_override,
+        )
     if verified_evidence_review and verified_partner_birth_data is not None:
         from chat.verified_partnership import generate_verified_partnership_response
         return await generate_verified_partnership_response(
@@ -20557,6 +20569,15 @@ async def generate_instant_chat_response(
         target_subject_override=target_subject,
         target_subjects_override=target_subjects,
     )
+    if instant_conversation and not verified_evidence_review:
+        from chat.instant_conversation import generate_conversation_response
+        _finish_local_stage("calculations_and_evidence", calculations_started)
+        return await generate_conversation_response(
+            question=question, language=language, birth_data=birth_data,
+            instant_context=instant_context, history=history, response_style=response_style,
+            stream_callback=stream_callback, calculation_callback=verified_calculation_callback,
+            stage_timings_ms=stage_timings_ms, pipeline_started=pipeline_started,
+        )
     instant_v2_packet = None
     instant_v2_packet_error = None
     if _env_flag("INSTANT_CHAT_V2_ENABLED", True):
@@ -20801,6 +20822,7 @@ async def generate_instant_chat_response(
             "birth_data": birth_data,
             "instant_context": {**instant_context,
                 "intent_summary": {**(instant_context.get("intent_summary") or {}),
+                    **({"mode": "CUSTOM_READING"} if (intent or {}).get("mode") == "CUSTOM_READING" else {}),
                     **({"mode": "CHART_DASHA_ANALYSIS", "reading_type": "chart_dasha_analysis"}
                        if (intent or {}).get("mode") == "CHART_DASHA_ANALYSIS" else {})},
                 "query_context": (intent or {}).get("query_context") or instant_context.get("query_context") or {}},

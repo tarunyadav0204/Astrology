@@ -289,13 +289,7 @@ function MessageBubble({
   const isPartnership = partnership || message.partnership_mode;
   const messageChatTier = String(message?.chatTier || message?.chat_tier || '').trim().toLowerCase();
   const messageResponseStyle = String(message?.responseStyle || message?.response_style || '').trim().toLowerCase();
-  // Simple Verified answers are intentionally a continuous, readable consultation.
-  // Do not turn a model heading into the large Premium quick-answer card: that
-  // card can swallow the rest of a Markdown response when the model uses nested
-  // headings for its timing or evidence sections.
-  // Old messages did not persist response_style. Verified defaults to the
-  // readable presentation unless it explicitly says Technical, so those older
-  // responses cannot fall back into an oversized Quick Answer card either.
+  // Keep a standalone Quick Answer card for all tiers; later sections stay outside it.
   const isVerifiedSimpleMessage = messageChatTier === 'verified' && messageResponseStyle !== 'technical';
   const isInstantChatMessage = forceInstantPresentation || messageChatTier === 'instant';
   const isPremiumChatMessage = messageChatTier === 'premium' || message?.premium_analysis === true;
@@ -1111,17 +1105,15 @@ function MessageBubble({
       return `<finalthoughts>${cleanContent}</finalthoughts>`;
     });
 
-    if (!isVerifiedSimpleMessage) {
-      // Partnership/relational merges often use "Direct Answer" style headings instead of quick-answer-card HTML.
-      // Normalize these to the same yellow quick-answer card UX used in single-chart responses.
-      formatted = formatted.replace(
-        /(###\s*(?:Direct Answer|Quick Answer|Short Answer|Bottom Line|Answer)\s*[\s\S]*?)(?=###|$)/gi,
-        (match) => {
-          const cleanContent = match.replace(/^###\s*(?:Direct Answer|Quick Answer|Short Answer|Bottom Line|Answer)\s*\n?/i, '').trim();
-          return `<quickanswer>${cleanContent}</quickanswer>`;
-        }
-      );
+    // Stop at any following Markdown heading, including nested ##/#### headings.
+    // Consume a heading colon instead of leaving it as a visible blank line.
+    formatted = formatted.replace(
+      /^#{1,6}\s*(?:Direct Answer|Quick Answer|Short Answer|Bottom Line|Answer)\s*:?[ \t]*\n([\s\S]*?)(?=^#{1,6}\s|(?![\s\S]))/gim,
+      (_match, body) => `<quickanswer>${body.trim()}</quickanswer>`
+    );
+    formatted = formatted.replace(/<div class="quick-answer-card">([\s\S]*?)<\/div>/gi, '<quickanswer>$1</quickanswer>');
 
+    if (!isVerifiedSimpleMessage) {
       // Normalize common closing section names from partnership branches to Final Thoughts card.
       formatted = formatted.replace(
         /(###\s*(?:Final Thought|Final Thoughts|Closing Thoughts|Closing Guidance|Final Guidance|Practical Guidance|Takeaway)\s*[\s\S]*?)(?=###|$)/gi,
@@ -1138,9 +1130,7 @@ function MessageBubble({
       // Be defensive with responses created before the Simple prompt rollout too.
       // The content is still useful; it just belongs in the normal reading flow.
       formatted = formatted
-        .replace(/<div class="quick-answer-card">([\s\S]*?)<\/div>/gi, '\n\n$1\n\n')
         .replace(/<div class="final-thoughts-card">([\s\S]*?)<\/div>/gi, '\n\n$1\n\n')
-        .replace(/<\/?quickanswer>/gi, '')
         .replace(/<\/?finalthoughts>/gi, '');
     }
 
@@ -1213,8 +1203,7 @@ function MessageBubble({
         // instead of trapping every section inside one oversized card.
         const containsNestedSections = /(^|\n)\s*#{2,}\s+/m.test(cardContent);
         const containsSentimentMarkers = /(?:\[|【)(?:POS|NEG)_(?:START|END)(?:\]|】)/i.test(cardContent);
-        const isOversizedCard = cardContent.length > 650;
-        if (containsNestedSections || containsSentimentMarkers || isOversizedCard) {
+        if (containsNestedSections || containsSentimentMarkers) {
           elements.push(...parseRegularText(cardContent, currentIndex));
           currentIndex += 100;
           lastIndex = item.lastIndex;
@@ -2193,7 +2182,7 @@ function MessageBubble({
             <Text style={[styles.instantMessageTime, { color: colors.textTertiary }]}>{instantTime}</Text>
           </View>
         {!isUser && !message.isTyping && !message.instantStreaming && !message.isWelcome && !isNativeGate && (message.messageId || message.content) ? (
-          <View
+          <MessageActionRow
             style={[
               styles.actionButtons,
               styles.instantActionButtons,
@@ -2310,7 +2299,7 @@ function MessageBubble({
             >
               <Ionicons name="trash-outline" size={16} color={colors.error} />
             </TouchableOpacity>
-          </View>
+          </MessageActionRow>
         ) : null}
         </View>
       </Animated.View>
@@ -2982,7 +2971,7 @@ function MessageBubble({
 
         {/* Action buttons (podcast, share, copy, etc.) - show for assistant messages with content (incl. chat history) */}
         {!message.isTyping && !message.instantStreaming && message.role === 'assistant' && !message.isWelcome && !isNativeGate && (message.messageId || message.content) && (
-          <View style={[styles.actionButtons, { borderTopColor: colors.cardBorder }]}>
+          <MessageActionRow style={[styles.actionButtons, { borderTopColor: colors.cardBorder }]}>
             <SaveAnswerButton message={message} style={[styles.actionButton, messageActionStyle]} />
             {/* Restart Button for timeout messages */}
             {message.showRestartButton && message.messageId && (
@@ -3126,11 +3115,11 @@ function MessageBubble({
             >
               <Ionicons name="trash-outline" size={16} color={colors.error} />
             </TouchableOpacity>
-          </View>
+          </MessageActionRow>
         )}
 
         {!message.isTyping && message.role === 'user' && !!(message.content && message.content.trim()) && (
-          <View style={[styles.actionButtons, { borderTopColor: colors.cardBorder }]}>
+          <MessageActionRow style={[styles.actionButtons, { borderTopColor: colors.cardBorder }]}>
             <TouchableOpacity
               style={[styles.actionButton, messageActionStyle]}
               onPress={copyToClipboard}
@@ -3158,7 +3147,7 @@ function MessageBubble({
             >
               <Ionicons name="trash-outline" size={16} color={colors.error} />
             </TouchableOpacity>
-          </View>
+          </MessageActionRow>
         )}
 
         {message.role === 'assistant' && (
@@ -3434,6 +3423,24 @@ const areMessageBubblePropsEqual = (prevProps, nextProps) => {
 
 export default React.memo(MessageBubble, areMessageBubblePropsEqual);
 
+// Keep message actions on one line, with horizontal overflow on small screens.
+function MessageActionRow({ children, style, ...props }) {
+  const { t } = useTranslation();
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator
+      style={{ width: '100%', flexGrow: 0 }}
+      contentContainerStyle={style}
+      accessibilityRole="toolbar"
+      accessibilityLabel={t('chat.messageActions', 'Message actions')}
+      {...props}
+    >
+      {children}
+    </ScrollView>
+  );
+}
+
   const styles = StyleSheet.create({
   instantMessageRow: {
     width: '100%',
@@ -3447,7 +3454,6 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     alignItems: 'flex-start',
   },
   instantActionButtons: {
-    width: '100%',
     alignSelf: 'stretch',
     marginTop: 8,
     paddingTop: 8,
@@ -3615,6 +3621,9 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     shadowRadius: 4,
   },
   assistantBubble: {
+    width: '100%',
+    maxWidth: '100%',
+    paddingHorizontal: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderBottomLeftRadius: 8,
     borderWidth: 1,
@@ -3994,13 +4003,14 @@ export default React.memo(MessageBubble, areMessageBubblePropsEqual);
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(80, 54, 64, 0.14)',
     gap: 6,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
   actionButton: {
     backgroundColor: 'rgba(120, 96, 104, 0.08)',
     borderRadius: 16,
     width: 32,
     height: 32,
+    flexShrink: 0,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,

@@ -1,3 +1,4 @@
+import { askOverConversation, takeConversationStream, closeConversations } from '../../utils/instantConversation';
 import { appendConflictResolution } from '../../hooks/useConflictResolution';
 import { applyInstantProgress, applyVerifiedCalculationProgress, buildImmediateChartPreview, mergeChartContext } from '../../utils/instantProgress';
 import { createChatJumpControlScheduler } from '../../utils/chatJumpControls';
@@ -1029,6 +1030,7 @@ export default function ChatScreen({ navigation, route }) {
   }, [hasInstantTypingMessage, instantLoaderWordCount]);
 
   useEffect(() => () => {
+    closeConversations();
     instantRevealTimersRef.current.forEach((timer) => clearTimeout(timer));
     instantRevealTimersRef.current.clear();
     instantRevealActiveRef.current.clear();
@@ -1201,6 +1203,16 @@ export default function ChatScreen({ navigation, route }) {
     if (lastAnswerIndex < 0) lastAnswerIndex = visibleMessages.length - 1;
   }
   lastAnswerIndexRef.current = lastAnswerIndex;
+  // A loading row is replaced in place, so list length/index alone cannot
+  // signal that its interactive reading choices have arrived.
+  const latestAnswer = visibleMessages[lastAnswerIndex];
+  const readingChoiceAction = latestAnswer?.next_action || latestAnswer?.nextAction;
+  const readingChoiceArrivalKey = latestAnswer?.role === 'assistant'
+    && !latestAnswer?.isTyping
+    && ['prashna_method', 'prashna_scope', 'muhurat_setup', 'muhurat_refine'].includes(readingChoiceAction?.choice_kind)
+    ? `${latestAnswer.messageId || latestAnswer.id || latestAnswer.clientRequestId || latestAnswer.timestamp || lastAnswerIndex}:${readingChoiceAction.choice_kind}`
+    : null;
+  const previousReadingChoiceArrivalRef = useRef(readingChoiceArrivalKey);
   const hiddenMessageCount = Math.max(0, messages.length - visibleMessages.length);
   const showWelcomeSuggestionCards =
     !isInstantAnalysis &&
@@ -1504,7 +1516,11 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   useEffect(() => {
+    const readingChoicesArrived = readingChoiceArrivalKey
+      && readingChoiceArrivalKey !== previousReadingChoiceArrivalRef.current;
+    previousReadingChoiceArrivalRef.current = readingChoiceArrivalKey;
     if (showGreeting) return;
+    if (readingChoicesArrived) requestScrollToLastAnswerTop();
     if (!pendingScrollToLastAnswerRef.current) return;
     if (hasInstantTypingMessage) {
       pendingScrollToLastAnswerRef.current = false;
@@ -1532,7 +1548,7 @@ export default function ChatScreen({ navigation, route }) {
       timers.forEach(clearTimeout);
       clearTimeout(finish);
     };
-  }, [showGreeting, visibleMessages.length, lastAnswerIndex, hasInstantTypingMessage]);
+  }, [showGreeting, visibleMessages.length, lastAnswerIndex, hasInstantTypingMessage, readingChoiceArrivalKey]);
 
   const rememberMessageTier = (messageId, tier) => {
     if (!messageId) return;
@@ -2581,6 +2597,19 @@ export default function ChatScreen({ navigation, route }) {
       unsubscribe();
     };
   }, [navigation, showGreeting, route.params]);
+
+  useEffect(() => {
+    const style = route.params?.bannerChatStyle;
+    const mode = route.params?.bannerChatMode || (style ? 'verified' : null);
+    if (!['standard', 'premium', 'instant', 'speech', 'verified'].includes(mode) || isGuest || !answerStylePreferenceHydrated) return;
+    if (!pricing || Object.keys(pricing).length === 0 || !birthData) return;
+    // Wait for the pricing effect to apply chat availability flags.
+    if (Boolean(pricingFeatures?.verified_chat_enabled) !== verifiedChatEnabled
+      || Boolean(pricingFeatures?.instant_chat_enabled) !== instantChatEnabled
+      || Boolean(pricingFeatures?.speech_chat_enabled) !== speechChatEnabled) return;
+    navigation.setParams({ bannerChatStyle: undefined, bannerChatMode: undefined });
+    handleGreetingOptionSelect({ action: 'question', chatMode: mode, answerStyle: style });
+  }, [route.params?.bannerChatStyle, route.params?.bannerChatMode, isGuest, answerStylePreferenceHydrated, pricing, pricingFeatures, verifiedChatEnabled, instantChatEnabled, speechChatEnabled, birthData]);
 
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -3844,6 +3873,8 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const handleGreetingOptionSelect = async (option) => {
+    const isBannerChatEntry = option.action === 'question' && ['standard', 'premium', 'instant', 'speech', 'verified'].includes(option.chatMode);
+    const isVerifiedBannerEntry = isBannerChatEntry && option.chatMode === 'verified';
     // Chat / analysis / predictions / partnership / mundane need an account.
     // Chart & dasha tools stay open for guests.
     const needsAuthNow = new Set(['question', 'partnership', 'mundane', 'analysis', 'events']);
@@ -3875,10 +3906,23 @@ export default function ChatScreen({ navigation, route }) {
           resumeRoute,
           resumeParams: option.action === 'events'
             ? { readingMode: option.readingMode || 'yearly' }
-            : {},
+            : isBannerChatEntry
+              ? { bannerChatMode: option.chatMode, ...(isVerifiedBannerEntry ? { bannerChatStyle: option.answerStyle === 'technical' ? 'technical' : 'simple' } : {}) }
+              : {},
         },
       });
       if (!ok) return;
+    }
+
+    if (isVerifiedBannerEntry && !verifiedChatEnabled) {
+      Alert.alert(t('chat.verifiedMode.name', 'Verified Chat'), t('chat.verifiedMode.unavailable', 'Verified Chat is currently unavailable. Please try again later.'));
+      return;
+    }
+
+    if (isBannerChatEntry && ((option.chatMode === 'instant' && !instantChatEnabled)
+      || (option.chatMode === 'speech' && (!instantChatEnabled || !speechChatEnabled)))) {
+      Alert.alert(getChatModeName(option.chatMode), t('chat.modeUnavailable', 'This chat mode is currently unavailable. Please try again later.'));
+      return;
     }
 
     if (option.action === 'partnership') {
@@ -3930,7 +3974,7 @@ export default function ChatScreen({ navigation, route }) {
       } else {
         pendingFomoQueryContextRef.current = null;
       }
-      if (isFomoChatEntry) {
+      if (isFomoChatEntry || isBannerChatEntry) {
         const introKey = `chat-entry:${currentPersonId || birthData?.id || birthData?.name || 'native'}`;
         chatModeIntroShownKeyRef.current = introKey;
         modeIntroSuppressOpenUntilRef.current = Date.now() + 5000;
@@ -3963,7 +4007,27 @@ export default function ChatScreen({ navigation, route }) {
       }
       setShowModeSelector(false);
 
-      if (!partnershipMode && !isMundane) {
+      if (isBannerChatEntry) {
+        if (isVerifiedBannerEntry) {
+          await persistAnswerStyle(option.answerStyle);
+          setPendingAnswerStyle(option.answerStyle === 'technical' ? 'technical' : 'simple');
+        } else {
+          setPendingAnswerStyle(answerStyle);
+        }
+        setPendingChatMode(option.chatMode);
+        if (option.chatMode === 'speech') {
+          if (!canAffordChatMode('speech')) {
+            openCreditChoice('speech');
+            return;
+          }
+          if (Platform.OS === 'web') getTextToSpeech().unlockWebAudio?.();
+          navigation.navigate('SpeechChat', { birthData, language, responseStyle: answerStyle, sessionId });
+          return;
+        }
+        applyChatMode(option.chatMode);
+        await saveSelectedChatMode(option.chatMode);
+        chatModeHydratedRef.current = true;
+      } else if (!partnershipMode && !isMundane) {
         if (isFomoChatEntry) {
           const storedMode = await loadSelectedChatMode(currentPersonId);
           applyChatModeFromTier(storedMode === 'premium' ? 'premium' : 'standard');
@@ -4762,7 +4826,7 @@ export default function ChatScreen({ navigation, route }) {
 
     let socket;
     try {
-      socket = new WebSocket(streamUrl);
+      socket = takeConversationStream(messageId) || new WebSocket(streamUrl);
     } catch (error) {
       console.warn('[InstantStream] WebSocket unavailable; polling will continue', error?.message || error);
       return false;
@@ -4777,6 +4841,12 @@ export default function ChatScreen({ navigation, route }) {
         return;
       }
 
+      if (payload?.type === 'progress') {
+        setMessagesWithStorage(prev => prev.map(msg =>
+          String(msg.messageId || '') === mid || msg.id === processingMessageId
+            ? applyVerifiedCalculationProgress(msg, payload.engagement_updates) : msg));
+        return;
+      }
       if (payload?.type === 'preview') {
         setMessagesWithStorage((prev) => prev.map((msg) => (
           String(msg.messageId || '') === mid || msg.id === processingMessageId
@@ -5150,9 +5220,7 @@ export default function ChatScreen({ navigation, route }) {
               ).trim().toLowerCase();
               if (['instant', 'verified'].includes(messageTier)) {
                 const partialContent = String(status.partial_content || '');
-                const withCalculations = messageTier === 'verified'
-                  ? applyVerifiedCalculationProgress(msg, status.engagement_updates)
-                  : msg;
+                const withCalculations = applyVerifiedCalculationProgress(msg, status.engagement_updates);
                 const progressed = applyInstantProgress(withCalculations, {
                   partial_content: partialContent,
                   preview: status.instant_preview,
@@ -5528,7 +5596,7 @@ export default function ChatScreen({ navigation, route }) {
 
         console.log(`🚀 [API CALL] Sending request to /chat-v2/ask at: ${new Date().toISOString()} (attempt ${attempt})`);
 
-        const response = await fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`, {
+        const submitHttp = () => fetch(`${API_BASE_URL}${getEndpoint('/chat-v2/ask')}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -5536,6 +5604,10 @@ export default function ChatScreen({ navigation, route }) {
           },
           body: JSON.stringify(requestBody)
         });
+        const conversationBase = String(API_BASE_URL || '').replace(/\/+$/, '').replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
+        const response = useInstantChat
+          ? await askOverConversation(`${conversationBase}${getEndpoint('/chat-v2/conversation')}`, token, requestBody, submitHttp)
+          : await submitHttp();
 
         console.log(`📡 [API RESPONSE] Received response at: ${new Date().toISOString()}, status: ${response.status}`);
 
@@ -5984,16 +6056,12 @@ export default function ChatScreen({ navigation, route }) {
     },
   ];
 
-  const renderInstantTypingIndicator = () => {
-    const lineIndex = Math.min(
-      Math.max(instantLoaderWordCount - 1, 0),
-      INSTANT_LOADER_LINES.length - 1,
-    );
-    const currentLine = t(
-      INSTANT_LOADER_LINES[lineIndex],
-      INSTANT_LOADER_FALLBACKS[lineIndex],
-    );
-    const isTakingLonger = instantLoaderWordCount >= INSTANT_LOADER_MAX_WORDS;
+  const renderInstantTypingIndicator = (message) => {
+    const findings = message?.calculationTrace || [];
+    const currentLine = findings.length
+      ? findings[findings.length - 1].detail || findings[findings.length - 1].title
+      : t('chat.conversation.waiting', 'Reading your question…');
+    const isTakingLonger = false;
 
     return (
       <View
@@ -7599,7 +7667,7 @@ export default function ChatScreen({ navigation, route }) {
                 if (item.chatTier === 'instant') {
                   return (
                     <View {...lastAnswerProps}>
-                      {renderInstantTypingIndicator()}
+                      {renderInstantTypingIndicator(item)}
                     </View>
                   );
                 }

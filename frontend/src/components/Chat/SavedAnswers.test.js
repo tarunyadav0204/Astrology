@@ -1,6 +1,9 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SaveAnswerButton } from './SavedAnswers';
+import { showToast } from '../../utils/toast';
+jest.mock('../../utils/toast', () => ({ showToast: jest.fn() }));
+beforeEach(() => jest.clearAllMocks());
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 test('save button restores state, saves, and removes the answer', async () => {
@@ -11,12 +14,15 @@ test('save button restores state, saves, and removes the answer', async () => {
   try {
     await act(async () => { root.render(<SaveAnswerButton message={{ messageId: 8, role: 'assistant', content: 'Career answer' }} />); });
     expect(host.querySelector('button').getAttribute('aria-label')).toBe('Save answer');
+    expect(showToast).not.toHaveBeenCalled();
     await act(async () => host.querySelector('button').click());
     expect(global.fetch.mock.calls[1][1].method).toBe('PUT');
     expect(host.querySelector('button').getAttribute('aria-pressed')).toBe('true');
+    expect(showToast).toHaveBeenLastCalledWith('Message bookmarked', 'success', 2500);
     await act(async () => host.querySelector('button').click());
     expect(global.fetch.mock.calls[2][1].method).toBe('DELETE');
     expect(host.querySelector('button').getAttribute('aria-pressed')).toBe('false');
+    expect(showToast).toHaveBeenLastCalledWith('Bookmark removed', 'success', 2500);
   } finally { act(() => root.unmount()); host.remove(); global.fetch = originalFetch; }
 });
 

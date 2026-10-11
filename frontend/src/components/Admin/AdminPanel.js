@@ -8290,6 +8290,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
               <div className="setting-item">
                 <div className="setting-info">
                   <strong>CTA action</strong>
+                  <p>This selects the landing destination. The button label only changes its text; Dismiss only closes the banner.</p>
                 </div>
                 <select
                   value={homeBannerCtaAction}
@@ -8299,6 +8300,15 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                   <option value="dismiss">Dismiss only</option>
                   <option value="credits">Open Credits</option>
                   <option value="chat">Open Chat (Ask Tara)</option>
+                  <option value="standard">Open Standard Chat</option>
+                  <option value="premium">Open Premium Chat</option>
+                  <option value="instant">Open Instant Chat (Live)</option>
+                  <option value="speech">Open Talk to Tara</option>
+                  <option value="verified_technical">Open Verified Technical Chat</option>
+                  <option value="verified_simple">Open Verified Simple Chat</option>
+                  <option value="yearly_events">Open Yearly Event Timeline</option>
+                  <option value="karma_analysis">Open Karma Analysis</option>
+                  <option value="partner_portrait">Open Partner Portrait</option>
                   <option value="url">Open URL</option>
                   <option value="none">None (tap X only)</option>
                 </select>

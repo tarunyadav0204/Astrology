@@ -68,5 +68,5 @@ export function applyVerifiedCalculationProgress(message, updates) {
             detail: typeof step.detail === 'string' ? step.detail.trim() : '',
         }));
     if (!calculationTrace.length || JSON.stringify(calculationTrace) === JSON.stringify(message.calculationTrace)) return message;
-    return { ...message, calculationTrace };
+    return { ...message, calculationTrace, loadingMessage: calculationTrace[calculationTrace.length - 1].detail || calculationTrace[calculationTrace.length - 1].title };
 }

@@ -1171,6 +1171,33 @@ export default function HomeScreen({
       });
       if (!ok) return;
       navigation.navigate('Credits');
+    } else if (['standard', 'premium', 'instant', 'speech'].includes(action)) {
+      onOptionSelect?.({ action: 'question', chatMode: action });
+    } else if (action === 'verified_technical' || action === 'verified_simple') {
+      onOptionSelect?.({
+        action: 'question',
+        chatMode: 'verified',
+        answerStyle: action === 'verified_technical' ? 'technical' : 'simple',
+      });
+    } else if (action === 'yearly_events') {
+      onOptionSelect?.({ action: 'events', readingMode: 'yearly' });
+    } else if (action === 'karma_analysis' || action === 'partner_portrait') {
+      if (action === 'partner_portrait' && !partnerPortraitEnabled) {
+        Alert.alert(t('partnerPortrait.title', 'Partner Portrait'), t('partnerPortrait.unavailable', 'Partner Portrait is currently unavailable. Please try again later.'));
+        return;
+      }
+      const destination = action === 'karma_analysis' ? 'KarmaAnalysis' : 'PartnerPortrait';
+      const params = action === 'karma_analysis' ? { chartId: (currentNativeData || birthData)?.id } : {};
+      const feature = action === 'karma_analysis'
+        ? t('premiumUi.home.karmaAnalysis', 'Karma Analysis')
+        : t('partnerPortrait.title', 'Partner Portrait');
+      const ok = await requireAuthForPaid({
+        feature,
+        message: t('authGate.messageGeneric', { feature }),
+        resume: { resumeRoute: destination, resumeParams: params },
+      });
+      if (!ok) return;
+      navigation.navigate(destination, params);
     } else if (action === 'chat') {
       onOptionSelect?.({ action: 'question' });
     } else if (action === 'url' && url) {
@@ -1180,7 +1207,7 @@ export default function HomeScreen({
         /* ignore */
       }
     }
-  }, [homeBanner, dismissHomeBanner, navigation, onOptionSelect, requireAuthForPaid]);
+  }, [homeBanner, dismissHomeBanner, navigation, onOptionSelect, requireAuthForPaid, partnerPortraitEnabled, currentNativeData, birthData, t]);
 
   const requireBirthChart = useCallback(
     (thenNavigate) => {
@@ -2216,45 +2243,7 @@ const loadHomeData = async (nativeData = null) => {
         ) : (
         <>
 
-        {homeBanner ? (
-          <TouchableOpacity
-            style={[
-              styles.adminHomeBannerRibbon,
-              androidLightCardFixStyle,
-              {
-                backgroundColor: colors.surfaceRaised,
-                borderColor: colors.cardBorder,
-              },
-            ]}
-            activeOpacity={0.86}
-            onPress={() => setShowHomeBannerSheet(true)}
-          >
-            <View style={[styles.adminHomeBannerRibbonIcon, { backgroundColor: colors.accentSoft }]}>
-              <Icon name="megaphone-outline" size={16} color={colors.onAccent} />
-            </View>
-            <View style={styles.adminHomeBannerRibbonCopy}>
-              <Text style={[styles.adminHomeBannerRibbonTitle, { color: colors.text }]} numberOfLines={1}>
-                {homeBanner.title || homeBanner.body}
-              </Text>
-              {homeBanner.title && homeBanner.body ? (
-                <Text style={[styles.adminHomeBannerRibbonBody, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {homeBanner.body}
-                </Text>
-              ) : null}
-            </View>
-            <Icon name="chevron-forward" size={17} color={colors.accent} />
-            <TouchableOpacity
-              onPress={(event) => {
-                event?.stopPropagation?.();
-                dismissHomeBanner();
-              }}
-              style={[styles.adminHomeBannerRibbonClose, { borderColor: colors.cardBorder }]}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Icon name="close" size={14} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </TouchableOpacity>
-        ) : null}
+
 
         {!showExploreCatalog ? <PremiumTodayOverview
           name={displayData?.name}
@@ -2421,45 +2410,7 @@ const loadHomeData = async (nativeData = null) => {
           </View>
         ) : null}
 
-        {homeBanner ? (
-          <TouchableOpacity
-            style={[
-              styles.adminHomeBannerRibbon,
-              androidLightCardFixStyle,
-              {
-                backgroundColor: colors.surfaceRaised,
-                borderColor: colors.cardBorder,
-              },
-            ]}
-            activeOpacity={0.86}
-            onPress={() => setShowHomeBannerSheet(true)}
-          >
-            <View style={[styles.adminHomeBannerRibbonIcon, { backgroundColor: colors.accentSoft }]}>
-              <Icon name="megaphone-outline" size={16} color={colors.onAccent} />
-            </View>
-            <View style={styles.adminHomeBannerRibbonCopy}>
-              <Text style={[styles.adminHomeBannerRibbonTitle, { color: colors.text }]} numberOfLines={1}>
-                {homeBanner.title || homeBanner.body}
-              </Text>
-              {homeBanner.title && homeBanner.body ? (
-                <Text style={[styles.adminHomeBannerRibbonBody, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {homeBanner.body}
-                </Text>
-              ) : null}
-            </View>
-            <Icon name="chevron-forward" size={17} color={colors.accent} />
-            <TouchableOpacity
-              onPress={(event) => {
-                event?.stopPropagation?.();
-                dismissHomeBanner();
-              }}
-              style={[styles.adminHomeBannerRibbonClose, { borderColor: colors.cardBorder }]}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Icon name="close" size={14} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </TouchableOpacity>
-        ) : null}
+
 
         {/* At-a-Glance Ticker */}
         <View style={[styles.tickerContainer, theme === 'light' && { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -3215,11 +3166,13 @@ const loadHomeData = async (nativeData = null) => {
             {homeBanner?.cta_label && homeBanner?.cta_action !== 'none' ? (
               <TouchableOpacity
                 onPress={handleHomeBannerCta}
+                accessibilityRole="button"
+                accessibilityLabel={homeBanner.cta_action === 'dismiss' ? t('languageModal.close', 'Close') : homeBanner.cta_label}
                 style={[styles.adminHomeBannerSheetCta, { backgroundColor: colors.accent }]}
                 activeOpacity={0.86}
               >
                 <Text style={[styles.adminHomeBannerSheetCtaText, { color: colors.onAccent }]}>
-                  {homeBanner.cta_label}
+                  {homeBanner.cta_action === 'dismiss' ? t('languageModal.close', 'Close') : homeBanner.cta_label}
                 </Text>
                 <Icon name="arrow-forward" size={18} color={colors.onAccent} />
               </TouchableOpacity>
@@ -3464,6 +3417,63 @@ const loadHomeData = async (nativeData = null) => {
       />
 
       </LinearGradient>
+
+      {homeBanner && !isPanditMode && homeTabsVisible ? (
+        <View
+          pointerEvents="box-none"
+          style={[styles.adminHomeBannerFloating, { bottom: tabTotalHeight + 12 + (showTaraDock && !showExploreCatalog ? 80 : 0) }]}
+        >
+          <TouchableOpacity
+            style={styles.adminHomeBannerRibbon}
+            activeOpacity={0.92}
+            accessibilityRole="button"
+            accessibilityLabel={homeBanner.title || homeBanner.body}
+            onPress={() => setShowHomeBannerSheet(true)}
+          >
+            <LinearGradient
+              colors={['#FFF8E7', '#F5DFAB', '#EDD098']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.adminHomeBannerRibbonGradient}
+            >
+              <View style={styles.adminHomeBannerRibbonIcon}>
+                <Icon name="sparkles" size={21} color="#6C3D20" />
+              </View>
+              <View style={styles.adminHomeBannerRibbonCopy}>
+                <Text style={styles.adminHomeBannerRibbonEyebrow}>
+                  {t('home.banner.featured', 'ASTROROSHNI · FEATURED')}
+                </Text>
+                <Text style={styles.adminHomeBannerRibbonTitle} numberOfLines={2}>
+                  {homeBanner.title || homeBanner.body}
+                </Text>
+                {homeBanner.title && homeBanner.body ? (
+                  <Text style={styles.adminHomeBannerRibbonBody} numberOfLines={1}>
+                    {homeBanner.body}
+                  </Text>
+                ) : null}
+                <View style={styles.adminHomeBannerRibbonCta}>
+                  <Text style={styles.adminHomeBannerRibbonCtaText} numberOfLines={1}>
+                    {['dismiss', 'none'].includes(homeBanner.cta_action) ? t('home.banner.details', 'Discover more') : homeBanner.cta_label || t('home.banner.details', 'Discover more')}
+                  </Text>
+                  <Icon name="arrow-forward" size={14} color="#FFF2D3" />
+                </View>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={t('home.banner.dismiss', 'Dismiss announcement')}
+                onPress={(event) => {
+                  event?.stopPropagation?.();
+                  dismissHomeBanner();
+                }}
+                style={styles.adminHomeBannerRibbonClose}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Icon name="close" size={15} color="#6C3D20" />
+              </TouchableOpacity>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {(() => {
         const dockAllowed = !showExploreCatalog
@@ -4080,28 +4090,42 @@ const styles = StyleSheet.create({
   headerDividerWide: {
     height: 36,
   },
-  adminHomeBannerRibbon: {
-    flexDirection: 'row',
+  adminHomeBannerFloating: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    gap: 9,
+    zIndex: 30,
+    elevation: 8,
+  },
+  adminHomeBannerRibbon: {
+    width: '100%',
+    maxWidth: 560,
     borderWidth: 1,
-    borderRadius: 16,
-    minHeight: 52,
-    paddingLeft: 10,
-    paddingRight: 8,
-    paddingVertical: 8,
-    marginHorizontal: 16,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2,
+    borderColor: '#D7AE60',
+    borderRadius: 20,
+    backgroundColor: '#FFF4DA',
+    shadowColor: '#5B321D',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  adminHomeBannerRibbonGradient: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: 19,
+    padding: 13,
   },
   adminHomeBannerRibbonIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: 'rgba(108, 61, 32, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(108, 61, 32, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -4109,22 +4133,50 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  adminHomeBannerRibbonTitle: {
-    fontSize: 13,
+  adminHomeBannerRibbonEyebrow: {
+    color: '#79501F',
+    fontSize: 9,
     fontWeight: '800',
-    lineHeight: 17,
+    letterSpacing: 1.2,
+    marginBottom: 5,
+  },
+  adminHomeBannerRibbonTitle: {
+    color: '#301623',
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 20,
   },
   adminHomeBannerRibbonBody: {
-    marginTop: 1,
+    color: '#65503E',
+    marginTop: 4,
     fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '600',
+    lineHeight: 15,
+    fontWeight: '500',
+  },
+  adminHomeBannerRibbonCta: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#3E1D30',
+  },
+  adminHomeBannerRibbonCtaText: {
+    flexShrink: 1,
+    color: '#FFF2D3',
+    fontSize: 11,
+    fontWeight: '800',
   },
   adminHomeBannerRibbonClose: {
     width: 28,
     height: 28,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(108, 61, 32, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },

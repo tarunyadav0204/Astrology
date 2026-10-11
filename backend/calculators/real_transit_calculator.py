@@ -36,11 +36,12 @@ class RealTransitCalculator:
             'Ketu': swe.TRUE_NODE if self.node_type == 'true' else swe.MEAN_NODE,
         }
 
-    def get_planet_state(self, date: datetime, planet: str) -> Dict:
+    def get_planet_state(self, date: datetime, planet: str, *, exact_time: bool = False) -> Dict:
         """Return a strict, calculation-backed sidereal transit state.
 
         Unlike the legacy convenience methods, this method never converts an
-        ephemeris or input error into ``None``/``False``. Prediction engines
+        ephemeris or input error into ``None``/``False``. ``exact_time=True``
+        preserves midnight for explicitly timestamped snapshots. Prediction engines
         must be able to distinguish a real non-retrograde planet from a failed
         calculation.
         """
@@ -52,7 +53,7 @@ class RealTransitCalculator:
             # callers, while allowing timing engines to supply an exact UTC
             # observation moment (needed especially for the Moon).
             decimal_hour = (
-                12.0 if not (date.hour or date.minute or date.second or date.microsecond)
+                12.0 if not exact_time and not (date.hour or date.minute or date.second or date.microsecond)
                 else date.hour + date.minute / 60.0 + date.second / 3600.0
             )
             jd = swe.julday(date.year, date.month, date.day, decimal_hour)

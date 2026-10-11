@@ -26,6 +26,25 @@ _CATEGORY_VALUES = [
     "litigation", "nakshatra",
 ]
 
+ADAPTIVE_OUTPUT_CONTRACT = """
+QUESTION-LED OUTPUT:
+Choose the response format yourself to satisfy the user's actual request. Use an annotated
+list for matching rules/sutras, a comparison for alternatives, or focused explanations and
+sections appropriate to the task. You may add, combine, rename or reorder sections. Do not
+fall back to the generic Dive Deep report or require a section from every astrology school.
+Simple style explains terms; Technical style preserves technical detail. Both retain the
+requested depth. State the answer directly and use clear Markdown headings where helpful.
+SOURCE SCOPE (takes precedence over every generic layout):
+When the user names a text or method (e.g. BPHS), keep interpretation and rule matching within
+that source unless they request comparison. BPHS requests do not require Jaimini, Nadi or KP
+sections. Use relevant calculators as factual evidence without misattributing their methods
+or claiming every calculator result is a rule in the requested text. For each matching rule,
+explain its conditions, the actual chart placements and qualifications. Distinguish full,
+partial and unverified matches. Never invent sutra wording, chapter/verse citations or claim
+an exhaustive match against a source corpus that you have not searched. If a complete source
+is unavailable, explain that limit briefly and provide the supported matches you can establish.
+""".strip()
+
 # This is deliberately a closed registry.  Luna may select from these stable
 # identifiers, but can never name or execute an arbitrary calculator.
 CAPABILITY_REGISTRY = {
@@ -591,6 +610,8 @@ def _verified_presentation_mode(instant_context):
     window = intent.get('period_window') or {}
     plan = instant_context.get('query_plan') or {}
     mode = str(intent.get('mode') or 'DEFAULT').upper()
+    if mode == 'CUSTOM_READING':
+        return mode
     # A specifically routed event on one date is not an overall daily outlook.
     if mode == 'CHART_DASHA_ANALYSIS' or intent.get('reading_type') == 'chart_dasha_analysis':
         return 'CHART_DASHA_ANALYSIS'
@@ -693,6 +714,12 @@ PREMIUM OUTPUT FORMAT:
         response_start_instruction = 'Start the strongest overall interpretation immediately after the greeting.'
         if presentation_style == 'simple':
             sentiment_instruction = 'Preserve the named chart/system and explicitly requested facts, explaining terms naturally.'
+    if str(intent_mode).upper() in {'CUSTOM_READING', 'DEFAULT'}:
+        output_presentation_instruction = ADAPTIVE_OUTPUT_CONTRACT
+        evidence_density_contract = 'Choose only calculated evidence relevant to the requested task and source.'
+        evidence_depth_instruction = 'Do not require unrelated methods, timing or life areas.'
+        response_start_instruction = 'Start the requested analysis directly after the greeting.'
+    output_presentation_instruction += '\n\n' + 'SOURCE SCOPE' + ADAPTIVE_OUTPUT_CONTRACT.split('SOURCE SCOPE', 1)[1]
     sentiment_instruction += "\n\n" + _verified_sentiment_instruction() + "\n\n" + _verified_emphasis_instruction()
     calculation_depth_requirement = (
         'For a daily reading, inspect the mandatory daily foundations and request additional systems only when relevant. '
@@ -712,6 +739,8 @@ marriage, health, or other consequential questions, also inspect the relevant av
         calculation_depth_requirement = 'Inspect the requested factual source; baseline evidence is sufficient when it directly establishes the fact. Request additional calculations only as needed.'
     if str(intent_mode).upper() in CHART_ANALYSIS_MODES:
         calculation_depth_requirement = 'Inspect the mandatory subject evidence in the approved chart/dasha contract before interpreting; choose independent confirmation according to relevance.'
+    if str(intent_mode).upper() in {'CUSTOM_READING', 'DEFAULT'}:
+        calculation_depth_requirement = 'Inspect the actual chart facts needed to evaluate the requested task or source rules. Choose additional calculators by relevance; do not force unrelated specialist systems.'
     display_name = str(native_name or "").strip()[:80]
     greeting_subject = f"the chart of {display_name}" if display_name else "the user's chart"
     return (
@@ -811,6 +840,9 @@ def _verified_final_writer_instruction(response_style: str, intent_mode: str = "
     """
     from ai.parallel_chat.presentation_style import normalize_merge_response_style
 
+    if str(intent_mode).upper() in {'CUSTOM_READING', 'DEFAULT'}:
+        return ('Write the requested answer now.\n\n' + ADAPTIVE_OUTPUT_CONTRACT
+                + '\nUse clear Markdown ## Heading sections when helpful.\n' + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction())
     if str(intent_mode).upper() == 'PRASHNA':
         from chat.verified_prashna import prashna_contract
         return prashna_contract(normalize_merge_response_style(response_style)) + '\n' + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction()
@@ -895,6 +927,7 @@ async def run_verified_calculator_agent(
     model_name: str,
     timeout_s: float,
     response_style: str = "technical",
+    conversation_mode: bool = False,
     stream_callback: Optional[Callable[[str, str], None]] = None,
     calculation_callback: Optional[Callable[[List[Dict[str, str]]], None]] = None,
 ) -> Dict[str, Any]:
@@ -959,9 +992,9 @@ async def run_verified_calculator_agent(
         }
     baseline_payloads = _capability_payloads(instant_context)
     try:
-        max_calculator_rounds = int(os.getenv("VERIFIED_CHAT_MAX_CALCULATOR_ROUNDS", "8"))
+        max_calculator_rounds = int(os.getenv("INSTANT_CHAT_MAX_CALCULATOR_ROUNDS" if conversation_mode else "VERIFIED_CHAT_MAX_CALCULATOR_ROUNDS", "4" if conversation_mode else "8"))
     except (TypeError, ValueError):
-        max_calculator_rounds = 8
+        max_calculator_rounds = 4 if conversation_mode else 8
     max_calculator_rounds = max(1, min(16, max_calculator_rounds))
     tool_events: List[Dict[str, Any]] = []
     information_rounds: List[Dict[str, Any]] = []
@@ -1021,6 +1054,14 @@ async def run_verified_calculator_agent(
             "strict": True,
         },
     ]
+    if conversation_mode:
+        tools.append({
+            "type": "function", "name": "ask_user",
+            "description": "Ask one focused question when a missing user fact materially affects the reading. Ends this turn; the user can reply in the conversation.",
+            "parameters": {"type": "object", "properties": {"question": {"type": "string"}},
+                           "required": ["question"], "additionalProperties": False},
+            "strict": True,
+        })
     if pair:
         tools[0]['description'] = 'Get labelled core D1/D9, Vimshottari and transit evidence for both actual birth charts plus mutual geometry.'
         for tool in tools[1:]:
@@ -1059,10 +1100,35 @@ async def run_verified_calculator_agent(
         tools[0]['description'] = 'Get the confirmed bounded Muhurat search and evaluated candidate windows.'
     from chat.calculator_menu import CALCULATOR_EVIDENCE_INTEGRITY
     instructions += '\n' + CALCULATOR_EVIDENCE_INTEGRITY
+    if conversation_mode:
+        instructions = (
+            f"You are Luna, an astrology conversation assistant. Write in {language}. "
+            f"Requested answer style: {response_style}. Simple means clear everyday language; "
+            "technical means explain relevant astrological mechanisms and terminology. "
+            "Answer the latest question directly, with a natural conversational structure. "
+            "Keep the response proportionate to the question. Do not force a multi-school report. "
+            "Available deterministic calculators and required inputs:\n"
+            + json.dumps(capability_registry) + "\n" + CALCULATOR_EVIDENCE_INTEGRITY
+        )
+        instructions += """
+You are Luna in a live, two-way conversation. The supplied calculations are starting
+ evidence, not a predetermined answer. Review their interpretation, correct unsupported
+ conclusions, and request additional registered calculators when needed. Use astrological
+ knowledge to interpret actual results; never invent or silently change calculated placements,
+ dates or unavailable outputs. Explain conflicts and uncertainty instead of promising perfection.
+ If a material user fact is missing, call ask_user with one focused question in the user's
+ language. History includes earlier questions and answers: use it to resolve short replies
+ and avoid repeating answered questions. Do not ask unnecessary questions before helping.
+ After inspecting the baseline and additional results, call report_calculation for concise
+ findings supported by results actually inspected. Each summary is a complete sentence in
+ the user language, no newlines, at most 220 characters. Do not expose internal field names.
+ These are public evidence summaries, never private reasoning or chain-of-thought.
+"""
+
     from ai.gemini_chat_analyzer import resolve_openai_reasoning_effort
     effort = resolve_openai_reasoning_effort(model_name, "none")
     reasoning_kwargs = {"reasoning": {"effort": effort}} if effort else {}
-    output_limit = 16384 if model_name.startswith("gpt-4") else 65536
+    output_limit = 8192 if conversation_mode else 16384 if model_name.startswith("gpt-4") else 65536
     sent_chars = len(question) + len(instructions)
     client = AsyncOpenAI(api_key=api_key, timeout=timeout_s)
 
@@ -1154,7 +1220,11 @@ async def run_verified_calculator_agent(
                 source = str(args.get("source") or "")
                 title = _compact_visible_calculation_summary(args.get("title"), limit=90)
                 summary = _compact_visible_calculation_summary(args.get("summary"), limit=260)
-                if source in {"instant_baseline", *capability_registry} and title and summary and (not pair or chart_subject in {"native", "partner", "both"}):
+                inspected_source = source == "instant_baseline" or (
+                    source in calculated and calculated[source] not in (None, {}, [])
+                    and not (isinstance(calculated[source], dict) and calculated[source].get("error"))
+                )
+                if (not conversation_mode or inspected_source) and source in {"instant_baseline", *capability_registry} and title and summary and (not pair or chart_subject in {"native", "partner", "both"}):
                     update_id = f"verified-calculation-{source}" + (f"-{chart_subject}" if pair else "")
                     model_calculations[:] = [row for row in model_calculations if row.get("id") != update_id]
                     if pair:
@@ -1173,6 +1243,10 @@ async def run_verified_calculator_agent(
                     "tool": "report_calculation", "requested": args,
                     "provided": result, "success": bool(result.get("accepted")),
                 })
+                continue
+            if tool_name == "ask_user" and conversation_mode:
+                outputs.append({"type": "function_call_output", "call_id": call_id,
+                                "output": json.dumps({"error": "Ask a nonempty focused question"})})
                 continue
             if capability not in capability_registry:
                 result: Dict[str, Any] = {"error": "unavailable_calculator", "capability_id": capability}
@@ -1232,6 +1306,7 @@ async def run_verified_calculator_agent(
     prior_response_id = str(getattr(first, "id", ""))
     pending_outputs = baseline_outputs
     calculator_rounds_used = 0
+    clarification_question = ""
     for calculator_round in range(1, max_calculator_rounds + 1):
         decision = await send_tool_outputs(prior_response_id, pending_outputs)
         prior_response_id = str(getattr(decision, "id", ""))
@@ -1239,8 +1314,28 @@ async def run_verified_calculator_agent(
         if not requested_calls:
             pending_outputs = []
             break
+        if conversation_mode:
+            for call in requested_calls:
+                if getattr(call, "name", "") == "ask_user":
+                    try:
+                        clarification_question = str(json.loads(call.arguments).get("question") or "").strip()[:1000]
+                    except (ValueError, TypeError, AttributeError):
+                        pass
+                    if clarification_question:
+                        break
+            if clarification_question:
+                break
         calculator_rounds_used = calculator_round
         pending_outputs = await calculate_tool_calls(requested_calls, calculator_round)
+
+    if clarification_question:
+        usage["non_cached_input_tokens"] = max(0, usage["input_tokens"] - usage["cached_tokens"])
+        usage["total_tokens"] = usage["input_tokens"] + usage["output_tokens"]
+        return {"success": True, "response": clarification_question, "message_type": "clarification",
+                "skip_instant_credit_charge": True, "chat_llm_model": model_name,
+                "chat_llm_provider": CHAT_LLM_OPENAI, "token_usage": usage, "prompt_chars": sent_chars,
+                "information_rounds": {"type": "instant", "events": information_rounds},
+                "packet_validation": {"calculation_trace": trace()}}
 
     final_input = list(pending_outputs or [])
     # Make the format request the final user-level instruction. Earlier
@@ -1260,6 +1355,12 @@ async def run_verified_calculator_agent(
             }, ensure_ascii=False, default=str)) if (pair or is_muhurat) else _verified_final_writer_instruction(response_style, intent_mode),
         }],
     })
+    if conversation_mode:
+        final_input[-1]["content"][0]["text"] = (
+            "Answer the latest user question now in the requested language and style. "
+            "Use inspected evidence, correct unsupported interpretations and state material uncertainty. "
+            "Keep it conversational; no mandatory report sections."
+        )
     # This final turn writes only the response. If the round ceiling is reached,
     # its last calculator outputs are still supplied before tool use is disabled.
     remaining = max(1.0, timeout_s - (time.perf_counter() - started))
@@ -1307,7 +1408,7 @@ async def run_verified_calculator_agent(
         "token_usage": usage,
         "elapsed_s": max(0.0, time.perf_counter() - started),
         "prompt_chars": sent_chars,
-        "information_rounds": {"type": "verified", "reading_mode": intent_mode, "max_rounds": max_calculator_rounds, "events": information_rounds},
+        "information_rounds": {"type": "instant" if conversation_mode else "verified", "reading_mode": intent_mode, "max_rounds": max_calculator_rounds, "events": information_rounds},
         "packet_validation": {
             "missing_capabilities": [],
             "calculated_capabilities": [c for c in calculated if c in capability_registry],
@@ -1521,6 +1622,7 @@ def _mode_to_intent_mode(answer_mode: str) -> str:
         "potential_capacity": "ANALYZE_TOPIC_POTENTIAL",
         "location_recommendation": "RECOMMEND_LOCATION",
         "remedy_action": "RECOMMEND_REMEDY_FOR_PROBLEM",
+        "custom_reading": "CUSTOM_READING",
     }.get(answer_mode, "ANALYZE_TOPIC")
 
 
@@ -1543,18 +1645,14 @@ async def classify_verified_question(
     prompt = f"""
 Classify one astrology chat question. Do not answer it and do not use astrology knowledge to infer chart facts.
 Return JSON only.
-Prashna intent: set prashna_intent to explicit, offer, or none. Explicit means the user asks for
-Prashna/horary/a chart of the question moment. Infer offer SEMANTICALLY when the user has a concrete,
-situational concern whose outcome or resolution is naturally assessed from the moment of asking:
-something unresolved, missing, pending, or dependent on a specific current circumstance or decision.
-Judge the underlying concern and its immediacy, not a keyword list or a catalog of example questions.
-The user need not know the word Prashna, request a question-moment method, or lack birth details.
-Having a saved birth chart does not rule out Prashna. Yes/no grammar alone is insufficient:
-distinguish a specific situational uncertainty from a broad natal life pattern or long-term outlook.
-Use none for chart/system explanations, factual natal lookups, overall daily forecasts and general
-natal readings. Understand natural phrasing, paraphrases, implicit intent and all languages.
-A situational question suitable for Prashna is within this astrology chat's scope, even when no
-astrology terminology appears; do not reject it as general knowledge merely for that reason.
+Prashna intent: set prashna_intent to explicit, offer, or none. Use explicit when the user
+requests Prashna, horary or a question-moment chart. Otherwise, use your understanding of
+Prashna to decide whether a question-moment chart is a suitable primary approach and use
+offer when appropriate. Do not offer Prashna merely because a concern is unresolved,
+emotionally important, or phrased as a yes/no question. Respect explicit requests for natal
+analysis or Prashna. When the intended approach is unclear, continue with the birth chart
+unless clarification is necessary. Use none when Prashna is not appropriate. Understand
+the user's intent across natural phrasing and all languages.
 When explicit/offer, user_message must briefly invite the user to select one of the displayed cards.
 For offer, ask them to choose Use Prashna or Continue with my birth chart. For explicit, ask them to
 select the Use Prashna card to continue. Do NOT ask them to type a choice, share a city, provide a
@@ -1603,7 +1701,7 @@ this as a natal two-person question, not an unknown-person/spouse-details lookup
 or request to add the partner chart. Choose the question's topic and timing scope normally.
 METHOD CONTEXT: {json.dumps({'selected': (query_context or {}).get('prashna_choice'), 'scope_choice': (query_context or {}).get('prashna_workflow_choice'), 'selected_question_chart': (query_context or {}).get('prashna'), 'previous_question_chart': (query_context or {}).get('_prashna_previous'), 'pending_clarification_context': (query_context or {}).get('_clarification_context')}, ensure_ascii=False)}
 
-Choose one answer_mode from: {json.dumps(ANSWER_MODES)}.
+Choose one answer_mode from: {json.dumps([*ANSWER_MODES, 'custom_reading'])}.
 Choose one category from: {json.dumps(_CATEGORY_VALUES)}.
 Choose target_subject_key from: {json.dumps(sorted(TARGET_SUBJECTS))}.
 
@@ -1662,6 +1760,11 @@ collect its own constraints. Latest unrelated questions exit Muhurat and use the
 A confirmed request/refinement card is an explicit Muhurat request; use its original question and fields.
 MUHURAT CONTEXT: {json.dumps({k:(query_context or {}).get(k) for k in ('muhurat_request','_muhurat_previous','muhurat_choice')}, ensure_ascii=False)}
 For all other contracts use reading_type default.
+If the task does not fit a defined contract, select custom_reading and let the writer choose
+its structure. Requests for rules/sutras matching a chart, named-source catalogs (BPHS),
+method-specific studies and unusual comparisons use custom_reading. Do not force topic_reading,
+Dive Deep or a multi-school report merely because the task concerns a chart.
+An explicit text/method scope overrides generic multi-school presentation.
 Factual routing: a requested placement, house lord, chart position, nakshatra, retrograde/combustion
 status, strength value, yoga presence or dasha schedule uses factual_chart_lookup. "Which dashas run
 during 2027?" is factual, while "What will those dashas bring during 2027?" is timing_window.
@@ -1737,7 +1840,7 @@ Schema:
     if action not in {"answer", "clarify", "handoff", "ack", "out_of_scope"}:
         action = "answer"
     answer_mode = str(parsed.get("answer_mode") or "topic_reading").strip()
-    if answer_mode not in ANSWER_MODES:
+    if answer_mode not in {*ANSWER_MODES, 'custom_reading'}:
         # The classifier occasionally mirrors route_action into answer_mode
         # (for example, answer_mode="out_of_scope"). Route actions are still
         # useful and must never turn a user-visible boundary reply into a 500.

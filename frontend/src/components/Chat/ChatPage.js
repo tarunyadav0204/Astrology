@@ -1,5 +1,6 @@
+import { askOverConversation, takeConversationStream, closeConversations } from '../../utils/instantConversation';
 import { appendConflictResolution } from '../../hooks/useConflictResolution';
-import { applyInstantProgress, buildImmediateChartPreview, mergeChartContext } from '../../utils/instantProgress';
+import { applyVerifiedCalculationProgress, applyInstantProgress, buildImmediateChartPreview, mergeChartContext } from '../../utils/instantProgress';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import MessageList from './MessageList';
@@ -32,7 +33,6 @@ import {
     getInstantReplyPieceDelay,
     getInstantLoaderMaxWords,
     INSTANT_REPLY_FIRST_PIECE_MS,
-    shouldPaceInstantAnswer,
     splitInstantReply,
 } from '../../constants/instantChatLoader';
 import '../Shared/nativeSelectorChip.css';
@@ -420,6 +420,7 @@ const ChatPage = ({ onLogin }) => {
     }, [hasInstantTypingMessage]);
 
     useEffect(() => () => {
+        closeConversations();
         instantRevealTimersRef.current.forEach((timer) => clearTimeout(timer));
         instantRevealTimersRef.current.clear();
         instantRevealActiveRef.current.clear();
@@ -1786,11 +1787,9 @@ const ChatPage = ({ onLogin }) => {
                     };
                     fetchBalance();
 
-                    const paceReply = shouldPaceInstantAnswer({
-                        chatTier: responseIsInstant ? 'instant' : status.chat_tier || status.chatTier,
-                        messageType: mt,
-                        content: raw,
-                    });
+                    // The live provider stream is already visible; do not replay
+                    // a completed answer through an artificial reveal timer.
+                    const paceReply = false;
                     const revealKey = String(processingClientId || assistantMessageId || '');
                     if (paceReply && !instantRevealActiveRef.current.has(revealKey)) {
                         revealInstantReply(processingClientId, assistantMessageId, content, () => {
@@ -1833,12 +1832,13 @@ const ChatPage = ({ onLogin }) => {
                         prev.map((m) => {
                             if (m.processingClientId !== processingClientId) return m;
                             const streamingTier = String(status.chat_tier || status.chatTier || m.chatTier || '').toLowerCase();
+                            if (['instant', 'verified'].includes(streamingTier)) m = applyVerifiedCalculationProgress(m, status.engagement_updates);
                             if (['instant', 'verified'].includes(streamingTier) && String(status.partial_content || '').trim()) {
                                 return applyInstantProgress({ ...m, chatTier: streamingTier }, {
                                     partial_content: status.partial_content, replace: true,
                                 });
                             }
-                            if (streamingTier === 'verified' && m.instantStreaming && String(m.content || '').trim()) return m;
+                            if (['instant', 'verified'].includes(streamingTier) && m.instantStreaming && String(m.content || '').trim()) return m;
                             if (String(m.chatTier || '').toLowerCase() === 'instant') {
                                 // Polling still reports `processing` until the first
                                 // real answer arrives. Preserve the visible wait state;
@@ -1934,10 +1934,10 @@ const ChatPage = ({ onLogin }) => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const url = `${protocol}//${window.location.host}/api/chat-v2/stream/${assistantMessageId}?token=${encodeURIComponent(token)}`;
         let completed = false;
-        let opened = false;
+        let opened = Boolean(takeConversationStream(assistantMessageId));
         let socket;
         try {
-            socket = new WebSocket(url);
+            socket = takeConversationStream(assistantMessageId) || new WebSocket(url);
         } catch (error) {
             reject(error);
             return;
@@ -1961,8 +1961,12 @@ const ChatPage = ({ onLogin }) => {
             } catch (_) {
                 return;
             }
-            if (payload.type === 'content_delta' || payload.type === 'preview') {
-                // Chart facts stay out of the reply. The answer is paced in after it is complete.
+            if (payload.type === 'progress' || payload.type === 'content_delta') {
+                setMessages(prev => prev.map(m => m.processingClientId === processingClientId
+                    ? payload.type === 'progress'
+                        ? applyVerifiedCalculationProgress(m, payload.engagement_updates)
+                        : applyInstantProgress(m, { content: payload.content, replace: payload.replace })
+                    : m));
                 return;
             }
             if (payload.type === 'completed') {
@@ -2111,6 +2115,7 @@ const ChatPage = ({ onLogin }) => {
 
         let askSessionId = currentSessionId;
         const requestData = {
+            client_request_id: processingClientId,
             session_id: askSessionId,
             question: questionForApi,
             query_context: buildQueryContext({
@@ -2183,7 +2188,7 @@ const ChatPage = ({ onLogin }) => {
                 chat_tier: requestData.chat_tier || 'standard',
                 query_context: requestData.query_context || null,
             });
-            let response = await fetch('/api/chat-v2/ask', {
+            const submitHttp = () => fetch('/api/chat-v2/ask', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -2191,6 +2196,10 @@ const ChatPage = ({ onLogin }) => {
                 },
                 body: JSON.stringify(requestData),
             });
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            let response = useInstantChat
+                ? await askOverConversation(`${wsProtocol}//${window.location.host}/api/chat-v2/conversation`, token, requestData, submitHttp)
+                : await submitHttp();
 
             if (!response.ok) {
                 let t = await response.text().catch(() => '');

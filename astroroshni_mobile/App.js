@@ -1,3 +1,4 @@
+import ToastProvider from './src/components/Common/ToastProvider';
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 import { DefaultTheme, NavigationContainer, getPathFromState, getStateFromPath } from '@react-navigation/native';
@@ -1019,6 +1020,7 @@ export default function App() {
         <ThemeProvider initialTheme={initialTheme} initialPanditMode={initialPanditMode}>
         <WebAlertProvider>
         <ThemedAppBackground>
+        <ToastProvider>
         <Animated.View
           style={{
             flex: 1,
@@ -1431,6 +1433,7 @@ export default function App() {
       </CreditProvider>
       </ErrorProvider>
         </Animated.View>
+        </ToastProvider>
         </ThemedAppBackground>
         </WebAlertProvider>
       </ThemeProvider>

@@ -933,6 +933,13 @@ def _chat_stream_user(token: str) -> User:
     )
 
 
+@router.websocket("/conversation")
+async def instant_conversation_socket(websocket: WebSocket):
+    from chat_history.conversation_transport import serve_conversation
+    await serve_conversation(websocket, authenticate=_chat_stream_user, token=_chat_stream_token,
+                             ask=ask_question_async, relay=stream_message_status)
+
+
 @router.websocket("/stream/{message_id}")
 async def stream_message_status(websocket: WebSocket, message_id: int):
     """Relay durable Instant Chat Gemini deltas across workers and VM instances."""
@@ -946,6 +953,7 @@ async def stream_message_status(websocket: WebSocket, message_id: int):
 
     last_content = ""
     last_preview = None
+    last_updates = None
     last_heartbeat = time.monotonic()
     started = time.monotonic()
     try:
@@ -973,6 +981,14 @@ async def stream_message_status(websocket: WebSocket, message_id: int):
                 await websocket.close(code=4403)
                 return
 
+            try:
+                updates = json.loads(preview_updates) if isinstance(preview_updates, str) else preview_updates
+            except (TypeError, ValueError):
+                updates = []
+            updates = [item for item in (updates or []) if isinstance(item, dict) and item.get("type") == "calculation"] if isinstance(updates, list) else []
+            if updates and updates != last_updates:
+                await websocket.send_json({"type": "progress", "message_id": message_id, "engagement_updates": updates})
+                last_updates = updates
             preview = read_instant_preview(preview_updates)
             if status == "processing" and preview and preview != last_preview:
                 await websocket.send_json({"type": "preview", "message_id": message_id, "preview": preview})
@@ -2081,6 +2097,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     )
 
     instant_chat_requested = requested_chat_tier == "instant"
+    if instant_chat_requested and not (request.get("speech_chat") or request.get("speechChat")):
+        from chat.calculator_first import select_instant_path
+        try:
+            select_instant_path(request.get("instant_path") or raw_query_context.get("instant_path"))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     verified_chat_requested = requested_chat_tier == "verified"
     instant_timeline_selection = bool(
         str(raw_query_context.get("follow_up_type") or "").strip().lower()
@@ -2889,6 +2911,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     worker_intent_metadata = {
         "query_context": raw_query_context,
     }
+    if effective_chat_tier == "instant" and not speech_chat_requested:
+        from chat.calculator_first import select_instant_path
+        worker_intent_metadata["instant_path"] = select_instant_path(
+            request.get("instant_path") or raw_query_context.get("instant_path"))
+
     if trusted_fomo_chat_context:
         worker_intent_metadata["fomo_chat_context"] = trusted_fomo_chat_context
     logger.info(
@@ -3041,6 +3068,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         "expectedWaitSeconds": get_chat_countdown_seconds(effective_chat_tier),
         "chart_insights": chart_insights,
         "instant_billing": instant_billing_state,
+        "instant_path": worker_intent_metadata.get("instant_path"),
     }
 
 
@@ -3862,6 +3890,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             question_chars=len(question or ""),
         )
         is_speech_chat = bool(speech_chat_requested or speech_chat_billing)
+        from chat.calculator_first import CALCULATOR_FIRST, select_instant_path
+        is_calculator_first = bool(is_instant_chat and not is_speech_chat and
+            select_instant_path((cached_intent or {}).get("instant_path") or
+                ((cached_intent or {}).get("query_context") or {}).get("instant_path")) == CALCULATOR_FIRST)
         if is_instant_chat or is_speech_chat:
             logger.info(
                 "SPEECH_DEBUG chat_worker_started user_id=%s message_id=%s session_id=%s chat_tier=%s speech_requested=%s speech_billing=%s question=%r",
@@ -3899,7 +3931,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             _release_free_question_if_reserved(using_free_question, user_id, birth_details)
             return
 
-        non_astrology_response = _non_astrology_scope_response(question, language)
+        non_astrology_response = None if is_calculator_first else _non_astrology_scope_response(question, language)
         if non_astrology_response:
             with get_conn() as conn:
                 execute(
@@ -3996,6 +4028,9 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             has_timezone=bool(birth_data.get("timezone")),
         )
         
+        if is_calculator_first:
+            birth_data = {**birth_details, **birth_data}
+
         if is_verified_chat and partnership_mode:
             birth_data = {**birth_details, **birth_data}
             partner = partner_birth_details or {}
@@ -4018,7 +4053,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 raise Exception("Partner birth time cannot be empty for partnership analysis")
         
         # Build context
-        context_builder = ChatContextBuilder()
+        context_builder = None if is_calculator_first else ChatContextBuilder()
         
         history_state_start = time.time()
         chat_state = _load_chat_history_and_state(session_id)
@@ -4041,6 +4076,9 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         intent_router_ms = None  # set after intent when not partnership_mode
         
         intent = {'status': 'READY', 'mode': 'birth', 'category': 'general', 'extracted_context': {}}  # Default
+        query_context = (cached_intent or {}).get('query_context') or {}
+        if is_calculator_first:
+            intent.update({'mode': 'CALCULATOR_FIRST', 'query_context': query_context})
         # Merged clarification chain (e.g. "eating habits" + "in general"); used for all generation below.
         combined_question = question
         trusted_fomo_context = (
@@ -4053,7 +4091,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
 
         fomo_chat_active = is_supported_fomo_chat_context(trusted_fomo_context)
 
-        if not partnership_mode or is_verified_chat:
+        if (not partnership_mode or is_verified_chat) and not is_calculator_first:
             intent_router = IntentRouter()
             cached_delivery_channel = (
                 str(cached_intent.get("delivery_channel") or "").strip().lower()
@@ -5017,7 +5055,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         
         # Generate response
         try:
-            analyzer = GeminiChatAnalyzer()
+            analyzer = None if is_calculator_first else GeminiChatAnalyzer()
         except Exception as init_error:
             from utils.error_logger import log_chat_error
             log_chat_error(user_id, birth_data.get('name', 'Unknown'), '', init_error, question, birth_data, 'backend')
@@ -5128,10 +5166,12 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 response_validation_enabled_override=False if is_verified_chat else None,
                 model_name_override=get_verified_chat_model() if is_verified_chat else None,
                 provider_override="openai" if is_verified_chat else None,
+                calculator_first=is_calculator_first,
+                instant_conversation=is_instant_chat and not is_speech_chat and os.getenv("INSTANT_CHAT_CONVERSATION_ENABLED", "true").lower() in {"true", "1", "yes"},
                 verified_evidence_review=is_verified_chat,
                 verified_partner_birth_data=partner_birth_details if is_verified_chat and partnership_mode else None,
                 verified_calculation_callback=(
-                    _persist_verified_calculation_trace if is_verified_chat else None
+                    _persist_verified_calculation_trace if is_verified_chat or is_instant_chat else None
                 ),
             )
             graph_fallback_error = result.get("graph_fallback_error")
@@ -5240,6 +5280,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 intent if isinstance(intent, dict) else {},
                 combined_question=combined_question,
             )
+            if is_verified_chat:
+                from chat.verified_followups import add_verified_followups
+                result = await add_verified_followups(result, analyzer=analyzer,
+                    question=question, intent=intent, language=language,
+                    remedy_followup_active=remedy_active)
             before_guard_action_type = str((result.get("next_action") or {}).get("type") or "")
             cleaned_response, cleaned_action, cleared_followups = apply_normal_answer_remedy_guards(
                 content=str(result.get("response") or ""),
@@ -5398,6 +5443,9 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         answer_gate_metadata["instant_preview"] = result["instant_preview"]
 
                     answer_gate_metadata = dict(answer_gate_metadata or {})
+                    if result.get("instant_path"):
+                        answer_gate_metadata["instant_path"] = result["instant_path"]
+                        answer_gate_metadata["experiment_metrics"] = result.get("experiment_metrics") or {}
                     routed_intent = cached_intent if isinstance(cached_intent, dict) else {}
                     audit_mode = (result.get('information_rounds') or {}).get('reading_mode')
                     answer_gate_metadata['reading_mode'] = audit_mode or routed_intent.get('mode') or intent.get('mode')
@@ -5427,7 +5475,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                         answer_gate_metadata['workflow_changed'] = bool(intent.get('reading_transition') == 'natal' and ((query_context or {}).get('_prashna_previous') or (cached_intent or {}).get('query_context', {}).get('prashna')))
 
 
-                    if is_verified_chat and result.get('information_rounds'):
+                    if is_deterministic_chat and result.get('information_rounds'):
                         from chat.calculation_audit import store_audit
                         store_audit(conn, message_id, result.pop('information_rounds'))
 
@@ -5582,7 +5630,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             summary_image,  # Store as string URL, not JSON
                             json.dumps(follow_up_questions),
                             "completed",
-                            "answer",
+                            "clarification" if result.get("message_type") == "clarification" else "answer",
                             datetime.now(),
                             language,
                             intent_router_ms,
@@ -5598,6 +5646,18 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             message_id,
                         ),
                     )
+                    if is_calculator_first and result.get("message_type") != "clarification":
+                        execute(conn, "UPDATE conversation_state SET clarification_count = 0 WHERE session_id = %s", (session_id,))
+                    if result.get("message_type") == "clarification":
+                        # Persist the pending turn so a short reply is routed with
+                        # its original question, including across reconnects.
+                        execute(conn, """
+                            INSERT INTO conversation_state (session_id, clarification_count, extracted_context)
+                            VALUES (%s, 1, %s)
+                            ON CONFLICT (session_id) DO UPDATE SET
+                                clarification_count = conversation_state.clarification_count + 1,
+                                last_updated = CURRENT_TIMESTAMP
+                        """, (session_id, json.dumps(session_extracted or {})))
                     try:
                         from ai.prediction_anchor import (
                             merge_anchor_candidates,
@@ -5616,7 +5676,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                             lifespan_timing_evidence=result.get("lifespan_timing_evidence"),
                             message_id=int(message_id) if message_id is not None else None,
                         )
-                        if anchor:
+                        if anchor and result.get("message_type") != "clarification":
                             cur = execute(
                                 conn,
                                 "SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = %s",

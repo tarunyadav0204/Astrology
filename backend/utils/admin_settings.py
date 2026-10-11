@@ -1572,7 +1572,7 @@ DEFAULT_HOME_SCREEN_BANNER: Dict[str, Any] = {
     "title": "",
     "body": "",
     "cta_label": "",
-    "cta_action": "dismiss",  # dismiss | credits | chat | url | none
+    "cta_action": "dismiss",  # dismiss | credits | chat | standard | premium | instant | speech | verified_technical | verified_simple | yearly_events | karma_analysis | partner_portrait | url | none
     "cta_url": "",
     "frequency": "always",  # always | every_x_days
     "interval_days": 7,
@@ -1607,7 +1607,7 @@ def get_home_screen_banner() -> Dict[str, Any]:
     out["body"] = str(parsed.get("body") or "").strip()
     out["cta_label"] = str(parsed.get("cta_label") or "").strip()
     cta_action = str(parsed.get("cta_action") or "dismiss").strip().lower()
-    if cta_action not in ("dismiss", "credits", "chat", "url", "none"):
+    if cta_action not in ("dismiss", "credits", "chat", "standard", "premium", "instant", "speech", "verified_technical", "verified_simple", "yearly_events", "karma_analysis", "partner_portrait", "url", "none"):
         cta_action = "dismiss"
     out["cta_action"] = cta_action
     out["cta_url"] = str(parsed.get("cta_url") or "").strip()

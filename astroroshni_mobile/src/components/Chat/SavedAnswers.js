@@ -1,3 +1,5 @@
+import { useToast } from '../Common/ToastProvider';
+import { useTranslation } from 'react-i18next';
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import AppAlertModal from '../Common/AppAlertModal';
@@ -14,13 +16,15 @@ async function request(path = '', method = 'GET', signal) {
   return response.json();
 }
 export function SaveAnswerButton({ message, style }) {
+  const showToast = useToast();
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const id = Number(message.messageId || message.message_id);
   const eligible = Number.isInteger(id) && id > 0 && (message.role || message.sender) === 'assistant' && !message.isTyping && !message.isProcessing && !message.instantStreaming && !message.isWelcome && (!message.message_type || message.message_type === 'answer') && Boolean(message.content);
   const [saved, setSaved] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   useEffect(() => { if (!eligible) return; const controller = new AbortController(); request(`/${id}`, 'GET', controller.signal).then(data => setSaved(data.saved)).catch(() => {}); return () => controller.abort(); }, [id, eligible]);
   if (!eligible) return null;
-  return <><TouchableOpacity accessibilityRole="button" accessibilityLabel={saved ? 'Remove saved answer' : 'Save answer'} accessibilityState={{ selected: saved, disabled: busy }} disabled={busy} style={[{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }, style, saved && { backgroundColor: colors.surfaceMuted, borderColor: colors.primary }]} onPress={async () => { setBusy(true); try { const data = await request(`/${id}`, saved ? 'DELETE' : 'PUT'); setSaved(data.saved); } catch (err) { setError(err.message); } finally { setBusy(false); } }}><Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={16} color={colors.primary} /></TouchableOpacity><AppAlertModal visible={Boolean(error)} title="Saved answers" message={error} variant="error" onPrimaryPress={() => setError('')} onRequestClose={() => setError('')} /></>;
+  return <><TouchableOpacity accessibilityRole="button" accessibilityLabel={saved ? 'Remove saved answer' : 'Save answer'} accessibilityState={{ selected: saved, disabled: busy }} disabled={busy} style={[{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }, style, saved && { backgroundColor: colors.surfaceMuted, borderColor: colors.primary }]} onPress={async () => { setBusy(true); try { const data = await request(`/${id}`, saved ? 'DELETE' : 'PUT'); setSaved(data.saved); showToast(data.saved ? t('chat.messageBookmarked', 'Message bookmarked') : t('chat.messageBookmarkRemoved', 'Bookmark removed')); } catch (err) { setError(err.message); } finally { setBusy(false); } }}><Ionicons name={saved ? 'bookmark' : 'bookmark-outline'} size={16} color={colors.primary} /></TouchableOpacity><AppAlertModal visible={Boolean(error)} title="Saved answers" message={error} variant="error" onPrimaryPress={() => setError('')} onRequestClose={() => setError('')} /></>;
 }
 const plain = text => String(text || '').replace(/<[^>]*>/g, '').replace(/(?:【|\[)(?:POS|NEG)_(?:START|END)(?:】|\])/gi, '').replace(/\*\*/g, '').replace(/^#{1,6}\s*/gm, '');
 export default function SavedAnswers({ navigation }) {
