@@ -26,13 +26,8 @@
 
 .admin-content-wrapper {
   padding: 28px 20px 24px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-/* Chat history tab: wider canvas for reading long assistant replies */
-.admin-content-wrapper--chat-wide {
   max-width: min(1600px, 100%);
+  margin: 0 auto;
 }
 
 .admin-content--chat {

@@ -1425,8 +1425,8 @@ function MessageBubble({
             key={`bold-${keyPrefix}-${boldIndex}`}
             style={[
               styles.boldText,
-              baseTextStyle,
               { color: colors.text },
+              baseTextStyle,
               message.role === 'user' && styles.userText,
               message.role === 'user' && { fontWeight: '700' },
               tone,
@@ -1446,8 +1446,8 @@ function MessageBubble({
                 key={`italic-${keyPrefix}-${boldIndex}-${italicIndex}`}
                 style={[
                   styles.regularText,
-                  baseTextStyle,
                   { color: colors.text },
+                  baseTextStyle,
                   { fontStyle: 'italic' },
                   message.role === 'user' && styles.userText,
                   tone,
@@ -1558,7 +1558,7 @@ function MessageBubble({
 
   const renderTextWithBold = (text, startIndex, role, baseTextStyle) => {
     const textStyle = baseTextStyle
-      ? [styles.regularText, baseTextStyle, { color: colors.text }, message.role === 'user' && styles.userText]
+      ? [styles.regularText, { color: colors.text }, baseTextStyle, message.role === 'user' && styles.userText]
       : [styles.regularText, { color: colors.text }, message.role === 'user' && styles.userText];
     const raw = (text || '');
     const lines = raw.split('\n');

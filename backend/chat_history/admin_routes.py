@@ -4031,3 +4031,101 @@ async def get_information_rounds(message_id: int, current_user: dict = Depends(r
     if payload is None:
         raise HTTPException(status_code=404, detail='Answer not found')
     return {'available': bool(payload), 'audit': payload or {}}
+
+
+def _chat_tool_cost(state: Dict[str, Any], fx: float) -> Dict[str, Any]:
+    """Only price measured tokens; old unrecorded summaries remain unknown."""
+    if state.get('cached'):
+        return dict(cost_usd=0.0, cost_inr=0.0, cost_basis='cache_hit', usage=state.get('usage'))
+    usage = state.get('usage')
+    model = state.get('model')
+    if not isinstance(usage, dict) or not model:
+        return dict(cost_usd=None, cost_inr=None, cost_basis='not_recorded', usage=usage)
+    input_tokens = max(0, int(usage.get('input_tokens') or 0))
+    cached_tokens = min(input_tokens, max(0, int(usage.get('cached_tokens') or 0)))
+    output_tokens = max(0, int(usage.get('output_tokens') or 0))
+    if input_tokens + output_tokens == 0:
+        return dict(cost_usd=0.0, cost_inr=0.0, cost_basis='no_model_usage', usage=usage)
+    # Both tools currently use OpenAI; never substitute Gemini fallback prices.
+    rates = openai_rate_usd_per_million(model)
+    if rates is None and model in _CHAT_MODEL_RATE_USD_PER_1M:
+        rates = _resolve_model_rate(model, input_tokens)
+    if rates is None:
+        return dict(cost_usd=None, cost_inr=None, cost_basis='model_rate_unavailable', usage=usage)
+    cost = ((input_tokens-cached_tokens)*rates['input'] + cached_tokens*float(rates.get('cached_input',rates['input'])) + output_tokens*rates['output'])/1_000_000
+    return dict(cost_usd=cost, cost_inr=cost*fx, cost_basis='measured_tokens_estimate', usage=usage,
+                rates_usd_per_million=rates)
+
+
+def _chat_tool_item(row: Any, fx: float) -> Dict[str, Any]:
+    state = row[4] if isinstance(row[4], dict) else json.loads(row[4] or '{}')
+    phase = state.get('phase') or 'unknown'
+    if state.get('last_error') and phase != 'completed':
+        phase = 'failed'
+    return dict(id=row[0], user_id=row[1], session_id=row[2], tool=row[3],
+                user_name=row[7] or 'Unknown user', created_at=row[5], updated_at=row[6],
+                status=phase, model=state.get('model'), provider_model=state.get('provider_model'),
+                cached=bool(state.get('cached')), legacy=bool(state.get('legacy')),
+                sources=state.get('sources') or [], concern=state.get('concern'),
+                result=state.get('summary') or state.get('content'), resolution=state.get('resolution'),
+                rounds=state.get('rounds'), elapsed_ms=state.get('elapsed_ms'),
+                question=state.get('question'), events=state.get('events') or [],
+                error_type=state.get('error_type') or (state.get('last_error') or {}).get('type'),
+                language=state.get('language'), message_id=state.get('message_id'),
+                **_chat_tool_cost(state, fx))
+
+
+@router.get('/admin/chat/tool-activity')
+async def get_admin_chat_tool_activity(
+    page: int = Query(1, ge=1), limit: int = Query(30, ge=1, le=100),
+    tool: Optional[str] = Query(None, pattern='^(summary|conflict_resolution)$'),
+    user_id: Optional[int] = Query(None, ge=1), user_name: Optional[str] = Query(None, max_length=100),
+    start_date: Optional[str] = Query(None, pattern=r'^\d{4}-\d{2}-\d{2}$'),
+    end_date: Optional[str] = Query(None, pattern=r'^\d{4}-\d{2}-\d{2}$'),
+    current_user=Depends(require_admin),
+):
+    from datetime import date
+    from chat.tool_activity import ensure_table
+    from chat.conflict_routes import ensure_table as ensure_conflicts
+    for value in (start_date, end_date):
+        if value:
+            try:
+                date.fromisoformat(value)
+            except ValueError:
+                raise HTTPException(422, 'Invalid date')
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(422, 'Start date must precede end date')
+    with get_conn() as conn:
+        ensure_table(conn)
+        ensure_conflicts(conn)
+        conn.commit()
+        parts = ["SELECT id,user_id,session_id,tool,state,created_at,updated_at FROM chat_tool_activity",
+                 "SELECT id,user_id,session_id,'conflict_resolution' AS tool,state,created_at,updated_at FROM chat_conflict_resolutions"]
+        if execute(conn, "SELECT to_regclass('chat_selected_summaries')", ()).fetchone()[0]:
+            parts.append("""SELECT 'legacy-summary:' || user_id::text || ':' || fingerprint AS id,user_id,NULL::text AS session_id,
+                'summary' AS tool,jsonb_build_object('phase','completed','legacy',true,'summary',summary,'sources','[]'::jsonb) AS state,
+                created_at AT TIME ZONE 'UTC',created_at AT TIME ZONE 'UTC'
+                FROM chat_selected_summaries old WHERE NOT EXISTS (
+                  SELECT 1 FROM chat_tool_activity a WHERE a.user_id=old.user_id AND a.tool='summary'
+                    AND a.state->>'fingerprint'=old.fingerprint AND a.state->>'phase'='completed'
+                    AND COALESCE(a.state->>'cached','false')='false')""")
+        cte = 'WITH activity AS (' + ' UNION ALL '.join(parts) + ') '
+        where, params = [], []
+        if tool:
+            where.append('a.tool=%s'); params.append(tool)
+        if user_id:
+            where.append('a.user_id=%s'); params.append(user_id)
+        if user_name:
+            where.append("COALESCE(u.name,'') ILIKE %s"); params.append(_build_ilike_pattern(user_name))
+        if start_date:
+            where.append("a.created_at >= %s::date AT TIME ZONE 'UTC'"); params.append(start_date)
+        if end_date:
+            where.append("a.created_at < (%s::date + INTERVAL '1 day') AT TIME ZONE 'UTC'"); params.append(end_date)
+        joined = ' FROM activity a JOIN users u ON u.userid=a.user_id' + (' WHERE ' + ' AND '.join(where) if where else '')
+        total = execute(conn, cte+'SELECT COUNT(*)'+joined, tuple(params)).fetchone()[0]
+        rows = execute(conn, cte+'''SELECT a.id,a.user_id,a.session_id,a.tool,a.state,a.created_at,a.updated_at,u.name'''+joined+
+                       ' ORDER BY a.created_at DESC,a.id DESC LIMIT %s OFFSET %s', tuple(params)+(limit,(page-1)*limit)).fetchall()
+    fx = _usd_to_inr_rate()
+    return dict(items=[_chat_tool_item(row,fx) for row in rows], total=total, page=page,
+                total_pages=max(1,(total+limit-1)//limit), usd_to_inr=fx,
+                cost_note='Estimates use measured input, cached-input and output tokens with configured model rates. Historical summaries may lack source messages and usage.')

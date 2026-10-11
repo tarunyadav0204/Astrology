@@ -2,6 +2,8 @@ import hashlib
 import json
 import os
 import re
+import time
+from chat.tool_activity import begin_summary, update_summary, response_usage
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from auth import get_current_user
@@ -54,14 +56,24 @@ async def summarize_answers(request: SummaryRequest, current_user=Depends(get_cu
             fingerprint TEXT NOT NULL, summary TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (user_id, fingerprint))''', ())
+        state = dict(phase='processing', sources=[{**source, 'session_id': rows[0][3]} for source in sources],
+                     model=model_name, language=request.language, fingerprint=fingerprint,
+                     cached=False, usage=None)
+        activity_id = begin_summary(conn, current_user.userid, rows[0][3], state)
+        started = time.monotonic()
         # A transaction lock prevents duplicate model calls across API workers.
         execute(conn, 'SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))', (f'{current_user.userid}:{fingerprint}',))
         cached = execute(conn, 'SELECT summary FROM chat_selected_summaries WHERE user_id = %s AND fingerprint = %s', (current_user.userid, fingerprint)).fetchone()
         if cached:
+            state.update(phase='completed', summary=cached[0], cached=True, usage=dict(input_tokens=0,output_tokens=0,cached_tokens=0), elapsed_ms=round((time.monotonic()-started)*1000))
+            update_summary(conn, activity_id, state)
             conn.commit()
             return {'summary': cached[0], 'count': len(rows), 'cached': True}
         key = os.getenv('OPENAI_API_KEY')
         if not key:
+            state.update(phase='failed', error_type='ProviderUnavailable')
+            update_summary(conn, activity_id, state)
+            conn.commit()
             raise HTTPException(503, 'Summaries are temporarily unavailable')
         try:
             from openai import AsyncOpenAI
@@ -77,11 +89,18 @@ timing discussed (only if present), unresolved issues or conflicting answers (on
 and next steps already discussed (only if present). Keep the summary under 350 words.
 Do not mention internal metadata or chart transport tokens.''',
                     input=payload, max_output_tokens=1400, store=False)
+            state['usage'] = response_usage(response)
+            state['provider_model'] = getattr(response, 'model', None) or model_name
             summary = response.output_text.strip()
             if not summary or getattr(response, 'status', 'completed') != 'completed':
                 raise ValueError('Incomplete summary')
-        except Exception:
+        except Exception as exc:
+            state.update(phase='failed', error_type=type(exc).__name__, elapsed_ms=round((time.monotonic()-started)*1000))
+            update_summary(conn, activity_id, state)
+            conn.commit()
             raise HTTPException(502, 'Could not generate the summary. Please try again.')
         execute(conn, 'INSERT INTO chat_selected_summaries (user_id, fingerprint, summary) VALUES (%s, %s, %s)', (current_user.userid, fingerprint, summary))
+        state.update(phase='completed', summary=summary, elapsed_ms=round((time.monotonic()-started)*1000))
+        update_summary(conn, activity_id, state)
         conn.commit()
     return {'summary': summary, 'count': len(rows), 'cached': False}

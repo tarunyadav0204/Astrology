@@ -1,3 +1,4 @@
+import AdminChatToolActivity from './AdminChatToolActivity';
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminService, getAdminAuthHeaders, getDeviceId } from '../../services/adminService';
@@ -3516,9 +3517,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         {navigationHeaderNode}
         <div className="admin-panel">
         <div
-          className={`admin-content-wrapper${
-            activeTab === 'chat' ? ' admin-content-wrapper--chat-wide' : ''
-          }`}
+          className="admin-content-wrapper"
         >
           {deviceAccessStatus === 'pending' && (
             <div className="admin-device-check">
@@ -3582,9 +3581,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       {navigationHeaderNode}
       <div className="admin-panel">
         <div
-          className={`admin-content-wrapper${
-            activeTab === 'chat' ? ' admin-content-wrapper--chat-wide' : ''
-          }`}
+          className="admin-content-wrapper"
         >
       <div className="admin-tabs">
         <button 
@@ -3932,6 +3929,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             onClick={() => setActiveSubTab('history')}
           >
             History
+          </button>
+          <button type="button" className={`subtab ${activeSubTab === 'toolActivity' ? 'active' : ''}`} onClick={() => setActiveSubTab('toolActivity')}>
+            Chat Tools Activity
           </button>
           <button
             type="button"
@@ -4734,6 +4734,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             )}
           </div>
         )}
+
+        {activeTab === 'chat' && activeSubTab === 'toolActivity' && (<AdminChatToolActivity />)}
 
         {activeTab === 'chat' && activeSubTab === 'history' && (
           <AdminChatHistory />

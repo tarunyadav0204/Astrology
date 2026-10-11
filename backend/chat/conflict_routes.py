@@ -343,6 +343,7 @@ async def conflict_socket(websocket: WebSocket, run_id: str):
         return
     owner = str(uuid.uuid4())
     model = None
+    state = None
     try:
         state = await asyncio.to_thread(load_run, run_id, user.userid)
         await websocket.send_json(dict(type='state', **public_state(run_id, state)))
@@ -417,6 +418,7 @@ async def conflict_socket(websocket: WebSocket, run_id: str):
                 state['transcript'].append(dict(role='user', content=json.dumps(dict(calculation_results=results), default=str)))
                 state.pop('pending_calculations', None)
             state['phase'] = 'running'
+            state.pop('last_error', None)
             state['question'] = None
             await asyncio.to_thread(save_state, run_id, user.userid, owner, state)
             if model is None:
@@ -424,12 +426,13 @@ async def conflict_socket(websocket: WebSocket, run_id: str):
             while True:
                 await websocket.send_json(dict(type='progress', text='Reviewing the verified evidence and resolving the comparison'))
                 raw, response = await model.turn(model_instructions(state, command['type'] == 'finish'), state['transcript'])
-                turn = validate_turn(raw, [s['answer_id'] for s in state['sources']], MAX_ROUNDS if command['type'] == 'finish' else state['rounds'], state['available'])
                 state['transcript'].extend(item for item in response.get('output', []) if item.get('type') == 'message')
                 usage = response.get('usage') or {}
                 state['usage']['input_tokens'] += int(usage.get('input_tokens') or 0)
                 state['usage']['output_tokens'] += int(usage.get('output_tokens') or 0)
                 state['usage']['cached_tokens'] += int((usage.get('input_tokens_details') or {}).get('cached_tokens') or 0)
+                state['provider_model'] = response.get('model') or state['model']
+                turn = validate_turn(raw, [s['answer_id'] for s in state['sources']], MAX_ROUNDS if command['type'] == 'finish' else state['rounds'], state['available'])
                 if turn.action == 'resolve':
                     state = await asyncio.to_thread(persist_resolution, run_id, user.userid, owner, state, turn.resolution)
                     await websocket.send_json(dict(type='state', **public_state(run_id, state)))
@@ -459,6 +462,12 @@ async def conflict_socket(websocket: WebSocket, run_id: str):
         pass
     except Exception as exc:
         logger.exception('Conflict resolution failed run_id=%s error_type=%s', run_id, type(exc).__name__)
+        if state is not None:
+            state['last_error'] = dict(type=type(exc).__name__, at=datetime.now(timezone.utc).isoformat())
+            try:
+                await asyncio.to_thread(save_state, run_id, user.userid, owner, state)
+            except Exception:
+                logger.warning('Could not record conflict failure run_id=%s', run_id)
         try:
             text = 'We couldn’t complete this comparison. Please reconnect to try again.'
             await websocket.send_json(dict(type='error', error=text))
