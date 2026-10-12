@@ -1189,7 +1189,7 @@ export default function HomeScreen({
       const destination = action === 'karma_analysis' ? 'KarmaAnalysis' : 'PartnerPortrait';
       const params = action === 'karma_analysis' ? { chartId: (currentNativeData || birthData)?.id } : {};
       const feature = action === 'karma_analysis'
-        ? t('premiumUi.home.karmaAnalysis', 'Karma Analysis')
+        ? t('premiumUi.karma.title', 'Karma Analysis')
         : t('partnerPortrait.title', 'Partner Portrait');
       const ok = await requireAuthForPaid({
         feature,
