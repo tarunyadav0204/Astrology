@@ -176,6 +176,8 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "dashaSk": "SK",
+    "dashaPr": "PR",
     "drawing": {
       "menu": "星盘选项",
       "mode": "绘图模式",

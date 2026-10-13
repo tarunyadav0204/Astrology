@@ -8,6 +8,12 @@ from twilio.rest import Client
 class SMSService:
     def __init__(self):
         self.provider = (os.getenv("SMS_PROVIDER") or "auto").strip().lower()
+        self.mtalkz_api_key = (os.getenv("MTALKZ_API_KEY") or "").strip()
+        self.mtalkz_sender_id = (os.getenv("MTALKZ_SENDER_ID") or "").strip()
+        self.mtalkz_template_id = (os.getenv("MTALKZ_TEMPLATE_ID") or "").strip()
+        self.mtalkz_pe_id = (os.getenv("MTALKZ_PE_ID") or "").strip()
+        self.mtalkz_message = (os.getenv("MTALKZ_OTP_MESSAGE") or "").strip()
+        self.mtalkz_url = (os.getenv("MTALKZ_SMS_URL") or "https://msg.mtalkz.com/V2/http-api-post.php").strip()
 
         # Twilio fallback / non-India support
         self.account_sid = os.getenv("TWILIO_ACCOUNT_SID")
@@ -15,7 +21,7 @@ class SMSService:
         self.from_number = os.getenv("TWILIO_PHONE_NUMBER")
         self.twilio_client = None
 
-        # MSG91 primary path for India OTP
+        # Existing providers retained as fallback.
         self.msg91_auth_key = (os.getenv("MSG91_AUTH_KEY") or "").strip()
         self.msg91_template_id = (os.getenv("MSG91_TEMPLATE_ID") or "").strip()
         self.msg91_flow_url = (
@@ -24,7 +30,10 @@ class SMSService:
         self.msg91_short_url = (os.getenv("MSG91_SHORT_URL") or "0").strip()
         self.msg91_otp_variable_key = (os.getenv("MSG91_OTP_VARIABLE_KEY") or "numeric").strip()
 
-        print(f"SMS Service Init - Provider: {self.provider}")
+        print(f"SMS Service Init - Primary: MTalkz; fallback selection: {self.provider}")
+        print(
+            f"SMS Service Init - MTalkz configured: {bool(self.mtalkz_api_key and self.mtalkz_sender_id and self.mtalkz_template_id and '{otp}' in self.mtalkz_message)}"
+        )
         print(
             f"SMS Service Init - MSG91 configured: {bool(self.msg91_auth_key and self.msg91_template_id)}"
         )
@@ -52,8 +61,8 @@ class SMSService:
             .replace(")", "")
         )
         digits = "".join(c for c in raw if c.isdigit())
-        if raw.startswith("+91") and len(digits) >= 12:
-            return digits[-12:]
+        if raw.startswith('+'):
+            return digits if raw.startswith('+91') and len(digits) == 12 else None
         if len(digits) == 12 and digits.startswith("91"):
             return digits
         if len(digits) == 10:
@@ -119,7 +128,7 @@ class SMSService:
                 or data.get("data")
             )
 
-            if status_value in {"success", "sent", "queued"} or has_request_marker:
+            if status_value in {"success", "sent", "queued"} or (not status_value and has_request_marker):
                 print(f"MSG91 accepted SMS request to {mobile}: {data}")
                 return True
 
@@ -160,24 +169,77 @@ class SMSService:
             print(f"Error type: {type(e).__name__}")
             return False
 
+    def _send_via_mtalkz(self, phone_number: str, code: str) -> bool:
+        mobile = self._normalize_india_mobile(phone_number)
+        if not mobile:
+            return False  # International numbers retain the existing Twilio path.
+        if not (self.mtalkz_api_key and self.mtalkz_sender_id and self.mtalkz_template_id
+                and self.mtalkz_message and '{otp}' in self.mtalkz_message):
+            print('MTalkz OTP configuration incomplete; using fallback')
+            return False
+        payload = {
+            'apikey': self.mtalkz_api_key,
+            'senderid': self.mtalkz_sender_id,
+            'number': mobile,
+            'message': self.mtalkz_message.replace('{otp}', str(code)),
+            'template_id': self.mtalkz_template_id,
+            'format': 'json',
+        }
+        if self.mtalkz_pe_id:
+            payload['pe_id'] = self.mtalkz_pe_id
+        try:
+            response = requests.post(self.mtalkz_url, json=payload, timeout=(3, 8))
+            if not 200 <= response.status_code < 300:
+                print(f'MTalkz SMS failed: HTTP {response.status_code}; using fallback')
+                return False
+            data = response.json()
+            if not isinstance(data, dict) or str(data.get('status', '')).upper() != 'OK':
+                print('MTalkz SMS request rejected; using fallback')
+                return False
+            recipients = data.get('data')
+            accepted = (
+                isinstance(recipients, list) and len(recipients) == 1
+                and isinstance(recipients[0], dict)
+                and str(recipients[0].get('mobile', '')).lstrip('+') == mobile
+                and str(recipients[0].get('status', '')).upper() == 'SUBMITTED'
+                and bool(recipients[0].get('id'))
+            )
+            if not accepted:
+                print('MTalkz SMS submission not confirmed; using fallback')
+            return bool(accepted)
+        except Exception as error:
+            # Provider exception text can contain the request body and API key.
+            print(f'MTalkz SMS exception: {type(error).__name__}; using fallback')
+            return False
+
     def send_reset_code(self, phone_number: str, code: str) -> bool:
-        """Send OTP via configured provider, preferring MSG91 for India when available."""
+        """Try MTalkz first, then the previously configured provider chain."""
+        if self._send_via_mtalkz(phone_number, code):
+            print('SMS OTP request accepted - provider=mtalkz')
+            return True
         provider = self.provider
+        print(f'SMS OTP using fallback - selection={provider}')
+
+        def send_fallback(name, send):
+            accepted = send(phone_number, code)
+            if accepted:
+                print(f'SMS OTP request accepted - provider={name}')
+            return accepted
 
         if provider == "msg91":
-            return self._send_via_msg91(phone_number, code)
+            return send_fallback('msg91', self._send_via_msg91)
         if provider == "twilio":
-            return self._send_via_twilio(phone_number, code)
+            return send_fallback('twilio', self._send_via_twilio)
 
         # auto mode: use MSG91 for India, otherwise Twilio fallback
         if self._is_india_number(phone_number):
-            if self._send_via_msg91(phone_number, code):
+            if send_fallback('msg91', self._send_via_msg91):
                 return True
-            return self._send_via_twilio(phone_number, code)
+            return send_fallback('twilio', self._send_via_twilio)
 
-        if self._send_via_twilio(phone_number, code):
+        if send_fallback('twilio', self._send_via_twilio):
             return True
-        return self._send_via_msg91(phone_number, code)
+        return send_fallback('msg91', self._send_via_msg91)
 
 
 sms_service = SMSService()

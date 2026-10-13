@@ -194,6 +194,8 @@ export const dashaLevelSuffix = (planetName, highlight) => {
   if (highlight.mahadasha === planetName) tags.push('MD');
   if (highlight.antardasha === planetName) tags.push('AD');
   if (highlight.pratyantardasha === planetName) tags.push('PD');
+  if (highlight.sookshma === planetName) tags.push('SK');
+  if (highlight.prana === planetName) tags.push('PR');
   return tags.length ? tags.join('·') : '';
 };
 

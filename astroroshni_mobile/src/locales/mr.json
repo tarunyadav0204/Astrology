@@ -176,6 +176,8 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "dashaSk": "SK",
+    "dashaPr": "PR",
     "drawing": {
       "menu": "चार्ट पर्याय",
       "mode": "रेखांकन मोड",

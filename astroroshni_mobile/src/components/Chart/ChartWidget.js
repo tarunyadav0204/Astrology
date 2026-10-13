@@ -323,6 +323,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         mahadasha: planetOf(current.mahadasha),
         antardasha: planetOf(current.antardasha),
         pratyantardasha: planetOf(current.pratyantardasha),
+        sookshma: planetOf(current.sookshma),
+        prana: planetOf(current.prana),
       };
       if (lords.mahadasha || lords.antardasha || lords.pratyantardasha) {
         setDashaLords(lords);
@@ -1119,7 +1121,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         || (showDashaHighlight && currentChartType !== 'transit' && dashaLords) ? (
         <Text
           style={[styles.dashaLegend, fitTablet && styles.dashaLegendTablet, { color: colors.chartText || colors.text }]}
-          numberOfLines={(currentChartType === 'lagna' || currentChartType === 'transit') && (bavPlanet || showSav) && showDashaHighlight && dashaLords ? 1 : 2}
         >
           {(currentChartType === 'lagna' || currentChartType === 'transit') && (bavPlanet || showSav) ? (
             bavPlanet
@@ -1139,6 +1140,14 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
               {` ${t(`home.planet_names.${dashaLords.antardasha}`, dashaLords.antardasha || '')} · `}
               <Text style={{ color: dashaColor }}>{t('chartScreen.dashaPd', 'PD')}</Text>
               {` ${t(`home.planet_names.${dashaLords.pratyantardasha}`, dashaLords.pratyantardasha || '')}`}
+              {dashaLords.sookshma ? <>
+                {' · '}<Text style={{ color: dashaColor }}>{t('chartScreen.dashaSk', 'SK')}</Text>
+                {` ${t(`home.planet_names.${dashaLords.sookshma}`, dashaLords.sookshma)}`}
+              </> : null}
+              {dashaLords.prana ? <>
+                {' · '}<Text style={{ color: dashaColor }}>{t('chartScreen.dashaPr', 'PR')}</Text>
+                {` ${t(`home.planet_names.${dashaLords.prana}`, dashaLords.prana)}`}
+              </> : null}
             </>
           ) : null}
         </Text>

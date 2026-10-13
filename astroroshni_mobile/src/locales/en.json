@@ -419,6 +419,8 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "dashaSk": "SK",
+    "dashaPr": "PR",
     "drawing": {
       "menu": "Chart options",
       "mode": "Drawing mode",

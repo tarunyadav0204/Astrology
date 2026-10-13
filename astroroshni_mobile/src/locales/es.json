@@ -176,6 +176,8 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "dashaSk": "SK",
+    "dashaPr": "PR",
     "drawing": {
       "menu": "Opciones de la carta",
       "mode": "Modo dibujo",

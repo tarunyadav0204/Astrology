@@ -125,6 +125,8 @@
     "dashaMd": "MD",
     "dashaAd": "AD",
     "dashaPd": "PD",
+    "dashaSk": "SK",
+    "dashaPr": "PR",
     "drawing": {
       "menu": "चार्ट विकल्प",
       "mode": "आरेख मोड",
