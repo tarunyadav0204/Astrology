@@ -719,6 +719,24 @@ def _ensure_conversation_state_pending_gate_cols_verified(conn):
     _ensure_conversation_state_pending_gate_cols(conn)
 
 
+def _selected_chart_preference(conn, session_id: str, *, remember: bool = False) -> bool:
+    """Retain a relationship gate choice on its durable assistant message."""
+    _ensure_chat_messages_gate_metadata(conn)
+    row = execute(conn, """
+        SELECT message_id, gate_metadata FROM chat_messages
+        WHERE session_id = %s AND message_type = 'native_gate'
+        ORDER BY message_id DESC LIMIT 1
+    """, (session_id,)).fetchone()
+    if not row:
+        return False
+    metadata = row[1] if isinstance(row[1], dict) else json.loads(row[1] or '{}')
+    if remember:
+        metadata['selected_chart_only'] = True
+        execute(conn, 'UPDATE chat_messages SET gate_metadata = %s WHERE message_id = %s AND session_id = %s',
+                (json.dumps(metadata, ensure_ascii=False), row[0], session_id))
+    return bool(metadata.get('selected_chart_only'))
+
+
 def _load_pending_native_gate(conn, session_id: str):
     _ensure_conversation_state_pending_gate_cols_verified(conn)
     try:
@@ -2170,7 +2188,6 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     )
     skip_subject_gate_for_fast_chat = bool(
         instant_chat_active
-        or verified_chat_active
         or speech_chat_requested
         or fomo_chat_requested
         or free_question_gate_eligible
@@ -2324,8 +2341,13 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             "single_chart_only",
             "relationship_context_provided",
         } or partnership_mode or fomo_chat_requested:
+            if verified_chat_active and subject_gate_override in {'selected_chart_only', 'single_chart_only'}:
+                _selected_chart_preference(conn, session_id, remember=True)
             _clear_pending_native_gate(conn, session_id)
             conn.commit()
+
+        if verified_chat_active and not partnership_mode and _selected_chart_preference(conn, session_id):
+            subject_gate_override = subject_gate_override or 'selected_chart_only'
 
         pending_gate_state = None if skip_subject_gate_for_fast_chat else _load_pending_native_gate(conn, session_id)
         if pending_gate_state and subject_gate_override == "":
@@ -2349,6 +2371,11 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             )
             if resolved_action == "continue_selected_chart":
                 subject_gate_override = "selected_chart_only"
+                if verified_chat_active:
+                    _selected_chart_preference(conn, session_id, remember=True)
+                    original_question = str(pending_gate_metadata.get('original_question') or '').strip()
+                    if original_question:
+                        raw_query_context['_selected_chart_question'] = original_question
                 _clear_pending_native_gate(conn, session_id)
                 conn.commit()
             elif resolved_action == "start_partnership":
@@ -2907,6 +2934,9 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         skipped=bool(effective_chat_tier in {"instant", "verified"} or partnership_mode),
         chart_insight_count=len(chart_insights or []),
     )
+
+    if verified_chat_active and subject_gate_override in {'selected_chart_only', 'single_chart_only', 'relationship_context_provided'}:
+        raw_query_context['selected_chart_only'] = True
 
     worker_intent_metadata = {
         "query_context": raw_query_context,

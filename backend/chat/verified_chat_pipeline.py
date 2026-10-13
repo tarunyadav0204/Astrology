@@ -750,6 +750,17 @@ Use the systems relevant to the question: Parashari, divisional charts, Jaimini,
 Nakshatra, KP, Ashtakavarga, Shadbala and Panchadha Maitri. Resolve agreement and conflict
 honestly. Do not invent chart facts.
 
+RELATIONSHIP FRAME: Respect the selected-chart-only choice. Do not repeat a request
+to switch to Partnership after that choice. Explain relationship indications and uncertainty
+from the native's chart; do not claim to establish another person's feelings as a fact.
+Read question_scope.target_subject before interpreting houses. If its base_house is not 1,
+this is a derived relative's frame, not the native's own Lagna. In Technical style explicitly
+identify the anchor (for example, the native's 7th is the spouse's derived 1st) and label each
+derived house as the spouse's/relative's house, giving the natal house when available. Never
+describe a derived house as "your" house. In Simple style preserve the person distinction
+without numbered-house jargon. Native dasha periods remain the native's periods; they are
+indirect indications for the relative, never the relative's independently calculated dashas.
+
 After the Instant baseline, you may request these deterministic calculators exactly by their
 registered capability ID. Request as many relevant calculators as needed, including several in one round.
 The deterministic baseline is a starting point, not a restriction on which systems to examine.
@@ -1543,6 +1554,13 @@ async def build_verified_generation_request(
 
 Never tell the user that the supplied data, packet, or calculations are missing or incomplete. If the calculated evidence cannot establish a conclusion, state the conclusion's uncertainty plainly without discussing the transport or missing internal inputs. Packet completeness is audited separately.
 
+RELATIONSHIP FRAME: Honor selected-chart-only analysis without repeatedly recommending
+Partnership. Read baseline_calculations.question_scope.target_subject. A base_house other
+than 1 denotes a derived relative's frame: explicitly identify its natal anchor, attribute all
+derived houses to that relative, and never call them "your" houses. Native dashas remain
+the native's dashas. A native chart offers indirect relationship indications, not certainty
+about another person's feelings or an independently calculated partner chart.
+
 PERSONAL CONSULTATION OPENING (mandatory): Before the Premium output format, write exactly one
 short, warm greeting sentence in {language} that thanks the user for consulting AstroRoshni
 about the chart of {str(birth_data.get("name") or "the native")[:80]}. Translate this naturally;
@@ -1706,7 +1724,16 @@ Choose one category from: {json.dumps(_CATEGORY_VALUES)}.
 Choose target_subject_key from: {json.dumps(sorted(TARGET_SUBJECTS))}.
 
 route_action is answer, clarify, handoff, ack, or out_of_scope. Use clarify only for a material missing fact.
-Use handoff for two-person compatibility ONLY when TWO-CHART CONTEXT is disabled.
+SELECTED-CHART CHOICE: {json.dumps({'selected_chart_only': bool((query_context or {}).get('selected_chart_only')), 'original_question': (query_context or {}).get('_selected_chart_question')}, ensure_ascii=False)}
+When selected_chart_only is true, or the user explicitly chooses their own chart in the latest
+message or recent conversation, honor that choice. Resolve a short choice reply against the
+original_question or previous relationship question. Use route_action answer for chart-supported
+relationship indications; never repeat a Partnership recommendation or ask for the other chart.
+For "will my spouse like me" and similar relationship dynamics, target_subject_key is self:
+analyze the native's relationship promise, not the spouse's standalone life. Use a derived
+spouse target only for a question specifically about the spouse's own career/health/life.
+Use handoff for two-person compatibility ONLY when TWO-CHART CONTEXT is disabled and
+the user has not chosen selected-chart-only analysis.
 When enabled, Partnership is already active: use answer for compatibility analysis and never
 ask the user to enable Partnership or supply the already selected partner chart.
 Use ack for greetings, thanks, or no question.
@@ -1839,6 +1866,9 @@ Schema:
     action = str(parsed.get("route_action") or "answer").strip().lower()
     if action not in {"answer", "clarify", "handoff", "ack", "out_of_scope"}:
         action = "answer"
+    if (query_context or {}).get('selected_chart_only') and action == 'handoff':
+        action = 'answer'
+        parsed['user_message'] = ''
     answer_mode = str(parsed.get("answer_mode") or "topic_reading").strip()
     if answer_mode not in {*ANSWER_MODES, 'custom_reading'}:
         # The classifier occasionally mirrors route_action into answer_mode

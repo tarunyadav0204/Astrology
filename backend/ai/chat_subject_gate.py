@@ -422,6 +422,13 @@ Return ONLY valid JSON:
                 "reason": "unrelated_life_area_vs_pending_gate",
             }
 
+        choice = re.sub(r'[^a-z\s]', '', str(user_message or '').lower()).strip()
+        if choice in {'use my chart', 'no use my chart', 'continue with my chart',
+                      'continue with my chart only', 'use my chart only',
+                      'use the selected chart', 'continue with selected chart only'}:
+            return {'action': 'continue_selected_chart', 'confidence': 'high',
+                    'reason': 'explicit_selected_chart_choice'}
+
         prompt = f"""
 You are resolving a pending astrology chat gate reply.
 
