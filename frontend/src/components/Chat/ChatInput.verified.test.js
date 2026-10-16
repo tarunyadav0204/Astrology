@@ -58,3 +58,19 @@ test.each(['standard', 'verified', 'premium'])('entering and exiting partnership
     expect(send).toHaveBeenLastCalledWith('Read my chart', expect.objectContaining({premium_analysis:tier === 'premium', ...(tier === 'verified' ? {chat_tier:'verified'} : {})}));
   } finally { act(() => root.unmount()); host.remove(); mockCredits=5; }
 });
+
+test('single-chart web users can select Verified from Standard', () => {
+  window.matchMedia = () => ({ matches: false, addEventListener: noop, removeEventListener: noop });
+  const host = document.createElement('div'); document.body.appendChild(host);
+  const root = createRoot(host); const change = jest.fn();
+  try {
+    act(() => root.render(<ChatInput onSendMessage={noop} verifiedMode={false} onInstantModeChange={noop} onModeChange={change} />));
+    const modes = host.querySelector('[aria-label="Answer mode"]');
+    const verified = Array.from(modes.querySelectorAll('button')).find(button => button.textContent.includes('Verified'));
+    expect(verified).toBeDefined();
+    expect(verified.textContent).toContain('10 credits');
+    expect(verified.className).not.toContain('chat-mode-option--active');
+    act(() => verified.click());
+    expect(change).toHaveBeenCalledWith('verified');
+  } finally { act(() => root.unmount()); host.remove(); }
+});

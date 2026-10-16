@@ -472,7 +472,7 @@ const ChatInput = ({
             >
                 {useCompactPremium && showModeSelector && (
                     <div className="chat-premium-mode-expanded" role="group" aria-label="Question mode">
-                        {verifiedMode && <button type="button" className="chat-premium-mode-pill chat-premium-mode-pill--active" disabled={isLocked} onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('verified'); }}><span className="chat-premium-mode-pill__label">Verified</span><span className="chat-premium-mode-pill__cost">{verifiedChatCost} credits</span></button>}
+                        {(verifiedChatEnabled || verifiedMode) && <button type="button" className={`chat-premium-mode-pill ${verifiedMode ? 'chat-premium-mode-pill--active' : ''}`} disabled={isLocked} onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('verified'); }}><span className="chat-premium-mode-pill__label">Verified</span><span className="chat-premium-mode-pill__cost">{verifiedChatCost} credits</span></button>}
                         <button
                             type="button"
                             className={`chat-premium-mode-pill ${!verifiedMode && !isPremiumAnalysis && !instantMode ? 'chat-premium-mode-pill--active' : ''}`}
@@ -550,7 +550,7 @@ const ChatInput = ({
                         )
                     ) : (
                     <div className="chat-mode-selector-web" role="group" aria-label="Answer mode">
-                        {verifiedMode && <button type="button" className="chat-mode-option chat-mode-option--active" disabled={isLocked} onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('verified'); }}><span className="chat-mode-option__label">Verified</span><span className="chat-mode-option__cost">{verifiedChatCost} credits</span></button>}
+                        {(verifiedChatEnabled || verifiedMode) && <button type="button" className={`chat-mode-option ${verifiedMode ? 'chat-mode-option--active' : ''}`} disabled={isLocked} onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('verified'); }}><span className="chat-mode-option__label">Verified</span><span className="chat-mode-option__cost">{verifiedChatCost} credits</span></button>}
                         <button
                             type="button"
                             className={`chat-mode-option ${!verifiedMode && !isPremiumAnalysis && !instantMode ? 'chat-mode-option--active' : ''}`}
