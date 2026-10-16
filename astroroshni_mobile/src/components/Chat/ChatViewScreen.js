@@ -217,22 +217,23 @@ export default function ChatViewScreen({ route, navigation }) {
         </View>
 
         <View style={[styles.contentShell, { backgroundColor: colors.background }]}>
-        <View style={[styles.contextCard, { backgroundColor: colors.surfaceInverse, borderColor: colors.cardBorder }]}>
-          <View pointerEvents="none" style={styles.linework}>
-            <View style={[styles.orbitLarge, { borderColor: colors.accent }]} />
-            <View style={[styles.orbitSmall, { borderColor: colors.accent }]} />
-          </View>
-          <Text style={[styles.contextEyebrow, { color: colors.accent }]}>{t('historyDetail.consultation')}</Text>
-          <Text style={[styles.contextTitle, { color: colors.onSurfaceInverse || colors.textInverse }]}>{displayDate}</Text>
-          <View style={styles.metaRow}>
-            {displayTime ? <Text style={[styles.metaText, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>{displayTime}</Text> : null}
-            <View style={[styles.metaDot, { backgroundColor: colors.accent }]} />
-            <Text style={[styles.metaText, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>{t('historyDetail.conversationCount', { count: conversationCount })}</Text>
-          </View>
-        </View>
-
         <FlatList
           data={messages}
+          ListHeaderComponent={(
+            <View style={[styles.contextCard, { backgroundColor: colors.surfaceInverse, borderColor: colors.cardBorder }]}>
+              <View pointerEvents="none" style={styles.linework}>
+                <View style={[styles.orbitLarge, { borderColor: colors.accent }]} />
+                <View style={[styles.orbitSmall, { borderColor: colors.accent }]} />
+              </View>
+              <Text style={[styles.contextEyebrow, { color: colors.accent }]}>{t('historyDetail.consultation')}</Text>
+              <Text style={[styles.contextTitle, { color: colors.onSurfaceInverse || colors.textInverse }]}>{displayDate}</Text>
+              <View style={styles.metaRow}>
+                {displayTime ? <Text style={[styles.metaText, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>{displayTime}</Text> : null}
+                <View style={[styles.metaDot, { backgroundColor: colors.accent }]} />
+                <Text style={[styles.metaText, { color: colors.onSurfaceInverseMuted || colors.textInverseMuted }]}>{t('historyDetail.conversationCount', { count: conversationCount })}</Text>
+              </View>
+            </View>
+          )}
           renderItem={renderMessage}
           keyExtractor={(item, index) => String(item?.id || item?.messageId || `${item?.timestamp}_${index}`)}
           style={styles.list}
@@ -277,7 +278,7 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, minWidth: 0, paddingHorizontal: 14 },
   headerEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
   headerTitle: { fontSize: 22, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600', marginTop: 2 },
-  contextCard: { margin: 16, marginBottom: 4, borderWidth: 1, borderRadius: 26, paddingHorizontal: 22, paddingVertical: 22, overflow: 'hidden' },
+  contextCard: { marginHorizontal: 4, marginTop: 4, marginBottom: 16, borderWidth: 1, borderRadius: 26, paddingHorizontal: 22, paddingVertical: 22, overflow: 'hidden' },
   linework: { ...StyleSheet.absoluteFillObject, opacity: 0.45 },
   orbitLarge: { position: 'absolute', width: 150, height: 150, borderRadius: 75, borderWidth: 1, right: -48, top: -83 },
   orbitSmall: { position: 'absolute', width: 96, height: 96, borderRadius: 48, borderWidth: 1, right: -20, top: -56 },

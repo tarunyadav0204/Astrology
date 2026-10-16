@@ -1821,10 +1821,10 @@ const MessageBubble = ({
         );
     }
 
+    const isAssistant = message.role === 'assistant';
     const renderMessageToolbar = (placement) => {
         if (!showMessageToolbar) return null;
         if (isNativeGate && placement === 'top') return null;
-        const isAssistant = message.role === 'assistant';
         const placementClass = placement === 'top' ? 'message-action-buttons--top' : 'message-action-buttons--bottom';
         return (
             <div
