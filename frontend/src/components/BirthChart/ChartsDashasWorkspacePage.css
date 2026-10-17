@@ -87,6 +87,7 @@
 }
 
 .parashari-desk-bar__back,
+.parashari-desk-bar__native-change,
 .parashari-desk-bar__right button,
 .parashari-desk-chip {
   border: 1px solid var(--color-border-inverse);
@@ -103,6 +104,8 @@
 }
 
 .parashari-desk-bar__back:hover,
+.parashari-desk-bar__native-change:hover,
+.parashari-desk-bar__native-change:focus-visible,
 .parashari-desk-bar__right button:hover,
 .parashari-desk-chip:hover,
 .parashari-desk-bar__back:focus-visible,

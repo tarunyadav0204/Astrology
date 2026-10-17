@@ -74,3 +74,20 @@ test('single-chart web users can select Verified from Standard', () => {
     expect(change).toHaveBeenCalledWith('verified');
   } finally { act(() => root.unmount()); host.remove(); }
 });
+
+test('chart panel exposes no mode picker and sends only Verified', () => {
+  window.matchMedia = () => ({ matches: false, addEventListener: noop, removeEventListener: noop });
+  const host = document.createElement('div'); document.body.appendChild(host);
+  const root = createRoot(host); const send = jest.fn();
+  mockCredits = 20;
+  try {
+    act(() => root.render(<ChatInput fixedVerified verifiedMode initialMode="verified" onSendMessage={send} followUpQuestion="Explain my chart" onFollowUpUsed={noop} />));
+    expect(host.querySelector('[aria-label="Answer mode"]')).toBeNull();
+    expect(host.querySelector('[aria-label="Question mode"]')).toBeNull();
+    expect(host.querySelector('.chat-premium-sp-toggle')).toBeNull();
+    expect(host.textContent).not.toContain('Standard: free');
+    expect(host.textContent).toContain('Verified: 10');
+    act(() => host.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    expect(send).toHaveBeenCalledWith('Explain my chart', expect.objectContaining({ chat_tier: 'verified', premium_analysis: false }));
+  } finally { act(() => root.unmount()); host.remove(); mockCredits = 5; }
+});

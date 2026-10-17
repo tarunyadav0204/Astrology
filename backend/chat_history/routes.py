@@ -4241,7 +4241,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 # the deterministic baseline calculators.
                 from chat.verified_chat_pipeline import classify_verified_question
 
-                query_context = {**(query_context or {}), '_clarification_context': combined_question}
+                query_context = {**(query_context or {}), '_clarification_context': combined_question,
+                    'selected_chart': {'available': bool(birth_data), 'name': birth_data.get('name')}}
                 if partnership_mode:
                     # An explicit two-chart request must not become single-chart Prashna.
                     query_context = {key: value for key, value in query_context.items() if not key.startswith('prashna')}

@@ -7,12 +7,12 @@ from chat_history.clarification_cards import build_clarification_next_action
 class Router:
     def __init__(self, decision): self.decision = decision
     async def generate_text_from_prompt(self, prompt, **kwargs):
-        assert 'Infer offer SEMANTICALLY' in prompt
-        assert 'not a keyword list' in prompt
+        assert 'use your understanding of\nPrashna' in prompt
+        assert 'Understand\nthe user\'s intent across natural phrasing and all languages' in prompt
         assert 'select one of the displayed cards' in prompt
         assert 'The UI opens city selection AFTER' in prompt
         assert 'Do NOT ask them to type a choice, share a city' in prompt
-        assert 'Having a saved birth chart does not rule out Prashna' in prompt
+        assert 'requests Prashna, horary or a question-moment chart' in prompt
         return {'success': True, 'response': json.dumps({'prashna_intent': self.decision,
             'answer_mode':'event_prediction', 'category':'career', 'route_action':'answer',
             'user_message':'Choose your reading.'})}

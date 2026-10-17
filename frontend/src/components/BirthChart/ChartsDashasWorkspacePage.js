@@ -26,6 +26,7 @@ import DeskDrawingBoard from './DeskDrawingBoard';
 import ParashariDeskMobile from './ParashariDeskMobile';
 import ChartActivationKey from './ChartActivationKey';
 import ChartOverviewPopup from '../Charts/ChartOverviewPopup';
+import ChartTaraPanel from '../Chat/ChartTaraPanel';
 import HouseInsightPopup from '../Charts/HouseInsightPopup';
 import { useAstrology } from '../../context/AstrologyContext';
 import { useCredits } from '../../context/CreditContext';
@@ -608,10 +609,14 @@ const ChartsDashasWorkspacePage = ({
         <div className="parashari-desk-bar__left">
           <button type="button" className="parashari-desk-bar__back" onClick={() => navigate('/')}>← Home</button>
           <strong className="parashari-desk-bar__brand">Parashari Desk</strong>
-          <span className="parashari-desk-bar__native">
+          <button type="button" className="parashari-desk-bar__native parashari-desk-bar__native-change"
+            aria-label={user ? `Change native. Currently ${birthData?.name || 'no chart selected'}` : 'Sign in to select a chart'}
+            title="Change native"
+            onClick={() => (user ? openBirthModal(hasChart ? 'saved' : 'new') : onLogin?.())}>
             {birthData?.name || 'No native'}
             {birthData?.date ? ` · ${String(birthData.date).split('T')[0]}` : ''}
-          </span>
+            {' ▾'}
+          </button>
         </div>
         <div className="parashari-desk-bar__center">
           <button
@@ -673,12 +678,7 @@ const ChartsDashasWorkspacePage = ({
           ) : null}
         </div>
         <div className="parashari-desk-bar__right">
-          <button
-            type="button"
-            onClick={() => (user ? openBirthModal(hasChart ? 'saved' : 'new') : onLogin?.())}
-          >
-            {user ? (hasChart ? 'Change native' : 'Select chart') : 'Sign in'}
-          </button>
+          {user && hasChart ? <ChartTaraPanel birthData={birthData} onLogin={onLogin} /> : null}
           {!user ? (
             <button type="button" className="parashari-desk-bar__primary" onClick={onLogin}>Sign in</button>
           ) : null}
@@ -705,6 +705,7 @@ const ChartsDashasWorkspacePage = ({
         </div>
       ) : isMobileDesk ? (
         <ParashariDeskMobile
+          toolbarActions={<ChartTaraPanel birthData={birthData} onLogin={onLogin} />}
           birthData={birthData}
           chartData={renderedChartData}
           viewChartData={renderedChartData}

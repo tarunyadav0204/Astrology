@@ -283,6 +283,11 @@ STRICT RULES:
 - Do not perform astrology. Only decide the safest next UX step.
 - If uncertain, return gate_required=false so the normal chat can continue.
 - Return a gate only when answering with the currently selected profile would likely be wrong or materially incomplete.
+- The selected native is not necessarily the user. If the user says this is their friend's,
+  parent's or spouse's chart, accept that identification of the current profile; do not ask
+  for another chart or confirm the same identity again. Questions about that native's own
+  health, career or dashas can proceed directly. A relative label alone is not a two-chart
+  relationship request. Only gate when a genuinely different person's chart is needed.
 - Write ALL user-facing text in the same language/script as the user's question when you can infer it naturally. This includes user_message and option labels.
 - When gate_required=true, user_message must explicitly tell the user to choose/tap one of the options shown below instead of typing a reply. Say this naturally in the same language/script as the user's question.
 - If previous user choices show the user already chose selected-chart-only for the same referenced person or same exact relation in this chat, you may return gate_required=false only for a clear follow-up continuation of that same unresolved gate topic. Do not suppress a new gate for a fresh standalone question just because the relation is the same.

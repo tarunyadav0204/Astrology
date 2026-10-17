@@ -22,7 +22,7 @@ import { buildReadableEvidence, buildRoutingSummary } from '../../utils/instantE
 import { autoWrapGlossaryTermsInHtml, buildGlossaryTooltipHtml } from '../../utils/chatGlossary';
 import { labelChatSentiment } from '../../utils/chatSentiment';
 import { SaveAnswerButton } from './SavedAnswers';
-import { formatChatHeadings } from '../../utils/chatFormatting';
+import { formatChatHeadings, formatChatLists } from '../../utils/chatFormatting';
 
 const premiumPodcastReadyKeys = new Set();
 const PODCAST_READY_TOAST = 'Podcast ready — tap to listen';
@@ -723,7 +723,7 @@ const MessageBubble = ({
         );
     };
     const isInstantTypingBubble =
-        (message.isTyping || message.isProcessing) && messageChatTier === 'instant';
+        (message.isTyping || message.isProcessing) && ['instant', 'verified'].includes(messageChatTier);
     const instantTypingState = useMemo(
         () => (isInstantTypingBubble ? {
             lines: message.calculationTrace?.length
@@ -1593,10 +1593,7 @@ const MessageBubble = ({
         // "... sentence. - Bullet one - Bullet two"
         // Normalize those into line-start bullets before list conversion.
         formatted = formatted.replace(/([.:!?])\s-\s(?=(?:\*\*)?[A-Z0-9])/g, '$1\n- ');
-        formatted = formatted.replace(/(\d+\.\s+[^\n]+)/g, '<p class="numbered-item">$1</p>');
-        formatted = formatted.replace(/(^|\n)-\s+(.+)/g, '$1<li class="chat-bullet">• $2</li>');
-        formatted = formatted.replace(/\n\*\s+(.+)/g, '<li class="chat-bullet">• $1</li>');
-        formatted = formatted.replace(/(<li class="chat-bullet">.*?<\/li>)/gs, '<ul class="chat-list">$1</ul>');
+        formatted = formatChatLists(formatted);
 
         // 9b. Turn blank lines / single newlines into visible spacing (HTML collapses raw \n)
         formatted = applyChatProseParagraphs(formatted.trim());
@@ -1994,7 +1991,7 @@ const MessageBubble = ({
                     {(message.isTyping || message.isProcessing) ? (
                         isInstantTypingBubble && instantTypingState ? (
                             <div className="instant-typing-bubble" aria-live="polite">
-                                <div className="instant-typing-bubble__label">Luna is reading</div>
+                                <div className="instant-typing-bubble__label">Tara is reading</div>
                                 {instantTypingState.lines.map((line, index) => {
                                     return (
                                         <div
@@ -2287,7 +2284,6 @@ const MessageBubble = ({
                         <button
                             type="button"
                             className="follow-up-btn remedy-next-action-card__button"
-                            style={followUpChipLayoutStyle}
                             onClick={() => {
                                 const nextQuestion = isRemedyNextAction
                                     ? remedyClickPrompt
@@ -2376,7 +2372,7 @@ const MessageBubble = ({
                             }}
                         >
                             {isRemedyNextAction
-                                ? remedyCardButton
+                                ? 'Explore supportive practices'
                                 : (nextActionFollowUps[0] ? String(nextActionFollowUps[0]) : 'Open follow-up')}
                         </button>
                     </div>
@@ -2712,7 +2708,7 @@ const MessageBubble = ({
                 >
                     <div 
                         style={{
-                            backgroundColor: 'white',
+                            backgroundColor: 'var(--color-surface)',
                             padding: '20px',
                             borderRadius: '10px',
                             maxWidth: '400px',
@@ -2721,15 +2717,15 @@ const MessageBubble = ({
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <h3 style={{ margin: '0 0 10px 0', color: '#e91e63' }}>{tooltipModal.term}</h3>
-                        <p style={{ margin: '0', lineHeight: '1.5', color: '#333' }}>{tooltipModal.definition}</p>
+                        <h3 style={{ margin: '0 0 10px 0', color: 'var(--color-text)' }}>{tooltipModal.term}</h3>
+                        <p style={{ margin: '0', lineHeight: '1.5', color: 'var(--color-text)' }}>{tooltipModal.definition}</p>
                         <button 
                             onClick={() => setTooltipModal({ show: false, term: '', definition: '' })}
                             style={{
                                 marginTop: '15px',
                                 padding: '8px 16px',
-                                backgroundColor: '#e91e63',
-                                color: 'white',
+                                backgroundColor: 'var(--color-brand)',
+                                color: 'var(--color-on-brand)',
                                 border: 'none',
                                 borderRadius: '5px',
                                 cursor: 'pointer'

@@ -1657,12 +1657,29 @@ async def classify_verified_question(
     recent = [
         {"question": str(row.get("question") or "")[:600],
          "response": re.sub(r"<[^>]+>", " ", str(row.get("response") or ""))[:600]}
-        for row in (history or [])[-2:]
+        for row in (history or [])[-6:]
         if isinstance(row, dict) and str(row.get("question") or "").strip()
     ]
     prompt = f"""
 Classify one astrology chat question. Do not answer it and do not use astrology knowledge to infer chart facts.
 Return JSON only.
+SELECTED CHART: {json.dumps((query_context or {}).get('selected_chart') or {}, ensure_ascii=False)}
+An available selected chart already has the birth details needed for this reading.
+The selected native can be the user's friend, parent or spouse; it is NOT necessarily the user.
+"This chart is my friend's chart" identifies the selected native, not a request for another chart.
+Set subject_resolution to selected_chart in that case and target_subject_key to self: self means
+the SELECTED NATIVE, not necessarily the person typing. Never rotate that friend's own chart
+into a friend-relative frame. Request another chart only if a genuinely different person is meant.
+Do not ask to confirm a clear question or a subject the user has already confirmed. A short yes
+answers the preceding clarification: resolved_question must recover the original topic, timeframe
+and requested breakdown from RECENT CONVERSATION and pending_clarification_context.
+Return clarification_reason as missing_birth_details, confirm_subject, workflow, other, or none.
+Return subject_resolution as selected_chart, other_chart, or unresolved.
+A multi-year health outlook broken down by dashas is natal period analysis, not Prashna.
+Route the chart-supported health vulnerability/timing reading without repetitive consent or
+subject confirmations. Do not promise disease events, diagnosis, Parkinson's progression,
+treatment response or cure; medical care remains with clinicians. These limits belong in the
+answer and do not require repeated clarification of an already clear natal question.
 Prashna intent: set prashna_intent to explicit, offer, or none. Use explicit when the user
 requests Prashna, horary or a question-moment chart. Otherwise, use your understanding of
 Prashna to decide whether a question-moment chart is a suitable primary approach and use
@@ -1832,7 +1849,7 @@ USER LOCAL NOW: {now_local.isoformat()}
 QUESTION: {question}
 
 Schema:
-{{"location_intent":"relocation|object_search|other","requires_new_location":false,"reading_transition":"none|continue_prashna|new_prashna|natal|clarify_workflow","resolved_question":"...","prashna_intent":"none|offer|explicit","answer_mode":"...","category":"...","target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","reading_type":"default|chart_dasha_analysis|muhurat","muhurat_transition":"new|continue|exit","muhurat_request":{{}},"forecast_scope":"daily|other","target_date":null,"period_start":null,"period_end":null,"user_message":""}}
+{{"subject_resolution":"selected_chart|other_chart|unresolved","clarification_reason":"missing_birth_details|confirm_subject|workflow|other|none","location_intent":"relocation|object_search|other","requires_new_location":false,"reading_transition":"none|continue_prashna|new_prashna|natal|clarify_workflow","resolved_question":"...","prashna_intent":"none|offer|explicit","answer_mode":"...","category":"...","target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","reading_type":"default|chart_dasha_analysis|muhurat","muhurat_transition":"new|continue|exit","muhurat_request":{{}},"forecast_scope":"daily|other","target_date":null,"period_start":null,"period_end":null,"user_message":""}}
 """.strip()
     # A routing timeout must not fall through to a guessed/default workflow.
     # The former 20-second ceiling cancelled slow but otherwise valid responses.
@@ -1864,6 +1881,12 @@ Schema:
             raise RuntimeError(error)
     out = {**out, "token_usage": usage_totals}
     action = str(parsed.get("route_action") or "answer").strip().lower()
+    selected_native = ((query_context or {}).get('selected_chart') or {}).get('available') is True and parsed.get('subject_resolution') == 'selected_chart'
+    if selected_native:
+        parsed['target_subject_key'] = 'self'
+        if action == 'clarify' and parsed.get('clarification_reason') in {'missing_birth_details', 'confirm_subject'}:
+            action = 'answer'
+            parsed['user_message'] = ''
     if action not in {"answer", "clarify", "handoff", "ack", "out_of_scope"}:
         action = "answer"
     if (query_context or {}).get('selected_chart_only') and action == 'handoff':
@@ -1936,6 +1959,11 @@ Schema:
     transition = str(parsed.get('reading_transition') or 'none').strip().lower()
     if transition not in {'none', 'continue_prashna', 'new_prashna', 'natal', 'clarify_workflow'}:
         transition = 'none'
+    if transition == 'clarify_workflow' and not ((query_context or {}).get('prashna') or (query_context or {}).get('_prashna_previous')):
+        transition = 'natal'
+        if action == 'clarify' and parsed.get('clarification_reason') == 'workflow':
+            action = 'answer'
+            clarification_question = ''
     if is_muhurat:
         transition = 'natal'
         parsed['prashna_intent'] = 'none'

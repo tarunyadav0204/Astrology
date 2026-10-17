@@ -117,6 +117,7 @@ export default function ParashariDeskMobile({
   onHouseSelect,
   onOpenTool,
   onChangeNative,
+  toolbarActions,
   onRequireLicense,
   initialHubTab,
   calculationProfile,
@@ -276,11 +277,12 @@ export default function ParashariDeskMobile({
           <button type="button" className="pdm__back" onClick={() => navigate('/')}>←</button>
           <div className="pdm__brand-wrap">
             <strong className="pdm__brand">Parashari</strong>
-            <span className="pdm__native">{birthData?.name || 'Native'}</span>
+            <button type="button" className="pdm__native pdm__native-change" onClick={onChangeNative}
+              aria-label={`Change native. Currently ${birthData?.name || 'Native'}`} title="Change native">
+              {birthData?.name || 'Native'} ▾
+            </button>
           </div>
-          <button type="button" className="pdm__change-native" onClick={onChangeNative}>
-            Change native
-          </button>
+          {toolbarActions}
           <button type="button" className="pdm__link" onClick={() => navigate('/charts-dashas/kp')}>KP</button>
           <button type="button" className="pdm__link" onClick={() => navigate('/charts-dashas/nadi')}>Nadi</button>
           <button type="button" className="pdm__link" onClick={() => navigate('/charts-dashas/rectification')}>Rectify</button>

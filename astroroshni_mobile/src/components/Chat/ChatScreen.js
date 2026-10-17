@@ -121,7 +121,7 @@ const INSTANT_LOADER_MAX_WORDS = INSTANT_LOADER_LINES.length + 7;
 const INSTANT_REPLY_FIRST_PIECE_MS = 0;
 const COMPOSER_LINE_HEIGHT = 22;
 const COMPOSER_MIN_HEIGHT = 44;
-const COMPOSER_MAX_LINES = 3;
+const COMPOSER_MAX_LINES = 5;
 const COMPOSER_MAX_HEIGHT = COMPOSER_MIN_HEIGHT + COMPOSER_LINE_HEIGHT * (COMPOSER_MAX_LINES - 1);
 const engagementEventId = (eventType) => (
   `chat_${String(eventType || 'event')}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
@@ -826,6 +826,7 @@ export default function ChatScreen({ navigation, route }) {
   const [inputText, setInputText] = useState('');
   /** Multiline input stays one line while empty; grows only when there is text. */
   const [composerHeight, setComposerHeight] = useState(44);
+  const composerInputRef = useRef(null);
   const inputTextRef = useRef('');
   inputTextRef.current = inputText;
   const [loading, setLoading] = useState(false);
@@ -864,6 +865,17 @@ export default function ChatScreen({ navigation, route }) {
   useEffect(() => {
     if (!inputText) setComposerHeight(COMPOSER_MIN_HEIGHT);
   }, [inputText]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const input = composerInputRef.current;
+    if (!input?.style) return;
+    // Reset before measuring so deleting lines also shrinks the textarea.
+    input.style.height = `${COMPOSER_MIN_HEIGHT}px`;
+    const height = inputText && !showModeSelector ? clampComposerHeight(input.scrollHeight) : COMPOSER_MIN_HEIGHT;
+    input.style.height = `${height}px`;
+    setComposerHeight(height);
+  }, [inputText, showModeSelector]);
 
   const [language, setLanguage] = useState('english');
   const [instantWelcomeAreaIds, setInstantWelcomeAreaIds] = useState([]);
@@ -8064,6 +8076,7 @@ export default function ChatScreen({ navigation, route }) {
 
               <TextInput
                 key="chat-main-input"
+                ref={composerInputRef}
                 style={[
                   styles.modernTextInput,
                   { color: colors.text },
@@ -8077,7 +8090,7 @@ export default function ChatScreen({ navigation, route }) {
                           whiteSpace: 'nowrap',
                         }
                       : {
-                          height: 'auto',
+                          height: composerHeight,
                           minHeight: COMPOSER_MIN_HEIGHT,
                           maxHeight: COMPOSER_MAX_HEIGHT,
                           overflow: 'auto',
@@ -8089,11 +8102,13 @@ export default function ChatScreen({ navigation, route }) {
                 ]}
                 value={inputText}
                 onFocus={() => {
+                  setShowModeSelector(false);
                   markInstantActivity();
                 }}
                 onChangeText={(text) => {
                   inputTextRef.current = text;
                   setInputText(text);
+                  if (text) setShowModeSelector(false);
                   if (!text) selectedEngagementSuggestionRef.current = null;
                   markInstantActivity();
                   if (!text) setComposerHeight(COMPOSER_MIN_HEIGHT);
@@ -8130,7 +8145,7 @@ export default function ChatScreen({ navigation, route }) {
                 nativeID="chat-composer-input"
                 {...(Platform.OS === 'web' ? { id: 'chat-composer-input' } : {})}
                 multiline
-                scrollEnabled={Boolean(inputText) && !showModeSelector}
+                scrollEnabled={Boolean(inputText) && !showModeSelector && composerHeight >= COMPOSER_MAX_HEIGHT}
                 {...(Platform.OS === 'web' && (!inputText || showModeSelector) ? { rows: 1 } : {})}
                 {...(Platform.OS !== 'web' && (!inputText || showModeSelector) ? { numberOfLines: 1 } : {})}
                 textAlignVertical={(!inputText || showModeSelector) ? 'center' : 'top'}
@@ -11023,6 +11038,7 @@ const styles = StyleSheet.create({
   modernTextInput: {
     flex: 1,
     fontSize: 16,
+    lineHeight: COMPOSER_LINE_HEIGHT,
     color: COLORS.white,
     paddingHorizontal: 16,
     minHeight: COMPOSER_MIN_HEIGHT,

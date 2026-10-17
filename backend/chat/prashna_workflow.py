@@ -35,8 +35,9 @@ def apply_prashna_transition(intent: Dict[str, Any], question: str, context: Dic
     resolved = str(intent.get('resolved_question') or '').strip() or (qc.get('_clarification_context') if transition == 'none' else None) or question
     if transition == 'natal':
         qc.pop('prashna_location', None)
-        # A new topic must not carry the old clarification chain into generation.
-        resolved = question
+        qc.pop('_prashna_previous', None)
+        # Preserve the router's resolved natal follow-up, never the old Prashna chain.
+        resolved = str(intent.get('resolved_question') or '').strip() or question
     elif transition == 'clarify_workflow' and previous:
         intent = {**intent, 'status': 'CLARIFY', 'route_action': 'clarify',
                   'workflow_choice': True, 'prashna_intent': 'none',

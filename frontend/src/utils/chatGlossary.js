@@ -15,7 +15,7 @@ const escapeChatHtmlText = (value) => String(value ?? '')
 export const buildGlossaryTooltipHtml = (termText, termKey, definition) => (
     `<span class="tooltip-wrapper" data-term="${escapeChatHtmlAttribute(termKey)}" `
     + `data-definition="${escapeChatHtmlAttribute(definition)}" `
-    + 'style="color: #e91e63; font-weight: bold; cursor: pointer; border-bottom: 1px dotted #e91e63;">'
+    + 'style="color: var(--color-brand); cursor: pointer;">'
     + `<span class="term-tooltip">${escapeChatHtmlText(termText)}</span></span>`
 );
 

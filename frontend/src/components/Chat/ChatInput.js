@@ -26,6 +26,7 @@ const ChatInput = ({
     isMundaneMode = false,
     prashnaMode = false,
     verifiedMode = false,
+    fixedVerified = false,
     isLocked = false, // when true, composer is disabled until guided steps are completed
     isAssistantSpeaking = false,
     onInterruptAssistantSpeech = () => {},
@@ -107,7 +108,7 @@ const ChatInput = ({
         }
     }, [isPartnershipMode, isMundaneMode, onInstantModeChange]);
 
-    const showPremiumControls = !prashnaMode && !isPartnershipMode && !isMundaneMode;
+    const showPremiumControls = !fixedVerified && !prashnaMode && !isPartnershipMode && !isMundaneMode;
     const useCompactPremium = showPremiumControls && isMobileLayout;
     const useFreeQuestionEligible = showPremiumControls && !verifiedMode && !isPremiumAnalysis && freeQuestionAvailable;
 
@@ -455,7 +456,7 @@ const ChatInput = ({
                     </button>
                 </div>
             )}
-            <div
+            {!fixedVerified && <div
                 className={`premium-toggle-container chat-composer-premium ${instantHeaderControls && isInstantSendMode && !showDesktopModeSelector ? 'chat-composer-premium--empty' : ''}`}
                 style={{
                     display: 'flex',
@@ -550,7 +551,7 @@ const ChatInput = ({
                         )
                     ) : (
                     <div className="chat-mode-selector-web" role="group" aria-label="Answer mode">
-                        {(verifiedChatEnabled || verifiedMode) && <button type="button" className={`chat-mode-option ${verifiedMode ? 'chat-mode-option--active' : ''}`} disabled={isLocked} onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('verified'); }}><span className="chat-mode-option__label">Verified</span><span className="chat-mode-option__cost">{verifiedChatCost} credits</span></button>}
+                        {(verifiedChatEnabled || verifiedMode) && <button type="button" className={`chat-mode-option ${verifiedMode ? 'chat-mode-option--active' : ''}`} disabled={isLocked} onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('verified'); }}><span className="chat-mode-option__topline"><span className="chat-mode-option__label">Verified</span><span className="chat-mode-option__cost">{verifiedChatCost} credits</span></span><span className="chat-mode-option__description">Verified chart analysis</span></button>}
                         <button
                             type="button"
                             className={`chat-mode-option ${!verifiedMode && !isPremiumAnalysis && !instantMode ? 'chat-mode-option--active' : ''}`}
@@ -652,7 +653,7 @@ const ChatInput = ({
                         </button>
                     </div>
                 )}
-            </div>
+            </div>}
             <form onSubmit={handleSubmit} className="chat-input-form">
                 <input
                     type="text"

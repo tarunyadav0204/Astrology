@@ -1,0 +1,55 @@
+.chart-tara-launcher {
+  position: static; flex-shrink: 0;
+  border: 1px solid var(--color-brand); border-radius: 999px; padding: 8px 14px;
+  background: var(--color-brand); color: var(--color-on-brand); font: inherit;
+  font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.chart-tara-launcher:disabled { opacity: .55; cursor: not-allowed; }
+.parashari-desk .chart-tara-launcher {
+  background: var(--color-text-inverse); color: var(--color-surface-inverse);
+  border-color: var(--color-text-inverse); border-radius: 999px;
+  padding: 7px 14px; min-height: 32px; font-weight: 800;
+}
+.parashari-desk .chart-tara-launcher:hover,
+.parashari-desk .chart-tara-launcher:focus-visible {
+  background: var(--color-text-inverse); color: var(--color-surface-inverse);
+  border-color: var(--color-text-inverse); box-shadow: 0 0 0 3px var(--color-border-inverse);
+}
+.chart-tara-panel {
+  box-sizing: border-box;
+  position: fixed; right: 20px; bottom: 16px; z-index: 1100;
+  width: min(440px, calc(100vw - 16px)); height: min(740px, calc(100dvh - 24px));
+  display: flex; flex-direction: column; border-radius: 20px;
+  border: 1px solid var(--color-border); background: var(--color-canvas);
+  color: var(--color-text); box-shadow: 0 16px 60px #0005; overflow: hidden;
+}
+.chart-tara-panel[hidden] { display: none; }
+.chart-tara-panel__header { display: flex; align-items: center; background: var(--color-brand); color: var(--color-on-brand); flex-shrink: 0; }
+.chart-tara-panel__drag { flex: 1; min-width: 0; padding: 14px 16px; cursor: grab; touch-action: none; user-select: none; }
+.chart-tara-panel__drag:active { cursor: grabbing; }
+.chart-tara-panel__drag:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
+.chart-tara-panel__drag strong { display: block; font-size: 17px; }
+.chart-tara-panel__drag strong span { font-size: 11px; margin-left: 8px; padding: 3px 7px; border: 1px solid currentColor; border-radius: 999px; }
+.chart-tara-panel__drag small { display: block; margin-top: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.chart-tara-panel__close { width: 44px; height: 44px; margin-right: 8px; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 28px; cursor: pointer; }
+.chart-tara-panel__body { flex: 1; min-height: 0; overflow: hidden; }
+.chart-tara-panel .chat-page {
+  display: flex !important; flex-direction: column; width: 100%; max-width: none;
+  height: 100% !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important;
+}
+.chart-tara-panel .chat-page > .chat-header,
+.chart-tara-panel .suggestions-scroll-wrapper { display: none !important; }
+.chart-tara-panel .chat-page > .chat-container { flex: 1; min-height: 0; width: 100%; max-width: none; margin: 0; padding: 12px; overflow-y: auto; }
+.chart-tara-panel .chat-thread { width: 100%; max-width: none; padding: 0; }
+.chart-tara-panel .chat-thread-welcome { padding: 12px; }
+.chart-tara-panel .chat-thread-welcome h2 { font-size: 22px; }
+.chart-tara-panel .chat-page > .chat-input-container { flex-shrink: 0; width: 100%; max-width: none; margin: 0; padding: 8px; position: static; box-sizing: border-box; }
+.chart-tara-panel .chat-page .chat-input-form { width: 100%; max-width: none; min-width: 0; padding: 6px; gap: 6px; box-sizing: border-box; }
+.chart-tara-panel .chat-page .chat-input { min-width: 0; padding: 10px; font-size: 14px; }
+.chart-tara-panel .chat-page .send-button { min-width: 54px; padding: 10px; }
+.chart-tara-panel .chat-page .speech-button { width: 40px; min-width: 40px; padding: 8px; }
+.chart-tara-panel .speech-button__label { display: none; }
+.chart-tara-panel .message-bubble { max-width: 100%; }
+@media (max-width: 600px) {
+  .chart-tara-panel { right: 8px; bottom: 8px; height: min(680px, calc(100dvh - 16px)); }
+}

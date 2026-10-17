@@ -16,6 +16,7 @@ import {
   ScrollView,
   Dimensions,
   Platform,
+  Clipboard as NativeClipboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -24,6 +25,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { prepareAndSharePdf } from '../../utils/pdfPreparation';
 import * as Clipboard from 'expo-clipboard';
+import { copyChatMessage } from '../../utils/copyChatMessage';
 import { COLORS, API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { stopAnimatedValue, stopAnimationLoop } from '../../utils/safeAnimated';
 import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule, userFacingPdfExportError } from '../../utils/pdfGenerator';
@@ -1001,18 +1003,15 @@ function MessageBubble({
 
   const copyToClipboard = async () => {
     try {
-      const cleanText = String(message.content || '')
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1')
-        .replace(/###\s*(.*?)$/gm, '$1')
-        .replace(/<[^>]*>/g, '')
-        .replace(/•\s*/g, '• ')
-        .trim();
-
-      await Clipboard.setStringAsync(cleanText);
+      await copyChatMessage(
+        message.content,
+        message.role,
+        text => Clipboard.setStringAsync(text),
+        Platform.OS !== 'web' ? text => NativeClipboard.setString(text) : undefined,
+      );
       setCopyAlert({ visible: true, error: false });
     } catch (error) {
-      console.error('[MessageBubble] Failed to copy message', error);
+      console.warn('[MessageBubble] Clipboard write failed:', error?.code || error?.name || 'UnknownError');
       setCopyAlert({ visible: true, error: true });
     }
   };

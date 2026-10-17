@@ -106,7 +106,7 @@ body:has([role='dialog']) [data-ar-home-bottom-nav='1'] {
 
 /*
  * Chat composer only. Empty stays one row (placeholder vs send button).
- * Filled grows with content up to three lines.
+ * Filled grows with content up to five lines.
  */
 #chat-composer-input {
   margin: 0;
@@ -125,7 +125,7 @@ body:has([role='dialog']) [data-ar-home-bottom-nav='1'] {
 #chat-composer-input:not(:placeholder-shown) {
   field-sizing: content;
   min-height: 44px;
-  max-height: 88px;
+  max-height: 132px;
   overflow-y: auto;
 }
 

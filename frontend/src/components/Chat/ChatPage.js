@@ -199,7 +199,7 @@ function singleChartProfileDisplay(b) {
 // Enable detailed logging for debugging
 // console.log('ChatPage component loaded - debugging enabled');
 
-const ChatPage = ({ onLogin }) => {
+const ChatPage = ({ onLogin, embeddedVerified = false }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { birthData } = useAstrology();
@@ -270,8 +270,8 @@ const ChatPage = ({ onLogin }) => {
     const [isPartnershipMode, setIsPartnershipMode] = useState(false);
     const [pendingMuhuratQuestion, setPendingMuhuratQuestion] = useState(null);
     const [prashnaLocation, setPrashnaLocation] = useState(null);
-    const [selectedChatTier, setSelectedChatTier] = useState('standard');
-    const [verifiedConversationMode, setVerifiedConversationMode] = useState(false);
+    const [selectedChatTier, setSelectedChatTier] = useState(embeddedVerified ? 'verified' : 'standard');
+    const [verifiedConversationMode, setVerifiedConversationMode] = useState(embeddedVerified);
     useEffect(() => {
         if (isPartnershipMode) {
             setPrashnaLocation(null);
@@ -287,9 +287,9 @@ const ChatPage = ({ onLogin }) => {
     const subjectGateMemoryRef = useRef([]);
 
     // Guided workflow wizard (embedded in this one-screen chat page).
-    const [wizardMode, setWizardMode] = useState(null); // 'single' | 'partnership' | 'mundane'
+    const [wizardMode, setWizardMode] = useState(embeddedVerified ? 'single' : null); // 'single' | 'partnership' | 'mundane'
     const [wizardStep, setWizardStep] = useState(0);
-    const [wizardCompleted, setWizardCompleted] = useState(false);
+    const [wizardCompleted, setWizardCompleted] = useState(embeddedVerified);
     const isWizardLocked = !wizardCompleted;
     const [wizardPartnershipStep, setWizardPartnershipStep] = useState(1); // 1:first chart, 2:second chart, 3:relationship
     const [wizardPrimaryChart, setWizardPrimaryChart] = useState(null);
@@ -1998,6 +1998,7 @@ const ChatPage = ({ onLogin }) => {
     });
 
     const handleSendMessageChatV2 = async (message, options = {}) => {
+        if (embeddedVerified) options = { ...options, chat_tier: 'verified', premium_analysis: false, instant_chat: false };
         if (!birthData) return;
 
         const userMessageId = Date.now();
@@ -2011,6 +2012,7 @@ const ChatPage = ({ onLogin }) => {
 
         const processingClientId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const useFreeQuestion = !options?.premium_analysis && options?.chat_tier !== 'verified' && !prashnaLocation && !isPartnershipMode && !isMundaneMode && freeQuestionAvailable;
+        const useVerifiedChat = Boolean(prashnaLocation || options?.chat_tier === 'verified');
         const useInstantChat =
             !useFreeQuestion
             && !prashnaLocation
@@ -2028,10 +2030,10 @@ const ChatPage = ({ onLogin }) => {
             isProcessing: true,
             isTyping: true,
             message_type: 'answer',
-            chatTier: useInstantChat ? 'instant' : undefined,
+            chatTier: useInstantChat ? 'instant' : useVerifiedChat ? 'verified' : undefined,
             loadingMessage: useInstantChat
                 ? INSTANT_LOADER_LINES[0]
-                : '🔮 Analyzing your birth chart...',
+                : useVerifiedChat ? 'Reading your question…' : '🔮 Analyzing your birth chart...',
             chartData: chartDataForMessage,
             chartInsights: useInstantChat ? [] : [],
             // Instant answers stay silent on web. The reply toolbar provides an explicit Listen control.
@@ -2138,6 +2140,7 @@ const ChatPage = ({ onLogin }) => {
         if (subjectGateOverride) {
             requestData.subject_gate_override = subjectGateOverride;
         }
+        if (embeddedVerified) requestData.subject_gate_override = 'selected_chart_only';
 
         if (useInstantChat) {
             requestData.chat_tier = 'instant';
@@ -2197,7 +2200,7 @@ const ChatPage = ({ onLogin }) => {
                 body: JSON.stringify(requestData),
             });
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            let response = useInstantChat
+            let response = (useInstantChat || useVerifiedChat)
                 ? await askOverConversation(`${wsProtocol}//${window.location.host}/api/chat-v2/conversation`, token, requestData, submitHttp)
                 : await submitHttp();
 
@@ -2223,7 +2226,7 @@ const ChatPage = ({ onLogin }) => {
                             session_id: newSid,
                             ...(retryBillingId ? { instant_billing_session_id: retryBillingId } : {}),
                         };
-                        response = await fetch('/api/chat-v2/ask', {
+                        const retryHttp = () => fetch('/api/chat-v2/ask', {
                             method: 'POST',
                             headers: {
                                 'Authorization': `Bearer ${token}`,
@@ -2231,6 +2234,9 @@ const ChatPage = ({ onLogin }) => {
                             },
                             body: JSON.stringify(retryBody),
                         });
+                        response = (useInstantChat || useVerifiedChat)
+                            ? await askOverConversation(`${wsProtocol}//${window.location.host}/api/chat-v2/conversation`, token, retryBody, retryHttp)
+                            : await retryHttp();
                         if (!response.ok) {
                             t = await response.text().catch(() => '');
                             throw new Error(`chat-v2/ask failed: HTTP ${response.status} ${t}`);
@@ -2259,7 +2265,7 @@ const ChatPage = ({ onLogin }) => {
                 prev.map(m => (m.messageId === userMessageId ? { ...m, messageId: serverUserMessageId, isFromDatabase: true } : m))
             );
 
-            const serverTier = String(result.chat_tier || (useInstantChat ? 'instant' : 'standard')).trim().toLowerCase();
+            const serverTier = String(result.chat_tier || (useInstantChat ? 'instant' : useVerifiedChat ? 'verified' : 'standard')).trim().toLowerCase();
 
             setMessages(prev =>
                 prev.map(m =>
@@ -2279,19 +2285,19 @@ const ChatPage = ({ onLogin }) => {
                 )
             );
 
-            const observeStatus = serverTier === 'instant'
+            const observeStatus = ['instant', 'verified'].includes(serverTier)
                 ? streamChatV2Status(
                     assistantMessageId,
                     processingClientId,
                     useFreeQuestion,
-                    true,
+                    serverTier === 'instant',
                 ).catch((streamError) => {
-                    console.warn('[ChatPage] Instant WebSocket unavailable; using polling fallback', streamError);
+                    console.warn('[ChatPage] Conversation WebSocket unavailable; using polling fallback', streamError);
                     return pollChatV2Status(
                         assistantMessageId,
                         processingClientId,
                         useFreeQuestion,
-                        true,
+                        serverTier === 'instant',
                     );
                 })
                 : pollChatV2Status(
@@ -2323,6 +2329,7 @@ const ChatPage = ({ onLogin }) => {
     };
 
     const handleSendMessage = async (message, options = {}) => {
+        if (embeddedVerified) return handleSendMessageChatV2(message, { ...options, chat_tier: 'verified', premium_analysis: false, instant_chat: false });
         if (isMundaneMode) {
             // Mundane does not require birthData, but ChatInput is still wired to this component.
             await handleSendMundaneMessage(message, options);
@@ -2889,7 +2896,7 @@ const ChatPage = ({ onLogin }) => {
                     handleSendMessageChatV2(pending.question, { chat_tier: 'verified', premium_analysis: false, query_context: { ...pending.queryContext, prashna_choice: 'prashna', prashna_requested: true, prashna_location: place } });
                 }} />
             </section></div>}
-            <ModernNavigationHeader
+            {!embeddedVerified && <ModernNavigationHeader
                 user={headerUser}
                 sticky
                 showNativeBar={false}
@@ -2900,14 +2907,14 @@ const ChatPage = ({ onLogin }) => {
                     navigate('/');
                 }}
                 onLogin={() => (onLogin ? onLogin() : navigate('/login'))}
-            />
-            <FirstPurchaseOffer
+            />}
+            {!embeddedVerified && <FirstPurchaseOffer
                 offer={firstPurchaseOffer}
                 remainingSeconds={firstPurchaseOfferRemainingSeconds}
                 modalOpen={firstPurchaseOfferModalOpen}
                 onClaim={claimFirstPurchaseOffer}
                 onCloseModal={() => setFirstPurchaseOfferModalOpen(false)}
-            />
+            />}
             <div className={`chat-page${wizardCompleted ? '' : ' chat-page--wizard'}${headerUser ? ' chat-page--with-user-header chat-page--with-user-header-compact' : ''}${isInstantAnalysis ? ' chat-page--instant-focus' : ''}`}>
             <div className={`chat-header${wizardCompleted ? '' : ' chat-header--wizard'}`}>
                 {!wizardCompleted ? (
@@ -3588,7 +3595,7 @@ const ChatPage = ({ onLogin }) => {
                 )}
             </div>
 
-            {wizardCompleted ? (
+            {wizardCompleted && !embeddedVerified ? (
                 <aside className="chat-consultation-rail" aria-label="Consultation context">
                     <div className="chat-consultation-rail__intro">
                         <span className="chat-consultation-rail__eyebrow">Private consultation</span>
@@ -3667,7 +3674,7 @@ const ChatPage = ({ onLogin }) => {
                                 <p>Ask about a decision, relationship, life phase or timing. Tara will connect the relevant chart factors into one clear answer.</p>
                             </section>
                         ) : null}
-                        {!isInstantAnalysis && !isMundaneMode && isBirthChartReadyForChat(birthData) && (
+                        {!embeddedVerified && !isInstantAnalysis && !isMundaneMode && isBirthChartReadyForChat(birthData) && (
                             <div className="message-bubble assistant chat-chart-essence-wrap">
                                 <div className="message-content chat-chart-essence-wrap__content">
                                     <ChatChartEssence
@@ -3711,10 +3718,11 @@ const ChatPage = ({ onLogin }) => {
             {(wizardCompleted || wizardMode) && (
                 <>
                 <ChatInput
+                    fixedVerified={embeddedVerified}
                     prashnaMode={Boolean(prashnaLocation)}
-                    verifiedMode={verifiedConversationMode}
+                    verifiedMode={embeddedVerified || verifiedConversationMode}
                     initialMode={verifiedConversationMode ? 'verified' : selectedChatTier}
-                    onModeChange={mode => { setSelectedChatTier(mode); setVerifiedConversationMode(mode === 'verified'); }}
+                    onModeChange={mode => { if (embeddedVerified) return; setSelectedChatTier(mode); setVerifiedConversationMode(mode === 'verified'); }}
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading}
                     followUpQuestion={pendingFollowUpQuestion}
@@ -3744,7 +3752,7 @@ const ChatPage = ({ onLogin }) => {
                 </>
             )}
 
-            {answerStylePreferenceHydrated && showAnswerStyleIntro && wizardCompleted && (
+            {!embeddedVerified && answerStylePreferenceHydrated && showAnswerStyleIntro && wizardCompleted && (
                 <div className="answer-style-intro" role="dialog" aria-modal="true" aria-labelledby="answer-style-intro-title">
                     <div className="answer-style-intro__card">
                         <span className="answer-style-intro__eyebrow">New answer preference</span>

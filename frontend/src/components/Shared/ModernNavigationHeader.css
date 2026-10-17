@@ -656,3 +656,13 @@
   .ar-modern-nav .mh-native-bar__change { font-size: 0; }
   .ar-modern-nav .mh-native-bar__change::before { content: 'Change'; font-size: 9px; }
 }
+
+@media (max-width: 640px) {
+  .ar-modern-nav .mh-nav__inner { padding-inline: 12px; gap: 10px; }
+  .ar-modern-nav .mh-brand { min-width: 0; font-size: 19px; gap: 8px; }
+  .ar-modern-nav .mh-brand__mark { width: 38px; height: 38px; flex-basis: 38px; }
+  .ar-modern-nav .mh-brand img { width: 36px; height: 36px; }
+  .ar-modern-nav .mh-nav__actions { gap: 7px; flex-shrink: 0; }
+  /* Admin remains available in the mobile navigation menu. */
+  .ar-modern-nav .mh-nav__actions > .mh-text-button { display: none; }
+}

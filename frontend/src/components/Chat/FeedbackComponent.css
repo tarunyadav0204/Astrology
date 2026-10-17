@@ -252,5 +252,7 @@
 }
 
 .feedback-reasons { display:flex; flex-wrap:wrap; gap:8px; }
-.feedback-reasons button { border:1px solid #c9b6bd; border-radius:16px; padding:8px 12px; background:transparent; color:inherit; cursor:pointer; }
-.feedback-reasons button[aria-pressed="true"] { background:#f1dfe7; border-color:#781f43; color:#57132d; }
+.feedback-reasons button { border:1px solid var(--color-border-strong); border-radius:16px; padding:8px 12px; background:transparent; color:var(--color-text); cursor:pointer; }
+.feedback-reasons button[aria-pressed="true"] { background:var(--color-accent-soft); border-color:var(--color-accent); color:var(--color-on-accent); }
+.feedback-reasons button:hover:not(:disabled) { border-color:var(--color-accent); }
+.feedback-reasons button:focus-visible { outline:2px solid var(--color-accent); outline-offset:2px; }
