@@ -2138,6 +2138,16 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         and not partnership_mode
         and instant_chat_enabled_for_user(current_user.userid)
     )
+    if instant_chat_requested and not instant_chat_active and (
+        request.get("instant_path") == "calculator_first"
+        or raw_query_context.get("instant_path") == "calculator_first"
+    ):
+        raise HTTPException(status_code=403, detail="Live chat is not enabled for your account.")
+    from chat.calculator_first import CALCULATOR_FIRST, select_instant_path
+    chart_chat_active = bool(instant_chat_active and not speech_chat_requested and
+        select_instant_path(request.get("instant_path") or raw_query_context.get("instant_path")) == CALCULATOR_FIRST)
+    if chart_chat_active:
+        instant_timeline_selection = False
     verified_chat_active = (
         verified_chat_requested
         and not premium_analysis
@@ -2556,7 +2566,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
     # clients omit this id and retain the legacy per-answer price during rollout.
     instant_billing_session_id = str(request.get("instant_billing_session_id") or "").strip()
     instant_metered_billing = bool(
-        instant_chat_active and instant_billing_session_id and not speech_chat_requested
+        instant_chat_active and instant_billing_session_id and not speech_chat_requested and not chart_chat_active
     )
     instant_billing_state = None
     if instant_metered_billing:
@@ -2571,7 +2581,9 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
 
     # Check credit cost and user balance (first question free for standard chat)
     credit_service = CreditService()
-    if partnership_mode and not verified_chat_active and not premium_analysis:
+    if chart_chat_active:
+        chat_cost = credit_service.get_credit_setting('chart_chat_cost')
+    elif partnership_mode and not verified_chat_active and not premium_analysis:
         chat_cost = credit_service.get_credit_setting('partnership_analysis_cost')
     elif premium_analysis:
         chat_cost = credit_service.get_credit_setting('premium_chat_cost')
@@ -2625,7 +2637,12 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             )
         )
     )
-    effective_cost = 0 if (free_eligible or instant_metered_billing or instant_timeline_selection) else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
+    if chart_chat_active:
+        from credits.chart_chat import chart_chat_cost
+        chat_key = 'chart_chat_cost'
+        effective_cost = chart_chat_cost(credit_service, current_user)
+    else:
+        effective_cost = 0 if (free_eligible or instant_metered_billing or instant_timeline_selection) else credit_service.get_effective_cost(current_user.userid, chat_cost, chat_key)
     log_ask_phase(
         "credits",
         chat_key=chat_key,
@@ -2643,7 +2660,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         elif verified_chat_active:
             analysis_type = "Verified Chat"
         elif instant_chat_active:
-            analysis_type = "Talk To Tara" if speech_chat_requested else "Instant Chat"
+            analysis_type = "Chart Chat" if chart_chat_active else "Talk To Tara" if speech_chat_requested else "Instant Chat"
         else:
             analysis_type = "Standard Analysis"
         if speech_chat_billing or instant_chat_active:
@@ -5415,8 +5432,8 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 else:
                     amount_to_deduct = effective_cost if effective_cost is not None else chat_cost
                     if is_instant_chat:
-                        analysis_type = "Talk To Tara" if is_speech_chat else "Instant Chat"
-                        spend_feature = "speech_chat" if is_speech_chat else "instant_chat"
+                        analysis_type = "Chart Chat" if is_calculator_first else "Talk To Tara" if is_speech_chat else "Instant Chat"
+                        spend_feature = "chart_chat" if is_calculator_first else "speech_chat" if is_speech_chat else "instant_chat"
                     elif is_verified_chat:
                         analysis_type = "Verified Chat"
                         spend_feature = "chat_question"

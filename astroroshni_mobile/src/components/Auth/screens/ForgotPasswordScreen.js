@@ -94,7 +94,7 @@ export default function ForgotPasswordScreen({ formData, updateFormData, navigat
         title={meta.title}
         subtitle={meta.subtitle}
         onBack={back}
-        action={<TouchableOpacity style={[styles.action, { backgroundColor: stepValid ? colors.accent : colors.surfaceMuted }]} onPress={step === 1 ? sendCode : step === 2 ? verifyCode : resetPassword} disabled={!stepValid || loading}><Text style={[styles.actionText, { color: stepValid ? colors.onAccent : colors.textTertiary }]}>{loading ? t('authDeep.pleaseWait', 'Please wait…') : meta.action}</Text><Ionicons name="arrow-forward" size={19} color={stepValid ? colors.onAccent : colors.textTertiary} /></TouchableOpacity>}
+        action={<TouchableOpacity style={[styles.action, { backgroundColor: stepValid ? '#d7b878' : colors.cosmicRaised, borderWidth: stepValid ? 0 : 1, borderColor: colors.cosmicLine }]} onPress={step === 1 ? sendCode : step === 2 ? verifyCode : resetPassword} disabled={!stepValid || loading}><Text style={[styles.actionText, { color: stepValid ? '#210b17' : colors.textInverseMuted }]}>{loading ? t('authDeep.pleaseWait', 'Please wait…') : meta.action}</Text><Ionicons name="arrow-forward" size={19} color={stepValid ? '#210b17' : colors.textInverseMuted} /></TouchableOpacity>}
       >
         <Animated.View style={{ opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
           {step === 1 && <>

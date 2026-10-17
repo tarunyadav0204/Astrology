@@ -111,6 +111,7 @@ def get_base_pricing_with_originals(credit_service: Any) -> Tuple[Dict[str, int]
     setting_keys = [
         ("chat", "chat_question_cost"),
         ("instant_chat", "instant_chat_cost"),
+        ("chart_chat", "chart_chat_cost"),
         ("instant_chat_first_minute", "instant_chat_first_minute_cost"),
         ("instant_chat_per_minute", "instant_chat_per_minute_cost"),
         ("speech_chat", "speech_chat_cost"),

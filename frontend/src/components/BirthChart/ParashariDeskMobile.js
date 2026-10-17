@@ -102,6 +102,7 @@ export default function ParashariDeskMobile({
   specialChartOptions,
   selectedDivisionalChart,
   dxChartType,
+  onChartChatViewChange,
   dashaSystem,
   onDashaSystemChange,
   activationLedger,
@@ -229,6 +230,10 @@ export default function ParashariDeskMobile({
       division: typeof selectedDx === 'number' ? selectedDx : undefined,
     };
   }, [chartPill, dxChartType, selectedDivisionalChart, selectedDx]);
+
+  useEffect(() => {
+    onChartChatViewChange?.(activeChart.title);
+  }, [activeChart.title, onChartChatViewChange]);
 
   const handleHouseSelect = (sel) => {
     onHouseSelect?.(sel);

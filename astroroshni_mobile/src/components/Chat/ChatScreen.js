@@ -8147,8 +8147,14 @@ export default function ChatScreen({ navigation, route }) {
                 multiline
                 scrollEnabled={Boolean(inputText) && !showModeSelector && composerHeight >= COMPOSER_MAX_HEIGHT}
                 {...(Platform.OS === 'web' && (!inputText || showModeSelector) ? { rows: 1 } : {})}
-                {...(Platform.OS !== 'web' && (!inputText || showModeSelector) ? { numberOfLines: 1 } : {})}
-                textAlignVertical={(!inputText || showModeSelector) ? 'center' : 'top'}
+                {...(Platform.OS !== 'web' ? {
+                  // Android setLines() persists independently of the outer height.
+                  // Always update it; dropping the one-line prop leaves native text clipped.
+                  numberOfLines: (!inputText || showModeSelector) ? 1 : Math.max(
+                    1, Math.min(COMPOSER_MAX_LINES, Math.round((composerHeight - 20) / COMPOSER_LINE_HEIGHT)),
+                  ),
+                } : {})}
+                textAlignVertical={Platform.OS !== 'web' ? 'top' : ((!inputText || showModeSelector) ? 'center' : 'top')}
                 blurOnSubmit={false}
               />
 

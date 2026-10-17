@@ -10,7 +10,7 @@ export async function askOverConversation(url, token, request, fallback) {
         let socket;
         try { socket = new WebSocket(`${url}?token=${encodeURIComponent(token)}`); }
         catch (_) { return fallback(); }
-        connection = { socket, pending: new Map(), listeners: new Map(), buffers: new Map() };
+        connection = { sessionId: request.session_id, socket, pending: new Map(), listeners: new Map(), buffers: new Map() };
         conversations.set(key, connection);
         connection.ready = new Promise((resolve, reject) => {
             const timer = setTimeout(() => { reject(new Error('Conversation unavailable')); socket.close(); }, 5000);
@@ -94,4 +94,15 @@ export function closeConversations() {
     for (const connection of conversations.values()) connection.socket.close();
     conversations.clear();
     turns.clear();
+}
+
+
+export function closeConversationSession(sessionId) {
+    if (!sessionId) return;
+    for (const [key, connection] of conversations) {
+        if (connection.sessionId !== sessionId) continue;
+        conversations.delete(key);
+        for (const [mid, owner] of turns) if (owner === connection) turns.delete(mid);
+        connection.socket.close();
+    }
 }

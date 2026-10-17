@@ -30,6 +30,7 @@ const LEDGER_FEATURE_OPTIONS = [
   { value: '', label: 'All features' },
   { value: 'standard_chat', label: 'Standard Chat' },
   { value: 'live_chat', label: 'Live Chat' },
+  { value: 'chart_chat', label: 'Chart Chat' },
   { value: 'talk_to_tara', label: 'Talk to Tara' },
   { value: 'premium_chat', label: 'Premium Chat' },
   { value: 'partnership_chat', label: 'Partnership Chat' },
@@ -372,6 +373,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
       const names = {
         chat_question: 'Standard Chat',
         instant_chat: 'Live Chat',
+        chart_chat: 'Chart Chat',
         instant_chat_minutes: 'Live Chat',
         speech_chat: 'Talk to Tara',
         speech_chat_minutes: 'Talk to Tara',

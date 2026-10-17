@@ -9,7 +9,6 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { COLORS } from '../../../utils/constants';
 import { authAPI, chartAPI } from '../../../services/api';
@@ -373,19 +372,15 @@ export default function PasswordScreen({
           ]}
         >
           <TouchableOpacity
-            style={[styles.continueButton, { shadowColor: colors.accent }, !isValid && styles.buttonDisabled]}
+            key={isValid ? 'enabled-action' : 'disabled-action'}
+            style={[styles.continueButton, styles.buttonGradient, { shadowColor: colors.accent, backgroundColor: isValid ? '#d7b878' : colors.cosmicRaised }, !isValid && [styles.buttonDisabled, { borderColor: colors.cosmicLine }]]}
             onPress={handleContinue}
             disabled={!isValid || loading}
           >
-            <LinearGradient
-              colors={isValid ? [colors.accent, colors.accent] : [colors.surfaceMuted, colors.surfaceMuted]}
-              style={styles.buttonGradient}
-            >
-              <Text style={[styles.buttonText, { color: isValid ? colors.onAccent : colors.textTertiary }]}>
+              <Text style={[styles.buttonText, { color: isValid ? '#210b17' : colors.textInverseMuted }]}>
                 {loading ? (isLogin ? 'Signing In...' : 'Continue') : (isLogin ? 'Sign In' : 'Continue')}
               </Text>
-              <Ionicons name="arrow-forward" size={20} color={isValid ? colors.onAccent : colors.textTertiary} />
-            </LinearGradient>
+              <Ionicons name="arrow-forward" size={20} color={isValid ? '#210b17' : colors.textInverseMuted} />
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -583,14 +578,16 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     borderRadius: 16,
-    overflow: 'hidden',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   buttonDisabled: {
-    opacity: 0.5,
+    borderWidth: 1,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   buttonGradient: {
     flexDirection: 'row',
@@ -601,6 +598,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 18,
+    opacity: 1,
     fontWeight: '600',
   },
   forgotButton: {

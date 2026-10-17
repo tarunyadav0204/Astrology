@@ -50,7 +50,7 @@ const toLocalYmd = (value) => {
   return `${date.getFullYear()}-${month}-${day}`;
 };
 
-const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, onRequestBirthChart, onRequestTimingLicense, timingLicensed = false, division, navigation, onHousePress, onDrawingModeChange }, ref) => {
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, onRequestBirthChart, onRequestTimingLicense, timingLicensed = false, division, navigation, onHousePress, onDrawingModeChange, onAskTara }, ref) => {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const dashaColor = dashaPaint(colors).fill;
@@ -1432,6 +1432,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
               label={t('chartScreen.askTara', 'Ask Tara')}
               primary
               onPress={() => {
+                if (onAskTara) { onAskTara(); return; }
                 const chartName = chartTitles[currentChartType] || currentChartType;
                 const prompt = `Analyze my ${chartName} chart in detail. What does it reveal about my life?`;
                 navigation?.navigate('Home', { startChat: true, initialMessage: prompt });

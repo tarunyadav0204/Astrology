@@ -3427,6 +3427,7 @@ def _get_pricing_with_originals():
     keys_map = [
         ("chat", "chat_question_cost"),
         ("instant_chat", "instant_chat_cost"),
+        ("chart_chat", "chart_chat_cost"),
         ("instant_chat_first_minute", "instant_chat_first_minute_cost"),
         ("instant_chat_per_minute", "instant_chat_per_minute_cost"),
         ("speech_chat", "speech_chat_cost"),
@@ -3530,6 +3531,7 @@ async def get_analysis_pricing():
 _PRICING_KEYS_MAP = [
     ("chat", "chat_question_cost"),
     ("instant_chat", "instant_chat_cost"),
+        ("chart_chat", "chart_chat_cost"),
     ("instant_chat_first_minute", "instant_chat_first_minute_cost"),
     ("instant_chat_per_minute", "instant_chat_per_minute_cost"),
     ("speech_chat", "speech_chat_cost"),
@@ -3651,6 +3653,11 @@ async def get_my_pricing(current_user: User = Depends(get_current_user)):
         pricing[short_key] = effective
         if original_val is not None and effective < original_val:
             pricing_original[short_key] = original_val
+
+    from credits.chart_chat import chart_chat_is_free
+    if chart_chat_is_free(current_user):
+        pricing_original["chart_chat"] = _effective_from_setting("chart_chat_cost")[1]
+        pricing["chart_chat"] = 0
 
     # Computed: trading premium daily/monthly from effective base costs.
     try:

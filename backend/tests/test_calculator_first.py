@@ -18,6 +18,22 @@ class Responses:
             usage=SimpleNamespace(input_tokens=10,output_tokens=5,input_tokens_details=SimpleNamespace(cached_tokens=2)))
 
 
+    def stream(self, **kwargs):
+        owner = self
+        class Stream:
+            async def __aenter__(self):
+                self.response = await owner.create(**kwargs)
+                return self
+            async def __aexit__(self, *args): return False
+            def __aiter__(self):
+                async def events():
+                    for token in self.response.output_text.splitlines(keepends=True):
+                        yield SimpleNamespace(type='response.output_text.delta', delta=token)
+                return events()
+            async def get_final_response(self): return self.response
+        return Stream()
+
+
 def call(name, args, index=0):
     return SimpleNamespace(type='function_call',name=name,arguments=json.dumps(args),call_id=f'{name}-{index}')
 
@@ -170,3 +186,164 @@ def test_generation_dispatch_skips_all_legacy_initial_processing(monkeypatch):
     assert result['success']
     assert received['question']=='My new question'
     assert received['query_context']==CLOCK
+
+
+def test_answer_deltas_arrive_before_provider_finishes_without_duplicate_final(monkeypatch):
+    delivered = []
+    class ResponsesWithTokens(Responses):
+        def stream(self, **kwargs):
+            owner = self
+            class Stream:
+                async def __aenter__(self):
+                    self.response = await owner.create(**kwargs)
+                    return self
+                async def __aexit__(self, *args): return False
+                def __aiter__(self):
+                    async def events():
+                        yield SimpleNamespace(type='response.reasoning_text.delta', delta='Private reasoning')
+                        yield SimpleNamespace(type='response.function_call_arguments.delta', delta='Internal arguments')
+                        yield SimpleNamespace(type='response.output_text.delta', delta='Your ')
+                        assert delivered == [('Your ', 'Your ')]
+                        yield SimpleNamespace(type='response.output_text.delta', delta='reading.')
+                        assert delivered[-1] == ('reading.', 'Your reading.')
+                    return events()
+                async def get_final_response(self):
+                    assert len(delivered) == 2
+                    return self.response
+            return Stream()
+    responses = ResponsesWithTokens([([], 'Your reading.')])
+    client(monkeypatch, responses)
+    result = run(stream_callback=lambda delta, full: delivered.append((delta, full)))
+    assert result['response'] == 'Your reading.'
+    assert delivered == [('Your ', 'Your '), ('reading.', 'Your reading.')]
+    assert result['token_usage']['input_tokens'] == 10
+    assert len(responses.sent) == 1
+
+
+def test_stream_iteration_obeys_turn_deadline(monkeypatch):
+    class StalledResponses(Responses):
+        def stream(self, **kwargs):
+            class Stream:
+                async def __aenter__(self): return self
+                async def __aexit__(self, *args): return False
+                def __aiter__(self):
+                    async def events():
+                        await asyncio.sleep(10)
+                        yield SimpleNamespace(type='response.output_text.delta', delta='Late answer')
+                    return events()
+            return Stream()
+    client(monkeypatch, StalledResponses([]))
+    monkeypatch.setattr(agent, '_timeout', lambda: 0.05)
+    with pytest.raises(asyncio.TimeoutError):
+        run()
+
+
+def test_chart_chat_requests_substantive_plain_language_answers_not_one_line(monkeypatch):
+    responses = Responses([([], 'An explained reading.')])
+    client(monkeypatch, responses)
+    asyncio.run(agent.generate_calculator_first_response(
+        question='What does my chart say about my career?', birth_data=BIRTH,
+        history=[], query_context={**CLOCK, 'source': 'chart_sheet'}, model_name='test-model'))
+    instructions = responses.sent[0]['instructions']
+    assert 'simple means plain language, not a short or superficial answer' in instructions
+    assert '3–6 short paragraphs' in instructions
+    assert 'This limit does not apply to the final answer' in instructions
+    assert 'ONLY the report_calculation progress summary' in instructions
+
+
+def test_chart_answer_depth_is_not_applied_to_other_instant_conversations(monkeypatch):
+    responses = Responses([([], 'A conversational answer.')])
+    client(monkeypatch, responses)
+    run()
+    assert 'For Chart Chat' not in responses.sent[0]['instructions']
+
+
+@pytest.mark.parametrize('question', [
+    'मेरी शादी कब होगी?',
+    'meri shaadi kab hogi?',
+    'When will I get married?',
+    'என் திருமணம் எப்போது?',
+])
+def test_chart_chat_language_is_chosen_from_current_question_and_survives_tools(monkeypatch, question):
+    responses = Responses([
+        ([call('calculate', {'capability_id': 'parashari.natal_foundation', 'parameters': None})], ''),
+        ([], 'Synthetic answer'),
+    ])
+    client(monkeypatch, responses)
+    monkeypatch.setattr(agent.LazyCalculators, 'calculate', lambda *args: {'facts': {'English tool label': 7}})
+    asyncio.run(agent.generate_calculator_first_response(
+        question=question, birth_data=BIRTH,
+        history=[{'role': 'user', 'content': 'An older English question'}],
+        language='english', query_context={**CLOCK, 'source': 'chart_sheet'}, model_name='test-model'))
+    assert json.loads(responses.sent[0]['input'][0]['content'])['question'] == question
+    for request in responses.sent:
+        instructions = request['instructions']
+        assert 'The current user question is authoritative' in instructions
+        assert 'Roman Hindi/Hinglish questions in natural Roman Hindi/Hinglish' in instructions
+        assert 'Never switch to English after receiving a calculator result' in instructions
+        assert 'most recent substantive USER question in history' in instructions
+        assert 'Explicit language-switch requests still take priority' in instructions
+    assert question in responses.sent[1]['input'][-1]['content']
+    assert 'Do not let your own earlier progress labels choose the language' in responses.sent[1]['input'][-1]['content']
+
+
+def test_requested_calculation_activity_is_published_before_execution(monkeypatch):
+    capability = 'parashari.natal_foundation'
+    responses = Responses([
+        ([call('calculate', {'capability_id': capability, 'parameters': None, 'activity_title': 'जन्म कुंडली की जाँच'})], ''),
+        ([call('report_calculation', {'source': capability, 'title': 'Calculated placements', 'summary': 'A supported chart finding.'})], ''),
+        ([], 'An explained answer.'),
+    ])
+    client(monkeypatch, responses)
+    traces = []
+    def calculate(*args):
+        assert traces[0][0]['title'] == 'जन्म कुंडली की जाँच'
+        assert traces[0][0]['detail'] == ''  # activity, not an invented finding
+        return {'facts': {'ascendant': 42}}
+    monkeypatch.setattr(agent.LazyCalculators, 'calculate', calculate)
+    run(calculation_callback=traces.append)
+    assert len(traces) == 2
+    assert traces[1] == [{'id': f'instant-calculation-{capability}', 'title': 'Calculated placements', 'detail': 'A supported chart finding.'}]
+
+
+def test_chart_health_policy_requires_interpretation_without_false_medical_causation(monkeypatch):
+    responses = Responses([([], 'Synthetic answer.')])
+    client(monkeypatch, responses)
+    asyncio.run(agent.generate_calculator_first_response(
+        question='What in this chart gave Parkinson’s to this native?', birth_data=BIRTH,
+        history=[], query_context={**CLOCK, 'source': 'chart_sheet'}, model_name='test-model'))
+    instructions = responses.sent[0]['instructions']
+    assert 'not the native receiving a personal consultation' in instructions
+    assert 'request relevant natal and strength calculators first' in instructions
+    assert 'Do not claim that a placement establishes a medical cause or diagnosis' in instructions
+    assert 'Do not append routine medical disclaimers or unsolicited symptom checklists' in instructions
+    assert 'Do not predict death' not in instructions
+    assert 'not blanket-banned discussion topics' in instructions
+    assert 'Do not state an individual’s death date or lifespan as a reliable fact' in instructions
+
+
+def test_activity_is_visible_before_provider_round_finishes(monkeypatch):
+    traces = []
+    item = call('calculate', {'capability_id': 'parashari.natal_foundation', 'parameters': None, 'activity_title': 'Inspecting natal placements'})
+    class EarlyResponses(Responses):
+        def stream(self, **kwargs):
+            owner = self
+            class Stream:
+                async def __aenter__(self):
+                    self.response = await owner.create(**kwargs)
+                    return self
+                async def __aexit__(self, *args): return False
+                def __aiter__(self):
+                    async def events():
+                        if self.response.output:
+                            yield SimpleNamespace(type='response.output_item.done', item=item)
+                            assert traces[0][0]['title'] == 'Inspecting natal placements'
+                        elif self.response.output_text:
+                            yield SimpleNamespace(type='response.output_text.delta', delta=self.response.output_text)
+                    return events()
+                async def get_final_response(self): return self.response
+            return Stream()
+    client(monkeypatch, EarlyResponses([([item], ''), ([], 'Answer')]))
+    monkeypatch.setattr(agent.LazyCalculators, 'calculate', lambda *args: {'facts': {'ascendant': 42}})
+    run(calculation_callback=traces.append)
+    assert len(traces) == 1  # executing the requested tool does not duplicate its activity

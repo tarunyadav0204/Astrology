@@ -31,6 +31,7 @@ import { chartAPI, creditAPI } from '../../services/api';
 import { refreshWebShellHeight } from '../../platform/webSafeArea';
 import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
+import ChartTaraSheet from './ChartTaraSheet';
 import ChartOverviewSheet from './ChartOverviewSheet';
 import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
@@ -94,6 +95,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const wideSheet = windowWidth >= 768;
   const embedded = !!route?.params?.embedded;
   const [birthData, setBirthData] = useState(null);
+  const [taraOpenSignal, setTaraOpenSignal] = useState(0);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [currentChartIndex, setCurrentChartIndex] = useState(0);
@@ -936,6 +938,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
             ]}
           >
             <ChartWidget
+              onAskTara={() => setTaraOpenSignal(value => value + 1)}
               ref={chartWidgetRef}
               chartData={getChartDataForType(chartTypes[currentChartIndex].id)}
               birthData={birthData}
@@ -2286,6 +2289,12 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           </View>
         </Modal>
 
+        {birthData && <ChartTaraSheet
+          key={JSON.stringify([birthData.id ?? birthData.birth_chart_id, birthData.name, birthData.date, birthData.time, birthData.latitude, birthData.longitude])}
+          birthData={birthData}
+          chartType={chartTypes[currentChartIndex]?.id || 'lagna'}
+          openSignal={taraOpenSignal}
+        />}
       </View>
     </GestureHandlerRootView>
   );

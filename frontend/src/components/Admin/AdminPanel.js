@@ -70,6 +70,10 @@ function withRequiredInstantChatSettings(settings) {
       normalized.push({ ...fallback });
     }
   });
+  if (!normalized.some((setting) => setting.key === 'chart_chat_cost')) {
+    normalized.push({ key: 'chart_chat_cost', value: 2, discount: null,
+      description: 'Chart Chat — credits per answer; free with an active Astrologer License' });
+  }
   return normalized;
 }
 

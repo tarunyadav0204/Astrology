@@ -241,6 +241,7 @@ const ChartsDashasWorkspacePage = ({
   const [asOfDate, setAsOfDate] = useState(new Date());
   /** number (D2–D60) or 'karkamsa' | 'swamsa' */
   const [selectedDx, setSelectedDx] = useState(loadCompareChart);
+  const [mobileTaraChart, setMobileTaraChart] = useState('D1');
   // Topic lenses are an explicit study mode. Always enter the workspace on
   // the complete chart instead of restoring a previously opened lens.
   const [topicId, setTopicId] = useState('whole_chart');
@@ -678,7 +679,7 @@ const ChartsDashasWorkspacePage = ({
           ) : null}
         </div>
         <div className="parashari-desk-bar__right">
-          {user && hasChart ? <ChartTaraPanel birthData={birthData} onLogin={onLogin} /> : null}
+          {user && hasChart ? <ChartTaraPanel birthData={{ ...birthData, calculation_profile: effectiveViewProfile }} chartType={`D1, D9 and ${typeof selectedDx === 'number' ? `D${selectedDx}` : selectedDx}`} onLogin={onLogin} /> : null}
           {!user ? (
             <button type="button" className="parashari-desk-bar__primary" onClick={onLogin}>Sign in</button>
           ) : null}
@@ -705,7 +706,8 @@ const ChartsDashasWorkspacePage = ({
         </div>
       ) : isMobileDesk ? (
         <ParashariDeskMobile
-          toolbarActions={<ChartTaraPanel birthData={birthData} onLogin={onLogin} />}
+          onChartChatViewChange={setMobileTaraChart}
+          toolbarActions={<ChartTaraPanel birthData={{ ...birthData, calculation_profile: effectiveViewProfile }} chartType={mobileTaraChart} onLogin={onLogin} />}
           birthData={birthData}
           chartData={renderedChartData}
           viewChartData={renderedChartData}

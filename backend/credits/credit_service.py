@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 # Safe prices used only while a newly deployed setting has not yet been seeded.
 # Most legacy settings intentionally retain the historical one-credit fallback.
 _CREDIT_SETTING_FALLBACKS = {
+    "chart_chat_cost": 2,
     "prashna_analysis_cost": 3,
     "partner_portrait_cost": 44,
     "verified_chat_cost": 10,
@@ -28,6 +29,7 @@ LEDGER_FEATURE_FILTERS = {
     "verified_chat": (
         {"reference_ids": ("chat_question",), "description_prefix": "Verified Chat"},
     ),
+    "chart_chat": ({"reference_ids": ("chart_chat",)},),
     "live_chat": (
         {"reference_ids": ("instant_chat", "instant_chat_minutes")},
         {"reference_ids": ("chat_question",), "description_prefix": "Instant Chat"},
@@ -46,6 +48,7 @@ LEDGER_FEATURE_FILTERS = {
 }
 
 _LEDGER_FEATURE_ALIASES = {
+    "chart_chat": "chart_chat",
     "standard": "standard_chat",
     "standard_chat": "standard_chat",
     "premium": "premium_chat",
@@ -73,7 +76,7 @@ def normalize_ledger_feature_filter(feature: Optional[str]) -> Optional[str]:
     mapped = _LEDGER_FEATURE_ALIASES.get(key)
     if mapped is None:
         raise ValueError(
-            "feature must be one of: standard_chat, live_chat, talk_to_tara, premium_chat, verified_chat, partnership_chat, partner_portrait"
+            "feature must be one of: standard_chat, live_chat, chart_chat, talk_to_tara, premium_chat, verified_chat, partnership_chat, partner_portrait"
         )
     return mapped
 
@@ -538,6 +541,7 @@ class CreditService:
             defaults = [
                 ("chat_question_cost", 1, "Credits per chat question"),
                 ("instant_chat_cost", 1, "Credits per instant chat answer"),
+                ("chart_chat_cost", 2, "Chart Chat — credits per answer; free with an active Astrologer License"),
                 ("instant_chat_first_minute_cost", 1, "Credits for the first minute of Instant Chat"),
                 ("instant_chat_per_minute_cost", 1, "Credits per following started minute of Instant Chat"),
                 ("speech_chat_cost", 1, "Credits per Talk To Tara turn"),
@@ -4080,6 +4084,7 @@ class CreditService:
         """
         from db import get_conn, execute
         descriptions = {
+            "chart_chat_cost": "Chart Chat — credits per answer; free with an active Astrologer License",
             "instant_chat_first_minute_cost": "Credits for the first minute of Instant Chat",
             "instant_chat_per_minute_cost": "Credits per following started minute of Instant Chat",
             "prashna_analysis_cost": "Credits per classical Prashna question chart",
@@ -4292,7 +4297,7 @@ class CreditService:
         """Get all credit settings (value = original cost, discount = discounted cost when set)."""
         from db import get_conn, execute
         keys = (
-            'chat_question_cost', 'instant_chat_cost', 'instant_chat_first_minute_cost', 'instant_chat_per_minute_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'verified_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
+            'chat_question_cost', 'chart_chat_cost', 'instant_chat_cost', 'instant_chat_first_minute_cost', 'instant_chat_per_minute_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'verified_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
             'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost',
             'progeny_analysis_cost', 'partnership_report_cost', 'career_report_cost', 'wealth_report_cost',
             'health_report_cost', 'janam_kundli_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
@@ -4321,6 +4326,9 @@ class CreditService:
                     "description": row[2],
                     "discount": row[3] if len(row) > 3 else None,
                 })
+            if not any(s["key"] == "chart_chat_cost" for s in settings):
+                settings.append({"key": "chart_chat_cost", "value": 2,
+                    "description": "Chart Chat — credits per answer; free with an active Astrologer License", "discount": None})
             # Ensure speech_chat_cost exists so admin Feature Costs always shows it
             if not any(s["key"] == "speech_chat_cost" for s in settings):
                 try:

@@ -2,76 +2,76 @@ import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useCredits } from '../../context/CreditContext';
 import './ChartTaraPanel.css';
+const ChartChatThread = lazy(() => import('./ChartChatThread'));
+export const sheetSnapHeight = (height, viewportHeight) => {
+  const points = [72, viewportHeight * 0.52, viewportHeight - 90];
+  return points.reduce((best, next) => Math.abs(next - height) < Math.abs(best - height) ? next : best);
+};
 
-const ChatPage = lazy(() => import('./ChatPage'));
-
-export const clampPanelPosition = (position, viewport, size) => ({
-  x: Math.max(8, Math.min(position.x, Math.max(8, viewport.width - size.width - 8))),
-  y: Math.max(8, Math.min(position.y, Math.max(8, viewport.height - size.height - 8))),
-});
-
-export default function ChartTaraPanel({ birthData, onLogin }) {
-  const { verifiedChatCost, features } = useCredits();
+export default function ChartTaraPanel({ birthData, chartType = 'lagna', onLogin }) {
+  const { chartChatCost = 2, features, fetchCosts } = useCredits();
   const [mounted, setMounted] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState(null);
+  const [visible, setVisible] = useState(false);
+  const launcher = useRef(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [height, setHeight] = useState(() => window.innerHeight * 0.52);
   const panel = useRef(null);
   const drag = useRef(null);
-  const enabled = features?.verified_chat_enabled === true;
-
-  const constrain = (next) => {
-    const bounds = panel.current?.getBoundingClientRect();
-    return clampPanelPosition(next, { width: window.innerWidth, height: window.innerHeight },
-      { width: bounds?.width || Math.min(440, window.innerWidth - 16), height: bounds?.height || Math.min(740, window.innerHeight - 24) });
-  };
+  const enabled = features?.instant_chat_enabled === true;
   useEffect(() => {
-    const resize = () => setPosition(previous => previous ? constrain(previous) : previous);
+    const resize = () => setHeight(previous => Math.min(previous, window.innerHeight - 90));
     window.addEventListener('resize', resize);
     return () => window.removeEventListener('resize', resize);
   }, []);
   useEffect(() => {
-    if (!open) return undefined;
-    panel.current?.querySelector('.chart-tara-panel__drag')?.focus({ preventScroll: true });
-    const escape = event => { if (event.key === 'Escape') setOpen(false); };
+    if (!visible) return undefined;
+    const escape = event => { if (event.key === 'Escape') {
+      if (collapsed) { setVisible(false); launcher.current?.focus(); }
+      else setCollapsed(true);
+    } };
     window.addEventListener('keydown', escape);
     return () => window.removeEventListener('keydown', escape);
-  }, [open]);
+  }, [visible, collapsed]);
+  const launch = () => { setMounted(true); setVisible(true); setCollapsed(false); setHeight(window.innerHeight * 0.52); fetchCosts?.(); };
   const beginDrag = event => {
     if (event.button !== 0) return;
-    const bounds = panel.current.getBoundingClientRect();
-    drag.current = { pointer: event.pointerId, x: event.clientX, y: event.clientY, left: bounds.left, top: bounds.top };
+    drag.current = { pointer: event.pointerId, y: event.clientY, height: panel.current.getBoundingClientRect().height };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const move = event => {
     if (!drag.current || drag.current.pointer !== event.pointerId) return;
-    setPosition(constrain({ x: drag.current.left + event.clientX - drag.current.x, y: drag.current.top + event.clientY - drag.current.y }));
+    setCollapsed(false);
+    setHeight(Math.max(72, Math.min(window.innerHeight - 90, drag.current.height + drag.current.y - event.clientY)));
   };
-  const finishDrag = () => { drag.current = null; };
-  const launch = () => { setMounted(true); setOpen(true); };
-  const chartKey = [birthData?.id, birthData?.name, birthData?.date, birthData?.time, birthData?.latitude, birthData?.longitude, birthData?.timezone].join('|');
-
+  const finish = event => {
+    if (!drag.current || drag.current.pointer !== event.pointerId) return;
+    const next = sheetSnapHeight(drag.current.height + drag.current.y - event.clientY, window.innerHeight);
+    setHeight(next); setCollapsed(next === 72); drag.current = null;
+  };
+  const chartKey = JSON.stringify([birthData?.chart_id ?? birthData?.birth_chart_id ?? birthData?.id, birthData?.name, birthData?.date, birthData?.time, birthData?.latitude, birthData?.longitude, birthData?.calculation_profile]);
   return <>
-    <button type="button" className="chart-tara-launcher" onClick={launch} disabled={!enabled} aria-expanded={open} title={!enabled ? 'Verified chat is currently unavailable' : 'Ask about the selected chart'}>✦ Ask Tara</button>
-    {mounted && createPortal(<section ref={panel} className="chart-tara-panel" role="region" aria-label="Ask Tara about this chart" hidden={!open}
-      style={position ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto' } : undefined}>
+    <button ref={launcher} type="button" className="chart-tara-launcher" onClick={launch} disabled={!enabled} aria-expanded={visible && !collapsed} title={enabled ? 'Ask about the selected chart' : 'Chart Chat is currently unavailable'}>✦ Ask Tara</button>
+    {mounted && createPortal(<section ref={panel} className={`chart-tara-panel${collapsed ? ' chart-tara-panel--collapsed' : ''}`} role="region" aria-label="Ask Tara about this chart" hidden={!visible} style={{ height: collapsed ? 72 : height }}>
       <header className="chart-tara-panel__header">
-        <div className="chart-tara-panel__drag" role="button" tabIndex={0} aria-label="Move chat panel. Drag or use arrow keys."
-          onPointerDown={beginDrag} onPointerMove={move} onPointerUp={finishDrag} onPointerCancel={finishDrag} onLostPointerCapture={finishDrag}
+        <div className="chart-tara-panel__drag" role="button" tabIndex={0} aria-label="Resize Chart Chat. Drag or use arrow keys."
+          onPointerDown={beginDrag} onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { drag.current = null; }} onLostPointerCapture={() => { drag.current = null; }}
           onKeyDown={event => {
-            const delta = { ArrowLeft: [-24, 0], ArrowRight: [24, 0], ArrowUp: [0, -24], ArrowDown: [0, 24] }[event.key];
-            if (!delta) return;
+            if (!['ArrowUp', 'ArrowDown', 'Enter', ' '].includes(event.key)) return;
             event.preventDefault();
-            const bounds = panel.current.getBoundingClientRect();
-            setPosition(constrain({ x: bounds.left + delta[0], y: bounds.top + delta[1] }));
+            if (event.key === 'ArrowUp') { setCollapsed(false); setHeight(window.innerHeight - 90); }
+            else if (event.key === 'ArrowDown') setCollapsed(true);
+            else setCollapsed(previous => !previous);
           }}>
-          <strong>✦ Ask Tara <span>Verified</span></strong>
-          <small>{birthData?.name || 'Selected chart'} · {verifiedChatCost} credits/question</small>
+          <i aria-hidden="true" />
+          <strong>✦ Ask Tara <span>Chart Chat</span></strong>
+          <small>{birthData?.name || 'Selected chart'} · {chartType} · {chartChatCost === 0 ? 'Free' : `${chartChatCost} credits/question`}</small>
         </div>
-        <button type="button" className="chart-tara-panel__close" aria-label="Minimize chat" onClick={() => setOpen(false)}>−</button>
+        <button type="button" className="chart-tara-panel__close" aria-label={collapsed ? 'Expand chat' : 'Minimize chat'} onClick={() => setCollapsed(previous => !previous)}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={collapsed ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} /></svg></button>
+        <button type="button" className="chart-tara-panel__close" aria-label="Close Chart Chat" title="Close chat — your conversation is kept" onClick={() => { setVisible(false); launcher.current?.focus(); }}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
       </header>
-      <div className="chart-tara-panel__body">
+      <div className="chart-tara-panel__body" hidden={collapsed}>
         <Suspense fallback={<p role="status">Opening Tara…</p>}>
-          <ChatPage key={chartKey} embeddedVerified onLogin={onLogin} />
+          <ChartChatThread key={chartKey} birthData={birthData} chartType={chartType} onLogin={onLogin} onFocus={() => { setCollapsed(false); setHeight(window.innerHeight - 90); }} />
         </Suspense>
       </div>
     </section>, document.body)}
