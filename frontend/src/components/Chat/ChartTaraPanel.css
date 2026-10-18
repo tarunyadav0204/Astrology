@@ -109,3 +109,8 @@
 .chart-chat-thread__cursor { color: var(--color-brand); }
 .chart-chat-thread__activity { max-height: 140px; box-sizing: border-box; overflow-y: auto; scrollbar-width: none; }
 .chart-chat-thread__activity::-webkit-scrollbar { display: none; }
+
+.chart-tara-panel .chart-chat-thread__messages > .message-bubble,
+.chart-tara-panel .chart-chat-thread__messages > .chart-chat-thread__stream {
+  margin-bottom: 16px;
+}
