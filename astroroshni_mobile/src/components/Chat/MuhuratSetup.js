@@ -23,6 +23,8 @@ export default function MuhuratSetup({ initial = {}, onSubmit }) {
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [picker, setPicker] = useState(null), [error, setError] = useState('');
   const label = key => t(`premiumUi.chat.muhurat.${key}`);
+  const festivalName = item => t(`festivalPuja.festivals.${item.id}`, item.name);
+  const ritualName = item => t(`festivalPuja.rituals.${item.label}`, item.label);
   const update = (key,value) => setDraft(old => ({ ...old, [key]:value }));
   const button = { padding: 12, marginVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: colors.cardBorder, backgroundColor: colors.surfaceRaised };
   const text = { color: colors.text };
@@ -37,9 +39,9 @@ export default function MuhuratSetup({ initial = {}, onSubmit }) {
     {draft.event_type && !['vehicle','home','gold','business','festival_puja'].includes(draft.event_type) && <Text style={text}>{draft.event_type}</Text>}
     {festival && <>
       <Text style={[text,{fontWeight:'700',marginTop:12}]}>{label('festival')}</Text>
-      {selectedFestival && <Text style={text}>{selectedFestival.name}</Text>}
+      {selectedFestival && <Text style={text}>{festivalName(selectedFestival)}</Text>}
       <TextInput accessibilityLabel={label('festival')} style={[button,text]} value={festivalSearch} onChangeText={setFestivalSearch} placeholder={label('searchFestival')} placeholderTextColor={colors.textMuted} />
-      {festivalSearch.trim().length > 1 && festivalCatalog.filter(item => item.name.toLowerCase().includes(festivalSearch.trim().toLowerCase())).map(item => <TouchableOpacity key={item.id} style={button} onPress={() => {setDraft(old=>({...old,festival_id:item.id,ritual:null}));setFestivalSearch('');}}><Text style={text}>{item.name}</Text></TouchableOpacity>)}
+      {festivalSearch.trim().length > 1 && festivalCatalog.filter(item => [item.name, festivalName(item)].some(name => name.toLowerCase().includes(festivalSearch.trim().toLowerCase()))).map(item => <TouchableOpacity key={item.id} style={button} onPress={() => {setDraft(old=>({...old,festival_id:item.id,ritual:null}));setFestivalSearch('');}}><Text style={text}>{festivalName(item)}</Text></TouchableOpacity>)}
       <Text style={text}>{label('year')}</Text>
       <View style={button}><Picker accessibilityLabel={label('year')} selectedValue={Number(draft.festival_year || (draft.start_date || '').slice(0,4)) || new Date().getFullYear()} dropdownIconColor={colors.text} style={text} onValueChange={value => { const year=Number(value); setDraft(old=>({...old,festival_year:year,start_date:`${year}-01-01`,end_date:`${year}-12-31`})); }}>
         {Array.from({length:201},(_,index)=>1900+index).map(year=><Picker.Item key={year} value={year} label={String(year)} color={colors.text} />)}
@@ -48,7 +50,7 @@ export default function MuhuratSetup({ initial = {}, onSubmit }) {
       <Text style={text}>{label('ritual')}</Text>
       <View style={button}><Picker accessibilityLabel={label('ritual')} selectedValue={ritualValue} dropdownIconColor={colors.text} style={text} onValueChange={value=>update('ritual',value || null)}>
         {!ritualOptions.length && <Picker.Item label={label(selectedFestival ? 'timingUnavailable' : 'chooseFestivalFirst')} value="" color={colors.text} />}
-        {ritualOptions.map(item => <Picker.Item key={item.value} value={item.value} enabled={item.supported} color={colors.text} label={`${item.label}${item.supported ? '' : ` · ${label('timingUnavailable')}`}`} />)}
+        {ritualOptions.map(item => <Picker.Item key={item.value} value={item.value} enabled={item.supported} color={colors.text} label={`${ritualName(item)}${item.supported ? '' : ` · ${label('timingUnavailable')}`}`} />)}
         {ritualValue && !ritualOptions.some(item=>item.value===ritualValue) && <Picker.Item value={ritualValue} label={String(draft.ritual)} color={colors.text} />}
       </Picker></View>
     </>}
@@ -61,7 +63,7 @@ export default function MuhuratSetup({ initial = {}, onSubmit }) {
         <View style={{padding:20, flex:1}}>
           <View style={{flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom:16}}>
             <Text style={[text,{fontWeight:'700',fontSize:20,flex:1}]}>{label('eventCity')}</Text>
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('common.close', 'Close')} onPress={() => setLocationPickerOpen(false)} style={button}><Text style={text}>✕</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={label('close')} onPress={() => setLocationPickerOpen(false)} style={button}><Text style={text}>✕</Text></TouchableOpacity>
           </View>
           <PlaceSearchField selectedName={draft.location?.name || ''} selectedLatitude={draft.location?.latitude} selectedLongitude={draft.location?.longitude} onSelect={place => {
             update('location', {name:place.name, latitude:Number(place.latitude), longitude:Number(place.longitude), timezone:String(place.timezone || 'UTC')});

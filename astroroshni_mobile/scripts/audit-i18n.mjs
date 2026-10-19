@@ -125,6 +125,23 @@ const mergedPremiumCopy = Object.fromEntries(Object.entries(normalizedPremiumCop
   ];
 }));
 const failures = [];
+const festivalPujaCopy = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/locales/festival-puja.json'), 'utf8'));
+const festivalCatalog = JSON.parse(fs.readFileSync(path.join(projectRoot, 'src/data/festivalPujaCatalog.json'), 'utf8'));
+for (const language of Object.keys(premiumCopy)) {
+  const copy = festivalPujaCopy[language];
+  for (const festival of festivalCatalog) {
+    if (!copy?.festivals?.[festival.id]?.trim()) failures.push(`${language}: missing festival name ${festival.id}`);
+    for (const ritual of festival.ritual_options || []) {
+      if (!copy?.rituals?.[ritual.label]?.trim()) failures.push(`${language}: missing ritual name ${ritual.label}`);
+    }
+  }
+  const muhurat = premiumCopy[language]?.chat?.muhurat || {};
+  for (const [key, value] of Object.entries(premiumCopy.english.chat.muhurat)) {
+    if (!muhurat[key]?.trim()) failures.push(`${language}: missing Muhurat text ${key}`);
+    else if (language !== 'english' && muhurat[key] === value && !(key === 'ritual' && ['es', 'german'].includes(language))) failures.push(`${language}: untranslated Muhurat text ${key}`);
+  }
+}
+
 const prashnaEnglish = flatten(prashnaCopy.english);
 const prashnaEnglishKeys = Object.keys(prashnaEnglish).sort();
 const prashnaKeySet = new Set(prashnaEnglishKeys);

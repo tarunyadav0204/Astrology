@@ -52,6 +52,7 @@ import matriShapaInfo from './matri-shapa-info.json';
 import chartSourceClarity from './chart-source-clarity.json';
 import partnerPortrait from './partner-portrait.json';
 import verifiedChat from './verified-chat.json';
+import festivalPuja from './festival-puja.json';
 
 const INSTANT_MODE_ACTION_COPY = Object.freeze({
   english: 'Mode',
@@ -382,6 +383,12 @@ Object.entries(normalizedPremiumUi).forEach(([language, copy]) => {
 ].forEach(([baseCopy, copy]) => {
   baseCopy.partnerPortrait = copy;
 });
+
+[
+  [en, 'english'], [es, 'es'], [hi, 'hindi'], [tamil, 'tamil'],
+  [te, 'telugu'], [gu, 'gujarati'], [mr, 'marathi'], [de, 'german'],
+  [fr, 'fr'], [ru, 'russian'], [zh, 'chinese'],
+].forEach(([baseCopy, language]) => { baseCopy.festivalPuja = festivalPuja[language]; });
 
 i18n
   .use(initReactI18next)
