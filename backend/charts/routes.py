@@ -2,12 +2,12 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Dict, Any, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import logging
 import traceback
 import time
 from collections import defaultdict, deque
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from auth import get_current_user, get_optional_user, User
 from calculators.chart_calculator import ChartCalculator, resolve_ayanamsha_mode
 from calculators.vedic_graha_drishti import attach_graha_drishti_to_chart
@@ -327,6 +327,74 @@ def persist_birth_chart_for_user(userid: int, birth_data: BirthData) -> Tuple[Op
 
 
 router = APIRouter()
+
+
+class MrityuBhagaWorkspaceRequest(BaseModel):
+    birth_data: Dict[str, Any]
+    start_date: date
+    end_date: date
+    calendar: bool = False
+    include_fast: bool = False
+    include_aspects: bool = False
+    orb_degrees: float = Field(default=1.0, ge=0.1, le=3.0)
+    birth_time_minutes: int = 0
+
+
+@router.post('/mrityu-bhaga-workspace')
+def mrityu_bhaga_workspace(
+    request: MrityuBhagaWorkspaceRequest,
+    current_user: User = Depends(get_current_user),
+):
+    # Sync route: the numerical scan runs in FastAPI's threadpool, never on
+    # the websocket/event loop. The service has bounded ranges and no fallback.
+    from charts.mrityu_bhaga_service import build_workspace
+    from prediction_engine.errors import PredictionCalculationError
+    try:
+        return build_workspace(
+            request.birth_data, request.start_date, request.end_date,
+            calendar=request.calendar, fast=request.include_fast,
+            aspects=request.include_aspects, orb=request.orb_degrees,
+            birth_time_minutes=request.birth_time_minutes,
+        )
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except PredictionCalculationError as exc:
+        logger.exception('Mrityu Bhaga ephemeris calculation failed')
+        raise HTTPException(status_code=503, detail='Ephemeris calculation unavailable; no fallback result was produced.') from exc
+    except Exception as exc:
+        logger.exception('Mrityu Bhaga workspace calculation failed')
+        raise HTTPException(status_code=503, detail='Assessment could not be calculated completely. Please retry.') from exc
+
+
+class BhriguBinduWorkspaceRequest(MrityuBhagaWorkspaceRequest):
+    focus: str = 'general'
+    chart_at: Optional[datetime] = None
+
+
+@router.post('/bhrigu-bindu-workspace')
+def bhrigu_bindu_workspace(
+    request: BhriguBinduWorkspaceRequest,
+    current_user: User = Depends(get_current_user),
+):
+    # Sync route: the numerical scan runs in FastAPI's threadpool, never on
+    # the websocket/event loop. The service has bounded ranges and no fallback.
+    from charts.bhrigu_bindu_service import build_workspace
+    from prediction_engine.errors import PredictionCalculationError
+    try:
+        return build_workspace(
+            request.birth_data, request.start_date, request.end_date,
+            calendar=request.calendar, fast=request.include_fast,
+            aspects=request.include_aspects, orb=request.orb_degrees,
+            birth_time_minutes=request.birth_time_minutes, focus=request.focus, chart_at=request.chart_at,
+        )
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except PredictionCalculationError as exc:
+        logger.exception('Bhrigu Bindu ephemeris calculation failed')
+        raise HTTPException(status_code=503, detail='Ephemeris calculation unavailable; no fallback result was produced.') from exc
+    except Exception as exc:
+        logger.exception('Bhrigu Bindu workspace calculation failed')
+        raise HTTPException(status_code=503, detail='Assessment could not be calculated completely. Please retry.') from exc
 
 
 class HouseInsightRequest(BaseModel):

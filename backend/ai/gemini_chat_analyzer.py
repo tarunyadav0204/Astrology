@@ -1241,6 +1241,14 @@ class GeminiChatAnalyzer:
                 else "FIRST_REQUEST",
             )
         
+        if (astrological_context.get('intent') or {}).get('mode') == 'ELECT_MUHURAT':
+            from ai.parallel_chat.orchestrator import run_parallel_chat_pipeline
+            return await run_parallel_chat_pipeline(self, user_question=user_question,
+                astrological_context=astrological_context, conversation_history=conversation_history or [],
+                language=language, response_style=response_style, user_context=user_context,
+                premium_analysis=premium_analysis, mode=mode, total_request_start=total_request_start,
+                using_free_question=using_free_question)
+
         # Add current date context and calculate native's age
         enhanced_context = astrological_context.copy()
         intent_block = enhanced_context.get("intent") or {}
@@ -1286,6 +1294,11 @@ class GeminiChatAnalyzer:
         )
 
         intent_mode = str(intent_block.get("mode") or mode or "").upper()
+        if intent_mode == "PREDICT_DAILY":
+            from ai.intent_router import apply_standard_daily_scope_guard
+            apply_standard_daily_scope_guard(intent_block, user_question)
+            intent_mode = str(intent_block.get('mode') or '').upper()
+            enhanced_context['intent'] = intent_block
         if intent_mode == "PREDICT_DAILY":
             from daily.daily_orchestrator import run_daily_chat_pipeline
 

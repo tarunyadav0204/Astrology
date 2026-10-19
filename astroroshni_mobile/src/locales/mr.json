@@ -167,6 +167,8 @@
     }
   },
   "chartScreen": {
+    "mrityuBhagaWorkspace": "मृत्यु भाग · मूल्यमापन आणि दिनदर्शिका",
+    "bhriguBinduWorkspace": "Bhrigu Bindu",
     "loadingText": "कॉस्मिक गणना सुरू आहे...",
     "loadingSubtext": "ग्रहांची स्थिती वाचत आहे",
     "emptyTitle": "कुंडलीचा डेटा नाही",

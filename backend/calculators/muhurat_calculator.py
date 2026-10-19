@@ -202,7 +202,7 @@ class MuhuratCalculator:
             date_warnings = []
             
             if current_date.weekday() in avoid_weekdays:
-                warning = 'Tuesday is traditionally avoided for vehicle purchase.'
+                warning = f'{category} is traditionally avoided on this weekday by the configured policy.'
                 if allow_caution_dates:
                     date_warnings.append(warning)
                 else:
@@ -232,7 +232,7 @@ class MuhuratCalculator:
                 rejected_dates.append({
                     'date': date_str,
                     'reasons': [
-                        f"Panchak is active during this date ({interval_text}).\n\nDecision: Not recommended for vehicle purchase."
+                        f"Panchak is active during this date ({interval_text}).\n\nDecision: Not recommended for {category.lower()}."
                     ],
                     'panchak': panchak_status,
                 })
@@ -254,7 +254,7 @@ class MuhuratCalculator:
                     date_warnings.append(warning)
                 else:
                     rejected_dates.append({'date': date_str, 'reasons': [
-                        f"{yoga['name']} Yoga\n\nTraditional effect: {str(yoga.get('effect', 'obstacles')).capitalize()}\nActive: {interval}\nDecision: Not recommended for vehicle purchase."
+                        f"{yoga['name']} Yoga\n\nTraditional effect: {str(yoga.get('effect', 'obstacles')).capitalize()}\nActive: {interval}\nDecision: Not recommended for {category.lower()}."
                     ]})
                     current_date += timedelta(days=1); days_scanned += 1; continue
             
@@ -268,7 +268,7 @@ class MuhuratCalculator:
 
             daily_nak = panchang['nakshatra']['number']
             if daily_nak not in good_nakshatras:
-                warning = f"Nakshatra {panchang['nakshatra']['name']} is outside the preferred vehicle-purpose set."
+                warning = f"Nakshatra {panchang['nakshatra']['name']} is outside the preferred {category.lower()} set."
                 if allow_caution_dates:
                     date_warnings.append(warning)
                 else:

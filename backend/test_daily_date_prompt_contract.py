@@ -32,7 +32,7 @@ def test_instant_router_prompt_contains_authoritative_calendar_contract():
     assert "YESTERDAY = 2026-08-11" in prompt
     assert "TOMORROW = 2026-08-13" in prompt
     assert "today / aaj / आज all mean 2026-08-12" in prompt
-    assert "Current question: \"HOW WILL BE MY DAY TODAY\"" in prompt
+    assert 'LATEST USER MESSAGE (answer this turn): "HOW WILL BE MY DAY TODAY"' in prompt
 
 
 def test_daily_answer_prompt_locks_relative_day_to_resolved_date():

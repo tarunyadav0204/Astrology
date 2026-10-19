@@ -1,11 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 from datetime import date
 from calculators.muhurat_calculator import MuhuratCalculator
+from calculators.marriage_muhurat_calculator import MarriageMuhuratCalculator
 from auth import get_current_user, User
 from credits.credit_service import CreditService
-from utils.timezone_service import parse_timezone_offset
+from utils.timezone_service import parse_timezone_offset, get_iana_timezone
 import swisseph as swe
 import logging
 
@@ -56,6 +57,46 @@ class GeneralMuhuratRequest(BaseModel):
     user_lon: float
     user_timezone: Optional[str] = None
 
+    @model_validator(mode="after")
+    def validate_search_period(self):
+        start, end = _parse_calendar_date(self.start_date), _parse_calendar_date(self.end_date)
+        if end < start or (end - start).days >= 60:
+            raise ValueError("Select an inclusive search period of 1–60 days")
+        return self
+
+
+class BirthProfile(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    date: str
+    time: str
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    timezone: Optional[str] = None
+
+
+class MarriageMuhuratRequest(BaseModel):
+    start_date: date
+    end_date: date
+    venue_latitude: float = Field(ge=-90, le=90)
+    venue_longitude: float = Field(ge=-180, le=180)
+    allowed_start: str = "18:00"
+    allowed_end: str = "23:30"
+    minimum_duration_minutes: int = Field(default=30, ge=10, le=180)
+    bride: Optional[BirthProfile] = None
+    groom: Optional[BirthProfile] = None
+
+    @model_validator(mode="after")
+    def validate_period_and_times(self):
+        if self.end_date < self.start_date or (self.end_date - self.start_date).days >= 60:
+            raise ValueError("Select an inclusive search period of 1–60 days")
+        try:
+            from datetime import time as clock_time
+            clock_time.fromisoformat(self.allowed_start)
+            clock_time.fromisoformat(self.allowed_end)
+        except ValueError as exc:
+            raise ValueError("Available hours must be HH:MM") from exc
+        return self
+
 # --- HELPER ---
 async def _process_muhurat(request, current_user, feature_name, calc_method):
     # 1. Get cost from settings and check credits (subscription tier discount applied)
@@ -87,7 +128,7 @@ async def _process_muhurat(request, current_user, feature_name, calc_method):
             lat, lon = request.user_lat, request.user_lon
             tz = getattr(request, 'user_timezone', None)
         
-        tz_offset = parse_timezone_offset(tz, lat, lon)
+        tz_offset = parse_timezone_offset(tz, lat, lon, for_date=dob)
         utc_hour = hour - tz_offset
         
         birth_date = _parse_calendar_date(dob)
@@ -104,7 +145,9 @@ async def _process_muhurat(request, current_user, feature_name, calc_method):
         # Map location fields
         lat = getattr(request, 'delivery_latitude', getattr(request, 'latitude', 0.0))
         lon = getattr(request, 'delivery_longitude', getattr(request, 'longitude', 0.0))
-        tz = getattr(request, 'delivery_timezone', getattr(request, 'timezone', None))
+        # The event city determines the ceremony clock.  Canonical IANA zones
+        # preserve future daylight-saving changes, unlike a device UTC offset.
+        tz = get_iana_timezone(float(lat), float(lon))
 
         calc_kwargs = {}
         if feature_name == 'vehicle_purchase':
@@ -187,3 +230,40 @@ async def get_gold_muhurat(request: GeneralMuhuratRequest, current_user: User = 
 async def get_business_muhurat(request: GeneralMuhuratRequest, current_user: User = Depends(get_current_user)):
     calculator = get_muhurat_calculator()
     return await _process_muhurat(request, current_user, "business_opening", calculator.calculate_business_muhurat)
+
+
+@router.post("/marriage")
+async def get_marriage_muhurat(request: MarriageMuhuratRequest, current_user: User = Depends(get_current_user)):
+    """Return conservative, interval-verified wedding ceremony windows.
+
+    The venue timezone is always resolved server-side from the venue coordinates
+    for the selected date, preventing a device timezone or a stale UTC offset
+    from moving a future wedding window.
+    """
+    feature_name = "marriage_muhurat"
+    base_cost = credit_service.get_credit_setting(f"{feature_name}_cost")
+    cost = credit_service.get_effective_cost(current_user.userid, base_cost, f"{feature_name}_cost")
+    if credit_service.get_user_credits(current_user.userid) < cost:
+        raise HTTPException(status_code=402, detail=f"Insufficient credits. Need {cost}.")
+    try:
+        timezone = get_iana_timezone(request.venue_latitude, request.venue_longitude)
+        payload = {
+            "start_date": request.start_date.isoformat(),
+            "end_date": request.end_date.isoformat(),
+            "location": {"latitude": request.venue_latitude, "longitude": request.venue_longitude, "timezone": timezone},
+            "allowed_start": request.allowed_start,
+            "allowed_end": request.allowed_end,
+            "minimum_duration_minutes": request.minimum_duration_minutes,
+            "bride": request.bride.model_dump() if request.bride else None,
+            "groom": request.groom.model_dump() if request.groom else None,
+        }
+        result = MarriageMuhuratCalculator().search(payload)
+        charged = bool(result.get("recommendations"))
+        if charged:
+            credit_service.spend_credits(current_user.userid, cost, feature_name, f"Marriage Muhurat {request.start_date}")
+        return {"status": "success", "data": result, "credits_deducted": charged}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Marriage Muhurat calculation failed user_id=%s", getattr(current_user, "userid", None))
+        raise HTTPException(status_code=500, detail="Marriage Muhurat calculation failed. Please verify the dates and venue.") from exc

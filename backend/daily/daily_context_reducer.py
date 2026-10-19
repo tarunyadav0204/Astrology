@@ -66,8 +66,11 @@ def reduce_daily_context(
     target_date = (
         daily_spine.get("target_date")
         or intent.get("dasha_as_of")
-        or datetime.now().strftime("%Y-%m-%d")
     )
+
+    if not target_date:
+        raise ValueError('Daily prediction requires an explicitly resolved target date')
+    datetime.strptime(str(target_date), '%Y-%m-%d')
 
     extracted_context = intent.get("extracted_context") if isinstance(intent.get("extracted_context"), dict) else {}
     micro_intent = classify_daily_micro_intent(

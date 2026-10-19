@@ -167,6 +167,8 @@
     }
   },
   "chartScreen": {
+    "mrityuBhagaWorkspace": "మృత్యు భాగం · విశ్లేషణ మరియు క్యాలెండర్",
+    "bhriguBinduWorkspace": "Bhrigu Bindu",
     "loadingText": "కాస్మిక్ అమరికలను లెక్కిస్తున్నాము...",
     "loadingSubtext": "గ్రహ స్థితులను చదువుతున్నాము",
     "emptyTitle": "చార్ట్ డేటా లేదు",

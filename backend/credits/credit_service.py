@@ -561,6 +561,7 @@ class CreditService:
                 ("griha_pravesh_cost", 15, "Credits per griha pravesh muhurat"),
                 ("gold_purchase_cost", 12, "Credits per gold purchase muhurat"),
                 ("business_opening_cost", 20, "Credits per business opening muhurat"),
+                ("marriage_muhurat_cost", 30, "Credits per couple-aware marriage muhurat"),
                 ("event_timeline_cost", 100, "Credits per yearly event timeline analysis"),
                 ("partnership_analysis_cost", 2, "Credits per partnership compatibility analysis"),
                 ("partnership_report_cost", 9, "Credits per partnership PDF report"),

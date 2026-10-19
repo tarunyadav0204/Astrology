@@ -16,10 +16,19 @@ const COST_KEYS = {
   vehicle: 'vehicle',
   property: 'griha_pravesh',
   gold: 'gold',
-  business: 'business'
+  business: 'business',
+  marriage: 'marriage_muhurat',
 };
 
 const MUHURAT_TYPE_DEFS = [
+  {
+    id: 'marriage',
+    title: 'Marriage Muhurat',
+    subtitle: 'Couple-aware wedding timing',
+    icon: 'heart',
+    gradient: ['#E75480', '#B23A5B'],
+    route: 'MarriageMuhurat',
+  },
   {
     id: 'childbirth',
     icon: 'medical',
@@ -62,8 +71,8 @@ export default function MuhuratHubScreen({ navigation }) {
     () =>
       MUHURAT_TYPE_DEFS.map((item) => ({
         ...item,
-        title: t(`muhurat.types.${item.id}.title`, item.id),
-        subtitle: t(`muhurat.types.${item.id}.subtitle`, ''),
+        title: t(`muhurat.types.${item.id}.title`, item.title || item.id),
+        subtitle: t(`muhurat.types.${item.id}.subtitle`, item.subtitle || ''),
       })),
     [t],
   );

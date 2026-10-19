@@ -32,6 +32,8 @@ import { refreshWebShellHeight } from '../../platform/webSafeArea';
 import { chartPreloader } from '../../services/chartPreloader';
 import ChartWidget from './ChartWidget';
 import ChartTaraSheet from './ChartTaraSheet';
+import MrityuBhagaPanel from './MrityuBhagaPanel';
+import BhriguBinduPanel from './BhriguBinduPanel';
 import ChartOverviewSheet from './ChartOverviewSheet';
 import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
 import NativeSelectorChip from '../Common/NativeSelectorChip';
@@ -96,6 +98,10 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const embedded = !!route?.params?.embedded;
   const [birthData, setBirthData] = useState(null);
   const [taraOpenSignal, setTaraOpenSignal] = useState(0);
+  const [mbOpen, setMbOpen] = useState(false);
+  const [bbOpen, setBbOpen] = useState(false);
+  const [mbDraft, setMbDraft] = useState(null);
+  useEffect(() => { setMbDraft(null); }, [birthData]);
   const [chartData, setChartData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [currentChartIndex, setCurrentChartIndex] = useState(0);
@@ -939,6 +945,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           >
             <ChartWidget
               onAskTara={() => setTaraOpenSignal(value => value + 1)}
+              onOpenMrityuBhaga={() => setMbOpen(true)}
+              onOpenBhriguBindu={() => setBbOpen(true)}
               ref={chartWidgetRef}
               chartData={getChartDataForType(chartTypes[currentChartIndex].id)}
               birthData={birthData}
@@ -2289,10 +2297,13 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
           </View>
         </Modal>
 
+        {birthData && <MrityuBhagaPanel visible={mbOpen} birthData={birthData} onClose={() => setMbOpen(false)} onAsk={text => { setMbDraft({ text, id: Date.now(), birthData }); setTaraOpenSignal(value => value + 1); }} />}
+        {birthData && <BhriguBinduPanel visible={bbOpen} birthData={birthData} onClose={() => setBbOpen(false)} onAsk={text => { setMbDraft({ text, id: Date.now(), birthData }); setTaraOpenSignal(value => value + 1); }} />}
         {birthData && <ChartTaraSheet
           key={JSON.stringify([birthData.id ?? birthData.birth_chart_id, birthData.name, birthData.date, birthData.time, birthData.latitude, birthData.longitude])}
           birthData={birthData}
           chartType={chartTypes[currentChartIndex]?.id || 'lagna'}
+          draftRequest={mbDraft?.birthData === birthData ? mbDraft : null}
           openSignal={taraOpenSignal}
         />}
       </View>

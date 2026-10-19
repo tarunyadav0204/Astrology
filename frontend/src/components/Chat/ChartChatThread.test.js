@@ -55,3 +55,18 @@ test.each([['chart_id', 7], ['birth_chart_id', 7], ['id', 7], [null, null]])('Ch
   } finally { act(() => root.unmount()); host.remove(); global.fetch = originalFetch; localStorage.removeItem('token'); jest.useRealTimers(); }
   expect(mockClose).toHaveBeenCalledWith('chart-session');
 });
+
+test('assessment questions are prepared as editable drafts without sending or charging', async () => {
+  mockAsk.mockClear();
+  localStorage.setItem('token','test-token');
+  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
+  const birth={name:'Synthetic',date:'1990-01-01',time:'12:00:42',latitude:28,longitude:77};
+  try {
+    await act(async()=>root.render(<ChartChatThread birthData={birth} chartType="lagna" draftRequest={{id:1,text:'Assess natal Rahu in Mrityu Bhaga'}}/>));
+    expect(host.querySelector('textarea').value).toBe('Assess natal Rahu in Mrityu Bhaga');
+    expect(mockAsk).not.toHaveBeenCalled();
+    await act(async()=>root.render(<ChartChatThread birthData={birth} chartType="lagna" draftRequest={{id:2,text:'Review the Saturn contact window'}}/>));
+    expect(host.querySelector('textarea').value).toBe('Review the Saturn contact window');
+    expect(mockAsk).not.toHaveBeenCalled();
+  } finally {act(()=>root.unmount());host.remove();localStorage.removeItem('token');}
+});

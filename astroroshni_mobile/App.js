@@ -54,6 +54,7 @@ import MuhuratHubScreen from './src/components/MuhuratHubScreen';
 import DailyPanchangScreen from './src/components/Panchang/DailyPanchangScreen';
 import { PanditHome, PanditPractice } from './src/components/Pandit/PanditDeskRoot';
 import UniversalMuhuratScreen from './src/components/UniversalMuhuratScreen';
+import MarriageMuhuratScreen from './src/components/MarriageMuhuratScreen';
 import EventScreen from './src/components/EventScreen';
 import MonthlyDeepScreen from './src/components/MonthlyDeepScreen';
 import AshtakvargaOracle from './src/components/Ashtakvarga/AshtakvargaOracle';
@@ -1282,6 +1283,11 @@ export default function App() {
           <Stack.Screen 
             name="UniversalMuhurat" 
             component={UniversalMuhuratScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="MarriageMuhurat"
+            component={MarriageMuhuratScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 

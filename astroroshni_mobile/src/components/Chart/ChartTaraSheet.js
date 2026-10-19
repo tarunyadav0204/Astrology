@@ -20,7 +20,7 @@ const errorText = data => typeof data?.detail === 'string' ? data.detail : data?
 
 // Mounted at the chart screen root, outside its scroll view. No modal/backdrop:
 // gestures on the uncovered chart continue to work.
-export default function ChartTaraSheet({ birthData, chartType, openSignal }) {
+export default function ChartTaraSheet({ birthData, chartType, openSignal, draftRequest }) {
   const { colors } = useTheme();
   const { i18n } = useTranslation();
   const { pricing, pricingFeatures, isAstrologerLicensed, fetchPricing, fetchBalance } = useCredits();
@@ -32,6 +32,7 @@ export default function ChartTaraSheet({ birthData, chartType, openSignal }) {
   const [keyboardTop, setKeyboardTop] = useState(null);
   const keyboardHeight = keyboardTop == null ? 0 : Math.max(0, windowHeight - keyboardTop);
   const [input, setInput] = useState('');
+  useEffect(() => { if (draftRequest?.text) setInput(draftRequest.text); }, [draftRequest]);
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

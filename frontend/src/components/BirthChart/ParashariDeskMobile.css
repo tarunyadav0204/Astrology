@@ -966,3 +966,5 @@
   font-size: 0.75rem;
   font-weight: 800;
 }
+
+.pdm__study-actions{display:flex;justify-content:flex-end;gap:8px;padding:10px 12px 0;flex-wrap:wrap}

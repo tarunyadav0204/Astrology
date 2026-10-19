@@ -270,7 +270,7 @@ DECISIONS
 2. `route_action`: ack for greeting/thanks/no question; handoff for two-chart compatibility; out_of_scope when the request is not about astrology or the user's chart; clarify only when a missing event, subject, reference, required child order, location scope, or incompatible multi-domain choice changes the calculation; otherwise answer.
 3. Multiple related facets of one event stay READY. Promise plus timing for the same event stays READY. Multiple unrelated domains use CLARIFY + compound_plan and 2-5 same-language choices faithfully preserving each question.
 4. Follow the latest user's language and the script actually typed for response_language, response_script, user_message, and clarification text. Romanized Hindi/Hinglish written in Latin letters must be response_language=hinglish and response_script=latn. Use deva only when the latest message itself uses Devanagari. Examples: `Mera visa kab aayega?` => hinglish/latn; `मेरा visa कब आएगा?` => hindi/deva.
-5. Resolve relative dates only from current_user_local_date. An exact day is PREDICT_DAILY; a range/season/month/year is PREDICT_PERIOD_OUTLOOK; asking when/if one event occurs is LIFESPAN_EVENT_TIMING; traits are ANALYZE_PERSONALITY; static promise/suitability/topic is ANALYZE_TOPIC_POTENTIAL; open-ended place selection is RECOMMEND_LOCATION; an explicit astrology-remedy request is RECOMMEND_REMEDY_FOR_PROBLEM.
+5. Resolve relative dates only from current_user_local_date. A request to forecast one exact day is PREDICT_DAILY; a date merely mentioned as background is not daily; a range/season/month/year is PREDICT_PERIOD_OUTLOOK; asking when/if one event occurs is LIFESPAN_EVENT_TIMING; traits are ANALYZE_PERSONALITY; static promise/suitability/topic is ANALYZE_TOPIC_POTENTIAL; open-ended place selection is RECOMMEND_LOCATION; an explicit astrology-remedy request is RECOMMEND_REMEDY_FOR_PROBLEM.
 6. `answer_mode`: explanation_mechanism, trait_nature, relationship_person, timing_window, event_prediction, potential_capacity, comparison_choice, decision_support, location_recommendation, factual_chart_lookup, dedicated_muhurat_flow, dedicated_partnership_flow, compound_plan, problem_diagnosis, remedy_action, or topic_reading.
 7. Use the most specific life-domain category, never `timing` when the domain is known. Select exactly one relevant subtype family from the catalog. Enum names are semantic definitions; distinguish capacity from timing, decision from timing, current state from future event, and static comparison from dated prediction.
 8. A named chart, placement, dasha, nakshatra, or specified house lookup uses factual_chart_lookup and structured chart_focus. A life question merely mentioning a chart remains a life-domain route.
@@ -298,7 +298,7 @@ Always return:
 - extracted_context: only user-stated or semantically resolved facts needed downstream
 - question_parts: one compact semantic part per compatible requested facet/person, with part_id, intent_families (topic_outlook/event_timing/period_forecast/comparison/causal_diagnosis/decision_guidance/personality_or_traits/factual_chart_lookup/remedy_request), life_domain, event_profile or null, subject, timeframe, confidence. Do not copy the full question into `text`.
 
-Return when relevant: one subtype field from the catalog; clarification_question; clarification_choices (label, submit_text); user_message; accepted_speech_follow_up; resolved_question; chart_focus (explicit, requested_chart, requested_houses); daily_intent_confirmed, daily_activity_label, daily_event_facets; child_order; third_party_decision_request, third_party_action; named career/education targets, traits and options; explicit_remedy_request; muhurat event/location/date facts.
+Return when relevant: one subtype field from the catalog; clarification_question; clarification_choices (label, submit_text); user_message; accepted_speech_follow_up; resolved_question; chart_focus (explicit, requested_chart, requested_houses); daily_intent_confirmed, daily_activity_label, daily_event_facets; child_order; third_party_decision_request, third_party_action; named career/education targets, traits and options; explicit_remedy_request; muhurat event/location/date facts. Festival puja uses dedicated_muhurat_flow; extract actual festival in muhurat_event_type, festival_id, explicitly requested festival_year, muhurat_ritual/tradition and muhurat_personalized. No invented dates or default birthplace; shared setup confirms the puja city and resolves the year.
 
 Minimal example shape (values are illustrative, not defaults):
 {{"medical_triage":{{"urgency":"none","reason":"","user_message":""}},"turn_relation":"new_request","status":"READY","route_action":"answer","response_language":"english","response_script":"latn","mode":"ANALYZE_TOPIC_POTENTIAL","answer_mode":"topic_reading","category":"general","target_subject_key":"self","target_subject_keys":["self"],"temporal_intent":{{"event_state":"unknown","expected_cadence":"open","process_scale":"unknown","explicit_timeframe":false,"reason":""}},"semantic_timeframe":{{"kind":"none"}},"dialogue_state":{{"request_summary":"","known_facts":{{}},"unresolved_facts":[],"corrections":[],"ready_to_calculate":true,"readiness_reason":""}},"extracted_context":{{}},"question_parts":[{{"part_id":"p1","intent_families":["topic_outlook"],"life_domain":"general","event_profile":null,"subject":"self","timeframe":{{"kind":"none"}},"confidence":"high"}}]}}
@@ -1584,7 +1584,8 @@ AUTHORITATIVE USER-LOCAL CALENDAR (NON-NEGOTIABLE):
 - This calendar overrides your internal clock, training-time date, server date, UTC date, birth-place timezone, and dates mentioned in conversation history.
 - Interpret equivalent relative-day words in every language/script using this same calendar (for example today / aaj / आज all mean {current_date}).
 - When the CURRENT QUESTION asks for one of these relative days, copy the corresponding ISO date above exactly into `extracted_context.specific_date`; do not calculate it again and do not shift it at midnight or for UTC.
-- For such a question set `mode="PREDICT_DAILY"`, `daily_intent_confirmed=true`, and `specific_date_basis="relative_user_day"`.
+- Only when the requested FORECAST itself is about that one day, set `mode="PREDICT_DAILY"`, `daily_intent_confirmed=true`, and `specific_date_basis="relative_user_day"`.
+- These calendar rows resolve dates; they do not request a daily reading. "Now/ab/current treatment" does not mean "forecast today". An earlier test yesterday, a message timestamp, or a prior daily answer does not scope the CURRENT QUESTION to one day.
 - Before returning JSON, silently audit this invariant: a relative-day phrase in the CURRENT QUESTION and `specific_date` must point to the same row above. If they differ, correct `specific_date` before returning.
 """.strip()
 
@@ -1675,6 +1676,51 @@ def _daily_intent_confirmed(result: Dict[str, Any]) -> bool:
     }
 
 
+
+def apply_standard_daily_scope_guard(result: Dict[str, Any], user_question: str) -> None:
+    """Standard/Premium require semantic day-request grounding in current text.
+
+    The model still understands every language. Python validates its verbatim
+    provenance, rather than routing by an English/Hindi day-keyword dictionary.
+    Ambient dates, unsupported route labels and prior-day context are insufficient.
+    """
+    original_mode = str(result.get('mode') or '').upper()
+    raw_extracted = result.get('extracted_context') or {}
+    proposed_date = raw_extracted.get('specific_date') if isinstance(raw_extracted, dict) else None
+    if original_mode != 'PREDICT_DAILY' and not (proposed_date and _daily_intent_confirmed(result)): return
+    evidence = result.get('daily_scope_evidence')
+    evidence = evidence if isinstance(evidence, dict) else {}
+    quote = str(evidence.get('request_quote') or '').strip()
+    reference = str(evidence.get('day_reference') or '').strip()
+    question = str(user_question or '')
+    extracted = result.get('extracted_context')
+    extracted = extracted if isinstance(extracted, dict) else {}
+    confirmed = str(result.get('daily_intent_confirmed') or '').lower() in {'true','1'}
+    valid = (confirmed and _daily_intent_confirmed(result)
+        and _normalize_specific_date(extracted.get('specific_date')) is not None
+        and evidence.get('source') == 'current_question'
+        and evidence.get('scope') == 'one_day_forecast'
+        and bool(quote and reference) and quote in question and reference in quote)
+    result['daily_scope_validated'] = bool(valid)
+    if valid: return
+    fallback = str(result.get('non_daily_mode') or (original_mode if original_mode != 'PREDICT_DAILY' else '')).upper()
+    allowed = {'ANALYZE_TOPIC_POTENTIAL','ANALYZE_PERSONALITY','PREDICT_PERIOD_OUTLOOK',
+        'LIFESPAN_EVENT_TIMING','PREDICT_EVENT_TIMING','ANALYZE_ROOT_CAUSE'}
+    if fallback not in allowed:
+        fallback = 'LIFESPAN_EVENT_TIMING' if result.get('answer_mode') == 'event_prediction' else 'ANALYZE_TOPIC_POTENTIAL'
+    result.update(mode=fallback, context_type='birth', daily_intent_confirmed=False)
+    result.pop('dasha_as_of',None)
+    result.pop('analysis_type',None)
+    result.pop('daily_activity_label',None)
+    result.pop('daily_event_facets',None)
+    result.pop('transit_request',None)  # discard the erroneous one-day/month restriction
+    extracted.pop('specific_date',None)
+    extracted['specific_date_basis'] = 'not_date_bound'
+    result['extracted_context'] = extracted
+    if fallback == 'ANALYZE_TOPIC_POTENTIAL': result['answer_mode'] = 'topic_reading'
+    elif fallback in {'LIFESPAN_EVENT_TIMING','PREDICT_EVENT_TIMING'}: result['answer_mode'] = 'event_prediction'
+    elif fallback == 'PREDICT_PERIOD_OUTLOOK': result['answer_mode'] = 'timing_window'
+
 def apply_transit_timing_guards(result: Dict, user_question: str, *, current_year: int, now: datetime | None = None) -> None:
     """
     Post-process router output: career/education (and related) questions that ask *when* or *whether*
@@ -1739,7 +1785,7 @@ def apply_transit_timing_guards(result: Dict, user_question: str, *, current_yea
             "endYear": dt.year,
             "yearMonthMap": {str(dt.year): [month_name]},
         }
-    elif exact_date and not daily_confirmed:
+    elif (exact_date and not daily_confirmed) or (not exact_date and str(result.get('mode') or '').upper() == 'PREDICT_DAILY'):
         if isinstance(result.get("extracted_context"), dict):
             result["extracted_context"].pop("specific_date", None)
         if str(result.get("mode") or "").upper() == "PREDICT_DAILY":
@@ -3116,6 +3162,8 @@ class IntentRouter:
         else:
             result['chart_insights'] = []
 
+        apply_standard_daily_scope_guard(result, user_question)
+
         apply_transit_timing_guards(
             result,
             user_question,
@@ -3523,6 +3571,17 @@ Answer modes:
 - location_recommendation: where to move / which city or direction for a life goal.
 - factual_chart_lookup: the user wants a named chart or one or more specified houses within that chart interpreted from calculated data (any language/script). For a house request, set chart_focus.requested_houses to the exact integer house numbers and use the named chart, or D1 when no other chart is named. Predict from the requested house's sign and lord, the lord's actual placement and condition, occupants, and exact aspects; do not replace this with a lagna-lord or whole-chart essay. For a whole-chart request, predict that chart's life area from the calculated packet; do not dump placements as the product, and do not map a named varga to family/career/soul topic_reading just because that chart is associated with that life area. Supported requested_chart codes: D1, D2, D3, D4, D7, D9, D10, D12, D16, D20, D24, D27, D30, D40, D45, D60, Karkamsa, Swamsa.
 - dedicated_muhurat_flow: choosing an auspicious time/date for a specified activity; collect the event, location and usable date range before READY. The location must be either the saved birth location (`muhurat_use_birth_location=true`) or the user's own place text in `muhurat_location_query`; never invent coordinates.
+Festival puja Muhurat uses dedicated_muhurat_flow too. Extract the actual festival name in
+muhurat_event_type, festival_id when known, festival_year only if explicitly stated, muhurat_ritual
+only for a distinct requested rite (parana, immersion, Ghatasthapana; generic puja leaves it null),
+muhurat_tradition only when specified, and muhurat_personalized=true for "according to my kundli".
+Do not invent calendar dates for an annual festival or require the user to supply them: shared intake
+calculates them for the confirmed year and event city. It will request explicit city selection; do not
+silently use birthplace. Preserve unsupported festival/ritual names rather than substitute a purchase.
+For election follow-ups, set extracted_context.muhurat_transition=continue only when the same activity
+continues; use new for a fresh activity. Respect query_context.muhurat_request from a submitted setup
+card and _muhurat_previous for continuing constraints. Ordinary unrelated questions exit the workflow.
+
 - dedicated_partnership_flow: compatibility/synastry between two charts; hand off to Partnership mode.
 - compound_plan: questions from different life domains or incompatible calculation families; clarify and ask for one question only. Do not use it for promise/outlook plus timing of the same event.
 - problem_diagnosis: why something is blocked, delayed, unstable, difficult.
@@ -3683,7 +3742,13 @@ Return exactly this JSON shape:
     "location_goal":"career/wealth/relationship/education/health/general or null",
     "hub_regions":["known normalized region ids only"],
     "awaiting_location_scope": false,
-    "muhurat_event_type":"childbirth/vehicle/griha_pravesh/gold/business_opening/marriage/property or null",
+    "muhurat_event_type":"actual festival name or childbirth/vehicle/griha_pravesh/gold/business_opening/marriage/property or null",
+    "festival_id":"canonical festival id or null",
+    "festival_year":"explicit year number or null",
+    "muhurat_ritual":"distinct ritual or null",
+    "muhurat_tradition":"explicit tradition or null",
+    "muhurat_personalized":true or false,
+    "muhurat_transition":"new or continue or exit",
     "muhurat_start_date":"YYYY-MM-DD or null",
     "muhurat_end_date":"YYYY-MM-DD or null",
     "muhurat_use_birth_location": true or false or null,
@@ -3816,6 +3881,13 @@ Do not ask for birth details.
 
         prompt = f"""
 You are the lightweight intent router for an astrology chat. Keep this fast and minimal.
+
+Festival puja timing uses dedicated_muhurat_flow. Extract the actual festival name in
+extracted_context.muhurat_event_type; festival_id when known, festival_year only when explicit,
+muhurat_ritual/tradition only when specified, and muhurat_personalized for kundli-based timing.
+Do not invent festival dates or default to birthplace. Shared intake confirms city and year.
+An explicit query_context.muhurat_request is a submitted election setup. Continue prior election
+constraints only for a same-activity follow-up (muhurat_transition=continue); unrelated questions exit.
 
 Your job:
 - classify the user's current question
@@ -4051,7 +4123,13 @@ Return ONLY this JSON shape:
     "location_goal":"career/wealth/relationship/education/health/general or null",
     "hub_regions":["known normalized region ids only"],
     "awaiting_location_scope": true or false,
-    "muhurat_event_type":"childbirth/vehicle/griha_pravesh/gold/business_opening/marriage/property or null",
+    "muhurat_event_type":"actual festival name or childbirth/vehicle/griha_pravesh/gold/business_opening/marriage/property or null",
+    "festival_id":"canonical festival id or null",
+    "festival_year":"explicit year number or null",
+    "muhurat_ritual":"distinct ritual or null",
+    "muhurat_tradition":"explicit tradition or null",
+    "muhurat_personalized":true or false,
+    "muhurat_transition":"new or continue or exit",
     "muhurat_start_date":"YYYY-MM-DD or null",
     "muhurat_end_date":"YYYY-MM-DD or null",
     "muhurat_use_birth_location": true or false or null,
@@ -4851,6 +4929,19 @@ CLARIFICATION FORMAT RULE:
         - If the question is not about one exact day, leave `extracted_context.specific_date` empty or omit it.
 
         DAILY INTENT CONFIRMATION:
+        - Distinguish the requested forecast horizon from dates mentioned as background. Ongoing pregnancy,
+          treatment, delivery, career or relationship concerns do not become today's prediction merely
+          because the situation is current, the user says now/ab, or previous messages mention a day.
+        - A question asking about an eventual delivery and its outcome has no one-day scope unless the
+          user explicitly asks about delivery ON a specific day. Retain its broader topic/event scope.
+        - For PREDICT_DAILY, daily_intent_confirmed MUST be true and daily_scope_evidence must contain
+          source=current_question, scope=one_day_forecast, request_quote copied VERBATIM from the current
+          question expressing the one-day forecast request, and day_reference copied from that quote.
+          Never quote message timestamps, the current-date header, previous questions or assistant answers.
+          A background date is not a forecast request, even if its text can be copied.
+        - Also return non_daily_mode: the appropriate broader topic/event mode if one-day scope is absent.
+          For "What about tomorrow?" as a real follow-up, quote that current request; use history only
+          to recover its subject. A fully stated new question cannot inherit a prior daily scope.
         - Daily mode is opt-in. Set `daily_intent_confirmed=true` only when the user's actual question is about one exact/relative day.
         - Date ranges are NOT daily, even when they contain exact dates. For "between 19 Jun and 25 Jun", "from 19 Jun to 25 Jun", or "19 Jun-25 Jun", do NOT set `PREDICT_DAILY`, do NOT set `specific_date`, set `daily_intent_confirmed=false`, and use `PREDICT_PERIOD_OUTLOOK` or event timing for the whole range.
         - Set `extracted_context.specific_date_basis` to:
@@ -4876,6 +4967,19 @@ CLARIFICATION FORMAT RULE:
         - "2026" → startYear: 2026, endYear: 2026
         - "next year" → startYear: {current_year + 1}, endYear: {current_year + 1}
         - General timing questions ("when will I...") → startYear: {current_year}, endYear: {current_year + 2}
+
+        ELECTION / FESTIVAL PUJA — PRIORITY OVER LIFE-EVENT TIMING:
+        Choosing when to BEGIN an action or perform festival puja is dedicated_muhurat_flow,
+        mode ELECT_MUHURAT, reading_type muhurat. It is not a prediction of when an event happens.
+        Extract muhurat_request with actual event_type (vehicle/home/gold/business or the festival's
+        actual name), festival_id when known, festival_year only when explicitly given, ritual/tradition
+        only for a distinct specified rite, personalized=true for kundli-based timing, start_date/end_date
+        only when explicitly requested. Do not invent festival dates or default event city to birthplace.
+        A confirmed query_context.muhurat_request is authoritative; shared intake validates the city and
+        resolves the festival year. For same-activity follow-ups use muhurat_transition=continue and
+        recover the original request from conversation; new activities use new. Unrelated questions exit.
+        Return response_language including script, e.g. Hindi in Latin script for Roman Hindi.
+        Do not require annual festival dates from the user: shared intake calculates them.
 
         MODES (USER INTENT):
         You must choose one of the following modes based on the user's question. This determines the structure of the final answer.
@@ -4906,6 +5010,10 @@ CLARIFICATION FORMAT RULE:
 
         Return ONLY a JSON object:
         {{
+            "response_language":"language and script of the latest question",
+            "reading_type":"muhurat or default",
+            "muhurat_transition":"new or continue or exit",
+            "muhurat_request": {{"event_type":"actual festival name or activity when choosing a muhurat", "festival_year":null, "ritual":null, "personalized":false}},
             "status": "CLARIFY" or "READY",
             "clarification_question": "When status=CLARIFY for compound_plan: 1-2 sentences that answering several questions together makes each reading weaker, then ask them to pick a card; do not list lettered options",
             "answer_mode": "compound_plan only for several unrelated asks, otherwise the best supported answer mode",
@@ -4924,6 +5032,8 @@ CLARIFICATION FORMAT RULE:
                 "requested_houses": ["integer house numbers 1-12, only when explicitly asked"]
             }} or null,
             "daily_intent_confirmed": true or false,
+            "daily_scope_evidence": {{"source":"current_question or none","scope":"one_day_forecast or none","request_quote":"verbatim current day-forecast request or empty","day_reference":"verbatim day phrase in that quote or empty"}},
+            "non_daily_mode":"ANALYZE_TOPIC_POTENTIAL or PREDICT_PERIOD_OUTLOOK or LIFESPAN_EVENT_TIMING as appropriate",
             "extracted_context": {{ "timeframe": "2025", "aspect": "promotion", "specific_date": "YYYY-MM-DD only when daily_intent_confirmed=true", "specific_date_basis": "explicit_user_day or relative_user_day or not_date_bound", "location_scope": "india or abroad or both or null", "awaiting_location_scope": true or false }},
             "context_type": "annual" or "birth",
             "category": "category_name",

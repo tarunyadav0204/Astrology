@@ -50,7 +50,7 @@ const toLocalYmd = (value) => {
   return `${date.getFullYear()}-${month}-${day}`;
 };
 
-const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, onRequestBirthChart, onRequestTimingLicense, timingLicensed = false, division, navigation, onHousePress, onDrawingModeChange, onAskTara }, ref) => {
+const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onNavigateToTransit, onOpenChartGuide, onRequestBirthChart, onRequestTimingLicense, timingLicensed = false, division, navigation, onHousePress, onDrawingModeChange, onAskTara, onOpenMrityuBhaga, onOpenBhriguBindu }, ref) => {
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const dashaColor = dashaPaint(colors).fill;
@@ -1094,6 +1094,26 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 {aspectMode === mode ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null}
               </TouchableOpacity>
             ))}
+            {onOpenMrityuBhaga ? (
+              <TouchableOpacity
+                style={styles.chartMenuRow}
+                onPress={() => { setShowChartMenu(false); onOpenMrityuBhaga(); }}
+                accessibilityRole="button"
+              >
+                <Ionicons name="calendar-outline" size={16} color={colors.chartText || colors.text} />
+                <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{t('chartScreen.mrityuBhagaWorkspace', 'Mrityu Bhaga · Assessment & Calendar')}</Text>
+              </TouchableOpacity>
+            ) : null}
+            {onOpenBhriguBindu ? (
+              <TouchableOpacity
+                style={styles.chartMenuRow}
+                onPress={() => { setShowChartMenu(false); onOpenBhriguBindu(); }}
+                accessibilityRole="button"
+              >
+                <Ionicons name="calendar-outline" size={16} color={colors.chartText || colors.text} />
+                <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{t('chartScreen.bhriguBinduWorkspace', 'Bhrigu Bindu')}</Text>
+              </TouchableOpacity>
+            ) : null}
             {[
               ['badhaka', showBadhaka, () => setShowBadhaka((on) => !on), t('chartScreen.badhaka', 'Badhaka'), 'alert-circle-outline'],
               ['marka', showMaraka, () => setShowMaraka((on) => !on), t('chartScreen.marka', 'Marka'), 'remove-circle-outline'],

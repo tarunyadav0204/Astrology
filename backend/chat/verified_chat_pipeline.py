@@ -626,7 +626,12 @@ def _verified_presentation_mode(instant_context):
     return mode
 
 
-def _premium_writer_system(
+def _premium_writer_system(intent_mode, language, native_name="", response_style="technical"):
+    from chat.verified_consultation import verified_consultation_instruction
+    return _premium_writer_system_base(intent_mode, language, native_name, response_style) + '\n' + verified_consultation_instruction()
+
+
+def _premium_writer_system_base(
     intent_mode: str,
     language: str,
     native_name: str = "",
@@ -793,9 +798,9 @@ Jaimini timing unless you have first called jaimini.chara_dasha and inspected it
 Karakas and Arudhas may support that analysis, but never substitute for Chara Dasha. Do not say
 that Chara Dasha was unavailable, absent, or not supplied: it is a registered calculator.
 
-Never tell the user that supplied data, a packet, or calculations are missing or incomplete.
-If the calculated evidence cannot establish a conclusion, state the uncertainty plainly without
-discussing internal transport or missing inputs. Internal gaps are recorded separately.
+Do not narrate internal packet transport or tool plumbing. If an essential user fact is missing,
+ask one focused question and explain its effect on the decision. Otherwise give the strongest
+supported interpretation and state only material uncertainty. Internal gaps are recorded separately.
 
 EVIDENCE PROVENANCE FIREWALL (mandatory): Never tell the user how the reading obtained,
 transported, selected, received, lacked, or verified its evidence. Do not describe what an
@@ -843,7 +848,12 @@ def build_verified_conversation_context(history: List[Dict[str, Any]], intent: D
     }
 
 
-def _verified_final_writer_instruction(response_style: str, intent_mode: str = "") -> str:
+def _verified_final_writer_instruction(response_style, intent_mode=""):
+    from chat.verified_consultation import verified_consultation_instruction
+    return _verified_layout_instruction(response_style, intent_mode) + '\n' + verified_consultation_instruction()
+
+
+def _verified_layout_instruction(response_style: str, intent_mode: str = "") -> str:
     """Put the visible-response contract in the final writer turn itself.
 
     Calculator turns need detailed analysis instructions, but they should not
@@ -1032,7 +1042,7 @@ async def run_verified_calculator_agent(
         {
             "type": "function",
             "name": "get_deterministic_evidence",
-            "description": "Get one additional deterministic astrology calculation. Select only a registered capability ID after inspecting the Instant baseline.",
+            "description": "Get an additional deterministic astrology calculation. After inspecting the baseline, request this whenever relevant evidence is missing rather than treating an unrequested calculation as unavailable. Select only a registered capability ID and supply its required parameters within the confirmed reading scope.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1105,11 +1115,12 @@ async def run_verified_calculator_agent(
         tools[0]['description'] = 'Get the fixed Parashari question chart. No natal chart or natal dasha.'
     if is_muhurat:
         intent_mode = 'ELECT_MUHURAT'
-        instructions = (muhurat_contract(response_style) + '\nCalculator requirements: ' + json.dumps(MUHURAT_CAPABILITIES) + '\nWrite in ' + language + '\n'
+        instructions = (muhurat_contract(response_style, muhurat_request) + '\nCalculator requirements: ' + json.dumps(MUHURAT_CAPABILITIES) + '\nWrite in ' + language + '\n'
             + _verified_emphasis_instruction() + '\n' + _verified_sentiment_instruction()
             + '\nAfter inspecting evidence call report_calculation with a factual title and summary. Never expose model details.')
         tools[0]['description'] = 'Get the confirmed bounded Muhurat search and evaluated candidate windows.'
     from chat.calculator_menu import CALCULATOR_EVIDENCE_INTEGRITY
+    from chat.verified_consultation import verified_consultation_instruction
     instructions += '\n' + CALCULATOR_EVIDENCE_INTEGRITY
     if conversation_mode:
         instructions = (
@@ -1135,6 +1146,9 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
  the user language, no newlines, at most 220 characters. Do not expose internal field names.
  These are public evidence summaries, never private reasoning or chain-of-thought.
 """
+
+    if verified_consultation_instruction() not in instructions:
+        instructions += '\n' + verified_consultation_instruction()
 
     from ai.gemini_chat_analyzer import resolve_openai_reasoning_effort
     effort = resolve_openai_reasoning_effort(model_name, "none")
@@ -1357,12 +1371,17 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
         "role": "user",
         "content": [{
             "type": "input_text",
-            "text": (PARTNERSHIP_CONTRACT + "\nWrite the final answer now in the requested language and answer style, using the evidence supplied for both charts." if pair else muhurat_contract(response_style) + "\nAUTHORITATIVE CURRENT SEARCH RESULT:\n" + json.dumps({
+            "text": (PARTNERSHIP_CONTRACT + "\nWrite the final answer now in the requested language and answer style, using the evidence supplied for both charts." if pair else muhurat_contract(response_style, muhurat_request) + "\nAUTHORITATIVE CURRENT SEARCH RESULT:\n" + json.dumps({
                 'status':baseline.get('status'), 'result_meaning':baseline.get('result_meaning'),
                 'candidate_count':len(baseline.get('candidates') or []),
                 'total_candidates':baseline.get('total_candidates'), 'days_evaluated':baseline.get('days_evaluated'),
                 'search':baseline.get('search'), 'rejection_counts':baseline.get('rejection_counts'),
                 'errors':baseline.get('errors'), 'limitation':baseline.get('limitation'),
+                'workflow':baseline.get('workflow'), 'coverage':baseline.get('coverage'),
+                'limitations':baseline.get('limitations'), 'ritual':baseline.get('ritual'),
+                'coverage_reason':baseline.get('coverage_reason'), 'requested_ritual':baseline.get('requested_ritual'),
+                'candidates':baseline.get('candidates') if baseline.get('workflow') == 'festival_puja' else None,
+                'tithi_intervals':baseline.get('tithi_intervals'), 'sources':baseline.get('sources'),
             }, ensure_ascii=False, default=str)) if (pair or is_muhurat) else _verified_final_writer_instruction(response_style, intent_mode),
         }],
     })
@@ -1372,6 +1391,8 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
             "Use inspected evidence, correct unsupported interpretations and state material uncertainty. "
             "Keep it conversational; no mandatory report sections."
         )
+    if verified_consultation_instruction() not in final_input[-1]['content'][0]['text']:
+        final_input[-1]['content'][0]['text'] += '\n' + verified_consultation_instruction()
     # This final turn writes only the response. If the round ceiling is reached,
     # its last calculator outputs are still supplied before tool use is disabled.
     remaining = max(1.0, timeout_s - (time.perf_counter() - started))
@@ -1552,7 +1573,7 @@ async def build_verified_generation_request(
     )
     writer_system = f"""You are Verified Chat, a rigorous Vedic astrology assistant. Analyze the supplied raw deterministic calculations yourself and reach your own conclusion. The packet contains no approved answer or ranking. For a past-timing question, use historical_timing_evidence; an empty current-period snapshot does not mean that historical dasha data is unavailable. Weigh Parashari, divisional, Jaimini, Nadi, Nakshatra, KP and Ashtakavarga evidence where it is relevant; do not mechanically force every system into the response. Resolve agreement and conflict honestly. Do not invent chart facts beyond the packet.
 
-Never tell the user that the supplied data, packet, or calculations are missing or incomplete. If the calculated evidence cannot establish a conclusion, state the conclusion's uncertainty plainly without discussing the transport or missing internal inputs. Packet completeness is audited separately.
+Do not narrate internal packet transport or tool plumbing. If an essential user fact is missing, ask one focused question and explain its effect on the decision. Otherwise give the strongest supported interpretation and state only material uncertainty. Packet completeness is audited separately.
 
 RELATIONSHIP FRAME: Honor selected-chart-only analysis without repeatedly recommending
 Partnership. Read baseline_calculations.question_scope.target_subject. A base_house other
@@ -1580,6 +1601,8 @@ PREMIUM OUTPUT FORMAT:
 {premium_output_format}
 
 {_verified_emphasis_instruction()}"""
+    from chat.verified_consultation import verified_consultation_instruction
+    writer_system += '\n' + verified_consultation_instruction()
     writer_prompt = f"""Answer the user's question in {language}.
 
 Question: {question}
@@ -1792,6 +1815,16 @@ from predicting whether a purchase happens. Understand intent semantically in ev
 Return muhurat_transition new|continue|exit and partial muhurat_request with event_type,
 start_date/end_date (inclusive ISO dates), allowed_start/end (HH:MM), check_time for a fixed instant,
 weekdays (0 Monday through 6 Sunday), excluded_dates, personalized, retrospective and minimum_duration_minutes.
+Festival/vrat puja requests also use this workflow: set event_type to the actual festival name,
+festival_id to its canonical catalog ID when known, festival_year only when explicitly specified,
+and ritual/tradition only when explicitly specified. Generic "puja" means the main ritual;
+leave ritual null in that case. Preserve a distinct ritual such as immersion/parana as written. Do NOT force festivals into purchases or general puja.
+Recognize Dussehra/dusehra/Dasara/Vijayadashami, Diwali/Lakshmi puja, Navratri, Janmashtami,
+Shivratri, Ganesh Chaturthi, Ram Navami and other festivals across languages and typos.
+Keep puja, shopping, fasting/parana, immersion, Ghatasthapana and regional rites distinguishable.
+Set personalized true when the user asks for timing according to their kundli/birth chart.
+For an annual festival with no explicit dates, leave dates absent; the festival intake resolves the year
+from the trusted server clock and asks the user to confirm city/year. Never assume puja city is birthplace.
 For a planned action, "this month" means remaining dates from USER LOCAL NOW through month-end, not
 elapsed dates earlier in the month. Set retrospective true ONLY for an explicitly historical assessment;
 never for buying, booking, signing or another planned future action.
@@ -1844,12 +1877,15 @@ timing_window with a bounded current/future horizon. Never route health to a lif
 life-event timeline.
 
 RECENT CONVERSATION: {json.dumps(recent, ensure_ascii=False)}
-USER LANGUAGE: {language}
+RESPONSE LANGUAGE: Infer from the latest question, not the UI locale. Return response_language as a
+natural-language instruction, e.g. "Hindi in Latin script" for Roman Hindi, "Hindi in Devanagari" for
+Devanagari. Preserve the question's language/script, including mixed languages; respect explicit requests.
+UI LANGUAGE FALLBACK: {language}
 USER LOCAL NOW: {now_local.isoformat()}
 QUESTION: {question}
 
 Schema:
-{{"subject_resolution":"selected_chart|other_chart|unresolved","clarification_reason":"missing_birth_details|confirm_subject|workflow|other|none","location_intent":"relocation|object_search|other","requires_new_location":false,"reading_transition":"none|continue_prashna|new_prashna|natal|clarify_workflow","resolved_question":"...","prashna_intent":"none|offer|explicit","answer_mode":"...","category":"...","target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","reading_type":"default|chart_dasha_analysis|muhurat","muhurat_transition":"new|continue|exit","muhurat_request":{{}},"forecast_scope":"daily|other","target_date":null,"period_start":null,"period_end":null,"user_message":""}}
+{{"response_language":"language and script of the latest question","subject_resolution":"selected_chart|other_chart|unresolved","clarification_reason":"missing_birth_details|confirm_subject|workflow|other|none","location_intent":"relocation|object_search|other","requires_new_location":false,"reading_transition":"none|continue_prashna|new_prashna|natal|clarify_workflow","resolved_question":"...","prashna_intent":"none|offer|explicit","answer_mode":"...","category":"...","target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","reading_type":"default|chart_dasha_analysis|muhurat","muhurat_transition":"new|continue|exit","muhurat_request":{{}},"forecast_scope":"daily|other","target_date":null,"period_start":null,"period_end":null,"user_message":""}}
 """.strip()
     # A routing timeout must not fall through to a guessed/default workflow.
     # The former 20-second ceiling cancelled slow but otherwise valid responses.
@@ -1987,6 +2023,7 @@ Schema:
     else:
         prashna_intent = 'none'
     return {
+        "response_language": str(parsed.get("response_language") or language)[:80],
         "location_intent": location_intent,
         "requires_new_location": parsed.get('requires_new_location') is True,
         "reading_transition": transition,

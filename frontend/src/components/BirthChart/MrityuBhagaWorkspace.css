@@ -1,0 +1,400 @@
+.mb-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #210b17a8;
+  z-index: 15000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+}
+
+.mb-workspace {
+  background: #fffaf1;
+  color: #29131e;
+  border: 1px solid #d6c5ac;
+  border-radius: 20px;
+  width: min(1080px,100%);
+  height: min(92dvh,1100px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 80px #0005;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.mb-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e1d7c8;
+}
+
+.mb-header h2 {
+  font-family: Georgia,serif;
+  font-size: 30px;
+  margin: 2px 0;
+}
+
+.mb-header p {
+  margin: 0;
+  color: #71655d;
+}
+
+.mb-header small {
+  color: #80682f;
+  letter-spacing: .12em;
+}
+
+.mb-workspace button {
+  border: 1px solid #c4b18b;
+  background: #f4ecd9;
+  color: #342519;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.mb-workspace button:hover,.mb-tabs button[aria-pressed=true] {
+  background: #dfcc99;
+  color: #29131e;
+}
+
+.mb-workspace button:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+.mb-workspace button:focus-visible,.mb-workspace input:focus-visible,.mb-workspace textarea:focus-visible,.mb-workspace select:focus-visible {
+  outline: 3px solid #967322;
+  outline-offset: 2px;
+}
+
+.mb-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 24px;
+  border-bottom: 1px solid #e1d7c8;
+  flex-wrap: wrap;
+}
+
+.mb-scroll {
+  overflow: auto;
+  flex: 1;
+  padding: 20px 24px;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+.mb-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+  background: #efe3c6;
+  border-radius: 12px;
+  margin-bottom: 18px;
+}
+
+.mb-summary strong {
+  font-size: 20px;
+}
+
+.mb-summary span,.mb-note {
+  font-size: 13px;
+  color: #756653;
+}
+
+.mb-card {
+  background: #fffdf8;
+  border: 1px solid #ded2bf;
+  border-radius: 14px;
+  padding: 20px;
+  margin: 0 0 16px;
+}
+
+.mb-card.is-selected {
+  border-color: #9e7d30;
+  box-shadow: 0 0 0 1px #9e7d30;
+}
+
+.mb-card h3,.mb-card h4 {
+  margin: 0;
+  font-size: 20px;
+  color: #362219;
+}
+
+.mb-card p {
+  margin: 8px 0;
+}
+
+.mb-position {
+  font-family: Georgia,serif;
+  font-size: 23px;
+}
+
+.mb-workspace dl {
+  display: grid;
+  grid-template-columns: minmax(130px,1fr) 3fr;
+  gap: 9px 20px;
+  margin: 16px 0;
+}
+
+.mb-workspace dt {
+  color: #76644d;
+  text-transform: capitalize;
+}
+
+.mb-workspace dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.mb-actions,.mb-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+
+.mb-controls {
+  align-items: flex-end;
+}
+
+.mb-controls label,.mb-note-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mb-workspace input:not([type=checkbox]),.mb-workspace select,.mb-workspace textarea {
+  background: #fffefb;
+  color: #29131e;
+  border: 1px solid #ccbda5;
+  border-radius: 8px;
+  padding: 9px;
+  font: inherit;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.mb-workspace textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+}
+
+.mb-note-input {
+  margin-top: 14px;
+  color: #71634f;
+  font-size: 13px;
+}
+
+.mb-workspace .mb-text-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #654c20;
+  font-weight: 700;
+}
+
+.mb-table-wrap {
+  overflow: auto;
+  margin-top: 12px;
+}
+
+.mb-workspace table {
+  border-collapse: collapse;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.mb-workspace th {
+  background: #e8d8b2;
+  color: #29131e;
+  text-align: left;
+}
+
+.mb-workspace td,.mb-workspace th {
+  padding: 10px;
+  border-bottom: 1px solid #ded2bf;
+}
+
+.mb-footer {
+  padding: 12px 24px;
+  border-top: 1px solid #ded2bf;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mb-error {
+  background: #f7e8df;
+  color: #783821;
+  padding: 14px;
+  border-radius: 12px;
+}
+
+.mb-card-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mb-card--small {
+  padding: 12px 16px;
+}
+
+.mb-workspace a {
+  color: #755b20;
+}
+
+@media (max-width:700px) {
+  .mb-backdrop {
+    padding: 0;
+  }
+  .mb-workspace {
+    border-radius: 0;
+    width: 100%;
+    height: 100dvh;
+  }
+  .mb-header,.mb-scroll {
+    padding: 16px;
+  }
+  .mb-header h2 {
+    font-size: 26px;
+  }
+  .mb-tabs {
+    padding: 10px 16px;
+    gap: 6px;
+  }
+  .mb-tabs button {
+    padding: 8px;
+    font-size: 13px;
+  }
+  .mb-card {
+    padding: 14px;
+  }
+  .mb-workspace dl {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+  .mb-workspace dd {
+    margin-bottom: 9px;
+  }
+  .mb-footer {
+    padding: 10px 16px;
+  }
+  .mb-footer button {
+    font-size: 12px;
+  }
+  .mb-controls label {
+    flex: 1;
+    min-width: 125px;
+  }
+  .mb-card-title {
+    flex-wrap: wrap;
+  }
+}
+
+.mb-chart-preview {
+  max-width: 400px;
+  margin: 12px auto;
+}
+
+.mb-birth-review {
+  background: #f4ecd9;
+  padding: 14px;
+  border-radius: 12px;
+  margin: 12px 0;
+}
+
+.mb-birth-review p {
+  margin: 8px 0;
+}
+
+.mb-workspace {
+  --color-chart-surface: #fffaf1;
+  --color-chart-line: #705c34;
+  --color-chart-text: #29131e;
+  --color-chart-text-muted: #807056;
+  --color-brand: #967631;
+  --color-text: #29131e;
+  --color-surface-raised: #fffaf1;
+}
+
+.mb-header>button {
+  align-self: flex-start;
+  width: 44px;
+  height: 44px;
+  padding: 8px;
+}
+
+.mb-chart-toggle {
+  margin-bottom: 12px;
+}
+
+.mb-all-points {
+  display: block;
+  clear: both;
+}
+
+.mb-chart-preview {
+  max-width: 320px;
+}
+
+.mb-birth-review>label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (min-width:901px) {
+  .mb-scroll--chart .mb-chart-preview {
+    float: right;
+    width: 310px;
+    margin: 0 0 16px 20px;
+  }
+  .mb-scroll--chart>.mb-card {
+    margin-right: 330px;
+  }
+  .mb-scroll--chart .mb-birth-review {
+    margin-bottom: 12px;
+  }
+}
+
+.mb-workspace:focus {
+  outline: none;
+}
+
+@media (max-width:700px) {
+  .mb-tabs {
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 5px;
+  }
+  .mb-tabs button {
+    font-size: 12px;
+    padding: 8px 5px;
+  }
+  .mb-header small {
+    font-size: 10px;
+    letter-spacing: .07em;
+  }
+  .mb-footer {
+    flex-wrap: nowrap;
+  }
+  .mb-footer button {
+    flex: 1;
+    font-size: 12px;
+    padding: 9px 6px;
+  }
+  .mb-header p {
+    font-size: 13px;
+  }
+}

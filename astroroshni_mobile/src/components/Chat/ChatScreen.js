@@ -6592,7 +6592,7 @@ export default function ChatScreen({ navigation, route }) {
     }
     if (queryContext.muhurat_choice || queryContext.prashna_choice === 'natal' || queryContext.prashna_workflow_choice) setPrashnaLocation(null);
     await sendMessageRef.current?.(chosen, {
-      ...((queryContext.prashna_choice || queryContext.prashna_workflow_choice || queryContext.muhurat_choice) ? { forceTier: 'verified' } : {}),
+      ...((queryContext.prashna_choice || queryContext.prashna_workflow_choice) ? { forceTier: 'verified' } : queryContext.muhurat_choice ? { forceTier:queryContext.muhurat_chat_tier || 'verified' } : {}),
       queryContext: {
         follow_up_type: 'clarification_choice',
         ...queryContext,
@@ -6917,8 +6917,9 @@ export default function ChatScreen({ navigation, route }) {
             {pendingMuhuratQuestion && <MuhuratSetup initial={pendingMuhuratQuestion.queryContext.muhurat_request} onSubmit={request => {
               if (loading) return;
               const pending=pendingMuhuratQuestion;
-              setPendingMuhuratQuestion(null); setPrashnaLocation(null); applyChatModeFromTier('verified');
-              sendMessageRef.current?.(pending.question,{ forceTier:'verified',queryContext:{ ...pending.queryContext,muhurat_setup_requested:false,muhurat_request:request } });
+              const tier = pending.queryContext.muhurat_chat_tier || getSelectedChatModeKey();
+              setPendingMuhuratQuestion(null); setPrashnaLocation(null);
+              sendMessageRef.current?.(pending.question,{ forceTier:tier,queryContext:{ ...pending.queryContext,muhurat_setup_requested:false,muhurat_request:request } });
             }} />}
           </View></View>
         </Modal>

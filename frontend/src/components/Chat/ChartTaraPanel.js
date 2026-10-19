@@ -8,7 +8,7 @@ export const sheetSnapHeight = (height, viewportHeight) => {
   return points.reduce((best, next) => Math.abs(next - height) < Math.abs(best - height) ? next : best);
 };
 
-export default function ChartTaraPanel({ birthData, chartType = 'lagna', onLogin }) {
+export default function ChartTaraPanel({ birthData, chartType = 'lagna', onLogin, draftRequest }) {
   const { chartChatCost = 2, features, fetchCosts } = useCredits();
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -33,6 +33,7 @@ export default function ChartTaraPanel({ birthData, chartType = 'lagna', onLogin
     return () => window.removeEventListener('keydown', escape);
   }, [visible, collapsed]);
   const launch = () => { setMounted(true); setVisible(true); setCollapsed(false); setHeight(window.innerHeight * 0.52); fetchCosts?.(); };
+  useEffect(() => { if (draftRequest?.text) launch(); }, [draftRequest]);
   const beginDrag = event => {
     if (event.button !== 0) return;
     drag.current = { pointer: event.pointerId, y: event.clientY, height: panel.current.getBoundingClientRect().height };
@@ -71,7 +72,7 @@ export default function ChartTaraPanel({ birthData, chartType = 'lagna', onLogin
       </header>
       <div className="chart-tara-panel__body" hidden={collapsed}>
         <Suspense fallback={<p role="status">Opening Tara…</p>}>
-          <ChartChatThread key={chartKey} birthData={birthData} chartType={chartType} onLogin={onLogin} onFocus={() => { setCollapsed(false); setHeight(window.innerHeight - 90); }} />
+          <ChartChatThread key={chartKey} birthData={birthData} chartType={chartType} onLogin={onLogin} draftRequest={draftRequest} onFocus={() => { setCollapsed(false); setHeight(window.innerHeight - 90); }} />
         </Suspense>
       </div>
     </section>, document.body)}

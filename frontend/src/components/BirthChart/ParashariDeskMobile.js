@@ -119,6 +119,7 @@ export default function ParashariDeskMobile({
   onOpenTool,
   onChangeNative,
   toolbarActions,
+  studyActions,
   onRequireLicense,
   initialHubTab,
   calculationProfile,
@@ -359,6 +360,7 @@ export default function ParashariDeskMobile({
       </header>
 
       <div className="pdm__body">
+        {studyActions ? <div className="pdm__study-actions">{studyActions}</div> : null}
         {hubTab === 'chart' ? (
           <section className="pdm__pane pdm__pane--chart">
             {(chartPill === 'lagna' || chartPill === 'transit') ? (

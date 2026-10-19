@@ -1,7 +1,7 @@
 """Mrityu Bhaga (Fatal Degrees) Calculator"""
 
 from .base_calculator import BaseCalculator
-from .classical_mrityu_bhaga import JATAKA_PARIJATA_SARVARTHA, evaluate_mrityu_bhaga
+from .classical_mrityu_bhaga import JATAKA_PARIJATA_SARVARTHA, evaluate_mrityu_bhaga, analyze_chart_mrityu_bhaga
 
 class MrityuBhagaCalculator(BaseCalculator):
     """Calculate Mrityu Bhaga (fatal degrees) for planets"""
@@ -38,62 +38,41 @@ class MrityuBhagaCalculator(BaseCalculator):
         }
     
     def analyze_chart_mrityu_bhaga(self):
-        """Analyze all planets for Mrityu Bhaga"""
+        """Expose the chart's complete calculation in the legacy chat schema."""
+        canonical = analyze_chart_mrityu_bhaga(self.chart_data)
         results = {}
-        planets_in_mrityu = []
-        
-        for planet_name, planet_data in self.chart_data['planets'].items():
-            if planet_name in ['Rahu', 'Ketu']:
-                continue
-            
-            longitude = planet_data.get('longitude', 0)
-            analysis = self.check_mrityu_bhaga(planet_name, longitude)
-            results[planet_name] = analysis
-            
-            if analysis['is_mrityu_bhaga']:
-                planets_in_mrityu.append({
-                    'planet': planet_name,
-                    'sign': analysis['sign_name'],
-                    'degree': analysis['degree_in_sign'],
-                    'health_risk': analysis['health_implication']
-                })
-        
+        affected = []
+        for point, analysis in canonical['point_analysis'].items():
+            results[point] = {
+                **analysis,
+                'sign_name': self.get_sign_name(analysis['sign']),
+                'degree_in_sign': round(analysis['degree_in_sign'], 2),
+                'mrityu_range': (analysis['degree_span_start'], analysis['degree_span_end']),
+                'distance_from_mrityu': analysis['distance_from_span'],
+                'health_implication': self._get_health_implication(point) if analysis['is_mrityu_bhaga'] else None,
+            }
+        for row in canonical['afflicted_points']:
+            affected.append({
+                **row,
+                # Existing health, karma and remedy consumers expect this key,
+                # including when the affected point is Lagna.
+                'planet': row['point'],
+                'sign': self.get_sign_name(row['sign']),
+                'health_risk': self._get_health_implication(row['point']),
+            })
         return {
+            **canonical,
             'planet_analysis': results,
-            'planets_in_mrityu': planets_in_mrityu,
-            'total_count': len(planets_in_mrityu),
-            'overall_risk': self._assess_overall_risk(planets_in_mrityu)
+            'planets_in_mrityu': affected,
+            'total_count': len(affected),
+            'overall_risk': self._assess_overall_risk(affected),
         }
-    
-    def _calculate_distance(self, degree, mrityu_range):
-        """Calculate distance from Mrityu Bhaga range"""
-        if degree < mrityu_range[0]:
-            return mrityu_range[0] - degree
-        else:
-            return degree - mrityu_range[1]
-    
+
     def _get_health_implication(self, planet_name):
-        """Get health implication for planet in Mrityu Bhaga"""
-        implications = {
-            'Sun': 'Heart problems, vitality issues, life force depletion',
-            'Moon': 'Mental health crises, emotional instability, fluid imbalances',
-            'Mars': 'Blood disorders, accidents, inflammatory diseases',
-            'Mercury': 'Nervous breakdown, respiratory failure, communication disorders',
-            'Jupiter': 'Liver failure, immune collapse, metabolic disorders',
-            'Venus': 'Reproductive system failure, kidney problems, hormonal crises',
-            'Saturn': 'Chronic disease culmination, bone/joint failure, terminal conditions'
-        }
-        return implications.get(planet_name, 'Serious health risk')
-    
+        """Keep the legacy field descriptive rather than inventing diagnoses."""
+        return f'{planet_name} occupies its classical Mrityu Bhaga degree span.'
+
     def _assess_overall_risk(self, planets_in_mrityu):
-        """Assess overall health risk from Mrityu Bhaga"""
+        """A placement count is not a classical severity calculation."""
         count = len(planets_in_mrityu)
-        
-        if count == 0:
-            return 'No Mrityu Bhaga - Normal health risk'
-        elif count == 1:
-            return 'One planet in Mrityu Bhaga - Moderate health risk, requires preventive care'
-        elif count == 2:
-            return 'Two planets in Mrityu Bhaga - High health risk, immediate attention needed'
-        else:
-            return 'Multiple planets in Mrityu Bhaga - Critical health risk, urgent medical consultation required'
+        return f'{count} natal point(s) in Mrityu Bhaga; assess with strength, lordship, aspects and timing.'

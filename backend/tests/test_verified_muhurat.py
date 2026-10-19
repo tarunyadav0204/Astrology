@@ -140,6 +140,9 @@ def test_agent_uses_election_menu_contract_streaming_and_audit(monkeypatch):
     assert set(sent[0]['tools'][1]['parameters']['properties']['capability_id']['enum'])==set(MUHURAT_CAPABILITIES)
     assert 'VERIFIED MUHURAT ELECTION CONTRACT' in sent[-1]['input'][-1]['content'][0]['text']
     assert 'AUTHORITATIVE CURRENT SEARCH RESULT' in sent[-1]['input'][-1]['content'][0]['text']
+    from chat.verified_consultation import verified_consultation_instruction
+    assert verified_consultation_instruction() in sent[0]['instructions']
+    assert verified_consultation_instruction() in sent[-1]['input'][-1]['content'][0]['text']
     assert 'matching_windows_found' in sent[-1]['input'][-1]['content'][0]['text']
     baseline=json.loads(sent[1]['input'][0]['output'])
     assert baseline['candidates'] and 'historical_timing_evidence' not in baseline
@@ -216,3 +219,10 @@ def test_completed_no_match_is_not_service_unavailable():
     contract=muhurat_contract('technical')
     assert 'status=completed means the calculation ran successfully' in contract
     assert 'Failure of an optional supplementary tool does not invalidate' in contract
+
+@pytest.mark.parametrize('activity',['puja','Pooja Muhurat','festival puja'])
+def test_unnamed_puja_opens_puja_activity_setup_not_purchase(activity):
+    result=prepare_muhurat_intent({'reading_type':'muhurat','muhurat_request':{'event_type':activity}},'Puja muhurat batao',{})
+    assert result['status']=='CLARIFY'
+    assert result['muhurat_setup']['muhurat_request']['event_type']=='festival_puja'
+    assert not result['muhurat_setup']['muhurat_request'].get('festival_id')

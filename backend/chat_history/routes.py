@@ -2267,7 +2267,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
                 prior_chart = last_metadata.get('prashna_context')
         raw_query_context.pop('_muhurat_previous', None)
         prior_muhurat = previous.get('muhurat_request') if state_row and state_row[0] else previous.get('last_muhurat')
-        if effective_chat_tier == 'verified' and prior_muhurat:
+        if prior_muhurat:
             raw_query_context['_muhurat_previous'] = prior_muhurat
         raw_query_context.pop('prashna', None)
         raw_query_context.pop('_prashna_previous', None)
@@ -4313,6 +4313,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     clarification_count=clarification_count,
                 )
 
+            if not partnership_mode and not fomo_chat_active:
+                from chat.muhurat_workflow import prepare_chat_muhurat
+                intent = prepare_chat_muhurat(intent, question, intent.get('query_context') or query_context, chat_tier=chat_tier)
+                query_context = intent.get('query_context') or query_context
+                if intent.get('mode') == 'ELECT_MUHURAT':
+                    combined_question = intent.get('resolved_question') or combined_question
+
             if (
                 isinstance(intent, dict)
                 and str(intent.get("route_action") or "").lower() == "out_of_scope"
@@ -4584,6 +4591,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             timing_keywords = ['when', 'year', 'which year', 'what year', 'kab', 'saal', 'samay']
             if (
                 not is_deterministic_chat
+                and intent.get("mode") != "ELECT_MUHURAT"
                 and str(intent.get("answer_mode") or "").strip().lower() != "compound_plan"
                 and
                 any(kw in question.lower() for kw in timing_keywords)
@@ -4796,7 +4804,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             is_deterministic_chat and str(intent.get("mode") or "").upper() != "RECOMMEND_LOCATION"
         )
         
-        if use_instant_slim_context:
+        if intent.get('mode') == 'ELECT_MUHURAT':
+            context = {'analysis_type':'muhurat', 'intent':intent, 'birth_details':birth_data}
+            context_time = time.time() - context_start
+        elif use_instant_slim_context:
             context = {
                 "analysis_type": "instant_chat",
                 "instant_chat": True,
@@ -5331,7 +5342,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             if is_verified_chat:
                 from chat.verified_followups import add_verified_followups
                 result = await add_verified_followups(result, analyzer=analyzer,
-                    question=question, intent=intent, language=language,
+                    question=question, intent=intent, language=intent.get('response_language') or language,
                     remedy_followup_active=remedy_active)
             before_guard_action_type = str((result.get("next_action") or {}).get("type") or "")
             cleaned_response, cleaned_action, cleared_followups = apply_normal_answer_remedy_guards(
@@ -5378,7 +5389,13 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     or (is_speech_chat and not speech_chat_billing)
                     or (is_instant_chat and instant_metered_billing)
                 )
-                if skip_instant_charge:
+                if result.get('skip_verified_muhurat_charge') and result.get('muhurat_context'):
+                    # An incomplete festival rule is a coverage explanation, not a
+                    # delivered election. Do not spend credits or consume a free question.
+                    success = True
+                    answer_gate_metadata = {'festival_muhurat_no_charge': True, 'reason': 'incomplete_ritual_coverage'}
+                    logger.info('festival Muhurat coverage limitation; no charge user_id=%s message_id=%s', user_id, message_id)
+                elif skip_instant_charge:
                     success = True
                     logger.info("instant/speech turn; no per-message credits charged user_id=%s message_id=%s speech=%s", user_id, message_id, bool(is_speech_chat))
                 elif using_free_question:

@@ -928,6 +928,21 @@ export const apiService = {
     return response.data;
   },
 
+  getMrityuBhagaWorkspace: async (birthData, options, signal) => {
+    const response = await apiClient.post(getEndpoint('/mrityu-bhaga-workspace'), {
+      birth_data: { ...apiService._chartInsightBirth(birthData), time: String(birthData.time || '').includes('T') ? String(birthData.time).split('T')[1].slice(0,8) : String(birthData.time || '').slice(0,8), calculation_profile: birthData.calculation_profile },
+      ...options,
+    }, { signal, timeout: 120000 });
+    return response.data;
+  },
+  getBhriguBinduWorkspace: async (birthData, options, signal) => {
+    const response = await apiClient.post(getEndpoint('/bhrigu-bindu-workspace'), {
+      birth_data: { ...apiService._chartInsightBirth(birthData), time: String(birthData.time || '').includes('T') ? String(birthData.time).split('T')[1].slice(0,8) : String(birthData.time || '').slice(0,8), calculation_profile: birthData.calculation_profile },
+      ...options,
+    }, { signal, timeout: 120000 });
+    return response.data;
+  },
+
   calculateGandantaAnalysis: async (chartData) => {
     const response = await apiClient.post(getEndpoint('/gandanta-analysis'), { chart_data: chartData });
     return response.data;

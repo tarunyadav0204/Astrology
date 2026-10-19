@@ -410,6 +410,8 @@
     }
   },
   "chartScreen": {
+    "mrityuBhagaWorkspace": "Mrityu Bhaga · Assessment & Calendar",
+    "bhriguBinduWorkspace": "Bhrigu Bindu",
     "loadingText": "Calculating chart alignments...",
     "loadingSubtext": "Reading planetary positions",
     "emptyTitle": "Welcome to AstroRoshni",
@@ -2349,6 +2351,10 @@
       "business": {
         "title": "Business Opening",
         "subtitle": "Success & Growth"
+      },
+      "marriage": {
+        "title": "Marriage Muhurat",
+        "subtitle": "Couple-aware wedding timing"
       }
     },
     "common": {
@@ -2427,6 +2433,9 @@
       "shareTitle": "AstroRoshni — Childbirth Muhurat",
       "calculationFailed": "Calculation failed. Please check inputs.",
       "notEnoughCredits": "Not enough credits"
+    },
+    "marriage": {
+      "title": "Marriage Muhurat", "intro": "Find ceremony-start windows for the wedding venue. Add both charts for couple natal Moon checks; otherwise the result remains Panchang-only.", "notice": "This is a timing election, not a compatibility verdict. Family tradition and priest guidance can apply additional rules.", "couple": "COUPLE", "bride": "Bride / partner one", "groom": "Groom / partner two", "profileHint": "Both charts are optional, but complete birth time and place make the couple check available.", "venue": "CEREMONY VENUE", "chooseCity": "Choose wedding city", "chooseVenue": "Choose venue", "chooseVenueBody": "Choose the city where the ceremony will take place.", "checkDates": "Check dates", "checkDatesBody": "Choose an inclusive range of 1 to 60 days.", "through": "Through", "hours": "CEREMONY HOURS", "day": "Day\n08:00–17:00", "evening": "Evening\n18:00–23:30", "overnight": "Overnight\n20:00–01:00", "overnightHint": "Overnight means the ceremony may finish after midnight on the following civil day.", "find": "Find Marriage Muhurat · {{cost}} credits", "confirmTitle": "Confirm Marriage Muhurat", "confirmBody": "This search costs {{cost}} credits. Credits are charged only when suitable windows are found.", "continue": "Continue", "signIn": "Sign in to calculate a marriage Muhurat.", "balanceChanged": "Your balance is no longer enough for this search.", "calculationFailed": "Could not calculate a marriage Muhurat. Please try again.", "chooseChart": "Choose saved chart", "savedLocation": "Saved location", "noCharts": "Add a birth chart first to use couple personalization.", "withoutChart": "Continue without this chart", "addChart": "Add chart (optional)", "results": "Recommended ceremony windows", "noResults": "No window met this policy in the chosen range. Try a different range or ceremony-hours preference; the search did run.", "lagna": "Lagna"
     },
     "panchang": {
       "title": "Daily Panchang",

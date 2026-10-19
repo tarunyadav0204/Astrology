@@ -167,6 +167,8 @@
     }
   },
   "chartScreen": {
+    "mrityuBhagaWorkspace": "死亡度数 · 评估与日历",
+    "bhriguBinduWorkspace": "Bhrigu Bindu",
     "loadingText": "正在计算宇宙方位...",
     "loadingSubtext": "读取行星位置",
     "emptyTitle": "暂无星盘数据",

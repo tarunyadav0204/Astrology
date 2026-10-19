@@ -20442,6 +20442,11 @@ async def generate_instant_chat_response(
             localized_message=str(medical_triage.get("user_message") or ""),
             source=str(medical_triage.get("source") or "safety_gate"),
         )
+    if not verified_evidence_review and (intent or {}).get('mode') == 'ELECT_MUHURAT':
+        from chat.muhurat_workflow import generate_chat_muhurat
+        return await generate_chat_muhurat(analyzer, question=question, intent=intent, birth=birth_data,
+            language=language, response_style=response_style, model_name=model_name_override or get_instant_chat_model(),
+            provider=provider_override or get_instant_chat_llm_provider(), stream_callback=stream_callback)
     if verified_evidence_review and (intent or {}).get('mode') == 'ELECT_MUHURAT':
         from chat.verified_muhurat import generate_muhurat_response
         return await generate_muhurat_response(question=question, intent=intent, birth=birth_data, history=history,

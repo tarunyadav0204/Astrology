@@ -9,7 +9,7 @@ import './ChatPage.css';
 const wsUrl = path => `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api${path}`;
 const detail = data => typeof data?.detail === 'string' ? data.detail : data?.detail?.message || data?.error_message || data?.error || 'Could not complete this question. Please retry.';
 
-export default function ChartChatThread({ birthData, chartType, onLogin, onFocus }) {
+export default function ChartChatThread({ birthData, chartType, onLogin, onFocus, draftRequest }) {
     const { chartChatCost = 2, credits, fetchBalance } = useCredits();
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
@@ -25,6 +25,7 @@ export default function ChartChatThread({ birthData, chartType, onLogin, onFocus
     const timer = useRef(null);
     const list = useRef(null);
     const inputRef = useRef(null);
+    useEffect(() => { if (draftRequest?.text) setInput(draftRequest.text); }, [draftRequest]);
     const stick = useRef(true);
     useEffect(() => {
         if (!inputRef.current) return;

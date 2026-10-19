@@ -27,6 +27,8 @@ import ParashariDeskMobile from './ParashariDeskMobile';
 import ChartActivationKey from './ChartActivationKey';
 import ChartOverviewPopup from '../Charts/ChartOverviewPopup';
 import ChartTaraPanel from '../Chat/ChartTaraPanel';
+import MrityuBhagaWorkspace from './MrityuBhagaWorkspace';
+import BhriguBinduWorkspace from './BhriguBinduWorkspace';
 import HouseInsightPopup from '../Charts/HouseInsightPopup';
 import { useAstrology } from '../../context/AstrologyContext';
 import { useCredits } from '../../context/CreditContext';
@@ -255,6 +257,8 @@ const ChartsDashasWorkspacePage = ({
   const [analysisExpanded, setAnalysisExpanded] = useState(() => topicId !== 'whole_chart');
   const [activationsFocus, setActivationsFocus] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
+  const [mbDraft, setMbDraft] = useState(null);
+  useEffect(() => { setMbDraft(null); }, [birthData]);
   const [houseSelection, setHouseSelection] = useState(null);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [houseSheetOpen, setHouseSheetOpen] = useState(false);
@@ -650,6 +654,8 @@ const ChartsDashasWorkspacePage = ({
           <button type="button" className="parashari-desk-chip" onClick={() => navigate('/charts-dashas/rectification')}>
             Rectify time
           </button>
+          {user && hasChart && !isMobileDesk ? <MrityuBhagaWorkspace birthData={{ ...birthData, calculation_profile: effectiveViewProfile }} onAsk={text => setMbDraft({ text, id: Date.now(), birthData })} /> : null}
+          {user && hasChart && !isMobileDesk ? <BhriguBinduWorkspace birthData={{ ...birthData, calculation_profile: effectiveViewProfile }} onAsk={text => setMbDraft({ text, id: Date.now(), birthData })} /> : null}
           {hasChart ? (
             <div className="parashari-desk-bar__tools" role="group" aria-label="Strength tools">
               {STRENGTH_TOOLS.map((tool) => (
@@ -679,7 +685,7 @@ const ChartsDashasWorkspacePage = ({
           ) : null}
         </div>
         <div className="parashari-desk-bar__right">
-          {user && hasChart ? <ChartTaraPanel birthData={{ ...birthData, calculation_profile: effectiveViewProfile }} chartType={`D1, D9 and ${typeof selectedDx === 'number' ? `D${selectedDx}` : selectedDx}`} onLogin={onLogin} /> : null}
+          {user && hasChart && !isMobileDesk ? <ChartTaraPanel draftRequest={mbDraft?.birthData === birthData ? mbDraft : null} birthData={{ ...birthData, calculation_profile: effectiveViewProfile }} chartType={`D1, D9 and ${typeof selectedDx === 'number' ? `D${selectedDx}` : selectedDx}`} onLogin={onLogin} /> : null}
           {!user ? (
             <button type="button" className="parashari-desk-bar__primary" onClick={onLogin}>Sign in</button>
           ) : null}
@@ -707,7 +713,8 @@ const ChartsDashasWorkspacePage = ({
       ) : isMobileDesk ? (
         <ParashariDeskMobile
           onChartChatViewChange={setMobileTaraChart}
-          toolbarActions={<ChartTaraPanel birthData={{ ...birthData, calculation_profile: effectiveViewProfile }} chartType={mobileTaraChart} onLogin={onLogin} />}
+          studyActions={<details><summary>Chart studies</summary><div className="mb-actions"><MrityuBhagaWorkspace birthData={{ ...birthData, calculation_profile: effectiveViewProfile }} onAsk={text => setMbDraft({ text, id: Date.now(), birthData })} /><BhriguBinduWorkspace birthData={{ ...birthData, calculation_profile: effectiveViewProfile }} onAsk={text => setMbDraft({ text, id: Date.now(), birthData })} /></div></details>}
+          toolbarActions={<ChartTaraPanel draftRequest={mbDraft?.birthData === birthData ? mbDraft : null} birthData={{ ...birthData, calculation_profile: effectiveViewProfile }} chartType={mobileTaraChart} onLogin={onLogin} />}
           birthData={birthData}
           chartData={renderedChartData}
           viewChartData={renderedChartData}

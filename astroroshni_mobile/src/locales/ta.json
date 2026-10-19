@@ -167,6 +167,8 @@
     }
   },
   "chartScreen": {
+    "mrityuBhagaWorkspace": "மிருத்யு பாகம் · மதிப்பீடு மற்றும் நாட்காட்டி",
+    "bhriguBinduWorkspace": "Bhrigu Bindu",
     "loadingText": "அண்ட அமர்வுகளைக் கணக்கிடுகிறது...",
     "loadingSubtext": "கிரக நிலைகளைப் படிக்கிறது",
     "emptyTitle": "ஜாதகத் தரவு இல்லை",

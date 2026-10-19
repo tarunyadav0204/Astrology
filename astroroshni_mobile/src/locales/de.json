@@ -167,6 +167,8 @@
     }
   },
   "chartScreen": {
+    "mrityuBhagaWorkspace": "Mrityu Bhaga · Analyse und Kalender",
+    "bhriguBinduWorkspace": "Bhrigu Bindu",
     "loadingText": "Berechne kosmische Ausrichtungen...",
     "loadingSubtext": "Lese Planetenpositionen",
     "emptyTitle": "Keine Horoskop-Daten",

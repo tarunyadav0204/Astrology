@@ -47,6 +47,8 @@ def evaluate_mrityu_bhaga(
     *,
     table_key: str = 'jataka_parijata_sarvartha_chintamani',
 ) -> Dict[str, Any]:
+    # This application's BPHS convention identifies Gulika with Mandi.
+    point_name = 'Mandi' if point_name == 'Gulika' else point_name
     table: Mapping[str, Tuple[int, ...]] = TABLES[table_key]
     if point_name not in table:
         return {'is_mrityu_bhaga': False, 'applicable': False, 'point': point_name}
@@ -70,5 +72,52 @@ def evaluate_mrityu_bhaga(
         'distance_from_span': round(distance, 6),
         'table_key': table_key,
         'source': TABLE_REFERENCES[table_key],
+        'interpretation_scope': 'A sensitive natal degree; it is not a standalone prediction of death or disease.',
+    }
+
+
+def analyze_chart_mrityu_bhaga(chart: Mapping[str, Any]) -> Dict[str, Any]:
+    """One natal calculation shared by chart displays and every chat path.
+
+    Preserve Mandi as the output name for compatibility with chart clients;
+    accept Gulika-only charts without counting the same upagraha twice.
+    Missing coordinates are not silently treated as zero longitude.
+    """
+    placements = dict(chart.get('planets') or {})
+    if 'Mandi' not in placements and 'Gulika' in placements:
+        placements['Mandi'] = placements['Gulika']
+    placements.pop('Gulika', None)
+    if chart.get('ascendant') is not None:
+        placements = {'Ascendant': {'longitude': chart['ascendant'], 'house': 1}, **placements}
+    analyses = {}
+    afflicted = []
+    for point, placement in placements.items():
+        if placement.get('longitude') is None:
+            continue
+        result = evaluate_mrityu_bhaga(point, placement['longitude'])
+        if not result.get('applicable'):
+            continue
+        analyses[point] = result
+        if result['is_mrityu_bhaga']:
+            row = {
+                **result,
+                'house': placement.get('house'),
+                'degree': round(result['degree_in_sign'], 2),
+                'mb_degree': result['traditional_degree'],
+                'orb': 0.0,
+                'intensity': 'Within classical degree span',
+            }
+            if point != 'Ascendant':
+                row['planet'] = point
+            afflicted.append(row)
+    return {
+        'point_name': 'Mrityu Bhaga',
+        'has_affliction': bool(afflicted),
+        'afflicted_points': afflicted,
+        'point_analysis': analyses,
+        'table_key': 'jataka_parijata_sarvartha_chintamani',
+        'degree_semantics': 'An ordinal degree N means the span from N−1° up to N°.',
+        'source': TABLE_REFERENCES['jataka_parijata_sarvartha_chintamani'],
+        'textual_variant': 'Phaladeepika gives a different Moon row; variants are not blended.',
         'interpretation_scope': 'A sensitive natal degree; it is not a standalone prediction of death or disease.',
     }

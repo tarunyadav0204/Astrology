@@ -7,6 +7,10 @@ from chat.calculator_menu import Location
 class MuhuratRequest(BaseModel):
     model_config=ConfigDict(extra='forbid')
     event_type: str = Field(min_length=1,max_length=80)
+    festival_id: Optional[str] = None
+    festival_year: Optional[int] = Field(default=None, ge=1900, le=2100)
+    tradition: Optional[str] = Field(default=None, max_length=80)
+    ritual: Optional[str] = Field(default=None, max_length=120)
     start_date: date
     end_date: date
     location: Location
@@ -21,8 +25,12 @@ class MuhuratRequest(BaseModel):
     @model_validator(mode='after')
     def check(self):
         from datetime import time
-        if self.end_date<self.start_date or (self.end_date-self.start_date).days>=60:
-            raise ValueError('Select 1–60 days per search')
+        if self.festival_id:
+            from festivals.festival_data import HINDU_FESTIVALS
+            if self.festival_id not in HINDU_FESTIVALS: raise ValueError('Unknown festival')
+        limit = 366 if self.festival_id else 60
+        if self.end_date<self.start_date or (self.end_date-self.start_date).days>=limit:
+            raise ValueError('Select at most one year for festivals, or 1–60 days for other activities')
         if any(n not in range(7) for n in self.weekdays): raise ValueError('Invalid weekday')
         if time.fromisoformat(self.allowed_end)<=time.fromisoformat(self.allowed_start): raise ValueError('Available hours must end after they start')
         if self.check_time: time.fromisoformat(self.check_time)
@@ -53,13 +61,40 @@ def prepare_muhurat_intent(intent, question, context):
     # Location must be explicitly selected, never invented by Luna or defaulted to birthplace.
     if isinstance(supplied,dict) and supplied.get('location'): base['location']=supplied['location']
     choice=qc.get('muhurat_choice')
-    if choice=='next_30_days' and previous:
+    if choice=='next_30_days' and previous and not previous.get('festival_id'):
         start=date.fromisoformat(previous['end_date'])+timedelta(days=1)
         base.update(start_date=start.isoformat(),end_date=(start+timedelta(days=29)).isoformat(),check_time=None)
     elif choice=='all_weekdays': base['weekdays']=[]
     resolved=str(intent.get('resolved_question') or question)
     from calculators.verified_muhurat_calculator import SUPPORTED_EVENTS
-    if base.get('event_type') and base['event_type'] not in SUPPORTED_EVENTS:
+    from festivals.verified_puja import resolve_festival, HINDU_FESTIVALS
+    # Canonical setup activity, including unnamed puja requests. Never leave a
+    # raw 'puja' value for a client select whose first option is a purchase.
+    activity = str(base.get('event_type') or '').casefold().replace('_',' ').replace('pooja','puja').strip()
+    if activity in {'puja','puja muhurat','festival','festival puja','festival puja muhurat','puja vrat'}:
+        base['event_type'] = 'festival_puja'
+    festival = base.get('festival_id') or resolve_festival(base.get('event_type'))
+    if not festival and base.get('event_type') in {'festival_puja','festival','puja'}:
+        festival = resolve_festival(resolved)
+    if festival:
+        if festival not in HINDU_FESTIVALS:
+            base.pop('festival_id', None)
+            festival = None
+        else:
+            base.update(event_type='festival_puja', festival_id=festival)
+            if not base.get('start_date') and not base.get('end_date'):
+                from datetime import datetime, timezone
+                clock = datetime.fromisoformat(qc['_question_received_at']) if qc.get('_question_received_at') else datetime.now(timezone.utc)
+                try:
+                    year = int(base.get('festival_year') or clock.year)
+                    if not 1900 <= year <= 2100: raise ValueError('Invalid year')
+                    base.update(festival_year=year, start_date=f'{year}-01-01', end_date=f'{year}-12-31')
+                except (TypeError, ValueError):
+                    pass  # Invalid year is handled by the setup validation below.
+            # Festival night pujas must not inherit generic daylight defaults.
+            base.setdefault('allowed_start', '00:00')
+            base.setdefault('allowed_end', '23:59')
+    if base.get('event_type') and base['event_type'] not in SUPPORTED_EVENTS and not festival and base['event_type'] != 'festival_puja':
         return {**intent,'status':'READY','route_action':'answer','mode':'ELECT_MUHURAT','category':'muhurat',
             'prashna_intent':'none','query_context':{**qc,'muhurat_request':base},'resolved_question':resolved}
     try:
@@ -68,18 +103,22 @@ def prepare_muhurat_intent(intent, question, context):
             from chat.verified_prashna import freeze_prashna
             from datetime import datetime,timezone
             base['location']=freeze_prashna(base['location'],datetime.now(timezone.utc))['location']
+        if base.get('event_type') == 'festival_puja' and not base.get('festival_id'):
+            raise ValueError('Select the festival')
         parsed=MuhuratRequest.model_validate(base)
     except (ValueError,TypeError,KeyError):
         return {**intent,'status':'CLARIFY','route_action':'clarify','mode':'ELECT_MUHURAT','category':'muhurat',
             'prashna_intent':'none','query_context':{**qc,'muhurat_draft':base},
             'muhurat_setup':setup_action(resolved,base),'resolved_question':resolved,
-            'clarification_question': intent.get('clarification_question') or 'Select the card below to set the activity, event city, dates and available hours.'}
+            'clarification_question': intent.get('clarification_question') or _setup_prompt(intent, bool(festival))}
     request=parsed.model_dump(mode='json')
     return {**intent,'status':'READY','route_action':'answer','mode':'ELECT_MUHURAT','category':'muhurat',
             'prashna_intent':'none','query_context':{**qc,'muhurat_request':request},'resolved_question':resolved}
 
 
-def muhurat_contract(style):
+def muhurat_contract(style, request=None):
+    if (request or {}).get('festival_id'):
+        return FESTIVAL_CONTRACT + (' Explain technical factors clearly.' if style != 'simple' else ' Use simple, practical language.')
     return '''VERIFIED MUHURAT ELECTION CONTRACT
 CURRENT ANSWER, NOT A RECAP:
 Give a fresh self-contained recommendation. Calculator rounds are internal preparation for THIS answer,
@@ -117,8 +156,8 @@ briefly when useful. Use clear sections and meaningful bold, not a software audi
 ## Direct Recommendation
 Straight answer first, bold recommendation and critical qualifications. Tell the user what you recommend
 and why it suits their plan, in conversational language.
-## What We Checked
-Activity/action that should begin, confirmed event city/timezone, searched inclusive dates and available
+## Your Plan
+Briefly establish the action to begin, confirmed event city/timezone, inclusive dates and available
 hours, exclusions and selected native/general scope. A city is not assumed from birth data.
 ## Best Windows and Alternatives
 Only calculated candidates: local date, start/end, timezone, duration, score as ranking, Lagna and
@@ -160,6 +199,9 @@ MUHURAT_CAPABILITIES={
 def calculate_muhurat_tool(capability, request, birth, parameters=None):
     if capability=='election.muhurat':
         if parameters and any(v is not None for v in parameters.values()): raise ValueError('Search parameters require user confirmation')
+        if request.get('festival_id'):
+            from festivals.verified_puja import VerifiedFestivalCalculator
+            return VerifiedFestivalCalculator().search(request, birth)
         from calculators.verified_muhurat_calculator import VerifiedMuhuratCalculator
         return VerifiedMuhuratCalculator().search(request,birth)
     if capability not in MUHURAT_CAPABILITIES: raise ValueError('Unsupported election calculator')
@@ -197,11 +239,78 @@ async def generate_muhurat_response(*,question,intent,birth,history,language,res
         history=history,model_name=model_name,timeout_s=180,response_style=response_style,
         stream_callback=stream_callback,calculation_callback=calculation_callback)
     action={'type':'none'}
-    if baseline.get('status')=='completed' and not baseline.get('candidates'):
+    if not request.get('festival_id') and baseline.get('status')=='completed' and not baseline.get('candidates'):
         options=[{'id':'next_30_days','label':'Search the next 30 days','submit_text':question,'query_context':{'muhurat_choice':'next_30_days'}},
             {'id':'change_details','label':'Change dates or available hours','submit_text':question,'query_context':{'muhurat_setup_requested':True,'muhurat_request':request}}]
         if request['weekdays']:
             options.insert(1,{'id':'all_weekdays','label':'Include all weekdays','submit_text':question,'query_context':{'muhurat_choice':'all_weekdays'}})
         action={'type':'clarification_choice','choice_kind':'muhurat_refine','original_question':question,'options':options}
     return {**result,'response_style':response_style,'terms':[],'glossary':{},'follow_up_questions':[],
-        'next_action':action,'muhurat_context':request,'llm_prompt_chars':result.get('prompt_chars'),'llm_response_chars':len(result['response'])}
+        'next_action':action,'muhurat_context':request,
+        'skip_verified_muhurat_charge': bool(request.get('festival_id') and baseline.get('status') in {'partial','unsupported'} and not baseline.get('candidates')),'llm_prompt_chars':result.get('prompt_chars'),'llm_response_chars':len(result['response'])}
+
+
+FESTIVAL_CONTRACT = """VERIFIED FESTIVAL PUJA CONTRACT
+Answer the latest question in its requested language and script, including Roman Hindi when typed.
+Lead with actual calculated LOCAL dates and times, ritual, city and timezone. Explain practical meaning.
+The calculator's festival, ritual and coverage are binding. These are festival-specific rules, not the
+purchase election engine. Do not impose purchase restrictions, daylight-only rules, Choghadiya, avoidance
+of Amavasya, or fourth-house vehicle interpretations. Do not move a festival to improve a natal score.
+For Dussehra, Aparahna Shami/Aparajita puja is NOT an exact Vijaya Muhurat or Durga Visarjan time.
+For Diwali/Dhanteras, household Lakshmi/wealth puja is NOT shopping or Tantrik Mahanishita worship.
+For Shivratri, Nishita puja is NOT a fasting/parana calculation. Do not infer other rites' timings.
+Only candidates are calculated ritual windows. Tithi intervals alone are NOT observance dates or puja
+muhurats. coverage=panchang_only requires a clear, useful distinction: explain the calculated lunar
+information but say which ritual rules remain unverified; never invent an auspicious window.
+status=partial means incomplete coverage or unresolved date priority. Explain the actual limitation
+without claiming no festival exists. If two dates overlap the ritual period, ask about tradition rather
+than choosing one. If a festival/ritual is ambiguous, ask a focused question. Never silently substitute
+rituals. Discuss useful calculated evidence without repetitive refusal paragraphs or an audit-style report.
+Personal checks are separate from the festival's date/ritual rule. Interpret only the provided midpoint
+Tara/Chandra snapshot when available, explaining whether the mixed factors change the recommendation
+rather than dumping Tara numbers or repeating coverage caveats; this is NOT a complete kundli election or continuous verification.
+A missing natal comparison does not invalidate a calculated general festival window. Never describe
+midpoint checks as favorable throughout a window or invent dasha, divisional, strength or Lagna checks.
+Respect not_before_utc and availability; past windows may be explained historically but not recommended
+for a future booking. Never offer a generic next-30-days search to shift an annual festival.
+PLAIN-LANGUAGE PUJA ANSWER — EVEN IN TECHNICAL MODE:
+A person asking when to do puja should not need Panchang knowledge to use the answer.
+Lead with ONE practical date/city/time range and a clear instruction, using practical_windows
+when available. These are rounded inward to whole minutes; do not lead with raw seconds or
+repeat competing broad/tithi/Rahu intervals. Give the brief reason in everyday language.
+For example, when established: "Puja is samay ke beech karein aur Rahu Kaal shuru hone se
+pehle poori kar lein." Use actual computed times; the example supplies no timings.
+Do not volunteer explanations of tithi intervals, exact Vijaya Muhurat, Visarjan, Tara numbers,
+"available midpoint check", "midpoint snapshot", "complete kundli election", or other
+internal assessment terminology when the user only wants a puja time. Explain such details
+when the user specifically asks for them, or briefly when a distinction changes their decision.
+If a personal limitation matters, explain it once in everyday language without claiming a full
+personal election. Do not hide a limit that changes the advice or imply mixed checks are all
+favorable. A short practical answer is preferable to a Panchang lesson or repetitive caveats.
+
+RAHU KAAL AND PRACTICAL DIRECTION:
+Each candidate's rahu_kaal is a separate calculated overlay. Keep the traditional ritual window
+and the portions outside daytime Rahu Kaal distinct. Lead with a practical portion from
+windows_outside_rahu_kaal when the user wants to avoid Rahu Kaal; for ordinary new-puja guidance,
+prefer such a portion when available and explicitly identify any overlap in the wider window.
+For a fixed time, use checked_time.within_rahu_kaal to answer whether THAT time overlaps;
+present outside portions as alternatives, not as proof the requested time passed.
+Recommend allowing enough time to complete the ritual before the overlap; its duration was not
+calculated, so do not invent a latest start or an exact best minute. Explain the overlap briefly.
+If no non-overlapping portion exists, say so and ask about their tradition rather than moving the
+festival or claiming all worship is forbidden. Nighttime Rahu Kaal was not assessed. If the overlay
+is unavailable, do not claim avoidance. Do not describe the outside portions as a complete election.
+Personal midpoint checks apply to their sampled instant, not automatically to a trimmed portion.
+Do not pick the midpoint as a recommended start merely because personal checks were sampled there.
+Cite supplied rule sources when useful. Explain limitations in the user's language, proportionately.
+"""
+
+
+def _setup_prompt(intent, festival):
+    language = str(intent.get('response_language') or '').lower()
+    if festival and 'hindi' in language:
+        if 'latin' in language or 'roman' in language:
+            return 'Puja kis shehar mein karenge? Neeche festival, saal aur puja ka shehar confirm karein.'
+        return 'पूजा किस शहर में करेंगे? नीचे त्योहार, वर्ष और पूजा का शहर चुनें।'
+    return ('Confirm the festival, year and city where you will perform the puja using the card below.' if festival
+            else 'Select the card below to set the activity, event city, dates and available hours.')

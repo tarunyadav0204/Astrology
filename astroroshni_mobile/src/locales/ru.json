@@ -167,6 +167,8 @@
     }
   },
   "chartScreen": {
+    "mrityuBhagaWorkspace": "Мритью Бхага · Анализ и календарь",
+    "bhriguBinduWorkspace": "Bhrigu Bindu",
     "loadingText": "Расчет космических соответствий...",
     "loadingSubtext": "Чтение положений планет",
     "emptyTitle": "Нет данных карты",

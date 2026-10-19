@@ -167,6 +167,8 @@
     }
   },
   "chartScreen": {
+    "mrityuBhagaWorkspace": "Mrityu Bhaga · Analyse et calendrier",
+    "bhriguBinduWorkspace": "Bhrigu Bindu",
     "loadingText": "Calcul des alignements cosmiques...",
     "loadingSubtext": "Lecture des positions planétaires",
     "emptyTitle": "Pas de données de thème",

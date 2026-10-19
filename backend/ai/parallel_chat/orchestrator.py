@@ -649,6 +649,12 @@ async def run_parallel_chat_pipeline(
     total_request_start: float,
     using_free_question: bool = False,
 ) -> Dict[str, Any]:
+    if (astrological_context.get('intent') or {}).get('mode') == 'ELECT_MUHURAT':
+        from chat.muhurat_workflow import generate_chat_muhurat
+        return await generate_chat_muhurat(analyzer, question=user_question,
+            intent=astrological_context['intent'], birth=astrological_context.get('birth_details'),
+            language=language, response_style=response_style, premium_analysis=premium_analysis, parallel=True)
+
     from utils.admin_settings import (
         get_chat_llm_provider,
         get_chat_llm_provider_premium,

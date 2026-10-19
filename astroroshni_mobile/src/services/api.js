@@ -701,6 +701,16 @@ export const chartAPI = {
       include_aspect_only: includeAspectOnly,
     }
   ),
+  getMrityuBhagaWorkspace: (birthData, options, signal) => api.post(
+    getEndpoint('/mrityu-bhaga-workspace'),
+    { birth_data: { ...birthData, date: String(birthData.date).slice(0, 10), time: String(birthData.time).includes('T') ? String(birthData.time).split('T')[1].slice(0,8) : String(birthData.time).slice(0,8) }, ...options },
+    { signal, timeout: 120000 }
+  ),
+  getBhriguBinduWorkspace: (birthData, options, signal) => api.post(
+    getEndpoint('/bhrigu-bindu-workspace'),
+    { birth_data: { ...birthData, date: String(birthData.date).slice(0, 10), time: String(birthData.time).includes('T') ? String(birthData.time).split('T')[1].slice(0,8) : String(birthData.time).slice(0,8) }, ...options },
+    { signal, timeout: 120000 }
+  ),
   calculateChart: (birthData) => {
     // console.log('[API] Calling calculateChart');
     const startTime = Date.now();
@@ -1565,6 +1575,8 @@ export const muhuratAPI = {
     api.post(getEndpoint('/muhurat/childbirth-planner'), payload, AUTH_LOCAL_ERROR_CONFIG),
   calculate: (endpoint, payload) =>
     api.post(getEndpoint(endpoint), payload, AUTH_LOCAL_ERROR_CONFIG),
+  calculateMarriage: (payload) =>
+    api.post(getEndpoint('/muhurat/marriage'), payload, AUTH_LOCAL_ERROR_CONFIG),
 };
 
 export const lifeEventsAPI = {

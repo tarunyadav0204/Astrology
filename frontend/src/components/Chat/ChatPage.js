@@ -568,8 +568,9 @@ const ChatPage = ({ onLogin, embeddedVerified = false }) => {
             return;
         }
         if (queryContextExtras?.muhurat_choice) {
-            setVerifiedConversationMode(true); setPrashnaLocation(null);
-            handleSendMessageChatV2(queryContextExtras.original_question || text, { chat_tier: 'verified', premium_analysis: false, query_context: queryContextExtras });
+            const tier = queryContextExtras.muhurat_chat_tier || 'verified';
+            setPrashnaLocation(null);
+            handleSendMessageChatV2(queryContextExtras.original_question || text, { chat_tier: tier, premium_analysis: tier === 'premium', instant_chat: tier === 'instant', query_context: queryContextExtras });
             return;
         }
         if (queryContextExtras?.prashna_choice === 'prashna') {
@@ -2882,8 +2883,9 @@ const ChatPage = ({ onLogin, embeddedVerified = false }) => {
                 <MuhuratSetup initial={pendingMuhuratQuestion.queryContext.muhurat_request} onSubmit={request => {
                     if (isLoading) return;
                     const pending = pendingMuhuratQuestion;
-                    setPendingMuhuratQuestion(null); setPrashnaLocation(null); setVerifiedConversationMode(true); setIsInstantAnalysis(false);
-                    handleSendMessageChatV2(pending.question, { chat_tier: 'verified', premium_analysis: false,
+                    const tier = pending.queryContext.muhurat_chat_tier || 'verified';
+                    setPendingMuhuratQuestion(null); setPrashnaLocation(null);
+                    handleSendMessageChatV2(pending.question, { chat_tier: tier, premium_analysis: tier === 'premium', instant_chat: tier === 'instant',
                         query_context: { ...pending.queryContext, muhurat_setup_requested: false, muhurat_request: request } });
                 }} />
             </section></div>}

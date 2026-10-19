@@ -89,3 +89,27 @@ def test_consultation_voice_removes_delivery_nouns_but_keeps_user_history():
     assert 'does not establish an exact date' in result
     assert 'In the D9 chart, Venus is strong.' in result
     assert 'You mentioned that you married in 2020.' in result
+
+
+@pytest.mark.parametrize('style', ['simple','technical'])
+@pytest.mark.parametrize('mode', ['DEFAULT','PRASHNA','PREDICT_DAILY','PREDICT_EVENT_TIMING','PREDICT_PERIOD_OUTLOOK','CHART_DASHA_ANALYSIS','FACTUAL_LOOKUP','CUSTOM_READING'])
+def test_consultation_guidance_survives_every_verified_layout(style,mode):
+    from chat.verified_consultation import verified_consultation_instruction
+    contract=verified_consultation_instruction()
+    assert contract in _premium_writer_system(mode,'Hindi in Latin script',response_style=style)
+    assert contract in _verified_final_writer_instruction(style,mode)
+    assert 'conclusive' in contract
+    assert 'do not stop at' in contract
+    assert 'Do not guarantee an outcome or invent facts' in contract
+    assert 'arbitrary midpoint' in contract
+
+
+def test_all_verified_answers_seek_registered_calculations_before_claiming_missing_evidence():
+    from chat.verified_consultation import verified_consultation_instruction
+    instruction=verified_consultation_instruction()
+    assert 'SEEK MISSING EVIDENCE BEFORE WRITING' in instruction
+    assert 'request the necessary calculation' in instruction
+    assert 'Do not ask the user to supply planetary calculations' in instruction
+    assert 'within the selected reading' in instruction
+    assert 'never imply that an unrequested calculation ran' in instruction
+    assert 'exhausted tool budget' in instruction
