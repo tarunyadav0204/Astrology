@@ -564,6 +564,7 @@ const NorthIndianChart = ({
   chartType,
   birthData,
   showDegreeNakshatra = true,
+  showOuterPlanets = false,
   cosmicTheme = false,
   rotatedAscendant = null,
   onRotate,
@@ -809,7 +810,7 @@ const NorthIndianChart = ({
     const useHousePlacement = chartData?._place_by_house === true;
     const planetsInHouse = [];
     const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Uranus', 'Neptune', 'Pluto', 'Gulika', 'Mandi'];
-    planetNames.forEach(name => {
+    planetNames.filter((name) => showOuterPlanets || !['Uranus', 'Neptune', 'Pluto'].includes(name)).forEach(name => {
       const data = planets[name];
       if (
         data
@@ -861,8 +862,8 @@ const NorthIndianChart = ({
     const planets = transitOverlay?.planets;
     if (!planets || typeof planets !== 'object') return [];
     const rashiForThisHouse = getRashiForHouse(houseIndex);
-    const names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'];
-    return names.flatMap((name) => {
+    const names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Uranus', 'Neptune', 'Pluto'];
+    return names.filter((name) => showOuterPlanets || !['Uranus', 'Neptune', 'Pluto'].includes(name)).flatMap((name) => {
       const data = planets[name];
       if (!data || data.sign !== rashiForThisHouse) return [];
       const retrograde = !!data.retrograde && name !== 'Rahu' && name !== 'Ketu';

@@ -73,6 +73,7 @@ const NorthIndianChart = ({
   chartType = 'lagna',
   division,
   showDegreeNakshatra = true,
+  showOuterPlanets = false,
   chartRefHighlight = null,
   showFooterHint = true,
   deskMode = false,
@@ -537,13 +538,14 @@ const NorthIndianChart = ({
     Object.entries(chartData.planets)
       .filter(([name, data]) => {
         if (!data || name === 'InduLagna') return false;
+        if (!showOuterPlanets && ['Uranus', 'Neptune', 'Pluto'].includes(name)) return false;
         if (useHousePlacement && typeof data.house === 'number') {
           return data.house === houseNumber;
         }
         return resolvePlanetSign(data) === rashiForThisHouse;
       })
       .forEach(([name, data]) => {
-        const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
+        const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Uranus', 'Neptune', 'Pluto', 'Gulika', 'Mandi'];
         const planetIndex = planetNames.indexOf(name);
         planetsInHouse.push({
           symbol: planets[planetIndex] || name.substring(0, 2),

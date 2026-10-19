@@ -194,7 +194,7 @@ async function tryDirectPaymentGetThenFallback(path, fallbackFn) {
 // ---- Transparent client-side caching (charts) ----
 // Bump whenever the additive chart display contract changes. Version 6 makes
 // canonical Neecha Bhanga and combustion evidence mandatory for display caches.
-const CHART_ONLY_CACHE_VERSION = 7;
+const CHART_ONLY_CACHE_VERSION = 8;
 const CHART_ONLY_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const chartOnlyInFlight = new Map(); // storageKey -> Promise
 const chartOnlyMemory = new Map(); // storageKey -> { expiresAt, data }
@@ -1348,6 +1348,11 @@ export const creditAPI = {
 };
 
 export const panchangAPI = {
+  calculateBirthPanchang: (birthData, calculationProfile = null) =>
+    api.post(getEndpoint('/panchang/calculate-birth-panchang'), {
+      birth_data: birthData,
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
+    }),
   calculateSunriseSunset: (date, latitude, longitude) => 
     api.post(getEndpoint('/panchang/calculate-sunrise-sunset'), { date, latitude, longitude }),
   calculateMoonPhase: (date) => 

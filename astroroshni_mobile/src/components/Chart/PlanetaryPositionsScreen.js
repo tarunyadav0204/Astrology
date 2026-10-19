@@ -20,6 +20,27 @@ const formatPointDegrees = (value) => {
   return Number.isFinite(degree) ? `${degree.toFixed(2)}°` : '';
 };
 
+const DEVA_GANA = new Set(['Ashwini', 'Mrigashira', 'Punarvasu', 'Pushya', 'Hasta', 'Swati', 'Anuradha', 'Shravana', 'Revati']);
+const MANUSHYA_GANA = new Set(['Bharani', 'Rohini', 'Ardra', 'Purva Phalguni', 'Uttara Phalguni', 'Purva Ashadha', 'Uttara Ashadha', 'Purva Bhadrapada', 'Uttara Bhadrapada']);
+
+const ganaForNakshatra = (name) => {
+  if (!name) return null;
+  if (DEVA_GANA.has(name)) return 'Deva';
+  if (MANUSHYA_GANA.has(name)) return 'Manushya';
+  return 'Rakshasa';
+};
+
+const formatLocalTime = (value) => {
+  if (!value) return null;
+  const match = String(value).match(/T(\d{2}:\d{2})/);
+  return match?.[1] || String(value).slice(0, 5);
+};
+
+const formatDegree = (value) => {
+  const degree = Number(value);
+  return Number.isFinite(degree) ? `${degree.toFixed(2)}°` : null;
+};
+
 const PlanetaryPositionsScreen = ({ navigation, route }) => {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -52,7 +73,10 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
     }
   }, [birthData, navigation]);
 
-  const [activeTab, setActiveTab] = React.useState('planets');
+  const [activeTab, setActiveTab] = React.useState('birth');
+  const [birthPanchang, setBirthPanchang] = React.useState(null);
+  const [birthPanchangLoading, setBirthPanchangLoading] = React.useState(false);
+  const [birthPanchangError, setBirthPanchangError] = React.useState(null);
   const [karakas, setKarakas] = React.useState(null);
   const [planetaryDignities, setPlanetaryDignities] = React.useState({});
   const [canonicalPositions, setCanonicalPositions] = React.useState(null);
@@ -92,6 +116,26 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   React.useEffect(() => {
     loadInitialPlanetData();
   }, [chartData, conditionChartData, canonicalNatalChart, birthData]);
+
+  React.useEffect(() => {
+    if (!birthData?.date || birthData?.latitude == null || birthData?.longitude == null) return undefined;
+    let cancelled = false;
+    setBirthPanchangLoading(true);
+    setBirthPanchangError(null);
+    const { panchangAPI } = require('../../services/api');
+    panchangAPI.calculateBirthPanchang(birthData)
+      .then((response) => {
+        if (!cancelled) setBirthPanchang(response?.data || response || null);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setBirthPanchang(null);
+          setBirthPanchangError(error?.response?.data?.detail || error?.message || 'Birth Panchanga is unavailable.');
+        }
+      })
+      .finally(() => { if (!cancelled) setBirthPanchangLoading(false); });
+    return () => { cancelled = true; };
+  }, [birthData]);
 
   React.useEffect(() => {
     fetchPricing({ force: true });
@@ -448,6 +492,8 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
   if (!birthData?.name) return null;
 
   const lagnas = professionalSpecialPoints?.special_lagnas?.points || [];
+  const moonNakshatra = nakshatraPlacements.find((row) => row.name === 'Moon');
+  const moonNakshatraMeta = moonNakshatra?.nakshatra_metadata || {};
 
   // Tab Button Component
   const TabButton = ({ label, emoji, value, active }) => (
@@ -2191,6 +2237,105 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
 
   // Render Tab Content
   const renderTabContent = () => {
+    if (activeTab === 'birth') {
+      const p = birthPanchang;
+      const birthPlace = birthData?.place || birthData?.birth_place || birthData?.location || birthData?.city;
+      const ascendant = chartData?.ascendant || chartData?.lagna || {};
+      const ascHouse = chartData?.houses?.[0] || {};
+      const sun = chartData?.planets?.Sun || {};
+      const section = (title, subtitle, rows) => ({ title, subtitle, rows: rows.filter((row) => row.value) });
+      const sections = [
+        section(t('birthDetailsTab.sections.record', 'Birth record'), t('birthDetailsTab.sections.recordHint', 'The saved information used to cast this chart.'), [
+          { label: t('birthDetailsTab.labels.date', 'Date'), value: birthData?.date && String(birthData.date).split('T')[0] },
+          { label: t('birthDetailsTab.labels.time', 'Local time'), value: birthData?.time && String(birthData.time).slice(0, 5) },
+          { label: t('birthDetailsTab.labels.place', 'Place'), value: typeof birthPlace === 'string' ? birthPlace : birthPlace?.name },
+          { label: t('birthDetailsTab.labels.coordinates', 'Coordinates'), value: birthData?.latitude != null && birthData?.longitude != null ? `${Number(birthData.latitude).toFixed(4)}, ${Number(birthData.longitude).toFixed(4)}` : null },
+          { label: t('birthDetailsTab.labels.timezone', 'Timezone'), value: birthData?.timezone || (p?.timezone_offset_hours != null ? `UTC${p.timezone_offset_hours >= 0 ? '+' : ''}${p.timezone_offset_hours}` : null) },
+        ]),
+        section(t('birthDetailsTab.sections.panchanga', 'Panchanga at birth'), t('birthDetailsTab.sections.panchangaHint', 'Calculated for the exact recorded birth moment, not sunrise.'), [
+          { label: t('birthDetailsTab.labels.tithi', 'Tithi'), value: [p?.tithi?.name, p?.tithi?.paksha].filter(Boolean).join(' · '), detail: [p?.tithi?.paksha === 'Shukla' ? t('birthDetailsTab.waxingMoon', 'Waxing Moon') : p?.tithi?.paksha === 'Krishna' ? t('birthDetailsTab.waningMoon', 'Waning Moon') : null, p?.tithi?.number != null ? t('birthDetailsTab.number', 'No. {{number}}', { number: p.tithi.number }) : null, p?.tithi?.lord ? t('birthDetailsTab.lord', 'Lord: {{value}}', { value: p.tithi.lord }) : null, p?.tithi?.start_time && p?.tithi?.end_time ? `${formatLocalTime(p.tithi.start_time)}–${formatLocalTime(p.tithi.end_time)}` : null].filter(Boolean).join(' · ') },
+          { label: t('birthDetailsTab.labels.vara', 'Vāra'), value: p?.vara?.name, detail: [p?.vara?.lord ? t('birthDetailsTab.lord', 'Lord: {{value}}', { value: p.vara.lord }) : null, p?.vara?.deity].filter(Boolean).join(' · ') },
+          { label: t('birthDetailsTab.labels.nakshatra', 'Nakshatra'), value: p?.nakshatra?.name, detail: [p?.nakshatra?.pada != null ? t('birthDetailsTab.pada', 'Pada {{number}}', { number: p.nakshatra.pada }) : null, p?.nakshatra?.lord ? t('birthDetailsTab.lord', 'Lord: {{value}}', { value: p.nakshatra.lord }) : null, p?.nakshatra?.deity, p?.nakshatra?.start_time && p?.nakshatra?.end_time ? `${formatLocalTime(p.nakshatra.start_time)}–${formatLocalTime(p.nakshatra.end_time)}` : null].filter(Boolean).join(' · ') },
+          { label: t('birthDetailsTab.labels.yoga', 'Yoga'), value: p?.yoga?.name, detail: [p?.yoga?.quality, p?.yoga?.effect, p?.yoga?.start_time && p?.yoga?.end_time ? `${formatLocalTime(p.yoga.start_time)}–${formatLocalTime(p.yoga.end_time)}` : null].filter(Boolean).join(' · ') },
+          { label: t('birthDetailsTab.labels.karana', 'Karaṇa'), value: p?.karana?.name, detail: [p?.karana?.nature, p?.karana?.effect, p?.karana?.business_suitable === false ? t('birthDetailsTab.notBusinessSuitable', 'Not traditionally preferred for new business') : null].filter(Boolean).join(' · ') },
+        ]),
+        section(t('birthDetailsTab.sections.moon', 'Moon identity'), t('birthDetailsTab.sections.moonHint', 'Traditional Nakshatra and compatibility attributes are read from the natal Moon.'), [
+          { label: t('birthDetailsTab.labels.moon', 'Moon placement'), value: [moonNakshatra?.sign_name || moonNakshatra?.sign, formatDegree(moonNakshatra?.degree)].filter(Boolean).join(' · '), detail: moonNakshatra?.house != null ? t('birthDetailsTab.house', 'House {{number}}', { number: moonNakshatra.house }) : null },
+          { label: t('birthDetailsTab.labels.gana', 'Gana'), value: moonNakshatraMeta.gana || ganaForNakshatra(p?.nakshatra?.name), detail: p?.nakshatra?.name ? t('birthDetailsTab.fromNakshatra', 'From {{value}} Nakshatra', { value: p.nakshatra.name }) : null },
+          { label: t('birthDetailsTab.labels.nadi', 'Nadi'), value: moonNakshatraMeta.nadi },
+          { label: t('birthDetailsTab.labels.yoni', 'Yoni'), value: moonNakshatraMeta.yoni },
+          { label: t('birthDetailsTab.labels.animal', 'Animal'), value: moonNakshatraMeta.animal },
+          { label: t('birthDetailsTab.labels.symbol', 'Symbol'), value: moonNakshatraMeta.symbol },
+          { label: t('birthDetailsTab.labels.element', 'Element'), value: moonNakshatraMeta.element },
+          { label: t('birthDetailsTab.labels.guna', 'Guna'), value: moonNakshatraMeta.guna },
+          { label: t('birthDetailsTab.labels.shakti', 'Shakti'), value: moonNakshatraMeta.shakti },
+          { label: t('birthDetailsTab.labels.namingSyllable', 'Naming syllable'), value: moonNakshatraMeta.pada_syllable },
+        ]),
+        section(t('birthDetailsTab.sections.anchors', 'Chart anchors'), t('birthDetailsTab.sections.anchorsHint', 'The principal references used throughout the chart.'), [
+          { label: t('birthDetailsTab.labels.lagna', 'Lagna'), value: [ascendant?.sign_name || ascendant?.sign || ascHouse?.sign_name || ascHouse?.sign, formatDegree(ascendant?.degree ?? ascendant?.longitude ?? ascHouse?.degree)].filter(Boolean).join(' · '), detail: ascendant?.nakshatra ? `${ascendant.nakshatra}${ascendant.pada ? ` · ${t('birthDetailsTab.pada', 'Pada {{number}}', { number: ascendant.pada })}` : ''}` : null },
+          { label: t('birthDetailsTab.labels.sun', 'Sun'), value: [sun?.sign_name || sun?.sign, formatDegree(sun?.degree)].filter(Boolean).join(' · '), detail: sun?.nakshatra ? `${sun.nakshatra}${sun.pada ? ` · ${t('birthDetailsTab.pada', 'Pada {{number}}', { number: sun.pada })}` : ''}` : null },
+          { label: t('birthDetailsTab.labels.ayanamsa', 'Ayanamsa'), value: p?.ayanamsa != null ? `${Number(p.ayanamsa).toFixed(4)}°` : null },
+          { label: t('birthDetailsTab.labels.nodeType', 'Node type'), value: p?.calculation_profile?.node_type || t('birthDetailsTab.meanNodes', 'Mean nodes') },
+        ]),
+        section(t('birthDetailsTab.sections.sky', 'Birth sky timings'), t('birthDetailsTab.sections.skyHint', 'Local timings for the saved place and birth date.'), [
+          { label: t('birthDetailsTab.labels.sunrise', 'Sunrise'), value: formatLocalTime(p?.birth_timing?.sunrise) },
+          { label: t('birthDetailsTab.labels.sunset', 'Sunset'), value: formatLocalTime(p?.birth_timing?.sunset) },
+          { label: t('birthDetailsTab.labels.moonrise', 'Moonrise'), value: formatLocalTime(p?.birth_timing?.moonrise) },
+          { label: t('birthDetailsTab.labels.moonset', 'Moonset'), value: formatLocalTime(p?.birth_timing?.moonset) },
+        ]),
+        section(t('birthDetailsTab.sections.calendar', 'Calendar context'), t('birthDetailsTab.sections.calendarHint', 'Sidereal solar reference for the recorded birth date.'), [
+          { label: t('birthDetailsTab.labels.lunarMonth', 'Lunar month'), value: p?.calendar_context?.amanta_lunar_month, detail: t('birthDetailsTab.amantaConvention', 'Amānta convention') },
+          { label: t('birthDetailsTab.labels.solarMonth', 'Solar month'), value: p?.calendar_context?.solar_month },
+          { label: t('birthDetailsTab.labels.ritu', 'Ritu'), value: p?.calendar_context?.ritu },
+          { label: t('birthDetailsTab.labels.ayana', 'Ayana'), value: p?.calendar_context?.ayana },
+          { label: t('birthDetailsTab.labels.vikramSamvat', 'Vikram Samvat'), value: p?.calendar_context?.vikram_samvat != null ? String(p.calendar_context.vikram_samvat) : null },
+          { label: t('birthDetailsTab.labels.kaliYear', 'Kali year'), value: p?.calendar_context?.kali_year != null ? String(p.calendar_context.kali_year) : null },
+        ]),
+        section(t('birthDetailsTab.sections.dasha', 'Dasha origin'), t('birthDetailsTab.sections.dashaHint', 'The opening Vimshottari period is derived from the Moon’s Nakshatra.'), [
+          { label: t('birthDetailsTab.labels.startingMahadasha', 'Starting Mahadasha'), value: moonNakshatra?.vimshottari_birth_balance?.starting_lord },
+          { label: t('birthDetailsTab.labels.balanceAtBirth', 'Balance at birth'), value: moonNakshatra?.vimshottari_birth_balance?.remaining_years != null ? t('birthDetailsTab.years', '{{value}} years', { value: Number(moonNakshatra.vimshottari_birth_balance.remaining_years).toFixed(2) }) : null },
+        ]),
+      ].filter((section) => section.rows.length > 0);
+      if (birthPanchangLoading) {
+        return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={colors.primary} /><Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('premiumUi.common.loading', 'Loading…')}</Text></View>;
+      }
+      if (birthPanchangError) {
+        return <View style={[styles.methodNote, { backgroundColor: colors.surfaceMuted, borderColor: colors.warning }]}><Ionicons name="alert-circle-outline" size={18} color={colors.warning} /><Text style={[styles.methodNoteText, { color: colors.textSecondary }]}>{birthPanchangError}</Text></View>;
+      }
+      return (
+        <View>
+          <View style={[styles.methodNote, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+            <Ionicons name="person-circle-outline" size={18} color={colors.primary} />
+            <Text style={[styles.methodNoteText, { color: colors.textSecondary }]}>{t('birthDetailsTab.intro', 'Your birth record, Janma Panchanga, chart anchors and traditional Moon-Nakshatra identity in one place.')}</Text>
+          </View>
+          <View style={styles.birthSectionStack}>
+            {sections.map((section) => (
+              <View key={section.title} style={[styles.birthSection, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                <Text style={[styles.birthSectionTitle, { color: colors.text }]}>{section.title}</Text>
+                <Text style={[styles.birthSectionHint, { color: colors.textSecondary }]}>{section.subtitle}</Text>
+                <View style={styles.birthGrid}>
+                  {section.rows.map((row) => (
+                    <View key={row.label} style={[styles.birthCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+                      <Text style={[styles.birthLabel, { color: colors.textSecondary }]}>{row.label}</Text>
+                      <Text style={[styles.birthValue, { color: colors.text }]}>{row.value}</Text>
+                      {row.detail ? <Text style={[styles.birthDetail, { color: colors.textSecondary }]}>{row.detail}</Text> : null}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
+            <TouchableOpacity onPress={() => setActiveTab('special')} style={[styles.birthSpecialLink, { backgroundColor: colors.selectionSurface, borderColor: colors.selectionBorder }]}>
+              <Ionicons name="sparkles-outline" size={18} color={colors.selectionText} />
+              <View style={styles.birthSpecialCopy}>
+                <Text style={[styles.birthSpecialTitle, { color: colors.selectionText }]}>{t('birthDetailsTab.specialTitle', 'Special birth markers')}</Text>
+                <Text style={[styles.birthSpecialBody, { color: colors.selectionText }]}>{t('birthDetailsTab.specialBody', 'Explore Yogi, Avayogi, Tithi Shunya, Gandanta and other calculated conditions.')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.selectionText} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
     if (loading && ['planets', 'houses', 'nakshatras'].includes(activeTab)) {
       return (
         <View style={styles.loadingContainer}>
@@ -2701,6 +2846,7 @@ const PlanetaryPositionsScreen = ({ navigation, route }) => {
 
           <View style={[styles.tabBar, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}>
             <GHScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
+              <TabButton label={t('birthDetailsTab.tab', 'Birth')} emoji="✦" value="birth" active={activeTab === 'birth'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.planets', 'Planets')} emoji="🪐" value="planets" active={activeTab === 'planets'} />
               <TabButton label={t('premiumUi.planetaryPositions.tabs.houses', 'Houses')} emoji="🏠" value="houses" active={activeTab === 'houses'} />
               {lifeTabEnabled ? (
@@ -3336,6 +3482,19 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '800',
   },
+  birthSectionStack: { gap: 14 },
+  birthSection: { borderWidth: 1, borderRadius: 18, padding: 14 },
+  birthSectionTitle: { fontSize: 16, fontWeight: '800' },
+  birthSectionHint: { fontSize: 12, lineHeight: 17, marginTop: 3, marginBottom: 12 },
+  birthGrid: { gap: 8 },
+  birthCard: { borderWidth: 1, borderRadius: 12, padding: 12 },
+  birthLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' },
+  birthValue: { fontSize: 17, fontWeight: '800', marginTop: 4 },
+  birthDetail: { fontSize: 12, lineHeight: 17, marginTop: 4 },
+  birthSpecialLink: { borderWidth: 1, borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  birthSpecialCopy: { flex: 1 },
+  birthSpecialTitle: { fontSize: 14, fontWeight: '800' },
+  birthSpecialBody: { fontSize: 11, lineHeight: 16, marginTop: 2 },
 });
 
 export default PlanetaryPositionsScreen;

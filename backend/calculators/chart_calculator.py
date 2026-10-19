@@ -150,6 +150,10 @@ class ChartCalculator(BaseCalculator):
         # Calculate planetary positions
         planets_start = time.time()
         planets = {}
+        # Outer planets are a display-only extension. Keep them separate until
+        # every classical Vedic calculation has completed: they do not have
+        # Parashari Shadbala, dignity, or graha-drsti rules.
+        outer_planets = {}
         planet_names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu']
         
         for i, planet in enumerate([0, 1, 4, 2, 5, 3, 6, 11, 12]):
@@ -185,6 +189,31 @@ class ChartCalculator(BaseCalculator):
                 'sign_name': self.SIGN_NAMES[planet_sign],
                 'degree': longitude % 30,
                 'retrograde': is_retrograde
+            }
+
+        # These bodies are optional in the chart UI, but must be present in
+        # the base payload for its visibility toggle to have anything to
+        # reveal.  Calculate them with the same sidereal profile, correction,
+        # and motion data used for the classical grahas.
+        for planet_name, planet in (
+            ('Uranus', swe.URANUS),
+            ('Neptune', swe.NEPTUNE),
+            ('Pluto', swe.PLUTO),
+        ):
+            flags = swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH
+            pos_array = swe.calc_ut(jd, planet, flags)[0]
+            longitude = (pos_array[0] - self.D1_CORRECTION) % 360
+            speed = pos_array[3] if len(pos_array) > 3 else 0.0
+            planet_sign = int(longitude / 30)
+            outer_planets[planet_name] = {
+                'longitude': longitude,
+                'latitude': pos_array[1] if len(pos_array) > 1 else None,
+                'distance_au': pos_array[2] if len(pos_array) > 2 else None,
+                'speed': speed,
+                'sign': planet_sign,
+                'sign_name': self.SIGN_NAMES[planet_sign],
+                'degree': longitude % 30,
+                'retrograde': speed < 0,
             }
             
         planets_end = time.time()
@@ -297,6 +326,23 @@ class ChartCalculator(BaseCalculator):
         attach_canonical_position_states(result)
         from .planet_result_delivery import attach_planet_result_delivery
         attach_planet_result_delivery(result)
+
+        # Add optional outer bodies only after all classical calculations. They
+        # still receive both whole-sign and Bhava Chalit house placement for
+        # the chart renderer, but cannot alter a Vedic analytical result.
+        for planet_data in outer_planets.values():
+            planet_sign = int(planet_data['longitude'] / 30)
+            planet_data['house'] = ((planet_sign - ascendant_sign) % 12) + 1
+        outer_bhav_chalit = self._calculate_bhav_chalit_professional(
+            jd,
+            birth_data.latitude,
+            birth_data.longitude,
+            outer_planets,
+            ayanamsa,
+            sid_mode,
+        )
+        result['planets'].update(outer_planets)
+        result['bhav_chalit']['planets'].update(outer_bhav_chalit['planets'])
         return result
     
     def _calculate_bhav_chalit_professional(self, jd, lat, lon, planets, ayanamsa, sid_mode=swe.SIDM_LAHIRI):

@@ -25,6 +25,11 @@ class MarriageMuhuratCalculator(VerifiedMuhuratCalculator):
     # Rohini, Mrigashira, Magha, Uttara Phalguni, Hasta, Swati, Anuradha,
     # Uttara Ashadha, Uttara Bhadrapada and Revati.
     GOOD_NAKSHATRAS = {4, 5, 10, 12, 13, 15, 17, 21, 26, 27}
+    # Used only when a strict search has no result. These are intentionally
+    # surfaced as family-review candidates, not silently presented as strict
+    # recommendations: regional wedding traditions differ materially here.
+    DISCOVERY_NAKSHATRAS = {2, 3, 4, 5, 7, 8, 10, 11, 12, 13, 14, 15, 17, 19, 21, 22, 24, 25, 26, 27}
+    DISCOVERY_AVOID_YOGAS = {9, 10, 17, 19, 27}
     GOOD_TITHIS = {2, 3, 5, 6, 7, 10, 11, 12, 13}
     GOOD_LAGNAS = {1, 2, 5, 6, 8, 10, 11}
     GOOD_WEEKDAYS = {0, 2, 3, 4}  # Monday, Wednesday, Thursday, Friday
@@ -48,15 +53,21 @@ class MarriageMuhuratCalculator(VerifiedMuhuratCalculator):
         with _SWISSEPH_CHART_LOCK:
             swe.set_sid_mode(swe.SIDM_LAHIRI)
             try:
-                return self._search(request)
+                strict = self._search(request, discovery_mode=False)
+                if strict["recommendations"]:
+                    return strict
+                # A discovery planner must not turn a valid paid range search
+                # into an empty experience merely because no narrow-policy
+                # date falls in that horizon.
+                return self._search(request, discovery_mode=True)
             finally:
                 swe.set_sid_mode(swe.SIDM_LAHIRI)
 
-    def _search(self, request: dict):
+    def _search(self, request: dict, discovery_mode: bool):
         start = date.fromisoformat(request["start_date"])
         end = date.fromisoformat(request["end_date"])
-        if end < start or (end - start).days >= 60:
-            raise ValueError("Select an inclusive search period of 1–60 days")
+        if end < start or (end - start).days >= 180:
+            raise ValueError("Select an inclusive search period of 1–180 days")
         place = request["location"]
         zone = ZoneInfo(place["timezone"])
         lat, lon = float(place["latitude"]), float(place["longitude"])
@@ -93,7 +104,7 @@ class MarriageMuhuratCalculator(VerifiedMuhuratCalculator):
                 run = None
                 while cursor + timedelta(minutes=1) <= day_end:
                     endpoint = cursor + timedelta(minutes=1)
-                    evaluated, reason = self._evaluate_minute(cursor, endpoint, lat, lon, forbidden, choghadiya, natal_nakshatras, partner_contexts)
+                    evaluated, reason = self._evaluate_minute(cursor, endpoint, lat, lon, forbidden, choghadiya, natal_nakshatras, partner_contexts, discovery_mode)
                     if reason:
                         rejected[reason] += 1
                         if run and (run["end_time"] - run["start_time"]).total_seconds() / 60 >= minimum:
@@ -119,17 +130,28 @@ class MarriageMuhuratCalculator(VerifiedMuhuratCalculator):
             row["duration_minutes"] = int((row["end_time"] - row["start_time"]).total_seconds() / 60)
             row["start_time"], row["end_time"] = row["start_time"].isoformat(), row["end_time"].isoformat()
             grouped.setdefault(row["date"], []).append(row)
-        recommendations = [{"date": key, "slots": value, "personalization": personalization} for key, value in sorted(grouped.items())]
+        # A six-month discovery search can yield a large number of valid dates.
+        # Return a concise, scored shortlist instead of making a user sift through
+        # every day that happened to pass the policy.
+        ranked_days = []
+        for key, slots in grouped.items():
+            slots.sort(key=lambda item: (-item["score"], item["start_time"]))
+            ranked_days.append({"date": key, "slots": slots, "personalization": personalization, "score": slots[0]["score"]})
+        ranked_days.sort(key=lambda item: (-item["score"], item["date"]))
+        recommendations = [{**item, "rank": rank} for rank, item in enumerate(ranked_days[:12], start=1)]
         return {
             "status": "partial" if errors else "completed", "profile": self.POLICY_VERSION,
             "category": "Marriage Muhurat", "location": place, "period": f"{start} to {end}",
             "recommendations": recommendations, "rejected_dates": [], "total_candidates": len(candidates),
+            "eligible_dates_found": len(ranked_days),
             "days_evaluated": days_evaluated, "rejection_counts": dict(rejected), "errors": errors,
             "personalization": personalization,
+            "recommendation_level": "expanded_review" if discovery_mode else "strict",
+            "selection_notice": ("No strict window fell in this period. These expanded candidates require confirmation with your family priest or tradition." if discovery_mode else "Strict marriage-policy windows, ranked for the selected period."),
             "limitations": ["A conservative, documented local Panchang policy; regional family traditions may differ.", "Compatibility analysis is not substituted for a ceremony-time election."],
         }
 
-    def _evaluate_minute(self, start, endpoint, lat, lon, forbidden, choghadiya, natal_nakshatras, contexts):
+    def _evaluate_minute(self, start, endpoint, lat, lon, forbidden, choghadiya, natal_nakshatras, contexts, discovery_mode):
         if any(start < end and endpoint > begin for begin, end in forbidden):
             return None, "rahu_yamaganda_gulika"
         details = None
@@ -142,11 +164,14 @@ class MarriageMuhuratCalculator(VerifiedMuhuratCalculator):
             vishti = 2 <= half <= 57 and (half - 2) % 7 == 6
             if moon >= 300: return None, "panchak_policy"
             if tithi not in self.GOOD_TITHIS: return None, "tithi_policy"
-            if yoga in self.AVOID_YOGAS: return None, "yoga_policy"
+            avoid_yogas = self.DISCOVERY_AVOID_YOGAS if discovery_mode else self.AVOID_YOGAS
+            permitted_nakshatras = self.DISCOVERY_NAKSHATRAS if discovery_mode else self.GOOD_NAKSHATRAS
+            if yoga in avoid_yogas: return None, "yoga_policy"
             if vishti: return None, "vishti_karana"
-            if nak not in self.GOOD_NAKSHATRAS: return None, "marriage_nakshatra_policy"
+            if nak not in permitted_nakshatras: return None, "marriage_nakshatra_policy"
             if asc not in self.GOOD_LAGNAS: return None, "marriage_lagna_policy"
-            if not self._good_choghadiya(sample, choghadiya): return None, "choghadiya_policy"
+            choghadiya_weight = self._choghadiya_weight(sample, choghadiya)
+            if not choghadiya_weight: return None, "choghadiya_policy"
             if self._angular_distance(sun, positions[swe.VENUS]) < 8 or self._angular_distance(sun, positions[swe.JUPITER]) < 9:
                 return None, "marriage_karaka_combustion"
             tara = [((nak - natal) % 27) % 9 + 1 for natal in natal_nakshatras]
@@ -157,20 +182,23 @@ class MarriageMuhuratCalculator(VerifiedMuhuratCalculator):
                     distance = (int(moon / 30) - context["moon_sign"]) % 12 + 1
                     chandra.append(distance)
             if any(value in {2, 4, 5, 8, 9, 12} for value in chandra): return None, "partner_chandra_bala"
-            details = {"score": 80 + (10 if len(natal_nakshatras) == 2 else 0), "lagna": self._sign_name(asc),
+            tithi_weight = {2: 6, 3: 5, 5: 7, 6: 8, 7: 6, 10: 7, 11: 9, 12: 8, 13: 10}[tithi]
+            lagna_weight = {1: 6, 2: 5, 5: 8, 6: 9, 8: 7, 10: 6, 11: 8}[asc]
+            details = {"score": 50 + tithi_weight + lagna_weight + choghadiya_weight + (10 if len(natal_nakshatras) == 2 else 0), "lagna": self._sign_name(asc),
                        "panchang": {"tithi_number": tithi, "nakshatra_number": nak, "yoga_number": yoga, "karana_half": half},
                        "reasons": ["Passed the marriage Panchang, Lagna and caution-period policy."],
-                       "positives": ["Auspicious marriage Nakshatra and permitted Tithi are active."],
-                       "cautions": ([] if len(natal_nakshatras) == 2 else ["Partner birth data was not available; couple natal Moon checks were not applied."])}
+                       "positives": [("Expanded marriage-date candidate; confirm regional tradition." if discovery_mode else "Auspicious marriage Nakshatra and permitted Tithi are active.")],
+                       "cautions": ((["This is an expanded discovery candidate, not a strict marriage-policy window."] if discovery_mode else []) + ([] if len(natal_nakshatras) == 2 else ["Partner birth data was not available; couple natal Moon checks were not applied."]))}
         return details, None
 
-    def _good_choghadiya(self, sample, data):
+    def _choghadiya_weight(self, sample, data):
+        weights = {"Amrit": 10, "Shubh": 8, "Labh": 6, "Chara": 3}
         for slot in (data.get("day_choghadiya", []) + data.get("night_choghadiya", [])):
             if slot.get("name") not in self.GOOD_CHOGHADIYA: continue
             try:
                 begin, end = datetime.fromisoformat(slot["start_time"]), datetime.fromisoformat(slot["end_time"])
                 if begin.tzinfo is None: begin, end = begin.replace(tzinfo=sample.tzinfo), end.replace(tzinfo=sample.tzinfo)
-                if begin <= sample < end: return True
+                if begin <= sample < end: return weights.get(slot["name"], 1)
             except (KeyError, ValueError, TypeError):
                 continue
-        return False
+        return 0

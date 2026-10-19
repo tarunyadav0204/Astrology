@@ -61,6 +61,35 @@ class TransitCalculator(BaseCalculator):
                 'degree': longitude % 30,
                 'retrograde': is_retrograde
             }
+
+        # Optional chart-display bodies. They are deliberately kept out of
+        # classical transit analysis (Ashtakavarga, graha drishti, etc.) but
+        # belong in the transit chart and its visual overlay.
+        for planet_name, planet in (
+            ('Uranus', swe.URANUS),
+            ('Neptune', swe.NEPTUNE),
+            ('Pluto', swe.PLUTO),
+        ):
+            with _SWISSEPH_CHART_LOCK:
+                try:
+                    swe.set_sid_mode(sid_mode)
+                    pos = swe.calc_ut(
+                        jd,
+                        planet,
+                        swe.FLG_SIDEREAL | swe.FLG_SPEED | swe.FLG_SWIEPH,
+                    )
+                finally:
+                    swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+            pos_array = pos[0]
+            longitude = pos_array[0] % 360
+            speed = pos_array[3] if len(pos_array) > 3 else 0.0
+            planets[planet_name] = {
+                'longitude': longitude,
+                'sign': int(longitude / 30),
+                'degree': longitude % 30,
+                'retrograde': speed < 0,
+            }
         
         # Calculate birth chart houses for transit display
         time_parts = birth_data.time.split(':')

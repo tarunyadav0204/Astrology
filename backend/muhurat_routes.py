@@ -87,8 +87,8 @@ class MarriageMuhuratRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_period_and_times(self):
-        if self.end_date < self.start_date or (self.end_date - self.start_date).days >= 60:
-            raise ValueError("Select an inclusive search period of 1–60 days")
+        if self.end_date < self.start_date or (self.end_date - self.start_date).days >= 180:
+            raise ValueError("Select an inclusive search period of 1–180 days")
         try:
             from datetime import time as clock_time
             clock_time.fromisoformat(self.allowed_start)

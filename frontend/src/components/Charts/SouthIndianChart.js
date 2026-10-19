@@ -15,6 +15,7 @@ const SouthIndianChart = ({
   chartType = 'lagna',
   division,
   showDegreeNakshatra = true,
+  showOuterPlanets = false,
   chartRefHighlight = null,
   showFooterHint = true,
   deskMode = false,
@@ -433,6 +434,7 @@ const SouthIndianChart = ({
     Object.entries(chartData.planets)
       .filter(([name, data]) => {
         if (!data || name === 'InduLagna') return false;
+        if (!showOuterPlanets && ['Uranus', 'Neptune', 'Pluto'].includes(name)) return false;
         if (useHousePlacement && typeof data.house === 'number') {
           // Place in the South-Indian sign cell of this Placidus house's cusp
           const cuspSign = chartData.houses?.[data.house - 1]?.sign;
@@ -441,7 +443,7 @@ const SouthIndianChart = ({
         return data.sign === signIndex;
       })
       .forEach(([name, data]) => {
-        const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Gulika', 'Mandi'];
+        const planetNames = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Uranus', 'Neptune', 'Pluto', 'Gulika', 'Mandi'];
         const planetIndex = planetNames.indexOf(name);
         planetsInSign.push({
           symbol: planets[planetIndex] || name.substring(0, 2),

@@ -13,6 +13,7 @@ const SouthIndianChart = ({
   chartData,
   chartType,
   showDegreeNakshatra = true,
+  showOuterPlanets = false,
   rotatedAscendant = null,
   onRotate,
   cosmicTheme = false,
@@ -142,6 +143,7 @@ const SouthIndianChart = ({
     Object.entries(chartData.planets)
       .filter(([name, data]) => (
         name !== 'InduLagna'
+        && (showOuterPlanets || !['Uranus', 'Neptune', 'Pluto'].includes(name))
         && (useHousePlacement && typeof data?.house === 'number'
           ? data.house === houseForSign
           : data?.sign === signIndex)
@@ -219,8 +221,8 @@ const SouthIndianChart = ({
   const getTransitPlanetsInSign = (signIndex) => {
     const planets = transitOverlay?.planets;
     if (!planets || signIndex === -1) return [];
-    const names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'];
-    return names.flatMap((name) => {
+    const names = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu', 'Uranus', 'Neptune', 'Pluto'];
+    return names.filter((name) => showOuterPlanets || !['Uranus', 'Neptune', 'Pluto'].includes(name)).flatMap((name) => {
       const data = planets[name];
       if (!data || data.sign !== signIndex) return [];
       const retrograde = !!data.retrograde && name !== 'Rahu' && name !== 'Ketu';

@@ -56,6 +56,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const dashaColor = dashaPaint(colors).fill;
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(true);
+  const [showOuterPlanets, setShowOuterPlanets] = useState(false);
   const [currentChartType, setCurrentChartType] = useState(chartType || 'lagna');
   const [rotatedAscendant, setRotatedAscendant] = useState(null);
   const [showKarakas, setShowKarakas] = useState(false);
@@ -849,6 +850,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         chartType={type}
         birthData={birthData}
         showDegreeNakshatra={showDegreeNakshatra}
+        showOuterPlanets={showOuterPlanets}
         cosmicTheme={cosmicTheme}
         rotatedAscendant={rotatedAscendant}
         onRotate={handleRotate}
@@ -873,6 +875,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         chartType={type}
         birthData={birthData}
         showDegreeNakshatra={showDegreeNakshatra}
+        showOuterPlanets={showOuterPlanets}
         cosmicTheme={cosmicTheme}
         rotatedAscendant={rotatedAscendant}
         onRotate={handleRotate}
@@ -891,7 +894,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         {...sizeProp}
       />
     );
-  }, [chartStyle, birthData, chartData, lagnaChartData, showDegreeNakshatra, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType, signPoints, bavBySign, handleTransitPlanetPress, drawingMode, aspectMode, aspectFocus, showBadhaka, showMaraka, showVargottama, showMooltrikona, t]);
+  }, [chartStyle, birthData, chartData, lagnaChartData, showDegreeNakshatra, showOuterPlanets, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType, signPoints, bavBySign, handleTransitPlanetPress, drawingMode, aspectMode, aspectFocus, showBadhaka, showMaraka, showVargottama, showMooltrikona, t]);
 
   const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
     const iconColor = primary ? colors.onPrimary : (active ? colors.onAccent : colors.text);
@@ -961,6 +964,16 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             <Text style={[styles.viewToolbarLabel, styles.viewToolbarLabelTablet, { color: colors.chartTextMuted }]}>{t('premiumUi.common.view')}</Text>
           ) : null}
           <View style={[styles.webToolbarLeft, !fitTablet && styles.webToolbarLeftPhone]}>
+            <TouchableOpacity
+              onPress={() => setShowOuterPlanets((visible) => !visible)}
+              style={[styles.viewControl, !fitTablet && styles.viewControlPhone, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: showOuterPlanets }}
+              accessibilityLabel={showOuterPlanets ? 'Hide Uranus, Neptune, and Pluto' : 'Show Uranus, Neptune, and Pluto'}
+            >
+              <Ionicons name="planet-outline" size={fitTablet ? 22 : 14} color={showOuterPlanets ? colors.primary : colors.chartTextMuted} />
+              <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showOuterPlanets ? colors.primary : colors.chartTextMuted }]}>Outer</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
               style={[

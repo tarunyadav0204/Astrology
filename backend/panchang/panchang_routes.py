@@ -46,6 +46,7 @@ def _format_anga_response(basic_panchang: dict) -> dict:
             'end_time': basic_panchang['tithi'].get('end_time'),
             'elapsed': basic_panchang['tithi'].get('elapsed_degrees', basic_panchang['tithi'].get('elapsed', 0)),
             'duration': 12.0,
+            'significance': basic_panchang['tithi'].get('significance'),
         },
         'vara': {
             'number': basic_panchang['vara']['number'],
@@ -63,6 +64,7 @@ def _format_anga_response(basic_panchang: dict) -> dict:
             'nature': basic_panchang['nakshatra'].get('nature'),
             'pada': basic_panchang['nakshatra'].get('pada'),
             'career_focus': basic_panchang['nakshatra'].get('career_focus'),
+            'degrees_traversed': basic_panchang['nakshatra'].get('degrees_traversed'),
             'start_time': basic_panchang['nakshatra'].get('start_time'),
             'end_time': basic_panchang['nakshatra'].get('end_time'),
         },
@@ -73,6 +75,7 @@ def _format_anga_response(basic_panchang: dict) -> dict:
             'quality': basic_panchang['yoga'].get('quality'),
             'recommended_activities': basic_panchang['yoga'].get('recommended_activities'),
             'spiritual_practice': basic_panchang['yoga'].get('spiritual_practice'),
+            'degrees_traversed': basic_panchang['yoga'].get('degrees_traversed'),
             'start_time': basic_panchang['yoga'].get('start_time'),
             'end_time': basic_panchang['yoga'].get('end_time'),
         },
@@ -84,7 +87,29 @@ def _format_anga_response(basic_panchang: dict) -> dict:
             'duration': basic_panchang['karana'].get('duration'),
             'suitable_activities': basic_panchang['karana'].get('suitable_activities'),
             'business_suitable': basic_panchang['karana'].get('business_suitable'),
+            'suitable_activities': basic_panchang['karana'].get('suitable_activities'),
         },
+    }
+
+
+def _calendar_context(date_value: str, sun_longitude: float) -> dict:
+    """Traditional solar calendar context for a recorded birth moment."""
+    date = datetime.strptime(str(date_value).split('T')[0], '%Y-%m-%d').date()
+    sign_index = int(float(sun_longitude or 0) // 30) % 12
+    solar_months = ['Mesha', 'Vrishabha', 'Mithuna', 'Karka', 'Simha', 'Kanya', 'Tula', 'Vrishchika', 'Dhanus', 'Makara', 'Kumbha', 'Mina']
+    ritu = ['Vasanta', 'Vasanta', 'Grishma', 'Grishma', 'Varsha', 'Varsha', 'Sharad', 'Sharad', 'Hemanta', 'Hemanta', 'Shishira', 'Shishira'][sign_index]
+    ayana = 'Uttarayana' if sign_index in (9, 10, 11, 0, 1, 2) else 'Dakshinayana'
+    # Vikram year changes at Chaitra; this civil-date convention is made explicit
+    # so it never masquerades as a fully calculated lunisolar month.
+    vikram_year = date.year + (56 if date.month < 4 else 57)
+    return {
+        'solar_month': solar_months[sign_index],
+        'amanta_lunar_month': None,
+        'ritu': ritu,
+        'ayana': ayana,
+        'vikram_samvat': vikram_year,
+        'kali_year': date.year + 3101,
+        'method': 'Sidereal solar month; Vikram Samvat changes at Chaitra.',
     }
 
 
@@ -164,10 +189,25 @@ async def calculate_birth_panchang(request: BirthPanchangRequest):
         profile = request.calculation_profile or {}
         calculator = PanchangCalculator(ayanamsha=profile.get('ayanamsha', 'lahiri'))
         basic = calculator.calculate_birth_panchang(birth_data)
+        timings = calculator.get_local_sunrise_sunset(
+            birth_data.get('date'),
+            float(birth_data['latitude']),
+            float(birth_data['longitude']),
+            birth_data.get('timezone'),
+        )
         result = {
             **_format_anga_response(basic),
             'reference': 'birth_moment',
             'ayanamsa': basic.get('ayanamsa'),
+            'timezone_offset_hours': basic.get('timezone_offset_hours'),
+            'calendar_context': {
+                **_calendar_context(birth_data.get('date'), basic.get('sun_longitude')),
+                'amanta_lunar_month': basic.get('amanta_lunar_month'),
+            },
+            'birth_timing': {
+                key: timings.get(key)
+                for key in ('sunrise', 'sunset', 'moonrise', 'moonset', 'day_duration', 'night_duration')
+            },
         }
         if request.calculation_profile:
             result['calculation_profile'] = {

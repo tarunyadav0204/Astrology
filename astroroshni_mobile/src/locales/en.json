@@ -663,6 +663,9 @@
     "Saturn": "Sa",
     "Rahu": "Ra",
     "Ketu": "Ke",
+    "Uranus": "Ur",
+    "Neptune": "Ne",
+    "Pluto": "Pl",
     "Gulika": "Gu",
     "Mandi": "Mn",
     "InduLagna": "IL"
@@ -2375,6 +2378,7 @@
       "missingData": "Missing Data",
       "verifyProfileLocation": "Please verify your profile and location.",
       "dateRange": "DATE RANGE",
+      "anySuitableTime": "Any suitable time\n00:00–23:59",
       "from": "From",
       "to": "To",
       "location": "LOCATION",
@@ -2435,7 +2439,7 @@
       "notEnoughCredits": "Not enough credits"
     },
     "marriage": {
-      "title": "Marriage Muhurat", "intro": "Find ceremony-start windows for the wedding venue. Add both charts for couple natal Moon checks; otherwise the result remains Panchang-only.", "notice": "This is a timing election, not a compatibility verdict. Family tradition and priest guidance can apply additional rules.", "couple": "COUPLE", "bride": "Bride / partner one", "groom": "Groom / partner two", "profileHint": "Both charts are optional, but complete birth time and place make the couple check available.", "venue": "CEREMONY VENUE", "chooseCity": "Choose wedding city", "chooseVenue": "Choose venue", "chooseVenueBody": "Choose the city where the ceremony will take place.", "checkDates": "Check dates", "checkDatesBody": "Choose an inclusive range of 1 to 60 days.", "through": "Through", "hours": "CEREMONY HOURS", "day": "Day\n08:00–17:00", "evening": "Evening\n18:00–23:30", "overnight": "Overnight\n20:00–01:00", "overnightHint": "Overnight means the ceremony may finish after midnight on the following civil day.", "find": "Find Marriage Muhurat · {{cost}} credits", "confirmTitle": "Confirm Marriage Muhurat", "confirmBody": "This search costs {{cost}} credits. Credits are charged only when suitable windows are found.", "continue": "Continue", "signIn": "Sign in to calculate a marriage Muhurat.", "balanceChanged": "Your balance is no longer enough for this search.", "calculationFailed": "Could not calculate a marriage Muhurat. Please try again.", "chooseChart": "Choose saved chart", "savedLocation": "Saved location", "noCharts": "Add a birth chart first to use couple personalization.", "withoutChart": "Continue without this chart", "addChart": "Add chart (optional)", "results": "Recommended ceremony windows", "noResults": "No window met this policy in the chosen range. Try a different range or ceremony-hours preference; the search did run.", "lagna": "Lagna"
+      "title": "Marriage Muhurat", "intro": "Find ceremony-start windows for the wedding venue. Add both charts for couple natal Moon checks; otherwise the result remains Panchang-only.", "notice": "This is a timing election, not a compatibility verdict. Family tradition and priest guidance can apply additional rules.", "couple": "COUPLE", "bride": "Bride / partner one", "groom": "Groom / partner two", "profileHint": "Both charts are optional, but complete birth time and place make the couple check available.", "venue": "CEREMONY VENUE", "chooseCity": "Choose wedding city", "chooseVenue": "Choose venue", "chooseVenueBody": "Choose the city where the ceremony will take place.", "checkDates": "Check dates", "checkDatesBody": "Choose an inclusive range of 1 to 180 days.", "through": "Through", "next30": "Next 30 days", "next90": "Next 3 months", "next180": "Next 6 months", "horizonHint": "One search covers the full selected period and is charged once, not once per date.", "hours": "CEREMONY HOURS", "day": "Day\n08:00–17:00", "evening": "Evening\n18:00–23:30", "overnight": "Overnight\n20:00–01:00", "overnightHint": "Overnight means the ceremony may finish after midnight on the following civil day.", "find": "Find Marriage Muhurat · {{cost}} credits", "confirmTitle": "Confirm Marriage Muhurat", "confirmBody": "This search costs {{cost}} credits. Credits are charged only when suitable windows are found.", "continue": "Continue", "signIn": "Sign in to calculate a marriage Muhurat.", "balanceChanged": "Your balance is no longer enough for this search.", "calculationFailed": "Could not calculate a marriage Muhurat. Please try again.", "chooseChart": "Choose saved chart", "savedLocation": "Saved location", "noCharts": "Add a birth chart first to use couple personalization.", "withoutChart": "Continue without this chart", "addChart": "Add chart (optional)", "results": "Recommended ceremony windows", "noResults": "No window met this policy in the chosen range. Try a different range or ceremony-hours preference; the search did run.", "lagna": "Lagna"
     },
     "panchang": {
       "title": "Daily Panchang",
@@ -2465,6 +2469,48 @@
       "openPlanners": "Open event muhurat planners",
       "now": "now",
       "newDelhi": "New Delhi"
+    }
+  },
+  "birthDetailsTab": {
+    "tab": "Birth",
+    "intro": "Your birth record, Janma Panchanga, chart anchors and traditional Moon-Nakshatra identity in one place.",
+    "number": "No. {{number}}",
+    "lord": "Lord: {{value}}",
+    "pada": "Pada {{number}}",
+    "house": "House {{number}}",
+    "years": "{{value}} years",
+    "fromNakshatra": "From {{value}} Nakshatra",
+    "meanNodes": "Mean nodes",
+    "waxingMoon": "Waxing Moon",
+    "waningMoon": "Waning Moon",
+    "amantaConvention": "Amānta convention",
+    "notBusinessSuitable": "Not traditionally preferred for new business",
+    "specialTitle": "Special birth markers",
+    "specialBody": "Explore Yogi, Avayogi, Tithi Shunya, Gandanta and other calculated conditions.",
+    "sections": {
+      "record": "Birth record",
+      "recordHint": "The saved information used to cast this chart.",
+      "panchanga": "Panchanga at birth",
+      "panchangaHint": "Calculated for the exact recorded birth moment, not sunrise.",
+      "moon": "Moon identity",
+      "moonHint": "Traditional Nakshatra and compatibility attributes are read from the natal Moon.",
+      "anchors": "Chart anchors",
+      "anchorsHint": "The principal references used throughout the chart.",
+      "sky": "Birth sky timings",
+      "skyHint": "Local timings for the saved place and birth date.",
+      "calendar": "Calendar context",
+      "calendarHint": "Sidereal solar reference for the recorded birth date.",
+      "dasha": "Dasha origin",
+      "dashaHint": "The opening Vimshottari period is derived from the Moon’s Nakshatra."
+    },
+    "labels": {
+      "date": "Date", "time": "Local time", "place": "Place", "coordinates": "Coordinates", "timezone": "Timezone",
+      "tithi": "Tithi", "vara": "Vāra", "nakshatra": "Nakshatra", "yoga": "Yoga", "karana": "Karaṇa",
+      "moon": "Moon placement", "gana": "Gana", "nadi": "Nadi", "yoni": "Yoni", "animal": "Animal", "symbol": "Symbol", "element": "Element", "guna": "Guna", "shakti": "Shakti", "namingSyllable": "Naming syllable",
+      "lagna": "Lagna", "sun": "Sun", "ayanamsa": "Ayanamsa", "nodeType": "Node type",
+      "sunrise": "Sunrise", "sunset": "Sunset", "moonrise": "Moonrise", "moonset": "Moonset",
+      "lunarMonth": "Lunar month", "solarMonth": "Solar month", "ritu": "Ritu", "ayana": "Ayana", "vikramSamvat": "Vikram Samvat", "kaliYear": "Kali year",
+      "startingMahadasha": "Starting Mahadasha", "balanceAtBirth": "Balance at birth"
     }
   },
   "prashna": {

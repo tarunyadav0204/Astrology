@@ -256,6 +256,9 @@ export default function SelectNativeScreen({ navigation, route }) {
   const refreshAt = route.params?.refreshAt;
   const returnParams = route.params?.returnParams || {};
   const selectionReturnParams = route.params?.selectionReturnParams || {};
+  // Some flows need a chart as an input without replacing the app-wide active
+  // chart. The selector remains the single native-chart selection experience.
+  const selectionOnly = route.params?.selectionOnly === true;
 
   useFocusEffect(
     React.useCallback(() => {
@@ -420,7 +423,7 @@ export default function SelectNativeScreen({ navigation, route }) {
         navigation.navigate('Yogas', { birthDetails: profileWithId });
       } else if (returnTo) {
         // Return to the screen that required a native (Chart, Shadbala, SadeSati, etc.)
-        await storage.setBirthDetails(profileWithId);
+        if (!selectionOnly) await storage.setBirthDetails(profileWithId);
         setSelectedProfileKey(getChartSelectionKey(profileWithId));
         navigation.navigate(returnTo, {
           ...returnParams,

@@ -24,7 +24,7 @@ def test_marriage_request_accepts_an_explicit_overnight_ceremony_window():
     "patch",
     [
         {"end_date": "2027-01-09"},
-        {"end_date": "2027-03-12"},
+        {"end_date": "2027-07-10"},
         {"allowed_start": "not-a-time"},
     ],
 )

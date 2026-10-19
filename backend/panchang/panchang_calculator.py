@@ -100,6 +100,11 @@ class PanchangCalculator:
         # Calculate Karana
         karana_data = self._calculate_karana(sun_pos, moon_pos, jd)
 
+        # Amānta lunar month is named from the sidereal Sun sign at the most
+        # recent conjunction. Refine the conjunction from the current phase
+        # instead of approximating it from the civil month.
+        lunar_month = self._amanta_lunar_month(jd, (moon_pos - sun_pos) % 360)
+
         return {
             'tithi': tithi_data,
             'vara': vara_data,
@@ -109,7 +114,37 @@ class PanchangCalculator:
             'ayanamsa': swe.get_ayanamsa_ut(jd),
             'reference_jd': jd,
             'timezone_offset_hours': self._tz_offset_hours,
+            'sun_longitude': sun_pos,
+            'moon_longitude': moon_pos,
+            'amanta_lunar_month': lunar_month,
         }
+
+    def _amanta_lunar_month(self, jd, phase_degrees):
+        month_names = [
+            'Chaitra', 'Vaishakha', 'Jyeshtha', 'Ashadha', 'Shravana', 'Bhadrapada',
+            'Ashwin', 'Kartika', 'Margashirsha', 'Pausha', 'Magha', 'Phalguna',
+        ]
+
+        def signed_phase(value):
+            sun = swe.calc_ut(value, swe.SUN, swe.FLG_SIDEREAL)[0][0]
+            moon = swe.calc_ut(value, swe.MOON, swe.FLG_SIDEREAL)[0][0]
+            return ((moon - sun + 180) % 360) - 180
+
+        candidate = jd - (phase_degrees / 12.19075)
+        for _ in range(5):
+            phase = signed_phase(candidate)
+            future = signed_phase(candidate + 0.05)
+            delta = future - phase
+            if delta < -180:
+                delta += 360
+            elif delta > 180:
+                delta -= 360
+            if abs(delta) < 1e-6:
+                break
+            candidate -= phase / (delta / 0.05)
+
+        new_moon_sun = swe.calc_ut(candidate, swe.SUN, swe.FLG_SIDEREAL)[0][0]
+        return month_names[int(new_moon_sun // 30) % 12]
 
     @staticmethod
     def _parse_timezone(tz_str):

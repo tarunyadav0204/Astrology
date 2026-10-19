@@ -600,7 +600,10 @@ async def calculate_chart_only(
 
         if birth_hash:
             cache_key = build_chart_cache_key(
-                "parashari-view-chart-v1" if explicit_profile else "calculate-chart-only",
+                # Version the payload cache whenever the base chart contract
+                # gains display bodies. Older entries do not contain Uranus,
+                # Neptune, or Pluto, so they cannot be safely enriched here.
+                "parashari-view-chart-v2" if explicit_profile else "calculate-chart-only-v2",
                 birth_hash,
                 **({"ayanamsha": ayanamsha, "node_type": node_type} if explicit_profile else {}),
             )
@@ -1035,7 +1038,9 @@ async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = '
             birth_data.longitude,
         )
         cache_key = (
-            build_chart_cache_key("calculate-chart", chart_birth_hash, node_type=node_type)
+            # The v2 payload includes Uranus, Neptune, and Pluto. Keep old
+            # persisted responses from masking those newly calculated bodies.
+            build_chart_cache_key("calculate-chart-v2", chart_birth_hash, node_type=node_type)
             if chart_birth_hash
             else None
         )

@@ -817,9 +817,12 @@ def calculate_classical_shadbala(birth_data, chart_data: Dict) -> Dict:
         jd, float(birth_dict['latitude']), float(birth_dict['longitude'])
     )
     results = {}
-    excluded = {'Rahu', 'Ketu', 'Gulika', 'Mandi', 'InduLagna', 'Ascendant'}
-    for planet_name, planet_data in planets.items():
-        if planet_name in excluded:
+    # Shadbala is defined for the seven classical visible grahas only. The
+    # natal payload can also carry optional outer planets for rendering, which
+    # must never enter a Parashari strength calculation.
+    for planet_name in NAISARGIKA_BALA:
+        planet_data = planets.get(planet_name)
+        if not isinstance(planet_data, dict):
             continue
         longitude = planet_data.get('longitude')
         if longitude is None:

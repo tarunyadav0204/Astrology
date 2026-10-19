@@ -39,6 +39,10 @@ const EyeIcon = ({ hidden = false }) => (
   </svg>
 );
 
+const OuterPlanetsIcon = () => (
+  <span aria-hidden="true" style={{ fontSize: '14px', lineHeight: 1 }}>♅</span>
+);
+
 const ChartWidget = ({
   title,
   chartType,
@@ -74,6 +78,7 @@ const ChartWidget = ({
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(
     inlinePlanetDetails || !deskMode
   );
+  const [showOuterPlanets, setShowOuterPlanets] = useState(false);
   const [showSpecialPoints, setShowSpecialPoints] = useState(false);
   const [specialPointsData, setSpecialPointsData] = useState(null);
   const [showPlanetaryDignities, setShowPlanetaryDignities] = useState(false);
@@ -345,6 +350,16 @@ const ChartWidget = ({
       >
         <EyeIcon hidden={!showDegreeNakshatra} />
       </button> : null}
+      <button
+        type="button"
+        onClick={() => setShowOuterPlanets((visible) => !visible)}
+        aria-label={showOuterPlanets ? 'Hide Uranus, Neptune, and Pluto' : 'Show Uranus, Neptune, and Pluto'}
+        aria-pressed={showOuterPlanets}
+        title={showOuterPlanets ? 'Hide outer planets' : 'Show outer planets'}
+        style={{ width: 24, height: 24, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.92)', color: showOuterPlanets ? 'var(--color-brand, #7a173d)' : '#666', border: `1px solid ${showOuterPlanets ? 'var(--color-brand, #7a173d)' : '#ddd'}`, borderRadius: '4px', cursor: 'pointer', lineHeight: 1 }}
+      >
+        <OuterPlanetsIcon />
+      </button>
       <StyleToggle onClick={toggleStyle} title="North / South Indian">
         {chartStyle === 'north' ? 'N' : 'S'}
       </StyleToggle>
@@ -394,6 +409,16 @@ const ChartWidget = ({
           </span>
         </div>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0, flexWrap: 'nowrap', overflow: 'hidden' }}>
+          <button
+            type="button"
+            onClick={() => setShowOuterPlanets((visible) => !visible)}
+            aria-label={showOuterPlanets ? 'Hide Uranus, Neptune, and Pluto' : 'Show Uranus, Neptune, and Pluto'}
+            aria-pressed={showOuterPlanets}
+            title={showOuterPlanets ? 'Hide outer planets' : 'Show outer planets'}
+            style={{ width: 28, height: 25, padding: 0, background: 'white', color: showOuterPlanets ? '#e91e63' : '#666', border: `1px solid ${showOuterPlanets ? '#e91e63' : '#ddd'}`, borderRadius: '12px', cursor: 'pointer', fontWeight: '600' }}
+          >
+            <OuterPlanetsIcon />
+          </button>
           <button
             onClick={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
             style={{
@@ -546,6 +571,7 @@ const ChartWidget = ({
             birthData={birthData}
             division={division}
             showDegreeNakshatra={showDegreeNakshatra}
+            showOuterPlanets={showOuterPlanets}
             showFooterHint={showFooterHint}
             deskMode={deskMode}
             onHouseSelect={onHouseSelect}
@@ -563,6 +589,7 @@ const ChartWidget = ({
             birthData={birthData}
             division={division}
             showDegreeNakshatra={showDegreeNakshatra}
+            showOuterPlanets={showOuterPlanets}
             showFooterHint={showFooterHint}
             deskMode={deskMode}
             onHouseSelect={onHouseSelect}
@@ -1163,6 +1190,7 @@ const ChartWidget = ({
                     birthData={birthData}
                     division={division}
                     showDegreeNakshatra={showDegreeNakshatra}
+                    showOuterPlanets={showOuterPlanets}
                     chartRefHighlight={chartRefHighlight}
                     showFooterHint={showFooterHint}
                     showPlanetHoverDetails={!inlinePlanetDetails}
@@ -1176,6 +1204,7 @@ const ChartWidget = ({
                     birthData={birthData}
                     division={division}
                     showDegreeNakshatra={showDegreeNakshatra}
+                    showOuterPlanets={showOuterPlanets}
                     chartRefHighlight={chartRefHighlight}
                     showFooterHint={showFooterHint}
                     showPlanetHoverDetails={!inlinePlanetDetails}
