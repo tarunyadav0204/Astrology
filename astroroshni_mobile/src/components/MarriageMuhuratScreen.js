@@ -13,6 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import LocationPicker from './LocationPicker';
 import { normalizeCalendarDateForApi } from '../utils/birthDateUtils';
 import { useTranslation } from 'react-i18next';
+import ConfirmCreditsModal from './ConfirmCreditsModal';
 
 const fmtDate = (value) => value.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 const localDate = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
@@ -37,6 +38,7 @@ export default function MarriageMuhuratScreen({ navigation, route }) {
   const [cost, setCost] = useState(0);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [showCreditConfirmation, setShowCreditConfirmation] = useState(false);
 
   const load = useCallback(async () => {
     const current = await storage.getBirthData();
@@ -68,7 +70,7 @@ export default function MarriageMuhuratScreen({ navigation, route }) {
     const authorised = await requireAuthForPaid({ feature: t('muhurat.marriage.title'), message: t('muhurat.marriage.signIn'), resume: { resumeRoute: 'MarriageMuhurat', resumeParams: {} } });
     if (!authorised) return;
     if (credits < cost) return Alert.alert(t('muhurat.common.insufficientCredits'), t('muhurat.common.needCredits', { cost, credits }), [{ text: t('muhurat.common.cancel') }, { text: t('muhurat.common.buyCredits'), onPress: () => navigation.navigate('Credits') }]);
-    Alert.alert(t('muhurat.marriage.confirmTitle'), t('muhurat.marriage.confirmBody', { cost }), [{ text: t('muhurat.common.cancel'), style: 'cancel' }, { text: t('muhurat.marriage.continue'), onPress: calculate }]);
+    setShowCreditConfirmation(true);
   };
   const calculate = async () => {
     setLoading(true); setResult(null);
@@ -97,7 +99,19 @@ export default function MarriageMuhuratScreen({ navigation, route }) {
     </ScrollView>
     {venueOpen && <LocationPicker onClose={() => setVenueOpen(false)} onLocationSelect={(place) => { setVenue(place); setVenueOpen(false); }} />}
     {datePicker && <DateTimePicker value={datePicker === 'start' ? startDate : endDate} mode="date" minimumDate={datePicker === 'end' ? startDate : new Date()} onChange={(_, selected) => { setDatePicker(null); if (!selected) return; if (datePicker === 'start') { setStartDate(selected); if (selected > endDate) setEndDate(selected); } else setEndDate(selected); }} />}
-    </SafeAreaView></View>;
+    </SafeAreaView>
+    <ConfirmCreditsModal
+      visible={showCreditConfirmation}
+      onClose={() => setShowCreditConfirmation(false)}
+      onConfirm={() => { setShowCreditConfirmation(false); calculate(); }}
+      title={t('muhurat.marriage.confirmTitle')}
+      description={t('muhurat.marriage.confirmBody', { cost })}
+      cost={cost}
+      credits={credits}
+      confirmLabel={t('muhurat.marriage.continue')}
+      iconName="heart-outline"
+    />
+    </View>;
 }
 
 const Section = ({ label, children, card }) => <View style={[styles.card, card]}><Text style={styles.label}>{label}</Text>{children}</View>;

@@ -2,7 +2,7 @@
   "expo": {
     "name": "AstroRoshni",
     "slug": "astroroshni-mobile",
-    "version": "1.2.14",
+    "version": "1.2.15",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
@@ -42,7 +42,7 @@
       },
       "package": "com.astroroshni.mobile",
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.astroroshni.mobile",
-      "versionCode": 272,
+      "versionCode": 273,
       "newArchEnabled": false,
       "googleServicesFile": "./google-services.json",
       "permissions": [

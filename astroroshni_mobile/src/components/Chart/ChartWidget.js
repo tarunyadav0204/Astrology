@@ -972,7 +972,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
               accessibilityLabel={showOuterPlanets ? 'Hide Uranus, Neptune, and Pluto' : 'Show Uranus, Neptune, and Pluto'}
             >
               <Ionicons name="planet-outline" size={fitTablet ? 22 : 14} color={showOuterPlanets ? colors.primary : colors.chartTextMuted} />
-              <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showOuterPlanets ? colors.primary : colors.chartTextMuted }]}>Outer</Text>
+              <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showOuterPlanets ? colors.primary : colors.chartTextMuted }]}>{t('premiumUi.chart.outerPlanets')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
