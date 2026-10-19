@@ -142,6 +142,8 @@ backend/gcp_key.json
 !backend/data/chat_glossary_terms_v3.json
 !astroroshni_mobile/src/data/eventTimelineYearlySample.json
 !astroroshni_mobile/src/data/eventTimelineMonthlySample.json
+!astroroshni_mobile/src/data/festivalPujaCatalog.json
+!frontend/src/data/festivalPujaCatalog.json
 !backend/whatsapp/flows/registration_flow.json
 !backend/longevity/classical_rule_registry.json
 !backend/classical_sources/data/

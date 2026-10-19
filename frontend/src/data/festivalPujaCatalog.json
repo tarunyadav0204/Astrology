@@ -1,0 +1,579 @@
+[
+  {
+    "id": "diwali",
+    "name": "Diwali",
+    "coverage": "ritual_window",
+    "ritual": "Household Lakshmi puja",
+    "source": "https://www.drikpanchang.com/festivals/lakshmipuja/festivals-lakshmipuja-timings.html",
+    "ritual_options": [
+      {
+        "value": "Household Lakshmi puja",
+        "label": "Lakshmi Puja",
+        "aliases": [
+          "lakshmi puja",
+          "laxmi puja",
+          "diwali puja",
+          "lakshmi ganesh puja",
+          "लक्ष्मी पूजा",
+          "लक्ष्मी पूजन",
+          "दीवाली पूजा",
+          "दिवाली पूजा"
+        ],
+        "supported": true
+      }
+    ]
+  },
+  {
+    "id": "holika_dahan",
+    "name": "Holika Dahan",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "holi",
+    "name": "Holi",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "dussehra",
+    "name": "Dussehra/Vijayadashami",
+    "coverage": "ritual_window",
+    "ritual": "Shami / Aparajita puja",
+    "source": "https://www.drikpanchang.com/festivals/vijayadashami/vijayadashami-date-time.html",
+    "ritual_options": [
+      {
+        "value": "Aparajita puja",
+        "label": "Aparajita Puja",
+        "aliases": [
+          "Aparajita",
+          "अपराजिता पूजा",
+          "अपराजिता पूजन"
+        ],
+        "supported": true
+      },
+      {
+        "value": "Shami puja",
+        "label": "Shami Puja",
+        "aliases": [
+          "Shami",
+          "शमी पूजा",
+          "शमी पूजन"
+        ],
+        "supported": true
+      },
+      {
+        "value": "Shami / Aparajita puja",
+        "label": "Shami and Aparajita Puja",
+        "aliases": [
+          "Aparajita/Shami puja"
+        ],
+        "supported": true
+      },
+      {
+        "value": "Exact Vijaya Muhurat",
+        "label": "Exact Vijaya Muhurat",
+        "aliases": [],
+        "supported": false
+      },
+      {
+        "value": "Durga Visarjan",
+        "label": "Durga Visarjan",
+        "aliases": [],
+        "supported": false
+      }
+    ]
+  },
+  {
+    "id": "navratri",
+    "name": "Sharad Navratri",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "janmashtami",
+    "name": "Krishna Janmashtami",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "govardhan_puja",
+    "name": "Govardhan Puja",
+    "coverage": "ritual_window",
+    "ritual": "Govardhan puja",
+    "source": "https://www.drikpanchang.com/festivals/govardhan-puja/govardhan-puja-date-time.html",
+    "ritual_options": [
+      {
+        "value": "Govardhan puja",
+        "label": "Govardhan Puja",
+        "aliases": [
+          "govardhan puja",
+          "annakut puja",
+          "गोवर्धन पूजा",
+          "अन्नकूट पूजा"
+        ],
+        "supported": true
+      }
+    ]
+  },
+  {
+    "id": "ganesh_chaturthi",
+    "name": "Ganesh Chaturthi",
+    "coverage": "ritual_window",
+    "ritual": "Ganesh sthapana and puja",
+    "source": "https://www.drikpanchang.com/festivals/ganesh-chaturthi/ganesh-chaturthi-date-time.html",
+    "ritual_options": [
+      {
+        "value": "Ganesh sthapana and puja",
+        "label": "Ganesh Sthapana and Puja",
+        "aliases": [
+          "ganesh puja",
+          "ganesha puja",
+          "ganesh sthapana",
+          "ganapati sthapana",
+          "गणेश पूजा",
+          "गणेश स्थापना"
+        ],
+        "supported": true
+      }
+    ]
+  },
+  {
+    "id": "maha_shivratri",
+    "name": "Maha Shivratri",
+    "coverage": "ritual_window",
+    "ritual": "Nishita Shiva puja",
+    "source": "https://www.drikpanchang.com/festivals/maha-shivaratri/maha-shivaratri-date-time.html",
+    "ritual_options": [
+      {
+        "value": "Nishita Shiva puja",
+        "label": "Shivratri Nishita Puja",
+        "aliases": [
+          "nishita puja",
+          "nishita shiva puja",
+          "shivratri puja",
+          "maha shivratri puja",
+          "निशिता पूजा",
+          "महाशिवरात्रि पूजा"
+        ],
+        "supported": true
+      }
+    ]
+  },
+  {
+    "id": "ram_navami",
+    "name": "Ram Navami",
+    "coverage": "ritual_window",
+    "ritual": "Rama Navami puja",
+    "source": "https://www.drikpanchang.com/dashavatara/rama-navami/rama-navami-date-time.html",
+    "ritual_options": [
+      {
+        "value": "Rama Navami puja",
+        "label": "Ram Navami Puja",
+        "aliases": [
+          "ram navami puja",
+          "rama navami puja",
+          "ram janma puja",
+          "राम नवमी पूजा"
+        ],
+        "supported": true
+      }
+    ]
+  },
+  {
+    "id": "hanuman_jayanti",
+    "name": "Hanuman Jayanti",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "karva_chauth",
+    "name": "Karva Chauth",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "teej",
+    "name": "Hariyali Teej",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "shukla_ekadashi",
+    "name": "Shukla Ekadashi",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "krishna_ekadashi",
+    "name": "Krishna Ekadashi",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "devutthana_ekadashi",
+    "name": "Devutthana Ekadashi",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "utpanna_ekadashi",
+    "name": "Utpanna Ekadashi",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "kansa_vadh",
+    "name": "Kansa Vadh",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "tulasi_vivah",
+    "name": "Tulasi Vivah",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "dev_diwali",
+    "name": "Dev Diwali",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "kalabhairav_jayanti",
+    "name": "Kalabhairav Jayanti",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "makar_sankranti",
+    "name": "Makar Sankranti",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "baisakhi",
+    "name": "Baisakhi",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "pitra_paksha",
+    "name": "Pitra Paksha",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "gudi_padwa",
+    "name": "Gudi Padwa",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "ugadi",
+    "name": "Ugadi",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "vishu",
+    "name": "Vishu",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "pohela_boishakh",
+    "name": "Pohela Boishakh",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "bihu",
+    "name": "Rongali Bihu",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "onam",
+    "name": "Onam",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "durga_puja",
+    "name": "Durga Puja",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "guru_purnima",
+    "name": "Guru Purnima",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "pradosh_vrat",
+    "name": "Pradosh Vrat",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "sankashti_chaturthi",
+    "name": "Sankashti Chaturthi",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "akshaya_tritiya",
+    "name": "Akshaya Tritiya",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "raksha_bandhan",
+    "name": "Raksha Bandhan",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "nag_panchami",
+    "name": "Nag Panchami",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "karthik_purnima",
+    "name": "Karthik Purnima",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "vat_savitri",
+    "name": "Vat Savitri Vrat",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "ahoi_ashtami",
+    "name": "Ahoi Ashtami",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "sharad_purnima",
+    "name": "Sharad Purnima",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "dhanteras",
+    "name": "Dhanteras",
+    "coverage": "ritual_window",
+    "ritual": "Dhanteras puja (not shopping)",
+    "source": "https://www.drikpanchang.com/festivals/dhanteras/festivals-dhanteras-puja-timings.html",
+    "ritual_options": [
+      {
+        "value": "Dhanteras puja (not shopping)",
+        "label": "Dhanteras Puja",
+        "aliases": [
+          "dhanteras puja",
+          "dhantrayodashi puja",
+          "धनतेरस पूजा"
+        ],
+        "supported": true
+      }
+    ]
+  },
+  {
+    "id": "naraka_chaturdashi",
+    "name": "Naraka Chaturdashi",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "bhai_dooj",
+    "name": "Bhai Dooj",
+    "coverage": "ritual_window",
+    "ritual": "Bhai Dooj tika",
+    "source": "https://www.drikpanchang.com/festivals/bhai-dooj/bhai-dooj-date-time.html",
+    "ritual_options": [
+      {
+        "value": "Bhai Dooj tika",
+        "label": "Bhai Dooj Tilak",
+        "aliases": [
+          "bhai dooj tika",
+          "bhai dooj tilak",
+          "bhai dooj puja",
+          "भाई दूज टीका",
+          "भाई दूज तिलक"
+        ],
+        "supported": true
+      }
+    ]
+  },
+  {
+    "id": "chaitra_navratri",
+    "name": "Chaitra Navratri",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "vasant_panchami",
+    "name": "Vasant Panchami",
+    "coverage": "ritual_window",
+    "ritual": "Saraswati puja",
+    "source": "https://www.drikpanchang.com/festivals/vasant-panchami/vasant-panchami-puja-date-time.html",
+    "ritual_options": [
+      {
+        "value": "Saraswati puja",
+        "label": "Saraswati Puja",
+        "aliases": [
+          "saraswati puja",
+          "vasant panchami puja",
+          "basant panchami puja",
+          "सरस्वती पूजा"
+        ],
+        "supported": true
+      }
+    ]
+  },
+  {
+    "id": "ratha_saptami",
+    "name": "Ratha Saptami",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "buddha_purnima",
+    "name": "Buddha Purnima",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "radha_ashtami",
+    "name": "Radha Ashtami",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "anant_chaturdashi",
+    "name": "Anant Chaturdashi",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "hartalika_teej",
+    "name": "Hartalika Teej",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "sarva_pitru_amavasya",
+    "name": "Sarva Pitru Amavasya",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "ganga_dussehra",
+    "name": "Ganga Dussehra",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  },
+  {
+    "id": "kumbh_mela",
+    "name": "Kumbh Mela",
+    "coverage": "panchang_only",
+    "ritual": null,
+    "source": null,
+    "ritual_options": []
+  }
+]
