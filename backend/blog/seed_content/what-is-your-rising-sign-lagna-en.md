@@ -70,3 +70,21 @@ Ask: **What was rising where I was born, and what does that make the rest of my 
 Your Sun sign can be meaningful. Your Moon sign can be deeply revealing. Your Lagna is the point that places both of them into a lived map of houses, rulers, relationships, work, and direction. It is the reason a Kundli can be specific to a person instead of a broad label shared by millions.
 
 If you already know your Lagna, open your chart and begin with its ruler. If you do not, calculate it with the most accurate birth time you can find. The first house is only the beginning—but it is a very important beginning.
+
+## Frequently Asked Questions
+
+### What is a Rising Sign (Lagna) in Vedic astrology?
+
+The Rising Sign, or Lagna (लग्न), is the zodiac sign rising on the eastern horizon at the exact moment and location of birth. In Vedic astrology, it anchors the first house and helps describe the body, outward approach to life, and the framework through which the rest of the birth chart is read.
+
+### What is the difference between my Sun sign and my Rising Sign?
+
+The Sun sign describes vitality, core identity, and conscious direction. The Rising Sign describes the outward presentation, instinctive response, and the house arrangement of the Janam Kundli. The Moon sign adds the inner mind and emotional habits.
+
+### How do I find my exact Rising Sign?
+
+You need the date of birth, the most accurate birth time available, and the city of birth. Enter them into a reliable Vedic Kundli calculator using a sidereal zodiac and a clearly stated ayanamsa.
+
+### Does Lagna change if my birth time is slightly wrong?
+
+It can. The Ascendant moves continuously and changes sign roughly every two hours, although the exact rate varies by location and season. A small time difference can matter most when the birth time is close to a sign boundary; an uncertain time should be checked before making a definitive chart judgment.

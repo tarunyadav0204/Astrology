@@ -77,6 +77,60 @@ function renderMediaSplit(lines) {
   return `<section class="blog-media-split"><figure><img src="${src}" alt="${escapeHtml(alt)}" loading="lazy" /></figure><div><p>${inlineFormat(copy)}</p></div></section>`;
 }
 
+function stripMarkdown(text) {
+  return String(text || '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[*_`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Pull a visible FAQ section from post Markdown for matching FAQPage JSON-LD.
+ * Only questions under a heading named "Frequently Asked Questions" or its
+ * Hindi equivalent are eligible, so schema never describes hidden content.
+ */
+export function extractFaqItems(content) {
+  const lines = String(content || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const items = [];
+  let inFaqSection = false;
+  let currentQuestion = '';
+  let answerLines = [];
+
+  const flush = () => {
+    const name = stripMarkdown(currentQuestion);
+    const text = stripMarkdown(answerLines.join(' '));
+    if (name && text) items.push({ name, text });
+    currentQuestion = '';
+    answerLines = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    const heading = /^(#{1,4})\s+(.+)$/.exec(line);
+    if (heading) {
+      const title = stripMarkdown(heading[2]).toLocaleLowerCase();
+      if (/^(frequently asked questions|faqs|अक्सर पूछे जाने वाले सवाल|अक्सर पूछे जाने वाले प्रश्न)$/.test(title)) {
+        flush();
+        inFaqSection = true;
+        continue;
+      }
+      if (inFaqSection && heading[1].length >= 2) {
+        flush();
+        if (heading[1].length >= 3) {
+          currentQuestion = heading[2];
+          continue;
+        }
+        inFaqSection = false;
+      }
+    }
+    if (inFaqSection && currentQuestion && line) answerLines.push(line);
+  }
+  flush();
+  return items.slice(0, 10);
+}
+
 /**
  * Convert blog Markdown to HTML for article rendering / editor preview.
  */

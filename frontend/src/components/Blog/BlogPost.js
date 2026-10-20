@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import SEOHead from '../SEO/SEOHead';
-import { markdownToHtml } from '../../utils/blogMarkdown';
+import { extractFaqItems, markdownToHtml } from '../../utils/blogMarkdown';
 import './BlogPost.css';
 
 const SITE_ORIGIN = 'https://astroroshni.com';
@@ -159,6 +159,11 @@ const BlogPost = ({ user, onLogin, onLogout, onAdminClick }) => {
         [post?.content]
     );
 
+    const faqItems = useMemo(
+        () => extractFaqItems(post?.content),
+        [post?.content]
+    );
+
     const readingMinutes = useMemo(() => {
         const words = String(post?.content || '').replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(Boolean).length;
         return Math.max(1, Math.ceil(words / 220));
@@ -223,7 +228,15 @@ const BlogPost = ({ user, onLogin, onLogout, onAdminClick }) => {
                                 { '@type': 'ListItem', position: 2, name: 'Journal', item: `${SITE_ORIGIN}/blog/` },
                                 { '@type': 'ListItem', position: 3, name: post.title, item: `${SITE_ORIGIN}/blog/${post.slug}/` }
                             ]
-                        }
+                        },
+                        ...(faqItems.length ? [{
+                            '@type': 'FAQPage',
+                            mainEntity: faqItems.map((item) => ({
+                                '@type': 'Question',
+                                name: item.name,
+                                acceptedAnswer: { '@type': 'Answer', text: item.text }
+                            }))
+                        }] : [])
                     ]
                 }}
             />
