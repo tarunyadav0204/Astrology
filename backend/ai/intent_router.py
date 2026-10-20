@@ -1241,6 +1241,202 @@ def _normalize_compound_clarification_choices(result: Dict[str, Any]) -> list[Di
     return choices
 
 
+def _is_integrated_spouse_details_request(question: str) -> bool:
+    """Recognize a single spouse-profile request that lists related qualities.
+
+    This is deliberately narrow.  It is not a general language classifier: it
+    only prevents the known failure mode where a request for a future partner's
+    appearance, nature, values, or build is split into artificial questions.
+    """
+    text = " ".join(str(question or "").casefold().split())
+    if not text:
+        return False
+
+    spouse_cues = (
+        "future partner", "life partner", "partner", "spouse", "husband", "wife",
+        "hone wali", "hone wala", "hone wale", "jeevan sathi", "jeevansathi",
+        "pati", "patni", "hone wali partner", "होने वाली", "होने वाला",
+        "जीवन साथी", "पति", "पत्नी", "भावी जीवनसाथी",
+    )
+    detail_cues = (
+        "look", "looks", "appearance", "nature", "personality", "height", "tall",
+        "fair", "complexion", "dikhe", "dikhegi", "dikhega", "kaisi", "kaisa",
+        "gori", "gora", "bhakt", "bakt", "devotion", "religious", "faith",
+        "दिखे", "कैसी", "कैसा", "रंग", "कद", "ऊंचाई", "ऊँचाई", "स्वभाव", "भक्त",
+    )
+    unrelated_domain_cues = (
+        "career", "job", "business", "salary", "promotion", "money", "finance",
+        "health", "disease", "education", "study", "exam", "property", "home",
+        "travel", "visa", "foreign", "career", "नौकरी", "पैसा", "स्वास्थ्य",
+        "पढ़ाई", "शिक्षा", "प्रॉपर्टी", "विदेश",
+    )
+    return (
+        any(cue in text for cue in spouse_cues)
+        and any(cue in text for cue in detail_cues)
+        and not any(cue in text for cue in unrelated_domain_cues)
+    )
+
+
+def _is_integrated_gambling_ranking_request(question: str) -> bool:
+    """Recognize a single speculative-outlook request that asks to rank dates."""
+    text = " ".join(str(question or "").casefold().split())
+    gambling_cues = (
+        "gambling", "gamble", "betting", "bet", "casino", "satta", "jua", "जुआ", "सट्टा",
+    )
+    ranking_cues = (
+        "rank", "ranking", "luckiest", "best day", "best days", "which day", "which days",
+        "सबसे अच्छा", "रैंक", "कौन सा दिन", "कौनसे दिन",
+    )
+    bounded_time_cues = (
+        "next week", "one week", "this week", "coming week", "7 days", "seven days",
+        "अगले हफ्ते", "इस हफ्ते", "एक हफ्ते", "7 दिन", "सात दिन",
+    )
+    return (
+        any(cue in text for cue in gambling_cues)
+        and any(cue in text for cue in ranking_cues)
+        and any(cue in text for cue in bounded_time_cues)
+    )
+
+
+def _is_integrated_career_direction_request(question: str) -> bool:
+    """Recognize job timing, stability, and earning-direction facets as one career ask."""
+    text = " ".join(str(question or "").casefold().split())
+    career_cues = (
+        "job", "career", "government job", "gov job", "naukri", "nokri", "rojgar",
+        "sarkari", "सरकारी", "नौकरी", "करियर", "रोजगार",
+    )
+    timing_cues = ("when", "kab", "kabhi", "lagegi", "lagengi", "कब", "लगेगी")
+    direction_cues = (
+        "stable", "stability", "stream", "field", "direction", "income", "money", "paisa",
+        "jyada paisa", "permanent", "settled", "स्टेबल", "स्थिर", "स्ट्रीम", "पैसा", "कमाई",
+    )
+    unrelated_domain_cues = (
+        "marriage", "partner", "spouse", "health", "disease", "property", "home", "child",
+        "travel", "visa", "foreign", "शादी", "विवाह", "स्वास्थ्य", "प्रॉपर्टी", "बच्चा", "विदेश",
+    )
+    return (
+        any(cue in text for cue in career_cues)
+        and any(cue in text for cue in timing_cues)
+        and any(cue in text for cue in direction_cues)
+        and not any(cue in text for cue in unrelated_domain_cues)
+    )
+
+
+def _is_integrated_love_arranged_pathway_request(question: str) -> bool:
+    """Recognize a love-vs-arranged comparison with match-introduction facets."""
+    text = " ".join(str(question or "").casefold().split())
+    comparison_cues = (
+        "love marriage", "arranged marriage", "love or arrange", "love vs arrange",
+        "love ya arrange", "love marriage or arrange marriage", "लव मैरिज", "अरेंज मैरिज",
+        "प्रेम विवाह", "व्यवस्थित विवाह",
+    )
+    pathway_cues = (
+        "find", "dhundu", "dhundungi", "dhundega", "relation", "relationship", "gharvale",
+        "family", "ladka", "ladki", "khud", "मिल", "ढूंढ", "रिलेशन", "घरवाले", "लड़का", "लड़की",
+    )
+    unrelated_domain_cues = (
+        "career", "job", "money", "health", "property", "travel", "visa", "foreign",
+        "नौकरी", "पैसा", "स्वास्थ्य", "प्रॉपर्टी", "विदेश",
+    )
+    return (
+        any(cue in text for cue in comparison_cues)
+        and any(cue in text for cue in pathway_cues)
+        and not any(cue in text for cue in unrelated_domain_cues)
+    )
+
+
+def _restore_integrated_topic_route(
+    result: Dict[str, Any], user_question: str,
+) -> Dict[str, Any]:
+    """Repair known false compound-plan splits for one integrated request.
+
+    Every chat surface ultimately uses one of the intent finalizers below.  By
+    applying this correction before their compound-plan invariant, Standard,
+    Simple, and Instant/Speech keep compatible timing, ranking, and profile
+    facets inside one reading.
+    """
+    if str(result.get("answer_mode") or "").strip().lower() != "compound_plan":
+        return result
+
+    repaired = dict(result)
+    extracted = dict(repaired.get("extracted_context") or {})
+    if _is_integrated_spouse_details_request(user_question):
+        extracted["spouse_detail_scope"] = "combined"
+        repaired.update({
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "answer_mode": "relationship_person",
+            "category": "marriage",
+            "marriage_subtype": "spouse_details",
+            "needs_transits": False,
+            "divisional_charts": ["D1", "D9", "D7"],
+        })
+        repaired.pop("transit_request", None)
+        readiness_reason = "One integrated spouse-profile request."
+    elif _is_integrated_love_arranged_pathway_request(user_question):
+        extracted["match_introduction_scope"] = "self_relationship_or_family_introduction"
+        repaired.update({
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            "answer_mode": "comparison_choice",
+            "category": "marriage",
+            "marriage_subtype": "love_vs_arranged",
+            "needs_transits": False,
+            "divisional_charts": ["D1", "D9"],
+        })
+        repaired.pop("transit_request", None)
+        readiness_reason = "One love-versus-arranged pathway comparison."
+    elif _is_integrated_gambling_ranking_request(user_question):
+        extracted.update({
+            "timeframe": "next 7 days",
+            "ranking_requested": True,
+            "activity": "gambling",
+        })
+        repaired.update({
+            "mode": "PREDICT_PERIOD_OUTLOOK",
+            "answer_mode": "timing_window",
+            "category": "investment",
+            "wealth_subtype": "investment_risk",
+            "needs_transits": True,
+            "divisional_charts": ["D1", "D2", "D5", "D9"],
+        })
+        readiness_reason = "One bounded gambling outlook with a requested day ranking."
+    elif _is_integrated_career_direction_request(user_question):
+        extracted.update({
+            "career_request_scope": "job timing, stability, and higher-earning direction",
+            "career_fit_requested": True,
+        })
+        repaired.update({
+            "mode": "LIFESPAN_EVENT_TIMING",
+            "answer_mode": "event_prediction",
+            "category": "career",
+            "career_subtype": "career_fit",
+            "needs_transits": True,
+            "divisional_charts": ["D1", "D10", "Karkamsa"],
+        })
+        readiness_reason = "One career request covering timing, stability, and earning direction."
+    else:
+        return result
+
+    repaired.update({
+        "status": "READY",
+        "route_action": "answer",
+        "context_type": "birth",
+        "extracted_context": extracted,
+        "clarification_question": "",
+        "clarification_choices": [],
+    })
+    state = dict(repaired.get("dialogue_state") or {})
+    state.update({
+        "unresolved_facts": [],
+        "ready_to_calculate": True,
+        "readiness_reason": readiness_reason,
+    })
+    state.pop("last_clarification_question", None)
+    state.pop("pending_choice_kind", None)
+    state.pop("clarification_choices", None)
+    repaired["dialogue_state"] = state
+    return repaired
+
+
 def _compound_choice_followup_instruction() -> str:
     return """
 COMPOUND CHOICE FOLLOW-UP (mandatory when dialogue_state.pending_choice_kind is compound_plan):
@@ -3094,6 +3290,7 @@ class IntentRouter:
         force_ready: bool = False,
         language: str = "english",
     ) -> Dict[str, Any]:
+        result = _restore_integrated_topic_route(result, user_question)
         if 'status' not in result:
             result['status'] = 'READY'
         if 'mode' not in result or result['mode'] is None:
@@ -4415,7 +4612,7 @@ SERIALIZATION ONLY (all semantic rules above remain mandatory):
                 token_usage.get("output_tokens"),
             )
             final = self._finalize_instant_router_result(
-                result,
+                _restore_integrated_topic_route(result, latest_user_reply_text),
                 current_year=current_year,
                 normalized_query_context=normalized_query_context,
             )
@@ -4490,7 +4687,7 @@ Invalid previous JSON:
                 )
                 repair_result = json.loads(repair_cleaned)
                 final = self._finalize_instant_router_result(
-                    repair_result,
+                    _restore_integrated_topic_route(repair_result, latest_user_reply_text),
                     current_year=current_year,
                     normalized_query_context=normalized_query_context,
                 )
@@ -4546,7 +4743,7 @@ Invalid previous JSON:
                 )
                 repair_result = json.loads(repair_cleaned)
                 final = self._finalize_instant_router_result(
-                    repair_result,
+                    _restore_integrated_topic_route(repair_result, latest_user_reply_text),
                     current_year=current_year,
                     normalized_query_context=normalized_query_context,
                 )

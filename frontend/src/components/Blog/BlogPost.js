@@ -231,7 +231,6 @@ const BlogPost = ({ user, onLogin, onLogout, onAdminClick }) => {
             <div className="blog-reading-progress" aria-hidden="true"><span style={{ width: `${readingProgress}%` }} /></div>
             <main className="blog-post-container">
             <div className="blog-post-layout">
-            <article className="blog-post">
                 <header className="post-header">
                     <Link to="/blog" className="back-link">← Back to Blog</Link>
                     
@@ -257,6 +256,8 @@ const BlogPost = ({ user, onLogin, onLogout, onAdminClick }) => {
                         </div>
                     )}
                 </header>
+
+            <article className="blog-post">
 
                 <div className="post-share-bar" aria-label="Share this article">
                     <span className="post-share-label">Share</span>

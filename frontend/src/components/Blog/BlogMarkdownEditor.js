@@ -182,7 +182,7 @@ const BlogMarkdownEditor = ({
         </div>
       </div>
       <p className="blog-md-hint">
-        Write = raw Markdown source (looks flat). Click <strong>Split</strong> or <strong>Preview</strong> to see headings, bold, lists, and tables.
+        Write = raw Markdown source (looks flat). Click <strong>Split</strong> or <strong>Preview</strong> to see headings, bold, lists, and tables. For an image alongside text, use <code>:::split</code>, an image line, its copy, then <code>:::</code>.
       </p>
 
       <div className="blog-md-panes">

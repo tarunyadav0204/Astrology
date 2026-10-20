@@ -68,6 +68,15 @@ function renderList(items, ordered) {
   return `<${tag}>${items.map((item) => `<li>${inlineFormat(item)}</li>`).join('')}</${tag}>`;
 }
 
+function renderMediaSplit(lines) {
+  const imageMatch = /^!\[([^\]]*)\]\(([^)\s]+)\)$/.exec((lines[0] || '').trim());
+  if (!imageMatch) return '';
+  const [, alt, src] = imageMatch;
+  const copy = lines.slice(1).join(' ').trim();
+  if (!copy) return '';
+  return `<section class="blog-media-split"><figure><img src="${src}" alt="${escapeHtml(alt)}" loading="lazy" /></figure><div><p>${inlineFormat(copy)}</p></div></section>`;
+}
+
 /**
  * Convert blog Markdown to HTML for article rendering / editor preview.
  */
@@ -88,6 +97,26 @@ export function markdownToHtml(content, { emptyMessage = '' } = {}) {
 
     if (!trimmed) {
       i += 1;
+      continue;
+    }
+
+    // Editorial image-and-text row. Keep the first line as Markdown image,
+    // then write the accompanying copy before the closing ::: marker.
+    if (trimmed === ':::split') {
+      const splitLines = [];
+      i += 1;
+      while (i < lines.length && lines[i].trim() !== ':::') {
+        if (lines[i].trim()) splitLines.push(lines[i].trim());
+        i += 1;
+      }
+      if (i < lines.length && lines[i].trim() === ':::') i += 1;
+      const splitHtml = renderMediaSplit(splitLines);
+      if (splitHtml) {
+        blocks.push(splitHtml);
+        continue;
+      }
+      // Invalid directive: render its contents normally rather than dropping it.
+      blocks.push(`<p>${inlineFormat(splitLines.join(' '))}</p>`);
       continue;
     }
 

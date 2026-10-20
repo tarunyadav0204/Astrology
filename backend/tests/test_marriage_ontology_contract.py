@@ -4,6 +4,7 @@ import asyncio
 import json
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 
@@ -21,7 +22,11 @@ from instant_chat_v2.marriage_graph_runtime import (  # noqa: E402
 )
 from instant_chat_v2.planner import build_query_plan  # noqa: E402
 from ai.evidence_planner_schema import normalize_evidence_plan  # noqa: E402
-from ai.intent_router import apply_marriage_routing_guards  # noqa: E402
+from ai.intent_router import (  # noqa: E402
+    IntentRouter,
+    _restore_integrated_topic_route,
+    apply_marriage_routing_guards,
+)
 import chat.instant_chat_pipeline as pipeline  # noqa: E402
 
 
@@ -46,6 +51,133 @@ def test_love_arranged_event_profile_survives_evidence_plan_normalization() -> N
     })
 
     assert plan["question_parts"][0]["event_profile"] == "love_vs_arranged_marriage"
+
+
+def test_integrated_future_spouse_profile_is_not_split_into_compound_questions() -> None:
+    question = (
+        "kya aap meri hone wali partner ke baare mein kuch bata sakte ho "
+        "kaisi dikhegi nature kaisa hoga gori hogi ya nhi krishna bihari ji ki "
+        "bakt hogi ya nhi height kaisi hogi aur bhi kuch"
+    )
+    false_compound = {
+        "status": "CLARIFY",
+        "route_action": "clarify",
+        "mode": "ANALYZE_TOPIC_POTENTIAL",
+        "answer_mode": "compound_plan",
+        "category": "general",
+        "clarification_choices": [{"id": "q1"}, {"id": "q2"}],
+    }
+
+    repaired = _restore_integrated_topic_route(false_compound, question)
+    assert repaired["status"] == "READY"
+    assert repaired["answer_mode"] == "relationship_person"
+    assert repaired["category"] == "marriage"
+    assert repaired["marriage_subtype"] == "spouse_details"
+    assert repaired["extracted_context"]["spouse_detail_scope"] == "combined"
+    assert repaired["clarification_choices"] == []
+
+    standard = IntentRouter()._finalize_router_result(
+        false_compound,
+        user_question=question,
+        current_year=2026,
+        current_month="October",
+        resolved_now=datetime(2026, 10, 20),
+        normalized_query_context=None,
+        include_chart_insights=False,
+    )
+    assert standard["status"] == "READY"
+    assert standard["answer_mode"] == "relationship_person"
+    assert standard["marriage_subtype"] == "spouse_details"
+
+    instant = IntentRouter()._finalize_instant_router_result(
+        _restore_integrated_topic_route(false_compound, question),
+        current_year=2026,
+        normalized_query_context=None,
+    )
+    assert instant["status"] == "READY"
+    assert instant["answer_mode"] == "relationship_person"
+    assert instant["marriage_subtype"] == "spouse_details"
+
+
+def test_love_arranged_and_match_introduction_stays_one_comparison() -> None:
+    question = (
+        "Meri love marriage or arrange marriage kya hoyegi ladka mai khud dhundu gi "
+        "relation mai hougi ya gharvale dhundege ladka"
+    )
+    false_compound = {
+        "status": "CLARIFY",
+        "route_action": "clarify",
+        "answer_mode": "compound_plan",
+        "category": "general",
+    }
+
+    repaired = _restore_integrated_topic_route(false_compound, question)
+    assert repaired["status"] == "READY"
+    assert repaired["answer_mode"] == "comparison_choice"
+    assert repaired["category"] == "marriage"
+    assert repaired["marriage_subtype"] == "love_vs_arranged"
+    assert repaired["extracted_context"]["match_introduction_scope"] == "self_relationship_or_family_introduction"
+
+    instant = IntentRouter()._finalize_instant_router_result(
+        repaired, current_year=2026, normalized_query_context=None,
+    )
+    assert instant["status"] == "READY"
+    assert instant["answer_mode"] == "comparison_choice"
+    assert instant["marriage_subtype"] == "love_vs_arranged"
+
+
+def test_integrated_gambling_weekly_outlook_and_day_ranking_stays_one_request() -> None:
+    question = "Over the next one week, how will my luck be with gambling? And which days are luckiest, please rank them."
+    false_compound = {
+        "status": "CLARIFY",
+        "route_action": "clarify",
+        "answer_mode": "compound_plan",
+        "category": "general",
+    }
+
+    repaired = _restore_integrated_topic_route(false_compound, question)
+    assert repaired["status"] == "READY"
+    assert repaired["mode"] == "PREDICT_PERIOD_OUTLOOK"
+    assert repaired["answer_mode"] == "timing_window"
+    assert repaired["category"] == "investment"
+    assert repaired["wealth_subtype"] == "investment_risk"
+    assert repaired["needs_transits"] is True
+    assert repaired["extracted_context"]["ranking_requested"] is True
+
+    instant = IntentRouter()._finalize_instant_router_result(
+        repaired, current_year=2026, normalized_query_context=None,
+    )
+    assert instant["status"] == "READY"
+    assert instant["answer_mode"] == "timing_window"
+    assert instant["category"] == "investment"
+
+
+def test_integrated_career_timing_stability_and_income_direction_stays_one_request() -> None:
+    question = (
+        "Job kab lagegi stable hogi ya nahi mai gov job ke liye 2 saal prep kiya failed "
+        "abhi kon stream se jyada paisa ayega or job kab lagegi"
+    )
+    false_compound = {
+        "status": "CLARIFY",
+        "route_action": "clarify",
+        "answer_mode": "compound_plan",
+        "category": "general",
+    }
+
+    repaired = _restore_integrated_topic_route(false_compound, question)
+    assert repaired["status"] == "READY"
+    assert repaired["mode"] == "LIFESPAN_EVENT_TIMING"
+    assert repaired["answer_mode"] == "event_prediction"
+    assert repaired["career_subtype"] == "career_fit"
+    assert repaired["needs_transits"] is True
+    assert repaired["extracted_context"]["career_fit_requested"] is True
+
+    instant = IntentRouter()._finalize_instant_router_result(
+        repaired, current_year=2026, normalized_query_context=None,
+    )
+    assert instant["status"] == "READY"
+    assert instant["career_subtype"] == "career_fit"
+    assert instant["divisional_charts"] == ["D1", "D10", "Karkamsa"]
 
 
 def test_compiled_bundle_covers_all_existing_relationship_families() -> None:
