@@ -65,7 +65,7 @@ def test_blog_test_push_contains_the_article_link():
         ),
         patch(
             "nudge_engine.campaigns._deliver_recipient_snapshots",
-            return_value=[{"sent": ["push"], "attempts": [("push", True)]}],
+            return_value=[{"sent": ["push"], "attempts": [("push", True, {}, None)]}],
         ) as deliver,
         patch("nudge_engine.campaigns.db.insert_delivery"),
     ):

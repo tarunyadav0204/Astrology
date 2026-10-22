@@ -1550,6 +1550,13 @@ def send_campaign_test(campaign: Dict[str, Any], target_userid: int) -> Dict[str
             "delivery_group_id": group_id,
             "channel": sent_channels[0] if sent_channels else "stored",
             "channels_sent": sent_channels,
-            "channels_failed": [c for c, ok in delivered.get("attempts") or [] if not ok],
+            # SMS and provider-backed WhatsApp attempts retain metadata and an
+            # error string, while push attempts have only channel and result.
+            # Read the shared prefix so tests can safely use either form.
+            "channels_failed": [
+                str(attempt[0])
+                for attempt in (delivered.get("attempts") or [])
+                if len(attempt) >= 2 and not bool(attempt[1])
+            ],
         },
     }

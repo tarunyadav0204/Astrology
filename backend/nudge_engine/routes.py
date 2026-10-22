@@ -2952,7 +2952,7 @@ async def admin_test_send_campaign(
     except HTTPException:
         raise
     except ValueError as e:
-        # A campaign test can legitimately be blocked by consent or an invalid
+        # A campaign test can legitimately be blocked by an opt-out or invalid
         # destination. Surface that as an actionable client error, not a 500.
         raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:
