@@ -77,3 +77,18 @@ def test_msg91_is_used_after_mtalkz_rejection(monkeypatch):
     assert error is None
     assert meta["provider"] == "msg91"
     assert meta["fallback_from"] == "mtalkz"
+
+
+def test_sms_eligibility_query_contains_no_sqlite_placeholder_characters():
+    """The shared adapter treats every question-mark character as a bind slot."""
+    from nudge_engine.campaigns import filter_sms_marketing_reachable_user_ids
+
+    class Cursor:
+        def fetchall(self):
+            return []
+
+    captured = []
+    with patch("nudge_engine.campaigns.execute", side_effect=lambda _conn, sql, _params: (captured.append(sql), Cursor())[1]):
+        assert filter_sms_marketing_reachable_user_ids(object(), [1]) == []
+
+    assert "?" not in captured[0]

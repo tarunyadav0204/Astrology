@@ -602,8 +602,8 @@ def filter_sms_marketing_reachable_user_ids(conn, user_ids: List[int]) -> List[i
         WHERE userid = ANY(%s)
           AND sms_marketing_opted_in_at IS NOT NULL
           AND sms_marketing_opted_out_at IS NULL
-          -- Do not use a literal '?' here: the shared SQLite-to-Postgres
-          -- adapter converts every '?' to a positional placeholder.
+          -- The shared SQLite-to-Postgres adapter rewrites question-mark
+          -- placeholders, including text inside SQL comments.
           AND REGEXP_REPLACE(COALESCE(phone, ''), '[^0-9]', '', 'g') ~ '^(91|)[6-9][0-9]{9}$'
         """,
         (ids,),
