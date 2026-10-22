@@ -4,18 +4,36 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
-from db import execute
+from db import execute, executemany
 from whatsapp.messaging import send_whatsapp_template
 
 from . import db
 
 logger = logging.getLogger(__name__)
+_SCHEMA_READY = False
+_SCHEMA_LOCK = threading.Lock()
 
 
 def ensure_credit_campaign_whatsapp_tables(conn) -> None:
+    # This function is deliberately safe to call at startup, but it used to be
+    # invoked for every status poll and every worker batch.  Re-running DDL and
+    # index checks on a hot delivery path turns a large campaign into database
+    # contention.  A process only needs to establish the schema once.
+    global _SCHEMA_READY
+    if _SCHEMA_READY:
+        return
+    with _SCHEMA_LOCK:
+        if _SCHEMA_READY:
+            return
+        _ensure_credit_campaign_whatsapp_tables(conn)
+        _SCHEMA_READY = True
+
+
+def _ensure_credit_campaign_whatsapp_tables(conn) -> None:
     execute(
         conn,
         """
@@ -245,6 +263,34 @@ def _delivery_rows(conn, job_ids: Iterable[str]) -> List[Dict[str, Any]]:
         }
         for row in (rows or [])
     ]
+
+
+def _delivery_metrics_by_job(conn, job_ids: Iterable[str]) -> Dict[str, Dict[str, int]]:
+    """Return compact provider metrics without materialising recipient rows."""
+    ids = [str(value) for value in job_ids if str(value)]
+    if not ids:
+        return {}
+    rows = execute(
+        conn,
+        """
+        SELECT job_id,
+               COUNT(*) FILTER (WHERE state = 'accepted' OR meta_accepted_at IS NOT NULL),
+               COUNT(*) FILTER (WHERE meta_sent_at IS NOT NULL OR meta_delivered_at IS NOT NULL OR meta_read_at IS NOT NULL),
+               COUNT(*) FILTER (WHERE meta_delivered_at IS NOT NULL OR meta_read_at IS NOT NULL),
+               COUNT(*) FILTER (WHERE meta_read_at IS NOT NULL),
+               COUNT(*) FILTER (WHERE meta_failed_at IS NOT NULL AND meta_delivered_at IS NULL AND meta_read_at IS NULL),
+               COUNT(*) FILTER (WHERE state = 'accepted' AND meta_message_id IS NULL)
+        FROM credit_campaign_whatsapp_recipients
+        WHERE job_id = ANY(%s)
+        GROUP BY job_id
+        """,
+        (ids,),
+    ).fetchall()
+    keys = ("accepted", "sent", "delivered", "read", "meta_failed", "legacy_accepted")
+    return {
+        str(row[0]): {key: int(row[index] or 0) for index, key in enumerate(keys, start=1)}
+        for row in (rows or [])
+    }
 
 
 def _iso(value: Any) -> Optional[str]:
@@ -548,15 +594,14 @@ def create_credit_campaign_whatsapp_job(
                 len(tokens_by_user), int(created_by),
             ),
         )
-        for userid in tokens_by_user:
-            execute(
-                conn,
-                """
-                INSERT INTO credit_campaign_whatsapp_recipients (job_id, userid)
-                VALUES (%s, %s) ON CONFLICT DO NOTHING
-                """,
-                (str(job_id), int(userid)),
-            )
+        executemany(
+            conn,
+            """
+            INSERT INTO credit_campaign_whatsapp_recipients (job_id, userid)
+            VALUES (%s, %s) ON CONFLICT DO NOTHING
+            """,
+            [(str(job_id), int(userid)) for userid in tokens_by_user],
+        )
         conn.commit()
     return get_credit_campaign_whatsapp_job(job_id) or {}
 
@@ -574,8 +619,9 @@ def get_credit_campaign_whatsapp_job(
         if not row:
             return None
         job = _job_dict(row)
-        delivery_rows = _delivery_rows(conn, [job["job_id"]])
-        job["meta_metrics"] = _delivery_metrics(delivery_rows)
+        job["meta_metrics"] = _delivery_metrics_by_job(conn, [job["job_id"]]).get(
+            job["job_id"], _delivery_metrics([])
+        )
         if include_issues:
             issues = execute(
                 conn,
@@ -639,12 +685,9 @@ def latest_credit_campaign_whatsapp_jobs(campaign_ids: Iterable[int]) -> Dict[in
             (ids,),
         ).fetchall()
         jobs = {int(row[1]): _job_dict(row) for row in (rows or [])}
-        delivery_rows = _delivery_rows(conn, [job["job_id"] for job in jobs.values()])
-        rows_by_job: Dict[str, List[Dict[str, Any]]] = {}
-        for delivery_row in delivery_rows:
-            rows_by_job.setdefault(delivery_row["job_id"], []).append(delivery_row)
+        metrics_by_job = _delivery_metrics_by_job(conn, [job["job_id"] for job in jobs.values()])
         for job in jobs.values():
-            job["meta_metrics"] = _delivery_metrics(rows_by_job.get(job["job_id"], []))
+            job["meta_metrics"] = metrics_by_job.get(job["job_id"], _delivery_metrics([]))
         return jobs
 
 
@@ -795,6 +838,58 @@ def _refresh_job(conn, job_id: str) -> None:
         WHERE job_id = %s
         """,
         (status, total, accepted, failed, skipped, completed_at, str(job_id)),
+    )
+
+
+def _record_terminal_outcomes(
+    conn,
+    job_id: str,
+    *,
+    accepted: int = 0,
+    failed: int = 0,
+    skipped: int = 0,
+) -> None:
+    """Atomically advance the job counters for one claimed batch.
+
+    Claiming guarantees a recipient is terminalised by only one worker.  Using
+    counters here avoids counting the complete recipient table after every
+    batch, which was the main source of campaign-time database load.
+    """
+    accepted = max(0, int(accepted))
+    failed = max(0, int(failed))
+    skipped = max(0, int(skipped))
+    terminal = accepted + failed + skipped
+    if not terminal:
+        execute(
+            conn,
+            """
+            UPDATE credit_campaign_whatsapp_jobs
+            SET status = 'running', updated_at = CURRENT_TIMESTAMP
+            WHERE job_id = %s
+            """,
+            (str(job_id),),
+        )
+        return
+    execute(
+        conn,
+        """
+        UPDATE credit_campaign_whatsapp_jobs
+        SET accepted = accepted + %s,
+            failed = failed + %s,
+            skipped = skipped + %s,
+            status = CASE
+                WHEN accepted + failed + skipped + %s >= total
+                    THEN CASE WHEN failed + %s > 0 THEN 'completed_with_errors' ELSE 'completed' END
+                ELSE 'running'
+            END,
+            completed_at = CASE
+                WHEN accepted + failed + skipped + %s >= total THEN CURRENT_TIMESTAMP
+                ELSE NULL
+            END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE job_id = %s
+        """,
+        (accepted, failed, skipped, terminal, failed, terminal, str(job_id)),
     )
 
 
@@ -962,9 +1057,14 @@ def process_credit_campaign_whatsapp_batch(*, job_id: str, recipients: List[Dict
                 ),
             )
         _reconcile_pending_meta_statuses(conn, accepted_message_ids)
-        _refresh_job(conn, str(job_id))
+        _record_terminal_outcomes(
+            conn,
+            str(job_id),
+            accepted=sum(1 for _, state, _, _, _ in outcomes if state == "accepted"),
+            failed=sum(1 for _, state, _, _, _ in outcomes if state == "failed"),
+            skipped=sum(1 for _, state, _, _, _ in outcomes if state == "skipped"),
+        )
         conn.commit()
-    summary = get_credit_campaign_whatsapp_job(str(job_id)) or {}
     if needs_retry:
         raise RuntimeError("One or more WhatsApp recipients require retry")
-    return {"ok": True, **summary, "processed": len(outcomes)}
+    return {"ok": True, "job_id": str(job_id), "processed": len(outcomes)}

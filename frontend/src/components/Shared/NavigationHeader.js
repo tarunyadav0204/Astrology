@@ -69,7 +69,7 @@ function FullHamburgerMenuItems({
     <button type="button" className="mobile-menu-item mobile-menu-item--featured" onClick={() => { navigate('/charts-dashas'); onClose(); }}>📊 Open Charts &amp; Dashas</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/nadi'); onClose(); }}>🧭 Nadi Desk</button>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/kp'); onClose(); }}>🪐 KP Desk</button>
-    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/activations'); onClose(); }}>✦ What’s activated</button>
+    <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/charts-dashas/activations'); onClose(); }}>✦ Timing</button>
 
     <div className="mobile-menu-section-label">Your Life</div>
     <button type="button" className="mobile-menu-item mobile-menu-item--sub" onClick={() => { navigate('/career-guidance'); onClose(); }}>💼 Your Career</button>
@@ -387,7 +387,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
             <button type="button" onClick={() => { navigate('/charts-dashas'); setActiveDropdown(null); }}>📊 Parashari Desk</button>
             <button type="button" onClick={() => { navigate('/charts-dashas/nadi'); setActiveDropdown(null); }}>🧭 Nadi Desk</button>
             <button type="button" onClick={() => { navigate('/charts-dashas/kp'); setActiveDropdown(null); }}>🪐 KP Desk</button>
-            <button type="button" onClick={() => { navigate('/charts-dashas/activations'); setActiveDropdown(null); }}>✦ What’s activated</button>
+            <button type="button" onClick={() => { navigate('/charts-dashas/activations'); setActiveDropdown(null); }}>✦ Timing</button>
           </div>
         )}
 
@@ -648,7 +648,7 @@ const NavigationHeader = ({ compact = false, variant, onPeriodChange, showZodiac
           <button type="button" onClick={() => { navigate('/charts-dashas'); setActiveDropdown(null); }}>📊 Parashari Desk</button>
           <button type="button" onClick={() => { navigate('/charts-dashas/nadi'); setActiveDropdown(null); }}>🧭 Nadi Desk</button>
           <button type="button" onClick={() => { navigate('/charts-dashas/kp'); setActiveDropdown(null); }}>🪐 KP Desk</button>
-          <button type="button" onClick={() => { navigate('/charts-dashas/activations'); setActiveDropdown(null); }}>✦ What’s activated</button>
+          <button type="button" onClick={() => { navigate('/charts-dashas/activations'); setActiveDropdown(null); }}>✦ Timing</button>
         </div>
       )}
 

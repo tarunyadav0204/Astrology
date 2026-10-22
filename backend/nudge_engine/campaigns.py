@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
@@ -26,7 +27,7 @@ from .template_render import extract_placeholders, render_template_lenient
 logger = logging.getLogger(__name__)
 IST_TZ = ZoneInfo("Asia/Kolkata")
 
-ALLOWED_CHANNELS = ("push", "whatsapp", "email")
+ALLOWED_CHANNELS = ("push", "whatsapp", "email", "sms")
 ALLOWED_POLICIES = ("waterfall", "blast", "push_only")
 ALLOWED_AUDIENCE_TYPES = (
     "all",
@@ -38,7 +39,7 @@ ALLOWED_AUDIENCE_TYPES = (
     "credit_intelligence_segment",
 )
 
-REACHABILITY_CHANNELS = ("push", "whatsapp", "email")
+REACHABILITY_CHANNELS = ("push", "whatsapp", "email", "sms")
 
 LANDING_SCREEN_TO_CTA: Dict[str, str] = {
     "chat": "astroroshni://chat",
@@ -432,12 +433,12 @@ def estimate_campaign_audience(
     if not user_ids:
         return {
             "total_users": 0,
-            "reachable": {"push": 0, "whatsapp": 0, "email": 0},
+            "reachable": {"push": 0, "whatsapp": 0, "email": 0, "sms": 0},
             "has_self_chart": 0,
             "sample_user_ids": [],
         }
     ids = sorted(set(user_ids))
-    reach = {"push": 0, "whatsapp": 0, "email": 0}
+    reach = {"push": 0, "whatsapp": 0, "email": 0, "sms": 0}
     whatsapp_presence_sql = _whatsapp_presence_sql(conn)
     queries = {
         "push": "SELECT COUNT(DISTINCT userid) FROM device_tokens WHERE userid = ANY(%s)",
@@ -448,6 +449,7 @@ def estimate_campaign_audience(
         cur = execute(token_conn if channel == "push" else conn, sql, (ids,))
         row = cur.fetchone()
         reach[channel] = int((row[0] if row else 0) or 0)
+    reach["sms"] = len(filter_sms_marketing_reachable_user_ids(conn, ids))
     cur = execute(
         conn,
         """
@@ -583,6 +585,31 @@ def _resolve_delivery_endpoints(conn, user_ids: List[int]) -> Dict[int, Dict[str
     return out
 
 
+def filter_sms_marketing_reachable_user_ids(conn, user_ids: List[int]) -> List[int]:
+    """Keep only explicitly opted-in users with a valid Indian mobile number.
+
+    A phone captured for login/OTP is not marketing consent.  The explicit
+    opt-in fields are introduced by ``add_sms_marketing_consent.sql``.
+    """
+    ids = sorted({int(uid) for uid in user_ids or [] if str(uid).isdigit() and int(uid) > 0})
+    if not ids:
+        return []
+    cur = execute(
+        conn,
+        """
+        SELECT userid
+        FROM users
+        WHERE userid = ANY(%s)
+          AND sms_marketing_opted_in_at IS NOT NULL
+          AND sms_marketing_opted_out_at IS NULL
+          AND REGEXP_REPLACE(COALESCE(phone, ''), '[^0-9]', '', 'g') ~ '^(91)?[6-9][0-9]{9}$'
+        """,
+        (ids,),
+    )
+    eligible = {int(row[0]) for row in cur.fetchall() or []}
+    return [uid for uid in user_ids if int(uid) in eligible]
+
+
 def _resolve_push_endpoints(conn, user_ids: List[int]) -> Dict[int, List[Dict[str, str]]]:
     """Resolve push endpoints from notification-owned token storage."""
     ids = sorted({int(uid) for uid in user_ids if str(uid).isdigit() and int(uid) > 0})
@@ -635,6 +662,7 @@ def _snapshot_campaign_batch(
         data_extra.update(_blog_push_data(campaign))
 
     template_config = campaign.get("whatsapp_template")
+    sms_template = campaign.get("sms_template")
     raw_mappings = (
         template_config.get("mappings") or {}
         if isinstance(template_config, dict)
@@ -708,6 +736,8 @@ def _snapshot_campaign_batch(
                 "missing": missing,
                 "include_unlinked": bool(template_config.get("include_unlinked")),
             }
+        if isinstance(sms_template, dict):
+            data["sms_template"] = sms_template
         snapshots.append(
             {
                 "campaign_id": campaign_id,
@@ -773,6 +803,7 @@ def _deliver_recipient_snapshots(recipients: List[Dict[str, Any]]) -> List[Dict[
         send_whatsapp_nudge_to_target,
         send_whatsapp_template_to_phone,
     )
+    from .sms_channel import send_partner_portrait_sms
 
     for recipient in recipients:
         rid = int(recipient["id"])
@@ -852,6 +883,15 @@ def _deliver_recipient_snapshots(recipients: List[Dict[str, Any]]) -> List[Dict[
                     question=recipient.get("question"),
                     delivery_group_id=str(recipient.get("delivery_group_id") or ""),
                 )
+            elif channel == "sms":
+                template = (recipient.get("data") or {}).get("sms_template") or {}
+                if template.get("key") == "partner_portrait":
+                    ok, provider_error, meta = send_partner_portrait_sms(
+                        phone=str(endpoints.get("phone") or ""),
+                        name=str(endpoints.get("name") or "there"),
+                    )
+                else:
+                    provider_error = "Unsupported or missing SMS DLT template"
             result["attempts"].append((actual, bool(ok), meta, provider_error))
             if ok:
                 result["sent"].append(actual)
@@ -884,7 +924,7 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
         "delivered": 0,
         "deduped": 0,
         "failed": 0,
-        "channels": {"push": 0, "whatsapp": 0, "email": 0, "stored": 0},
+        "channels": {"push": 0, "whatsapp": 0, "email": 0, "sms": 0, "stored": 0},
     }
     # Phase 1: short notification DB read, followed by a read-replica snapshot.
     with db.get_conn() as conn:
@@ -943,6 +983,7 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
                     and endpoints.get("phone")
                 )
             )
+            sms_reachable = bool("sms" in requested and endpoints.get("phone"))
             had_reachable_endpoint = any(
                 (
                     channel == "push"
@@ -953,6 +994,7 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
                     and whatsapp_reachable
                 )
                 or (channel == "email" and bool(endpoints.get("email")))
+                or (channel == "sms" and sms_reachable)
                 for channel in requested
             )
             if (
@@ -991,6 +1033,8 @@ def process_campaign_batch(*, campaign_id: int, user_ids: List[int]) -> Dict[str
                     channel=str(channel),
                     data_payload={
                         **(recipient.get("data") or {}),
+                        **({"sms_provider": str(meta.get("provider"))[:40]} if channel == "sms" and meta.get("provider") else {}),
+                        **({"sms_fallback_from": str(meta.get("fallback_from"))[:40]} if channel == "sms" and meta.get("fallback_from") else {}),
                         **({"provider_error": str(provider_error)[:1000]} if provider_error else {}),
                     },
                     campaign_id=int(campaign_id),
@@ -1095,19 +1139,31 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
             else bool(token_filter)
         )
         audience = [uid for uid in audience if (uid in reachable) == require_push]
+    if "sms" in (campaign.get("channels") or []):
+        with db.get_read_conn() as audience_conn:
+            sms_reachable = set(filter_sms_marketing_reachable_user_ids(audience_conn, audience))
+        # An SMS-only campaign must not create in-app-only deliveries for
+        # people who have not explicitly opted in to marketing SMS.
+        if set(campaign.get("channels") or []) == {"sms"}:
+            audience = [uid for uid in audience if uid in sms_reachable]
     frequency_cap_days = max(0, min(int(campaign.get("frequency_cap_days") or 0), 365))
-    if frequency_cap_days and campaign.get("whatsapp_template") and audience:
+    capped_channels = []
+    if campaign.get("whatsapp_template"):
+        capped_channels.extend(["whatsapp", "whatsapp_template"])
+    if campaign.get("sms_template"):
+        capped_channels.append("sms")
+    if frequency_cap_days and capped_channels and audience:
         recent_rows = execute(
             conn,
             """
             SELECT DISTINCT userid
             FROM nudge_deliveries
             WHERE userid = ANY(%s)
-              AND channel IN ('whatsapp', 'whatsapp_template')
+              AND channel = ANY(%s)
               AND COALESCE(send_status, 'sent') = 'sent'
               AND created_at >= CURRENT_TIMESTAMP - (%s * INTERVAL '1 day')
             """,
-            (audience, frequency_cap_days),
+            (audience, capped_channels, frequency_cap_days),
         ).fetchall()
         suppressed = {int(row[0]) for row in (recent_rows or [])}
         audience = [uid for uid in audience if uid not in suppressed]
@@ -1168,9 +1224,18 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
         enqueue_failed = 0
         inline_summaries: List[Dict[str, Any]] = []
         if tasks_enabled and enqueue_nudge_task:
-            for batch_index, chunk in enumerate(batches):
-                ok = enqueue_nudge_task(
-                    task_kind="campaign-batch",
+            # SMS has provider throughput constraints distinct from push/email.
+            # Keep it on its own queue so a large SMS run cannot occupy the
+            # general campaign workers (or vice versa).
+            task_kind = "sms-campaign-batch" if set(campaign.get("channels") or []) == {"sms"} else "campaign-batch"
+            try:
+                enqueue_workers = int(os.getenv("NUDGE_CAMPAIGN_ENQUEUE_CONCURRENCY", "12") or "12")
+            except (TypeError, ValueError):
+                enqueue_workers = 12
+
+            def enqueue_batch(batch_index: int, chunk: List[int]) -> bool:
+                return enqueue_nudge_task(
+                    task_kind=task_kind,
                     task_id=f"{campaign_id}-{batch_index}",
                     payload={
                         "campaign_id": campaign_id,
@@ -1178,6 +1243,13 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
                         "user_ids": [int(u) for u in chunk],
                     },
                 )
+
+            # The admin send-now route waits for this dispatch result.  Bound
+            # parallel submissions so task creation is fast without creating
+            # an unbounded burst against Cloud Tasks.
+            with ThreadPoolExecutor(max_workers=max(1, min(enqueue_workers, 32))) as pool:
+                outcomes = list(pool.map(lambda item: enqueue_batch(*item), enumerate(batches)))
+            for ok in outcomes:
                 if ok:
                     enqueued += 1
                 else:
@@ -1390,6 +1462,8 @@ def send_campaign_test(campaign: Dict[str, Any], target_userid: int) -> Dict[str
             read_conn, [uid], needed=needed_placeholders(campaign)
         ).get(uid) or default_params()
         endpoints = _resolve_delivery_endpoints(read_conn, [uid]).get(uid) or {}
+        if "sms" in (campaign.get("channels") or []) and not filter_sms_marketing_reachable_user_ids(read_conn, [uid]):
+            raise ValueError("Test recipient has not opted in to marketing SMS or has no valid Indian mobile number")
     with db.get_conn() as notification_conn:
         endpoints["push"] = _resolve_push_endpoints(notification_conn, [uid]).get(uid) or []
 
@@ -1409,6 +1483,8 @@ def send_campaign_test(campaign: Dict[str, Any], target_userid: int) -> Dict[str
         data.update(_blog_push_data(campaign))
     if copy.get("question"):
         data["question"] = copy["question"][:500]
+    if isinstance(campaign.get("sms_template"), dict):
+        data["sms_template"] = campaign["sms_template"]
     recipient = {
         "id": 0,
         "userid": uid,
@@ -1426,7 +1502,8 @@ def send_campaign_test(campaign: Dict[str, Any], target_userid: int) -> Dict[str
     with db.get_conn() as notification_conn:
         sent_channels = list(delivered.get("sent") or [])
         primary_assigned = False
-        for channel, ok in delivered.get("attempts") or []:
+        for attempt in delivered.get("attempts") or []:
+            channel, ok = attempt[0], bool(attempt[1])
             is_primary = bool(ok and not primary_assigned)
             primary_assigned = primary_assigned or is_primary
             db.insert_delivery(

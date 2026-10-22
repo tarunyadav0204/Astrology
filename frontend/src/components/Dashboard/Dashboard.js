@@ -470,8 +470,8 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                   </div>
                   <ActivationMobileButton type="button" onClick={() => navigate('/charts-dashas/activations')}>
                     <span aria-hidden>✦</span>
-                    <strong>What is activated now?</strong>
-                    <small>See why, possible results and timing</small>
+                    <strong>Explore Timing</strong>
+                    <small>See calculated windows and the evidence behind them</small>
                     <b aria-hidden>→</b>
                   </ActivationMobileButton>
                 </div>
@@ -491,8 +491,8 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
                   </div>
                   <ActivationMobileButton type="button" onClick={() => navigate('/charts-dashas/activations')}>
                     <span aria-hidden>✦</span>
-                    <strong>What is activated now?</strong>
-                    <small>D1-based prediction logic and timing</small>
+                    <strong>Explore Timing</strong>
+                    <small>D1, D9, Dasha and transit timing evidence</small>
                     <b aria-hidden>→</b>
                   </ActivationMobileButton>
                 </div>
@@ -733,11 +733,11 @@ const Dashboard = ({ onBack, onViewAllCharts, onNewChart, currentView, setCurren
               <span className="activation-entry-icon" aria-hidden>✦</span>
               <div>
                 <small>Deterministic Parashari prediction lab</small>
-                <strong>What is activated now?</strong>
-                <p>See active houses, why they are activated, possible results and Sun–Moon timing windows.</p>
+                <strong>Timing</strong>
+                <p>Start with a life topic, then inspect calculated windows and the astrological evidence behind them.</p>
               </div>
               <button type="button" onClick={() => navigate('/charts-dashas/activations')}>
-                Explore activations <span aria-hidden>→</span>
+                Explore Timing <span aria-hidden>→</span>
               </button>
             </ActivationEntry>
             

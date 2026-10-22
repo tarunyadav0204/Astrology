@@ -374,6 +374,7 @@ const linking = {
       '/festivals': '/muhurat',
       '/festivals/monthly': '/muhurat',
       '/marriage-analysis': '/kundli-matching',
+      '/go/partner-portrait': '/partner-portrait',
       '/policy': '/about',
       '/pandit-desk': '/pandit',
       '/for-pandits': '/pandit',

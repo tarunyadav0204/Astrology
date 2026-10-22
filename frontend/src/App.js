@@ -768,6 +768,7 @@ function App() {
                 />
               </>
             } />
+            <Route path="/go/partner-portrait" element={<Navigate to="/partner-portrait" replace />} />
             <Route path="/career-guidance" element={
               <>
                 <AnalysisDetailPage

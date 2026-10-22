@@ -220,6 +220,7 @@ class CampaignUpsertRequest(BaseModel):
     landing_screen: str = "chat"
     landing_url: Optional[str] = None
     whatsapp_template: Optional[Dict[str, Any]] = None
+    sms_template: Optional[Dict[str, Any]] = None
     conversion_event: str = "click"
     frequency_cap_days: int = Field(default=0, ge=0, le=365)
     scheduled_at: Optional[str] = None  # ISO datetime (IST assumed when no offset)
@@ -2399,6 +2400,15 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
         if len(whatsapp_template_json) > 2_000_000:
             raise HTTPException(status_code=400, detail="WhatsApp template campaign configuration is too large")
 
+    sms_template_json = None
+    if body.sms_template is not None:
+        if "sms" not in channels:
+            raise HTTPException(status_code=400, detail="An SMS template requires the SMS channel")
+        from .sms_channel import PARTNER_PORTRAIT_TEMPLATE_KEY
+        if body.sms_template != {"key": PARTNER_PORTRAIT_TEMPLATE_KEY}:
+            raise HTTPException(status_code=400, detail="Only the approved Partner Portrait SMS DLT template is available")
+        sms_template_json = json.dumps(body.sms_template)
+
     conversion_event = str(body.conversion_event or "click").strip().lower()
     if conversion_event not in {"click", "credit_purchase", "subscription_purchase", "question", "none"}:
         raise HTTPException(status_code=400, detail="Unsupported conversion event")
@@ -2419,6 +2429,7 @@ def _validate_campaign_payload(body: CampaignUpsertRequest) -> Dict[str, Any]:
         "landing_screen": landing,
         "landing_url": landing_url,
         "whatsapp_template_json": whatsapp_template_json,
+        "sms_template_json": sms_template_json,
         "conversion_event": conversion_event,
         "frequency_cap_days": int(body.frequency_cap_days or 0),
         "scheduled_at": scheduled_at,
@@ -2431,6 +2442,7 @@ def _campaign_dto(conn, campaign: Dict[str, Any], include_stats: bool = False) -
     out.pop("channels_json", None)
     out.pop("audience_filter_json", None)
     out.pop("whatsapp_template_json", None)
+    out.pop("sms_template_json", None)
     if include_stats:
         try:
             out["stats"] = db.campaign_stats(conn, int(campaign["id"]))
@@ -2443,19 +2455,38 @@ def _campaign_dto(conn, campaign: Dict[str, Any], include_stats: bool = False) -
 @router.get("/admin/campaigns")
 async def admin_list_campaigns(
     limit: int = Query(200, ge=1, le=500),
+    channel: Optional[str] = Query(None),
+    include_stats: bool = Query(True),
     current_user: User = Depends(get_current_user),
 ):
     _require_admin(current_user)
     try:
         with db.get_conn() as conn:
             db.init_nudge_tables(conn)
-            items = [_campaign_dto(conn, c, include_stats=True) for c in db.list_campaigns(conn, limit=limit)]
+            requested_channel = str(channel or "").strip().lower()
+            if requested_channel and requested_channel not in {"push", "inbox", "email", "whatsapp", "sms"}:
+                raise HTTPException(status_code=422, detail="Unsupported campaign channel")
+            campaigns = db.list_campaigns(conn, limit=limit)
+            if requested_channel:
+                campaigns = [
+                    campaign for campaign in campaigns
+                    if requested_channel in set(campaign.get("channels") or [])
+                ]
+            items = [_campaign_dto(conn, c, include_stats=include_stats) for c in campaigns]
         from .param_resolver import CAMPAIGN_PLACEHOLDERS
 
         return {"items": items, "allowed_placeholders": sorted(CAMPAIGN_PLACEHOLDERS)}
     except Exception as e:
         logger.exception("admin_list_campaigns failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to load campaigns") from e
+
+
+@router.get("/admin/sms-campaigns/config")
+async def admin_sms_campaign_config(current_user: User = Depends(get_current_user)):
+    """Return the approved DLT template and non-secret provider readiness."""
+    _require_admin(current_user)
+    from .sms_channel import campaign_sms_configuration
+    return {"ok": True, **campaign_sms_configuration()}
 
 
 @router.post("/admin/campaigns")
@@ -2753,6 +2784,11 @@ async def admin_duplicate_campaign(
                 whatsapp_template_json=(
                     json.dumps(existing.get("whatsapp_template"), ensure_ascii=False)
                     if existing.get("whatsapp_template") is not None
+                    else None
+                ),
+                sms_template_json=(
+                    json.dumps(existing.get("sms_template"), ensure_ascii=False)
+                    if existing.get("sms_template") is not None
                     else None
                 ),
                 conversion_event=existing.get("conversion_event") or "click",

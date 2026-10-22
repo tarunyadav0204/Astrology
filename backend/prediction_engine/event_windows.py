@@ -21,7 +21,7 @@ from .errors import PredictionCalculationError, PredictionConfigurationError
 from .primitives import aspected_houses, ruled_houses
 
 
-EVENT_WINDOW_ENGINE_VERSION = "1.0.0"
+EVENT_WINDOW_ENGINE_VERSION = "1.1.0"
 
 
 @dataclass(frozen=True)
@@ -154,9 +154,9 @@ JOB_CHANGE = EventDefinition(
     key="job_change",
     label="Job change",
     description=(
-        "Professional movement requiring a dynamically active career anchor "
-        "and a separate transition signal. Natal career-change wiring is "
-        "context only and never vetoes a window."
+        "A voluntary move between roles or employers. It requires a dynamically active career "
+        "anchor and an initiative, application or transfer signal. It does not use exit or "
+        "disruption houses, which are evaluated separately under Work disruption."
     ),
     varga="D10",
     varga_houses=(6, 10),
@@ -174,12 +174,11 @@ JOB_CHANGE = EventDefinition(
         ),
     ),
     transition=SignalGroup(
-        key="transition", label="Transition signal", houses=(3, 8, 12), weight=20,
+        key="transition", label="Initiative or transfer signal", houses=(3,), weight=20,
         required=True,
         description=(
-            "A job-change reading needs movement as well as career activity: H3 can show initiative, "
-            "applications or transfer; H8 can show restructuring or a break in continuity; H12 can "
-            "show release from the present arrangement."
+            "A voluntary job-change reading needs movement as well as career activity: H3 can show "
+            "initiative, applications, interviews, outreach or transfer."
         ),
     ),
     outcome=SignalGroup(
@@ -193,17 +192,145 @@ JOB_CHANGE = EventDefinition(
         ClassificationRule(
             "job_change_with_gain_support", "Job change with gain support", outcome="present"
         ),
-        ClassificationRule(
-            "transfer_or_relocation", "Transfer or relocation pattern",
-            transition_all=(3, 12), outcome="absent",
-        ),
-        ClassificationRule(
-            "exit_or_interruption", "Exit or interruption pattern",
-            transition_any=(8, 12), outcome="absent",
-        ),
         ClassificationRule("professional_transition", "Professional transition"),
     ),
-    version="job_change.v1",
+    version="job_change.v2",
+)
+
+
+NEW_JOB = EventDefinition(
+    key="new_job",
+    label="New job / offer",
+    description=(
+        "An employment-start or offer window. It requires a dasha connection to employment or "
+        "profession plus a gain or landing signal; it does not assume a resignation or job loss."
+    ),
+    varga="D10",
+    varga_houses=(6, 10, 11),
+    varga_description=(
+        "D10 is the career-specific divisional chart. An active dasha lord connected to D10 H6 "
+        "or H10 supports employment or professional relevance; connection to D10 H11 strengthens "
+        "the landing or gain side of the window. D10 confirms but never guarantees an offer."
+    ),
+    anchor=SignalGroup(
+        key="employment_anchor", label="Employment or profession anchor", houses=(6, 10), weight=25,
+        required=True,
+        description=(
+            "H6 describes employment, service and the working environment; H10 describes profession, "
+            "role and status. At least one must be opened by the active MD/AD/PD."
+        ),
+    ),
+    transition=SignalGroup(
+        key="job_landing", label="Offer or joining signal", houses=(11,), weight=20,
+        required=True,
+        description=(
+            "H11 describes gain, fulfilment and receiving the result of an employment effort. It must "
+            "be opened in the same dasha window as the employment or profession anchor."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="income_continuity", label="Income continuity support", houses=(2,), weight=10,
+        description=(
+            "H2 can show salary continuity, family-resource support or a stable financial landing. "
+            "It strengthens the financial side of a new-job window but is not required."
+        ),
+    ),
+    classifications=(
+        ClassificationRule("new_job_with_income_support", "New job with income support", outcome="present"),
+        ClassificationRule("employment_offer_or_joining", "Employment offer or joining window"),
+    ),
+    version="new_job.v1",
+)
+
+
+COMPENSATION = EventDefinition(
+    key="compensation",
+    label="Compensation growth",
+    description=(
+        "A work-linked pay, bonus, benefit or compensation-improvement window. It requires both "
+        "resource-and-gain houses together with an employment or profession connection."
+    ),
+    varga="D10",
+    varga_houses=(2, 10, 11),
+    varga_description=(
+        "D10 confirms the professional context of a compensation window: D10 H10 supports role and "
+        "status relevance, while D10 H11 supports recognition or gain. It never guarantees a raise."
+    ),
+    anchor=SignalGroup(
+        key="resources_and_gains", label="Resources and gains anchor", houses=(2, 11), weight=25,
+        required=True,
+        require_all=True,
+        description=(
+            "H2 describes salary and accumulated resources, while H11 describes gain and fulfilment. "
+            "Both must be opened by the active MD/AD/PD in the same window."
+        ),
+    ),
+    transition=SignalGroup(
+        key="work_context", label="Employment or profession context", houses=(6, 10), weight=20,
+        required=True,
+        description=(
+            "A compensation reading must also connect to work: H6 describes employment and service, "
+            "and H10 describes professional role, authority and status."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="recognition_support", label="Recognition support", houses=(5,), weight=10,
+        description=(
+            "H5 can describe recognition, merit, an award or a visible performance benefit. It can "
+            "strengthen the flavour of the window but is not required."
+        ),
+    ),
+    classifications=(
+        ClassificationRule("compensation_with_recognition", "Compensation growth with recognition", outcome="present"),
+        ClassificationRule("work_linked_compensation", "Work-linked compensation window"),
+    ),
+    version="compensation.v1",
+)
+
+
+WORK_DISRUPTION = EventDefinition(
+    key="work_disruption",
+    label="Work disruption / exit",
+    description=(
+        "A period of work restructuring, interruption, exit or release from an existing arrangement. "
+        "It is a timing signal for attention and planning, not a prediction that someone will lose a job."
+    ),
+    varga="D10",
+    varga_houses=(6, 8, 10, 12),
+    varga_description=(
+        "D10 is used only to confirm work relevance: H6/H10 connect the period to employment or role, "
+        "while H8/H12 can reflect restructuring, interruption or release. D10 never predicts dismissal."
+    ),
+    anchor=SignalGroup(
+        key="work_anchor", label="Employment or profession anchor", houses=(6, 10), weight=25,
+        required=True,
+        description=(
+            "H6 describes employment, duties and the workplace; H10 describes profession, role and status. "
+            "At least one must be opened by the active MD/AD/PD."
+        ),
+    ),
+    transition=SignalGroup(
+        key="disruption_or_release", label="Restructuring or release signal", houses=(8, 12), weight=20,
+        required=True,
+        description=(
+            "H8 can describe restructuring, a break in continuity or deeper change; H12 can describe "
+            "release, withdrawal, a contract ending or time away from the existing arrangement."
+        ),
+    ),
+    outcome=SignalGroup(
+        key="income_continuity", label="Income continuity support", houses=(2, 11), weight=10,
+        description=(
+            "H2 and H11 can show financial continuity, support or a subsequent gain. They qualify the "
+            "financial context but are not required for a disruption window."
+        ),
+    ),
+    classifications=(
+        ClassificationRule("work_disruption_with_income_support", "Work disruption with income support", outcome="present"),
+        ClassificationRule("release_from_work_arrangement", "Release from work arrangement", transition_any=(12,), outcome="absent"),
+        ClassificationRule("career_restructuring", "Career restructuring pattern", transition_any=(8,), outcome="absent"),
+        ClassificationRule("work_disruption", "Work-disruption window"),
+    ),
+    version="work_disruption.v1",
 )
 
 
@@ -623,7 +750,7 @@ FOREIGN_TRAVEL = EventDefinition(
 
 CHILDREN = EventDefinition(
     key="children",
-    label="Children",
+    label="Child-related matters",
     description=(
         "Child-related development, responsibility or fulfilment around the fifth house. "
         "This is an astrological timing aid and does not predict a birth, diagnose fertility "
@@ -671,6 +798,76 @@ CHILDREN = EventDefinition(
         ClassificationRule("child_development", "Child-related development window"),
     ),
     version="children.v1",
+)
+
+
+CONCEPTION = EventDefinition(
+    key="conception",
+    label="Conception",
+    description=(
+        "A family-expansion timing aid around the fifth and ninth houses. This cannot establish "
+        "fertility, confirm a pregnancy, predict conception or replace medical advice."
+    ),
+    varga="D7",
+    varga_houses=(5, 9),
+    varga_description=(
+        "D7 is used only as a confirming chart for progeny themes. A connection to D7 H5 or H9 "
+        "can strengthen relevance, but it never confirms conception or pregnancy."
+    ),
+    anchor=SignalGroup(
+        key="conception_anchor", label="Progeny anchor", houses=(5,), weight=25,
+        required=True,
+        description="H5 describes children and creative progeny. It must be opened by the current MD/AD/PD.",
+    ),
+    transition=SignalGroup(
+        key="family_expansion", label="Family-expansion signal", houses=(9,), weight=20,
+        required=True,
+        description="H9 supplies the expansion or blessing-linked signal required alongside H5.",
+    ),
+    outcome=SignalGroup(
+        key="family_support", label="Fulfilment support", houses=(11,), weight=10,
+        description="H11 can show fulfilment or support for the family objective; it is not required.",
+    ),
+    classifications=(
+        ClassificationRule("conception_with_support", "Family-expansion window with support", outcome="present"),
+        ClassificationRule("family_expansion", "Family-expansion window"),
+    ),
+    version="conception.v1",
+)
+
+
+DELIVERY = EventDefinition(
+    key="delivery",
+    label="Delivery",
+    description=(
+        "A family-arrival planning aid around the fifth and eleventh houses. It cannot predict a "
+        "delivery date, birth outcome, pregnancy health or replace care from a qualified clinician."
+    ),
+    varga="D7",
+    varga_houses=(5, 11),
+    varga_description=(
+        "D7 is used only as a confirming chart for progeny themes. A connection to D7 H5 or H11 "
+        "can strengthen relevance, but it never predicts a delivery or birth outcome."
+    ),
+    anchor=SignalGroup(
+        key="delivery_anchor", label="Progeny anchor", houses=(5,), weight=25,
+        required=True,
+        description="H5 describes children and creative progeny. It must be opened by the current MD/AD/PD.",
+    ),
+    transition=SignalGroup(
+        key="family_arrival", label="Family-arrival signal", houses=(11,), weight=20,
+        required=True,
+        description="H11 supplies the fulfilment signal required alongside H5 for this planning view.",
+    ),
+    outcome=SignalGroup(
+        key="family_expansion_support", label="Expansion support", houses=(9,), weight=10,
+        description="H9 can show expansion support; it is not required.",
+    ),
+    classifications=(
+        ClassificationRule("delivery_with_support", "Family-arrival window with support", outcome="present"),
+        ClassificationRule("family_arrival", "Family-arrival window"),
+    ),
+    version="delivery.v1",
 )
 
 
@@ -792,6 +989,18 @@ EVENT_DEFINITIONS: Mapping[str, EventDefinition] = {
     CHILDREN.key: CHILDREN,
     EDUCATION.key: EDUCATION,
     INCOME_GAIN.key: INCOME_GAIN,
+}
+
+# These are deliberate, user-selected Work searches. They are not added to the
+# automatic event timeline: a proactive prediction about an offer, pay, or an
+# employment disruption would overstate what a timing signal can establish.
+INTERACTIVE_EVENT_DEFINITIONS: Mapping[str, EventDefinition] = {
+    **EVENT_DEFINITIONS,
+    NEW_JOB.key: NEW_JOB,
+    COMPENSATION.key: COMPENSATION,
+    WORK_DISRUPTION.key: WORK_DISRUPTION,
+    CONCEPTION.key: CONCEPTION,
+    DELIVERY.key: DELIVERY,
 }
 
 CUSTOM_EVENT_KEY = "custom"
@@ -993,6 +1202,7 @@ def _group_trace(group: SignalGroup, rows: Mapping[int, HouseActivation]) -> Dic
                 "dasha_levels": list(row.activation.active_dasha_levels),
                 "natal_connections": list(row.natal_connections),
                 "transit_connections": list(row.transit_connections),
+                "timing_triggers": list(row.timing_triggers),
             }
             for row in matched
         ],
@@ -1020,6 +1230,86 @@ def _confirmations(rows: Iterable[HouseActivation]) -> List[Dict[str, Any]]:
                 seen.add(key)
                 output.append(dict(item))
     return output
+
+
+def _merge_timeline_segments(
+    segments: Iterable[Dict[str, Any]], identity_keys: Sequence[str]
+) -> List[Dict[str, Any]]:
+    """Merge adjacent presentation segments without inferring new timing facts."""
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for segment in segments:
+        identity = json.dumps(
+            {key: segment.get(key) for key in identity_keys}, sort_keys=True
+        )
+        grouped.setdefault(identity, []).append(segment)
+    output: List[Dict[str, Any]] = []
+    for rows in grouped.values():
+        merged: List[Dict[str, Any]] = []
+        for segment in sorted(rows, key=lambda row: row["start_date"]):
+            previous = merged[-1] if merged else None
+            adjacent = previous is not None and (
+                date.fromisoformat(previous["end_date"]) + timedelta(days=1)
+                == date.fromisoformat(segment["start_date"])
+            )
+            if adjacent:
+                previous["end_date"] = segment["end_date"]
+            else:
+                merged.append(dict(segment))
+        output.extend(merged)
+    return sorted(output, key=lambda row: (row["start_date"], row["end_date"]))
+
+
+def _timing_map(
+    calculation: CalculationContext,
+    activations: Sequence[HouseActivation],
+    focus_houses: Sequence[int],
+) -> Dict[str, Any]:
+    """Return the raw timing lanes, independently of event qualification.
+
+    Qualified event windows are intentionally selective.  They are useful for a
+    verdict, but they cannot truthfully define the duration of a Dasha or a
+    transit.  The map is therefore built from every calculation window.
+    """
+    dasha_rows = [
+        {
+            "start_date": window.start_date,
+            "end_date": window.end_date,
+            "MD": window.mahadasha,
+            "AD": window.antardasha,
+            "PD": window.pratyantardasha,
+        }
+        for window in calculation.windows
+    ]
+    dasha = {
+        level: _merge_timeline_segments(dasha_rows, (level,))
+        for level in ("MD", "AD", "PD")
+    }
+    transits: List[Dict[str, Any]] = []
+    for window in calculation.windows:
+        rows = _rows_for_window(activations, window)
+        for house in focus_houses:
+            row = rows.get(house)
+            if row is None:
+                continue
+            for connection in row.transit_connections:
+                if not connection.get("timing_trigger"):
+                    continue
+                transits.append({
+                    "start_date": window.start_date,
+                    "end_date": window.end_date,
+                    "planet": connection.get("planet"),
+                    "source_house": connection.get("transit_house"),
+                    "target_house": house,
+                    "relations": list(connection.get("relations") or (connection.get("relation"),)),
+                    "dasha_levels": list(connection.get("dasha_levels") or ()),
+                })
+    return {
+        "dasha": dasha,
+        "transits": _merge_timeline_segments(
+            transits,
+            ("planet", "source_house", "target_house", "relations", "dasha_levels"),
+        ),
+    }
 
 
 def _classification(
@@ -1108,7 +1398,7 @@ class EventWindowEngine:
         if event_key == CUSTOM_EVENT_KEY:
             definition = build_custom_definition(focus_houses)
         else:
-            definition = EVENT_DEFINITIONS.get(event_key)
+            definition = INTERACTIVE_EVENT_DEFINITIONS.get(event_key)
             if definition is None:
                 raise PredictionConfigurationError(f"Unsupported event focus: {event_key}")
 
@@ -1282,6 +1572,12 @@ class EventWindowEngine:
                 "inspection_date": peak or window.start_date,
                 "peak_reason": peak_reason,
                 "peak_rank": peak_rank,
+                "calculation_slice": {
+                    "start_date": window.start_date,
+                    "end_date": window.end_date,
+                    "opened_by": list(window.opened_by),
+                    "closed_by": list(window.closed_by),
+                },
                 "dasha": {
                     "mahadasha": window.mahadasha,
                     "antardasha": window.antardasha,
@@ -1324,6 +1620,15 @@ class EventWindowEngine:
             })
 
         output = _merge_adjacent_windows(output, event_key)
+        timing_map = _timing_map(
+            calculation,
+            activations,
+            tuple(sorted(set(
+                definition.anchor.houses
+                + definition.transition.houses
+                + definition.outcome.houses
+            ))),
+        )
         signature = hashlib.sha256(json.dumps({
             "engine": self.version,
             "definition": definition.version,
@@ -1345,5 +1650,6 @@ class EventWindowEngine:
             "qualified_windows": len(output),
             "rejected_summary": rejected,
             "evidence_signature": signature,
+            "timing_map": timing_map,
             "windows": output,
         }

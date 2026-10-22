@@ -40,7 +40,8 @@ from .service import PredictionService
 from .manifestation_synthesis import synthesize_manifestations
 from .event_windows import (
     CUSTOM_EVENT_KEY,
-    EVENT_DEFINITIONS,
+    INTERACTIVE_EVENT_DEFINITIONS,
+    EVENT_WINDOW_ENGINE_VERSION,
     EventWindowEngine,
     normalise_focus_houses,
 )
@@ -118,7 +119,7 @@ class EventWindowRequest(BaseModel):
             except PredictionEngineError as exc:
                 raise ValueError(str(exc)) from exc
             return self
-        if self.event_key not in EVENT_DEFINITIONS:
+        if self.event_key not in INTERACTIVE_EVENT_DEFINITIONS:
             raise ValueError(f"Unsupported event focus: {self.event_key}")
         return self
 
@@ -283,6 +284,7 @@ async def get_activation_explorer(
 def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, Any]) -> Dict[str, Any]:
     birth = BirthChartInput.from_mapping(_normalise_birth_data(chart))
     cache_key = (
+        EVENT_WINDOW_ENGINE_VERSION,
         birth.birth_chart_id, birth.date, birth.time, birth.latitude, birth.longitude,
         str(birth.timezone), payload.year, payload.event_key, payload.include_developing,
         tuple(payload.focus_houses or ()),

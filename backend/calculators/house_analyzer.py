@@ -1,6 +1,9 @@
 from .base_calculator import BaseCalculator
 from .house_correspondences import classical_house_body_parts, classical_sign_body_parts
 
+
+SHADBALA_PLANETS = {"Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"}
+
 class HouseAnalyzer(BaseCalculator):
     """Comprehensive house analyzer - reusable for any house analysis"""
     
@@ -440,6 +443,12 @@ class HouseAnalyzer(BaseCalculator):
     def _assess_lord_shadbala_strength(self, analysis, shadbala_data):
         """Assess house lord strength using real Shadbala"""
         lord_planet = analysis['house_lord_analysis']['basic_info']['planet']
+        if lord_planet not in SHADBALA_PLANETS:
+            return {
+                'value': None,
+                'grade': 'N/A',
+                'reasoning': f'Classical Shadbala is not applicable to {lord_planet}',
+            }
         lord_shadbala = shadbala_data.get(lord_planet, {})
         
         rupas = lord_shadbala.get('total_rupas', 0)
@@ -512,7 +521,8 @@ class HouseAnalyzer(BaseCalculator):
         for resident in residents:
             planet_name = resident['planet']
             
-            # Handle shadow planets (Rahu/Ketu) which don't have Shadbala
+            # Shadow planets use their separate traditional handling; optional
+            # outer planets are not scored through classical Shadbala at all.
             if planet_name in ['Rahu', 'Ketu']:
                 # Use dignity and house placement for shadow planets
                 planet_analysis = resident.get('analysis', {})
@@ -532,7 +542,7 @@ class HouseAnalyzer(BaseCalculator):
                 else:
                     house_name = f"{house}st" if house == 1 else f"{house}nd" if house == 2 else f"{house}rd" if house == 3 else f"{house}th"
                     planet_details.append(f"{planet_name} (moderate: {dignity} in {house_name} house)")
-            else:
+            elif planet_name in SHADBALA_PLANETS:
                 # Regular planets use Shadbala
                 planet_shadbala = shadbala_data.get(planet_name, {})
                 rupas = planet_shadbala.get('total_rupas', 0)
@@ -545,6 +555,8 @@ class HouseAnalyzer(BaseCalculator):
                     planet_details.append(f"{planet_name} (weak: {rupas:.1f} rupas)")
                 else:
                     planet_details.append(f"{planet_name} (moderate: {rupas:.1f} rupas)")
+            else:
+                planet_details.append(f"{planet_name} (classical Shadbala not applicable)")
         
         if strong_residents > weak_residents:
             grade = 'Uttama'
@@ -599,7 +611,8 @@ class HouseAnalyzer(BaseCalculator):
             planet_name = aspect['aspecting_planet']
             target = aspect.get('target', 'house')
             
-            # Handle shadow planets (Rahu/Ketu) which don't have Shadbala
+            # Shadow planets retain their separate aspect handling. Optional
+            # outer planets do not receive a fake 0-rupa classical score.
             if planet_name in ['Rahu', 'Ketu']:
                 # Shadow planets are always considered strong aspecters
                 if self._is_benefic_aspect_safe(aspect, planet_name):
@@ -608,7 +621,7 @@ class HouseAnalyzer(BaseCalculator):
                 else:
                     strong_malefic_aspects += 1
                     aspect_details.append(f"{planet_name} → {target} (malefic shadow planet)")
-            else:
+            elif planet_name in SHADBALA_PLANETS:
                 # Regular planets use Shadbala
                 planet_shadbala = shadbala_data.get(planet_name, {})
                 rupas = planet_shadbala.get('total_rupas', 0)
@@ -622,6 +635,8 @@ class HouseAnalyzer(BaseCalculator):
                         aspect_details.append(f"{planet_name} → {target} (malefic, {rupas:.1f} rupas)")
                 else:
                     aspect_details.append(f"{planet_name} → {target} (weak, {rupas:.1f} rupas)")
+            else:
+                aspect_details.append(f"{planet_name} → {target} (classical Shadbala not applicable)")
         
         if strong_benefic_aspects > strong_malefic_aspects:
             grade = 'Uttama'

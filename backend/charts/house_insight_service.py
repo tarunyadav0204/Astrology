@@ -53,6 +53,10 @@ CHART_DIVISIONS = {
 BENEFICS = {"Jupiter", "Venus", "Moon", "Mercury"}
 MALEFICS = {"Saturn", "Mars", "Rahu", "Ketu", "Sun"}
 NODE_PLANETS = {"Rahu", "Ketu"}
+# Classical Shadbala is defined only for these seven visible grahas. Optional
+# outer planets may be rendered in a chart, but an absent strength value is not
+# evidence of weakness.
+SHADBALA_PLANETS = {"Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"}
 NAKSHATRA_LORDS = {
     1: "Ketu", 2: "Venus", 3: "Sun", 4: "Moon", 5: "Mars", 6: "Rahu", 7: "Jupiter",
     8: "Saturn", 9: "Mercury", 10: "Ketu", 11: "Venus", 12: "Sun", 13: "Moon",
@@ -876,14 +880,14 @@ def _collect_house_factors(
     # placement, dignity, occupant, or aspect row above. These are independent
     # facts and therefore each receives its own ledger entry.
     lord_shadbala = assessment_factors.get("lord_shadbala_strength") or {}
-    if lord_shadbala.get("grade") == "Uttama":
+    if lord in SHADBALA_PLANETS and lord_shadbala.get("grade") == "Uttama":
         support.append(_factor(
             f"{lord} has strong Shadbala at {float(lord_shadbala.get('value') or 0):.2f} rupas.",
             "good",
             "shadbala",
             evidence_key=f"lord:{lord}:shadbala",
         ))
-    elif lord_shadbala.get("grade") == "Adhama":
+    elif lord in SHADBALA_PLANETS and lord_shadbala.get("grade") == "Adhama":
         stress.append(_factor(
             f"{lord} has weak Shadbala at {float(lord_shadbala.get('value') or 0):.2f} rupas.",
             "warn",
@@ -894,7 +898,7 @@ def _collect_house_factors(
     resident_shadbala = getattr(analyzer.planet_analyzer, "shadbala_data", {}) or {}
     for resident in residents:
         planet = resident.get("planet")
-        if planet in NODE_PLANETS or not planet:
+        if planet not in SHADBALA_PLANETS:
             continue
         rupas = float((resident_shadbala.get(planet) or {}).get("total_rupas") or 0)
         if rupas >= 6:

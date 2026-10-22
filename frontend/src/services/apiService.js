@@ -12,6 +12,22 @@ const API_BASE_URL =
     ? process.env.REACT_APP_API_BASE_URL
     : '';
 
+export const apiErrorMessage = (error, fallback = 'Something went wrong. Please try again.') => {
+  const detail = error?.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => typeof item?.msg === 'string' ? item.msg : null)
+      .filter(Boolean);
+    if (messages.length) return messages.join(' ');
+  }
+  if (detail && typeof detail === 'object') {
+    const message = detail.message || detail.error || detail.detail;
+    if (typeof message === 'string') return message;
+  }
+  return error?.message || fallback;
+};
+
 console.log('Environment:', process.env.NODE_ENV);
 console.log('API Base URL:', API_BASE_URL || '(same-origin /api)');
 
@@ -86,6 +102,11 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // FastAPI/Pydantic validation detail is an array of objects. Normalise it
+    // once at the boundary so every existing error panel can render it safely.
+    if (Array.isArray(error.response?.data?.detail)) {
+      error.response.data.detail = apiErrorMessage(error);
+    }
     if (error.code === 'ECONNABORTED') {
       throw new Error('Request timeout. Please try again.');
     }

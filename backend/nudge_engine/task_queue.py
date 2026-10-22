@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+_TASK_CLIENT = None
+_TASK_CLIENT_LOCK = threading.Lock()
 
 # Stable Cloud Run service URL. This is deliberately used as a safety fallback
 # when an older VM-era http:// target remains in the shared production env.
@@ -40,6 +43,11 @@ def _queue_name(task_kind: Optional[str] = None) -> str:
         return (
             os.getenv("NUDGE_WHATSAPP_TASKS_QUEUE")
             or "nudge-whatsapp-campaign-queue"
+        ).strip()
+    if task_kind_s == "sms-campaign-batch":
+        return (
+            os.getenv("NUDGE_SMS_TASKS_QUEUE")
+            or "nudge-sms-campaign-queue"
         ).strip()
     if task_kind_s in {"campaign-batch", "admin-bulk-job", "broadcast-schedule-batch"}:
         return (
@@ -148,7 +156,12 @@ def enqueue_nudge_task(
         from google.cloud import tasks_v2
         from google.protobuf import duration_pb2
 
-        client = tasks_v2.CloudTasksClient()
+        global _TASK_CLIENT
+        if _TASK_CLIENT is None:
+            with _TASK_CLIENT_LOCK:
+                if _TASK_CLIENT is None:
+                    _TASK_CLIENT = tasks_v2.CloudTasksClient()
+        client = _TASK_CLIENT
         parent = client.queue_path(project, location, queue)
         task_name = client.task_path(project, location, queue, f"{safe_kind}-{safe_id}")
         body = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")

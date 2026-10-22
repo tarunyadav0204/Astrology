@@ -196,6 +196,15 @@ async def internal_campaign_batch_task(
     )
 
 
+@app.post("/api/nudge/internal/tasks/sms-campaign-batch")
+async def internal_sms_campaign_batch_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    """Dedicated, rate-limited queue for SMS campaign batches."""
+    return await internal_campaign_batch_task(body, x_nudge_task_secret)
+
+
 @app.post("/api/nudge/internal/tasks/credit-campaign-whatsapp-batch")
 async def internal_credit_campaign_whatsapp_batch_task(
     body: Dict[str, Any],

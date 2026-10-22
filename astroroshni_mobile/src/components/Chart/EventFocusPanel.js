@@ -21,11 +21,14 @@ const HOUSE_SHORT = {
 
 const EVENT_GROUPS = [
   {
-    label: 'Career',
-    items: [
-      { key: 'job_change', label: 'Job change', intro: 'Requires career plus a transition house in the same dasha. Natal wiring never vetoes the window.' },
+  label: 'Career',
+  items: [
+      { key: 'new_job', label: 'New job / offer', intro: 'Requires employment or profession plus a gain or joining signal. It does not assume a resignation or job loss.' },
+      { key: 'job_change', label: 'Job change', intro: 'Requires career plus H3 initiative, applications or transfer in the same dasha. Exit and disruption are checked separately.' },
       { key: 'promotion', label: 'Promotion / status', intro: 'Requires H10 plus H11 gain or H5 honour. This is not Job change: leaving houses are not required.' },
-    ],
+      { key: 'compensation', label: 'Pay growth', intro: 'Requires H2 salary and H11 gains together with employment or profession context. It does not guarantee a raise.' },
+      { key: 'work_disruption', label: 'Work disruption / exit', intro: 'Checks career alongside H8 restructuring or H12 release. It is a planning signal, not a prediction of job loss.' },
+  ],
   },
   {
     label: 'Money',
@@ -45,13 +48,21 @@ const EVENT_GROUPS = [
       { key: 'property_purchase', label: 'Property purchase', intro: 'Requires H4 plus a payment or financing signal (H2 savings or H8 loan).' },
       { key: 'relocation', label: 'Relocation', intro: 'Requires H4 plus a move or leaving signal (H3 or H12). Not a guaranteed move date.' },
       { key: 'property_gain', label: 'Property gain', intro: 'Requires both H4 and H11 dasha-opened so a property objective can reach fulfilment.' },
+      { key: 'vehicle_purchase', label: 'Vehicle purchase', intro: 'Requires H4 plus a payment or fulfilment signal. This is timing support, not a purchase guarantee.' },
+    ],
+  },
+  {
+    label: 'Progeny',
+    items: [
+      { key: 'conception', label: 'Conception', intro: 'Requires H5 plus family expansion (H9). It cannot establish fertility, confirm pregnancy, predict conception or replace medical advice.' },
+      { key: 'delivery', label: 'Delivery', intro: 'Requires H5 plus a family-arrival signal (H11). It cannot predict a delivery date, birth outcome or pregnancy health.' },
+      { key: 'children', label: 'Child-related matters', intro: 'Requires H5 plus expansion or fulfilment for child-related responsibilities or milestones. Not a birth prediction, fertility claim or determination of a child’s sex.' },
     ],
   },
   {
     label: 'Relationship',
     items: [
       { key: 'marriage', label: 'Marriage / partnership', intro: 'Requires H7 plus joining, romance or fulfilment. Relationship timing—not a wedding-date guarantee.' },
-      { key: 'children', label: 'Children', intro: 'Requires H5 plus expansion or fulfilment. Not a birth prediction, fertility claim or determination of a child’s sex.' },
     ],
   },
   {

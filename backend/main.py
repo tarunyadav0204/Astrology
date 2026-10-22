@@ -6,6 +6,7 @@ import secrets
 import uuid
 import socket
 from fastapi import FastAPI, Depends, HTTPException, APIRouter, Request, Query, BackgroundTasks
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator, ValidationError
@@ -643,6 +644,20 @@ def ensure_users_gender_column() -> None:
     )
 
 
+def ensure_users_sms_marketing_consent_columns() -> None:
+    """Store explicit SMS marketing consent separately from login/OTP phone data."""
+    _ensure_users_column(
+        """
+        ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS sms_marketing_opted_in_at TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS sms_marketing_opted_out_at TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS sms_marketing_consent_source TEXT,
+            ADD COLUMN IF NOT EXISTS sms_marketing_consent_version TEXT
+        """,
+        "users SMS marketing consent columns",
+    )
+
+
 def ensure_users_userid_default() -> None:
     """Postgres guard: users.userid must auto-generate when INSERT omits it."""
     try:
@@ -696,6 +711,11 @@ async def lifespan(app: FastAPI):
             _startup_step("ensure_users_userid_default", ensure_users_userid_default, "users.userid default sequence ensured")
             _startup_step("ensure_users_signup_client_column", ensure_users_signup_client_column, "users.signup_client ensured")
             _startup_step("ensure_users_gender_column", ensure_users_gender_column, "users.gender ensured")
+            _startup_step(
+                "ensure_users_sms_marketing_consent_columns",
+                ensure_users_sms_marketing_consent_columns,
+                "users SMS marketing consent columns ensured",
+            )
             _startup_step(
                 "ensure_app_installations_schema",
                 lambda: __import__("acquisition_schema", fromlist=["ensure_app_installations_schema"]).ensure_app_installations_schema(),
@@ -843,17 +863,21 @@ horoscope_api = HoroscopeAPI()
 # Add validation error handler
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = jsonable_encoder(
+        exc.errors(),
+        custom_encoder={Exception: lambda error: str(error)},
+    )
     log_lifecycle_event(
         "request_validation_error",
         level=logging.WARNING,
         method=request.method,
         path=request.url.path,
         client_ip=request.client.host if request.client else "unknown",
-        errors=exc.errors(),
+        errors=errors,
     )
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors()}
+        content={"detail": errors},
     )
 
 

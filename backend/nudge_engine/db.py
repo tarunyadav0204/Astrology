@@ -326,6 +326,7 @@ def init_nudge_tables(conn) -> None:
                 landing_screen TEXT NOT NULL DEFAULT 'chat',
                 landing_url TEXT,
                 whatsapp_template_json TEXT,
+                sms_template_json TEXT,
                 conversion_event TEXT NOT NULL DEFAULT 'click',
                 frequency_cap_days INTEGER NOT NULL DEFAULT 0,
                 scheduled_at TIMESTAMPTZ,
@@ -343,6 +344,7 @@ def init_nudge_tables(conn) -> None:
         )
         for _ddl in (
             "ALTER TABLE nudge_campaigns ADD COLUMN IF NOT EXISTS whatsapp_template_json TEXT",
+            "ALTER TABLE nudge_campaigns ADD COLUMN IF NOT EXISTS sms_template_json TEXT",
             "ALTER TABLE nudge_campaigns ADD COLUMN IF NOT EXISTS conversion_event TEXT NOT NULL DEFAULT 'click'",
             "ALTER TABLE nudge_campaigns ADD COLUMN IF NOT EXISTS frequency_cap_days INTEGER NOT NULL DEFAULT 0",
         ):
@@ -1145,6 +1147,7 @@ def summarize_deliveries_for_date_admin(conn, target_date: str) -> Dict[str, int
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND COALESCE(send_status, 'sent') = 'sent') AS whatsapp_template,
                COUNT(*) FILTER (WHERE channel = 'whatsapp_template' AND read_at IS NOT NULL) AS whatsapp_template_continued,
                COUNT(*) FILTER (WHERE channel = 'email' AND COALESCE(send_status, 'sent') = 'sent') AS email,
+               COUNT(*) FILTER (WHERE channel = 'sms' AND COALESCE(send_status, 'sent') = 'sent') AS sms,
                COUNT(*) FILTER (WHERE COALESCE(send_status, '') = 'failed') AS failed_attempts,
                COUNT(*) FILTER (WHERE COALESCE(is_primary, TRUE)
                                 AND (channel IS NULL OR TRIM(channel) = '' OR channel = 'stored')) AS stored_only
@@ -1459,7 +1462,7 @@ def insert_cron_run(conn, job_key: str, status: str, summary_json: str) -> Optio
 _CAMPAIGN_COLUMNS = (
     "id", "name", "status", "title_template", "body_template", "question_template",
     "channel_policy", "channels_json", "ai_personalize", "ai_base_prompt",
-    "audience_filter_json", "landing_screen", "landing_url", "whatsapp_template_json",
+    "audience_filter_json", "landing_screen", "landing_url", "whatsapp_template_json", "sms_template_json",
     "conversion_event", "frequency_cap_days", "scheduled_at", "dispatched_at",
     "total_targeted", "created_by", "created_at", "updated_at",
 )
@@ -1482,6 +1485,10 @@ def _campaign_row_to_dict(row: Tuple[Any, ...]) -> Dict[str, Any]:
         out["whatsapp_template"] = json.loads(out.get("whatsapp_template_json") or "null")
     except Exception:
         out["whatsapp_template"] = None
+    try:
+        out["sms_template"] = json.loads(out.get("sms_template_json") or "null")
+    except Exception:
+        out["sms_template"] = None
     out["ai_personalize"] = bool(out.get("ai_personalize"))
     return out
 
@@ -1504,6 +1511,7 @@ def create_campaign(
     status: str,
     created_by: Optional[int],
     whatsapp_template_json: Optional[str] = None,
+    sms_template_json: Optional[str] = None,
     conversion_event: str = "click",
     frequency_cap_days: int = 0,
 ) -> Optional[int]:
@@ -1513,15 +1521,15 @@ def create_campaign(
         INSERT INTO nudge_campaigns
             (name, status, title_template, body_template, question_template,
              channel_policy, channels_json, ai_personalize, ai_base_prompt,
-             audience_filter_json, landing_screen, landing_url, whatsapp_template_json,
+             audience_filter_json, landing_screen, landing_url, whatsapp_template_json, sms_template_json,
              conversion_event, frequency_cap_days, scheduled_at, created_by)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (
             name, status, title_template, body_template, question_template or None,
             channel_policy, channels_json, bool(ai_personalize), ai_base_prompt or None,
-            audience_filter_json, landing_screen, landing_url, whatsapp_template_json,
+            audience_filter_json, landing_screen, landing_url, whatsapp_template_json, sms_template_json,
             str(conversion_event or "click"), int(frequency_cap_days or 0), scheduled_at, created_by,
         ),
     )
@@ -1534,7 +1542,7 @@ def update_campaign(conn, campaign_id: int, **fields: Any) -> int:
         "name", "status", "title_template", "body_template", "question_template",
         "channel_policy", "channels_json", "ai_personalize", "ai_base_prompt",
         "audience_filter_json", "landing_screen", "landing_url", "scheduled_at", "dispatched_at",
-        "total_targeted", "whatsapp_template_json", "conversion_event", "frequency_cap_days",
+        "total_targeted", "whatsapp_template_json", "sms_template_json", "conversion_event", "frequency_cap_days",
     }
     updates = []
     params: List[Any] = []
@@ -1762,17 +1770,17 @@ def campaign_recipient_report(conn, campaign_id: int) -> List[Dict[str, Any]]:
                d.channel, d.send_status, d.created_at, d.clicked_at,
                d.meta_message_id, d.meta_status, d.meta_accepted_at,
                d.meta_sent_at, d.meta_delivered_at, d.meta_read_at,
-               d.meta_failed_at, d.meta_error
+               d.meta_failed_at, d.meta_error, d.data_json
         FROM nudge_campaign_recipients r
         LEFT JOIN LATERAL (
             SELECT channel, send_status, created_at, clicked_at,
                    meta_message_id, meta_status, meta_accepted_at,
                    meta_sent_at, meta_delivered_at, meta_read_at,
-                   meta_failed_at, meta_error
+                   meta_failed_at, meta_error, data_json
             FROM nudge_deliveries d
             WHERE d.campaign_id = r.campaign_id AND d.userid = r.userid
-              AND d.channel IN ('whatsapp', 'whatsapp_template')
-            ORDER BY (d.meta_message_id IS NOT NULL) DESC, d.created_at DESC, d.id DESC
+              AND d.channel IN ('whatsapp', 'whatsapp_template', 'sms')
+            ORDER BY d.created_at DESC, d.id DESC
             LIMIT 1
         ) d ON TRUE
         WHERE r.campaign_id = %s
@@ -1783,13 +1791,20 @@ def campaign_recipient_report(conn, campaign_id: int) -> List[Dict[str, Any]]:
     keys = (
         "userid", "state", "last_error", "attempt_count", "channel", "send_status",
         "created_at", "clicked_at", "meta_message_id", "meta_status", "accepted_at",
-        "sent_at", "delivered_at", "read_at", "failed_at", "meta_error",
+        "sent_at", "delivered_at", "read_at", "failed_at", "meta_error", "data_json",
     )
     rows: List[Dict[str, Any]] = []
     for raw in cur.fetchall() or []:
         item = dict(zip(keys, raw))
         item["userid"] = int(item["userid"])
         item["attempt_count"] = int(item.get("attempt_count") or 0)
+        try:
+            delivery_data = json.loads(item.pop("data_json") or "{}")
+        except (TypeError, ValueError):
+            delivery_data = {}
+        item["provider"] = delivery_data.get("sms_provider") if item.get("channel") == "sms" else None
+        item["fallback_from"] = delivery_data.get("sms_fallback_from") if item.get("channel") == "sms" else None
+        item["provider_error"] = delivery_data.get("provider_error")
         for key in ("created_at", "clicked_at", "accepted_at", "sent_at", "delivered_at", "read_at", "failed_at"):
             if hasattr(item.get(key), "isoformat"):
                 item[key] = item[key].isoformat()
@@ -2052,7 +2067,7 @@ def _delivery_channel_counts(conn, where_sql: str, params: Tuple[Any, ...]) -> D
         """,
         params,
     )
-    row = cur.fetchone() or (0,) * 17
+    row = cur.fetchone() or (0,) * 18
     keys = (
         "targeted",
         "push",
@@ -2063,6 +2078,7 @@ def _delivery_channel_counts(conn, where_sql: str, params: Tuple[Any, ...]) -> D
         "whatsapp_template_message_sent",
         "whatsapp_after_continue",
         "email",
+        "sms",
         "failed_attempts",
         "stored_only",
         "clicked",

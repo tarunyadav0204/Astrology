@@ -260,11 +260,11 @@ def _append_confirmation(
 ) -> None:
     key = (
         row.get("kind"), row.get("planet"), row.get("target_planet"),
-        row.get("exact_at"), row.get("label"),
+        row.get("house"), row.get("exact_at"), row.get("label"),
     )
     if not any((
         item.get("kind"), item.get("planet"), item.get("target_planet"),
-        item.get("exact_at"), item.get("label"),
+        item.get("house"), item.get("exact_at"), item.get("label"),
     ) == key for item in confirmations):
         confirmations.append(row)
 
@@ -840,6 +840,7 @@ class HouseActivationEngine:
                 confirmation = {
                     "kind": "exact_degree_return",
                     "label": label,
+                    "house": house,
                     "dasha_levels": planet_levels,
                     **return_pass,
                 }
@@ -877,6 +878,7 @@ class HouseActivationEngine:
                 _append_confirmation(transit_confirmations, {
                     "kind": "repeated_natal_relationship",
                     "label": label,
+                    "house": house,
                     **repetition,
                 })
                 evidence.append(_evidence(
@@ -957,6 +959,7 @@ class HouseActivationEngine:
                             f"{resonance['natal_nakshatra']['name']}"
                         ),
                         "planet": planet,
+                        "house": house,
                         "nakshatra": resonance["natal_nakshatra"]["name"],
                         "nakshatra_lord": lord,
                         "natal_pada": resonance["natal_nakshatra"]["pada"],

@@ -626,6 +626,14 @@ const ChartsDashasWorkspacePage = ({
         <div className="parashari-desk-bar__center">
           <button
             type="button"
+            className="parashari-desk-chip"
+            onClick={() => navigate(`/charts-dashas/activations?asOf=${formatAsOfIso(asOfDate)}`)}
+            title="Open topic timing windows"
+          >
+            Timing
+          </button>
+          <button
+            type="button"
             className={`parashari-desk-chip parashari-desk-chip--activations${activationsFocus ? ' is-active' : ''}`}
             onClick={() => {
               if (creditsLoading) return;

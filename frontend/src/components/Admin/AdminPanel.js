@@ -41,6 +41,7 @@ import AdminNudgeAnalytics from './AdminNudgeAnalytics';
 import AdminWhatsAppTemplates from './AdminWhatsAppTemplates';
 import AdminCreditCampaigns from './AdminCreditCampaigns';
 import AdminWhatsAppCampaigns from './AdminWhatsAppCampaigns';
+import AdminSmsCampaigns from './AdminSmsCampaigns';
 import AdminIssues from './AdminIssues';
 import AdminPandits from './AdminPandits';
 import AdminGooglePlayTestimonials from './AdminGooglePlayTestimonials';
@@ -3703,6 +3704,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             WhatsApp campaigns
           </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'smsCampaigns' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('smsCampaigns')}
+          >
+            SMS campaigns
+          </button>
         </div>
       )}
 
@@ -4775,6 +4783,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'campaigns' && activeSubTab === 'whatsappCampaigns' && (
           <AdminWhatsAppCampaigns />
+        )}
+
+        {activeTab === 'campaigns' && activeSubTab === 'smsCampaigns' && (
+          <AdminSmsCampaigns />
         )}
 
         {activeTab === 'credits' && activeSubTab === 'management' && (

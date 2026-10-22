@@ -15,9 +15,24 @@ const HOUSE_LABELS = {
 };
 
 const EVENT_FOCUS_META = {
+  new_job: {
+    label: 'New job / offer',
+    intro: 'Requires employment or profession together with a gain or joining signal. It does not assume resignation or job loss.',
+    loading: 'Calculating one strict year of dasha, transit, D10 and exact-return evidence…',
+  },
   job_change: {
     label: 'Job change',
-    intro: 'Requires career + transition activation in the same dasha period. Natal wiring never vetoes the event.',
+    intro: 'Requires career plus H3 initiative, applications or transfer in the same dasha period. Exit and disruption are checked separately.',
+    loading: 'Calculating one strict year of dasha, transit, D10 and exact-return evidence…',
+  },
+  compensation: {
+    label: 'Compensation growth',
+    intro: 'Requires H2 salary and H11 gains together with employment or profession context. It does not guarantee a raise.',
+    loading: 'Calculating one strict year of dasha, transit, D10 and exact-return evidence…',
+  },
+  work_disruption: {
+    label: 'Work disruption / exit',
+    intro: 'Checks career alongside H8 restructuring or H12 release. It is a planning signal, not a prediction of job loss.',
     loading: 'Calculating one strict year of dasha, transit, D10 and exact-return evidence…',
   },
   health: {
@@ -45,6 +60,11 @@ const EVENT_FOCUS_META = {
     intro: 'Requires both H4 and H11 dasha-opened in the same period so a property objective can reach fulfilment. Savings (H2) classify support and are not required.',
     loading: 'Calculating one strict year of dasha, transit, D4 and exact-return evidence…',
   },
+  vehicle_purchase: {
+    label: 'Vehicle purchase',
+    intro: 'Requires H4 together with a payment, financing or fulfilment signal. This is timing support, not a purchase guarantee.',
+    loading: 'Calculating one strict year of dasha, transit, D4 and exact-return evidence…',
+  },
   promotion: {
     label: 'Promotion / status',
     intro: 'Requires a dasha-opened tenth house plus a status or recognition signal (H11 gain or H5 honour). This is not Job change: leaving or break houses are not required.',
@@ -61,8 +81,18 @@ const EVENT_FOCUS_META = {
     loading: 'Calculating one strict year of dasha, transit, D9 and exact-return evidence…',
   },
   children: {
-    label: 'Children',
-    intro: 'Looks for H5 plus expansion or fulfilment (H9 / H11). This is a timing aid—not a birth prediction, fertility diagnosis or determination of a child’s sex.',
+    label: 'Child-related matters',
+    intro: 'Looks for H5 plus expansion or fulfilment (H9 / H11) in child-related matters. This is a timing aid—not a birth prediction, fertility diagnosis or determination of a child’s sex.',
+    loading: 'Calculating one strict year of dasha, transit, D7 and exact-return evidence…',
+  },
+  conception: {
+    label: 'Conception',
+    intro: 'Looks for H5 plus a family-expansion signal (H9). It cannot establish fertility, confirm a pregnancy, predict conception or replace medical advice.',
+    loading: 'Calculating one strict year of dasha, transit, D7 and exact-return evidence…',
+  },
+  delivery: {
+    label: 'Delivery',
+    intro: 'Looks for H5 plus a family-arrival signal (H11). It cannot predict a delivery date, birth outcome, pregnancy health or replace clinical care.',
     loading: 'Calculating one strict year of dasha, transit, D7 and exact-return evidence…',
   },
   education: {
@@ -82,10 +112,29 @@ const EVENT_HOUSE_MEANINGS = {
     2: 'Salary, accumulated resources and financial continuity after the transition.',
     3: 'Initiative, applications, interviews, negotiation, movement or transfer.',
     6: 'Employment, service, duties, colleagues and the day-to-day working environment.',
-    8: 'A break in continuity, restructuring, uncertainty or transformation of the existing role.',
     10: 'Profession, responsibility, authority, public role and career status.',
     11: 'Gain, fulfilment, recognition and the benefit received from the change.',
-    12: 'Release, resignation, separation, remote/foreign movement or leaving the present arrangement.',
+  },
+  new_job: {
+    2: 'Salary continuity, financial landing or family-resource support.',
+    6: 'Employment, service and the working environment.',
+    10: 'Professional role, responsibility and status.',
+    11: 'Offer, joining, gain or fulfilment of the employment effort.',
+  },
+  compensation: {
+    2: 'Salary, accumulated resources and compensation.',
+    5: 'Recognition, merit or a performance-linked benefit.',
+    6: 'Employment, duties and work context.',
+    10: 'Professional role, authority and status context.',
+    11: 'Gain, bonus, fulfilment or improved benefits.',
+  },
+  work_disruption: {
+    2: 'Salary continuity, savings or financial support through the change.',
+    6: 'Employment, duties and the existing work arrangement.',
+    8: 'Restructuring, a break in continuity or deeper change.',
+    10: 'Professional role, authority and career status.',
+    11: 'Support, a subsequent gain or a later landing.',
+    12: 'Release, contract ending, withdrawal or time away from the arrangement.',
   },
   health: {
     1: 'The body, vitality and overall physical condition.',
@@ -127,6 +176,12 @@ const EVENT_HOUSE_MEANINGS = {
     4: 'Home, residence, land and the property objective.',
     11: 'Gaining the asset, progress and fulfilment of the property objective.',
   },
+  vehicle_purchase: {
+    2: 'Savings, payment capacity or family resources.',
+    4: 'Vehicles, comforts and the asset being acquired.',
+    8: 'Financing, loans or shared payment.',
+    11: 'Gain or fulfilment of the vehicle objective.',
+  },
   promotion: {
     2: 'Salary, accumulated resources and financial continuity with the rise.',
     5: 'Honour, award, authority or a visible step-up without leaving the role.',
@@ -151,6 +206,16 @@ const EVENT_HOUSE_MEANINGS = {
     5: 'Children, creative progeny and the intelligence applied to them.',
     9: 'Dharma, expansion or a blessing-linked child-related development.',
     11: 'Fulfilment of a child-related objective.',
+  },
+  conception: {
+    5: 'Children and creative progeny.',
+    9: 'Expansion or a blessing-linked family development.',
+    11: 'Fulfilment or support for the family objective.',
+  },
+  delivery: {
+    5: 'Children and creative progeny.',
+    9: 'Expansion or a blessing-linked family development.',
+    11: 'Fulfilment of the family objective.',
   },
   education: {
     4: 'Foundational learning, schooling or the educational base.',
@@ -195,6 +260,12 @@ const EVENT_HOUSE_LABELS = {
     4: 'Home & property',
     11: 'Property fulfilment',
   },
+  vehicle_purchase: {
+    2: 'Payment support',
+    4: 'Vehicle & comfort',
+    8: 'Finance or loan',
+    11: 'Vehicle gained',
+  },
   promotion: {
     2: 'Salary',
     5: 'Honour & authority',
@@ -219,6 +290,16 @@ const EVENT_HOUSE_LABELS = {
     5: 'Children',
     9: 'Expansion',
     11: 'Fulfilment',
+  },
+  conception: {
+    5: 'Progeny',
+    9: 'Family expansion',
+    11: 'Fulfilment',
+  },
+  delivery: {
+    5: 'Progeny',
+    9: 'Expansion',
+    11: 'Family arrival',
   },
   education: {
     4: 'Foundational study',
@@ -1335,8 +1416,11 @@ export default function DeskActivationsPanel({
                   }}
                 >
                   <optgroup label="Career">
+                    <option value="new_job">New job / offer</option>
                     <option value="job_change">Job change</option>
                     <option value="promotion">Promotion / status</option>
+                    <option value="compensation">Compensation growth</option>
+                    <option value="work_disruption">Work disruption / exit</option>
                   </optgroup>
                   <optgroup label="Money">
                     <option value="income_gain">Income / gains</option>
@@ -1346,10 +1430,15 @@ export default function DeskActivationsPanel({
                     <option value="property_purchase">Property purchase</option>
                     <option value="relocation">Relocation</option>
                     <option value="property_gain">Property gain</option>
+                    <option value="vehicle_purchase">Vehicle purchase</option>
                   </optgroup>
                   <optgroup label="Relationship">
                     <option value="marriage">Marriage / partnership</option>
-                    <option value="children">Children</option>
+                  </optgroup>
+                  <optgroup label="Progeny">
+                    <option value="conception">Conception</option>
+                    <option value="delivery">Delivery</option>
+                    <option value="children">Child-related matters</option>
                   </optgroup>
                   <optgroup label="Learning & travel">
                     <option value="education">Education / exams</option>

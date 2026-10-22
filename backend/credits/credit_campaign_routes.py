@@ -1,6 +1,7 @@
 """Admin APIs for targeted credit multiplier campaigns."""
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from decimal import Decimal
 import logging
@@ -364,27 +365,38 @@ async def admin_send_credit_campaign_whatsapp(
     )
     batch_size = max(10, min(int(os.getenv("WHATSAPP_CAMPAIGN_BATCH_SIZE", "25") or "25"), 100))
     batches = [recipient_ids[index:index + batch_size] for index in range(0, len(recipient_ids), batch_size)]
-    enqueued = 0
-    failed_ids: List[int] = []
-    for index, user_ids in enumerate(batches):
-        queued = await run_in_threadpool(
-            lambda index=index, user_ids=user_ids: enqueue_nudge_task(
-                task_kind="credit-campaign-whatsapp-batch",
-                task_id=f"{job_id}-{index}",
-                payload={
-                    "job_id": job_id,
-                    "recipients": [
-                        {"user_id": user_id, "secure_token": tokens[user_id]}
-                        for user_id in user_ids
-                    ],
-                },
-                dispatch_deadline_s=900,
+    # Creating a Cloud Task is a network RPC.  Enqueue a bounded number in
+    # parallel so a large eligible audience does not tie up the admin request
+    # (and therefore the portal) for minutes before any delivery can begin.
+    try:
+        enqueue_concurrency = int(os.getenv("WHATSAPP_CAMPAIGN_ENQUEUE_CONCURRENCY", "12") or "12")
+    except (TypeError, ValueError):
+        enqueue_concurrency = 12
+    semaphore = asyncio.Semaphore(max(1, min(enqueue_concurrency, 32)))
+
+    async def enqueue_batch(index: int, user_ids: List[int]) -> tuple[List[int], bool]:
+        async with semaphore:
+            queued = await run_in_threadpool(
+                lambda: enqueue_nudge_task(
+                    task_kind="credit-campaign-whatsapp-batch",
+                    task_id=f"{job_id}-{index}",
+                    payload={
+                        "job_id": job_id,
+                        "recipients": [
+                            {"user_id": user_id, "secure_token": tokens[user_id]}
+                            for user_id in user_ids
+                        ],
+                    },
+                    dispatch_deadline_s=900,
+                )
             )
-        )
-        if queued:
-            enqueued += 1
-        else:
-            failed_ids.extend(user_ids)
+        return user_ids, bool(queued)
+
+    enqueue_results = await asyncio.gather(
+        *(enqueue_batch(index, user_ids) for index, user_ids in enumerate(batches))
+    )
+    enqueued = sum(1 for _, queued in enqueue_results if queued)
+    failed_ids = [user_id for user_ids, queued in enqueue_results if not queued for user_id in user_ids]
     enqueue_error = (
         f"Could not enqueue {len(failed_ids)} recipient(s) on the isolated worker"
         if failed_ids else None

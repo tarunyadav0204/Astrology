@@ -4,7 +4,8 @@ import ModernNavigationHeader from '../Shared/ModernNavigationHeader';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import { useAstrology } from '../../context/AstrologyContext';
 import { useCredits } from '../../context/CreditContext';
-import { apiService } from '../../services/apiService';
+import { apiErrorMessage, apiService } from '../../services/apiService';
+import TimingWorkspace from './TimingWorkspace';
 import './ActivationExplorerPage.css';
 
 const PARASHARI_PROFILE_KEY = 'astroroshni_parashari_view_profile_v1';
@@ -241,7 +242,7 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showOutcomeReasons, setShowOutcomeReasons] = useState(false);
-  const [activeTab, setActiveTab] = useState('houses');
+  const [activeTab, setActiveTab] = useState('timing');
   const calculationProfile = useMemo(loadCalculationProfile, []);
   const hasChart = Boolean(birthData && chartData);
 
@@ -262,11 +263,7 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
       setSelectedWindowStart(null);
     } catch (requestError) {
       setResult(null);
-      setError(
-        requestError?.response?.data?.detail
-        || requestError?.message
-        || 'We could not read this chart right now. Please try again.'
-      );
+      setError(apiErrorMessage(requestError, 'We could not read this chart right now. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -400,26 +397,17 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
       />
 
       <main className="activation-explorer-main">
-        <header className="activation-explorer-header">
+        <header className="activation-explorer-toolbar">
           <button type="button" className="activation-explorer-back" onClick={() => navigate('/charts-dashas')}>
             <span aria-hidden>←</span> Charts &amp; Dashas
           </button>
-          <div className="activation-explorer-title-row">
-            <div>
-              <p className="activation-explorer-kicker">Your chart, explained step by step</p>
-              <h1>What’s active in your chart?</h1>
-              <p>
-                Understand which parts of life are drawing attention now, what they may bring, and the astrology behind them.
-              </p>
-            </div>
-            {birthData ? (
-              <button type="button" className="activation-chart-identity" onClick={() => setShowBirthModal(true)}>
-                <span>{birthData.name || 'Selected chart'}</span>
-                <small>{String(birthData.date || '').slice(0, 10)} · {birthData.place || 'Birth place'}</small>
-                <strong>Change chart</strong>
-              </button>
-            ) : null}
-          </div>
+          <h1>Timing</h1>
+          {birthData ? (
+            <button type="button" className="activation-chart-identity" onClick={() => setShowBirthModal(true)}>
+              <span>{birthData.name || 'Selected chart'}</span>
+              <small>{String(birthData.date || '').slice(0, 10)} · {birthData.place || 'Birth place'}</small>
+            </button>
+          ) : null}
         </header>
 
         {!user ? (
@@ -449,22 +437,49 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
           </section>
         ) : (
           <div className="activation-explorer-content">
-            <section className="activation-controls" aria-label="Calculation controls">
-              <label>
-                <span>View the chart from</span>
-                <input type="date" value={draftDate} onChange={(event) => setDraftDate(event.target.value)} />
-              </label>
-              <label>
-                <span>Look ahead</span>
-                <select value={draftHorizonDays} onChange={(event) => setDraftHorizonDays(Number(event.target.value))}>
-                  <option value={30}>30 days</option>
-                  <option value={90}>90 days</option>
-                  <option value={180}>180 days</option>
-                </select>
-              </label>
-              <button type="button" className="activation-primary-button" onClick={applyControls} disabled={loading || !draftDate}>
-                {loading ? 'Calculating…' : 'Recalculate'}
-              </button>
+            <section className="activation-workbench-shell" aria-label="Timing workspace controls">
+              <div className="activation-workbench-topline">
+                <section className="activation-controls" aria-label="Calculation controls">
+                  <label>
+                    <span>As-of date</span>
+                    <input type="date" value={draftDate} onChange={(event) => setDraftDate(event.target.value)} />
+                  </label>
+                  <label>
+                    <span>Ledger horizon</span>
+                    <select value={draftHorizonDays} onChange={(event) => setDraftHorizonDays(Number(event.target.value))}>
+                      <option value={30}>30 days</option>
+                      <option value={90}>90 days</option>
+                      <option value={180}>180 days</option>
+                    </select>
+                  </label>
+                  <button type="button" className="activation-primary-button" onClick={applyControls} disabled={loading || !draftDate}>
+                    {loading ? 'Calculating…' : 'Recalculate'}
+                  </button>
+                </section>
+
+                {result ? (
+                  <section className="activation-dasha-summary">
+                    <div>
+                      <span>Current Dasha</span>
+                      <strong>
+                        {currentWindow?.mahadasha || '—'} <b>→</b> {currentWindow?.antardasha || '—'} <b>→</b> {currentWindow?.pratyantardasha || '—'}
+                      </strong>
+                    </div>
+                    <div className="activation-summary-meta">
+                      <span>{formatDate(currentWindow?.start_date)} – {formatDate(currentWindow?.end_date, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                      <span>{predictiveCount} houses active</span>
+                    </div>
+                  </section>
+                ) : null}
+              </div>
+
+              {result ? (
+                <nav className="activation-view-toggle" aria-label="Activation explorer view">
+                  <button type="button" className={activeTab === 'timing' ? 'is-active' : ''} onClick={() => setActiveTab('timing')}>Timing</button>
+                  <button type="button" className={activeTab === 'houses' ? 'is-active' : ''} onClick={() => setActiveTab('houses')}>Activation Ledger</button>
+                  <button type="button" className={activeTab === 'manifestations' ? 'is-active' : ''} onClick={() => setActiveTab('manifestations')}>Life Themes</button>
+                </nav>
+              ) : null}
             </section>
 
             {error ? (
@@ -485,30 +500,28 @@ const ActivationExplorerPage = ({ user, onLogout, onAdminClick, onLogin }) => {
 
             {result ? (
               <>
-                <section className="activation-dasha-summary">
-                  <div>
-                    <span>Your current timing cycle</span>
-                    <strong>
-                      {currentWindow?.mahadasha || '—'} major period <b>→</b> {currentWindow?.antardasha || '—'} sub-period <b>→</b> {currentWindow?.pratyantardasha || '—'} sub-sub-period
-                    </strong>
-                  </div>
-                  <div className="activation-summary-meta">
-                    <span>{formatDate(currentWindow?.start_date)} – {formatDate(currentWindow?.end_date, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                    <span>{predictiveCount} houses active now</span>
-                    <span>Based on the birth chart (D1)</span>
-                  </div>
-                </section>
-
-                <nav className="activation-view-toggle" aria-label="Activation explorer view">
-                  <button type="button" className={activeTab === 'houses' ? 'is-active' : ''} onClick={() => setActiveTab('houses')}>
-                    House by House
-                  </button>
-                  <button type="button" className={activeTab === 'manifestations' ? 'is-active' : ''} onClick={() => setActiveTab('manifestations')}>
-                    Combined Life Themes
-                  </button>
-                </nav>
-
-                {activeTab === 'houses' ? (
+                {activeTab === 'timing' ? (
+                  <TimingWorkspace
+                    birthData={birthData}
+                    chartData={chartData}
+                    calculationProfile={calculationProfile}
+                    activationResult={result}
+                    asOf={asOf}
+                    onSelectMapDate={(date) => {
+                      if (!date || date === asOf) return;
+                      setDraftDate(date);
+                      setAsOf(date);
+                      setSelectedWindowStart(null);
+                    }}
+                    onInspectDate={(date) => {
+                      if (!date) return;
+                      setDraftDate(date);
+                      setAsOf(date);
+                      setSelectedWindowStart(null);
+                      setActiveTab('houses');
+                    }}
+                  />
+                ) : activeTab === 'houses' ? (
                   <>
                 <section className="activation-timeline-section">
                   <div className="activation-section-heading">

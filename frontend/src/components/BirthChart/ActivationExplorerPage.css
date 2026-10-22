@@ -23,6 +23,52 @@
   box-sizing: border-box;
 }
 
+.activation-explorer-toolbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.activation-explorer-toolbar h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.activation-explorer-toolbar .activation-explorer-back {
+  color: var(--color-brand);
+  font-size: 0.78rem;
+}
+
+.activation-explorer-toolbar .activation-chart-identity {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  box-shadow: none;
+}
+
+.activation-explorer-toolbar .activation-chart-identity span,
+.activation-explorer-toolbar .activation-chart-identity small {
+  display: inline;
+  color: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.activation-explorer-toolbar .activation-chart-identity small::before {
+  content: ' · ';
+}
+
 .activation-explorer-header {
   padding: 0.8rem 0 1.4rem;
 }
@@ -1253,6 +1299,15 @@ a.activation-primary-button {
 }
 
 @media (max-width: 767px) {
+  .activation-explorer-toolbar {
+    grid-template-columns: auto 1fr;
+  }
+
+  .activation-explorer-toolbar .activation-chart-identity {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
   .activation-reason-columns { grid-template-columns: 1fr; }
   .activation-explorer-main { width: min(100% - 1rem, 1120px); padding-top: 0.6rem; }
   .activation-explorer-title-row { align-items: stretch; flex-direction: column; gap: 1rem; }
@@ -1541,6 +1596,121 @@ a.activation-primary-button {
   color: var(--color-cosmic-text);
   border-color: var(--color-cosmic-line);
   background: color-mix(in srgb, var(--color-cosmic-text) 7%, transparent);
+}
+
+/* The compact toolbar sits on the canvas, not on the former cosmic hero. */
+.activation-explorer-page .activation-explorer-toolbar .activation-explorer-back {
+  color: var(--color-brand);
+}
+
+.activation-explorer-page .activation-explorer-toolbar .activation-chart-identity {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.activation-explorer-page .activation-explorer-toolbar .activation-chart-identity span,
+.activation-explorer-page .activation-explorer-toolbar .activation-chart-identity small {
+  color: inherit;
+}
+
+.activation-explorer-page .activation-explorer-toolbar .activation-chart-identity:hover {
+  color: var(--color-brand);
+}
+
+/* Timing uses one workbench surface instead of a stack of independent cards. */
+.activation-explorer-page .activation-workbench-shell {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.7rem 0.9rem 0.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.activation-explorer-page .activation-workbench-topline {
+  display: grid;
+  grid-template-columns: minmax(310px, 0.85fr) minmax(0, 1.15fr);
+  gap: 1rem;
+  align-items: center;
+}
+
+.activation-explorer-page .activation-workbench-shell .activation-controls {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.activation-explorer-page .activation-workbench-shell .activation-dasha-summary {
+  padding: 0.2rem 0 0.2rem 1rem;
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0;
+  color: var(--color-text);
+  background: transparent;
+  box-shadow: none;
+}
+
+.activation-explorer-page .activation-workbench-shell .activation-dasha-summary > div:first-child span {
+  color: var(--color-text-muted);
+  font-size: 0.66rem;
+}
+
+.activation-explorer-page .activation-workbench-shell .activation-dasha-summary > div:first-child strong {
+  margin-top: 0.16rem;
+  color: var(--color-text);
+  font-size: 0.93rem;
+}
+
+.activation-explorer-page .activation-workbench-shell .activation-dasha-summary b {
+  color: var(--color-accent);
+}
+
+.activation-explorer-page .activation-workbench-shell .activation-summary-meta {
+  gap: 0.7rem;
+}
+
+.activation-explorer-page .activation-workbench-shell .activation-summary-meta span {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  font-size: 0.7rem;
+}
+
+.activation-explorer-page .activation-workbench-shell .activation-view-toggle {
+  margin: 0;
+  padding: 0.55rem 0 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.activation-explorer-page .activation-workbench-shell .activation-view-toggle button {
+  border-radius: var(--radius-sm);
+  padding: 0.42rem 0.62rem;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 767px) {
+  .activation-explorer-page .activation-workbench-topline {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .activation-explorer-page .activation-workbench-shell .activation-dasha-summary {
+    padding: 0.7rem 0 0;
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
+  }
 }
 
 .activation-explorer-page .activation-timeline-window,

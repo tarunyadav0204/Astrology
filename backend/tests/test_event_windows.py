@@ -13,6 +13,8 @@ from prediction_engine.contracts import (
 )
 from prediction_engine.errors import PredictionConfigurationError
 from prediction_engine.event_windows import EventWindowEngine
+from prediction_engine.event_windows import INTERACTIVE_EVENT_DEFINITIONS
+from prediction_engine.routes import EventWindowRequest
 
 
 def _window(*, opened_by=({"kind": "dasha", "level": "PD", "label": "PD Rahu begins"},)) -> PredictionWindow:
@@ -99,6 +101,14 @@ def _disable_varga(monkeypatch):
     )
 
 
+def test_every_interactive_event_is_accepted_at_the_api_request_boundary():
+    for event_key in INTERACTIVE_EVENT_DEFINITIONS:
+        request = EventWindowRequest(
+            birth_chart_id=1,
+            event_key=event_key,
+            year=2026,
+        )
+        assert request.event_key == event_key
 def test_job_change_does_not_require_a_static_natal_promise(monkeypatch):
     _disable_varga(monkeypatch)
     result = EventWindowEngine().resolve(
@@ -133,10 +143,10 @@ def test_job_change_rejects_generic_career_activation_without_transition(monkeyp
     assert result["rejected_summary"]["missing_transition"] == 1
 
 
-def test_income_houses_classify_outcome_but_do_not_gate_change(monkeypatch):
+def test_income_houses_classify_outcome_but_do_not_gate_work_disruption(monkeypatch):
     _disable_varga(monkeypatch)
     result = EventWindowEngine().resolve(
-        event_key="job_change",
+        event_key="work_disruption",
         calculation=_context(),
         activations=(
             _activation(6, HouseActivationState.DASHA_CONNECTED),
@@ -145,13 +155,95 @@ def test_income_houses_classify_outcome_but_do_not_gate_change(monkeypatch):
     )
 
     assert result["qualified_windows"] == 1
-    assert result["windows"][0]["classification"] == "exit_or_interruption"
+    assert result["windows"][0]["classification"] == "release_from_work_arrangement"
     outcome = next(
         step for step in result["windows"][0]["calculation_trace"]
-        if step["key"] == "outcome"
+        if step["key"] == "income_continuity"
     )
     assert outcome["required"] is False
     assert outcome["passed"] is False
+
+
+def test_new_job_requires_work_anchor_and_job_landing_signal(monkeypatch):
+    _disable_varga(monkeypatch)
+    rejected = EventWindowEngine().resolve(
+        event_key="new_job",
+        calculation=_context(),
+        activations=(_activation(6, HouseActivationState.DASHA_CONNECTED),),
+    )
+    result = EventWindowEngine().resolve(
+        event_key="new_job",
+        calculation=_context(),
+        activations=(
+            _activation(10, HouseActivationState.DASHA_CONNECTED),
+            _activation(11, HouseActivationState.DASHA_TRANSIT_ACTIVATED),
+            _activation(2, HouseActivationState.DASHA_CONNECTED),
+        ),
+    )
+
+    assert rejected["qualified_windows"] == 0
+    assert rejected["rejected_summary"]["missing_transition"] == 1
+    assert result["windows"][0]["classification"] == "new_job_with_income_support"
+    assert result["varga"] == "D10"
+
+
+def test_compensation_requires_resources_gains_and_work_context(monkeypatch):
+    _disable_varga(monkeypatch)
+    missing_gain = EventWindowEngine().resolve(
+        event_key="compensation",
+        calculation=_context(),
+        activations=(
+            _activation(2, HouseActivationState.DASHA_CONNECTED),
+            _activation(10, HouseActivationState.DASHA_TRANSIT_ACTIVATED),
+        ),
+    )
+    result = EventWindowEngine().resolve(
+        event_key="compensation",
+        calculation=_context(),
+        activations=(
+            _activation(2, HouseActivationState.DASHA_CONNECTED),
+            _activation(11, HouseActivationState.DASHA_CONNECTED),
+            _activation(6, HouseActivationState.DASHA_TRANSIT_ACTIVATED),
+            _activation(5, HouseActivationState.DASHA_CONNECTED),
+        ),
+    )
+
+    assert missing_gain["qualified_windows"] == 0
+    assert missing_gain["rejected_summary"]["missing_anchor"] == 1
+    assert result["windows"][0]["classification"] == "compensation_with_recognition"
+    assert result["varga"] == "D10"
+
+
+def test_job_change_and_work_disruption_are_separate_searches(monkeypatch):
+    _disable_varga(monkeypatch)
+    voluntary = EventWindowEngine().resolve(
+        event_key="job_change",
+        calculation=_context(),
+        activations=(
+            _activation(6, HouseActivationState.DASHA_CONNECTED),
+            _activation(3, HouseActivationState.DASHA_TRANSIT_ACTIVATED),
+        ),
+    )
+    disruption = EventWindowEngine().resolve(
+        event_key="work_disruption",
+        calculation=_context(),
+        activations=(
+            _activation(10, HouseActivationState.DASHA_CONNECTED),
+            _activation(8, HouseActivationState.DASHA_TRANSIT_ACTIVATED),
+        ),
+    )
+    job_change_with_only_disruption = EventWindowEngine().resolve(
+        event_key="job_change",
+        calculation=_context(),
+        activations=(
+            _activation(10, HouseActivationState.DASHA_CONNECTED),
+            _activation(12, HouseActivationState.DASHA_TRANSIT_ACTIVATED),
+        ),
+    )
+
+    assert voluntary["qualified_windows"] == 1
+    assert disruption["windows"][0]["classification"] == "career_restructuring"
+    assert job_change_with_only_disruption["qualified_windows"] == 0
 
 
 def test_health_focus_uses_health_pressure_and_recovery_groups(monkeypatch):
@@ -408,6 +500,43 @@ def test_children_and_education_share_the_fifth_but_need_different_paths(monkeyp
     assert fifth_only["qualified_windows"] == 0
 
 
+def test_progeny_searches_distinguish_conception_delivery_and_existing_children(monkeypatch):
+    _disable_varga(monkeypatch)
+    conception = EventWindowEngine().resolve(
+        event_key="conception",
+        calculation=_context(),
+        activations=(
+            _activation(5, HouseActivationState.DASHA_CONNECTED),
+            _activation(9, HouseActivationState.DASHA_TRANSIT_ACTIVATED),
+        ),
+    )
+    delivery = EventWindowEngine().resolve(
+        event_key="delivery",
+        calculation=_context(),
+        activations=(
+            _activation(5, HouseActivationState.DASHA_CONNECTED),
+            _activation(11, HouseActivationState.DASHA_TRANSIT_ACTIVATED),
+        ),
+    )
+    conception_without_expansion = EventWindowEngine().resolve(
+        event_key="conception",
+        calculation=_context(),
+        activations=(
+            _activation(5, HouseActivationState.DASHA_CONNECTED),
+            _activation(11, HouseActivationState.DASHA_TRANSIT_ACTIVATED),
+        ),
+    )
+
+    assert conception["qualified_windows"] == 1
+    assert conception["windows"][0]["classification"] == "family_expansion"
+    assert delivery["qualified_windows"] == 1
+    assert delivery["windows"][0]["classification"] == "family_arrival"
+    assert conception_without_expansion["qualified_windows"] == 0
+    assert conception["varga"] == delivery["varga"] == "D7"
+    assert "cannot establish fertility" in conception["event_description"]
+    assert "cannot predict a delivery date" in delivery["event_description"]
+
+
 def test_income_gain_requires_second_and_eleventh(monkeypatch):
     _disable_varga(monkeypatch)
     rejected = EventWindowEngine().resolve(
@@ -505,4 +634,3 @@ def test_custom_without_houses_is_rejected():
         assert "at least one house" in str(exc)
     else:
         raise AssertionError("custom focus must require houses")
-
