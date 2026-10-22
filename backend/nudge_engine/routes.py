@@ -2951,6 +2951,10 @@ async def admin_test_send_campaign(
         return {"ok": True, "user_id": target_uid, **result}
     except HTTPException:
         raise
+    except ValueError as e:
+        # A campaign test can legitimately be blocked by consent or an invalid
+        # destination. Surface that as an actionable client error, not a 500.
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:
         logger.exception("admin_test_send_campaign failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to test-send campaign") from e

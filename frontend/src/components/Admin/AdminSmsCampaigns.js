@@ -133,7 +133,10 @@ export default function AdminSmsCampaigns() {
       let path = `/api/nudge/admin/campaigns/${campaign.id}`;
       let options = { method: 'POST', headers: getAdminAuthHeaders() };
       if (actionName === 'send') path += '/send-now';
-      if (actionName === 'test') path += '/test-send';
+      if (actionName === 'test') {
+        path += '/test-send';
+        options = { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAdminAuthHeaders() }, body: JSON.stringify({}) };
+      }
       if (actionName === 'retry') path += '/retry-failed';
       if (actionName === 'delete') options = { method: 'DELETE', headers: getAdminAuthHeaders() };
       if (actionName === 'pause' || actionName === 'resume') {
