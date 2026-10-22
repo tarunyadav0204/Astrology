@@ -586,10 +586,11 @@ def _resolve_delivery_endpoints(conn, user_ids: List[int]) -> Dict[int, Dict[str
 
 
 def filter_sms_marketing_reachable_user_ids(conn, user_ids: List[int]) -> List[int]:
-    """Keep only explicitly opted-in users with a valid Indian mobile number.
+    """Keep users with a valid Indian mobile number who have not opted out.
 
-    A phone captured for login/OTP is not marketing consent.  The explicit
-    opt-in fields are introduced by ``add_sms_marketing_consent.sql``.
+    The delivery provider performs the final DLT/DND preference scrub.  We
+    retain our own opt-out as a hard suppression so a user who asks us not to
+    send SMS is never submitted to a provider.
     """
     ids = sorted({int(uid) for uid in user_ids or [] if str(uid).isdigit() and int(uid) > 0})
     if not ids:
@@ -600,7 +601,6 @@ def filter_sms_marketing_reachable_user_ids(conn, user_ids: List[int]) -> List[i
         SELECT userid
         FROM users
         WHERE userid = ANY(%s)
-          AND sms_marketing_opted_in_at IS NOT NULL
           AND sms_marketing_opted_out_at IS NULL
           -- The shared SQLite-to-Postgres adapter rewrites question-mark
           -- placeholders, including text inside SQL comments.
@@ -1145,7 +1145,7 @@ def _dispatch_one_campaign(conn, campaign: Dict[str, Any]) -> Dict[str, Any]:
         with db.get_read_conn() as audience_conn:
             sms_reachable = set(filter_sms_marketing_reachable_user_ids(audience_conn, audience))
         # An SMS-only campaign must not create in-app-only deliveries for
-        # people who have not explicitly opted in to marketing SMS.
+        # people who are locally opted out or lack a valid mobile number.
         if set(campaign.get("channels") or []) == {"sms"}:
             audience = [uid for uid in audience if uid in sms_reachable]
     frequency_cap_days = max(0, min(int(campaign.get("frequency_cap_days") or 0), 365))
@@ -1465,7 +1465,7 @@ def send_campaign_test(campaign: Dict[str, Any], target_userid: int) -> Dict[str
         ).get(uid) or default_params()
         endpoints = _resolve_delivery_endpoints(read_conn, [uid]).get(uid) or {}
         if "sms" in (campaign.get("channels") or []) and not filter_sms_marketing_reachable_user_ids(read_conn, [uid]):
-            raise ValueError("Test recipient has not opted in to marketing SMS or has no valid Indian mobile number")
+            raise ValueError("Test recipient has opted out of SMS or has no valid Indian mobile number")
     with db.get_conn() as notification_conn:
         endpoints["push"] = _resolve_push_endpoints(notification_conn, [uid]).get(uid) or []
 

@@ -92,3 +92,5 @@ def test_sms_eligibility_query_contains_no_sqlite_placeholder_characters():
         assert filter_sms_marketing_reachable_user_ids(object(), [1]) == []
 
     assert "?" not in captured[0]
+    assert "sms_marketing_opted_in_at IS NOT NULL" not in captured[0]
+    assert "sms_marketing_opted_out_at IS NULL" in captured[0]
