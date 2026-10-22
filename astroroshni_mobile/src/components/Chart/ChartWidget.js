@@ -272,10 +272,16 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const enableTiming = useCallback((kind) => {
     if (kind === 'transit') {
       setShowTransitOverlay(true);
+      setShowDashaHighlight(true);
       if (currentChartType !== 'lagna') onRequestBirthChart?.();
       return;
     }
-    if (kind === 'dasha') setShowDashaHighlight(true);
+    if (kind === 'dasha') {
+      setShowTransitOverlay(true);
+      setShowDashaHighlight(true);
+      if (currentChartType !== 'lagna') onRequestBirthChart?.();
+      return;
+    }
     if (kind === 'sav') setShowSav(true);
     if (kind === 'drawing') {
       setDrawingMode(true);
@@ -290,6 +296,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     }
     setShowTransitOverlay((prev) => {
       const next = !prev;
+      setShowDashaHighlight(next);
       if (next && currentChartType !== 'lagna') onRequestBirthChart?.();
       return next;
     });
@@ -406,14 +413,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     const wantsPoints = showSav || showTransitOverlay || currentChartType === 'transit' || Boolean(bavPlanet);
     if (wantsPoints) ensureAshtakavarga();
   }, [bavPlanet, currentChartType, ensureAshtakavarga, showSav, showTransitOverlay]);
-
-  const toggleDashaHighlight = useCallback(() => {
-    if (!showDashaHighlight && !timingLicensed) {
-      onRequestTimingLicense?.('dasha');
-      return;
-    }
-    setShowDashaHighlight((prev) => !prev);
-  }, [onRequestTimingLicense, showDashaHighlight, timingLicensed]);
 
   const toggleSav = useCallback(() => {
     if (!showSav && !timingLicensed) {
@@ -972,7 +971,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
               accessibilityLabel={showOuterPlanets ? 'Hide Uranus, Neptune, and Pluto' : 'Show Uranus, Neptune, and Pluto'}
             >
               <Ionicons name="planet-outline" size={fitTablet ? 22 : 14} color={showOuterPlanets ? colors.primary : colors.chartTextMuted} />
-              <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showOuterPlanets ? colors.primary : colors.chartTextMuted }]}>{t('premiumUi.chart.outerPlanets')}</Text>
+              <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showOuterPlanets ? colors.primary : colors.chartTextMuted }]}>{fitTablet ? t('premiumUi.chart.outerPlanets') : t('premiumUi.chart.outer', 'Outer')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setShowDegreeNakshatra(!showDegreeNakshatra)}
@@ -1001,7 +1000,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 style={[styles.viewControl, !fitTablet && styles.viewControlPhone, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
                 accessibilityRole="button"
                 accessibilityState={{ selected: showTransitOverlay }}
-                accessibilityLabel={timingLicensed ? t('chartScreen.transit', 'Transit') : t('premiumUi.chart.licenseRequired')}
+                accessibilityLabel={timingLicensed ? `${t('chartScreen.transit', 'Transit')} and ${t('chartScreen.dasha', 'Dasha')}` : t('premiumUi.chart.licenseRequired')}
               >
                 <Ionicons name="planet-outline" size={fitTablet ? 22 : 14} color={showTransitOverlay ? colors.primary : colors.chartTextMuted} />
                 {timingLicensed ? null : (
@@ -1009,23 +1008,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
                 )}
                 <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showTransitOverlay ? colors.primary : colors.chartTextMuted }]}>
                   {t('chartScreen.transit', 'Transit')}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-            {currentChartType !== 'transit' ? (
-              <TouchableOpacity
-                onPress={toggleDashaHighlight}
-                style={[styles.viewControl, !fitTablet && styles.viewControlPhone, fitTablet && styles.viewControlTablet, { backgroundColor: 'transparent' }]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: showDashaHighlight }}
-                accessibilityLabel={timingLicensed ? t('chartScreen.dasha', 'Dasha') : t('premiumUi.chart.licenseRequired')}
-              >
-                <Ionicons name="time-outline" size={fitTablet ? 22 : 14} color={showDashaHighlight ? colors.primary : colors.chartTextMuted} />
-                {timingLicensed ? null : (
-                  <Ionicons name="lock-closed" size={fitTablet ? 14 : 10} color={colors.chartTextMuted} />
-                )}
-                <Text numberOfLines={1} style={[styles.viewControlText, !fitTablet && styles.viewControlTextPhone, fitTablet && styles.viewControlTextTablet, { color: showDashaHighlight ? colors.primary : colors.chartTextMuted }]}>
-                  {t('chartScreen.dasha', 'Dasha')}
                 </Text>
               </TouchableOpacity>
             ) : null}

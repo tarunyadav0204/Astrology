@@ -124,6 +124,7 @@ export default function PartnerPortraitScreen({ navigation }) {
   const [clothingStyle, setClothingStyle] = useState('contemporary');
   const [status, setStatus] = useState('setup');
   const [result, setResult] = useState(null);
+  const [resultJobId, setResultJobId] = useState(null);
   const [creatingVariation, setCreatingVariation] = useState(false);
   const [error, setError] = useState(null);
   const [available, setAvailable] = useState(true);
@@ -198,6 +199,7 @@ export default function PartnerPortraitScreen({ navigation }) {
       stopPolling();
       activeJobIdRef.current = null;
       setResult(null);
+      setResultJobId(null);
       setCreatingVariation(false);
       setError(null);
       setDirection(null);
@@ -288,6 +290,7 @@ export default function PartnerPortraitScreen({ navigation }) {
       stopPolling();
       activeJobIdRef.current = null;
       setResult(null);
+      setResultJobId(null);
       setCreatingVariation(false);
       setStatus('setup');
       return;
@@ -307,6 +310,7 @@ export default function PartnerPortraitScreen({ navigation }) {
       stopPolling();
       activeJobIdRef.current = null;
       setResult(payload.data);
+      setResultJobId(id);
       setCreatingVariation(false);
       setStatus('completed');
       if (completedActiveGeneration) {
@@ -1103,6 +1107,7 @@ export default function PartnerPortraitScreen({ navigation }) {
         visible={shareOpen}
         onClose={() => setShareOpen(false)}
         portraitUrl={portraitAsset?.url}
+        jobId={resultJobId}
         traits={shareTraits}
       />
     </View>

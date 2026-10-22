@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -6,33 +6,62 @@ import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '../../context/ThemeContext';
 import { sharePartnerPortraitCard } from '../../platform/sharePartnerPortrait';
+import { partnerPortraitAPI } from '../../services/api';
 import { trackEvent } from '../../utils/analytics';
 
 const SHARE_URL = 'astroroshni.com/mobile/partner-portrait';
 
-export default function PartnerPortraitShareModal({ visible, onClose, portraitUrl, traits = [] }) {
+export default function PartnerPortraitShareModal({ visible, onClose, portraitUrl, jobId, traits = [] }) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const { height } = useWindowDimensions();
   const [format, setFormat] = useState('story');
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState('');
+  const [capturePortraitUrl, setCapturePortraitUrl] = useState(portraitUrl);
   const cardRef = useRef(null);
   const story = format === 'story';
   const previewWidth = story ? Math.min(248, Math.max(190, (height - 290) * 9 / 16)) : Math.min(310, height - 330);
   const cleanTraits = useMemo(() => traits.filter(Boolean).slice(0, 3), [traits]);
+
+  useEffect(() => {
+    setCapturePortraitUrl(portraitUrl);
+  }, [portraitUrl]);
+
+  const prepareWebCaptureImage = async () => {
+    if (Platform.OS !== 'web' || !jobId) return;
+    const response = await partnerPortraitAPI.getAsset(jobId, 'portrait');
+    const imageBlob = response?.data;
+    if (!imageBlob || typeof FileReader === 'undefined') throw new Error('Portrait image is unavailable for sharing.');
+
+    // html-to-image still attempts to fetch a blob: URL while cloning the
+    // card. A data URL is already embedded, so its SVG/canvas export path has
+    // no network or origin boundary left to cross.
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Portrait image could not be prepared for sharing.'));
+      reader.readAsDataURL(imageBlob);
+    });
+    if (typeof dataUrl !== 'string') throw new Error('Portrait image could not be prepared for sharing.');
+
+    setCapturePortraitUrl(dataUrl);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  };
 
   const share = async () => {
     try {
       setSharing(true);
       setError('');
       trackEvent('partner_portrait_share_started', { format });
+      await prepareWebCaptureImage();
       await sharePartnerPortraitCard(cardRef, format, {
         title: t('partnerPortrait.shareSheetTitle', 'My Partner Portrait from AstroRoshni'),
         text: t('partnerPortrait.shareSheetText', 'One possible partner appearance suggested by my birth chart. Create yours with AstroRoshni.'),
       });
       trackEvent('partner_portrait_shared', { format });
     } catch (shareError) {
+      console.error('Partner Portrait share-card export failed:', shareError);
       if (!['AbortError', 'NotAllowedError'].includes(shareError?.name)) {
         setError(t('partnerPortrait.shareFailed', 'The share card could not be created. Please try again.'));
       }
@@ -72,7 +101,7 @@ export default function PartnerPortraitShareModal({ visible, onClose, portraitUr
               collapsable={false}
               style={[styles.shareCard, { width: previewWidth, aspectRatio: story ? 9 / 16 : 1 }]}
             >
-              <Image source={{ uri: portraitUrl }} style={styles.shareImage} resizeMode="cover" />
+              <Image source={{ uri: capturePortraitUrl }} style={styles.shareImage} resizeMode="cover" />
               <LinearGradient colors={['rgba(23,3,14,0.05)', 'rgba(23,3,14,0.96)']} style={styles.shareShade} />
               <View style={styles.shareTop}>
                 <Text style={styles.shareBrand}>ASTROROSHNI</Text>

@@ -1427,6 +1427,10 @@ export const partnerPortraitAPI = {
     timeout: 15000,
   }),
   getHistory: () => api.get(getEndpoint('/partner-portrait/history')),
+  getAsset: (jobId, kind) => api.get(getEndpoint(`/partner-portrait/asset/${encodeURIComponent(jobId)}/${encodeURIComponent(kind)}`), {
+    responseType: 'blob',
+    timeout: 30000,
+  }),
 };
 
 export const relationshipAPI = {
