@@ -1678,3 +1678,21 @@ def test_wealth_routing_guard_only_rewrites_intraday_trading_subtype() -> None:
     assert daily["mode"] == "PREDICT_DAILY"
     assert daily["answer_mode"] == "timing_window"
     assert "speculative_trading" in daily["daily_event_facets"]
+
+
+def test_exact_day_speculation_guard_keeps_lottery_and_gambling_in_daily_mode() -> None:
+    from ai.intent_router import apply_exact_day_speculation_routing_guard
+
+    for subtype in ("windfall", "investment_risk"):
+        route = {
+            "mode": "LIFESPAN_EVENT_TIMING",
+            "answer_mode": "event_prediction",
+            "wealth_subtype": subtype,
+            "daily_intent_confirmed": True,
+            "daily_event_facets": ["speculative_trading"],
+            "extracted_context": {"specific_date_basis": "relative_user_day"},
+        }
+        apply_exact_day_speculation_routing_guard(route)
+        assert route["mode"] == "PREDICT_DAILY"
+        assert route["answer_mode"] == "timing_window"
+        assert route["category"] == "investment"

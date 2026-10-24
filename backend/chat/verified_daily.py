@@ -102,6 +102,41 @@ Location basis must be explicit: use a known current location; otherwise identif
 Clock times must use that location's timezone. Relative-day dates come from the structured user-local query context.
 ''' + template
 
+
+def daily_speculation_contract(style='technical', *, intraday=False):
+    """Output contract for one-day speculative decisions, never a timing arc."""
+    activity = "cash-market intraday trading" if intraday else "the named chance-based activity"
+    timing = (
+        "List every calculated usable and caution market-hour interval verbatim. "
+        "Do not invent, rename, merge, or omit a session window."
+        if intraday else
+        "Give clock-time guidance only when the supplied exact-day evidence calculates it; otherwise give a day-wide judgment."
+    )
+    language = "plain language" if style == 'simple' else "clear technical language with only relevant terms"
+    return f'''EXACT-DAY SPECULATION OUTPUT CONTRACT (takes precedence over generic daily breadth):
+This is a decision reading for {activity} on one named date. It is not a lifetime aptitude reading,
+a monthly forecast, or a ranked future-opportunity report. Use {language}.
+
+Required visible structure:
+## [Weekday, Date] — Direct Decision
+State the date and give exactly one clear decision first: sit out, proceed cautiously/reduce size, or participation is permitted with normal risk controls. Do not guarantee a win, profit, market direction, ticket outcome, or return.
+
+## Why This Day
+Give the two to four strongest requested-date factors. Prioritize the shortest active periods, Moon/nakshatra/Tara and Panchang; natal promise and slow transits are background only.
+
+## Timing
+{timing}
+
+## Risk Controls
+Give concrete, proportionate safeguards for the named activity. For intraday, address sizing, a pre-set exit and avoiding revenge/averaging trades. For lottery or gambling, state a fixed discretionary limit and that no astrological reading establishes an outcome.
+
+## Bottom Line
+Repeat the one-day verdict and the best practical action in one or two sentences.
+
+Forbidden: ranked future windows, another year/month comparison, broad financial-breakthrough claims,
+or a school-by-school natal report. Do not predict a ticker, index, sector, lottery draw, casino result,
+or the size of a profit or loss.'''
+
 def daily_inputs(birth, context):
     intent=context.get('intent_summary') or {}
     window=intent.get('period_window') or {}

@@ -156,3 +156,91 @@ def test_verified_router_daily_reaches_technical_contract():
     assert 'Your Day: [Weekday, Date]' in prompt
     assert 'LIFESPAN EVENT TIMELINE (MANDATORY)' not in prompt
     assert 'Panchang' in prompt and 'Navatara' in prompt
+
+
+def test_verified_exact_day_intraday_overrides_broad_event_timing():
+    import asyncio
+    import json
+    from chat.verified_chat_pipeline import classify_verified_question
+
+    class Router:
+        async def generate_text_from_prompt(self, prompt, **kwargs):
+            return {'success': True, 'response': json.dumps({
+                # Reproduce the faulty broad classification: the semantic
+                # subtype must still enforce the one-day session route.
+                'answer_mode': 'event_prediction', 'forecast_scope': 'other',
+                'target_date': '2026-10-26', 'category': 'investment',
+                'wealth_subtype': 'intraday_trading', 'route_action': 'answer',
+                'needs_transits': True, 'time_relation': 'future',
+            })}
+
+    intent = asyncio.run(classify_verified_question(
+        Router(), question='How is my luck on speculation this upcoming Monday for intraday stock trading?',
+        history=[], language='english',
+        query_context={'client_now_iso': '2026-10-24T19:38:00+05:30', 'timezone_name': 'Asia/Kolkata'},
+    ))
+    assert intent['mode'] == 'PREDICT_DAILY'
+    assert intent['answer_mode'] == 'timing_window'
+    assert intent['wealth_subtype'] == 'intraday_trading'
+    assert intent['period_window'] == {'kind': 'day', 'start': '2026-10-26', 'end': '2026-10-26'}
+
+
+def test_verified_exact_day_lottery_stays_daily_when_semantically_classified():
+    import asyncio
+    import json
+    from chat.verified_chat_pipeline import classify_verified_question
+
+    class Router:
+        async def generate_text_from_prompt(self, prompt, **kwargs):
+            return {'success': True, 'response': json.dumps({
+                'answer_mode': 'event_prediction', 'forecast_scope': 'other',
+                'target_date': '2026-10-26', 'category': 'investment',
+                'wealth_subtype': 'windfall', 'daily_intent_confirmed': True,
+                'daily_activity_label': 'lottery purchase',
+                'daily_event_facets': ['speculative_trading'],
+                'route_action': 'answer', 'needs_transits': True,
+                'time_relation': 'future',
+            })}
+
+    intent = asyncio.run(classify_verified_question(
+        Router(), question='Is Monday good for buying a lottery ticket?', history=[], language='english',
+        query_context={'client_now_iso': '2026-10-24T19:38:00+05:30', 'timezone_name': 'Asia/Kolkata'},
+    ))
+    assert intent['mode'] == 'PREDICT_DAILY'
+    assert intent['answer_mode'] == 'timing_window'
+    assert intent['period_window'] == {'kind': 'day', 'start': '2026-10-26', 'end': '2026-10-26'}
+
+
+def test_verified_daily_speculation_contract_forbids_broad_windows():
+    from chat.verified_daily import daily_speculation_contract
+
+    contract = daily_speculation_contract('technical', intraday=True)
+    assert 'Direct Decision' in contract
+    assert 'calculated usable and caution market-hour interval verbatim' in contract
+    assert 'ranked future windows' in contract
+
+
+def test_verified_next_week_trading_question_is_not_forced_to_one_day():
+    import asyncio
+    import json
+    from chat.verified_chat_pipeline import classify_verified_question
+
+    class Router:
+        async def generate_text_from_prompt(self, prompt, **kwargs):
+            # Simulates the malformed route that produced the user-visible
+            # "Which date" clarification.
+            return {'success': True, 'response': json.dumps({
+                'answer_mode': 'timing_window', 'forecast_scope': 'daily',
+                'target_date': None, 'category': 'investment',
+                'route_action': 'answer', 'needs_transits': True,
+                'time_relation': 'future',
+            })}
+
+    intent = asyncio.run(classify_verified_question(
+        Router(), question='So which day next week is better for speculative trading?',
+        history=[], language='english',
+        query_context={'client_now_iso': '2026-10-24T21:54:00+05:30', 'timezone_name': 'Asia/Kolkata'},
+    ))
+    assert intent['status'] == 'READY'
+    assert intent['mode'] == 'PREDICT_PERIOD_OUTLOOK'
+    assert intent['period_window'] == {'kind': 'window', 'start': '2026-10-26', 'end': '2026-11-01'}

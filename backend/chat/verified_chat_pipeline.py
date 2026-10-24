@@ -12,6 +12,7 @@ import asyncio
 import os
 import re
 import time
+from datetime import timedelta
 from typing import Any, Callable, Dict, List, Optional
 
 from chat.instant_chat_pipeline import ANSWER_MODES, TARGET_SUBJECTS
@@ -1101,6 +1102,20 @@ async def run_verified_calculator_agent(
         native_name=str(birth_data.get("name") or ""),
         response_style=response_style,
     )
+    verified_intent = instant_context.get("intent_summary") if isinstance(instant_context.get("intent_summary"), dict) else {}
+    speculative_facets = {
+        str(value or "").strip().lower()
+        for value in (verified_intent.get("daily_event_facets") or [])
+    }
+    wealth_subtype = str(verified_intent.get("wealth_subtype") or "").strip().lower()
+    if intent_mode == 'PREDICT_DAILY' and (
+        wealth_subtype == 'intraday_trading' or 'speculative_trading' in speculative_facets
+    ):
+        from chat.verified_daily import daily_speculation_contract
+        instructions += '\n\n' + daily_speculation_contract(
+            response_style,
+            intraday=wealth_subtype == 'intraday_trading',
+        )
     if pair:
         intent_mode = 'VERIFIED_PARTNERSHIP'
         instructions = (PARTNERSHIP_CONTRACT + '\nAvailable registered calculators and requirements:\n' + json.dumps(capability_registry) + '\nWrite in ' + language
@@ -1855,11 +1870,18 @@ be for my career, finances and family?", and "What will happen in my career over
 timing_window, forecast_scope other, route_action answer. Multiple life areas within ONE requested
 period form one integrated period outlook, not a compound pick-one request. A specific milestone
 such as "Will I get promoted this November?" remains event_prediction. One overall day remains daily.
-Daily routing: an overall outlook for today, tomorrow, yesterday, or one specified calendar day
-uses answer_mode timing_window and forecast_scope daily. This is not a life-event timeline.
+"Which day next week is better/best" is a bounded next-week comparison: use timing_window with
+forecast_scope other, resolve period_start and period_end for the full next calendar week, and preserve
+the user's request to rank the relevant days. It is never a daily reading and must not ask the user to
+choose one date.
+Daily routing: an overall outlook or a named activity for today, tomorrow, yesterday, or one specified calendar day
+uses answer_mode timing_window and forecast_scope daily. This is not a life-event timeline. In particular, an
+exact-day intraday-trading, lottery, gambling, betting, or other chance-based speculation question is a daily
+decision reading, never broad event timing: set category investment, daily_intent_confirmed true, and include
+speculative_trading in daily_event_facets. Only a request to compare multiple days or a longer period is a period/event route.
 Resolve its target_date as YYYY-MM-DD using USER LOCAL NOW below. Use the latest question's scope,
 not a career or other subject from previous questions. A specific event asked about on a date
-is still event timing, not automatically an overall daily reading.
+is event timing only when it is not an exact-day activity or decision.
 For non-daily questions set forecast_scope other and target_date null.
 For bounded period outlooks or bounded event timing, resolve period_start and period_end as YYYY-MM-DD
 using USER LOCAL NOW. Preserve explicit years and horizons. Use null when no bounded horizon is requested.
@@ -1885,7 +1907,7 @@ USER LOCAL NOW: {now_local.isoformat()}
 QUESTION: {question}
 
 Schema:
-{{"response_language":"language and script of the latest question","subject_resolution":"selected_chart|other_chart|unresolved","clarification_reason":"missing_birth_details|confirm_subject|workflow|other|none","location_intent":"relocation|object_search|other","requires_new_location":false,"reading_transition":"none|continue_prashna|new_prashna|natal|clarify_workflow","resolved_question":"...","prashna_intent":"none|offer|explicit","answer_mode":"...","category":"...","target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","reading_type":"default|chart_dasha_analysis|muhurat","muhurat_transition":"new|continue|exit","muhurat_request":{{}},"forecast_scope":"daily|other","target_date":null,"period_start":null,"period_end":null,"user_message":""}}
+{{"response_language":"language and script of the latest question","subject_resolution":"selected_chart|other_chart|unresolved","clarification_reason":"missing_birth_details|confirm_subject|workflow|other|none","location_intent":"relocation|object_search|other","requires_new_location":false,"reading_transition":"none|continue_prashna|new_prashna|natal|clarify_workflow","resolved_question":"...","prashna_intent":"none|offer|explicit","answer_mode":"...","category":"...","wealth_subtype":"general|investment_risk|windfall|intraday_trading|null","daily_intent_confirmed":false,"daily_activity_label":"...|null","daily_event_facets":["speculative_trading"],"target_subject_key":"self","route_action":"answer","needs_transits":false,"time_relation":"past|current|future|none","reading_type":"default|chart_dasha_analysis|muhurat","muhurat_transition":"new|continue|exit","muhurat_request":{{}},"forecast_scope":"daily|other","target_date":null,"period_start":null,"period_end":null,"user_message":""}}
 """.strip()
     # A routing timeout must not fall through to a guessed/default workflow.
     # The former 20-second ceiling cancelled slow but otherwise valid responses.
@@ -1950,6 +1972,18 @@ Schema:
     category = str(parsed.get("category") or "general").strip().lower()
     if category not in _CATEGORY_VALUES:
         category = "general"
+    # Keep Verified Chat on the same semantic precedence as Standard/Instant:
+    # exact-day speculation is a daily decision, not a broad event timeline.
+    from ai.intent_router import (
+        apply_exact_day_speculation_routing_guard,
+        apply_wealth_routing_guards,
+    )
+    wealth_subtype = str(parsed.get("wealth_subtype") or "").strip().lower()
+    if wealth_subtype:
+        parsed["wealth_subtype"] = wealth_subtype
+        apply_wealth_routing_guards(parsed)
+    apply_exact_day_speculation_routing_guard(parsed)
+    category = str(parsed.get("category") or category).strip().lower()
     target = str(parsed.get("target_subject_key") or "self").strip().lower()
     if target not in TARGET_SUBJECTS:
         target = "self"
@@ -1972,7 +2006,15 @@ Schema:
         answer_mode = "topic_reading" if time_relation in {"current", "none"} else "timing_window"
     is_muhurat = parsed.get('reading_type') == 'muhurat' and action not in {'ack', 'handoff', 'out_of_scope'}
     chart_analysis = parsed.get('reading_type') == 'chart_dasha_analysis' and answer_mode == 'topic_reading'
-    daily = not is_muhurat and not chart_analysis and answer_mode != "factual_chart_lookup" and str(parsed.get("forecast_scope") or "").lower() == "daily"
+    daily = (
+        not is_muhurat
+        and not chart_analysis
+        and answer_mode != "factual_chart_lookup"
+        and (
+            str(parsed.get("forecast_scope") or "").lower() == "daily"
+            or str(parsed.get("mode") or "").upper() == "PREDICT_DAILY"
+        )
+    )
     period_window = None
     if not daily and parsed.get('period_start') and parsed.get('period_end'):
         from datetime import date
@@ -1989,8 +2031,21 @@ Schema:
             target_date = date.fromisoformat(str(parsed.get("target_date") or "")).isoformat()
             period_window = {"kind": "day", "start": target_date, "end": target_date}
         except ValueError:
-            action = "clarify"
-            clarification_question = clarification_question or "Which date would you like the daily reading for?"
+            # A weekly comparison is a valid bounded request, even when the
+            # compact router accidentally labels it as daily without a date.
+            # Resolve its calendar span rather than forcing the user to choose
+            # one day from the comparison they explicitly requested.
+            relative_week = re.search(r"\b(?:next|coming|following)\s+week\b", question, re.IGNORECASE)
+            if relative_week:
+                days_until_monday = (7 - now_local.weekday()) % 7 or 7
+                week_start = (now_local.date() + timedelta(days=days_until_monday))
+                week_end = week_start + timedelta(days=6)
+                period_window = {"kind": "window", "start": week_start.isoformat(), "end": week_end.isoformat()}
+                daily = False
+                answer_mode = "timing_window"
+            else:
+                action = "clarify"
+                clarification_question = clarification_question or "Which date would you like the daily reading for?"
         answer_mode = "timing_window"
     transition = str(parsed.get('reading_transition') or 'none').strip().lower()
     if transition not in {'none', 'continue_prashna', 'new_prashna', 'natal', 'clarify_workflow'}:
@@ -2038,6 +2093,10 @@ Schema:
         "muhurat_request": parsed.get("muhurat_request") or {},
         "answer_mode": answer_mode,
         "category": category,
+        "wealth_subtype": wealth_subtype or None,
+        "daily_intent_confirmed": str(parsed.get("daily_intent_confirmed") or "").lower() in {"true", "1", "yes"},
+        "daily_activity_label": str(parsed.get("daily_activity_label") or "").strip() or None,
+        "daily_event_facets": list(parsed.get("daily_event_facets") or []),
         "target_subject_key": target,
         "target_subject_keys": [target],
         "needs_transits": bool(parsed.get("needs_transits")),

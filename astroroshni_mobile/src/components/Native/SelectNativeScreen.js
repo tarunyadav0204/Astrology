@@ -125,7 +125,7 @@ const groupProfilesByRelation = (profiles) => {
   return Array.from(groups.values()).sort((a, b) => a.sort - b.sort);
 };
 
-const ProfileCard = ({ profile, selectedProfileKey, onSelect, onMore, getZodiacSign, colors }) => {
+const ProfileCard = ({ profile, selectedProfileKey, onSelect, onMore, getZodiacSign, colors, selecting }) => {
   const selected = selectedProfileKey === getChartSelectionKey(profile);
   const cardBackground = selected ? colors.selectionSurface : colors.surface;
   const primaryText = selected ? colors.selectionText : colors.text;
@@ -145,6 +145,7 @@ const ProfileCard = ({ profile, selectedProfileKey, onSelect, onMore, getZodiacS
         <TouchableOpacity
           style={styles.cardTouchable}
           onPress={() => onSelect(profile)}
+          disabled={selecting}
           activeOpacity={0.86}
           accessibilityRole="button"
           accessibilityLabel={`Use ${profile.name}'s birth chart`}
@@ -191,7 +192,9 @@ const ProfileCard = ({ profile, selectedProfileKey, onSelect, onMore, getZodiacS
               ) : null}
             </View>
             <View style={styles.selectionMark}>
-              {selected ? (
+              {selecting ? (
+                <ActivityIndicator size="small" color={secondaryText} />
+              ) : selected ? (
                 <View style={[styles.activeCheck, { backgroundColor: colors.accentSoft }]}>
                   <Ionicons name="checkmark" size={16} color={colors.onAccent} />
                 </View>
@@ -240,8 +243,8 @@ export default function SelectNativeScreen({ navigation, route }) {
   const [listLoading, setListLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
   const [totalCharts, setTotalCharts] = useState(0);
+  const [selectingProfileKey, setSelectingProfileKey] = useState(null);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
   const [selectedProfileForMenu, setSelectedProfileForMenu] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -252,6 +255,9 @@ export default function SelectNativeScreen({ navigation, route }) {
   const [sharing, setSharing] = useState(false);
   const [syncError, setSyncError] = useState(null);
   const shareSearchDebounceRef = useRef(null);
+  const paginationOffsetRef = useRef(0);
+  const localSearchQueryRef = useRef('');
+  const selectionInFlightRef = useRef(false);
   const fromProfile = route.params?.fromProfile;
   const returnTo = route.params?.returnTo;
   const selectorTarget = route.params?.selectorTarget;
@@ -267,7 +273,8 @@ export default function SelectNativeScreen({ navigation, route }) {
   // keeps pagination available for unusually large libraries.
   const PAGE_SIZE = 50;
 
-  const loadProfiles = React.useCallback(async ({ reset = false, search = localSearchQuery } = {}) => {
+  const loadProfiles = React.useCallback(async ({ reset = false, search } = {}) => {
+    const requestedSearch = search ?? localSearchQueryRef.current;
     try {
       if (reset) {
         setListLoading(true);
@@ -281,14 +288,14 @@ export default function SelectNativeScreen({ navigation, route }) {
       if (!authToken) {
         setSyncError(null);
         const savedProfiles = await storage.getBirthProfiles();
-        const q = String(search || '').trim().toLowerCase();
+        const q = String(requestedSearch || '').trim().toLowerCase();
         const localList = (savedProfiles || []).filter((profile) => {
           if (!shouldShowForGenderFilter(profile, nativeGenderFilter)) return false;
           if (!q) return true;
           return String(profile.name || '').toLowerCase().includes(q);
         });
         setProfiles(localList);
-        setOffset(localList.length);
+        paginationOffsetRef.current = localList.length;
         setHasMore(false);
         setTotalCharts(localList.length);
         if (currentNative) {
@@ -299,9 +306,9 @@ export default function SelectNativeScreen({ navigation, route }) {
       
       // Fetch saved charts from API
       const { chartAPI } = require('../../services/api');
-      const nextOffset = reset ? 0 : offset;
+      const nextOffset = reset ? 0 : paginationOffsetRef.current;
       const fetchLimit = 50;
-      const response = await chartAPI.getExistingCharts(search.trim(), fetchLimit, nextOffset);
+      const response = await chartAPI.getExistingCharts(String(requestedSearch).trim(), fetchLimit, nextOffset);
       const apiCharts = response.data.charts || [];
       
       const profileList = [];
@@ -335,7 +342,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       const filteredProfiles = profileList.filter((profile) => shouldShowForGenderFilter(profile, nativeGenderFilter));
 
       setProfiles(prev => (reset ? filteredProfiles : [...prev, ...filteredProfiles]));
-      setOffset(nextOffset + apiCharts.length);
+      paginationOffsetRef.current = nextOffset + apiCharts.length;
       setHasMore(!!response.data?.has_more);
       setTotalCharts(nativeGenderFilter ? null : (response.data?.total || 0));
       setSyncError(null);
@@ -365,7 +372,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       if (hasAccountSession || status === 401 || status === 403) {
         if (reset) {
           setProfiles([]);
-          setOffset(0);
+          paginationOffsetRef.current = 0;
           setHasMore(false);
           setTotalCharts(0);
         }
@@ -383,7 +390,7 @@ export default function SelectNativeScreen({ navigation, route }) {
         const savedProfiles = await storage.getBirthProfiles();
         const filteredProfiles = (savedProfiles || []).filter((profile) => shouldShowForGenderFilter(profile, nativeGenderFilter));
         setProfiles(filteredProfiles);
-        setOffset(savedProfiles.length);
+        paginationOffsetRef.current = savedProfiles.length;
         setHasMore(false);
         setTotalCharts(filteredProfiles.length);
       }
@@ -391,7 +398,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       setListLoading(false);
       setLoadingMore(false);
     }
-  }, [localSearchQuery, nativeGenderFilter, offset]);
+  }, [nativeGenderFilter]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -410,6 +417,7 @@ export default function SelectNativeScreen({ navigation, route }) {
 
   const handleLocalSearchChange = (text) => {
     setLocalSearchQuery(text);
+    localSearchQueryRef.current = text;
     const q = text.trim();
     if (q.length >= 2) {
       trackAstrologyEvent.search(q, 'birth_chart');
@@ -439,6 +447,12 @@ export default function SelectNativeScreen({ navigation, route }) {
   };
 
   const selectProfile = async (profile) => {
+    if (selectionInFlightRef.current) return;
+
+    const profileKey = getChartSelectionKey(profile);
+    selectionInFlightRef.current = true;
+    setSelectingProfileKey(profileKey);
+    let phase = 'prepare';
     try {
       // Ensure profile includes id
       const profileWithId = {
@@ -449,32 +463,46 @@ export default function SelectNativeScreen({ navigation, route }) {
       if (fromProfile) {
         // Connect chart to profile and return to Profile screen
         const { chartAPI } = require('../../services/api');
+        phase = 'connect_chart';
         await chartAPI.setChartAsSelf(profileWithId.id);
         Alert.alert('Success', '✅ Chart connected to your profile!');
+        phase = 'navigate';
         navigation.navigate('Profile');
       } else if (returnTo === 'ChildbirthPlanner') {
         // Set as mother's profile for childbirth planner
+        phase = 'persist_selection';
         await storage.setBirthDetails(profileWithId);
         setSelectedProfileKey(getChartSelectionKey(profileWithId));
+        phase = 'navigate';
         navigation.navigate('ChildbirthPlanner');
       } else if (returnTo === 'KarmaAnalysis') {
         // Return to Karma Analysis with selected chart
+        phase = 'persist_selection';
         await storage.setBirthDetails(profileWithId);
         setSelectedProfileKey(getChartSelectionKey(profileWithId));
+        phase = 'navigate';
         navigation.navigate('KarmaAnalysis', { chartId: profileWithId.id });
       } else if (returnTo === 'KP') {
         // Return to KP Screen with selected chart
+        phase = 'persist_selection';
         await storage.setBirthDetails(profileWithId);
         setSelectedProfileKey(getChartSelectionKey(profileWithId));
+        phase = 'navigate';
         navigation.navigate('KPSystem', { birthDetails: profileWithId });
       } else if (returnTo === 'Yogas') {
+        phase = 'persist_selection';
         await storage.setBirthDetails(profileWithId);
         setSelectedProfileKey(getChartSelectionKey(profileWithId));
+        phase = 'navigate';
         navigation.navigate('Yogas', { birthDetails: profileWithId });
       } else if (returnTo) {
         // Return to the screen that required a native (Chart, Shadbala, SadeSati, etc.)
-        if (!selectionOnly) await storage.setBirthDetails(profileWithId);
+        if (!selectionOnly) {
+          phase = 'persist_selection';
+          await storage.setBirthDetails(profileWithId);
+        }
         setSelectedProfileKey(getChartSelectionKey(profileWithId));
+        phase = 'navigate';
         navigation.navigate(returnTo, {
           ...returnParams,
           ...selectionReturnParams,
@@ -484,18 +512,59 @@ export default function SelectNativeScreen({ navigation, route }) {
           selectorTarget,
         });
       } else {
+        phase = 'persist_selection';
         await storage.setBirthDetails(profileWithId);
         setSelectedProfileKey(getChartSelectionKey(profileWithId));
+        phase = 'navigate';
         navigation.navigate('Home', { resetToGreeting: true, stayOnGreeting: true });
       }
     } catch (error) {
+      const status = error?.response?.status;
+      const message = String(error?.message || '');
+      const category = phase === 'persist_selection'
+        ? 'storage'
+        : error?.code === 'ECONNABORTED'
+          ? 'timeout'
+          : /network/i.test(message) || error?.code === 'NETWORK_ERROR'
+            ? 'network'
+            : status === 401 || status === 403
+              ? 'auth'
+              : status
+                ? 'http'
+                : phase === 'navigate'
+                  ? 'navigation'
+                  : 'unknown';
+      try {
+        Sentry.captureMessage('chart_profile_selection_failed', {
+          level: 'warning',
+          tags: {
+            screen: 'SelectNative',
+            phase,
+            category,
+            flow: fromProfile ? 'connect_profile' : returnTo || 'switch_active_chart',
+            http_status: status ? String(status) : 'none',
+          },
+        });
+      } catch (_) {
+        // Diagnostics must never interfere with profile selection.
+      }
+
       let errorMessage = '❌ Unable to select profile. Please try again.';
-      
-      if (error.message?.includes('Network Error')) {
+
+      if (category === 'storage') {
+        errorMessage = '❌ We could not save this chart on your device. Please free some storage and try again.';
+      } else if (category === 'timeout') {
+        errorMessage = '❌ The request took too long. Please check your connection and try again.';
+      } else if (category === 'auth') {
+        errorMessage = '❌ Your session has expired. Please sign in again, then retry.';
+      } else if (category === 'network') {
         errorMessage = '❌ Connection failed. Please check your internet.';
       }
-      
+
       Alert.alert('Error', errorMessage);
+    } finally {
+      selectionInFlightRef.current = false;
+      setSelectingProfileKey(null);
     }
   };
 
@@ -793,6 +862,7 @@ export default function SelectNativeScreen({ navigation, route }) {
                       key={`${getChartSelectionKey(profile)}:${profileIndex}`}
                       profile={profile}
                       selectedProfileKey={selectedProfileKey}
+                      selecting={selectingProfileKey === getChartSelectionKey(profile)}
                       onSelect={selectProfile}
                       onMore={handleMore}
                       getZodiacSign={getZodiacSign}
