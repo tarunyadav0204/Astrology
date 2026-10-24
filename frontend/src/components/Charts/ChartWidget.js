@@ -43,6 +43,11 @@ const OuterPlanetsIcon = () => (
   <span aria-hidden="true" style={{ fontSize: '14px', lineHeight: 1 }}>♅</span>
 );
 
+const REFERENCE_LAGNA_CHART_TYPES = new Set([
+  'chandra_lagna', 'surya_lagna', 'arudha_lagna', 'upapada_lagna',
+  'bhava_lagna', 'hora_lagna', 'ghatika_lagna', 'pranapada_lagna', 'indu_lagna',
+]);
+
 const ChartWidget = ({
   title,
   chartType,
@@ -196,6 +201,24 @@ const ChartWidget = ({
   }, [chartType, chartData, birthData]);
 
   useEffect(() => {
+    if (!REFERENCE_LAGNA_CHART_TYPES.has(chartType) || !birthData) return undefined;
+    let cancelled = false;
+    setLoading(true);
+    apiService.calculateReferenceChart(birthData, chartType, calculationProfile)
+      .then((response) => {
+        if (!cancelled) setDivisionalData(response?.reference_chart || null);
+      })
+      .catch((error) => {
+        console.error(`Failed to calculate ${chartType}:`, error);
+        if (!cancelled) setDivisionalData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [chartType, birthData, calculationProfile?.ayanamsha, calculationProfile?.node_type]);
+
+  useEffect(() => {
     if (chartType === 'transit' && birthData && transitDate) {
       setLoading(true);
       const transitDay = (() => {
@@ -235,6 +258,15 @@ const ChartWidget = ({
       case 'divisional':
       case 'karkamsa':
       case 'swamsa':
+      case 'chandra_lagna':
+      case 'surya_lagna':
+      case 'arudha_lagna':
+      case 'upapada_lagna':
+      case 'bhava_lagna':
+      case 'hora_lagna':
+      case 'ghatika_lagna':
+      case 'pranapada_lagna':
+      case 'indu_lagna':
         return divisionalData || chartData;
       case 'transit':
         return transitChartData || chartData;
@@ -560,7 +592,7 @@ const ChartWidget = ({
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', color: '#666' }}>
             Calculating divisional chart...
           </div>
-        ) : ((chartType === 'bhav_chalit' && !processedData) || (!divisionalData && (chartType === 'navamsa' || chartType === 'divisional' || chartType === 'karkamsa' || chartType === 'swamsa'))) ? (
+        ) : ((chartType === 'bhav_chalit' && !processedData) || (!divisionalData && (chartType === 'navamsa' || chartType === 'divisional' || chartType === 'karkamsa' || chartType === 'swamsa' || REFERENCE_LAGNA_CHART_TYPES.has(chartType)))) ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px', color: '#e91e63' }}>
             Failed to load chart
           </div>
@@ -1178,7 +1210,7 @@ const ChartWidget = ({
                 <div className="chart-maximized-modal__state">
                   Calculating divisional chart...
                 </div>
-              ) : ((chartType === 'bhav_chalit' && !processedData) || (!divisionalData && (chartType === 'navamsa' || chartType === 'divisional' || chartType === 'karkamsa' || chartType === 'swamsa'))) ? (
+              ) : ((chartType === 'bhav_chalit' && !processedData) || (!divisionalData && (chartType === 'navamsa' || chartType === 'divisional' || chartType === 'karkamsa' || chartType === 'swamsa' || REFERENCE_LAGNA_CHART_TYPES.has(chartType)))) ? (
                 <div className="chart-maximized-modal__state chart-maximized-modal__state--error">
                   Failed to load chart
                 </div>

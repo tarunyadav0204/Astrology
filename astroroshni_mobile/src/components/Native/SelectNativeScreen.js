@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  AppState,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +22,7 @@ import { storage } from '../../services/storage';
 import { chartAPI } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import * as Sentry from '@sentry/react-native';
 import { trackAstrologyEvent } from '../../utils/analytics';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 
@@ -248,6 +250,7 @@ export default function SelectNativeScreen({ navigation, route }) {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [syncError, setSyncError] = useState(null);
   const shareSearchDebounceRef = useRef(null);
   const fromProfile = route.params?.fromProfile;
   const returnTo = route.params?.returnTo;
@@ -260,15 +263,11 @@ export default function SelectNativeScreen({ navigation, route }) {
   // chart. The selector remains the single native-chart selection experience.
   const selectionOnly = route.params?.selectionOnly === true;
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadProfiles({ reset: true });
-    }, [nativeGenderFilter, refreshAt])
-  );
+  // Show a complete normal library on first open. The API caps this safely and
+  // keeps pagination available for unusually large libraries.
+  const PAGE_SIZE = 50;
 
-  const PAGE_SIZE = 10;
-
-  const loadProfiles = async ({ reset = false, search = localSearchQuery } = {}) => {
+  const loadProfiles = React.useCallback(async ({ reset = false, search = localSearchQuery } = {}) => {
     try {
       if (reset) {
         setListLoading(true);
@@ -280,6 +279,7 @@ export default function SelectNativeScreen({ navigation, route }) {
 
       // Guests: local AsyncStorage profiles only (no server list).
       if (!authToken) {
+        setSyncError(null);
         const savedProfiles = await storage.getBirthProfiles();
         const q = String(search || '').trim().toLowerCase();
         const localList = (savedProfiles || []).filter((profile) => {
@@ -300,7 +300,7 @@ export default function SelectNativeScreen({ navigation, route }) {
       // Fetch saved charts from API
       const { chartAPI } = require('../../services/api');
       const nextOffset = reset ? 0 : offset;
-      const fetchLimit = nativeGenderFilter ? 50 : PAGE_SIZE;
+      const fetchLimit = 50;
       const response = await chartAPI.getExistingCharts(search.trim(), fetchLimit, nextOffset);
       const apiCharts = response.data.charts || [];
       
@@ -338,12 +338,47 @@ export default function SelectNativeScreen({ navigation, route }) {
       setOffset(nextOffset + apiCharts.length);
       setHasMore(!!response.data?.has_more);
       setTotalCharts(nativeGenderFilter ? null : (response.data?.total || 0));
+      setSyncError(null);
       
       if (currentNative) {
         setSelectedProfileKey(getChartSelectionKey(currentNative));
       }
     } catch (error) {
-      // Fallback to local storage if API fails
+      const status = error?.response?.status;
+      const hasAccountSession = Boolean(await storage.getAuthToken().catch(() => null));
+      try {
+        Sentry.captureMessage('chart_library_sync_failed', {
+          level: 'warning',
+          tags: {
+            screen: 'SelectNative',
+            http_status: status ? String(status) : 'network_or_timeout',
+            signed_in: hasAccountSession ? 'true' : 'false',
+          },
+        });
+      } catch (_) {
+        // Diagnostics must never affect the chart library itself.
+      }
+
+      // A signed-in library must never quietly turn into the one chart that
+      // happens to be stored on this device. Make the failed live sync visible
+      // and allow an explicit retry instead.
+      if (hasAccountSession || status === 401 || status === 403) {
+        if (reset) {
+          setProfiles([]);
+          setOffset(0);
+          setHasMore(false);
+          setTotalCharts(0);
+        }
+        setSyncError(
+          status === 401 || status === 403
+            ? 'Your session needs to be refreshed. Please sign in again, then retry your chart library.'
+            : 'We could not refresh your chart library. Your saved charts are safe — please try again.'
+        );
+        return;
+      }
+
+      // Guests have no server library; their device-only profiles remain a
+      // useful offline experience.
       if (reset) {
         const savedProfiles = await storage.getBirthProfiles();
         const filteredProfiles = (savedProfiles || []).filter((profile) => shouldShowForGenderFilter(profile, nativeGenderFilter));
@@ -356,7 +391,22 @@ export default function SelectNativeScreen({ navigation, route }) {
       setListLoading(false);
       setLoadingMore(false);
     }
-  };
+  }, [localSearchQuery, nativeGenderFilter, offset]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadProfiles({ reset: true });
+    }, [loadProfiles, refreshAt])
+  );
+
+  // iOS home-screen PWAs can resume from suspension without remounting this
+  // screen. Refresh the authoritative server list whenever that happens.
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') loadProfiles({ reset: true });
+    });
+    return () => subscription?.remove?.();
+  }, [loadProfiles]);
 
   const handleLocalSearchChange = (text) => {
     setLocalSearchQuery(text);
@@ -710,6 +760,22 @@ export default function SelectNativeScreen({ navigation, route }) {
               </View>
             )}
 
+            {syncError ? (
+              <View style={[styles.syncErrorCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                <Ionicons name="cloud-offline-outline" size={24} color={colors.primary} />
+                <Text style={[styles.syncErrorText, { color: colors.text }]}>{syncError}</Text>
+                <TouchableOpacity
+                  style={[styles.retrySyncButton, { backgroundColor: colors.primary }]}
+                  onPress={() => loadProfiles({ reset: true })}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading birth charts"
+                >
+                  <Ionicons name="refresh" size={16} color={colors.onPrimary} />
+                  <Text style={[styles.retrySyncText, { color: colors.onPrimary }]}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             {listLoading && profiles.length === 0 ? (
               <View style={[styles.inlineLoader, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
                 <ActivityIndicator size="small" color={colors.primary} />
@@ -753,7 +819,7 @@ export default function SelectNativeScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
 
-            {profiles.length === 0 && (
+            {profiles.length === 0 && !syncError && (
               <View style={styles.emptyState}>
                 <View style={[styles.emptyIcon, { backgroundColor: colors.accentSoft }]}>
                   <Ionicons name="person-add-outline" size={28} color={colors.onAccent} />
@@ -1419,6 +1485,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 44,
     paddingHorizontal: 24,
+  },
+  syncErrorCard: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 18,
+    alignItems: 'center',
+  },
+  syncErrorText: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  retrySyncButton: {
+    marginTop: 16,
+    minHeight: 40,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  retrySyncText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
   emptyIcon: {
     width: 58,

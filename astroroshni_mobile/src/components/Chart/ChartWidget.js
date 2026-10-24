@@ -32,6 +32,10 @@ import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
 
 const isWeb = Platform.OS === 'web';
 const BAV_PLANETS = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'];
+const REFERENCE_LAGNA_TYPES = new Set([
+  'chandra_lagna', 'surya_lagna', 'arudha_lagna', 'upapada_lagna',
+  'bhava_lagna', 'hora_lagna', 'ghatika_lagna', 'pranapada_lagna', 'indu_lagna',
+]);
 
 const normalizeBindus = (bindus) => {
   const out = [];
@@ -195,7 +199,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   }, [chartDataCache]);
 
   const chartTypes = [
-    'lagna', 'bhav_chalit', 'navamsa', 'transit', 'karkamsa', 'swamsa', 'saptamsa', 'dasamsa', 'dwadasamsa', 'shodasamsa',
+    'lagna', 'bhav_chalit', 'navamsa', 'transit', 'karkamsa', 'swamsa', 'chandra_lagna', 'surya_lagna', 'arudha_lagna', 'upapada_lagna', 'bhava_lagna', 'hora_lagna', 'ghatika_lagna', 'pranapada_lagna', 'indu_lagna', 'panchamsa', 'shashtamsa', 'saptamsa', 'ashtamsa', 'dasamsa', 'ekadasamsa', 'dwadasamsa', 'shodasamsa',
     'vimshamsa', 'chaturvimshamsa', 'saptavimshamsa', 'trimshamsa',
     'khavedamsa', 'akshavedamsa', 'shashtyamsa'
   ];
@@ -207,8 +211,14 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     transit: 'Transit Chart',
     karkamsa: 'Karakamsha Reference',
     swamsa: 'Swamsha Reference (D9)',
+    chandra_lagna: 'Chandra Lagna', surya_lagna: 'Surya Lagna', arudha_lagna: 'Arudha Lagna', upapada_lagna: 'Upapada Lagna',
+    bhava_lagna: 'Bhava Lagna', hora_lagna: 'Hora Lagna', ghatika_lagna: 'Ghatika Lagna', pranapada_lagna: 'Pranapada Lagna', indu_lagna: 'Indu Lagna',
+    panchamsa: 'Panchamsa (D5)',
+    shashtamsa: 'Shashtamsa (D6)',
     saptamsa: 'Saptamsa (D7)',
+    ashtamsa: 'Ashtamsa (D8)',
     dasamsa: 'Dasamsa (D10)',
+    ekadasamsa: 'Ekadasamsa (D11)',
     dwadasamsa: 'Dwadasamsa (D12)',
     shodasamsa: 'Shodasamsa (D16)',
     vimshamsa: 'Vimshamsa (D20)',
@@ -225,10 +235,14 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     hora: 2,
     drekkana: 3,
     chaturthamsa: 4,
+    panchamsa: 5,
+    shashtamsa: 6,
     navamsa: 9,
     saptamsa: 7,
+    ashtamsa: 8,
     dashamsa: 10,
     dasamsa: 10,
+    ekadasamsa: 11,
     dwadashamsa: 12,
     dwadasamsa: 12,
     shodamsa: 16,
@@ -689,6 +703,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             data = response.data.swamsa?.swamsa_chart;
           }
         }
+      } else if (REFERENCE_LAGNA_TYPES.has(type)) {
+        response = await chartAPI.calculateReferenceChart(formattedData, type);
+        data = response.data.reference_chart;
       }
       if (data && activeChartTypeRef.current === typeAtStart) {
         setChartDataCache((prev) => ({ ...prev, [type]: data }));
@@ -742,6 +759,10 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       return;
     }
     if (type === 'karkamsa' || type === 'swamsa') {
+      loadChartData(type, true);
+      return;
+    }
+    if (REFERENCE_LAGNA_TYPES.has(type)) {
       loadChartData(type, true);
       return;
     }

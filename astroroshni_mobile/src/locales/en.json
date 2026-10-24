@@ -356,6 +356,15 @@
       "name": "Swamsha (D9)",
       "description": "D9 from the Atmakaraka’s D9 sign"
     },
+    "chandraLagna": { "name": "Chandra Lagna", "description": "Natal chart viewed from the Moon" },
+    "suryaLagna": { "name": "Surya Lagna", "description": "Natal chart viewed from the Sun" },
+    "arudhaLagna": { "name": "Arudha Lagna", "description": "Public image and manifestation" },
+    "upapadaLagna": { "name": "Upapada Lagna", "description": "Marriage and spouse context" },
+    "bhavaLagna": { "name": "Bhava Lagna", "description": "Time-derived life reference" },
+    "horaLagna": { "name": "Hora Lagna", "description": "Time-derived wealth reference" },
+    "ghatikaLagna": { "name": "Ghatika Lagna", "description": "Time-derived authority reference" },
+    "pranapadaLagna": { "name": "Pranapada Lagna", "description": "Vitality reference point" },
+    "induLagna": { "name": "Indu Lagna", "description": "Wealth reference point" },
     "hora": {
       "name": "Hora (D2)",
       "description": "Wealth & Family"
@@ -368,9 +377,29 @@
       "name": "Chaturthamsa (D4)",
       "description": "Destiny & Assets"
     },
+    "panchamsa": {
+      "name": "Panchamsa (D5)",
+      "description": "Creativity, authority & speculation"
+    },
+    "shashtamsa": {
+      "name": "Shashtamsa (D6)",
+      "description": "Health, disputes & competition"
+    },
+    "saptamsa": {
+      "name": "Saptamsa (D7)",
+      "description": "Children & lineage"
+    },
+    "ashtamsa": {
+      "name": "Ashtamsa (D8)",
+      "description": "Longevity, inheritance & chronic patterns"
+    },
     "dashamsa": {
       "name": "Dashamsa (D10)",
       "description": "Career & Profession"
+    },
+    "ekadasamsa": {
+      "name": "Ekadasamsa (D11)",
+      "description": "Gains, networks & fulfilment"
     },
     "dwadashamsa": {
       "name": "Dwadashamsa (D12)",

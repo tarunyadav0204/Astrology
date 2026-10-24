@@ -14,6 +14,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { authAPI, chatAPI } from '../../services/api';
 import { storage } from '../../services/storage';
+import { invalidateChatHistory } from '../../services/chatHistoryInvalidation';
 import AppAlertModal from '../Common/AppAlertModal';
 import FocusedStatusBar from '../Common/FocusedStatusBar';
 
@@ -323,6 +324,7 @@ export default function AccountSecurityScreen({ navigation }) {
     setDeletingChatHistory(true);
     try {
       const { data } = await chatAPI.clearHistory();
+      invalidateChatHistory();
       await storage.clearChatHistory();
       const deletedMessages = Number(data?.deleted_messages || 0);
       setAppAlert({

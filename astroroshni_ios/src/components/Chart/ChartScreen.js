@@ -73,10 +73,24 @@ export default function ChartScreen({ navigation, route }) {
     { id: 'transit', name: t('chartTypes.transit.name'), icon: '🪐', description: t('chartTypes.transit.description') },
     { id: 'karkamsa', name: t('chartTypes.karkamsa.name'), icon: '🎯', description: t('chartTypes.karkamsa.description') },
     { id: 'swamsa', name: t('chartTypes.swamsa.name'), icon: '🕉️', description: t('chartTypes.swamsa.description') },
+    { id: 'chandra_lagna', name: t('chartTypes.chandraLagna.name'), icon: '🌙', description: t('chartTypes.chandraLagna.description') },
+    { id: 'surya_lagna', name: t('chartTypes.suryaLagna.name'), icon: '☀️', description: t('chartTypes.suryaLagna.description') },
+    { id: 'arudha_lagna', name: t('chartTypes.arudhaLagna.name'), icon: '🎭', description: t('chartTypes.arudhaLagna.description') },
+    { id: 'upapada_lagna', name: t('chartTypes.upapadaLagna.name'), icon: '💍', description: t('chartTypes.upapadaLagna.description') },
+    { id: 'bhava_lagna', name: t('chartTypes.bhavaLagna.name'), icon: '⌂', description: t('chartTypes.bhavaLagna.description') },
+    { id: 'hora_lagna', name: t('chartTypes.horaLagna.name'), icon: '💰', description: t('chartTypes.horaLagna.description') },
+    { id: 'ghatika_lagna', name: t('chartTypes.ghatikaLagna.name'), icon: '⌛', description: t('chartTypes.ghatikaLagna.description') },
+    { id: 'pranapada_lagna', name: t('chartTypes.pranapadaLagna.name'), icon: '✦', description: t('chartTypes.pranapadaLagna.description') },
+    { id: 'indu_lagna', name: t('chartTypes.induLagna.name'), icon: '◐', description: t('chartTypes.induLagna.description') },
     { id: 'hora', name: t('chartTypes.hora.name'), icon: '💰', description: t('chartTypes.hora.description') },
     { id: 'drekkana', name: t('chartTypes.drekkana.name'), icon: '👫', description: t('chartTypes.drekkana.description') },
     { id: 'chaturthamsa', name: t('chartTypes.chaturthamsa.name'), icon: '🏡', description: t('chartTypes.chaturthamsa.description') },
+    { id: 'panchamsa', name: t('chartTypes.panchamsa.name'), icon: '🎨', description: t('chartTypes.panchamsa.description') },
+    { id: 'shashtamsa', name: t('chartTypes.shashtamsa.name'), icon: '⚕️', description: t('chartTypes.shashtamsa.description') },
+    { id: 'saptamsa', name: t('chartTypes.saptamsa.name'), icon: '👶', description: t('chartTypes.saptamsa.description') },
+    { id: 'ashtamsa', name: t('chartTypes.ashtamsa.name'), icon: '🛡️', description: t('chartTypes.ashtamsa.description') },
     { id: 'dashamsa', name: t('chartTypes.dashamsa.name'), icon: '💼', description: t('chartTypes.dashamsa.description') },
+    { id: 'ekadasamsa', name: t('chartTypes.ekadasamsa.name'), icon: '📈', description: t('chartTypes.ekadasamsa.description') },
     { id: 'dwadashamsa', name: t('chartTypes.dwadashamsa.name'), icon: '👨👩👧👦', description: t('chartTypes.dwadashamsa.description') },
     { id: 'shodamsa', name: t('chartTypes.shodamsa.name'), icon: '🚗', description: t('chartTypes.shodamsa.description') },
     { id: 'vimsamsa', name: t('chartTypes.vimsamsa.name'), icon: '🙏', description: t('chartTypes.vimsamsa.description') },
@@ -394,8 +408,13 @@ export default function ChartScreen({ navigation, route }) {
                                   division={chartTypes[currentChartIndex].id === 'hora' ? 2 :
                                            chartTypes[currentChartIndex].id === 'drekkana' ? 3 :
                                            chartTypes[currentChartIndex].id === 'chaturthamsa' ? 4 :
+                                           chartTypes[currentChartIndex].id === 'panchamsa' ? 5 :
+                                           chartTypes[currentChartIndex].id === 'shashtamsa' ? 6 :
+                                           chartTypes[currentChartIndex].id === 'saptamsa' ? 7 :
+                                           chartTypes[currentChartIndex].id === 'ashtamsa' ? 8 :
                                            chartTypes[currentChartIndex].id === 'navamsa' ? 9 : 
                                            chartTypes[currentChartIndex].id === 'dashamsa' ? 10 :
+                                           chartTypes[currentChartIndex].id === 'ekadasamsa' ? 11 :
                                            chartTypes[currentChartIndex].id === 'dwadashamsa' ? 12 :
                                            chartTypes[currentChartIndex].id === 'shodamsa' ? 16 :
                                            chartTypes[currentChartIndex].id === 'vimsamsa' ? 20 :

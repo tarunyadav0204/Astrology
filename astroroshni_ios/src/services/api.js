@@ -243,6 +243,8 @@ export const chartAPI = {
         throw error;
       });
   },
+  calculateReferenceChart: (birthData, chartType) =>
+    api.post(getEndpoint('/calculate-reference-chart'), { birth_data: birthData, chart_type: chartType }),
   calculateTransits: (birthData, transitDate = new Date().toISOString().split('T')[0]) => {
     // console.log(`[API] Calling calculateTransits for date ${transitDate}`);
     const startTime = Date.now();

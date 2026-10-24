@@ -24,6 +24,10 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
+const REFERENCE_LAGNA_TYPES = new Set([
+  'chandra_lagna', 'surya_lagna', 'arudha_lagna', 'upapada_lagna',
+  'bhava_lagna', 'hora_lagna', 'ghatika_lagna', 'pranapada_lagna', 'indu_lagna',
+]);
 
 const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaChartData, defaultStyle = 'north', disableSwipe = false, hideHeader = false, cosmicTheme = false, onOpenDasha, onNavigateToTransit, division, navigation, onHousePress }, ref) => {
   const { t } = useTranslation();
@@ -58,7 +62,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   }, [currentChartType]);
   
   const chartTypes = [
-    'lagna', 'navamsa', 'transit', 'karkamsa', 'swamsa', 'saptamsa', 'dasamsa', 'dwadasamsa', 'shodasamsa', 
+    'lagna', 'navamsa', 'transit', 'karkamsa', 'swamsa', 'chandra_lagna', 'surya_lagna', 'arudha_lagna', 'upapada_lagna', 'bhava_lagna', 'hora_lagna', 'ghatika_lagna', 'pranapada_lagna', 'indu_lagna', 'panchamsa', 'shashtamsa', 'saptamsa', 'ashtamsa', 'dasamsa', 'ekadasamsa', 'dwadasamsa', 'shodasamsa',
     'vimshamsa', 'chaturvimshamsa', 'saptavimshamsa', 'trimshamsa', 
     'khavedamsa', 'akshavedamsa', 'shashtyamsa'
   ];
@@ -69,8 +73,14 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     transit: 'Transit Chart',
     karkamsa: 'Karkamsa Chart',
     swamsa: 'Swamsa Chart',
+    chandra_lagna: 'Chandra Lagna', surya_lagna: 'Surya Lagna', arudha_lagna: 'Arudha Lagna', upapada_lagna: 'Upapada Lagna',
+    bhava_lagna: 'Bhava Lagna', hora_lagna: 'Hora Lagna', ghatika_lagna: 'Ghatika Lagna', pranapada_lagna: 'Pranapada Lagna', indu_lagna: 'Indu Lagna',
+    panchamsa: 'Panchamsa (D5)',
+    shashtamsa: 'Shashtamsa (D6)',
     saptamsa: 'Saptamsa (D7)',
+    ashtamsa: 'Ashtamsa (D8)',
     dasamsa: 'Dasamsa (D10)',
+    ekadasamsa: 'Ekadasamsa (D11)',
     dwadasamsa: 'Dwadasamsa (D12)',
     shodasamsa: 'Shodasamsa (D16)',
     vimshamsa: 'Vimshamsa (D20)',
@@ -83,7 +93,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   };
   
   const chartDivisions = {
-    hora: 2, drekkana: 3, chaturthamsa: 4, navamsa: 9, saptamsa: 7, dashamsa: 10, dwadashamsa: 12, shodamsa: 16,
+    hora: 2, drekkana: 3, chaturthamsa: 4, panchamsa: 5, shashtamsa: 6, saptamsa: 7, ashtamsa: 8, navamsa: 9, dashamsa: 10, ekadasamsa: 11, dwadashamsa: 12, shodamsa: 16,
     vimsamsa: 20, chaturvimsamsa: 24, saptavimshamsa: 27,
     trimsamsa: 30, khavedamsa: 40, akshavedamsa: 45, shashtyamsa: 60,
   };
@@ -280,6 +290,9 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             data = response.data.swamsa?.swamsa_chart;
           }
         }
+      } else if (REFERENCE_LAGNA_TYPES.has(type)) {
+        response = await chartAPI.calculateReferenceChart(formattedData, type);
+        data = response.data.reference_chart;
       }
       if (data && activeChartTypeRef.current === typeAtStart) {
         setChartDataCache(prev => ({ ...prev, [type]: data }));

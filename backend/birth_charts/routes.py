@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 import traceback
 from auth import get_current_user, User
 from pydantic import BaseModel
@@ -103,11 +103,17 @@ def _row_to_chart(row) -> dict:
 
 @router.get("/birth-charts")
 async def get_birth_charts(
+    response: Response,
     search: str = "",
     limit: int = 50,
     offset: int = 0,
     current_user: User = Depends(get_current_user),
 ):
+    # A chart library is account-specific and can change on another device.
+    # Do not let Safari/PWA or an intermediary reuse an earlier authenticated
+    # response as the user's current list.
+    response.headers["Cache-Control"] = "private, no-store, max-age=0, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
     print(f"Search query: '{search}', Limit: {limit}, Offset: {offset}")
     limit = max(1, min(limit, 100))
     offset = max(0, offset)

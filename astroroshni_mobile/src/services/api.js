@@ -809,6 +809,8 @@ export const chartAPI = {
         throw error;
       });
   },
+  calculateReferenceChart: (birthData, chartType) =>
+    api.post(getEndpoint('/calculate-reference-chart'), { birth_data: birthData, chart_type: chartType }),
   calculateTransits: (birthData, transitDate = new Date().toISOString().split('T')[0]) => {
     // console.log(`[API] Calling calculateTransits for date ${transitDate}`);
     const startTime = Date.now();
@@ -1016,12 +1018,23 @@ export const chartAPI = {
   submitPhysicalFeedback: (feedbackData) => 
     api.post(getEndpoint('/physical-feedback'), feedbackData),
 
-  getExistingCharts: (search = '', limit = 10, offset = 0, config = {}) => {
+  getExistingCharts: (search = '', limit = 50, offset = 0, config = {}) => {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
     params.append('limit', String(limit));
     params.append('offset', String(offset));
-    return api.get(`${getEndpoint('/birth-charts')}?${params}`, config);
+    // Safari can retain a GET response while an installed PWA is suspended.
+    // Chart ownership is live account data, so every list read must reach the
+    // API rather than presenting an earlier chart library as current.
+    if (Platform.OS === 'web') params.append('_ar_refresh', String(Date.now()));
+    return api.get(`${getEndpoint('/birth-charts')}?${params}`, {
+      ...config,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate',
+        Pragma: 'no-cache',
+        ...(config.headers || {}),
+      },
+    });
   },
   updateChart: (id, data) => api.put(`${getEndpoint('/birth-charts')}/${id}`, data, GLOBAL_ERROR_CONFIG),
   deleteChart: (id) => api.delete(`${getEndpoint('/birth-charts')}/${id}`, GLOBAL_ERROR_CONFIG),

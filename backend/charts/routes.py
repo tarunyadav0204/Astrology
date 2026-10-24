@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import Dict, Any, Optional, Tuple
 from datetime import date, datetime, timedelta
+from copy import deepcopy
 import logging
 import traceback
 import time
@@ -58,7 +59,54 @@ from utils.birth_hash import birth_hash_from_parts
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_PARASHARI_DIVISIONS = frozenset({2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60})
+# The chart calculator has explicit, source-audited mappings for each of these
+# vargas.  Do not accept a division merely because a generic equal-part mapping
+# could be made: a displayed chart must have an explicit rule in
+# DivisionalChartCalculator.
+SUPPORTED_PARASHARI_DIVISIONS = frozenset({2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 24, 27, 30, 40, 45, 60})
+
+REFERENCE_CHART_TYPES = frozenset({
+    "chandra_lagna", "surya_lagna", "arudha_lagna", "upapada_lagna",
+    "bhava_lagna", "hora_lagna", "ghatika_lagna", "pranapada_lagna", "indu_lagna",
+})
+
+
+def _recast_reference_chart(chart_data: Dict[str, Any], reference: Dict[str, Any]) -> Dict[str, Any]:
+    """Recast D1 houses from a validated reference lagna without moving planets.
+
+    A reference-Lagna chart is not a divisional chart: it preserves the natal
+    sidereal planetary longitudes and changes only the first-house reference.
+    Sign-only points (for example Indu Lagna) use the middle of the sign solely
+    as a plotting anchor; the returned precision makes that explicit.
+    """
+    sign = reference.get("sign")
+    if sign is None:
+        sign = reference.get("sign_id")
+    if not isinstance(sign, int) or sign < 0 or sign > 11:
+        raise ValueError("Reference Lagna has no valid sign")
+    longitude = reference.get("longitude")
+    if not isinstance(longitude, (int, float)):
+        longitude = sign * 30 + 15
+    result = deepcopy(chart_data)
+    result["ascendant"] = float(longitude) % 360
+    result["houses"] = [
+        {"longitude": ((sign + offset) % 12) * 30, "sign": (sign + offset) % 12, "house_number": offset + 1}
+        for offset in range(12)
+    ]
+    for planet in (result.get("planets") or {}).values():
+        if not isinstance(planet, dict) or not isinstance(planet.get("sign"), int):
+            continue
+        planet["house"] = ((planet["sign"] - sign) % 12) + 1
+    result["reference_lagna"] = {
+        "key": reference.get("key"),
+        "name": reference.get("name"),
+        "sign": sign,
+        "longitude": result["ascendant"],
+        "precision": reference.get("precision", "sign_only"),
+        "longitude_is_plotting_anchor": bool(reference.get("longitude_is_plotting_anchor", False)),
+        "calculation_basis": reference.get("calculation_basis"),
+    }
+    return result
 
 # Simple in-memory rate limit for public chart-only (guest) calls.
 _GUEST_CHART_ONLY_WINDOW_SEC = 60
@@ -741,7 +789,7 @@ async def calculate_all_charts(
         # Calculate all divisional charts
         divisional_charts = {}
         
-        for division in [2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60]:
+        for division in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 20, 24, 27, 30, 40, 45, 60]:
             try:
                 div_result = await calculate_divisional_chart(
                     {
@@ -1007,6 +1055,66 @@ async def calculate_divisional_chart(
             request.get('division', request.get('division_number', 9)) if isinstance(request, dict) else None,
         )
         return {"success": False, "error": str(e)}
+
+
+@router.post("/calculate-reference-chart")
+async def calculate_reference_chart(
+    request: dict,
+    current_user: Optional[User] = Depends(get_optional_user),
+):
+    """Return a natal chart recast from a classical Lagna reference point."""
+    chart_type = str(request.get("chart_type") or "").lower()
+    if chart_type not in REFERENCE_CHART_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unsupported reference chart: {chart_type}")
+    birth_data = request.get("birth_data") or {}
+    if not birth_data:
+        raise HTTPException(status_code=400, detail="birth_data is required")
+    try:
+        ayanamsha, node_type, explicit_profile = _parashari_view_profile(request)
+
+        class BirthDataSimple:
+            def __init__(self, data):
+                self.name = data.get("name", "Unknown")
+                self.date = data.get("date")
+                self.time = data.get("time")
+                self.latitude = float(data.get("latitude", 0))
+                self.longitude = float(data.get("longitude", 0))
+                self.timezone = data.get("timezone", "")
+                self.place = data.get("place", "")
+                self.gender = data.get("gender", "")
+                self.relation = data.get("relation", "other")
+
+        d1 = ChartCalculator({}).calculate_chart(BirthDataSimple(birth_data), node_type=node_type, ayanamsha=ayanamsha)
+        d9 = DivisionalChartCalculator(d1).calculate_divisional_chart(9)["divisional_chart"]
+        if chart_type == "chandra_lagna":
+            moon = d1.get("planets", {}).get("Moon") or {}
+            reference = {"key": chart_type, "name": "Chandra Lagna", "sign": moon.get("sign"), "longitude": moon.get("longitude"), "precision": "exact_longitude", "calculation_basis": {"formula": "Moon's natal sidereal longitude"}}
+        elif chart_type == "surya_lagna":
+            sun = d1.get("planets", {}).get("Sun") or {}
+            reference = {"key": chart_type, "name": "Surya Lagna", "sign": sun.get("sign"), "longitude": sun.get("longitude"), "precision": "exact_longitude", "calculation_basis": {"formula": "Sun's natal sidereal longitude"}}
+        elif chart_type in {"arudha_lagna", "upapada_lagna"}:
+            points = JaiminiPointCalculator(d1, d9, "Sun", birth_data=birth_data, ayanamsha=ayanamsha).calculate_jaimini_points()
+            point_key = "arudha_lagna" if chart_type == "arudha_lagna" else "upapada_lagna"
+            point = points[point_key]
+            reference = {"key": chart_type, "name": "Arudha Lagna" if point_key == "arudha_lagna" else "Upapada Lagna", "sign": point["sign_id"], "precision": "sign_only", "longitude_is_plotting_anchor": True, "calculation_basis": {"formula": "Jaimini Arudha Pada with same-sign and seventh-sign exceptions"}}
+        else:
+            rows = ClassicalSpecialPointsCalculator(d1, birth_data, d9, ayanamsha=ayanamsha).special_lagnas().get("points", [])
+            by_key = {row.get("key"): row for row in rows}
+            reference = by_key.get(chart_type)
+            if not reference:
+                raise ValueError(f"{chart_type} could not be calculated")
+        return {
+            "success": True,
+            "chart_type": chart_type,
+            "reference_chart": _recast_reference_chart(d1, reference),
+            "reference_lagna": reference,
+            **({"calculation_profile": {"ayanamsha": ayanamsha, "node_type": node_type}} if explicit_profile else {}),
+        }
+    except (SpecialPointCalculationError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("reference chart calculation failed: %s", chart_type)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 @router.post("/calculate-chart")
 async def calculate_chart_with_db_save(birth_data: BirthData, node_type: str = 'mean', current_user: User = Depends(get_current_user)):

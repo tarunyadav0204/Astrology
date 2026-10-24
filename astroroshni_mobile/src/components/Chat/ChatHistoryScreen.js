@@ -15,12 +15,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { storage } from '../../services/storage';
+import { chatAPI } from '../../services/api';
+import { invalidateChatHistory } from '../../services/chatHistoryInvalidation';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { goBackOrHome } from '../../navigation/navHelpers';
 import SavedAnswers from './SavedAnswers';
 import FocusedStatusBar from '../Common/FocusedStatusBar';
+import AppAlertModal from '../Common/AppAlertModal';
 
 const getDateKey = (timestamp) => {
   if (!timestamp) return 'unknown';
@@ -41,6 +44,9 @@ export default function ChatHistoryScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [historyMenuOpen, setHistoryMenuOpen] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [appAlert, setAppAlert] = useState(null);
 
   const loadChatHistory = useCallback(async (pageNum = 1, append = false) => {
     try {
@@ -90,6 +96,74 @@ export default function ChatHistoryScreen({ navigation }) {
   }, [navigation]);
 
   useEffect(() => { loadChatHistory(); }, [loadChatHistory]);
+
+  const dismissAppAlert = useCallback(() => setAppAlert(null), []);
+
+  const deleteAllChatHistory = async () => {
+    setDeletingAll(true);
+    try {
+      const { data } = await chatAPI.clearHistory();
+      // The server archive is the source of truth, but active-chat caches are
+      // intentionally removed too so a deleted answer cannot reappear offline.
+      invalidateChatHistory();
+      await storage.clearChatHistory();
+      setHistoryRows([]);
+      setHasMore(false);
+      setPage(1);
+      setSearchQuery('');
+
+      const deletedMessages = Number(data?.deleted_messages || 0);
+      setAppAlert({
+        variant: 'success',
+        title: t('accountSecurity.chatHistoryDeletedTitle', 'Chat history deleted'),
+        message: deletedMessages > 0
+          ? t(
+              'accountSecurity.chatHistoryDeletedCount',
+              {
+                count: deletedMessages,
+                defaultValue: '{{count}} chat messages have been permanently deleted. Your account, charts and credits are unchanged.',
+              }
+            )
+          : t(
+              'accountSecurity.chatHistoryAlreadyEmpty',
+              'Your chat history is already empty. Your account, charts and credits are unchanged.'
+            ),
+      });
+    } catch (error) {
+      const detail = error?.response?.data?.detail;
+      const message = typeof detail === 'string'
+        ? detail
+        : error?.message || t('accountSecurity.requestFailed', 'Request failed');
+      setAppAlert({
+        variant: 'error',
+        title: t('accountSecurity.chatHistoryDeleteFailedTitle', 'Could not delete chat history'),
+        message,
+      });
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
+  const confirmDeleteAllChatHistory = () => {
+    setHistoryMenuOpen(false);
+    setAppAlert({
+      variant: 'warning',
+      title: t('accountSecurity.deleteChatsConfirmTitle', 'Delete all chat history?'),
+      message: t(
+        'accountSecurity.deleteChatsConfirmBody',
+        'Every question and answer in your chat history will be permanently deleted. Your account, birth charts and credits will remain available.'
+      ),
+      secondaryText: t('common.cancel', 'Cancel'),
+      primaryText: t('accountSecurity.deleteAllChats', 'Delete All Chats'),
+      onPrimaryPress: deleteAllChatHistory,
+    });
+  };
+
+  const handleAlertPrimary = () => {
+    const action = appAlert?.onPrimaryPress;
+    dismissAppAlert();
+    if (typeof action === 'function') void action();
+  };
 
   const filteredRows = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -187,6 +261,33 @@ export default function ChatHistoryScreen({ navigation }) {
           <View style={[styles.countPill, { backgroundColor: colors.accentSoft }]}>
             <Text style={[styles.countText, { color: colors.onAccent }]}>{historyRows.length}</Text>
           </View>
+          {view === 'all' && (
+            <View style={styles.headerMenuAnchor}>
+              <TouchableOpacity
+                onPress={() => setHistoryMenuOpen((open) => !open)}
+                disabled={deletingAll}
+                accessibilityRole="button"
+                accessibilityLabel={t('historyUi.chat.actions', 'Chat history actions')}
+                accessibilityHint={t('historyUi.chat.actionsHint', 'Opens chat history actions')}
+                style={[styles.headerMenuButton, { borderColor: colors.cosmicLine || colors.cardBorder }]}
+              >
+                {deletingAll ? <ActivityIndicator size="small" color={colors.textInverse} /> : <Ionicons name="ellipsis-vertical" size={20} color={colors.textInverse} />}
+              </TouchableOpacity>
+              {historyMenuOpen && (
+                <View style={[styles.historyMenu, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+                  <TouchableOpacity
+                    onPress={confirmDeleteAllChatHistory}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('accountSecurity.deleteAllChats', 'Delete All Chats')}
+                    style={styles.historyMenuItem}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={colors.error} />
+                    <Text style={[styles.historyMenuItemText, { color: colors.error }]}>{t('accountSecurity.deleteAllChats', 'Delete All Chats')}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
         </View>
 
         <View style={[styles.contentShell, { backgroundColor: colors.background }]}>
@@ -196,7 +297,7 @@ export default function ChatHistoryScreen({ navigation }) {
         </View>
 
         <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 12 }}>
-          {['all', 'saved'].map(value => <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: view === value }} onPress={() => setView(value)} style={{ padding: 10, borderRadius: 12, backgroundColor: view === value ? colors.surfaceMuted : colors.background }}><Text style={{ color: colors.text }}>{value === 'all' ? 'All chats' : 'Saved answers'}</Text></TouchableOpacity>)}
+          {['all', 'saved'].map(value => <TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{ selected: view === value }} onPress={() => { setView(value); setHistoryMenuOpen(false); }} style={{ padding: 10, borderRadius: 12, backgroundColor: view === value ? colors.surfaceMuted : colors.background }}><Text style={{ color: colors.text }}>{value === 'all' ? 'All chats' : 'Saved answers'}</Text></TouchableOpacity>)}
         </View>
         {view === 'saved' ? <SavedAnswers navigation={navigation} /> : <>
         <View
@@ -245,6 +346,17 @@ export default function ChatHistoryScreen({ navigation }) {
         </>}
         </View>
       </SafeAreaView>
+      <AppAlertModal
+        visible={appAlert != null}
+        variant={appAlert?.variant ?? 'info'}
+        title={appAlert?.title ?? ''}
+        message={appAlert?.message ?? ''}
+        primaryText={appAlert?.primaryText}
+        secondaryText={appAlert?.secondaryText}
+        onPrimaryPress={handleAlertPrimary}
+        onSecondaryPress={dismissAppAlert}
+        onRequestClose={dismissAppAlert}
+      />
     </View>
   );
 }
@@ -253,13 +365,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   contentShell: { flex: 1 },
-  header: { minHeight: 78, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1 },
+  header: { minHeight: 78, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, zIndex: 2 },
   backButton: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1, paddingHorizontal: 14 },
   headerEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 2 },
   headerTitle: { fontSize: 23, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600', marginTop: 2 },
   countPill: { minWidth: 38, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   countText: { fontSize: 13, fontWeight: '900' },
+  headerMenuAnchor: { position: 'relative', marginLeft: 8, zIndex: 3 },
+  headerMenuButton: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  historyMenu: { position: 'absolute', top: 46, right: 0, width: 210, borderRadius: 14, borderWidth: 1, padding: 6, elevation: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.22, shadowRadius: 14 },
+  historyMenuItem: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, borderRadius: 10 },
+  historyMenuItemText: { fontSize: 14, fontWeight: '800' },
   intro: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 18 },
   introTitle: { fontSize: 31, lineHeight: 36, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '500' },
   introBody: { fontSize: 14, lineHeight: 21, marginTop: 8, maxWidth: 470 },

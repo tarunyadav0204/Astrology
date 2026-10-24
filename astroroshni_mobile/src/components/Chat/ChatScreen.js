@@ -52,6 +52,7 @@ import ChatCreditChoiceModal from './ChatCreditChoiceModal';
 import PodcastPromoModal from './PodcastPromoModal';
 import ChatRatingPromptModal from './ChatRatingPromptModal';
 import { storage } from '../../services/storage';
+import { subscribeToChatHistoryInvalidation } from '../../services/chatHistoryInvalidation';
 import { chatAPI, creditAPI, mundaneAPI, predictionAPI } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, LANGUAGES, API_BASE_URL, getEndpoint } from '../../utils/constants';
@@ -288,8 +289,19 @@ const DEFAULT_CHAT_SUGGESTIONS = [
 const DEBUG_SHOW_RATING_PROMPT_ON_CHAT_OPEN = false;
 /** Dev testing: if true, never redirect to Play/App Store from Rate now. */
 const DEBUG_IN_APP_REVIEW_ONLY = false;
-const CHAT_RENDER_WINDOW_DEFAULT = 80;
-const CHAT_RENDER_WINDOW_STEP = 80;
+// Chat History is the durable archive. Keeping this screen's state bounded is
+// essential on Android: a long-running account must not repeatedly sort and
+// serialize thousands of full AI answers for every incoming status update.
+const CHAT_ACTIVE_MESSAGE_LIMIT = 30;
+const CHAT_RENDER_WINDOW_DEFAULT = CHAT_ACTIVE_MESSAGE_LIMIT;
+const CHAT_RENDER_WINDOW_STEP = CHAT_ACTIVE_MESSAGE_LIMIT;
+
+const keepRecentActiveMessages = (messageList) => {
+  const messages = Array.isArray(messageList) ? messageList : [];
+  return messages.length > CHAT_ACTIVE_MESSAGE_LIMIT
+    ? messages.slice(-CHAT_ACTIVE_MESSAGE_LIMIT)
+    : messages;
+};
 
 /** Client wait anchor for countdown + poll budget; ignore stale server started_at (idempotent / old row). */
 function mergeProcessingStartedAt(clientIso, serverIso) {
@@ -823,6 +835,9 @@ export default function ChatScreen({ navigation, route }) {
   }, [verifiedChatEnabled, isVerifiedAnalysis]);
 
   const [messages, setMessages] = useState([]);
+  // Incrementing this prevents an already-scheduled write of old state from
+  // restoring messages after the user deletes all chat history elsewhere.
+  const chatHistoryGenerationRef = useRef(0);
   const [inputText, setInputText] = useState('');
   /** Multiline input stays one line while empty; grows only when there is text. */
   const [composerHeight, setComposerHeight] = useState(44);
@@ -853,6 +868,7 @@ export default function ChatScreen({ navigation, route }) {
   const [creditChoiceMode, setCreditChoiceMode] = useState('standard');
   const [creditChoiceQuestion, setCreditChoiceQuestion] = useState('');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showNewConversationConfirm, setShowNewConversationConfirm] = useState(false);
   /** Soft push opt-in after a successful answer (Android; cadence in notificationReminder). */
   const [showChatNotifBanner, setShowChatNotifBanner] = useState(false);
 
@@ -2808,7 +2824,7 @@ export default function ChatScreen({ navigation, route }) {
         loadMessagesFromStorage(personId).then(async storedMessages => {
           if (storedMessages.length > 0) {
             await hydrateSelectedChatMode(storedMessages, personId);
-            setMessages(storedMessages);
+            setMessagesWithStorage(storedMessages);
             // Ask Tara is the default landing surface; restore the last thread immediately.
 
             // Align to the last answer once chat is visible; don't jump to the thread bottom.
@@ -2891,20 +2907,24 @@ export default function ChatScreen({ navigation, route }) {
   }, [birthData?.id, showGreeting]);
 
   // Save messages to AsyncStorage per person (like web app)
-  const saveMessagesToStorage = async (messages, personId = currentPersonId) => {
+  const saveMessagesToStorage = async (messages, personId = currentPersonId, generation = chatHistoryGenerationRef.current) => {
     if (!personId) return;
+    if (generation !== chatHistoryGenerationRef.current) return;
     try {
-      await AsyncStorage.setItem(`chatMessages_${personId}`, JSON.stringify(sortMessagesForDisplay(messages)));
+      const recentMessages = keepRecentActiveMessages(sortMessagesForDisplay(messages));
+      if (generation !== chatHistoryGenerationRef.current) return;
+      await AsyncStorage.setItem(`chatMessages_${personId}`, JSON.stringify(recentMessages));
     } catch (error) {
       console.error('Error saving messages:', error);
     }
   };
 
   // Load messages from AsyncStorage per person (like web app)
-  const loadMessagesFromStorage = async (personId = currentPersonId) => {
+  const loadMessagesFromStorage = async (personId = currentPersonId, generation = chatHistoryGenerationRef.current) => {
     if (!personId) return [];
     try {
       const stored = await AsyncStorage.getItem(`chatMessages_${personId}`);
+      if (generation !== chatHistoryGenerationRef.current) return [];
       if (stored) {
         const messages = JSON.parse(stored);
         // Older builds persisted a long bulleted welcome; rewrite stored welcome rows
@@ -2918,7 +2938,7 @@ export default function ChatScreen({ navigation, route }) {
             content: getWelcomeMessageContent(birthData?.name || 'there'),
           };
         });
-        return sortMessagesForDisplay(refreshed);
+        return keepRecentActiveMessages(sortMessagesForDisplay(refreshed));
       }
     } catch (error) {
       console.error('Error loading messages from storage:', error);
@@ -2936,7 +2956,7 @@ export default function ChatScreen({ navigation, route }) {
       if (newMessagesRaw === prev) {
         return prev;
       }
-      return sortMessagesForDisplay(newMessagesRaw);
+      return keepRecentActiveMessages(sortMessagesForDisplay(newMessagesRaw));
     });
   };
 
@@ -2944,7 +2964,8 @@ export default function ChatScreen({ navigation, route }) {
     if (loading || isTyping || messages.some(msg => msg.instantStreaming)) return undefined;
     const personId = currentPersonId || chatPersonStorageKey(birthData);
     if (!personId || !messages.length) return undefined;
-    const timer = setTimeout(() => saveMessagesToStorage(messages, personId), 300);
+    const generation = chatHistoryGenerationRef.current;
+    const timer = setTimeout(() => saveMessagesToStorage(messages, personId, generation), 300);
     return () => clearTimeout(timer);
   }, [messages, currentPersonId, birthData, loading, isTyping]);
 
@@ -3136,7 +3157,7 @@ export default function ChatScreen({ navigation, route }) {
             await hydrateSelectedChatMode(storedMessages, currentPersonId);
             // Only update messages if we don't have any current messages to avoid overwriting
             const prevLength = messages.length;
-            setMessages(prev => prev.length === 0 ? storedMessages : prev);
+            setMessagesWithStorage(prev => prev.length === 0 ? storedMessages : prev);
             // Ask Tara is the default landing surface; restore the last thread immediately.
 
             if (prevLength === 0 && storedMessages.length > 0 && !showGreeting) {
@@ -4184,6 +4205,41 @@ export default function ChatScreen({ navigation, route }) {
     };
   };
 
+  useEffect(() => subscribeToChatHistoryInvalidation(() => {
+    // Invalidate current polling/stream callbacks before clearing state: a
+    // response that finishes after deletion must not repopulate this thread.
+    chatHistoryGenerationRef.current += 1;
+    statusPollGenerationRef.current.clear();
+    instantRevealTimersRef.current.forEach((timer) => clearTimeout(timer));
+    instantRevealTimersRef.current.clear();
+    instantRevealActiveRef.current.clear();
+    instantStreamSocketsRef.current.forEach((socket) => {
+      try {
+        socket.close();
+      } catch (_) {
+        // Closing a stale socket is best-effort.
+      }
+    });
+    instantStreamSocketsRef.current.clear();
+    instantStreamContentRef.current.clear();
+
+    setSessionId(null);
+    setLoading(false);
+    setIsTyping(false);
+    setWaitSideReplying(false);
+    setPendingMessages(new Set());
+    setInputText('');
+    setRenderedMessageCount(CHAT_RENDER_WINDOW_DEFAULT);
+
+    if (birthData) {
+      setMessages([buildFreshWelcomeMessage(birthData.name || null)]);
+      setShowGreeting(false);
+    } else {
+      setMessages([]);
+      setShowGreeting(true);
+    }
+  }), [birthData, isInstantAnalysis]);
+
   const mapSessionMessagesToClient = (sessionData) => {
     const localByMessageId = new Map(
       (messages || [])
@@ -4302,7 +4358,9 @@ export default function ChatScreen({ navigation, route }) {
       force = false,
       openChat = false,
     } = options;
+    const generation = chatHistoryGenerationRef.current;
     const payload = await fetchSessionMessagesFromServer(targetSessionId);
+    if (generation !== chatHistoryGenerationRef.current) return false;
     if (!payload) return false;
 
     const activeBirth = partnershipMode ? nativeChart : birthData;
@@ -6714,9 +6772,33 @@ export default function ChatScreen({ navigation, route }) {
 
   /** Clears local thread, resets server session id (next send creates a new session). Server Chat History entries stay as-is. */
   const performStartNewChat = () => {
+    setShowNewConversationConfirm(false);
+    // A new conversation must not let an in-flight answer or delayed cache
+    // write restore the previous session into this fresh thread.
+    chatHistoryGenerationRef.current += 1;
+    statusPollGenerationRef.current.clear();
+    instantRevealTimersRef.current.forEach((timer) => clearTimeout(timer));
+    instantRevealTimersRef.current.clear();
+    instantRevealActiveRef.current.clear();
+    instantStreamSocketsRef.current.forEach((socket) => {
+      try {
+        socket.close();
+      } catch (_) {
+        // Best-effort cleanup of a previous conversation stream.
+      }
+    });
+    instantStreamSocketsRef.current.clear();
+    instantStreamContentRef.current.clear();
+    const personId = currentPersonId || chatPersonStorageKey(birthData);
+    if (personId) {
+      AsyncStorage.removeItem(`chatSessions_${personId}`).catch(() => {});
+    }
     setSessionId(null);
     setLoading(false);
     setIsTyping(false);
+    setPendingMessages(new Set());
+    setInputText('');
+    setRenderedMessageCount(CHAT_RENDER_WINDOW_DEFAULT);
     subjectGateOverrideRef.current = null;
     subjectGateMemoryRef.current = [];
     const nativeName = birthData?.name || 'there';
@@ -6743,18 +6825,7 @@ export default function ChatScreen({ navigation, route }) {
   };
 
   const confirmStartNewChat = () => {
-    Alert.alert(
-      t('chat.newConversationTitle', 'New conversation'),
-      t('chat.newConversationMessage', 'This clears the chat on this screen and starts a fresh session on your next message. Your past threads remain in Chat History.'),
-      [
-        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
-        {
-          text: t('chat.newConversationConfirm', 'Start fresh'),
-          style: 'destructive',
-          onPress: performStartNewChat,
-        },
-      ]
-    );
+    setShowNewConversationConfirm(true);
   };
 
   const clearChat = confirmStartNewChat;
@@ -7148,7 +7219,7 @@ export default function ChatScreen({ navigation, route }) {
               ) : (
                 <>
                   {!partnershipMode && !isMundane ? (
-                    <ChatSummary key={sessionId} messages={messages} onPartnership={!instantBilling.active && !loading ? () => openPartnershipModal(partnershipCost) : undefined} header headerSize={wideHeader ? 48 : 36} onDisablePrashna={prashnaLocation ? () => setPrashnaLocation(null) : undefined} onPrashna={verifiedChatEnabled && !instantBilling.active && !loading && !freeQuestionAvailable && !partnershipMode && !isMundane ? place => { setPrashnaLocation(place); applyChatModeFromTier('verified'); } : undefined} onResolved={result => { if (result.session_id === sessionId) setMessages(previous => appendConflictResolution(previous, result)); }} />
+                    <ChatSummary key={sessionId} messages={messages} onPartnership={!instantBilling.active && !loading ? () => openPartnershipModal(partnershipCost) : undefined} header headerSize={wideHeader ? 48 : 36} onDisablePrashna={prashnaLocation ? () => setPrashnaLocation(null) : undefined} onPrashna={verifiedChatEnabled && !instantBilling.active && !loading && !freeQuestionAvailable && !partnershipMode && !isMundane ? place => { setPrashnaLocation(place); applyChatModeFromTier('verified'); } : undefined} onResolved={result => { if (result.session_id === sessionId) setMessagesWithStorage(previous => appendConflictResolution(previous, result)); }} />
                   ) : null}
                   {!isMundane && !(isInstantAnalysis && instantBilling.active) ? (
                     <TouchableOpacity
@@ -8818,6 +8889,11 @@ export default function ChatScreen({ navigation, route }) {
                         },
                       }) : null}
                       {renderDrawerMenuRow({
+                        icon: 'add-circle-outline',
+                        label: t('menu.newConversation', 'New conversation'),
+                        action: confirmStartNewChat,
+                      })}
+                      {renderDrawerMenuRow({
                         icon: 'chatbubbles-outline',
                         label: t('menu.chatHistory', 'Chat History'),
                         action: () => navigation.navigate('ChatHistory'),
@@ -9897,6 +9973,19 @@ export default function ChatScreen({ navigation, route }) {
         onPrimaryPress={performLogout}
         onSecondaryPress={() => setShowLogoutConfirm(false)}
         onRequestClose={() => setShowLogoutConfirm(false)}
+      />
+
+      <AppAlertModal
+        visible={showNewConversationConfirm}
+        variant="warning"
+        icon="add-circle-outline"
+        title={t('chat.newConversationTitle', 'New conversation')}
+        message={t('chat.newConversationMessage', 'This clears the chat on this screen and starts a fresh session on your next message. Your past threads remain in Chat History.')}
+        primaryText={t('chat.newConversationConfirm', 'Start fresh')}
+        secondaryText={t('common.cancel', 'Cancel')}
+        onPrimaryPress={performStartNewChat}
+        onSecondaryPress={() => setShowNewConversationConfirm(false)}
+        onRequestClose={() => setShowNewConversationConfirm(false)}
       />
 
       <PodcastPromoModal

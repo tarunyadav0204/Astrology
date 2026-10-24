@@ -66,8 +66,10 @@ const SIGN_NAMES = [
 const PLANET_NAMES = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn', 'Rahu', 'Ketu'];
 
 const CHART_CODES = {
-  lagna: 'D1', navamsa: 'D9', transit: 'NOW', karkamsa: 'KA', swamsa: 'S9',
-  hora: 'D2', drekkana: 'D3', chaturthamsa: 'D4', dashamsa: 'D10',
+  lagna: 'D1', bhav_chalit: 'BC', navamsa: 'D9', transit: 'NOW', karkamsa: 'KA', swamsa: 'S9',
+  chandra_lagna: 'CL', surya_lagna: 'SL', arudha_lagna: 'AL', upapada_lagna: 'UL',
+  bhava_lagna: 'BL', hora_lagna: 'HL', ghatika_lagna: 'GL', pranapada_lagna: 'PP', indu_lagna: 'IL',
+  hora: 'D2', drekkana: 'D3', chaturthamsa: 'D4', panchamsa: 'D5', shashtamsa: 'D6', saptamsa: 'D7', ashtamsa: 'D8', dashamsa: 'D10', ekadasamsa: 'D11',
   dwadashamsa: 'D12', shodamsa: 'D16', vimsamsa: 'D20', chaturvimsamsa: 'D24',
   saptavimshamsa: 'D27', trimsamsa: 'D30', khavedamsa: 'D40',
   akshavedamsa: 'D45', shashtyamsa: 'D60',
@@ -106,6 +108,8 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   const [loading, setLoading] = useState(false);
   const [currentChartIndex, setCurrentChartIndex] = useState(0);
   const bottomNavScrollRef = useRef(null);
+  const chartTabLayoutsRef = useRef(new Map());
+  const chartTabViewportWidthRef = useRef(width);
   const pageScrollRef = useRef(null);
   const chartBlockRef = useRef(null);
   const pageScrollYRef = useRef(0);
@@ -181,10 +185,24 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
     { id: 'transit', name: t('chartTypes.transit.name'), icon: '🪐', description: t('chartTypes.transit.description') },
     { id: 'karkamsa', name: t('chartTypes.karkamsa.name'), icon: '🎯', description: t('chartTypes.karkamsa.description') },
     { id: 'swamsa', name: t('chartTypes.swamsa.name'), icon: '🕉️', description: t('chartTypes.swamsa.description') },
+    { id: 'chandra_lagna', name: t('chartTypes.chandraLagna.name'), icon: '🌙', description: t('chartTypes.chandraLagna.description') },
+    { id: 'surya_lagna', name: t('chartTypes.suryaLagna.name'), icon: '☀️', description: t('chartTypes.suryaLagna.description') },
+    { id: 'arudha_lagna', name: t('chartTypes.arudhaLagna.name'), icon: '🎭', description: t('chartTypes.arudhaLagna.description') },
+    { id: 'upapada_lagna', name: t('chartTypes.upapadaLagna.name'), icon: '💍', description: t('chartTypes.upapadaLagna.description') },
+    { id: 'bhava_lagna', name: t('chartTypes.bhavaLagna.name'), icon: '⌂', description: t('chartTypes.bhavaLagna.description') },
+    { id: 'hora_lagna', name: t('chartTypes.horaLagna.name'), icon: '💰', description: t('chartTypes.horaLagna.description') },
+    { id: 'ghatika_lagna', name: t('chartTypes.ghatikaLagna.name'), icon: '⌛', description: t('chartTypes.ghatikaLagna.description') },
+    { id: 'pranapada_lagna', name: t('chartTypes.pranapadaLagna.name'), icon: '✦', description: t('chartTypes.pranapadaLagna.description') },
+    { id: 'indu_lagna', name: t('chartTypes.induLagna.name'), icon: '◐', description: t('chartTypes.induLagna.description') },
     { id: 'hora', name: t('chartTypes.hora.name'), icon: '💰', description: t('chartTypes.hora.description') },
     { id: 'drekkana', name: t('chartTypes.drekkana.name'), icon: '👫', description: t('chartTypes.drekkana.description') },
     { id: 'chaturthamsa', name: t('chartTypes.chaturthamsa.name'), icon: '🏡', description: t('chartTypes.chaturthamsa.description') },
+    { id: 'panchamsa', name: t('chartTypes.panchamsa.name'), icon: '🎨', description: t('chartTypes.panchamsa.description') },
+    { id: 'shashtamsa', name: t('chartTypes.shashtamsa.name'), icon: '⚕️', description: t('chartTypes.shashtamsa.description') },
+    { id: 'saptamsa', name: t('chartTypes.saptamsa.name'), icon: '👶', description: t('chartTypes.saptamsa.description') },
+    { id: 'ashtamsa', name: t('chartTypes.ashtamsa.name'), icon: '🛡️', description: t('chartTypes.ashtamsa.description') },
     { id: 'dashamsa', name: t('chartTypes.dashamsa.name'), icon: '💼', description: t('chartTypes.dashamsa.description') },
+    { id: 'ekadasamsa', name: t('chartTypes.ekadasamsa.name'), icon: '📈', description: t('chartTypes.ekadasamsa.description') },
     { id: 'dwadashamsa', name: t('chartTypes.dwadashamsa.name'), icon: '👨👩👧👦', description: t('chartTypes.dwadashamsa.description') },
     { id: 'shodamsa', name: t('chartTypes.shodamsa.name'), icon: '🚗', description: t('chartTypes.shodamsa.description') },
     { id: 'vimsamsa', name: t('chartTypes.vimsamsa.name'), icon: '🙏', description: t('chartTypes.vimsamsa.description') },
@@ -208,14 +226,27 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
   // Must be declared before handleSwipe/changeChart — those hooks read it in their dep arrays.
   const scrollToActiveTab = useCallback((index) => {
     if (!bottomNavScrollRef.current) return;
-    const pillWidth = 126;
     const maxIndex = Math.max(0, chartTypes.length - 1);
     const safeIndex = Math.max(0, Math.min(index, maxIndex));
-    const x = Math.max(0, safeIndex * pillWidth - (width / 2) + (pillWidth / 2));
+    const activeChart = chartTypes[safeIndex];
+    const layout = activeChart ? chartTabLayoutsRef.current.get(activeChart.id) : null;
+    // Use measured positions rather than an assumed pill width: translated
+    // names and tablet cards have different widths. Centering the active tab
+    // keeps it visible after tap, swipe, and programmatic chart changes.
+    const viewportWidth = chartTabViewportWidthRef.current || width;
+    const x = layout
+      ? Math.max(0, layout.x - ((viewportWidth - layout.width) / 2))
+      : Math.max(0, safeIndex * 126 - (viewportWidth / 2) + 63);
     try {
       bottomNavScrollRef.current.scrollTo({ x, animated: true });
     } catch (_) {}
   }, [chartTypes.length]);
+
+  useEffect(() => {
+    // The selected tab may be laid out one frame after the chart changes.
+    const timer = setTimeout(() => scrollToActiveTab(currentChartIndex), 0);
+    return () => clearTimeout(timer);
+  }, [currentChartIndex, scrollToActiveTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -978,8 +1009,13 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                 chartTypes[currentChartIndex].id === 'hora' ? 2 :
                 chartTypes[currentChartIndex].id === 'drekkana' ? 3 :
                 chartTypes[currentChartIndex].id === 'chaturthamsa' ? 4 :
+                chartTypes[currentChartIndex].id === 'panchamsa' ? 5 :
+                chartTypes[currentChartIndex].id === 'shashtamsa' ? 6 :
+                chartTypes[currentChartIndex].id === 'saptamsa' ? 7 :
+                chartTypes[currentChartIndex].id === 'ashtamsa' ? 8 :
                 chartTypes[currentChartIndex].id === 'navamsa' ? 9 :
                 chartTypes[currentChartIndex].id === 'dashamsa' ? 10 :
+                chartTypes[currentChartIndex].id === 'ekadasamsa' ? 11 :
                 chartTypes[currentChartIndex].id === 'dwadashamsa' ? 12 :
                 chartTypes[currentChartIndex].id === 'shodamsa' ? 16 :
                 chartTypes[currentChartIndex].id === 'vimsamsa' ? 20 :
@@ -1108,6 +1144,10 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                       ref={bottomNavScrollRef}
                       horizontal
                       showsHorizontalScrollIndicator={false}
+                      onLayout={(event) => {
+                        chartTabViewportWidthRef.current = event.nativeEvent.layout.width;
+                        scrollToActiveTab(currentChartIndex);
+                      }}
                       contentContainerStyle={styles.collectionRow}
                     >
                       {chartTypes.map((chart, index) => {
@@ -1115,6 +1155,10 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                         return (
                           <TouchableOpacity
                             key={chart.id}
+                            onLayout={(event) => {
+                              chartTabLayoutsRef.current.set(chart.id, event.nativeEvent.layout);
+                              if (selected) scrollToActiveTab(index);
+                            }}
                             onPress={() => changeChart(index)}
                             activeOpacity={0.8}
                             style={[
@@ -1125,7 +1169,7 @@ export default function ChartScreen({ navigation, route, onHeaderStateChange }) 
                               },
                             ]}
                           >
-                            <Text style={[styles.collectionCode, wideSheet && styles.collectionCodeTablet, { color: selected ? colors.primary : colors.textTertiary }]}>{CHART_CODES[chart.id] || `D${index + 1}`}</Text>
+                            <Text style={[styles.collectionCode, wideSheet && styles.collectionCodeTablet, { color: selected ? colors.primary : colors.textTertiary }]}>{CHART_CODES[chart.id] || '—'}</Text>
                             <Text style={[styles.collectionName, wideSheet && styles.collectionNameTablet, { color: selected ? colors.text : colors.textSecondary }]} numberOfLines={1}>{chart.name.replace(/\s*\([^)]*\)\s*$/, '')}</Text>
                           </TouchableOpacity>
                         );

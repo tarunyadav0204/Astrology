@@ -501,6 +501,16 @@ export const apiService = {
     });
     return response.data;
   },
+
+  calculateReferenceChart: async (birthData, chartType, calculationProfile = null) => {
+    const { timezone, ...birthDataWithoutTimezone } = birthData;
+    const response = await apiClient.post(getEndpoint('/calculate-reference-chart'), {
+      birth_data: birthDataWithoutTimezone,
+      chart_type: chartType,
+      ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
+    });
+    return response.data;
+  },
   
   // Rule Engine APIs
   getRules: async () => {
