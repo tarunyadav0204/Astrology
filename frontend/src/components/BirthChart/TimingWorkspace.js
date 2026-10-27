@@ -13,6 +13,8 @@ const TOPIC_GROUPS = [
   },
   {
     key: 'relationships', label: 'Relationships', topics: [
+      { key: 'relationship_meeting', label: 'Meeting / beginning', houses: [5, 7, 11], varga: 'D9' },
+      { key: 'engagement', label: 'Engagement', houses: [2, 7, 9, 11], varga: 'D9' },
       { key: 'marriage', label: 'Marriage', houses: [2, 5, 7, 9, 11], varga: 'D9' },
     ],
   },
@@ -27,7 +29,8 @@ const TOPIC_GROUPS = [
   },
   {
     key: 'money', label: 'Money', topics: [
-      { key: 'income_gain', label: 'Wealth', houses: [2, 5, 9, 11], varga: 'D2' },
+      { key: 'income_gain', label: 'Income / gains', houses: [2, 5, 9, 11], varga: 'D2' },
+      { key: 'speculative_gain', label: 'Speculative trading', houses: [2, 5, 9, 11], varga: 'D2' },
     ],
   },
   {
@@ -183,38 +186,39 @@ function divisionalEvidence(window, fallbackChart) {
   };
 }
 
-function topicNatalAssessment(insights, houses) {
-  const assessmentTone = (label) => {
-    const normalized = String(label || '').toLowerCase();
-    if (normalized.includes('well supported') || normalized === 'supported') return 'green';
-    if (normalized.includes('supported but pressured')) return 'amber';
-    if (normalized.includes('challenging')) return 'challenging';
-    if (normalized.includes('mixed')) return 'amber';
-    return 'neutral';
+function promiseTone(status) {
+  return ({ supportive: 'supportive', mixed: 'mixed', pressured: 'challenging' })[status] || 'neutral';
+}
+
+function precisionSummary(window) {
+  const precision = window?.precision;
+  if (!precision) return { label: 'Timing resolution unavailable', date: null, explanation: 'The calculation did not return a precision ledger.' };
+  return {
+    label: precision.label || 'Timing resolution',
+    date: precision.grade === 'date_trigger' ? (precision.date || window?.peak_date) : null,
+    explanation: precision.explanation || 'No additional precision explanation was returned.',
   };
-  const byHouse = new Map(insights.map((insight) => [Number(insight.house_num), insight]));
-  const houseStates = houses.map((house) => {
-    const label = byHouse.get(house)?.verdict?.label;
-    return label ? { house, label, tone: assessmentTone(label) } : { house, label: 'Assessing…', tone: 'neutral' };
-  });
-  const tones = houseStates.map((item) => item.tone).filter((tone) => tone !== 'neutral');
-  const tone = tones.includes('challenging') ? 'challenging'
-    : tones.includes('amber') ? 'mixed'
-      : tones.includes('green') ? 'supportive' : 'neutral';
-  return { tone, houseStates, ready: insights.length === houses.length };
 }
 
-function monthPosition(value, year) {
+function addMonths(value, months) {
+  const source = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  const targetMonth = source.getMonth() + Number(months);
+  const lastDay = new Date(source.getFullYear(), targetMonth + 1, 0).getDate();
+  const target = new Date(source.getFullYear(), targetMonth, Math.min(source.getDate(), lastDay));
+  return target.toISOString().slice(0, 10);
+}
+
+function rangePosition(value, start, end) {
   const date = new Date(`${String(value || '').slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(date.getTime()) || date.getFullYear() !== year) return 0;
-  const yearStart = new Date(year, 0, 1);
-  const yearEnd = new Date(year + 1, 0, 1);
-  return ((date - yearStart) / (yearEnd - yearStart)) * 100;
+  const rangeStart = new Date(`${String(start || '').slice(0, 10)}T00:00:00`);
+  const rangeEnd = new Date(`${String(end || '').slice(0, 10)}T23:59:59`);
+  if (Number.isNaN(date.getTime()) || Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime()) || rangeEnd <= rangeStart) return 0;
+  return ((date - rangeStart) / (rangeEnd - rangeStart)) * 100;
 }
 
-function windowStyle(window, year) {
-  const start = Math.max(0, monthPosition(window.start_date, year));
-  const end = Math.min(100, Math.max(start + 2, monthPosition(window.end_date, year)));
+function windowStyle(window, rangeStart, rangeEnd) {
+  const start = Math.max(0, rangePosition(window.start_date, rangeStart, rangeEnd));
+  const end = Math.min(100, Math.max(start + 2, rangePosition(window.end_date, rangeStart, rangeEnd)));
   return { left: `${start}%`, width: `${Math.max(4, end - start)}%` };
 }
 
@@ -288,6 +292,9 @@ export default function TimingWorkspace({
   const [topicGroupKey, setTopicGroupKey] = useState('progeny');
   const [topicKey, setTopicKey] = useState('conception');
   const [year, setYear] = useState(() => Number(String(asOf || new Date().toISOString()).slice(0, 4)));
+  const [rangeMode, setRangeMode] = useState('calendar');
+  const [customStart, setCustomStart] = useState(() => String(asOf || new Date().toISOString()).slice(0, 10));
+  const [customEnd, setCustomEnd] = useState(() => addMonths(String(asOf || new Date().toISOString()).slice(0, 10), 12));
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -308,9 +315,27 @@ export default function TimingWorkspace({
   const chartId = birthData?.chart_id || birthData?.birth_chart_id || birthData?.id || null;
 
   useEffect(() => {
-    setYear(Number(String(asOf || new Date().toISOString()).slice(0, 4)));
-    setSelectedMapDate(asOf || null);
+    const asOfDate = String(asOf || new Date().toISOString()).slice(0, 10);
+    setYear(Number(asOfDate.slice(0, 4)));
+    setCustomStart(asOfDate);
+    setCustomEnd(addMonths(asOfDate, 12));
+    setSelectedMapDate(asOfDate);
   }, [asOf]);
+
+  const requestedHorizon = useMemo(() => {
+    if (rangeMode === 'calendar') {
+      return {
+        start: `${year}-01-01`, end: `${year}-12-31`, label: `calendar year ${year}`, year,
+      };
+    }
+    if (rangeMode === 'custom') {
+      return { start: customStart, end: customEnd, label: `${formatDate(customStart, { day: 'numeric', month: 'short', year: 'numeric' })} – ${formatDate(customEnd, { day: 'numeric', month: 'short', year: 'numeric' })}`, year: null };
+    }
+    const months = Number(rangeMode);
+    const end = new Date(`${addMonths(customStart, months)}T12:00:00`);
+    end.setDate(end.getDate() - 1);
+    return { start: customStart, end: end.toISOString().slice(0, 10), label: `next ${months} months`, year: null };
+  }, [customEnd, customStart, rangeMode, year]);
 
   useEffect(() => {
     setNatalEvidenceOpen(false);
@@ -353,7 +378,9 @@ export default function TimingWorkspace({
       birthChartId: chartId,
       birthData,
       eventKey: topic.key,
-      year,
+      year: requestedHorizon.year,
+      startDate: requestedHorizon.year ? null : requestedHorizon.start,
+      endDate: requestedHorizon.year ? null : requestedHorizon.end,
       includeDeveloping: true,
       calculationProfile,
     }).then((result) => {
@@ -369,7 +396,7 @@ export default function TimingWorkspace({
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [birthData, calculationProfile, chartId, searchedTopicKey, searchVersion, topic.key, year]);
+  }, [birthData, calculationProfile, chartId, requestedHorizon.end, requestedHorizon.start, requestedHorizon.year, searchedTopicKey, searchVersion, topic.key]);
 
   const preciseWindows = useMemo(() => (
     (data?.windows || []).filter((item) => Number(item.peak_rank) >= 2)
@@ -403,7 +430,6 @@ export default function TimingWorkspace({
   const currentDasha = activationResult?.house_activations?.find((item) => (
     item.window?.start_date <= asOf && item.window?.end_date >= asOf
   ))?.window;
-  const natalAssessment = topicNatalAssessment(houseInsights, topic.houses);
   const selectedDashaEvidence = dashaEvidence(selectedWindow);
   const selectedDashaConnections = dashaConnections(selectedWindow);
   const selectedTransitEvidence = transitEvidence(selectedWindow);
@@ -411,12 +437,14 @@ export default function TimingWorkspace({
     || selectedTransitEvidence.exact.length > 0
     || selectedTransitEvidence.short.length > 0;
   const selectedDivisionalEvidence = divisionalEvidence(selectedWindow, topic.varga);
-  const progenyD7Confirmation = topicGroup.key === 'progeny' ? selectedDivisionalEvidence : null;
+  const topicVargaConfirmation = selectedDivisionalEvidence;
+  const eventNatalPromise = data?.natal_promise || null;
+  const selectedPrecision = precisionSummary(selectedWindow);
   const verdict = preciseWindows.length
-    ? `${preciseWindows.length} qualifying ${topic.label.toLowerCase()} period${preciseWindows.length === 1 ? '' : 's'} with ${exactTriggers.length || preciseWindows.length} exact confirmation${(exactTriggers.length || preciseWindows.length) === 1 ? '' : 's'} in ${year}.`
+    ? `${preciseWindows.length} ${topic.label.toLowerCase()} activation period${preciseWindows.length === 1 ? '' : 's'} with ${exactTriggers.length || preciseWindows.length} date-level transit trigger${(exactTriggers.length || preciseWindows.length) === 1 ? '' : 's'} in the selected horizon.`
     : broadWindows.length
-      ? `${broadWindows.length} qualifying ${topic.label.toLowerCase()} period${broadWindows.length === 1 ? '' : 's'} found in ${year}; no exact date was isolated.`
-      : `No qualifying ${topic.label.toLowerCase()} period was found in ${year}.`;
+      ? `${broadWindows.length} ${topic.label.toLowerCase()} activation period${broadWindows.length === 1 ? '' : 's'} found in the selected horizon; no date-level transit trigger was isolated.`
+      : `No activated ${topic.label.toLowerCase()} period was found in the selected horizon.`;
   const allWindows = useMemo(() => data?.windows || [], [data]);
   const dashaLanes = useMemo(() => {
     const raw = data?.timing_map?.dasha;
@@ -462,7 +490,9 @@ export default function TimingWorkspace({
   ), [displayedTransitLanes, selectedTransitLaneKey]);
   const windowInspectionDate = selectedWindow?.inspection_date || selectedWindow?.peak_date || selectedWindow?.start_date;
   const selectedDate = selectedMapDate || windowInspectionDate;
-  const selectedPosition = Math.min(100, Math.max(0, monthPosition(selectedDate, year)));
+  const mapStart = data?.as_of || requestedHorizon.start;
+  const mapEnd = data?.horizon_end || requestedHorizon.end;
+  const selectedPosition = Math.min(100, Math.max(0, rangePosition(selectedDate, mapStart, mapEnd)));
   const dashaAtSelectedDate = useMemo(() => Object.fromEntries(
     ['MD', 'AD', 'PD'].map((level) => [level, dashaLanes[level]?.find((lane) => (
       lane.start_date <= selectedDate && lane.end_date >= selectedDate
@@ -533,11 +563,27 @@ export default function TimingWorkspace({
             >{group.label}</button>
           ))}
         </div>
-        <label className="timing-year-picker">Year
-          <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
-            {[year - 1, year, year + 1].map((value) => <option key={value} value={value}>{value}</option>)}
-          </select>
-        </label>
+        <div className="timing-horizon-picker" aria-label="Timing search horizon">
+          <label>Horizon
+            <select value={rangeMode} onChange={(event) => setRangeMode(event.target.value)}>
+              <option value="calendar">Calendar year</option>
+              <option value="3">Next 3 months</option>
+              <option value="6">Next 6 months</option>
+              <option value="12">Next 12 months</option>
+              <option value="24">Next 24 months</option>
+              <option value="custom">Custom range</option>
+            </select>
+          </label>
+          {rangeMode === 'calendar' ? <label>Year
+            <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
+              {[year - 1, year, year + 1].map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label> : null}
+          {rangeMode === 'custom' ? <>
+            <label>From <input type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} /></label>
+            <label>To <input type="date" value={customEnd} min={customStart} onChange={(event) => setCustomEnd(event.target.value)} /></label>
+          </> : null}
+        </div>
       </div>
 
       <div className="timing-topic-subtabs" role="tablist" aria-label={`${topicGroup.label} timing tools`}>
@@ -553,53 +599,59 @@ export default function TimingWorkspace({
       </div>
 
       <div className="timing-search-control">
-        <p>Timing windows for the selected topic load automatically for the full calendar year.</p>
+        <p>Timing windows load for the selected horizon. Use a past custom range to validate known events; it does not rewrite the original calculation.</p>
         <button type="button" onClick={() => setSearchVersion((version) => version + 1)} disabled={!birthData || loading}>
           {loading && searchedTopicKey === topic.key ? 'Calculating…' : `Refresh ${topic.label} windows`}
         </button>
       </div>
 
       <section className="timing-context" aria-label="Current timing context">
-        <div className={`timing-promise-verdict timing-promise-verdict--${natalAssessment.tone}`}>
-          <span>D1 house assessments</span>
-          {!natalEvidenceOpen ? <strong>Available on demand</strong> : null}
-          {natalEvidenceOpen && !natalAssessment.ready ? <strong>Loading house assessments…</strong> : null}
-          {natalEvidenceOpen ? <div className="timing-natal-assessment-chips">{natalAssessment.houseStates.map((item) => <span key={item.house} className={`timing-natal-assessment-chip timing-natal-assessment-chip--${item.tone}`}><b>House {item.house}{' '}</b><small>{item.label}</small></span>)}</div> : null}
+        <div className={`timing-promise-verdict timing-promise-verdict--${promiseTone(eventNatalPromise?.status)}`}>
+          <span>D1 natal event promise</span>
+          <strong>{eventNatalPromise?.label || (loading ? 'Assessing natal promise…' : 'Natal promise unavailable')}</strong>
+          {eventNatalPromise ? <p>{eventNatalPromise.interpretation}</p> : null}
+          {eventNatalPromise?.houses?.length ? <div className="timing-natal-assessment-chips">{eventNatalPromise.houses.map((item) => <span key={`${item.role}-${item.house}`} className={`timing-natal-assessment-chip timing-natal-assessment-chip--${promiseTone(item.tone)}`}><b>House {item.house}{' '}</b><small>{item.role} · {item.tone}</small></span>)}</div> : null}
         </div>
         <div>
           <span>Dasha now</span>
           <strong>{dashaPath(currentDasha)}</strong>
         </div>
-        <button type="button" onClick={inspectNatalEvidence}>{natalEvidenceOpen ? 'Hide natal evidence' : 'Inspect natal evidence'}</button>
+        <button type="button" onClick={inspectNatalEvidence}>{natalEvidenceOpen ? 'Hide house-by-house audit' : 'Inspect house-by-house audit'}</button>
       </section>
 
-      {progenyD7Confirmation ? (
-        <section className="timing-d7-confirmation" aria-label={`D7 Saptamsa ${topic.label} confirmation`}>
+      {data?.calculation_context ? <section className="timing-calculation-context" aria-label="Timing calculation context">
+        <div><span>Calculation basis</span><strong>{calculationProfile?.ayanamsha || 'lahiri'} ayanamsha · {calculationProfile?.node_type || 'mean'} nodes</strong></div>
+        <div><span>Birth-chart timezone</span><strong>{data.calculation_context.birth_timezone || 'Not recorded'}</strong></div>
+        <div><span>Precision boundary</span><p>{data.calculation_context.precision_policy}</p></div>
+      </section> : null}
+
+      {topicVargaConfirmation ? (
+        <section className="timing-d7-confirmation" aria-label={`${topicVargaConfirmation.chart} ${topic.label} confirmation`}>
           <div className="timing-d7-confirmation__intro">
-            <span>D7 / Saptamsa</span>
-            <h3>Progeny confirmation</h3>
+            <span>{topicVargaConfirmation.chart} divisional chart</span>
+            <h3>{topic.label} confirmation</h3>
             <p>
               {selectedWindow
-                ? `This checks whether an active Dasha lord connects with the relevant D7 houses during the selected ${topic.label} window.`
-                : `Choose a ${topic.label} timing window to check its D7 confirmation.`}
+                ? `This checks whether an active Dasha lord connects with the relevant ${topicVargaConfirmation.chart} houses during the selected ${topic.label} window.`
+                : `Choose a ${topic.label} timing window to check its ${topicVargaConfirmation.chart} confirmation.`}
             </p>
           </div>
-          <div className={`timing-d7-confirmation__status ${selectedWindow && progenyD7Confirmation.passed ? 'is-confirmed' : ''}`}>
+          <div className={`timing-d7-confirmation__status ${selectedWindow && topicVargaConfirmation.passed ? 'is-confirmed' : ''}`}>
             <span>Window result</span>
-            <strong>{selectedWindow ? (progenyD7Confirmation.passed ? 'D7 confirmed' : 'No direct D7 confirmation') : 'Awaiting a timing window'}</strong>
+            <strong>{selectedWindow ? (topicVargaConfirmation.passed ? `${topicVargaConfirmation.chart} confirmed` : `No direct ${topicVargaConfirmation.chart} confirmation`) : 'Awaiting a timing window'}</strong>
           </div>
           <div className="timing-d7-confirmation__evidence">
             <span>Active Dasha connection</span>
-            {selectedWindow && progenyD7Confirmation.passed ? (
+            {selectedWindow && topicVargaConfirmation.passed ? (
               <ul>
-                {progenyD7Confirmation.matches.map((match, index) => (
+                {topicVargaConfirmation.matches.map((match, index) => (
                   <li key={`${match.planet}-${match.house}-${index}`}>
-                    <b>{match.planet}</b> connects to D7 House {match.house} by {(match.relations || []).map(relationLabel).join(' / ')}.
+                    <b>{match.planet}</b> connects to {topicVargaConfirmation.chart} House {match.house} by {(match.relations || []).map(relationLabel).join(' / ')}.
                   </li>
                 ))}
               </ul>
             ) : (
-              <p>{selectedWindow ? progenyD7Confirmation.explanation : 'D7 is assessed from the active Mahadasha, Antardasha and Pratyantardasha of the selected window.'}</p>
+              <p>{selectedWindow ? topicVargaConfirmation.explanation : `${topicVargaConfirmation.chart} is assessed from the active Mahadasha, Antardasha and Pratyantardasha of the selected window.`}</p>
             )}
           </div>
           <button
@@ -608,12 +660,12 @@ export default function TimingWorkspace({
             disabled={!chartData}
             onClick={() => openChartInspection({
               date: selectedDate || asOf,
-              label: `D7 / Saptamsa — ${topic.label} confirmation`,
-              house: progenyD7Confirmation.matches[0]?.house || 5,
-              planet: progenyD7Confirmation.matches[0]?.planet || null,
+              label: `${topicVargaConfirmation.chart} — ${topic.label} confirmation`,
+              house: topicVargaConfirmation.matches[0]?.house || topic.houses[0],
+              planet: topicVargaConfirmation.matches[0]?.planet || null,
             })}
           >
-            View D7 chart comparison
+            View {topicVargaConfirmation.chart} chart comparison
           </button>
         </section>
       ) : null}
@@ -648,8 +700,8 @@ export default function TimingWorkspace({
 
       {searchedTopicKey === topic.key ? (
         <div className="timing-section-heading">
-          <div><span>Timing verdict</span><h2>{verdict}</h2></div>
-          <p>An exact confirmation is a defined transit contact at its precise calculated moment; it is separate from the longer Dasha permission and transit-duration lanes.</p>
+          <div><span>Timing assessment</span><h2>{verdict}</h2></div>
+          <p>An exact transit trigger is a defined contact at its calculated moment. It narrows an activation period; it does not confirm that the life event occurs on that date.</p>
         </div>
       ) : null}
 
@@ -658,18 +710,18 @@ export default function TimingWorkspace({
       {!loading && !error && searchedTopicKey !== topic.key ? <div className="timing-state">No search has been run for this topic yet.</div> : null}
       {!loading && !error && data ? (
         <>
-          {exactTriggers.length ? <section className="timing-exact-triggers" aria-label="Exact transit confirmations">
-            <div><span>Exact transit confirmations</span><p>These are the exact contacts behind the timing verdict. Select one to inspect its Dasha and house context.</p></div>
+          {exactTriggers.length ? <section className="timing-exact-triggers" aria-label="Exact transit triggers">
+            <div><span>Exact transit triggers</span><p>These are date-level contacts within an activation period. Select one to inspect the Dasha, natal promise and house context.</p></div>
             <div>{exactTriggers.map((trigger) => <div className="timing-exact-trigger" key={trigger.id}><button type="button" className={trigger.id === selectedExactTriggerId ? 'is-selected' : ''} onClick={() => { setSelectedExactTriggerId(trigger.id); setSelectedTransitLaneKey(null); selectMapDate(trigger.date, trigger.windowId); }}><b>{trigger.house ? `House ${trigger.house} · ` : ''}{trigger.label}</b><small>{trigger.date ? formatDate(trigger.date, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date recorded in selected slice'}</small></button><button type="button" className="timing-exact-trigger__chart" aria-label={`Open charts for ${trigger.label}`} title="Open chart comparison" onClick={() => openChartInspection({ date: trigger.date, label: trigger.label, house: trigger.house, planet: trigger.planet })}>⌑</button></div>)}</div>
           </section> : null}
-          <section className="timing-map" aria-label={`${topic.label} timing map for ${year}`}>
+          <section className="timing-map" aria-label={`${topic.label} timing map for ${requestedHorizon.label}`}>
             <div className="timing-map-key"><span><i className="timing-map-key--dasha" />Dasha permission</span><span><i className="timing-map-key--transit" />Transit activation</span><span><i className="timing-map-key--exact" />Exact trigger</span><label><input type="checkbox" checked={showFastTriggers} onChange={(event) => setShowFastTriggers(event.target.checked)} /> Show fast triggers (Sun / Moon)</label></div>
-            <div className="timing-map-months"><span /><div>{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month) => <span key={month}>{month}</span>)}</div></div>
+            <div className="timing-map-months"><span /><div className="timing-map-range-labels"><span>{formatDate(mapStart, { day: 'numeric', month: 'short', year: 'numeric' })}</span><span>{formatDate(mapEnd, { day: 'numeric', month: 'short', year: 'numeric' })}</span></div></div>
             {['MD', 'AD', 'PD'].map((level) => (
               <div className="timing-map-lane" key={level}>
                 <strong>{level === 'MD' ? 'Mahadasha' : level === 'AD' ? 'Antardasha' : 'Pratyantardasha'}</strong>
                 <div className="timing-map-track">
-                  {dashaLanes[level].map((lane) => <span key={lane.window_id} className={`timing-map-bar timing-map-bar--dasha timing-map-bar--${level.toLowerCase()}`} style={windowStyle(lane, year)} title={`${lane.planet}: ${formatRange(lane.start_date, lane.end_date)}`}><b>{lane.planet}</b><small className="timing-map-dasha-range">{formatRange(lane.start_date, lane.end_date)}</small></span>)}
+                  {dashaLanes[level].map((lane) => <span key={lane.window_id} className={`timing-map-bar timing-map-bar--dasha timing-map-bar--${level.toLowerCase()}`} style={windowStyle(lane, mapStart, mapEnd)} title={`${lane.planet}: ${formatRange(lane.start_date, lane.end_date)}`}><b>{lane.planet}</b><small className="timing-map-dasha-range">{formatRange(lane.start_date, lane.end_date)}</small></span>)}
                   {level === 'MD' && selectedDate ? <i className="timing-map-cursor" style={{ left: `${selectedPosition}%` }}><b>As of · {formatDate(selectedDate)}</b></i> : null}
                 </div>
               </div>
@@ -680,11 +732,11 @@ export default function TimingWorkspace({
               return <div className="timing-map-lane" key={laneKey}>
                 <div className="timing-map-lane-label"><strong>{lane.planet} transit</strong><button type="button" aria-label={`Open charts for ${lane.label}`} title="Open chart comparison" onClick={() => openChartInspection({ date: lane.startDate, label: lane.label, house: lane.house, planet: lane.planet })}>⌑</button></div>
                 <div className="timing-map-track">
-                  <button type="button" className={`timing-map-bar timing-map-bar--${lane.kind}${laneKey === selectedTransitLaneKey ? ' is-selected' : ''}`} style={windowStyle({ start_date: lane.startDate, end_date: lane.endDate }, year)} onClick={() => { setSelectedTransitLaneKey(laneKey); selectMapDate(lane.startDate, lane.windowId); }} title={`${lane.label}: ${formatRange(lane.startDate, lane.endDate)}`}>{lane.label}</button>
+                  <button type="button" className={`timing-map-bar timing-map-bar--${lane.kind}${laneKey === selectedTransitLaneKey ? ' is-selected' : ''}`} style={windowStyle({ start_date: lane.startDate, end_date: lane.endDate }, mapStart, mapEnd)} onClick={() => { setSelectedTransitLaneKey(laneKey); selectMapDate(lane.startDate, lane.windowId); }} title={`${lane.label}: ${formatRange(lane.startDate, lane.endDate)}`}>{lane.label}</button>
                 </div>
               </div>;
             })}
-            {!displayedTransitLanes.length ? <p className="timing-map-empty">No slower-planet transit activation was found for these topic houses in this year.</p> : null}
+            {!displayedTransitLanes.length ? <p className="timing-map-empty">No slower-planet transit activation was found for these topic houses in this horizon.</p> : null}
             <div className="timing-house-rail">
               <div><span>Selected date</span><strong>{selectedDate ? formatDate(selectedDate, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</strong></div>
               <section aria-label="Activated topic houses">{topic.houses.map((house) => {
@@ -692,7 +744,7 @@ export default function TimingWorkspace({
                 return <div key={house} className={count ? 'is-active' : ''}><b>House {house}</b><small>{count ? `${count} active link${count === 1 ? '' : 's'}` : 'No active link'}</small></div>;
               })}</section>
             </div>
-            <p className="timing-slice-note"><strong>How to read this map:</strong> the top three lanes show what the Dasha permits; the lower lanes show the separate transit activation and its actual duration. Select a transit bar to inspect its house links and calculation slice.</p>
+            <p className="timing-slice-note"><strong>How to read this map:</strong> the top three lanes show what the Dasha permits; the lower lanes show the separate transit activation and its actual duration. A transit contact narrows a period—it is not, by itself, an event outcome. Select a transit bar to inspect its house links and calculation slice.</p>
           </section>
 
           {selectedTransitLane ? (
@@ -708,7 +760,7 @@ export default function TimingWorkspace({
                 <div className="timing-evidence-list">
                   <div><i>1</i><span><strong>Dasha context at the selected date</strong>{['MD', 'AD', 'PD'].map((level) => dashaAtSelectedDate[level] ? `${level}: ${dashaAtSelectedDate[level]}` : null).filter(Boolean).join(' · ') || 'No Dasha row was available for the selected date.'}</span></div>
                   <div><i>2</i><span><strong>Transit house activation</strong><b>{selectedTransitLane.planet}</b> travels through House {selectedTransitLane.transitHouse} and activates House {selectedTransitLane.house} by {(selectedTransitLane.relations || []).map(relationLabel).join(' / ') || 'transit contact'}. <small>Active for the entire lane: {formatRange(selectedTransitLane.startDate, selectedTransitLane.endDate)}.</small></span></div>
-                  <div><i>3</i><span><strong>Exact transit confirmation</strong>No exact contact is implied by this duration lane. Exact contacts, if calculated, appear separately as precise triggers.</span></div>
+                  <div><i>3</i><span><strong>Exact transit trigger</strong>No exact contact is implied by this duration lane. Exact contacts, if calculated, appear separately as date-level triggers.</span></div>
                 </div>
               </article>
               <aside>
@@ -730,17 +782,19 @@ export default function TimingWorkspace({
                   <span><b>Slice ended by</b>{boundaryLabel(selectedWindow.calculation_slice?.closed_by, 'the end of the requested horizon')}</span>
                 </div>
                 <div className="timing-evidence-list">
-                  <div><i>1</i><span><strong>Dasha permission</strong>{selectedDashaEvidence.join(' · ')}</span></div>
-                  <div><i>2</i><span><strong>Transit house activation</strong>{selectedTransitEvidence.direct.length ? <div className="timing-transit-rows">{selectedTransitEvidence.direct.map((item, index) => <p key={`${item.planet}-${item.house}-${index}`}><b>{item.planet}:</b> from House {item.transitHouse || '—'} activates House {item.house} by {item.relations.map(relationLabel).join(' / ') || 'transit contact'}. <small>Active for this slice: {formatRange(item.startDate, item.endDate)}.</small></p>)}</div> : 'No Dasha-carrier transit directly activates a selected house in this slice.'}</span></div>
-                  <div><i>3</i><span><strong>Exact or repeating transit confirmation</strong>{selectedTransitEvidence.exact.length ? <div className="timing-transit-rows">{selectedTransitEvidence.exact.map((item, index) => <p key={`${item.label}-${index}`}><b>{item.house ? `House ${item.house}: ` : ''}</b>{item.label}. <small>{item.startDate && item.endDate ? `Orb window: ${formatRange(item.startDate, item.endDate)}${item.orb ? ` (±${item.orb}°)` : ''}.` : item.exactDate ? `Exact on ${formatDate(item.exactDate, { day: 'numeric', month: 'short', year: 'numeric' })}; recorded in this calculation slice.` : 'Recorded in this calculation slice.'}</small></p>)}</div> : 'No exact return or repeated natal contact was isolated in this slice.'}</span></div>
-                  <div><i>4</i><span><strong>Short Sun / Moon reinforcement</strong>{selectedTransitEvidence.short.length ? <div className="timing-transit-rows">{selectedTransitEvidence.short.map((item, index) => <p key={`${item.kind}-${item.house}-${index}`}>{item.kind === 'sun_reinforcement' ? <>Sun in House {item.sun_house} reinforces active {item.activated_dasha_lords?.join(' / ')} for House {item.house}.</> : <>Moon in House {item.moon_house} activates House {item.house} by {(item.house_relations || []).map(relationLabel).join(' / ')}, while contacting natal {item.natal_carriers_contacted?.join(' / ')}.</>} <small>Duration: {formatRange(item.start_date, item.end_date)}.</small></p>)}</div> : 'No short Sun or Moon reinforcement was recorded in this slice.'}</span></div>
-                  <div><i>5</i><span><strong>{selectedDivisionalEvidence.chart} confirmation</strong>{selectedDivisionalEvidence.passed ? selectedDivisionalEvidence.details.join(' · ') : selectedDivisionalEvidence.explanation}</span></div>
+                  <div><i>1</i><span><strong>D1 natal promise</strong>{eventNatalPromise ? <>{eventNatalPromise.label}. {eventNatalPromise.interpretation}</> : 'Natal promise was unavailable for this calculation.'}</span></div>
+                  <div><i>2</i><span><strong>Dasha permission</strong>{selectedDashaEvidence.join(' · ')}</span></div>
+                  <div><i>3</i><span><strong>Transit house activation</strong>{selectedTransitEvidence.direct.length ? <div className="timing-transit-rows">{selectedTransitEvidence.direct.map((item, index) => <p key={`${item.planet}-${item.house}-${index}`}><b>{item.planet}:</b> from House {item.transitHouse || '—'} activates House {item.house} by {item.relations.map(relationLabel).join(' / ') || 'transit contact'}. <small>Active for this slice: {formatRange(item.startDate, item.endDate)}.</small></p>)}</div> : 'No Dasha-carrier transit directly activates a selected house in this slice.'}</span></div>
+                  <div><i>4</i><span><strong>Exact or repeating transit trigger</strong>{selectedTransitEvidence.exact.length ? <div className="timing-transit-rows">{selectedTransitEvidence.exact.map((item, index) => <p key={`${item.label}-${index}`}><b>{item.house ? `House ${item.house}: ` : ''}</b>{item.label}. <small>{item.startDate && item.endDate ? `Orb window: ${formatRange(item.startDate, item.endDate)}${item.orb ? ` (±${item.orb}°)` : ''}.` : item.exactDate ? `Exact on ${formatDate(item.exactDate, { day: 'numeric', month: 'short', year: 'numeric' })}; recorded in this calculation slice.` : 'Recorded in this calculation slice.'}</small></p>)}</div> : 'No exact return or repeated natal contact was isolated in this slice.'}</span></div>
+                  <div><i>5</i><span><strong>Short Sun / Moon reinforcement</strong>{selectedTransitEvidence.short.length ? <div className="timing-transit-rows">{selectedTransitEvidence.short.map((item, index) => <p key={`${item.kind}-${item.house}-${index}`}>{item.kind === 'sun_reinforcement' ? <>Sun in House {item.sun_house} reinforces active {item.activated_dasha_lords?.join(' / ')} for House {item.house}.</> : <>Moon in House {item.moon_house} activates House {item.house} by {(item.house_relations || []).map(relationLabel).join(' / ')}, while contacting natal {item.natal_carriers_contacted?.join(' / ')}.</>} <small>Duration: {formatRange(item.start_date, item.end_date)}.</small></p>)}</div> : 'No short Sun or Moon reinforcement was recorded in this slice.'}</span></div>
+                  <div><i>6</i><span><strong>{selectedDivisionalEvidence.chart} confirmation</strong>{selectedDivisionalEvidence.passed ? selectedDivisionalEvidence.details.join(' · ') : selectedDivisionalEvidence.explanation}</span></div>
+                  <div><i>7</i><span><strong>Counter-evidence / limits</strong>{selectedWindow.counter_evidence?.length ? <div className="timing-transit-rows">{selectedWindow.counter_evidence.map((item, index) => <p key={`${item.kind}-${index}`}><b>{item.label}.</b> <small>{item.detail}</small></p>)}</div> : 'No additional counter-evidence was identified by this event contract.'}</span></div>
                 </div>
               </article>
               <aside>
-                <span className="timing-overline">Exact date</span>
-                <strong>{hasTransitTiming && selectedWindow.peak_date ? formatDate(selectedWindow.peak_date, { day: 'numeric', month: 'short', year: 'numeric' }) : 'None isolated'}</strong>
-                <p>{hasTransitTiming && selectedWindow.peak_date ? selectedWindow.peak_reason : 'The calculated evidence supports a Dasha-led slice only; it does not isolate a date.'}</p>
+                <span className="timing-overline">{selectedPrecision.label}</span>
+                <strong>{selectedPrecision.date ? formatDate(selectedPrecision.date, { day: 'numeric', month: 'short', year: 'numeric' }) : 'No date isolated'}</strong>
+                <p>{selectedPrecision.explanation}</p>
                 <button type="button" className="timing-chart-inspect-button" onClick={() => openChartInspection({ date: selectedExactTrigger?.date || selectedWindow.inspection_date || selectedWindow.start_date, label: selectedExactTrigger?.label || `${topic.label} timing slice`, house: selectedExactTrigger?.house })}>View natal, {topic.varga} and transit charts</button>
                 <button type="button" onClick={() => onInspectDate?.(selectedWindow.inspection_date || selectedWindow.start_date)}>Inspect this date in Activation Ledger →</button>
               </aside>

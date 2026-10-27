@@ -1,0 +1,43 @@
+name: Clean Production Release Artifacts
+
+on:
+  schedule:
+    # 03:00 Asia/Kolkata (21:30 UTC) every day.
+    - cron: '30 21 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: production-release-artifact-cleanup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Remove expired release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/cleanup-production-release-artifacts.sh \
+            --apply \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --keep-vm-images 20 \
+            --keep-container-images 15 \
+            --container-max-age-days 30

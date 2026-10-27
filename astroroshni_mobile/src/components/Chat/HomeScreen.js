@@ -2334,10 +2334,13 @@ const loadHomeData = async (nativeData = null) => {
           onOpenMonthly={() => onOptionSelect({ action: 'events', readingMode: 'monthly' })}
           onOpenPrashna={() => navigation.navigate('Prashna')}
           onOpenPartnerPortrait={() => navigation.navigate('PartnerPortrait')}
+          onOpenNakshatraBlueprint={() => requireBirthChart(() => navigation.navigate('NakshatraBlueprint'))}
           prashnaCost={pricing.prashna ?? 3}
           prashnaOriginalCost={pricingOriginal.prashna}
           eventsCost={pricing.events ?? 100}
           partnerPortraitCost={pricing.partner_portrait ?? 44}
+          nakshatraBlueprintCost={pricing.nakshatra_blueprint ?? 9}
+          nakshatraBlueprintOriginalCost={pricingOriginal.nakshatra_blueprint}
           partnerPortraitPreview={partnerPortraitPreview}
           partnerPortraitGender={displayData?.gender || ''}
           paths={options}

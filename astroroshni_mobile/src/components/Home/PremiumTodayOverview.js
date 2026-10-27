@@ -607,12 +607,15 @@ export function PremiumExploreIntro({
   onOpenMonthly,
   onOpenPrashna,
   onOpenPartnerPortrait,
+  onOpenNakshatraBlueprint,
   prashnaCost = 3,
   prashnaOriginalCost = null,
   eventsCost = 100,
   partnerPortraitCost = 44,
   partnerPortraitPreview = null,
   partnerPortraitGender = '',
+  nakshatraBlueprintCost = 9,
+  nakshatraBlueprintOriginalCost = null,
   paths = [],
   analyses = [],
   onSelectPath,
@@ -630,6 +633,18 @@ export function PremiumExploreIntro({
   const personalAnalyses = analyses.filter((item) => !['yearly', 'muhurat', 'trading', 'financial', 'childbirth'].includes(item.id));
   const timingAnalyses = analyses.filter((item) => ['muhurat', 'trading', 'financial', 'childbirth'].includes(item.id));
   const guidedPaths = paths.filter((item) => item.action !== 'events');
+  // Use semantic theme colors so this featured treatment belongs to every
+  // visual system (Heritage, Midnight, Pandit, etc.), not only the purple one.
+  const nakshatraPalette = {
+    gradient: [colors.cosmicSurface, colors.headerSurface, colors.cosmicRaised],
+    accent: colors.accent,
+    accentSoft: colors.accentSoft,
+    inverse: colors.textInverse,
+    inverseMuted: colors.textInverseMuted,
+    onAccent: colors.onAccent,
+    line: colors.cosmicLine,
+    glow: colors.cosmicGlow,
+  };
   return (
     <View style={styles.exploreIntroWrap}>
       <View style={[styles.exploreHero, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
@@ -657,6 +672,56 @@ export function PremiumExploreIntro({
         chartGender={partnerPortraitGender}
         onPress={onOpenPartnerPortrait}
       />
+      <TouchableOpacity
+        onPress={onOpenNakshatraBlueprint}
+        activeOpacity={0.88}
+        accessibilityRole="button"
+        accessibilityLabel={t('nakshatraBlueprint.exploreLabel', 'Open Nakshatra Blueprint')}
+        style={[styles.nakshatraBlueprintShell, { shadowColor: colors.primaryStrong || colors.primary }]}
+      >
+        <LinearGradient
+          colors={nakshatraPalette.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.nakshatraBlueprintCard}
+        >
+          <View pointerEvents="none" style={[styles.nakshatraBlueprintHalo, { borderColor: nakshatraPalette.line, backgroundColor: nakshatraPalette.glow }]} accessibilityElementsHidden />
+          <View style={styles.nakshatraBlueprintHeader}>
+            <View style={[styles.nakshatraBlueprintMark, { backgroundColor: nakshatraPalette.glow, borderColor: nakshatraPalette.line }]}>
+              <Ionicons name="sparkles" size={23} color={nakshatraPalette.accent} />
+            </View>
+            <View style={styles.nakshatraBlueprintCopy}>
+              <View style={styles.nakshatraBlueprintLabelRow}>
+                <Text style={[styles.nakshatraBlueprintEyebrow, { color: nakshatraPalette.accent }]}>
+                  {t('nakshatraBlueprint.exploreEyebrow', 'CELESTIAL IDENTITY')}
+                </Text>
+                <View style={[styles.nakshatraBlueprintNewPill, { backgroundColor: nakshatraPalette.accent }]}>
+                  <Text style={[styles.nakshatraBlueprintNewText, { color: nakshatraPalette.onAccent }]}>{t('common.new', 'NEW')}</Text>
+                </View>
+              </View>
+              <Text style={[styles.nakshatraBlueprintTitle, { color: nakshatraPalette.inverse }]}>
+                {t('nakshatraBlueprint.title', 'Nakshatra Blueprint')}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.nakshatraBlueprintBody, { color: nakshatraPalette.inverseMuted }]}>
+            {t('nakshatraBlueprint.exploreBody', 'A complete natal reading through every graha, nakshatra and pada — character, gifts, patterns and life themes.')}
+          </Text>
+          <View style={styles.nakshatraBlueprintFooter}>
+            <View style={styles.nakshatraBlueprintCta}>
+              <Text style={[styles.nakshatraBlueprintCtaText, { color: nakshatraPalette.accent }]}>{t('nakshatraBlueprint.exploreCta', 'Discover your blueprint')}</Text>
+              <Ionicons name="arrow-forward" size={15} color={nakshatraPalette.accent} />
+            </View>
+            <View style={[styles.nakshatraBlueprintCost, { backgroundColor: colors.cosmicSurface, borderColor: nakshatraPalette.line }]}>
+              <Ionicons name="diamond-outline" size={12} color={nakshatraPalette.accent} />
+              {Number(nakshatraBlueprintOriginalCost) > Number(nakshatraBlueprintCost) ? (
+                <Text style={[styles.nakshatraBlueprintOriginalCost, { color: nakshatraPalette.inverseMuted }]}>{nakshatraBlueprintOriginalCost}</Text>
+              ) : null}
+              <Text style={[styles.nakshatraBlueprintCostText, { color: nakshatraPalette.inverse }]}>{nakshatraBlueprintCost}</Text>
+            </View>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
       <View style={[styles.timingSpotlight, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
         <View pointerEvents="none" style={styles.timingSpotlightGlow} />
         <View style={styles.timingSpotlightHeader}>
@@ -857,6 +922,24 @@ const styles = StyleSheet.create({
   exploreHeroEyebrowRule: { width: 24, height: StyleSheet.hairlineWidth },
   exploreHeroTitle: { fontSize: 38, lineHeight: 41, marginBottom: 14 },
   exploreHeroBody: { fontSize: 13, lineHeight: 20, maxWidth: 330, fontWeight: '500' },
+  nakshatraBlueprintShell: { borderRadius: 26, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.24, shadowRadius: 18, elevation: 5 },
+  nakshatraBlueprintCard: { minHeight: 192, borderRadius: 26, padding: 18, overflow: 'hidden' },
+  nakshatraBlueprintHalo: { position: 'absolute', width: 170, height: 170, borderRadius: 85, right: -56, top: -79, borderWidth: 1 },
+  nakshatraBlueprintHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  nakshatraBlueprintMark: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  nakshatraBlueprintCopy: { flex: 1, minWidth: 0 },
+  nakshatraBlueprintLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  nakshatraBlueprintEyebrow: { fontSize: 10, lineHeight: 13, fontWeight: '900', letterSpacing: 1 },
+  nakshatraBlueprintNewPill: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
+  nakshatraBlueprintNewText: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.8 },
+  nakshatraBlueprintTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 25, lineHeight: 29 },
+  nakshatraBlueprintBody: { fontSize: 13, lineHeight: 19, marginTop: 16, maxWidth: '92%' },
+  nakshatraBlueprintFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 'auto', paddingTop: 16 },
+  nakshatraBlueprintCta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  nakshatraBlueprintCtaText: { fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  nakshatraBlueprintCost: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5 },
+  nakshatraBlueprintOriginalCost: { fontSize: 11, textDecorationLine: 'line-through' },
+  nakshatraBlueprintCostText: { fontSize: 12, fontWeight: '900' },
   timingSpotlight: { borderWidth: 1, borderRadius: 26, padding: 18, overflow: 'hidden' },
   timingSpotlightGlow: { position: 'absolute', width: 180, height: 180, borderRadius: 90, right: -75, top: -105, backgroundColor: 'rgba(245, 158, 11, 0.12)' },
   timingSpotlightHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },

@@ -21,7 +21,7 @@ from .errors import PredictionCalculationError, PredictionConfigurationError
 from .primitives import aspected_houses, ruled_houses
 
 
-EVENT_WINDOW_ENGINE_VERSION = "1.1.0"
+EVENT_WINDOW_ENGINE_VERSION = "1.2.0"
 
 
 @dataclass(frozen=True)
@@ -640,6 +640,77 @@ PROMOTION = EventDefinition(
 )
 
 
+RELATIONSHIP_MEETING = EventDefinition(
+    key="relationship_meeting",
+    label="Relationship meeting / beginning",
+    description=(
+        "A window for a meaningful relationship beginning or meeting. It requires romance or affinity "
+        "together with a one-to-one partnership signal. It does not promise a particular person, "
+        "commitment, or marriage outcome."
+    ),
+    varga="D9",
+    varga_houses=(5, 7),
+    varga_description=(
+        "D9 is used to check whether the active Dasha carriers connect with romance or partnership "
+        "houses. It confirms relationship relevance; it does not identify a person or guarantee a union."
+    ),
+    anchor=SignalGroup(
+        key="romance_anchor", label="Romance or affinity anchor", houses=(5,), weight=25,
+        required=True,
+        description="H5 describes attraction, romance and the opening of an emotional connection.",
+    ),
+    transition=SignalGroup(
+        key="partnership_opening", label="Partnership-opening signal", houses=(7,), weight=20,
+        required=True,
+        description="H7 brings the interaction into a one-to-one partnership context.",
+    ),
+    outcome=SignalGroup(
+        key="relationship_fulfilment", label="Relationship fulfilment support", houses=(11,), weight=10,
+        description="H11 can support fulfilment, a social connection becoming meaningful, or a shared objective.",
+    ),
+    classifications=(
+        ClassificationRule("meeting_with_fulfilment", "Relationship beginning with fulfilment support", outcome="present"),
+        ClassificationRule("relationship_beginning", "Relationship-beginning window"),
+    ),
+    version="relationship_meeting.v1",
+)
+
+
+ENGAGEMENT = EventDefinition(
+    key="engagement",
+    label="Engagement / formal commitment",
+    description=(
+        "A formal-commitment window requiring partnership together with both family joining and fulfilment. "
+        "It is distinct from a first meeting and is not a guaranteed ceremony date."
+    ),
+    varga="D9",
+    varga_houses=(2, 7, 11),
+    varga_description=(
+        "D9 checks whether active Dasha carriers repeat the family, partnership and fulfilment pattern. "
+        "It supports formalisation relevance but never guarantees an engagement."
+    ),
+    anchor=SignalGroup(
+        key="partnership_anchor", label="Partnership anchor", houses=(7,), weight=25,
+        required=True,
+        description="H7 describes the counterpart and the committed one-to-one bond.",
+    ),
+    transition=SignalGroup(
+        key="formal_joining", label="Family joining and fulfilment", houses=(2, 11), weight=20,
+        required=True, require_all=True,
+        description="H2 and H11 together distinguish family joining and formal fulfilment from a romance-only phase.",
+    ),
+    outcome=SignalGroup(
+        key="ceremony_support", label="Ceremony or blessing support", houses=(9,), weight=10,
+        description="H9 can support the ceremonial, dharmic or blessing-linked side of formal commitment.",
+    ),
+    classifications=(
+        ClassificationRule("engagement_with_ceremony_support", "Formal commitment with ceremony support", outcome="present"),
+        ClassificationRule("formal_commitment", "Formal-commitment window"),
+    ),
+    version="engagement.v1",
+)
+
+
 MARRIAGE = EventDefinition(
     key="marriage",
     label="Marriage / partnership",
@@ -976,6 +1047,42 @@ INCOME_GAIN = EventDefinition(
 )
 
 
+SPECULATIVE_GAIN = EventDefinition(
+    key="speculative_gain",
+    label="Speculative gain / trading",
+    description=(
+        "A timing view for speculative or market-risk themes. It requires risk/intelligence together "
+        "with both resource and gain channels. It is not financial advice and cannot establish profit, "
+        "a winning trade, a ticker, or a suitable position size."
+    ),
+    varga="D2",
+    varga_houses=(2, 5, 11),
+    varga_description=(
+        "D2 checks resource and inflow relevance while H5 distinguishes the speculative channel. "
+        "It can only qualify an astrological activation, never a financial outcome."
+    ),
+    anchor=SignalGroup(
+        key="speculation_anchor", label="Speculation or intelligent-risk anchor", houses=(5,), weight=25,
+        required=True,
+        description="H5 describes speculation, discernment and calculated risk in this narrow event definition.",
+    ),
+    transition=SignalGroup(
+        key="resource_and_gain", label="Resource and gain channels", houses=(2, 11), weight=20,
+        required=True, require_all=True,
+        description="Both H2 and H11 must be opened alongside H5; neither gain nor speculation alone qualifies this view.",
+    ),
+    outcome=SignalGroup(
+        key="fortune_support", label="Fortune or guidance support", houses=(9,), weight=10,
+        description="H9 may add a fortune, guidance or long-view support factor, but does not guarantee success.",
+    ),
+    classifications=(
+        ClassificationRule("speculation_with_fortune_support", "Speculative theme with fortune support", outcome="present"),
+        ClassificationRule("speculation_activation", "Speculation activation period"),
+    ),
+    version="speculative_gain.v1",
+)
+
+
 EVENT_DEFINITIONS: Mapping[str, EventDefinition] = {
     JOB_CHANGE.key: JOB_CHANGE,
     PROMOTION.key: PROMOTION,
@@ -984,11 +1091,14 @@ EVENT_DEFINITIONS: Mapping[str, EventDefinition] = {
     RELOCATION.key: RELOCATION,
     PROPERTY_GAIN.key: PROPERTY_GAIN,
     VEHICLE_PURCHASE.key: VEHICLE_PURCHASE,
+    RELATIONSHIP_MEETING.key: RELATIONSHIP_MEETING,
+    ENGAGEMENT.key: ENGAGEMENT,
     MARRIAGE.key: MARRIAGE,
     FOREIGN_TRAVEL.key: FOREIGN_TRAVEL,
     CHILDREN.key: CHILDREN,
     EDUCATION.key: EDUCATION,
     INCOME_GAIN.key: INCOME_GAIN,
+    SPECULATIVE_GAIN.key: SPECULATIVE_GAIN,
 }
 
 # These are deliberate, user-selected Work searches. They are not added to the
@@ -1130,6 +1240,133 @@ def _varga_confirmation(
             if matches else
             f"No active dasha lord carries the selected {definition.varga} houses in this period."
         ),
+    }
+
+
+def _event_natal_promise(
+    definition: EventDefinition,
+    natal_promises: Sequence[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Summarise the existing D1 promise ledger for one event definition.
+
+    Natal promise is evidence about whether an event theme is naturally
+    supported, mixed or pressured.  It is deliberately not a mechanical veto:
+    a timing engine must be able to show a real activation in a pressured chart
+    while making that pressure visible to the astrologer.
+    """
+    by_house = {int(row.get("house")): row for row in natal_promises if row.get("house")}
+    required_groups = [
+        ("anchor", definition.anchor),
+        *([("transition", definition.transition)] if definition.transition.required else []),
+    ]
+    required_houses = tuple(dict.fromkeys(
+        house for _, group in required_groups for house in group.houses
+    ))
+    supporting_houses = tuple(house for house in definition.outcome.houses if house not in required_houses)
+    rows = []
+    for house in (*required_houses, *supporting_houses):
+        promise = by_house.get(int(house))
+        if not promise:
+            continue
+        rows.append({
+            "house": int(house),
+            "role": next((name for name, group in required_groups if house in group.houses), "supporting"),
+            "tone": str(promise.get("tone") or "neutral"),
+            "lord": promise.get("lord"),
+            "supportive_weight": promise.get("supportive_weight"),
+            "challenging_weight": promise.get("challenging_weight"),
+        })
+    group_assessments = []
+    for name, group in required_groups:
+        group_rows = [row for row in rows if row["role"] == name]
+        if group.require_all:
+            available = len(group_rows) == len(group.houses)
+            tones = {row["tone"] for row in group_rows}
+            group_status = (
+                "unavailable" if not available else
+                "supportive" if tones == {"supportive"} else
+                "pressured" if "challenging" in tones else "mixed"
+            )
+        else:
+            minimum_hits = min(int(group.minimum_hits), len(group.houses))
+            available = len(group_rows) >= minimum_hits
+            tones = {row["tone"] for row in group_rows}
+            group_status = (
+                "unavailable" if not available else
+                "supportive" if "supportive" in tones else
+                "mixed" if "mixed" in tones else "pressured"
+            )
+        group_assessments.append({
+            "key": name,
+            "label": group.label,
+            "status": group_status,
+            "houses": list(group.houses),
+            "minimum_hits": len(group.houses) if group.require_all else int(group.minimum_hits),
+        })
+    statuses = {row["status"] for row in group_assessments}
+    status = (
+        "unavailable" if "unavailable" in statuses else
+        "pressured" if "pressured" in statuses else
+        "mixed" if "mixed" in statuses else "supportive"
+    )
+    pressure = [
+        row for row in rows
+        if row["role"] != "supporting" and row["tone"] in {"challenging", "mixed"}
+    ]
+    return {
+        "status": status,
+        "label": {
+            "supportive": "Natal promise supportive",
+            "mixed": "Natal promise mixed",
+            "pressured": "Natal promise pressured",
+            "unavailable": "Natal promise unavailable",
+        }[status],
+        "required_houses": list(required_houses),
+        "supporting_houses": list(supporting_houses),
+        "required_groups": group_assessments,
+        "houses": rows,
+        "pressure": pressure,
+        "interpretation": {
+            "supportive": "The required event houses are directionally supportive in D1. Timing still needs Dasha, varga and transit evidence.",
+            "mixed": "The required event houses give mixed D1 testimony. Treat a timing window as conditional and inspect both support and pressure.",
+            "pressured": "At least one required event house is pressured in D1. A timing window is an activation to judge carefully, not an event assurance.",
+            "unavailable": "The D1 promise ledger is incomplete, so no event-level natal promise can be stated.",
+        }[status],
+    }
+
+
+def _window_precision(
+    *,
+    exact_peak: Optional[Tuple[str, str]],
+    varga_passed: bool,
+    strength: str,
+) -> Dict[str, Any]:
+    """Describe resolution honestly without turning a transit contact into an outcome claim."""
+    if exact_peak:
+        return {
+            "grade": "date_trigger",
+            "label": "Date-level transit trigger",
+            "date": exact_peak[0],
+            "event_claimable": False,
+            "explanation": (
+                "A transit contact is exact on this date. It narrows the activation, "
+                "but does not by itself establish that the event occurs on that date."
+            ),
+        }
+    if varga_passed and strength in {"strong", "exceptional"}:
+        return {
+            "grade": "narrowed_period",
+            "label": "Narrowed timing period",
+            "date": None,
+            "event_claimable": False,
+            "explanation": "The evidence supports a bounded period; no exact transit trigger was isolated.",
+        }
+    return {
+        "grade": "broad_period",
+        "label": "Broad activation period",
+        "date": None,
+        "event_claimable": False,
+        "explanation": "The evidence identifies a Dasha-led activation period, not an exact event date.",
     }
 
 
@@ -1402,6 +1639,7 @@ class EventWindowEngine:
             if definition is None:
                 raise PredictionConfigurationError(f"Unsupported event focus: {event_key}")
 
+        natal_promise = _event_natal_promise(definition, calculation.natal_promises)
         varga_chart = _build_varga(calculation, definition.varga) if definition.varga else {}
         varga_by_dasha: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
         output: List[Dict[str, Any]] = []
@@ -1534,14 +1772,6 @@ class EventWindowEngine:
             )
             if strength == "developing" and not include_developing:
                 continue
-            if definition.key == CUSTOM_EVENT_KEY:
-                classification_key, classification_label = _custom_classification(
-                    independent_passed, transit_reinforced
-                )
-            else:
-                classification_key, classification_label = _classification(
-                    definition, transition, outcome
-                )
             exact_peak = next(
                 (
                     (str(row.get("exact_at"))[:10], str(row.get("label") or "Exact transit confirmation"))
@@ -1553,6 +1783,50 @@ class EventWindowEngine:
                 (str(row.get("label")) for row in dasha_boundary if row.get("label")),
                 None,
             )
+            precision = _window_precision(
+                exact_peak=exact_peak,
+                varga_passed=bool(varga_confirmation["passed"]),
+                strength=strength,
+            )
+            counter_evidence: List[Dict[str, Any]] = []
+            for row in natal_promise["pressure"]:
+                counter_evidence.append({
+                    "kind": "natal_pressure",
+                    "label": f"D1 House {row['house']} is {row['tone']}",
+                    "detail": (
+                        f"House {row['house']} is a {row['role']} event house and its natal "
+                        "testimony should qualify this timing window."
+                    ),
+                })
+            if definition.varga and not varga_confirmation["passed"]:
+                counter_evidence.append({
+                    "kind": "missing_varga_confirmation",
+                    "label": f"No direct {definition.varga} confirmation",
+                    "detail": varga_confirmation["explanation"],
+                })
+            if definition.outcome.houses and not outcome["passed"]:
+                counter_evidence.append({
+                    "kind": "missing_outcome_support",
+                    "label": f"No {definition.outcome.label.lower()}",
+                    "detail": (
+                        "Outcome support is not required for this event window, but its absence "
+                        "means the result or ease of manifestation is not independently reinforced."
+                    ),
+                })
+            if strength == "developing":
+                counter_evidence.append({
+                    "kind": "developing_window",
+                    "label": "Developing evidence only",
+                    "detail": "This window is included for review but does not meet the stronger evidence threshold.",
+                })
+            if definition.key == CUSTOM_EVENT_KEY:
+                classification_key, classification_label = _custom_classification(
+                    independent_passed, transit_reinforced
+                )
+            else:
+                classification_key, classification_label = _classification(
+                    definition, transition, outcome
+                )
             if exact_peak:
                 peak, peak_reason, peak_rank = exact_peak[0], exact_peak[1], 2
             elif opening_dasha:
@@ -1572,6 +1846,7 @@ class EventWindowEngine:
                 "inspection_date": peak or window.start_date,
                 "peak_reason": peak_reason,
                 "peak_rank": peak_rank,
+                "precision": precision,
                 "calculation_slice": {
                     "start_date": window.start_date,
                     "end_date": window.end_date,
@@ -1588,6 +1863,7 @@ class EventWindowEngine:
                 "maximum_score": 100,
                 "classification": classification_key,
                 "classification_label": classification_label,
+                "counter_evidence": counter_evidence,
                 "summary": (
                     f"{classification_label}: {definition.anchor.label.lower()} and "
                     f"{definition.transition.label.lower()} converge in the same dasha window."
@@ -1644,6 +1920,7 @@ class EventWindowEngine:
             "event_label": definition.label,
             "event_description": definition.description,
             "varga": definition.varga or None,
+            "natal_promise": natal_promise,
             "focus_houses": list(definition.anchor.houses) if event_key == CUSTOM_EVENT_KEY else [],
             "include_developing": include_developing,
             "evaluated_windows": len(calculation.windows),

@@ -1446,6 +1446,14 @@ export const partnerPortraitAPI = {
   }),
 };
 
+export const nakshatraBlueprintAPI = {
+  getPricing: () => api.get(getEndpoint('/nakshatra-blueprint/pricing')),
+  findExisting: (payload) => api.post(getEndpoint('/nakshatra-blueprint/existing'), payload),
+  findLatestExisting: (payload) => api.post(getEndpoint('/nakshatra-blueprint/existing-latest'), payload),
+  generate: (payload) => api.post(getEndpoint('/nakshatra-blueprint/generate'), payload, GLOBAL_ERROR_CONFIG),
+  get: (blueprintId) => api.get(getEndpoint(`/nakshatra-blueprint/${encodeURIComponent(blueprintId)}`)),
+};
+
 export const relationshipAPI = {
   analyzeCompatibility: (personOneBirthData, personTwoBirthData) =>
     api.post(getEndpoint('/compatibility-analysis'), {

@@ -12,7 +12,7 @@ from prediction_engine.contracts import (
     PredictionWindow,
 )
 from prediction_engine.errors import PredictionConfigurationError
-from prediction_engine.event_windows import EventWindowEngine
+from prediction_engine.event_windows import EventWindowEngine, _window_precision
 from prediction_engine.event_windows import INTERACTIVE_EVENT_DEFINITIONS
 from prediction_engine.routes import EventWindowRequest
 
@@ -67,7 +67,11 @@ def _activation(
     )
 
 
-def _context(window: PredictionWindow | None = None) -> CalculationContext:
+def _context(
+    window: PredictionWindow | None = None,
+    *,
+    natal_promises=(),
+) -> CalculationContext:
     timing = window or _window()
     return CalculationContext(
         birth=BirthChartInput.from_mapping({
@@ -84,7 +88,7 @@ def _context(window: PredictionWindow | None = None) -> CalculationContext:
             },
         },
         divisional_charts={},
-        natal_promises=(),
+        natal_promises=natal_promises,
     )
 
 
@@ -109,6 +113,47 @@ def test_every_interactive_event_is_accepted_at_the_api_request_boundary():
             year=2026,
         )
         assert request.event_key == event_key
+
+
+def test_relationship_and_money_stages_have_separate_event_contracts():
+    meeting = INTERACTIVE_EVENT_DEFINITIONS["relationship_meeting"]
+    engagement = INTERACTIVE_EVENT_DEFINITIONS["engagement"]
+    speculation = INTERACTIVE_EVENT_DEFINITIONS["speculative_gain"]
+
+    assert meeting.anchor.houses == (5,)
+    assert meeting.transition.houses == (7,)
+    assert engagement.anchor.houses == (7,)
+    assert engagement.transition.houses == (2, 11)
+    assert engagement.transition.require_all is True
+    assert speculation.anchor.houses == (5,)
+    assert speculation.transition.houses == (2, 11)
+    assert speculation.transition.require_all is True
+    assert "not financial advice" in speculation.description
+
+
+def test_event_window_request_accepts_a_bounded_custom_or_historical_range():
+    request = EventWindowRequest(
+        birth_chart_id=1,
+        event_key="marriage",
+        start_date="2024-02-01",
+        end_date="2025-01-31",
+    )
+
+    assert request.year is None
+    assert str(request.start_date) == "2024-02-01"
+    assert str(request.end_date) == "2025-01-31"
+
+
+def test_event_window_request_rejects_an_incomplete_or_oversized_range():
+    for values in (
+        {"start_date": "2026-01-01"},
+        {"start_date": "2026-01-01", "end_date": "2028-01-03"},
+    ):
+        try:
+            EventWindowRequest(birth_chart_id=1, event_key="marriage", **values)
+        except ValueError:
+            continue
+        raise AssertionError("event timing ranges must be complete and no longer than 24 months")
 def test_job_change_does_not_require_a_static_natal_promise(monkeypatch):
     _disable_varga(monkeypatch)
     result = EventWindowEngine().resolve(
@@ -126,6 +171,47 @@ def test_job_change_does_not_require_a_static_natal_promise(monkeypatch):
     assert window["strength"] == "strong"
     assert window["classification"] == "job_change_with_gain_support"
     assert all(step["key"] != "natal_promise" for step in window["calculation_trace"])
+
+
+def test_event_window_returns_natal_pressure_and_missing_confirmation_as_limits(monkeypatch):
+    _disable_varga(monkeypatch)
+    result = EventWindowEngine().resolve(
+        event_key="job_change",
+        calculation=_context(natal_promises=(
+            {"house": 10, "tone": "supportive", "lord": "Saturn", "supportive_weight": 4, "challenging_weight": 1},
+            {"house": 3, "tone": "challenging", "lord": "Mars", "supportive_weight": 1, "challenging_weight": 4},
+            {"house": 2, "tone": "mixed", "lord": "Jupiter", "supportive_weight": 2, "challenging_weight": 2},
+        )),
+        activations=(
+            _activation(10, HouseActivationState.DASHA_CONNECTED),
+            _activation(3, HouseActivationState.DASHA_TRANSIT_ACTIVATED),
+        ),
+    )
+
+    assert result["natal_promise"]["status"] == "pressured"
+    limits = {row["kind"] for row in result["windows"][0]["counter_evidence"]}
+    assert {"natal_pressure", "missing_varga_confirmation", "missing_outcome_support"}.issubset(limits)
+
+
+def test_date_level_precision_is_a_trigger_not_an_event_claim():
+    precise = _window_precision(
+        exact_peak=("2027-04-10", "Exact return"), varga_passed=True, strength="exceptional",
+    )
+    bounded = _window_precision(exact_peak=None, varga_passed=True, strength="strong")
+    broad = _window_precision(exact_peak=None, varga_passed=False, strength="developing")
+
+    assert precise == {
+        "grade": "date_trigger",
+        "label": "Date-level transit trigger",
+        "date": "2027-04-10",
+        "event_claimable": False,
+        "explanation": (
+            "A transit contact is exact on this date. It narrows the activation, "
+            "but does not by itself establish that the event occurs on that date."
+        ),
+    }
+    assert bounded["grade"] == "narrowed_period"
+    assert broad["grade"] == "broad_period"
 
 
 def test_job_change_rejects_generic_career_activation_without_transition(monkeypatch):

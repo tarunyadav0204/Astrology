@@ -600,6 +600,17 @@ const ModernAstroRoshniHomepage = ({
           </div>
         </section>
 
+        <section className="mh-chapter mh-nakshatra-feature" aria-labelledby="nakshatra-blueprint-home-title">
+          <div className="mh-nakshatra-feature__copy">
+            <p className="mh-eyebrow"><span></span> New · Created from your Kundli</p>
+            <h2 id="nakshatra-blueprint-home-title">Your life, through<br /><em>every Nakshatra.</em></h2>
+            <p>Go beyond Moon-sign summaries. Nakshatra Blueprint reads every graha and its pada to reveal the instincts shaping your relationships, vocation, home, mind and spiritual direction.</p>
+            <ul><li>All nine grahas, interpreted through Nakshatra and pada</li><li>Twelve life areas with practical alignment</li><li>Personal remedies tied to the life areas they support</li></ul>
+            <button className="mh-primary-button" type="button" onClick={() => requireAccount('/nakshatra-blueprint')}>Open my Nakshatra Blueprint <span aria-hidden>↗</span></button>
+          </div>
+          <div className="mh-nakshatra-feature__visual" aria-hidden="true"><div className="mh-nb-orbit mh-nb-orbit--one"></div><div className="mh-nb-orbit mh-nb-orbit--two"></div><span>27</span><small>LUNAR MANSIONS</small><i>✦</i><b>✦</b><em>✦</em></div>
+        </section>
+
         <section className="mh-chapter mh-discover" id="discover">
           {showPartnerPortrait ? <div className="mh-discover__feature mh-discover__portrait">
             <img src={partnerSample} alt="" aria-hidden="true" />

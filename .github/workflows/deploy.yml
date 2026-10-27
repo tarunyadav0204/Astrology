@@ -373,12 +373,18 @@ jobs:
       - name: Build baked backend release image
         id: baked_image
         shell: bash
-        env:
-          GCP_RELEASE_BASE_IMAGE: ${{ vars.GCP_RELEASE_BASE_IMAGE || 'astroroshni-release-backend-cad234c4eae9-855' }}
         run: |
           set -euo pipefail
           SHORT_SHA="${GITHUB_SHA::12}"
           IMAGE_NAME="astroroshni-release-backend-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
+          ACTIVE_TEMPLATE="$(gcloud compute instance-groups managed describe "${GCP_API_MIG_NAME}" \
+            --project="${GCP_PROJECT_ID}" \
+            --zone="${GCP_API_MIG_ZONE}" \
+            --format='value(instanceTemplate.basename())')"
+          BASE_IMAGE="$(gcloud compute instance-templates describe "${ACTIVE_TEMPLATE}" \
+            --project="${GCP_PROJECT_ID}" \
+            --format='value(properties.disks[0].initializeParams.sourceImage.basename())')"
+          test -n "${BASE_IMAGE}"
           echo "image_name=${IMAGE_NAME}" >> "${GITHUB_OUTPUT}"
           APP_ROOT="${GITHUB_WORKSPACE}" \
           GCLOUD_BIN="gcloud" \
@@ -386,7 +392,7 @@ jobs:
           PROJECT_ID="${GCP_PROJECT_ID}" \
           ZONE="${GCP_API_MIG_ZONE}" \
           MACHINE_TYPE="${GCP_IMAGE_BUILDER_MACHINE_TYPE}" \
-          BASE_IMAGE="${GCP_RELEASE_BASE_IMAGE}" \
+          BASE_IMAGE="${BASE_IMAGE}" \
           BASE_IMAGE_PROJECT="${GCP_PROJECT_ID}" \
           IMAGE_NAME="${IMAGE_NAME}" \
           IMAGE_FAMILY="astroroshni-release-backend" \
@@ -453,6 +459,17 @@ jobs:
             --project="${GCP_PROJECT_ID}" \
             --zone="${GCP_CHAT_WORKER_MIG_ZONE}" \
             --template="${TEMPLATE_NAME}"
+
+      - name: Prune obsolete release templates and images
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash "${GITHUB_WORKSPACE}/scripts/cleanup-production-release-artifacts.sh" \
+            --apply \
+            --project "${GCP_PROJECT_ID}" \
+            --keep-vm-images 20 \
+            --keep-container-images 15 \
+            --container-max-age-days 30
 
   payment_service:
     if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.payment_required == 'true' }}

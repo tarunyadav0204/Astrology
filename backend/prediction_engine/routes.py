@@ -104,7 +104,9 @@ class EventWindowRequest(BaseModel):
     birth_chart_id: Optional[int] = None
     birth_data: Optional[Dict[str, Any]] = None
     event_key: str = "job_change"
-    year: int = Field(ge=1900, le=2200)
+    year: Optional[int] = Field(default=None, ge=1900, le=2200)
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     include_developing: bool = False
     focus_houses: Optional[List[int]] = None
     calculation_profile: Optional[Dict[str, str]] = None
@@ -113,6 +115,15 @@ class EventWindowRequest(BaseModel):
     def validate_request(self):
         if self.birth_chart_id is None and not self.birth_data:
             raise ValueError("birth_chart_id or birth_data is required")
+        if (self.start_date is None) != (self.end_date is None):
+            raise ValueError("start_date and end_date must be supplied together")
+        if self.start_date and self.end_date:
+            if self.end_date < self.start_date:
+                raise ValueError("end_date must not be before start_date")
+            if (self.end_date - self.start_date).days > 731:
+                raise ValueError("Timing searches are limited to 24 months; narrow the requested range")
+        elif self.year is None:
+            raise ValueError("year or a start_date/end_date range is required")
         if self.event_key == CUSTOM_EVENT_KEY:
             try:
                 self.focus_houses = list(normalise_focus_houses(self.focus_houses))
@@ -286,7 +297,8 @@ def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, 
     cache_key = (
         EVENT_WINDOW_ENGINE_VERSION,
         birth.birth_chart_id, birth.date, birth.time, birth.latitude, birth.longitude,
-        str(birth.timezone), payload.year, payload.event_key, payload.include_developing,
+        str(birth.timezone), payload.year, payload.start_date, payload.end_date,
+        payload.event_key, payload.include_developing,
         tuple(payload.focus_houses or ()),
         tuple(sorted((payload.calculation_profile or {}).items())),
     )
@@ -297,8 +309,8 @@ def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, 
             return {**cached[1], "cache_hit": True}
         if cached:
             _event_window_cache.pop(cache_key, None)
-    start = date(payload.year, 1, 1)
-    end = date(payload.year, 12, 31)
+    start = payload.start_date or date(int(payload.year), 1, 1)
+    end = payload.end_date or date(int(payload.year), 12, 31)
     request = PredictionRequest(
         birth=birth,
         as_of=start,
@@ -327,7 +339,12 @@ def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, 
         focus_houses=payload.focus_houses,
     )
     response.update({
-        "year": payload.year,
+        "year": start.year,
+        "requested_horizon": {
+            "start_date": start.isoformat(),
+            "end_date": end.isoformat(),
+            "kind": "custom_range" if payload.start_date else "calendar_year",
+        },
         "as_of": start.isoformat(),
         "horizon_end": end.isoformat(),
         "chart": {
@@ -336,6 +353,16 @@ def _generate_event_window_search(payload: EventWindowRequest, chart: Dict[str, 
             "date": birth.date,
             "time": birth.time,
             "place": birth.place,
+            "timezone": str(birth.timezone),
+        },
+        "calculation_context": {
+            "start_date": start.isoformat(),
+            "end_date": end.isoformat(),
+            "birth_timezone": str(birth.timezone),
+            "precision_policy": (
+                "A date-level item is an exact transit trigger, not a guarantee that the event occurs "
+                "on that date. Time-of-day election requires an event location and timezone."
+            ),
         },
         "cache_hit": False,
     })

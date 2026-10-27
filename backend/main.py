@@ -139,6 +139,7 @@ from education.routes import router as education_router
 from marriage.marriage_routes import router as marriage_router
 from reports.routes import router as reports_router
 from reports.admin_routes import router as reports_admin_router
+from nakshatra_blueprint.routes import router as nakshatra_blueprint_router
 from pandit.routes import router as pandit_router
 from pandit.admin_routes import router as pandit_admin_router
 from progeny.progeny_routes import router as progeny_router
@@ -1119,6 +1120,7 @@ app.include_router(education_router, prefix="/api")
 app.include_router(marriage_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(reports_admin_router, prefix="/api")
+app.include_router(nakshatra_blueprint_router, prefix="/api")
 app.include_router(pandit_router, prefix="/api")
 app.include_router(pandit_admin_router, prefix="/api")
 app.include_router(progeny_router, prefix="/api")

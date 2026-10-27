@@ -347,12 +347,13 @@ export const apiService = {
     return response.data;
   },
 
-  getEventWindows: async ({ birthChartId, birthData, eventKey, year, includeDeveloping = false, focusHouses = null, calculationProfile = null }) => {
+  getEventWindows: async ({ birthChartId, birthData, eventKey, year = null, startDate = null, endDate = null, includeDeveloping = false, focusHouses = null, calculationProfile = null }) => {
     const response = await apiClient.post(getEndpoint('/prediction-engine/event-windows'), {
       birth_chart_id: birthChartId || null,
       birth_data: birthChartId ? null : birthData,
       event_key: eventKey,
-      year,
+      ...(year ? { year } : {}),
+      ...(startDate && endDate ? { start_date: startDate, end_date: endDate } : {}),
       include_developing: includeDeveloping,
       focus_houses: eventKey === 'custom' ? (focusHouses || []) : null,
       ...(calculationProfile ? { calculation_profile: calculationProfile } : {}),
@@ -1040,6 +1041,26 @@ export const apiService = {
       chart_data: chartData,
       d9_chart: d9Chart,
     });
+    return response.data;
+  },
+
+  getNakshatraBlueprintPricing: async () => {
+    const response = await apiClient.get(getEndpoint('/nakshatra-blueprint/pricing'));
+    return response.data;
+  },
+
+  getLatestNakshatraBlueprint: async (payload) => {
+    const response = await apiClient.post(getEndpoint('/nakshatra-blueprint/existing-latest'), payload);
+    return response.data;
+  },
+
+  findNakshatraBlueprint: async (payload) => {
+    const response = await apiClient.post(getEndpoint('/nakshatra-blueprint/existing'), payload);
+    return response.data;
+  },
+
+  generateNakshatraBlueprint: async (payload) => {
+    const response = await apiClient.post(getEndpoint('/nakshatra-blueprint/generate'), payload, { timeout: 180000 });
     return response.data;
   },
 };

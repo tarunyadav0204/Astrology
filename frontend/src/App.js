@@ -103,6 +103,7 @@ const ReportsStudioPage = lazy(() => import('./components/Reports/ReportsStudioP
 const EventsTimelinePage = lazy(() => import('./components/Events/EventsTimelinePage'));
 const AshtakavargaSeoPage = lazy(() => import('./components/Ashtakavarga/AshtakavargaSeoPage'));
 const AshtakavargaToolPage = lazy(() => import('./components/Ashtakavarga/AshtakavargaToolPage'));
+const NakshatraBlueprintPage = lazy(() => import('./components/NakshatraBlueprint/NakshatraBlueprintPage'));
 const BlogList = lazy(() => import('./components/Blog/BlogList'));
 const BlogPost = lazy(() => import('./components/Blog/BlogPost'));
 const BlogDashboard = lazy(() => import('./components/Blog/BlogDashboard'));
@@ -1045,6 +1046,17 @@ function App() {
             path="/tools/ashtakavarga"
             element={
               <AshtakavargaToolPage
+                user={user}
+                onLogout={user ? handleLogout : () => {}}
+                onAdminClick={user ? handleAdminClick : () => {}}
+                onLogin={() => setShowLoginModal(true)}
+              />
+            }
+          />
+          <Route
+            path="/nakshatra-blueprint"
+            element={
+              <NakshatraBlueprintPage
                 user={user}
                 onLogout={user ? handleLogout : () => {}}
                 onAdminClick={user ? handleAdminClick : () => {}}

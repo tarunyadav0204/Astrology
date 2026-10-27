@@ -3454,6 +3454,8 @@ def _get_pricing_with_originals():
         ("podcast", "podcast_cost"),
         ("prashna", "prashna_analysis_cost"),
         ("partner_portrait", "partner_portrait_cost"),
+        ("nakshatra_blueprint", "nakshatra_blueprint_cost"),
+        ("nakshatra_blueprint_images", "nakshatra_blueprint_images_addon_cost"),
     ]
     pricing = {}
     pricing_original = {}
@@ -3566,6 +3568,8 @@ _PRICING_KEYS_MAP = [
     ("podcast", "podcast_cost"),
     ("prashna", "prashna_analysis_cost"),
     ("partner_portrait", "partner_portrait_cost"),
+    ("nakshatra_blueprint", "nakshatra_blueprint_cost"),
+    ("nakshatra_blueprint_images", "nakshatra_blueprint_images_addon_cost"),
 ]
 
 

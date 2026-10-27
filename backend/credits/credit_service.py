@@ -14,6 +14,8 @@ _CREDIT_SETTING_FALLBACKS = {
     "chart_chat_cost": 2,
     "prashna_analysis_cost": 3,
     "partner_portrait_cost": 44,
+    "nakshatra_blueprint_cost": 9,
+    "nakshatra_blueprint_images_addon_cost": 3,
     "verified_chat_cost": 10,
 }
 
@@ -575,6 +577,8 @@ class CreditService:
                 ("podcast_cost", 2, "Credits per podcast (listen to message as audio)"),
                 ("prashna_analysis_cost", 3, "Credits per classical Prashna question chart"),
                 ("partner_portrait_cost", 44, "Credits per AI Partner Portrait with face and full-body views"),
+                ("nakshatra_blueprint_cost", 9, "Credits per Nakshatra Blueprint reading"),
+                ("nakshatra_blueprint_images_addon_cost", 3, "Additional credits for illustrated Nakshatra Blueprint"),
             ]
             for key, value, desc in defaults:
                 cur = execute(conn, "SELECT COUNT(*) FROM credit_settings WHERE setting_key = ?", (key,))
@@ -4090,6 +4094,8 @@ class CreditService:
             "instant_chat_per_minute_cost": "Credits per following started minute of Instant Chat",
             "prashna_analysis_cost": "Credits per classical Prashna question chart",
             "partner_portrait_cost": "Credits per AI Partner Portrait with face and full-body views",
+            "nakshatra_blueprint_cost": "Credits per Nakshatra Blueprint reading",
+            "nakshatra_blueprint_images_addon_cost": "Additional credits for illustrated Nakshatra Blueprint",
             "verified_chat_cost": "Credits per Verified Chat answer",
         }
         description = descriptions.get(setting_key, setting_key.replace("_", " ").strip().capitalize())
@@ -4304,7 +4310,7 @@ class CreditService:
             'health_report_cost', 'janam_kundli_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
             'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost',
             'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost',
-            'prashna_analysis_cost', 'partner_portrait_cost'
+            'prashna_analysis_cost', 'partner_portrait_cost', 'nakshatra_blueprint_cost', 'nakshatra_blueprint_images_addon_cost'
         )
         placeholders = ", ".join(["?"] * len(keys))
         with get_conn() as conn:
@@ -4489,6 +4495,8 @@ class CreditService:
                 ("health_report_cost", 9, "Credits per health PDF report"),
                 ("janam_kundli_report_cost", 300, "Credits per Janam Kundli PDF report"),
                 ("progeny_report_cost", 15, "Credits per progeny PDF report"),
+                ("nakshatra_blueprint_cost", 9, "Credits per Nakshatra Blueprint reading"),
+                ("nakshatra_blueprint_images_addon_cost", 3, "Additional credits for illustrated Nakshatra Blueprint"),
             ]
             for key, value, desc in report_defaults:
                 if any(s["key"] == key for s in settings):

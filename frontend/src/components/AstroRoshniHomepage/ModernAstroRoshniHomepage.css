@@ -1589,6 +1589,19 @@ body.modern-homepage-active {
 .mh-tool-card:hover i,
 .mh-tool-card:focus-visible i { opacity: 1; }
 
+.mh-nakshatra-feature { display: grid; grid-template-columns: minmax(390px, .95fr) minmax(390px, 1.05fr); gap: clamp(52px, 9vw, 150px); align-items: center; color: var(--color-header-text); background: var(--mh-ink-soft); overflow: hidden; }
+.mh-nakshatra-feature__copy { position: relative; z-index: 1; }
+.mh-nakshatra-feature .mh-eyebrow { color: var(--mh-gold-soft); }
+.mh-nakshatra-feature h2 { margin: 0; font-family: var(--mh-display); font-size: clamp(50px, 5.5vw, 78px); font-weight: 400; line-height: 1.02; letter-spacing: -.045em; }
+.mh-nakshatra-feature h2 em { color: var(--mh-gold); font-weight: 400; }
+.mh-nakshatra-feature__copy > p:not(.mh-eyebrow) { max-width: 530px; margin: 25px 0; color: rgba(255,248,238,.65); line-height: 1.72; }
+.mh-nakshatra-feature ul { margin: 0 0 30px; padding: 0; display: grid; gap: 10px; list-style: none; color: rgba(255,248,238,.8); font-size: 12px; }
+.mh-nakshatra-feature li::before { content: '✦'; margin-right: 10px; color: var(--mh-gold); }
+.mh-nakshatra-feature__visual { position: relative; min-height: 430px; display: grid; place-content: center; border: 1px solid rgba(234,216,173,.22); border-radius: 50%; aspect-ratio: 1; background: radial-gradient(circle, rgba(233,196,111,.16), transparent 25%), radial-gradient(circle at 68% 24%, rgba(179,106,152,.25), transparent 16%), #26122e; overflow: hidden; }
+.mh-nakshatra-feature__visual::before,.mh-nakshatra-feature__visual::after,.mh-nb-orbit { content: ''; position: absolute; border: 1px solid rgba(234,216,173,.26); border-radius: 50%; }
+.mh-nakshatra-feature__visual::before { inset: 11%; }.mh-nakshatra-feature__visual::after { inset: 27%; }.mh-nb-orbit--one { inset: 4%; transform: rotate(22deg); }.mh-nb-orbit--two { inset: 39%; border-color: rgba(234,216,173,.45); }
+.mh-nakshatra-feature__visual span { position: relative; z-index: 1; font-family: var(--mh-display); font-size: clamp(76px, 10vw, 150px); color: var(--mh-gold-soft); line-height: .8; }.mh-nakshatra-feature__visual small { position: relative; z-index: 1; margin-top: 15px; color: rgba(255,248,238,.65); font-size: 9px; letter-spacing: .18em; }.mh-nakshatra-feature__visual i,.mh-nakshatra-feature__visual b,.mh-nakshatra-feature__visual em { position: absolute; color: var(--mh-gold); font-style: normal; }.mh-nakshatra-feature__visual i { top: 16%; left: 25%; }.mh-nakshatra-feature__visual b { right: 17%; bottom: 26%; }.mh-nakshatra-feature__visual em { top: 29%; right: 12%; font-size: 10px; }
+
 .mh-discover {
   display: grid;
   grid-template-columns: minmax(390px, 0.85fr) minmax(570px, 1.15fr);
@@ -2801,6 +2814,7 @@ body.modern-homepage-active {
   .mh-tools,
   .mh-clarity,
   .mh-match,
+  .mh-nakshatra-feature,
   .mh-day,
   .mh-discover,
   .mh-journal,
@@ -2861,6 +2875,8 @@ body.modern-homepage-active {
   .mh-focus-detail h3 { font-size: clamp(28px, 3.6vw, 36px); }
   .mh-focus-detail .mh-primary-button { margin-top: 18px; }
   .mh-match__copy,
+  .mh-nakshatra-feature__copy,
+  .mh-nakshatra-feature__visual,
   .mh-match__visual,
   .mh-discover__feature,
   .mh-discover__calendar,
@@ -2870,6 +2886,7 @@ body.modern-homepage-active {
     width: 100%;
   }
   .mh-match__visual { justify-self: center; }
+  .mh-nakshatra-feature__visual { max-width: 520px; justify-self: center; }
   .mh-day__content { width: 100%; }
   .mh-day__links { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .mh-day__links button { min-height: 148px; padding: 20px 18px; }
@@ -3078,6 +3095,9 @@ body.modern-homepage-active {
   .mh-day__links button { min-height: 150px; }
   .mh-tools-grid { grid-template-columns: 1fr; }
   .mh-tool-card { min-height: 220px; }
+  .mh-nakshatra-feature { gap: 32px; }
+  .mh-nakshatra-feature h2 { font-size: clamp(46px, 13vw, 62px); }
+  .mh-nakshatra-feature__visual { min-height: 300px; width: min(100%, 390px); }
   .mh-discover__feature { padding: 30px 24px; border-radius: 24px; }
   .mh-discover__portrait > img {
     width: 200%;

@@ -107,6 +107,14 @@ export default function AnalysisHubScreen({ navigation }) {
         description: t('partnerPortrait.cardDescription', 'Explore their likely appearance and personality through a face and full-body portrait, with the chart reasons behind it.'),
       },
       {
+        id: 'nakshatraBlueprint',
+        title: 'Nakshatra Blueprint',
+        subtitle: 'A complete behavioural reading of every graha and life area',
+        icon: '✦',
+        gradient: ['#312E81', '#7C3AED'],
+        description: 'Explore the finer Nakshatra and pada layer of your complete birth chart.',
+      },
+      {
         id: 'career',
         title: t('home.analysis.career.title'),
         subtitle: t('home.analysis.career.description'),
@@ -171,10 +179,10 @@ export default function AnalysisHubScreen({ navigation }) {
       ...type,
       cost: type.id === 'reports'
         ? (pricing.partnership_report ?? pricing.partnership ?? 9)
-        : (type.id === 'partnerPortrait' ? (pricing.partner_portrait ?? 44) : (pricing[type.id] || 0)),
+        : (type.id === 'partnerPortrait' ? (pricing.partner_portrait ?? 44) : (type.id === 'nakshatraBlueprint' ? (pricing.nakshatra_blueprint ?? 9) : (pricing[type.id] || 0))),
       originalCost: type.id === 'reports'
         ? (pricingOriginal.partnership_report ?? pricingOriginal.partnership ?? null)
-        : (type.id === 'partnerPortrait' ? pricingOriginal.partner_portrait : pricingOriginal[type.id]),
+        : (type.id === 'partnerPortrait' ? pricingOriginal.partner_portrait : (type.id === 'nakshatraBlueprint' ? pricingOriginal.nakshatra_blueprint : pricingOriginal[type.id])),
       }));
   };
 
@@ -189,6 +197,10 @@ export default function AnalysisHubScreen({ navigation }) {
     }
     if (analysisType.id === 'partnerPortrait') {
       navigation.navigate('PartnerPortrait');
+      return;
+    }
+    if (analysisType.id === 'nakshatraBlueprint') {
+      navigation.navigate('NakshatraBlueprint');
       return;
     }
 

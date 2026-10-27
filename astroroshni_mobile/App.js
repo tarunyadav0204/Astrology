@@ -41,6 +41,7 @@ import RelationshipMatchScreen from './src/components/Relationship/RelationshipM
 import ReportsStudioScreen from './src/components/Reports/ReportsStudioScreen';
 import PartnerPortraitScreen from './src/components/PartnerPortrait/PartnerPortraitScreen';
 import ReportViewerScreen from './src/components/Reports/ReportViewerScreen';
+import NakshatraBlueprintScreen from './src/components/NakshatraBlueprint/NakshatraBlueprintScreen';
 import ReportHistoryScreen from './src/components/Reports/ReportHistoryScreen';
 import KarmaAnalysisScreen from './src/components/KarmaAnalysis/KarmaAnalysisScreen';
 import ChartScreen from './src/components/Chart/ChartScreen';
@@ -1224,6 +1225,11 @@ export default function App() {
           <Stack.Screen
             name="ReportHistory"
             component={ReportHistoryScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="NakshatraBlueprint"
+            component={NakshatraBlueprintScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen 
