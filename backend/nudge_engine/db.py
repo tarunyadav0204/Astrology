@@ -740,21 +740,30 @@ def get_vimshottari_dasha_dedupe_keys(
     return keys
 
 
-def get_self_charts_for_nudge(conn) -> List[Dict[str, Any]]:
+def get_self_charts_for_nudge(conn, user_ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
     """
     One row per user: self birth chart for personalized nudges.
     Returns dicts: birth_chart_id, userid, date, time, latitude, longitude, timezone.
     """
     rows: List[Any] = []
     try:
-        cur = execute(
-            conn,
-            """
+        ids = [int(uid) for uid in (user_ids or []) if str(uid).isdigit()]
+        if user_ids is not None and not ids:
+            return []
+        sql = """
             SELECT id, userid, date, time, latitude, longitude, timezone
             FROM birth_charts
             WHERE LOWER(COALESCE(relation, '')) = 'self'
-            ORDER BY userid ASC, id ASC
-            """,
+        """
+        params: List[Any] = []
+        if ids:
+            sql += " AND userid = ANY(%s)"
+            params.append(ids)
+        sql += " ORDER BY userid ASC, id ASC"
+        cur = execute(
+            conn,
+            sql,
+            tuple(params),
         )
         rows = cur.fetchall() or []
     except Exception as e:
@@ -846,6 +855,39 @@ def get_device_tokens_for_users(conn, userids: List[int]) -> List[Tuple[int, str
     except Exception as e:
         logger.warning("Could not fetch device tokens for users: %s", e)
         return []
+
+
+def get_push_enabled_user_ids_after(conn, *, after_userid: int = 0, limit: int = 500) -> List[int]:
+    """Page users with a valid Expo token from the notification database only."""
+    lim = max(1, min(int(limit), 1000))
+    cur = execute(
+        conn,
+        """
+        SELECT DISTINCT userid
+        FROM device_tokens
+        WHERE userid > %s
+          AND token LIKE 'ExponentPushToken[%%]'
+        ORDER BY userid ASC
+        LIMIT %s
+        """,
+        (int(after_userid or 0), lim),
+    )
+    return [int(row[0]) for row in (cur.fetchall() or [])]
+
+
+def has_delivery_for_user_trigger_on_date(conn, *, userid: int, trigger_id: str, target_date: date) -> bool:
+    """Idempotency guard for personalized daily nudges, independent of copy changes."""
+    cur = execute(
+        conn,
+        """
+        SELECT 1
+        FROM nudge_deliveries
+        WHERE userid = %s AND trigger_id = %s AND sent_at = %s
+        LIMIT 1
+        """,
+        (int(userid), str(trigger_id), target_date.isoformat()),
+    )
+    return cur.fetchone() is not None
 
 
 def resolve_notification_recipient_user_ids(

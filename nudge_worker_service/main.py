@@ -31,6 +31,7 @@ from nudge_engine.credit_campaign_whatsapp import (  # noqa: E402
     process_credit_campaign_whatsapp_batch,
 )
 from nudge_engine.delivery import deliver_for_user_batch  # noqa: E402
+from nudge_engine.kp_daily import process_kp_daily_batch  # noqa: E402
 from nudge_engine.models import NudgeEvent  # noqa: E402
 from nudge_engine.routes import (  # noqa: E402
     _run_admin_bulk_notification_job,
@@ -254,4 +255,24 @@ async def internal_scan_delivery_batch_task(
             event,
             user_ids_raw,
         )
+    )
+
+
+@app.post("/api/nudge/internal/tasks/kp-daily-batch")
+async def internal_kp_daily_batch_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    _require_worker_role()
+    _verify_nudge_task_secret(x_nudge_task_secret)
+    user_ids = body.get("user_ids") or []
+    if not isinstance(user_ids, list):
+        raise HTTPException(status_code=400, detail="user_ids must be a list")
+    try:
+        from datetime import date
+        target_date = date.fromisoformat(str(body.get("scan_date") or ""))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="scan_date is required") from exc
+    return await run_in_threadpool(
+        partial(process_kp_daily_batch, target_date=target_date, user_ids=user_ids)
     )
