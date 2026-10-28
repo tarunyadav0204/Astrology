@@ -1,8 +1,8 @@
 """Cached, evidence-led Nakshatra Blueprint API.
 
 The chart engine owns all astronomical facts.  Luna is only allowed to turn the
-locked fact pack into readable prose; Gemini 3 Flash receives the same prompt
-only when Luna is unavailable.
+locked fact pack into readable prose; Gemini 3 Flash is the primary writer and
+Luna receives the same prompt only when Gemini is unavailable.
 """
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ from reports.cache.report_hash import normalize_birth_data
 from reports.context.janam_kundli_context_builder import build_janam_kundli_report_context
 from reports.models import BirthInput
 from .image_service import NakshatraBlueprintImageProvider, NakshatraBlueprintStorage, image_provider_configured
+from .knowledge import build_nakshatra_blueprint_brief
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/nakshatra-blueprint", tags=["nakshatra-blueprint"])
@@ -110,25 +111,36 @@ def _prompt(facts: dict, language: str, native_name: str) -> str:
         "ascendant": facts.get("ascendant"), "moon": facts.get("moon"),
         "planet_matrix": facts.get("planet_matrix"), "house_themes": facts.get("house_themes"),
         "nakshatra_deep_dive": facts.get("nakshatra_deep_dive"),
+        # This is a controlled editorial knowledge layer for *only* the stars
+        # actually active in this chart. It prevents the writer from falling
+        # back to generic planet-and-house prose.
+        "nakshatra_reasoning_brief": build_nakshatra_blueprint_brief(facts),
     }
     schema = {
         "headline": "string", "opening": "string",
+        "presence_style": {"headline": "string", "reading": "string", "style_direction": "string"},
+        "core_patterns": [{"title": "string", "reading": "string"}],
         "planet_readings": [{"planet": "Sun", "signature": "string"}],
-        "life_areas": [{"key": "identity", "title": "string", "reading": "string", "alignment": "string"}],
+        "life_areas": [{"key": "identity", "title": "string", "reading": "string", "application": "string"}],
         "nakshatra_remedies": [{"nakshatra": "string", "life_area": "string", "practice": "string", "purpose": "string"}],
         "closing": "string",
     }
     return f"""You are Luna, writing an evidence-led Nakshatra Blueprint in {language}.
 Return ONLY valid JSON matching this schema: {json.dumps(schema)}
 The native is {json.dumps(native_name, ensure_ascii=False)}. Write as their experienced, compassionate Vedic astrologer, speaking directly to them in a polished natal consultation. Use their name naturally in the headline and opening, then sparingly in pivotal passages; do not mechanically repeat it. When the name is "you", write directly in second person without a name.
-This is a Nakshatra Blueprint, not a generic natal-chart or house reading. The Nakshatra standard is non-negotiable:
-- Every planet_readings.signature MUST begin by naming that graha's Nakshatra and, where supplied, its pada, then explain the behavioural instinct of that Nakshatra/pada before mentioning rashi or house.
-- Every life_areas.reading MUST lead with the relevant Nakshatra/pada influence that colours that life area. It may then use graha, rashi and house only as supporting context for where or how the Nakshatra pattern manifests.
+This is a Nakshatra Blueprint, not a generic natal-chart or house reading. Write as a thoughtful astrologer speaking to an intelligent person, never as compressed notes for another astrologer. The Nakshatra standard is non-negotiable:
+- Before drafting, identify the 3–5 strongest chart_patterns and use them as the Blueprint's recurring interpretive spine. A pattern that repeats through several grahas must be developed across the relevant life areas, with a different consequence in each area. Do not make every section a new, disconnected placement list.
+- The active_nakshatra_dossiers are an approved interpretive library. Use their deity, symbol, ruler, mature_action, shadow_expression, life_motifs and pada_refinement selectively when they illuminate the placement. Never dump dossier fields, give a textbook entry, or claim every trait applies. Make the mythic identifier do interpretive work: explain what it changes in the native's behaviour, choices, relationships or vocation.
+- A reading must contain real tension, not only additive praise. Where supported by chart_patterns or placements, distinguish mature expression from an overextended expression, and explain what helps integrate it. Do not make clinical, deterministic, or diagnostic claims.
+- Every planet_readings.signature MUST name that graha's Nakshatra and, where supplied, its pada, then explain the behavioural instinct of that Nakshatra/pada before mentioning rashi or house.
+- Every life_areas.reading MUST lead with a plain-language observation the native can recognise in life, then clearly name the relevant Nakshatra/pada influence. Write "Your Moon is in Swati, in its fourth pada" or "Your Sun and Rahu are both in Ardra"—never shorthand such as "Swati pada 4 Moon", "Ardra's Sun-Rahu pattern", or an unexplained stack of star names. It may then use graha, rashi and house only as supporting context for where or how the Nakshatra pattern manifests. When mentioning a house, translate its ordinary-life domain in the same sentence, for example "the sixth house of daily work and routines". Each chapter must make one clear chart-specific claim about the interaction of factors, not merely say that one placement 'adds' to another.
 - Never lead a paragraph with a house, rashi, sign, or generic graha strength. A statement such as "Mercury is strong in Gemini" or "the eleventh house emphasises" is incomplete and forbidden unless it follows a clear Nakshatra/pada interpretation.
 - Use the exact Nakshatra and pada only when they appear in the locked chart facts. If a pada is absent, name the Nakshatra without inventing one.
-Cover all nine grahas exactly once in planet_readings and all twelve life areas exactly once in life_areas. The life areas are the heart of this consultation: each life_areas.reading must be a substantial, lucid synthesis of the 2–4 most relevant grahas, Nakshatras/padas and contextual houses or rashis for that area. Explain how those patterns interact in the native's lived experience, rather than listing placements. Aim for 90–140 words per life area, with concrete nuance and no generic filler.
+Write 3 to 5 core_patterns before the life areas. These are the chart's most consequential recurring Nakshatra dynamics, selected from chart_patterns and enriched_placements—not generic headings. Each must be 55–90 words and explain a genuine interaction, tension or reinforcement that will recur later in the reading. Do not repeat the opening or turn this into a placement list.
+Write presence_style as a 70–110 word reading of presence, appearance and personal style. Anchor it in the Ascendant Nakshatra and pada, then support it only with relevant Ascendant-lord, Moon, Venus, first-house or aspect facts that are present. Describe the felt impression, gaze, voice, movement, self-presentation and aesthetic instinct—not fixed physical traits. Never claim exact height, weight, complexion, ethnicity, facial features, age, attractiveness, health, or anything deterministic. style_direction must be one concise, practical suggestion for a way of presenting oneself that aligns with the chart's Nakshatra qualities.
+Cover all nine grahas exactly once in planet_readings and all twelve life areas exactly once in life_areas. The life areas are the heart of this consultation: each life_areas.reading must be a detailed, lucid synthesis of the 2–4 most relevant grahas, Nakshatras/padas and contextual houses or rashis for that area. Explain how those patterns interact in the native's lived experience, rather than listing placements. Aim for 130–180 words per life area. A good chapter has: (1) a humanly recognisable opening, (2) an explicit explanation of the relevant placements and their interaction, (3) the likely lived expression, including both a strength and an overextended expression where supported. Use complete, flowing prose with no unexplained technical shorthand. Do not reuse the same conclusion, shadow, or practical guidance in more than one chapter. Avoid empty advice such as 'set boundaries', 'communicate clearly', 'pause before reacting' or 'be authentic' unless the preceding interpretation makes that exact action uniquely necessary.
+Every life area MUST also include application: 55–90 words that directly answers its matching life_area_reader_questions entry in the reasoning brief. This is the reader's practical conclusion, not a summary of placements. Write it as warm, readable guidance in connected sentences, not a checklist. Be specific about choices, environments, role types, habits, agreements, methods or priorities. For career, application MUST name 3–5 plausible role families or work domains plus the work environment and contribution that fit; present them as options to explore, not promises of occupation, income or status. For all other areas, never make guarantees about marriage, children, money, health, events or outcomes.
 Planet readings are supporting reference, not nine mini-consultations: each signature must be only 1–2 concise sentences. Do not include separate gift, growth-edge, remedy, or life-area material there; reserve that depth for life_areas. Nakshatra describes behavioural instinct; rashi and house are context. Pada is a refinement, never a generic personality label. Use only the locked chart facts below. Do not invent classical quotations, events, diagnoses, dates, placements, or certainties.
-For every life_areas item, write alignment as one concise, practical way to align with that area's specific Nakshatra/pada energy in ordinary life. It must be an actionable habit, boundary, reflective practice, communication choice, or decision principle—not a generic affirmation, ritual, gemstone, mantra, purchase, medical advice, or guaranteed result. Make the action clearly arise from the Nakshatra behaviour you just described.
 Write 3 to 5 nakshatra_remedies. Each remedy must name a Nakshatra that appears in the locked chart facts and offer one gentle, low-cost traditional or devotional practice associated with that Nakshatra's energy, such as a mindful observance, selfless service, nature practice, prayer or mantra only where the relevant Nakshatra association is present in the facts. Set life_area to the one most relevant chart area it supports (for example, career and purpose, relationships, home and family, emotional wellbeing, confidence, communication, health routines, or spiritual growth). In purpose, explain in one sentence how the practice supports that specific life area; use grounded language such as "supports" or "helps cultivate", never promises that it will improve, fix, cure, attract, or guarantee an outcome. Never prescribe medical treatment, gemstones, costly purchases, fasting that risks health, coercive acts, or guaranteed outcomes.
 Never mention or allude to evidence, supplied facts, supplied data, the fact pack, calculations, source material, a prompt, an AI, a model, a schema, or an analysis process. Do not use phrases such as "the evidence shows", "based on the supplied", "the data indicates", or "your chart data". State the interpretation directly and naturally, as an astrologer reading the native's chart.
 FACT_PACK={json.dumps(evidence, ensure_ascii=False, default=str)}"""
@@ -138,8 +150,8 @@ async def _write_reading(facts: dict, language: str, native_name: str) -> tuple[
     prompt = _prompt(facts, language, native_name)
     analyzer = GeminiChatAnalyzer()
     attempts = [
-        {"provider_override": "openai", "model_name_override": "gpt-5.6-luna", "openai_reasoning_effort": "minimal"},
         {"provider_override": "gemini", "model_name_override": "models/gemini-3-flash-preview", "use_gemini_rest": True},
+        {"provider_override": "openai", "model_name_override": "gpt-5.6-luna", "openai_reasoning_effort": "minimal"},
     ]
     for attempt in attempts:
         out = await analyzer.generate_text_from_prompt(prompt, premium_analysis=True, llm_log_tag="nakshatra_blueprint", request_timeout_s=120, **attempt)

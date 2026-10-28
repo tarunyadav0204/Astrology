@@ -48,6 +48,7 @@ async def generate_sitemap():
         ('/monthly-panchang', 'weekly', '0.7'),
         ('/kundli-matching', 'weekly', '0.9'),
         ('/reports', 'weekly', '0.9'),
+        ('/nakshatra-blueprint', 'weekly', '0.9'),
         ('/festivals', 'weekly', '0.7'),
         ('/festivals/monthly', 'weekly', '0.7'),
         ('/nakshatras', 'weekly', '0.8'),

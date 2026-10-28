@@ -23,7 +23,7 @@ export const SEO_CONFIG = {
     logoPngFallback: "/images/astroroshni-icon-96.png",
     ogDefault: "/images/astroroshni-og-image.jpg",
     twitterDefault: "/images/astroroshni-twitter-image.jpg",
-    favicon: "/favicon.png",
+    favicon: "/logo192.png?v=20261027",
     /** Responsive WebP built from source banner; PNG fallbacks for non‑WebP browsers. */
     homeLifePathBanner: "/images/homepage-life-path-banner-1200.webp",
     homeLifePathBannerSrcSetWebp:
@@ -245,6 +245,12 @@ export const SEO_CONFIG = {
       title: "Ashtakavarga Calculator | Sarvashtakavarga & Bhinna Ashtakavarga Analysis | AstroRoshni",
       description: "Use AstroRoshni's Ashtakavarga Calculator to study Sarvashtakavarga totals, Bhinna Ashtakavarga bindus, house strength, and transit support from your Vedic birth chart.",
       keywords: "Ashtakavarga Calculator, Sarvashtakavarga, Bhinna Ashtakavarga, Ashtakavarga bindus, house strength astrology, Vedic chart strength, transit support astrology, bindu analysis, Ashtakavarga in Vedic astrology, Sarvashtakavarga calculator"
+    },
+
+    nakshatraBlueprint: {
+      title: "Nakshatra Blueprint | Personalised Nakshatra & Pada Reading | AstroRoshni",
+      description: "Discover a personalised Nakshatra Blueprint for every graha and life area: Nakshatra and pada patterns, practical alignment, and gentle Vedic remedies from your birth chart.",
+      keywords: "nakshatra reading, nakshatra pada reading, personalised nakshatra analysis, vedic astrology natal reading, graha nakshatra analysis, moon nakshatra, birth star reading, nakshatra remedies"
     },
 
     astroVastu: {

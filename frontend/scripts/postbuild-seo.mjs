@@ -38,6 +38,7 @@ const STATIC_PRERENDER_PATHS = [
   // /karma-analysis is pre-rendered by frontend-next (do not puppeteer the CRA route)
   // /chat is pre-rendered by frontend-next (do not puppeteer the CRA route)
   '/reports',
+  '/nakshatra-blueprint',
   '/blog',
   '/about',
   '/astroroshni',

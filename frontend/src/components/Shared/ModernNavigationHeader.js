@@ -28,6 +28,7 @@ const READING_LINKS = [
   ['/karma-analysis', 'Past-life karma', 'Inherited patterns made practical'],
   ['/progeny-analysis', 'Progeny', 'Children and family-growth themes'],
   ['/education', 'Education', 'Learning patterns and examination periods'],
+  ['/nakshatra-blueprint', 'Nakshatra Blueprint', 'A detailed reading of your birth-star pattern'],
 ];
 
 const ModernNavigationHeader = ({

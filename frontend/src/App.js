@@ -1056,12 +1056,25 @@ function App() {
           <Route
             path="/nakshatra-blueprint"
             element={
-              <NakshatraBlueprintPage
-                user={user}
-                onLogout={user ? handleLogout : () => {}}
-                onAdminClick={user ? handleAdminClick : () => {}}
-                onLogin={() => setShowLoginModal(true)}
-              />
+              <>
+                <NakshatraBlueprintPage
+                  user={user}
+                  onLogout={user ? handleLogout : () => {}}
+                  onAdminClick={user ? handleAdminClick : () => {}}
+                  onLogin={() => {
+                    setAuthView('login');
+                    setShowLoginModal(true);
+                  }}
+                />
+                <AnalysisGuestAuthModal
+                  isOpen={showLoginModal && !user}
+                  onClose={() => setShowLoginModal(false)}
+                  authView={authView}
+                  setAuthView={setAuthView}
+                  description="Sign in to create and save your personalised Nakshatra Blueprint with your own Kundli."
+                  onAuthenticated={handleLogin}
+                />
+              </>
             }
           />
           <Route path="/policy" element={<PolicyPage user={user} onLogout={handleLogout} onLogin={() => setShowLoginModal(true)} onAdminClick={handleAdminClick} />} />
