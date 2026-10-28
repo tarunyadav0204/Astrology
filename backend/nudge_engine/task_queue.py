@@ -41,6 +41,8 @@ def _queue_name(task_kind: Optional[str] = None) -> str:
     task_kind_s = str(task_kind or "").strip().lower()
     if task_kind_s == "kp-daily-batch":
         return (os.getenv("NUDGE_KP_DAILY_TASKS_QUEUE") or "nudge-kp-daily-queue").strip()
+    if task_kind_s == "moon-tara-batch":
+        return (os.getenv("NUDGE_MOON_TARA_TASKS_QUEUE") or "nudge-moon-tara-queue").strip()
     if task_kind_s == "credit-campaign-whatsapp-batch":
         return (
             os.getenv("NUDGE_WHATSAPP_TASKS_QUEUE")

@@ -38,6 +38,7 @@ from nudge_engine.routes import (  # noqa: E402
 )
 from nudge_engine.service import run_nudge_scan  # noqa: E402
 from nudge_engine.kp_daily import enqueue_kp_daily_batches  # noqa: E402
+from nudge_engine.moon_tara_daily import enqueue_moon_tara_batches  # noqa: E402
 from nudge_engine import db  # noqa: E402
 from nudge_engine.connections import assert_isolated_database_configuration  # noqa: E402
 
@@ -101,6 +102,21 @@ async def cron_dispatch_kp_daily(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"Invalid date: {exc}") from exc
     return await run_in_threadpool(enqueue_kp_daily_batches, target)
+
+
+@app.post("/api/nudge/cron/moon-tara-daily")
+async def cron_dispatch_moon_tara_daily(
+    scan_date: Optional[str] = Query(None, description="Date YYYY-MM-DD; default is today"),
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+):
+    _require_dispatch_role()
+    _verify_cron_secret(x_cron_secret)
+    try:
+        from datetime import date
+        target = date.fromisoformat(scan_date) if scan_date else date.today()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid date: {exc}") from exc
+    return await run_in_threadpool(enqueue_moon_tara_batches, target)
 
 
 @app.post("/api/nudge/cron/broadcast/dispatch-due")

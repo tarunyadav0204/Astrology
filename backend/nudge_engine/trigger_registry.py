@@ -4,7 +4,6 @@ from .triggers.planet_transit_sign import PlanetTransitSignTrigger
 from .triggers.lunar_phase import LunarPhaseTrigger
 from .triggers.planet_retrograde import PlanetRetrogradeTrigger
 from .triggers.festival import FestivalTrigger
-from .triggers.moon_nakshatra import MoonNakshatraTrigger
 from .triggers.natal_planet_return import NatalPlanetReturnTrigger
 from .triggers.natal_whole_sign_return import NatalWholeSignReturnTrigger
 from .triggers.vimshottari_dasha_change import VimshottariDashaChangeTrigger
@@ -14,7 +13,6 @@ TRIGGERS: dict[str, TriggerBase] = {
     "lunar_phase": LunarPhaseTrigger(),
     "planet_retrograde": PlanetRetrogradeTrigger(),
     "festival": FestivalTrigger(),
-    "moon_nakshatra": MoonNakshatraTrigger(),
     "natal_planet_return": NatalPlanetReturnTrigger(),
     "natal_whole_sign_return": NatalWholeSignReturnTrigger(),
     "vimshottari_dasha_change": VimshottariDashaChangeTrigger(),
