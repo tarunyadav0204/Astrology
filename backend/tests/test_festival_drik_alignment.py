@@ -73,6 +73,14 @@ def test_pitra_paksha_covers_ashwin_krishna(festivals_2026):
     assert "2026-10-10" in _dates_for(festivals_2026, "sarva_pitru_amavasya")
 
 
+def test_pitra_paksha_amanta_does_not_repeat_after_sharad_purnima(calc):
+    festivals = calc.find_festival_dates(
+        2026, 10, DELHI["lat"], DELHI["lon"], "amanta", DELHI["tz"]
+    )
+    dates = _dates_for(festivals, "pitra_paksha")
+    assert dates == [f"2026-10-{day:02d}" for day in range(1, 11)]
+
+
 def test_sharad_purnima_handles_short_tithi(festivals_2026):
     dates = _dates_for(festivals_2026, "sharad_purnima")
     assert dates == ["2026-10-25"]

@@ -558,7 +558,10 @@ class FestivalCalculator:
         # Purnimanta label: Ashwin Krishna. Amanta label: Bhadrapada Krishna.
         if calendar_system == "purnimanta":
             return self.base_month(lunar_month) == "ashwin"
-        return self._month_matches(festival.get("month", "bhadrapada"), lunar_month, paksha, calendar_system)
+        # The festival catalogue records the Purnimanta month (Ashwin). Do not
+        # read that value for Amanta: doing so also matches the later Ashwin
+        # Krishna fortnight after Sharad Purnima and falsely emits Pitru Paksha.
+        return self.base_month(lunar_month) == "bhadrapada"
 
     def get_monthly_vrats(
         self,
