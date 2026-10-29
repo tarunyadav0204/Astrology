@@ -102,7 +102,7 @@ import {
 } from './src/services/runtimeGuard';
 import { API_BASE_URL, getEndpoint } from './src/utils/constants';
 import { initFacebookAnalytics } from './src/services/facebookAnalytics';
-import { initAppsFlyerAnalytics } from './src/services/appsFlyerAnalytics';
+import { initAppsFlyerAnalytics, subscribeToAppsFlyerDeepLinks } from './src/services/appsFlyerAnalytics';
 import { initFirebaseAnalytics } from './src/services/firebaseAnalytics';
 import { trackNavigationRoute } from './src/services/navigationAnalytics';
 import {
@@ -484,6 +484,7 @@ export default function App() {
   const [isRecoveringFromCrash, setIsRecoveringFromCrash] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const navigationRef = useRef(null);
+  const pendingAppsFlyerRouteRef = useRef(null);
   const playRestartPromptedRef = useRef(false);
   const promptPlayRestartRef = useRef(() => {});
   const pendingAndroidForceRef = useRef(null);
@@ -562,6 +563,26 @@ export default function App() {
 
     return unsubscribe;
   }, []);
+
+  // OneLink values are intentionally allow-listed. A marketing link may only
+  // take a user to a safe in-app destination; it can never inject a route or
+  // a chat prompt. Queue the action while the splash/navigation tree is loading.
+  useEffect(() => {
+    const openAppsFlyerDestination = (event) => {
+      if (event?.deepLinkValue !== 'chat') return;
+      if (isLoading || !navigationRef.current) {
+        pendingAppsFlyerRouteRef.current = 'chat';
+        return;
+      }
+      pendingAppsFlyerRouteRef.current = null;
+      navigationRef.current.navigate('Home', { startChat: true, deepLinkSource: 'appsflyer' });
+    };
+    const unsubscribe = subscribeToAppsFlyerDeepLinks(openAppsFlyerDestination);
+    if (!isLoading && pendingAppsFlyerRouteRef.current === 'chat') {
+      openAppsFlyerDestination({ deepLinkValue: 'chat' });
+    }
+    return unsubscribe;
+  }, [isLoading]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;
@@ -1045,6 +1066,10 @@ export default function App() {
                   guardMobileWebHistoryUrl();
                   if (navigationRef.current) {
                     trackNavigationRoute(navigationRef.current.getRootState());
+                    if (!isLoading && pendingAppsFlyerRouteRef.current === 'chat') {
+                      pendingAppsFlyerRouteRef.current = null;
+                      navigationRef.current.navigate('Home', { startChat: true, deepLinkSource: 'appsflyer' });
+                    }
                   }
                 }}
                 ref={(nav) => {

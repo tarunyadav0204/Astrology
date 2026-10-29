@@ -60,6 +60,8 @@
         <data android:scheme="https" android:host="astroroshni.com" android:pathPrefix="/panchang"/>
         <data android:scheme="https" android:host="astroroshni.com" android:pathPrefix="/muhurat-finder"/>
         <data android:scheme="https" android:host="astroroshni.com" android:pathPrefix="/nakshatras"/>
+        <!-- AppsFlyer OneLink: routes deep_link_value=chat through the JS listener. -->
+        <data android:scheme="https" android:host="astroroshni.onelink.me" android:pathPrefix="/"/>
         <data android:scheme="https" android:host="www.astroroshni.com" android:pathPrefix="/karma-analysis"/>
         <data android:scheme="https" android:host="www.astroroshni.com" android:pathPrefix="/kundli-matching"/>
         <data android:scheme="https" android:host="www.astroroshni.com" android:pathPrefix="/marriage-analysis"/>

@@ -30,6 +30,7 @@ from nudge_engine.credit_campaign_whatsapp import (  # noqa: E402
     ensure_credit_campaign_whatsapp_tables,
     process_credit_campaign_whatsapp_batch,
 )
+from nudge_engine.credit_grant_whatsapp import process_credit_grant_whatsapp_batch  # noqa: E402
 from nudge_engine.delivery import deliver_for_user_batch  # noqa: E402
 from nudge_engine.kp_daily import process_kp_daily_batch  # noqa: E402
 from nudge_engine.moon_tara_daily import process_moon_tara_batch  # noqa: E402
@@ -225,6 +226,27 @@ async def internal_credit_campaign_whatsapp_batch_task(
             recipients=recipients,
         )
     )
+
+
+@app.post("/api/nudge/internal/tasks/credit-grant-whatsapp-batch")
+async def internal_credit_grant_whatsapp_batch_task(
+    body: Dict[str, Any],
+    x_nudge_task_secret: Optional[str] = Header(None, alias="X-Nudge-Task-Secret"),
+):
+    _require_worker_role()
+    _verify_nudge_task_secret(x_nudge_task_secret)
+    recipients = body.get("recipients") or []
+    if not isinstance(recipients, list) or not recipients:
+        raise HTTPException(status_code=400, detail="recipients are required")
+    # The API supplies only the approved, server-side configuration. Clients never choose it.
+    template_name = str(body.get("template_name") or "").strip()
+    language = str(body.get("language") or "en").strip()
+    if not template_name:
+        raise HTTPException(status_code=400, detail="template_name is required")
+    return await run_in_threadpool(partial(
+        process_credit_grant_whatsapp_batch, recipients=recipients,
+        template_name=template_name, language=language,
+    ))
 
 
 @app.post("/api/nudge/internal/tasks/scan-delivery-batch")

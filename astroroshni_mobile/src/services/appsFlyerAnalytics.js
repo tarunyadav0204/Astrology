@@ -11,6 +11,8 @@ let initStarted = false;
 let sdkReady = false;
 let conversionListener = null;
 let deepLinkListener = null;
+const deepLinkSubscribers = new Set();
+let pendingDeepLink = null;
 
 function getExtra() {
   return Constants.expoConfig?.extra || {};
@@ -103,7 +105,36 @@ function registerDeepLinkListener(appsFlyer) {
     const payload = extractConversionPayload(res);
     if (!payload) return;
     persistConversion(payload).catch(() => {});
+    const raw = payload.attribution_raw || {};
+    const deepLinkValue = String(raw.deep_link_value || raw.deepLinkValue || '').trim().toLowerCase();
+    if (!deepLinkValue) return;
+    const event = { deepLinkValue, raw };
+    // AppsFlyer can deliver an initial link before React Navigation is ready.
+    // Keep the latest actionable link until App subscribes and can route it.
+    pendingDeepLink = event;
+    deepLinkSubscribers.forEach((subscriber) => {
+      try {
+        subscriber(event);
+      } catch (error) {
+        afLog('deep link subscriber failed', String(error?.message || error));
+      }
+    });
   });
+}
+
+/** Subscribe to OneLink routing events after AppsFlyer has attributed them. */
+export function subscribeToAppsFlyerDeepLinks(subscriber) {
+  if (typeof subscriber !== 'function') return () => {};
+  deepLinkSubscribers.add(subscriber);
+  if (pendingDeepLink) {
+    const event = pendingDeepLink;
+    pendingDeepLink = null;
+    // Defer so callers can finish creating their navigation ref first.
+    setTimeout(() => {
+      if (deepLinkSubscribers.has(subscriber)) subscriber(event);
+    }, 0);
+  }
+  return () => deepLinkSubscribers.delete(subscriber);
 }
 
 export async function initAppsFlyerAnalytics() {
