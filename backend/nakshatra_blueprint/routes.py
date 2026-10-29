@@ -1,8 +1,8 @@
 """Cached, evidence-led Nakshatra Blueprint API.
 
 The chart engine owns all astronomical facts.  Luna is only allowed to turn the
-locked fact pack into readable prose; Gemini 3 Flash is the primary writer and
-Luna receives the same prompt only when Gemini is unavailable.
+locked fact pack into readable prose; Luna is the primary writer and Gemini 3
+Flash receives the same prompt only when Luna is unavailable.
 """
 from __future__ import annotations
 
@@ -150,8 +150,8 @@ async def _write_reading(facts: dict, language: str, native_name: str) -> tuple[
     prompt = _prompt(facts, language, native_name)
     analyzer = GeminiChatAnalyzer()
     attempts = [
-        {"provider_override": "gemini", "model_name_override": "models/gemini-3-flash-preview", "use_gemini_rest": True},
         {"provider_override": "openai", "model_name_override": "gpt-5.6-luna", "openai_reasoning_effort": "minimal"},
+        {"provider_override": "gemini", "model_name_override": "models/gemini-3-flash-preview", "use_gemini_rest": True},
     ]
     for attempt in attempts:
         out = await analyzer.generate_text_from_prompt(prompt, premium_analysis=True, llm_log_tag="nakshatra_blueprint", request_timeout_s=120, **attempt)
