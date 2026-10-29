@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import asyncio
+import logging
 import os
 import re
 import time
@@ -17,6 +18,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 from chat.instant_chat_pipeline import ANSWER_MODES, TARGET_SUBJECTS
 from utils.admin_settings import CHAT_LLM_OPENAI, get_verified_planner_model, get_verified_router_model
+
+logger = logging.getLogger(__name__)
 
 
 _CATEGORY_VALUES = [
@@ -146,6 +149,13 @@ def redact_verified_internal_transport(text: Any) -> str:
         r"\b(?:supplied|provided)\s+(?=(?:D\d+|divisional|natal|synastry|Jaimini|Nadi|nakshatra)\b)",
         "", value, flags=re.IGNORECASE,
     )
+    # These were part of an older card-oriented presentation contract. They
+    # add no astrological meaning in prose and make a consultation read like
+    # an evidence scorecard when a model happens to emit them.
+    value = re.sub(r"\*\*(?:✓\s*)?Support\s*·\s*([^*]+)\*\*", r"\1", value, flags=re.IGNORECASE)
+    value = re.sub(r"\*\*(?:!\s*)?Caution\s*·\s*([^*]+)\*\*", r"\1", value, flags=re.IGNORECASE)
+    value = re.sub(r"\*\*(?:✓\s*)?Support\s*·\*\*\s*", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"\*\*(?:!\s*)?Caution\s*·\*\*\s*", "", value, flags=re.IGNORECASE)
     # This is the final response persisted and returned to every client.
     # Collapsing whitespace here also collapses Markdown section boundaries,
     # paragraphs and ranked choices, even when the writer formatted them correctly.
@@ -567,6 +577,102 @@ def _add_usage(total: Dict[str, int], response: Any) -> None:
         total[key] = int(total.get(key, 0) or 0) + value
 
 
+def _verified_editorial_preserves_timing(source: str, candidate: str) -> bool:
+    """Reject a prettier rewrite if it lost a calculated date or ranking."""
+    if not candidate.strip():
+        return False
+    # Full date bands and exact dates are the highest-risk facts in a timing
+    # answer. A light structural check keeps the editorial pass from silently
+    # turning a precise calculation into a nicer but incomplete answer.
+    dates = set(re.findall(
+        r"\b(?:\d{1,2}\s+[A-Z][a-z]+(?:\s+\d{4})?|[A-Z][a-z]+\s+\d{1,2}(?:,\s*\d{4})?)\b",
+        source,
+    ))
+    if any(date not in candidate for date in dates):
+        return False
+    numeric_facts = set(re.findall(r"\b\d{1,4}\b", source))
+    if any(number not in candidate for number in numeric_facts):
+        return False
+    ranks = set(re.findall(r"\bRank\s+\d+\b", source, flags=re.IGNORECASE))
+    return all(rank.lower() in candidate.lower() for rank in ranks)
+
+
+async def _polish_verified_visible_answer(
+    *,
+    client: Any,
+    model_name: str,
+    language: str,
+    native_name: str,
+    draft: str,
+    max_output_tokens: int,
+    timeout_s: float,
+    reasoning_kwargs: Dict[str, Any],
+) -> tuple[str, Optional[Any]]:
+    """Give the already-calculated answer a separate, fact-preserving human edit.
+
+    The calculator writer is necessarily dense with evidence contracts. Asking
+    it to both adjudicate and sound literary has repeatedly produced a report
+    with a name added to the first line. This pass sees only the completed
+    draft, may not calculate, and is rejected if it omits a visible timing fact.
+    """
+    if timeout_s < 6.0 or not draft.strip():
+        return draft, None
+    display_name = " ".join(str(native_name or "").split())[:80]
+    name_line = (
+        f"The person is {display_name!r}; address them naturally in the opening."
+        if display_name else
+        "No name is available; address the person naturally as 'you'."
+    )
+    instructions = f"""You are the final editor for a Vedic astrology consultation in {language}.
+Return only the rewritten user-facing reading, with no explanation of your edit.
+
+This is an editorial pass, not a new analysis. Preserve every astrological fact, placement,
+date, date range, rank, condition, and stated confidence from the source exactly. Do not add,
+remove, reinterpret, soften, or strengthen any astrological claim. Keep every Rank present.
+
+Make it read as an experienced astrologer speaking to one person: warm, clear, and absorbing,
+while retaining its full depth. The first paragraph must feel personally addressed, not like a
+database verdict with a name prefixed to it. Translate a technical term in the sentence where it
+matters. Connect reasons into prose instead of stacking them as evidence labels.
+
+CRITICAL DELIVERY STANDARD: Make this a detailed, psychologically insightful and human-friendly
+reading for this particular person—not shorthand, a calculation report, or a generic horoscope.
+Preserve the full relevant astrological analysis, then explain what its placements and periods can
+mean in lived choices, relationships, work, hopes, strengths, and recurring patterns. Do not invent
+private history, emotions, trauma, or any fact not supported by the source. The writing should feel
+pleasurable and absorbing to read while remaining precise, grounded, and astrologically rigorous.
+
+SENTIMENT EMPHASIS: Preserve every existing `<span class="chat-sentiment-positive">…</span>` and
+`<span class="chat-sentiment-negative">…</span>` from the source. If a major section has a genuinely
+favorable or cautionary conclusion without one, add one short span around that exact clause. Keep
+the source language inside the span; do not add English labels such as "Support" or "Caution", do
+not wrap whole paragraphs, and do not put Markdown bold inside a span.
+
+Never use `✓ Support`, `! Caution`, `Support ·`, `Caution ·`, `likely event stage`, `Bottom line`,
+or an opening such as "Parenthood is favored". Do not repeat the same verdict at both beginning
+and end. Do not use generic reassurance or invent feelings. {name_line}
+"""
+    try:
+        response = await asyncio.wait_for(
+            client.responses.create(
+                model=model_name,
+                instructions=instructions,
+                input=f"SOURCE READING — preserve its facts exactly:\n\n{draft}",
+                **reasoning_kwargs,
+                max_output_tokens=max_output_tokens,
+            ),
+            timeout=max(1.0, timeout_s),
+        )
+    except Exception:
+        logger.exception("verified_editorial_polish_failed")
+        return draft, None
+    polished = str(getattr(response, "output_text", "") or "").strip()
+    if not _verified_editorial_preserves_timing(draft, polished):
+        logger.warning("verified_editorial_polish_rejected_for_fact_loss")
+        return draft, response
+    return polished, response
+
+
 def _function_calls(response: Any) -> List[Any]:
     return [
         item for item in (getattr(response, "output", None) or [])
@@ -628,8 +734,18 @@ def _verified_presentation_mode(instant_context):
 
 
 def _premium_writer_system(intent_mode, language, native_name="", response_style="technical"):
-    from chat.verified_consultation import verified_consultation_instruction
-    return _premium_writer_system_base(intent_mode, language, native_name, response_style) + '\n' + verified_consultation_instruction()
+    from chat.verified_consultation import (
+        verified_consultation_instruction,
+        verified_final_delivery_instruction,
+    )
+    return (
+        _premium_writer_system_base(intent_mode, language, native_name, response_style)
+        + '\n' + verified_consultation_instruction()
+        # The calculator loop retains this system prompt through its final
+        # writing turn. Put the delivery override here too, so a legacy
+        # evidence contract cannot reassert an audit-style voice.
+        + '\n' + verified_final_delivery_instruction(native_name)
+    )
 
 
 def _premium_writer_system_base(
@@ -812,11 +928,10 @@ limits directly. For example, say "the Sudarshana analysis indicates..." and "th
 supports this wider period; finer sub-period dates remain uncertain," never "the supplied
 Sudarshana branch gives..." or "a schedule was not independently supplied."
 
-PERSONAL CONSULTATION OPENING (mandatory): Before the response format, write exactly one
-short, warm greeting sentence in {language} that thanks the user for consulting AstroRoshni
-about {greeting_subject}. Translate this naturally; never emit the English instruction verbatim.
-It must be plain text, not a heading or card, and it must not introduce Tara, AI, a model, tools,
-or an analysis process. Use the native's name at most once. {response_start_instruction}
+PERSONAL CONSULTATION OPENING: Do not use a formal greeting or thank the user. Start with the
+answer in a sentence addressed to {display_name or 'the person'} when a name is available. It must
+be plain text, not a heading or card, and must not introduce Tara, AI, a model, tools, or an
+analysis process. Use the native's name at most once. Start the direct answer immediately.
 
 DELIVERY LINE-BREAK RULE (all response styles): Every visible heading, card label, list item,
 and explanatory paragraph must be on its own line. Put a blank line between sections. Never put
@@ -830,8 +945,32 @@ the body of a section on the same line as a Markdown heading or card label.
     )
 
 
+def _compact_verified_user_context(value: Any) -> Dict[str, List[str]]:
+    """Bound saved user facts for a warm but non-invasive Verified reading."""
+    if not isinstance(value, dict):
+        return {}
+    compact: Dict[str, List[str]] = {}
+    fact_budget = 18
+    for category, items in value.items():
+        if fact_budget <= 0:
+            break
+        if not isinstance(items, list):
+            continue
+        cleaned = []
+        for item in items:
+            text = re.sub(r"\s+", " ", str(item or "")).strip()
+            if text and text not in cleaned:
+                cleaned.append(text[:320])
+            if len(cleaned) >= 5 or len(cleaned) >= fact_budget:
+                break
+        if cleaned:
+            compact[str(category)[:60]] = cleaned
+            fact_budget -= len(cleaned)
+    return compact
+
+
 def build_verified_conversation_context(history: List[Dict[str, Any]], intent: Dict[str, Any]) -> Dict[str, Any]:
-    """Keep follow-up context separate from deterministic chart evidence."""
+    """Keep follow-up and user-stated context separate from chart evidence."""
     turns = []
     for row in (history or [])[-6:]:
         if not isinstance(row, dict):
@@ -842,16 +981,31 @@ def build_verified_conversation_context(history: List[Dict[str, Any]], intent: D
         if question or answer:
             turns.append({"question": question, "answer": answer})
     facts = intent.get("_session_extracted_context") if isinstance(intent, dict) else {}
+    user_context = _compact_verified_user_context(
+        intent.get("_verified_user_facts") if isinstance(intent, dict) else None
+    )
     return {
         "recent_question_answer_pairs": turns,
         "confirmed_session_facts": facts if isinstance(facts, dict) else {},
-        "rule": "Conversation context explains references and confirmed user facts. It is not astrological evidence and cannot override deterministic calculations.",
+        "relevant_user_stated_facts": user_context,
+        "rule": (
+            "Conversation context and relevant_user_stated_facts explain references and can make the reading personal. "
+            "They are not astrological evidence, cannot override deterministic calculations, and must not be repeated "
+            "unless directly useful to the user's current question."
+        ),
     }
 
 
-def _verified_final_writer_instruction(response_style, intent_mode=""):
-    from chat.verified_consultation import verified_consultation_instruction
-    return _verified_layout_instruction(response_style, intent_mode) + '\n' + verified_consultation_instruction()
+def _verified_final_writer_instruction(response_style, intent_mode="", native_name=""):
+    from chat.verified_consultation import (
+        verified_consultation_instruction,
+        verified_final_delivery_instruction,
+    )
+    return (
+        _verified_layout_instruction(response_style, intent_mode)
+        + '\n' + verified_consultation_instruction()
+        + '\n' + verified_final_delivery_instruction(native_name)
+    )
 
 
 def _verified_layout_instruction(response_style: str, intent_mode: str = "") -> str:
@@ -994,6 +1148,7 @@ async def run_verified_calculator_agent(
         {
             **(instant_context.get("intent_summary") if isinstance(instant_context.get("intent_summary"), dict) else {}),
             "_session_extracted_context": instant_context.get("session_extracted_context"),
+            "_verified_user_facts": instant_context.get("verified_user_context"),
         },
     )
     if is_prashna:
@@ -1397,7 +1552,9 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
                 'coverage_reason':baseline.get('coverage_reason'), 'requested_ritual':baseline.get('requested_ritual'),
                 'candidates':baseline.get('candidates') if baseline.get('workflow') == 'festival_puja' else None,
                 'tithi_intervals':baseline.get('tithi_intervals'), 'sources':baseline.get('sources'),
-            }, ensure_ascii=False, default=str)) if (pair or is_muhurat) else _verified_final_writer_instruction(response_style, intent_mode),
+            }, ensure_ascii=False, default=str)) if (pair or is_muhurat) else _verified_final_writer_instruction(
+                response_style, intent_mode, str(birth_data.get("name") or "")
+            ),
         }],
     })
     if conversation_mode:
@@ -1408,6 +1565,13 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
         )
     if verified_consultation_instruction() not in final_input[-1]['content'][0]['text']:
         final_input[-1]['content'][0]['text'] += '\n' + verified_consultation_instruction()
+    # Conversation mode replaces the normal final-writer prompt, so append the
+    # same user-facing delivery override here as well. This is intentionally
+    # Verified-only and does not affect Standard/Premium generation.
+    from chat.verified_consultation import verified_final_delivery_instruction
+    delivery_override = verified_final_delivery_instruction(str(birth_data.get("name") or ""))
+    if delivery_override not in final_input[-1]['content'][0]['text']:
+        final_input[-1]['content'][0]['text'] += '\n' + delivery_override
     # This final turn writes only the response. If the round ceiling is reached,
     # its last calculator outputs are still supplied before tool use is disabled.
     remaining = max(1.0, timeout_s - (time.perf_counter() - started))
@@ -1422,10 +1586,8 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
         max_output_tokens=output_limit,
     )
     parts: List[str] = []
-    published = ""
     async with stream as events:
         async def consume() -> Any:
-            nonlocal published
             async for event in events:
                 if getattr(event, "type", None) != "response.output_text.delta":
                     continue
@@ -1433,18 +1595,32 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
                 if not delta:
                     continue
                 parts.append(delta)
-                full = "".join(parts)
-                if stream_callback and (not published or len(full) - len(published) >= 48):
-                    await asyncio.to_thread(stream_callback, full[len(published):], full)
-                    published = full
             return await events.get_final_response()
         final_response = await asyncio.wait_for(consume(), timeout=remaining)
     _add_usage(usage, final_response)
     text = "".join(parts).strip() or str(getattr(final_response, "output_text", "") or "").strip()
-    if stream_callback and text and text != published:
-        await asyncio.to_thread(stream_callback, text[len(published):], text)
     if not text:
         raise RuntimeError("verified_agent_blank_final_answer")
+    editorial_remaining = max(0.0, timeout_s - (time.perf_counter() - started))
+    text, editorial_response = await _polish_verified_visible_answer(
+        client=client,
+        model_name=model_name,
+        language=language,
+        native_name=str(birth_data.get("name") or ""),
+        draft=text,
+        # This is a fact-preserving rewrite of the completed answer, not a
+        # second research pass. Cap its output near the source length so it
+        # cannot become the dominant cost of a Verified consultation.
+        max_output_tokens=min(8192, max(2048, len(text) // 2 + 512)),
+        timeout_s=min(20.0, editorial_remaining),
+        reasoning_kwargs=reasoning_kwargs,
+    )
+    if editorial_response is not None:
+        _add_usage(usage, editorial_response)
+    # Do not stream the calculator draft: a user should only ever see the
+    # fact-preserving consultation edit that will be persisted.
+    if stream_callback and text:
+        await asyncio.to_thread(stream_callback, text, text)
     usage["non_cached_input_tokens"] = max(0, usage["input_tokens"] - usage["cached_tokens"])
     usage["total_tokens"] = usage["input_tokens"] + usage["output_tokens"]
     return {
@@ -1715,9 +1891,12 @@ Return clarification_reason as missing_birth_details, confirm_subject, workflow,
 Return subject_resolution as selected_chart, other_chart, or unresolved.
 A multi-year health outlook broken down by dashas is natal period analysis, not Prashna.
 Route the chart-supported health vulnerability/timing reading without repetitive consent or
-subject confirmations. Do not promise disease events, diagnosis, Parkinson's progression,
-treatment response or cure; medical care remains with clinicians. These limits belong in the
-answer and do not require repeated clarification of an already clear natal question.
+subject confirmations. For an explicit disease question, the final reading may name a calculated
+astrological disease tendency when independent chart layers converge; it must frame this as an
+astrological prediction, not a medically confirmed diagnosis, disease progression, treatment
+response, or cure. Use one top-level medical-astrology disclaimer and then answer the astrology
+question directly. These limits belong in the answer and do not require repeated clarification of
+an already clear natal question.
 Prashna intent: set prashna_intent to explicit, offer, or none. Use explicit when the user
 requests Prashna, horary or a question-moment chart. Otherwise, use your understanding of
 Prashna to decide whether a question-moment chart is a suitable primary approach and use

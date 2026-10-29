@@ -369,6 +369,11 @@ const linking = {
     if (normalizedPath === '/') {
       return undefined;
     }
+    // AppsFlyer's installed-app fallback uses astroroshni://chat. It must open
+    // a usable standard chat, not merely start the app at its default screen.
+    if (normalizedPath === '/chat') {
+      return { routes: [{ name: 'Home', params: { startChat: true, deepLinkSource: 'appsflyer' } }] };
+    }
     const pathAliases = {
       '/panchang': '/muhurat',
       '/monthly-panchang': '/muhurat',

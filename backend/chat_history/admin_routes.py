@@ -1492,6 +1492,137 @@ async def get_admin_chat_user_thread(
         raise HTTPException(status_code=500, detail=f"Error fetching user thread: {str(e)}")
 
 
+@router.get("/admin/chat/evidence-audit/{message_id}")
+async def get_answer_evidence_audit(
+    message_id: int,
+    current_user: dict = Depends(require_admin),
+):
+    """Return the passive evidence audit saved for one assistant answer."""
+    _ = current_user
+    try:
+        with get_conn() as conn:
+            if not _table_exists(conn, "chat_answer_evidence_audits"):
+                return {"found": False, "message_id": int(message_id)}
+            row = execute(conn, """
+                SELECT status, evidence_brief, evaluator_result, evaluator_provider,
+                       evaluator_model, error_message, created_at, completed_at
+                FROM chat_answer_evidence_audits WHERE message_id = %s
+            """, (int(message_id),)).fetchone()
+        if not row:
+            return {"found": False, "message_id": int(message_id)}
+        def parse(raw: Any) -> Any:
+            if not raw:
+                return None
+            try:
+                return json.loads(raw) if isinstance(raw, str) else raw
+            except Exception:
+                return {"raw": str(raw)}
+        return {
+            "found": True,
+            "message_id": int(message_id),
+            "status": row[0],
+            "evidence_brief": parse(row[1]) or {},
+            "evaluator_result": parse(row[2]),
+            "evaluator_provider": row[3],
+            "evaluator_model": row[4],
+            "error_message": row[5],
+            "created_at": _timestamp_to_ist_iso(row[6]),
+            "completed_at": _timestamp_to_ist_iso(row[7]),
+        }
+    except Exception as exc:
+        logger.exception("get_answer_evidence_audit failed message_id=%s", message_id)
+        raise HTTPException(status_code=500, detail="Could not load answer evidence audit") from exc
+
+
+@router.get("/admin/chat/chart-inspection/{message_id}")
+async def get_chat_chart_inspection(
+    message_id: int,
+    birth_chart_id: Optional[int] = Query(None),
+    current_user: dict = Depends(require_admin),
+):
+    """Admin-only birth payload for the exact native used by a chat answer."""
+    _ = current_user
+    try:
+        from encryption_utils import EncryptionManager
+        from chat_history.routes import coerce_chat_birth_details
+
+        enc = EncryptionManager()
+        with get_conn() as conn:
+            row = execute(conn, """
+                SELECT cs.user_id, cs.birth_chart_id, bc.id, bc.name, bc.date, bc.time,
+                       bc.latitude, bc.longitude, bc.timezone, bc.place, bc.gender
+                FROM chat_messages cm
+                JOIN chat_sessions cs ON cs.session_id = cm.session_id
+                LEFT JOIN birth_charts bc ON bc.id = cs.birth_chart_id
+                WHERE cm.message_id = %s
+                LIMIT 1
+            """, (int(message_id),)).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Chat message not found")
+
+            # New sessions are permanently chart-bound. Older sessions were
+            # allowed to be created without a chart id, even though their chat
+            # request supplied birth details. Do not guess among several saved
+            # natives: return a picker; automatically use the sole chart.
+            selected_chart_id = int(row[2]) if row[2] is not None else None
+            if selected_chart_id is None and birth_chart_id is not None:
+                selected_chart_id = int(birth_chart_id)
+            if selected_chart_id is None:
+                choices = execute(conn, """
+                    SELECT id, name, date, place, relation
+                    FROM birth_charts WHERE userid = %s
+                    ORDER BY CASE WHEN relation = 'self' THEN 0 ELSE 1 END, created_at DESC
+                    LIMIT 30
+                """, (int(row[0]),)).fetchall() or []
+                if len(choices) != 1:
+                    def safe_dec(value: Any) -> str:
+                        try:
+                            return enc.decrypt(str(value)) if value is not None else ""
+                        except Exception:
+                            return str(value or "")
+                    return {
+                        "message_id": int(message_id),
+                        "selection_required": True,
+                        "charts": [{
+                            "id": int(c[0]), "name": safe_dec(c[1]), "date": safe_dec(c[2]),
+                            "place": safe_dec(c[3]), "relation": c[4],
+                        } for c in choices],
+                    }
+                selected_chart_id = int(choices[0][0])
+
+            # Always re-read by selected id and owner. This verifies a legacy
+            # picker choice as well as handling a deleted session binding.
+            chart_row = execute(conn, """
+                SELECT id, userid, name, date, time, latitude, longitude, timezone, place, gender
+                FROM birth_charts WHERE id = %s AND userid = %s
+            """, (selected_chart_id, int(row[0]))).fetchone()
+        if not chart_row:
+            raise HTTPException(status_code=404, detail="The birth chart attached to this chat is no longer available")
+
+        def dec(value: Any) -> str:
+            if value is None:
+                return ""
+            raw = str(value)
+            try:
+                return enc.decrypt(raw)
+            except Exception:
+                return raw
+        try:
+            birth = coerce_chat_birth_details({
+                "id": int(chart_row[0]), "name": dec(chart_row[2]), "date": dec(chart_row[3]), "time": dec(chart_row[4]),
+                "latitude": float(dec(chart_row[5])), "longitude": float(dec(chart_row[6])),
+                "timezone": dec(chart_row[7]), "place": dec(chart_row[8]), "gender": dec(chart_row[9]),
+            })
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail="The saved birth chart is incomplete") from exc
+        return {"message_id": int(message_id), "user_id": int(row[0]), "birth_chart_id": int(chart_row[0]), "birth_data": birth}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("get_chat_chart_inspection failed message_id=%s", message_id)
+        raise HTTPException(status_code=500, detail="Could not load chart inspection") from exc
+
+
 @router.get("/admin/chat/user-value-summary/{user_id}")
 async def get_admin_chat_user_value_summary(
     user_id: int,

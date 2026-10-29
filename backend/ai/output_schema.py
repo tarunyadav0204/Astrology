@@ -429,7 +429,7 @@ Your response must be a chronological analysis of the specific event requested a
 - **Window [1/2/3]**: [Year/Period] — tag **Same arc** (phase of the primary story) or **Alternate path** (backup / later / different outcome path)
   - **Ripe Window**: [Broader year/range when the event is ripe — not natal chart promise / not KP CSL]
   - **Execution Window**: [Best month or narrow month-band]
-  - **Career/Promotion layer**: Job-seeking: exactly one of Activation | Offer | Joining. Promotion: exactly one of Visibility | Formalization | Settle. Never combine two layers on one window.
+  - **Career/Promotion layer**: Job-seeking: exactly one of Activation | Offer | Joining. Promotion: exactly one of Visibility | Formalization | Settle. Never combine two layers on one window (for example, **Offer & Joining** is forbidden).
   - **Astrological Strength**: [High/Medium/Low]
   - **Key Triggers**: [Brief dasha + one transit/divisional hook]
   - **What Helps**: [Why this window is strong]
@@ -983,6 +983,20 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
             "- `classical_rule_matches` contains pre-filtered supporting sutra evidence, not a mandate.\n"
             "- For now only `derived_12th_from_topic_house` is enabled: the 12th counted from the topic house shows expense, sacrifice, loss, release, or investment for that topic.\n"
             "- Use it only when its evidence makes it relevant; do not force it into the answer if stronger chart/dasha/transit evidence points elsewhere."
+        )
+
+    if isinstance(static_context.get("instant_prediction_cross_check"), dict):
+        prompt_parts.append(
+            """
+INSTANT PREDICTION CROSS-CHECK — INTERNAL USE ONLY:
+`instant_prediction_cross_check` is a separately calculated, compact cross-check for this one prediction/timing question. It does not replace the established Standard/Premium chart context, its reading style, or its detailed explanation.
+
+- Use it only to check the direct prediction, ranked timing windows, and the dasha chain tied to each exact window.
+- Preserve the normal rich Standard/Premium analysis and write naturally. Never mention this cross-check, its JSON fields, a second system, scores, or internal calculation language to the user.
+- When it agrees with the established context, let it reinforce precision; do not mechanically repeat its contents.
+- If it conflicts with the established context, do not silently make the prediction stronger. Reconcile the conflict from the supplied chart evidence, retain only dates/dasha chains supported by the matching window, and state the resulting judgment with the appropriate confidence.
+- User facts and conversation history can personalize the reading but are not astrological proof.
+""".strip()
         )
 
     if str(intent_mode or "").upper() == "FOMO_MANIFESTATION_DETAIL":

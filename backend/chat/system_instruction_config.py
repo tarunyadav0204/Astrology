@@ -287,7 +287,7 @@ DATA_SOVEREIGNTY = """
 # Lean lifespan methodology + mandatory outline for parallel MERGE (full LIFESPAN_EVENT_TIMING_STRUCTURE is single-pass only).
 LIFESPAN_MERGE_TIMING_RULE = """
 [MERGE-LIFESPAN] When intent mode is LIFESPAN_EVENT_TIMING (or the question is open-ended event timing):
-1. If `LIFESPAN_TIMING_EVIDENCE_JSON` / `lifespan_timing_evidence` is present, it is the cite-only authority for MD/AD/PD dates, Double Transit status, topic divisionals, and confidence ceiling. Present `candidate_windows` in exact `rank` order (1 = primary). Soft override / re-ranking is FORBIDDEN. Do not invent PD stacks outside `dasha_spine.pd_near`.
+1. If `LIFESPAN_TIMING_EVIDENCE_JSON` / `lifespan_timing_evidence` is present, it is the cite-only authority for MD/AD/PD dates, Double Transit status, topic divisionals, and confidence ceiling. Present **every** supplied `candidate_windows` row (up to the supplied limit) in exact `rank` order (1 = primary). A Rank 2+ row remains a viable window: NEVER omit it, collapse it into a generic caveat, or rename it “preparatory” unless the calculator itself says it is not viable. Soft override / re-ranking is FORBIDDEN. Do not invent PD stacks outside `dasha_spine.pd_near`.
 2. Confidence must not exceed `confidence_ceiling`. High requires full Double Transit on the main event house + solid dasha occupy/rule. If Double Transit is `none`, do not claim High.
 3. Vocabulary: natal/chart promise ≠ ripe timing-band ≠ KP CSL promise. Prefer "Ripe Window" / "natal promise" / "KP promise". For marriage/children/property, Ripe Window = AD dates; PD = Execution only.
 4. State each window's pack Double Transit status (full/partial/none) honestly — never invent a full DT. Use Chara from `chara_execution` / branches across the scan window.
@@ -519,7 +519,7 @@ LIFESPAN_EVENT_TIMING_STRUCTURE = """
        - Property: sign connected to 4th lord / AL / relevant support sign.
        🚨 Do not use Darakaraka as the executioner for every event type.
     5. **Rank Candidate Windows Before You Narrate**:
-       a) If `lifespan_timing_evidence.candidate_windows` is present, present them in exact `rank` order. Soft override / re-ranking is FORBIDDEN. Rank 1 is always the primary window.
+       a) If `lifespan_timing_evidence.candidate_windows` is present, present **every supplied row** in exact `rank` order. A Rank 2+ candidate is still viable; do not omit it or call it only a preparatory phase. Soft override / re-ranking is FORBIDDEN. Rank 1 is always the primary window.
        b) Otherwise identify 3-5 candidates and rank by **dasha strength + transit confirmation + divisional support + execution-month refinement** (Window 1 = strongest claim, not earliest date).
        c) Tag each window **Same arc** or **Alternate path** (use pack `same_arc_hint` when present).
        d) State what weakens lower-ranked windows. Use `past_scan_note` for why earlier adult windows were weaker — do not invent biography.

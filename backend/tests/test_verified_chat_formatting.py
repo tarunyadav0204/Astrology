@@ -34,6 +34,19 @@ def test_verified_redaction_still_removes_internal_delivery_language():
     assert redact_verified_internal_transport('The supplied packet shows a favorable period.') == 'The chart shows a favorable period.'
 
 
+def test_verified_redaction_removes_legacy_support_and_caution_badges():
+    answer = '**✓ Support · This period is active.** **! Caution · Saturn makes it slower.**'
+    assert redact_verified_internal_transport(answer) == 'This period is active. Saturn makes it slower.'
+
+
+def test_verified_editorial_guard_rejects_a_rewrite_that_loses_timing_facts():
+    from chat.verified_chat_pipeline import _verified_editorial_preserves_timing
+
+    source = 'Rank 1: 17 October–3 December 2027. The child house has 20 points.'
+    assert _verified_editorial_preserves_timing(source, source)
+    assert not _verified_editorial_preserves_timing(source, 'Rank 1: October 2027.')
+
+
 def test_verified_final_response_cleanup_keeps_visible_layout():
     answer = 'A practical degree fits best.\n\n## Best-fit fields\n\n1. **Analytics**\nApply your skills.\n\n## Final verdict\n\nChoose industry projects.'
     parsed = ResponseParser.parse_images_in_chat_response(answer)

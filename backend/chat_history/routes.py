@@ -2238,8 +2238,23 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         # Defense in depth for sessions created before chart ownership was enforced.
         _require_birth_chart_owner(conn, session_birth_chart_id, current_user.userid)
 
+        # Some older clients created the session before the selected native was
+        # known, then supplied the chart only with /ask. Bind it at the first
+        # authenticated send so every answer (and admin inspection) retains its
+        # exact native from here onward.
+        requested_chart_id = _birth_chart_id_from_birth_details(birth_details)
+        if session_birth_chart_id is None and requested_chart_id is not None:
+            _require_birth_chart_owner(conn, requested_chart_id, current_user.userid)
+            execute(
+                conn,
+                """UPDATE chat_sessions SET birth_chart_id = %s
+                   WHERE session_id = %s AND user_id = %s AND birth_chart_id IS NULL""",
+                (requested_chart_id, session_id, current_user.userid),
+            )
+            conn.commit()
+            session_birth_chart_id = requested_chart_id
+
         if session_birth_chart_id is not None:
-            requested_chart_id = _birth_chart_id_from_birth_details(birth_details)
             if requested_chart_id is not None and int(session_birth_chart_id) != int(requested_chart_id):
                 raise HTTPException(
                     status_code=409,
@@ -2693,9 +2708,20 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
         # Defense in depth for sessions created before chart ownership was enforced.
         _require_birth_chart_owner(conn, session_birth_chart_id, current_user.userid)
 
+        requested_chart_id = _birth_chart_id_from_birth_details(birth_details)
+        if session_birth_chart_id is None and requested_chart_id is not None:
+            _require_birth_chart_owner(conn, requested_chart_id, current_user.userid)
+            execute(
+                conn,
+                """UPDATE chat_sessions SET birth_chart_id = %s
+                   WHERE session_id = %s AND user_id = %s AND birth_chart_id IS NULL""",
+                (requested_chart_id, session_id, current_user.userid),
+            )
+            conn.commit()
+            session_birth_chart_id = requested_chart_id
+
         # Reject stale client: session thread is for one chart; birth_details must not claim another.
         if session_birth_chart_id is not None:
-            requested_chart_id = _birth_chart_id_from_birth_details(birth_details)
             if requested_chart_id is not None and int(session_birth_chart_id) != int(requested_chart_id):
                 raise HTTPException(
                     status_code=409,
@@ -4018,7 +4044,11 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         
         # Get user facts for intent routing
         all_user_facts = {}
-        if birth_chart_id and not is_instant_chat and not is_verified_chat:
+        # Verified uses the same saved, user-stated context as Standard/Premium,
+        # but receives it later as a separately-labelled personalization packet.
+        # Instant stays lean because its conversational route has its own memory
+        # and latency budget.
+        if birth_chart_id and not is_instant_chat:
             fact_extractor = FactExtractor()
             facts_start = time.time()
             all_user_facts = await asyncio.to_thread(
@@ -5013,8 +5043,63 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         if user_facts and not is_instant_chat:
             context['user_facts'] = user_facts
 
+        # Verified's calculator agent does not consume the normal Standard/
+        # Premium context object. Pass only the category-filtered facts through
+        # its dedicated context lane, where they are explicitly forbidden from
+        # acting as astrological evidence.
+        if is_verified_chat and user_facts:
+            intent["_verified_user_facts"] = user_facts
+
         if death_analysis_unlocked:
             context['death_analysis_unlocked'] = True
+
+        # Standard and Premium retain their established calculation context and
+        # writer.  For narrowly routed prediction/timing questions only, add a
+        # compact Instant cross-check.  It is deliberately additive and
+        # best-effort: a failed cross-check must never block or change the
+        # long-standing Standard/Premium experience.
+        prediction_anchor_enabled = str(
+            os.getenv("STANDARD_PREMIUM_INSTANT_PREDICTION_ANCHOR_ENABLED", "true")
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        if (
+            prediction_anchor_enabled
+            and effective_chat_tier in {"standard", "premium"}
+            and not partnership_mode
+            and not fomo_chat_active
+            and isinstance(context, dict)
+        ):
+            try:
+                from chat.instant_prediction_anchor import (
+                    build_standard_premium_prediction_anchor,
+                    is_prediction_anchor_eligible,
+                )
+
+                if is_prediction_anchor_eligible(intent):
+                    anchor_started = time.time()
+                    instant_prediction_anchor = await asyncio.to_thread(
+                        build_standard_premium_prediction_anchor,
+                        question=combined_question,
+                        birth_data=birth_data,
+                        intent=intent,
+                        history=history,
+                        language=language,
+                    )
+                    if instant_prediction_anchor:
+                        context["instant_prediction_cross_check"] = instant_prediction_anchor
+                        _chat_log_event(
+                            "instant_prediction_cross_check_ready",
+                            message_id=message_id,
+                            session_id=session_id,
+                            answer_mode=intent.get("answer_mode"),
+                            duration_ms=round((time.time() - anchor_started) * 1000, 1),
+                        )
+            except Exception as anchor_error:
+                logger.warning(
+                    "instant prediction cross-check unavailable message_id=%s: %s",
+                    message_id,
+                    str(anchor_error)[:300],
+                    exc_info=True,
+                )
         
         # Inject session extracted_context (clarifications + prediction_anchors) for continuity.
         session_extracted = dict(extracted_context or {})
@@ -5359,6 +5444,24 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             result["response"] = cleaned_response
             result["next_action"] = cleaned_action
             result["follow_up_questions"] = cleared_followups
+            # The model receives the deterministic candidate ranking, but it can
+            # still summarise only the primary period.  Keep every calculated
+            # viable window visible instead of allowing a Rank 2+ band to be
+            # mischaracterised as merely "preparation".
+            if str((intent or {}).get("mode") or "").upper() in {
+                "LIFESPAN_EVENT_TIMING",
+                "PREDICT_EVENT_TIMING",
+            }:
+                try:
+                    from chat.lifespan_timing_delivery import ensure_complete_ranked_lifespan_windows
+
+                    result["response"] = ensure_complete_ranked_lifespan_windows(
+                        str(result.get("response") or ""),
+                        result.get("lifespan_timing_evidence"),
+                    )
+                except Exception:
+                    # A display safeguard must never make a paid answer fail.
+                    logger.exception("lifespan_timing_delivery_guard_failed message_id=%s", message_id)
             logger.info(
                 "chat_remedy_delivery_guard message_id=%s explicit_followup=%s answer_mode=%s "
                 "next_action_before=%s next_action_after=%s followups_after=%s",
@@ -5857,6 +5960,24 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
         )
 
         if result.get('success'):
+            # Shadow-only answer audit. It is scheduled only after the response
+            # commit, so it can never delay, alter, or invalidate the answer a
+            # user receives. Admin Chat History exposes its compact evidence and
+            # evaluator result for quality review.
+            try:
+                from chat.answer_evidence_audit import schedule_answer_evidence_audit
+
+                schedule_answer_evidence_audit(
+                    message_id=int(message_id),
+                    question=combined_question or question,
+                    answer=str(result.get('response') or ''),
+                    intent=intent,
+                    result=result,
+                    chat_tier=effective_chat_tier,
+                    calculation_context=context,
+                )
+            except Exception:
+                logger.exception("answer_evidence_audit_schedule_failed message_id=%s", message_id)
             # Persist the follow-ups the answer already produced as reusable
             # engagement opportunities. This performs no additional LLM call
             # and must never make an otherwise successful chat fail.

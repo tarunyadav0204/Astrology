@@ -14772,6 +14772,11 @@ def _build_instant_context(
             "target_subjects": target_subjects or [target_subject or {"key": "self", "label": "self", "base_house": 1}],
         },
         "session_extracted_context": session_extracted if isinstance(session_extracted, dict) else {},
+        "verified_user_context": (
+            (intent or {}).get("_verified_user_facts")
+            if isinstance((intent or {}).get("_verified_user_facts"), dict)
+            else {}
+        ),
         "evidence_plan": evidence_plan,
         "natal_snapshot": evidence_natal_snapshot if is_non_self_target else natal_snapshot,
         "target_chart_context": target_chart_context,

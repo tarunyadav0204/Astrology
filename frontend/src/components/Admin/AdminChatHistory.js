@@ -5,6 +5,9 @@ import { formatChatMessageHtml as formatMessageContent } from '../../utils/markd
 import { extractChatSectionDrafts } from '../../utils/chatPdfSections';
 import './AdminChatHistory.css';
 import InformationRounds from './InformationRounds';
+import ChartWidget from '../Charts/ChartWidget';
+import DeskDashaPanel from '../BirthChart/DeskDashaPanel';
+import { apiService } from '../../services/apiService';
 
 const USER_PAGE_SIZE = 10;
 const SESSION_MESSAGE_PAGE_SIZE = 20;
@@ -379,6 +382,10 @@ const AdminChatHistory = () => {
     adminNotes: '',
     result: null,
   });
+  const [evidenceModal, setEvidenceModal] = useState({ open: false, loading: false, error: '', messageId: null, data: null });
+  const [chartModal, setChartModal] = useState({ open: false, loading: false, error: '', messageId: null, birthData: null, chartData: null, charts: [] });
+  const [chartAsOf, setChartAsOf] = useState(() => new Date());
+  const [chartDashaSystem, setChartDashaSystem] = useState('vimshottari');
   const [pdfMessageId, setPdfMessageId] = useState(null);
 
   useEffect(() => {
@@ -573,6 +580,47 @@ const AdminChatHistory = () => {
       adminNotes: '',
       result: null,
     });
+  };
+
+  const closeEvidenceModal = () => setEvidenceModal({ open: false, loading: false, error: '', messageId: null, data: null });
+  const openEvidenceAudit = async (messageId) => {
+    if (!messageId) return;
+    setEvidenceModal({ open: true, loading: true, error: '', messageId, data: null });
+    try {
+      const response = await fetch(`/api/admin/chat/evidence-audit/${messageId}`, { headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' } });
+      if (!response.ok) throw new Error((await response.text().catch(() => '')) || `Failed (${response.status})`);
+      const data = await response.json();
+      setEvidenceModal({ open: true, loading: false, error: '', messageId, data });
+    } catch (e) {
+      setEvidenceModal({ open: true, loading: false, error: String(e?.message || 'Failed to load evidence audit'), messageId, data: null });
+    }
+  };
+
+  const closeChartModal = () => setChartModal({ open: false, loading: false, error: '', messageId: null, birthData: null, chartData: null, charts: [] });
+  const loadChartInspection = async (messageId, selectedChartId = null) => {
+    if (!messageId) return;
+    setChartModal((prev) => ({ ...prev, open: true, loading: true, error: '', messageId, birthData: null, chartData: null, charts: [] }));
+    try {
+      const suffix = selectedChartId ? `?birth_chart_id=${encodeURIComponent(selectedChartId)}` : '';
+      const response = await fetch(`/api/admin/chat/chart-inspection/${messageId}${suffix}`, { headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' } });
+      if (!response.ok) throw new Error((await response.text().catch(() => '')) || `Failed (${response.status})`);
+      const data = await response.json();
+      if (data?.selection_required) {
+        setChartModal({ open: true, loading: false, error: '', messageId, birthData: null, chartData: null, charts: Array.isArray(data.charts) ? data.charts : [] });
+        return;
+      }
+      const birthData = data?.birth_data;
+      if (!birthData?.date) throw new Error('No usable birth chart is attached to this answer');
+      const chartData = await apiService.calculateChartOnly(birthData, 'mean', { ayanamsha: 'lahiri', node_type: 'mean' });
+      setChartModal({ open: true, loading: false, error: '', messageId, birthData, chartData, charts: [] });
+    } catch (e) {
+      setChartModal({ open: true, loading: false, error: String(e?.message || 'Failed to load chart'), messageId, birthData: null, chartData: null, charts: [] });
+    }
+  };
+  const openChartInspection = (messageId) => {
+    setChartAsOf(new Date());
+    setChartDashaSystem('vimshottari');
+    return loadChartInspection(messageId);
   };
 
   const openResponseQa = async (messageId) => {
@@ -2241,6 +2289,26 @@ const AdminChatHistory = () => {
                           Astrology QA
                         </button>
                       )}
+                      {role === 'assistant' && Number.isFinite(Number(message.message_id)) && (
+                        <button
+                          type="button"
+                          className="message-branch-btn message-evidence-btn"
+                          onClick={() => openEvidenceAudit(message.message_id)}
+                          title="Open the non-blocking evidence brief and answer audit"
+                        >
+                          Evidence audit
+                        </button>
+                      )}
+                      {role === 'assistant' && Number.isFinite(Number(message.message_id)) && (
+                        <button
+                          type="button"
+                          className="message-branch-btn message-chart-btn"
+                          onClick={() => openChartInspection(message.message_id)}
+                          title="Open the native's D1 chart and dashas used for this answer"
+                        >
+                          Charts & dashas
+                        </button>
+                      )}
                       {role === 'assistant' && Number.isFinite(Number(message.message_id)) && !isInstantUsage && !isVerifiedUsage && (
                         <button
                           type="button"
@@ -2618,6 +2686,84 @@ const AdminChatHistory = () => {
         </div>
       </div>
     </div>
+    {evidenceModal.open && (
+      <div className="admin-branch-modal-overlay" onClick={closeEvidenceModal}>
+        <div className="admin-branch-modal admin-evidence-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="admin-branch-modal-header">
+            <h3>Evidence audit • Msg #{evidenceModal.messageId}</h3>
+            <button type="button" className="admin-branch-modal-close" onClick={closeEvidenceModal}>×</button>
+          </div>
+          <div className="admin-branch-modal-body">
+            <p className="admin-qa-intro">This shadow audit is generated after delivery. It never changes the answer shown to the user.</p>
+            {evidenceModal.loading && <p>Loading evidence audit…</p>}
+            {!evidenceModal.loading && evidenceModal.error && <p className="admin-branch-modal-error">{evidenceModal.error}</p>}
+            {!evidenceModal.loading && !evidenceModal.error && !evidenceModal.data?.found && (
+              <p className="admin-qa-intro">No audit is available for this older answer. New answers are audited automatically.</p>
+            )}
+            {!evidenceModal.loading && evidenceModal.data?.found && (() => {
+              const report = evidenceModal.data.evaluator_result || {};
+              const brief = evidenceModal.data.evidence_brief || {};
+              const list = (items) => Array.isArray(items) && items.length ? <ul className="admin-qa-list">{items.map((item, i) => <li key={i}>{String(item)}</li>)}</ul> : <p>None.</p>;
+              return <>
+                <div className="admin-qa-score-row">
+                  <span className="admin-qa-meta-chip">Status {evidenceModal.data.status}</span>
+                  {report.brief_alignment && <span className="admin-qa-meta-chip">Alignment {report.brief_alignment}</span>}
+                  {report.answer_outcome && <span className="admin-qa-meta-chip">Outcome {report.answer_outcome}</span>}
+                  {report.claim_strength && <span className="admin-qa-meta-chip">Claim {report.claim_strength}</span>}
+                </div>
+                {report.summary && <div className="admin-qa-block"><h4>Audit summary</h4><p>{report.summary}</p></div>}
+                {evidenceModal.data.status === 'failed' && <p className="admin-branch-modal-error">{evidenceModal.data.error_message || 'Audit failed.'}</p>}
+                {Array.isArray(report.claim_checks) && report.claim_checks.length > 0 && (
+                  <div className="admin-qa-block"><h4>Claim checks</h4><div className="admin-qa-findings">
+                    {report.claim_checks.map((check, i) => <details key={i} className="admin-qa-finding" open={i < 4}>
+                      <summary><span className={`admin-qa-sev ${severityClass(check?.status === 'conflicts' ? 'high' : check?.status === 'not_found' ? 'medium' : 'low')}`}>{check?.status || '—'}</span> <strong>{check?.claim || 'Claim'}</strong></summary>
+                      {check?.exact_evidence ? <div className="admin-qa-finding-body"><p><strong>Calculated evidence:</strong> {check.exact_evidence}</p></div> : null}
+                    </details>)}
+                  </div></div>
+                )}
+                <div className="admin-qa-block"><h4>Unsupported claims</h4>{list(report.unsupported_claims)}</div>
+                <div className="admin-qa-block"><h4>Missing evidence</h4>{list(report.missing_evidence)}</div>
+                <details className="admin-qa-block"><summary>Evidence brief sent to evaluator</summary><pre className="admin-evidence-json">{JSON.stringify(brief, null, 2)}</pre></details>
+                <p className="admin-qa-footer-meta">Evaluator {evidenceModal.data.evaluator_provider || '—'} / {evidenceModal.data.evaluator_model || '—'}</p>
+              </>;
+            })()}
+          </div>
+        </div>
+      </div>
+    )}
+    {chartModal.open && (
+      <div className="admin-branch-modal-overlay" onClick={closeChartModal}>
+        <div className="admin-branch-modal admin-chart-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="admin-branch-modal-header">
+            <h3>Charts & dashas • {chartModal.birthData?.name || `Msg #${chartModal.messageId}`}</h3>
+            <button type="button" className="admin-branch-modal-close" onClick={closeChartModal}>×</button>
+          </div>
+          <div className="admin-branch-modal-body">
+            {chartModal.loading && <p>Calculating the chart used for this answer…</p>}
+            {!chartModal.loading && chartModal.error && <p className="admin-branch-modal-error">{chartModal.error}</p>}
+            {!chartModal.loading && !chartModal.error && chartModal.charts?.length > 0 && (
+              <div className="admin-chart-picker">
+                <p className="admin-qa-intro">This is a legacy chat session without a saved native. Select the chart you want to inspect; new sessions are bound automatically.</p>
+                <div className="admin-chart-picker__list">
+                  {chartModal.charts.map((chart) => (
+                    <button key={chart.id} type="button" onClick={() => loadChartInspection(chartModal.messageId, chart.id)}>
+                      <strong>{chart.name || 'Unnamed native'}</strong>
+                      <span>{[chart.date, chart.place, chart.relation].filter(Boolean).join(' · ')}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!chartModal.loading && chartModal.birthData && chartModal.chartData && (
+              <div className="admin-chart-inspection-grid">
+                <section><h4>D1 · Lagna</h4><ChartWidget title="D1" chartType="lagna" chartData={chartModal.chartData} birthData={chartModal.birthData} defaultStyle="north" showFooterHint={false} embedInDashboard /></section>
+                <section><h4>Current dashas</h4><DeskDashaPanel birthData={chartModal.birthData} chartData={chartModal.chartData} asOfDate={chartAsOf} onJumpToDate={setChartAsOf} system={chartDashaSystem} onSystemChange={setChartDashaSystem} /></section>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
     {branchModal.open && (
       <div className="admin-branch-modal-overlay" onClick={closeBranchModal}>
         <div className="admin-branch-modal" onClick={(e) => e.stopPropagation()}>

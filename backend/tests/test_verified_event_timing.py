@@ -13,16 +13,16 @@ def test_event_contract_overrides_generic_layout_in_both_writer_turns(mode, styl
     final = _verified_final_writer_instruction(style, mode)
     for prompt in (system, final):
         assert 'VERIFIED EVENT TIMING OUTPUT CONTRACT' in prompt
-        assert 'Ranked Event Windows' in prompt
-        assert 'What Could Change the Timing?' in prompt
+        assert '## When this becomes most likely' in prompt
+        assert '## How to hold the present period' in prompt
         assert 'houses (1–12), start_date and end_date' in prompt
         assert 'LIFESPAN EVENT TIMELINE (MANDATORY)' not in prompt
         assert 'STANDARD SIMPLE OUTPUT CONTRACT' not in prompt
     if style == 'simple':
-        assert '## When the Opportunity Becomes Stronger' in final
+        assert '## When this becomes most likely' in final
         assert '## Dasha Analysis' not in final
     else:
-        assert '## Dive Deep: Independent Confirmation' in final
+        assert '## The promise and what shapes its timing' in final
 
 
 def test_specific_event_on_one_day_is_not_daily_outlook():

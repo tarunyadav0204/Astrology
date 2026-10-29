@@ -1471,6 +1471,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
     timing_contract_block = ""
     prediction_anchor_meta_tail = ""
     lifespan_evidence_block = ""
+    instant_prediction_cross_check_block = ""
     try:
         from ai.prediction_anchor import (
             PREDICTION_ANCHOR_META_INSTRUCTION,
@@ -1512,6 +1513,16 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             )
     except Exception:
         logger.exception("parallel_lifespan_evidence_inject_failed")
+    instant_prediction_cross_check = (
+        ctx.get("instant_prediction_cross_check")
+        if isinstance(ctx.get("instant_prediction_cross_check"), dict)
+        else {}
+    )
+    if instant_prediction_cross_check:
+        instant_prediction_cross_check_block = (
+            "INSTANT_PREDICTION_CROSS_CHECK_JSON (internal cross-check only):\n"
+            f"{_json_compact(instant_prediction_cross_check)}\n"
+        )
     from utils.query_context import NEXT_ACTION_NONE_IN_REMEDY_MODE, NO_INLINE_REMEDY_PLAN_RULE
 
     next_action_block = (
@@ -1523,6 +1534,7 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         f"{time_context}\n\n"
         f"{merge_cached_note}"
         f"{lifespan_evidence_block}"
+        f"{instant_prediction_cross_check_block}"
         f"SPECIAL_POINTS_AUTHORITY_JSON:\n"
         f"{_json_compact(ctx.get('special_points') or {})}\n"
         f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n"
@@ -1558,6 +1570,19 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         CLASSICAL_RULE_MATCH_INSTRUCTION,
         VEDIC_ASTROLOGY_SYSTEM_INSTRUCTION.strip(),
     ]
+    if instant_prediction_cross_check:
+        merge_static_parts.append(
+            """
+INSTANT PREDICTION CROSS-CHECK — INTERNAL USE ONLY:
+The supplied `INSTANT_PREDICTION_CROSS_CHECK_JSON` is a separate, compact calculation for this prediction/timing question. It is not a new specialist branch and must not be described to the user.
+
+- Keep the established Standard/Premium multi-school reading and its natural, detailed writing style.
+- Use this only to cross-check the direct verdict, ranked dates, and the dasha chain attached to each exact window.
+- When it agrees with the specialist synthesis, use it silently to improve precision; do not mechanically repeat it.
+- When it conflicts with a branch output, do not silently strengthen the prediction. Reconcile against the supplied branch evidence, retain only dates and dasha chains supported by their matching window, and express the resulting confidence honestly.
+- Never reveal the cross-check, JSON, internal labels, scores, or implementation process. User facts and history may personalize prose but are not astrological evidence.
+""".strip()
+        )
     simple_presentation_instruction = build_simple_merge_instruction(response_style)
     if simple_presentation_instruction:
         merge_static_parts.append(simple_presentation_instruction)

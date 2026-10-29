@@ -3,66 +3,27 @@
 EVENT_TIMING_MODES = {'PREDICT_EVENT_TIMING', 'LIFESPAN_EVENT_TIMING'}
 
 EVENT_TECHNICAL_TEMPLATE = '''
-## Your Answer: Most Likely Outcome and Timing
-Answer what is likely to happen and when before presenting analysis. Bold the strongest conclusion and window.
-Distinguish precursors from the event: interview versus offer, offer versus joining, responsibilities versus promotion,
-meeting versus marriage. If the event is not supported within the requested horizon, say so and describe the closest
-supported development. Never invent an outcome or date to satisfy the question.
+## The promise and what shapes its timing
+Open by speaking to the person and give the judgment in natural language. For example: "I would not read this as
+denial; the chart shows why the path asks for patience before it becomes easier." Do not copy that sentence as a
+template, but preserve its human, decisive movement. Explain the two or three factors that matter most as connected
+paragraphs: the event house/lord, a supporting or delaying factor, and the relevant divisional chart when it changes
+the result. Translate each technical term when it first appears. Do not merely recite placements or every system that
+happens to agree.
 
-## Does the Chart Support This Event?
-Establish natal promise using relevant houses, lords, occupants, aspects, connections, significators and their condition.
-Explain appropriate divisional confirmation, relevant yogas, strengths and obstacles. Conclude whether the event,
-a conditional opportunity, partial outcome or weaker possibility is supported; interpret rather than list placements.
+## When this becomes most likely
+Show every deterministic candidate window in its exact calculated rank order. Keep `Rank 1`, `Rank 2`, and so on so
+the ordering is unambiguous, but make each rank read like a reasoned paragraph, not a row in a report. State its date
+range, the one most likely event stage, and why that period carries its particular weight. Rank 1 is the strongest
+calculated window; never promote an attractive lower-ranked sub-period above it. A viable Rank 2+ window is not merely
+"preparation". Use an exact day only when the calculation explicitly supports exact-day precision; otherwise use the
+calculated month or date band. Do not manufacture alternate windows.
 
-## Your Current Stage: What Happens Before the Event?
-Explain the likely event-specific sequence and current stage using known circumstances without inventing milestones.
-For example: responsibility, results, management discussion, approval; or relationship, commitment, arrangements, marriage.
-Previous answers explain conversational references but are not verified astrological evidence.
-
-## Dasha Analysis: When the Event Becomes Active
-Explain Mahadasha's broader chapter, Antardasha's event activation, Pratyantardasha's stronger periods and finer levels
-only when calculated and useful. Connect active planets to event houses, lordship, placements, aspects, significators,
-and divisional confirmation. Separate a period beginning from the event occurring; a boundary is not an announcement.
-
-## Transit and Double-Transit Confirmation
-Explain Jupiter and Saturn influences on relevant houses, lords and significators; inspect event-house double-transit
-confirmation over candidate windows. Include other relevant transits, nodes, shorter triggers and calculated retrograde
-or repeated activation. Distinguish full confirmation from partial or aspect-only support.
-
-## Dive Deep: Independent Confirmation
-Use relevant subsections, not compulsory school reports. Explain what each adds, including disagreement:
-Divisional confirmation: event-specific chart and timing implications.
-Jaimini: relevant karakas, Chara dasha, Argala and rashi strength; inspect Chara dasha before Jaimini timing claims.
-KP: relevant house significations and event support.
-Nadi: calculated planetary connections and their meaning.
-Additional dashas: Yogini or Shoola when useful; never claim deterministic death predictions.
-Annual analysis: Varshphal, Tajika and annual nakshatra for candidate years.
-Strength and yogas: planetary delivery, house strength, Ashtakavarga and event-specific yogas.
-Do not repeat one finding under many systems. Omit unrelated systems instead of manufacturing confirmation.
-
-## Ranked Event Windows
-Rank genuinely distinct candidate windows strongest first. For each show date range, most likely development
-(preparation/opportunity/commitment/execution/completion), specific dasha and transit reasons, what strengthens it,
-what delays or weakens it, and relative high/medium/low confidence with a reason. No numerical probabilities without
-an established basis. Show one window when only one is supported; never manufacture alternatives or arbitrary exact dates.
-Narrow to days only when actual calculations justify that precision.
-
-## Where the Evidence Agrees—and Where It Differs
-Combine the methods into one prioritized judgment. Explain why support plus delay may imply responsibility first and
-recognition later. Resolve contradictions; do not leave equally weighted conflicting possibilities without a conclusion.
-
-## What Could Change the Timing?
-Separate astrological conditions from practical dependencies such as approvals, recruitment, relationship readiness,
-documents or financing. Ask material missing personal facts during information rounds when the tools support clarification.
-Otherwise state relevant uncertainty plainly; do not fabricate user facts or claim to have asked a question.
-
-## Preparation and Action
-Give useful actions now, before the strongest window, and signs of progress to watch for. Remedies only when requested
-or directly relevant, without guaranteeing an event.
-
-## Final Verdict
-Clearly state and bold: most likely outcome, strongest window, earlier development, main astrological reason and main
-condition or uncertainty. Maintain a decisive evidence-based conclusion without guaranteeing external events.
+## How to hold the present period
+Give one concrete interpretation of the current or nearest period and, when guidance was requested, one proportionate
+action. Write it as counsel from an astrologer who has weighed the chart—not as an instruction sheet. Do not give
+medical, legal, financial, or lifestyle checklists unless specifically requested. End with a direct closing sentence,
+not a separate "Bottom line" or a repetition of the opening verdict.
 '''
 
 
@@ -78,9 +39,11 @@ def event_timing_contract(style):
         for old, new in replacements.items():
             template = template.replace('## ' + old, '## ' + new)
     return '''VERIFIED EVENT TIMING OUTPUT CONTRACT — overrides generic lifespan and Standard Simple layouts.
-Start with the straight answer, then provide a detailed 360-degree event analysis. No fixed word count or fixed number
-of reasons/windows. Use Markdown headings on separate lines with blank lines and meaningful bold emphasis. Sentiment
-spans are the only allowed HTML. Do not emit cards, internal answer IDs or evidence-transport language.
+Start with the straight answer, then write a clear, satisfying consultation rather than a fragmented all-systems report.
+Use the three sections below; do not add method headings, an executive-summary duplicate, a final-verdict duplicate,
+or a boilerplate disclaimer.
+Use Markdown headings on separate lines with blank lines and meaningful bold emphasis. Sentiment spans are the only
+allowed HTML. Do not emit cards, internal answer IDs or evidence-transport language.
 SCOPE: Assess the requested event and timeframe. For "this November", assess November first. For open "when" questions,
 explore future candidate windows. Never automatically expand a bounded event question into a lifespan timeline.
 EVIDENCE CHECKLIST: Inspect event promise, relevant divisional confirmation, dasha coverage, transits and event-house
@@ -93,5 +56,5 @@ Never interpret a calculator failure as negative event evidence. State the pract
 instructions below into everyday explanations. Do not expose house numbers, chart codes, dasha abbreviations, dignity
 labels, counts or method-by-method reports. Explain why the outcome is likely through understandable real-life effects.
 ''' if style == 'simple' else '''TECHNICAL: Explain the concrete calculated astrological factors and how they lead to each
-conclusion. Relevant Dive Deep subsections can use Markdown level-3 headings. No compulsory unrelated methods.
+conclusion, but give the person the lived meaning of each fact in the same paragraph. No compulsory unrelated methods.
 ''') + template

@@ -112,7 +112,13 @@ def test_daily_agent_runs_mandatory_tools_even_when_model_requests_none(monkeypa
     assert baseline['daily_location_basis']=='saved_birth_location'
     audit=result['information_rounds']['events']
     assert len([e for e in audit if e['kind']=='mandatory_daily_calculation'])==2
-    assert 'Your Mood and Momentum' in sent[-1]['input'][-1]['content'][0]['text']
+    final_writer = next(
+        item for item in sent
+        if isinstance(item.get('input'), list)
+        and item['input']
+        and item['input'][-1].get('type') == 'message'
+    )
+    assert 'Your Mood and Momentum' in final_writer['input'][-1]['content'][0]['text']
 
 
 def test_navatara_uses_requested_local_snapshot_and_keeps_birth_moon_reference():
