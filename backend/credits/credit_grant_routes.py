@@ -48,16 +48,20 @@ def _validate_grant_template(template_name: str, language: str) -> None:
         raise HTTPException(status_code=409, detail='Configured credit-grant WhatsApp template is not an approved Meta template')
     variables = _template_variables(template)
     body = [str(item.get('token') or '').strip().lower() for item in variables if item.get('component') == 'BODY']
-    if body != ['1', '2'] or len(variables) != 2:
+    # The dynamic URL button legitimately has its own {{1}} variable. Validate
+    # BODY independently; counting all template variables here made every
+    # correctly configured dynamic URL button look like an invalid extra body
+    # placeholder.
+    if body != ['1', '2']:
         raise HTTPException(status_code=409, detail='Credit-grant template must have exactly BODY {{1}} for credits added and {{2}} for new balance')
     buttons = [button for component in template.get('components') or []
                if str(component.get('type') or '').upper() == 'BUTTONS'
                for button in (component.get('buttons') or [])]
     chat_button = next((button for button in buttons
                         if str(button.get('type') or '').upper() == 'URL'
-                        and str(button.get('text') or '').strip().lower() == 'chat now'), None)
+                        and str(button.get('text') or '').strip().lower() in {'chat now', 'visit website'}), None)
     if not chat_button:
-        raise HTTPException(status_code=409, detail='Credit-grant template needs a URL button labelled “Chat Now”')
+        raise HTTPException(status_code=409, detail='Credit-grant template needs a URL button labelled “Chat Now” or “Visit website”')
     url = str(chat_button.get('url') or '').strip()
     expected_url = _grant_chat_url()
     if not expected_url.startswith('https://') or expected_url.count('{{1}}') != 1:
