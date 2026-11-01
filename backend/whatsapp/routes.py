@@ -138,6 +138,14 @@ async def whatsapp_webhook_events(request: Request, background_tasks: Background
                 # Inbound messages remain independent from campaign analytics.
                 logger.exception("whatsapp campaign status webhook processing failed")
             try:
+                from credits.credit_grant_campaigns import record_credit_grant_whatsapp_status_updates
+
+                matched = record_credit_grant_whatsapp_status_updates(payload)
+                if matched:
+                    logger.info("whatsapp webhook: matched %s credit-grant status update(s)", matched)
+            except Exception:
+                logger.exception("whatsapp credit-grant status webhook processing failed")
+            try:
                 process_whatsapp_payload(payload)
             except Exception:
                 logger.exception("whatsapp webhook processing failed")

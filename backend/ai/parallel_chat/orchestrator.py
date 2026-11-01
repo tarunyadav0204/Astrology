@@ -1580,6 +1580,7 @@ The supplied `INSTANT_PREDICTION_CROSS_CHECK_JSON` is a separate, compact calcul
 - Use this only to cross-check the direct verdict, ranked dates, and the dasha chain attached to each exact window.
 - When it agrees with the specialist synthesis, use it silently to improve precision; do not mechanically repeat it.
 - When it conflicts with a branch output, do not silently strengthen the prediction. Reconcile against the supplied branch evidence, retain only dates and dasha chains supported by their matching window, and express the resulting confidence honestly.
+- If `immediate_outcome_rule.posture` is `no_positive_immediate_prediction`, follow its instruction as a hard ceiling: do not call an outcome awaiting announcement likely, highly supported, a breakthrough, an admission, a win, or a success. A later ranked window never proves the immediate result.
 - Never reveal the cross-check, JSON, internal labels, scores, or implementation process. User facts and history may personalize prose but are not astrological evidence.
 """.strip()
         )

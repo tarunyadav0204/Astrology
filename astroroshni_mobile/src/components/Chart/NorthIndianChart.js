@@ -583,6 +583,7 @@ const NorthIndianChart = ({
   gridLineWidth = null,
   transitOverlay = null,
   dashaHighlight = null,
+  dashaOverlay = null,
   signPoints = null,
   bavBySign = null,
   onTransitPlanetPress = null,
@@ -910,7 +911,13 @@ const NorthIndianChart = ({
     })), showDegreeNakshatra);
     if (!layout) return null;
 
-    const transitColor = colors.accent || colors.primary;
+    // `accent` may be deliberately pale in a theme. Use semantic chart
+    // colours, then run them through the existing contrast chooser.
+    const transitColor = dashaPaint({
+      ...colors,
+      primary: colors.info || colors.primary,
+      accent: colors.success || colors.primary,
+    }).fill;
     return (
       <>
         <G pointerEvents="box-none">
@@ -992,6 +999,127 @@ const NorthIndianChart = ({
       } : null,
     }) || { planets: [], occupied: [] };
   }
+
+  const activationOverlays = (Array.isArray(dashaOverlay) ? dashaOverlay : [dashaOverlay]).filter(Boolean);
+  const dashaLensSource = (overlay) => {
+    if (!overlay?.planet || !overlay?.sourceHouse) return null;
+    const sourceHouse = overlay.sourceHouse;
+    if (overlay.type === 'transit') {
+      const list = getTransitPlanetsInHouse(sourceHouse - 1);
+      const polygon = HOUSE_POLYGONS[sourceHouse];
+      const boxes = (houseLayouts[sourceHouse]?.occupied || []).slice();
+      const savSpot = savSpotFor(sourceHouse, boxes);
+      if (savSpot?.box) boxes.push(savSpot.box);
+      const layout = polygon ? placeTransitLabels(polygon, boxes, list.map((planet) => ({
+        symbol: planet.symbol,
+        retrograde: planet.retrograde,
+        combust: planet.combust,
+        degree: planet.formattedDegree,
+        nakshatra: planet.shortNakshatra,
+        name: planet.name,
+        bav: planet.bav,
+      })), showDegreeNakshatra) : null;
+      const index = list.findIndex((planet) => planet.name === overlay.planet);
+      const slot = index >= 0 ? layout?.placed?.[index] : null;
+      const spec = index >= 0 ? layout?.specs?.[index] : null;
+      return slot ? { x: slot.x, y: slot.y + (spec?.detail ? (spec.detailOffset || 10) + 3 : 5) } : getHouseData(sourceHouse)?.center;
+    }
+    const planets = getPlanetsInHouse(sourceHouse - 1);
+    const index = planets.findIndex((planet) => planet.name === overlay.planet);
+    const slot = index >= 0 ? houseLayouts[sourceHouse]?.planets?.[index] : null;
+    return slot ? { x: slot.x, y: slot.y + Math.max(5, (slot.symbolFont || 12) * 0.42) } : getHouseData(sourceHouse)?.center;
+  };
+  const dashaLensPaint = activationOverlays.length ? dashaPaint(colors) : null;
+  const transitLensPaint = dashaPaint({
+    ...colors,
+    primary: colors.info || colors.primary,
+    accent: colors.success || colors.primary,
+  });
+  const samePlanetPaint = dashaPaint({
+    ...colors,
+    // Prefer the theme's warm highlight for a true Dasha + Transit
+    // confluence; dashaPaint falls back to a high-contrast theme-safe ink.
+    primary: colors.warning || colors.accent || colors.primary,
+    accent: colors.primary,
+  }).fill;
+  const isSamePlanetHouse = (house) => {
+    const dashaPlanets = activationOverlays
+      .filter((overlay) => overlay.type !== 'transit' && overlay.houses?.some((item) => item.house === house))
+      .map((overlay) => overlay.planet);
+    const transitPlanets = activationOverlays
+      .filter((overlay) => overlay.type === 'transit' && overlay.houses?.some((item) => item.house === house))
+      .map((overlay) => overlay.planet);
+    return dashaPlanets.some((planet) => transitPlanets.includes(planet));
+  };
+  const isConfluenceHouse = (house) => (
+    activationOverlays.some((overlay) => overlay.type !== 'transit' && overlay.houses?.some((item) => item.house === house))
+    && activationOverlays.some((overlay) => overlay.type === 'transit' && overlay.houses?.some((item) => item.house === house))
+  );
+  const dashaLensTarget = (house, radius = 20) => {
+    const polygon = HOUSE_POLYGONS[house];
+    if (!polygon) return HOUSE_DOT_POINTS_ALT[house] || getHouseData(house)?.center;
+
+    // A fixed marker point lands on natal labels for crowded houses. Build the
+    // same occupied map used by the chart labels and select the clearest space.
+    const occupied = (houseLayouts[house]?.occupied || []).slice();
+    const center = getHouseData(house)?.center;
+    const sign = center ? signAnchor(house, center) : null;
+    if (sign) occupied.push(labelBox(sign.x, sign.y, 12, 14, 5));
+
+    const transitPlanets = getTransitPlanetsInHouse(house - 1);
+    if (transitPlanets.length) {
+      const transitLayout = placeTransitLabels(polygon, occupied, transitPlanets.map((planet) => ({
+        symbol: planet.symbol,
+        retrograde: planet.retrograde,
+        combust: planet.combust,
+        degree: planet.formattedDegree,
+        nakshatra: planet.shortNakshatra,
+        name: planet.name,
+        bav: planet.bav,
+      })), showDegreeNakshatra);
+      transitLayout?.specs?.forEach((spec, index) => {
+        const slot = transitLayout.placed?.[index];
+        if (!slot) return;
+        const halfWidth = textHalfWidth(spec.text, spec.fontSize) + 2;
+        const below = spec.detail ? (spec.detailOffset || 10) + (spec.detailSize || 8) + 3 : 4;
+        occupied.push(labelBox(slot.x, slot.y, halfWidth, spec.fontSize + 3, below));
+      });
+    }
+
+    const clear = placeCircleClear(polygon, occupied, radius);
+    return clear || HOUSE_DOT_POINTS_ALT[house] || center;
+  };
+  const dashaLensPath = (from, to, index) => {
+    const bend = index % 2 === 0 ? 24 : -24;
+    const midX = (from.x + to.x) / 2;
+    const midY = (from.y + to.y) / 2;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const controlX = midX - (dy / distance) * bend;
+    const controlY = midY + (dx / distance) * bend;
+    return `M ${from.x} ${from.y} Q ${controlX} ${controlY} ${to.x} ${to.y}`;
+  };
+  const dashaLensArrowhead = (from, to, index) => {
+    const bend = index % 2 === 0 ? 24 : -24;
+    const midX = (from.x + to.x) / 2;
+    const midY = (from.y + to.y) / 2;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const controlX = midX - (dy / distance) * bend;
+    const controlY = midY + (dx / distance) * bend;
+    const tangentX = to.x - controlX;
+    const tangentY = to.y - controlY;
+    const tangentLength = Math.max(1, Math.hypot(tangentX, tangentY));
+    const ux = tangentX / tangentLength;
+    const uy = tangentY / tangentLength;
+    const baseX = to.x - ux * 5;
+    const baseY = to.y - uy * 5;
+    const px = -uy * 2.4;
+    const py = ux * 2.4;
+    return `M ${baseX + px} ${baseY + py} L ${to.x} ${to.y} L ${baseX - px} ${baseY - py} Z`;
+  };
 
   const aspectArrows = [];
   if (aspectMode === 'jaimini' && aspectFocus) {
@@ -1116,6 +1244,34 @@ const NorthIndianChart = ({
 
         <ChartAspectArrows arrows={aspectArrows} color={colors.chartText || colors.text} />
 
+        {activationOverlays.length && dashaLensPaint ? (
+          <G pointerEvents="none">
+            {activationOverlays.map((overlay, overlayIndex) => {
+              const source = dashaLensSource(overlay);
+              if (!source) return null;
+              return overlay.houses.filter((item) => item.house !== overlay.sourceHouse).map((item, index) => {
+                const targetCenter = dashaLensTarget(item.house);
+                if (!targetCenter) return null;
+                const radius = isConfluenceHouse(item.house) ? 14 : 12;
+                const targetDistance = Math.max(1, Math.hypot(targetCenter.x - source.x, targetCenter.y - source.y));
+                const target = {
+                  x: targetCenter.x - ((targetCenter.x - source.x) / targetDistance) * radius,
+                  y: targetCenter.y - ((targetCenter.y - source.y) / targetDistance) * radius,
+                };
+                const isTransit = overlay.type === 'transit';
+                const arrowPaint = isTransit ? transitLensPaint : dashaLensPaint;
+                const arrowIndex = index + overlayIndex;
+                return (
+                  <G key={`activation-path-${overlayIndex}-${item.house}`}>
+                    <Path d={dashaLensPath(source, target, arrowIndex)} fill="none" stroke={arrowPaint.fill} strokeWidth={isTransit ? 1.35 : (item.kind === 'aspect' ? 1.35 : 2.25)} strokeDasharray={isTransit ? '1 3' : (item.kind === 'aspect' ? '4 4' : undefined)} strokeLinecap={isTransit ? 'round' : undefined} opacity="0.88" />
+                    <Path d={dashaLensArrowhead(source, target, arrowIndex)} fill={arrowPaint.fill} opacity="0.94" />
+                  </G>
+                );
+              });
+            })}
+          </G>
+        ) : null}
+
         {/* Houses */}
         {[1,2,3,4,5,6,7,8,9,10,11,12].map((houseNumber) => {
           const houseIndex = houseNumber - 1;
@@ -1142,6 +1298,14 @@ const NorthIndianChart = ({
                   d={houseData.path}
                   fill={houseActivation[houseNumber].fill}
                   opacity={houseActivation[houseNumber].state === 'dormant' ? 0 : 0.42}
+                  pointerEvents="none"
+                />
+              ) : null}
+              {activationOverlays.some((overlay) => overlay.houses?.some((item) => item.house === houseNumber)) ? (
+                <Path
+                  d={houseData.path}
+                  fill={dashaLensPaint?.fill || 'transparent'}
+                  opacity="0.09"
                   pointerEvents="none"
                 />
               ) : null}
@@ -1307,10 +1471,50 @@ const NorthIndianChart = ({
                   </G>
                 );
               })}
+              {activationOverlays.some((overlay) => overlay.houses?.some((item) => item.house === houseNumber)) ? (() => {
+                const target = dashaLensTarget(houseNumber);
+                if (!target) return null;
+                const matches = activationOverlays.flatMap((overlay) => overlay.houses.filter((entry) => entry.house === houseNumber).map((item) => ({ item, overlay })));
+                const item = matches[0]?.item;
+                const dashaMatches = matches.filter(({ overlay }) => overlay.type !== 'transit');
+                const transitMatches = matches.filter(({ overlay }) => overlay.type === 'transit');
+                const confluence = dashaMatches.length > 0 && transitMatches.length > 0;
+                const samePlanet = dashaMatches.some(({ overlay }) => transitMatches.some(({ overlay: transitOverlay }) => transitOverlay.planet === overlay.planet));
+                const markerRadius = confluence ? 14 : 12;
+                return (
+                  <G pointerEvents="none">
+                    <Circle cx={target.x} cy={target.y} r={markerRadius} fill={colors.chartSurface || '#fffaf2'} stroke={samePlanet ? samePlanetPaint : (dashaLensPaint?.fill || colors.primary)} strokeWidth={samePlanet ? "3" : (confluence ? "2.3" : "1.5")} />
+                    <SvgText x={target.x} y={target.y + 4} fontSize="11" fontWeight="900" fill={samePlanet ? samePlanetPaint : (dashaLensPaint?.fill || colors.primary)} textAnchor="middle">{houseNumber}</SvgText>
+                    {target.gap == null || target.gap >= 5 ? (
+                      <SvgText x={target.x} y={target.y + markerRadius + 10} fontSize="6.5" fontWeight="800" fill={samePlanet ? samePlanetPaint : (dashaLensPaint?.fill || colors.primary)} textAnchor="middle">{samePlanet || confluence ? 'BOTH' : item?.kind === 'transit' ? 'TRANSITS' : item?.kind === 'placement' ? 'SITS' : item?.kind === 'lordship' ? 'RULES' : 'ASPECTS'}</SvgText>
+                    ) : null}
+                  </G>
+                );
+              })() : null}
               {renderTransitOverlay(houseNumber, natalLayout.occupied)}
             </G>
           );
         })}
+
+        {/* Keep an exact same-planet confluence visibly above every label and
+            activation marker. This is intentionally drawn last: it is the
+            strongest timing signal and must never disappear behind chart text. */}
+        {activationOverlays.length ? (
+          <G pointerEvents="none">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+              .filter((house) => isSamePlanetHouse(house))
+              .map((house) => (
+                <Path
+                  key={`same-planet-boundary-${house}`}
+                  d={getHouseData(house).path}
+                  fill="none"
+                  stroke={samePlanetPaint}
+                  strokeWidth="3.8"
+                  strokeLinejoin="round"
+                />
+              ))}
+          </G>
+        ) : null}
 
         {/* House Hit Areas - Moved to end to be on top */}
         <G pointerEvents="auto">

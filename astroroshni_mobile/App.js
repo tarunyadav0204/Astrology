@@ -102,7 +102,8 @@ import {
 } from './src/services/runtimeGuard';
 import { API_BASE_URL, getEndpoint } from './src/utils/constants';
 import { initFacebookAnalytics } from './src/services/facebookAnalytics';
-import { initAppsFlyerAnalytics, subscribeToAppsFlyerDeepLinks } from './src/services/appsFlyerAnalytics';
+import { initAppsFlyerAnalytics, logAppsFlyerEvent, subscribeToAppsFlyerDeepLinks } from './src/services/appsFlyerAnalytics';
+import api from './src/services/api';
 import { initFirebaseAnalytics } from './src/services/firebaseAnalytics';
 import { trackNavigationRoute } from './src/services/navigationAnalytics';
 import {
@@ -575,6 +576,13 @@ export default function App() {
   useEffect(() => {
     const openAppsFlyerDestination = (event) => {
       if (event?.deepLinkValue !== 'chat') return;
+      const campaignTag = String(event?.raw?.af_sub1 || event?.raw?.deep_link_sub1 || '').trim();
+      const grantMatch = /^cg-(\d+)$/.exec(campaignTag);
+      if (grantMatch) {
+        const campaignId = Number(grantMatch[1]);
+        logAppsFlyerEvent('credit_grant_chat_opened', { af_content_id: campaignTag, af_content_type: 'credit_grant' });
+        api.post(getEndpoint(`/campaigns/credit-grants/${campaignId}/chat-open`)).catch(() => {});
+      }
       if (isLoading || !navigationRef.current) {
         pendingAppsFlyerRouteRef.current = 'chat';
         return;

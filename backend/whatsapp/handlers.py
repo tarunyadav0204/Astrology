@@ -50,6 +50,68 @@ _ALLOWED_FLOW_RELATIONS = frozenset(
     {"self", "spouse", "child", "parent", "sibling", "friend", "other"}
 )
 
+# These commands are handled before any conversational state.  A user should be
+# able to stop promotional WhatsApp notices even when they are midway through a
+# chart, payment, or support flow.
+_WHATSAPP_MARKETING_STOP_WORDS = frozenset({
+    "stop", "unsubscribe", "cancel", "opt out", "optout", "remove",
+})
+_WHATSAPP_MARKETING_START_WORDS = frozenset({
+    "start", "unstop", "resume", "subscribe",
+})
+
+
+def _whatsapp_marketing_preference_command(body: str) -> Optional[bool]:
+    """Return True for opt-out, False for opt-in, otherwise None.
+
+    Meta sends user text unchanged, so normalize whitespace and common terminal
+    punctuation without treating normal sentences containing "stop" as a command.
+    """
+    normalized = re.sub(r"\s+", " ", str(body or "").strip().lower())
+    normalized = normalized.strip(".!?,;:\")('")
+    if normalized in _WHATSAPP_MARKETING_STOP_WORDS:
+        return True
+    if normalized in _WHATSAPP_MARKETING_START_WORDS:
+        return False
+    return None
+
+
+def _set_whatsapp_marketing_preference(conn, wa_id: str, session_userid: Any, opted_out: bool) -> bool:
+    """Persist a preference for the WhatsApp account, falling back to its phone."""
+    user_id: Optional[int] = None
+    if session_userid:
+        try:
+            user_id = int(session_userid)
+        except (TypeError, ValueError):
+            user_id = None
+    if user_id is None:
+        row = _find_user_by_wa_id(conn, wa_id)
+        if row:
+            user_id = int(row[0])
+    if user_id is None:
+        row = _find_user_by_phone(conn, wa_id_to_lookup_phone(wa_id))
+        if row:
+            user_id = int(row[0])
+    if user_id is None:
+        return False
+
+    if opted_out:
+        execute(
+            conn,
+            """UPDATE users SET whatsapp_marketing_opted_out_at = CURRENT_TIMESTAMP
+               WHERE userid = %s""",
+            (user_id,),
+        )
+    else:
+        execute(
+            conn,
+            """UPDATE users SET whatsapp_marketing_opted_out_at = NULL
+               WHERE userid = %s""",
+            (user_id,),
+        )
+    conn.commit()
+    return True
+
 
 def _flatten_whatsapp_flow_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     """WhatsApp may send `complete` fields at the top level or nested under `payload`."""
@@ -1930,6 +1992,34 @@ def process_whatsapp_payload(payload: Dict[str, Any]) -> None:
                     sess["last_phone_number_id"] = phone_number_id
 
                 input_kind = msg.get("input_kind") or "text"
+                marketing_preference = _whatsapp_marketing_preference_command(body)
+                if marketing_preference is not None:
+                    updated = _set_whatsapp_marketing_preference(
+                        conn, wa_id, sess.get("userid"), marketing_preference
+                    )
+                    if marketing_preference:
+                        confirmation = (
+                            "You have been opted out of AstroRoshni WhatsApp promotional messages. "
+                            "Reply START at any time to opt back in."
+                        )
+                    else:
+                        confirmation = (
+                            "You are now opted in to AstroRoshni WhatsApp promotional messages. "
+                            "Reply STOP at any time to opt out."
+                        )
+                    if not updated:
+                        # There is no campaign-eligible AstroRoshni account associated
+                        # with this number yet, but acknowledge the request clearly.
+                        confirmation = (
+                            "We could not find an AstroRoshni account linked to this WhatsApp number. "
+                            "No promotional messages will be sent to it unless it is linked to an account."
+                        )
+                    send_whatsapp_text(
+                        to_wa_id=wa_id,
+                        body=confirmation,
+                        phone_number_id=phone_number_id,
+                    )
+                    continue
                 if input_kind == "flow_reply":
                     _handle_flow_completion(conn, wa_id, body, phone_number_id)
                     continue

@@ -72,8 +72,12 @@ def ensure_whatsapp_schema() -> None:
         if _SCHEMA_READY:
             return
         with get_conn() as conn:
-            # If column + table already exist, skip ALTER on users entirely.
-            if _column_exists(conn, "users", "whatsapp_wa_id") and _table_exists(conn, "whatsapp_sessions"):
+            # If the user columns + session table already exist, skip ALTER on users entirely.
+            if (
+                _column_exists(conn, "users", "whatsapp_wa_id")
+                and _column_exists(conn, "users", "whatsapp_marketing_opted_out_at")
+                and _table_exists(conn, "whatsapp_sessions")
+            ):
                 # Still ensure newer session columns without touching users.
                 _ensure_session_columns(conn)
                 conn.commit()
@@ -85,6 +89,13 @@ def ensure_whatsapp_schema() -> None:
                 conn,
                 """
                 ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp_wa_id TEXT
+                """,
+            )
+            _safe_ddl(
+                conn,
+                """
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS whatsapp_marketing_opted_out_at TIMESTAMPTZ
                 """,
             )
             _safe_ddl(

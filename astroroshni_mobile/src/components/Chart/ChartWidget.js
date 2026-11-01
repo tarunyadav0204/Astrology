@@ -29,6 +29,8 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../context/ThemeContext';
 import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
 import { buildBhavChalitChart } from '../../utils/bhavChalitChart';
+import { buildDashaLens, dashaLensThemes } from './dashaLens';
+import { buildTransitLens, TRANSIT_LENS_PLANETS } from './transitLens';
 
 const isWeb = Platform.OS === 'web';
 const BAV_PLANETS = ['Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'];
@@ -36,7 +38,6 @@ const REFERENCE_LAGNA_TYPES = new Set([
   'chandra_lagna', 'surya_lagna', 'arudha_lagna', 'upapada_lagna',
   'bhava_lagna', 'hora_lagna', 'ghatika_lagna', 'pranapada_lagna', 'indu_lagna',
 ]);
-
 const normalizeBindus = (bindus) => {
   const out = [];
   for (let i = 0; i < 12; i += 1) {
@@ -58,6 +59,11 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const { t } = useTranslation();
   const { theme, colors } = useTheme();
   const dashaColor = dashaPaint(colors).fill;
+  const timingHighlightColor = dashaPaint({
+    ...colors,
+    primary: colors.accent || colors.primary,
+    accent: colors.warning || colors.primary,
+  }).fill;
   const [chartStyle, setChartStyle] = useState(defaultStyle);
   const [showDegreeNakshatra, setShowDegreeNakshatra] = useState(true);
   const [showOuterPlanets, setShowOuterPlanets] = useState(false);
@@ -72,6 +78,13 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [ashtakavarga, setAshtakavarga] = useState(null);
   const [showDashaHighlight, setShowDashaHighlight] = useState(false);
   const [dashaLords, setDashaLords] = useState(null);
+  const [dashaLensPlanet, setDashaLensPlanet] = useState(null);
+  const [showDashaLens, setShowDashaLens] = useState(false);
+  const [dashaLensEnabled, setDashaLensEnabled] = useState(false);
+  const [showTransitLens, setShowTransitLens] = useState(false);
+  const [transitLensPlanet, setTransitLensPlanet] = useState('Jupiter');
+  const [transitLensEnabled, setTransitLensEnabled] = useState(false);
+  const [transitOverlayChart, setTransitOverlayChart] = useState(null);
   const [showChartMenu, setShowChartMenu] = useState(false);
   const [drawingMode, setDrawingMode] = useState(false);
   const [aspectMode, setAspectMode] = useState(null);
@@ -96,6 +109,8 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const chartToolbarRef = useRef(null);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const fitTablet = windowWidth >= 768;
+  const chartMenuIconSize = fitTablet ? 20 : 16;
+  const chartMenuLockSize = fitTablet ? 18 : 14;
   const fitChartToScreen = windowWidth >= 744;
 
   useEffect(() => {
@@ -108,6 +123,33 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   }, [drawingMode, onDrawingModeChange]);
 
   const dateNavigatorVisible = currentChartType === 'transit' || showTransitOverlay || showDashaHighlight;
+  const dashaLens = useMemo(
+    () => buildDashaLens(lagnaChartData || chartData, dashaLensPlanet),
+    [lagnaChartData, chartData, dashaLensPlanet],
+  );
+  const selectedDashaThemes = useMemo(() => dashaLensThemes(dashaLens), [dashaLens]);
+  const transitLens = useMemo(
+    () => buildTransitLens(lagnaChartData || chartData, transitOverlayChart, transitLensPlanet),
+    [lagnaChartData, chartData, transitOverlayChart, transitLensPlanet],
+  );
+  const timingLensThemes = useMemo(() => {
+    const byHouse = new Map();
+    const add = (themes, source, planet) => themes.forEach((theme) => {
+      const existing = byHouse.get(theme.house);
+      if (existing) {
+        if (!existing.sources.some((entry) => entry.source === source && entry.planet === planet)) existing.sources.push({ source, planet });
+        return;
+      }
+      byHouse.set(theme.house, { ...theme, sources: [{ source, planet }] });
+    });
+    if (dashaLensEnabled && dashaLens) add(selectedDashaThemes, 'Dasha', dashaLens.planet);
+    if (transitLensEnabled && transitLens) add(transitLens.themes || [], 'Transit', transitLens.planet);
+    return [...byHouse.values()].sort((a, b) => a.house - b.house);
+  }, [dashaLensEnabled, selectedDashaThemes, transitLensEnabled, transitLens]);
+  const timingLensOverlays = useMemo(() => [
+    dashaLensEnabled && showDashaHighlight ? dashaLens : null,
+    transitLensEnabled && showTransitOverlay ? transitLens : null,
+  ].filter(Boolean), [dashaLensEnabled, showDashaHighlight, dashaLens, transitLensEnabled, showTransitOverlay, transitLens]);
 
   useEffect(() => {
     if (!fitChartToScreen) {
@@ -185,7 +227,6 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
   const [showSwipeHint, setShowSwipeHint] = useState(true);
   const [chartDataCache, setChartDataCache] = useState({ lagna: chartData });
   const [transitDate, setTransitDate] = useState(new Date());
-  const [transitOverlayChart, setTransitOverlayChart] = useState(null);
 
   const activeChartTypeRef = useRef(currentChartType);
   const chartDataCacheRef = useRef(chartDataCache);
@@ -350,6 +391,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
       };
       if (lords.mahadasha || lords.antardasha || lords.pratyantardasha) {
         setDashaLords(lords);
+        setDashaLensPlanet((selected) => selected || lords.mahadasha || lords.antardasha || lords.pratyantardasha);
       }
     } catch (error) {
       console.error('Failed to load dasha highlight:', error);
@@ -836,6 +878,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
     const dashaHighlight = showDashaHighlight && currentChartType !== 'transit' && dashaLords
       ? dashaLords
       : null;
+    const activationOverlay = currentChartType === 'lagna' ? timingLensOverlays : [];
     // Combustion is an astronomical D1 condition, so divisional charts retain
     // the natal result instead of recalculating it from divided longitudes.
     // A transit chart uses the selected date's transit Sun and planets.
@@ -880,6 +923,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         hideInstructions={cosmicTheme}
         transitOverlay={transitOverlay}
         dashaHighlight={dashaHighlight}
+        dashaOverlay={activationOverlay}
         signPoints={signPoints}
         bavBySign={bavBySign}
         onTransitPlanetPress={handleTransitPlanetPress}
@@ -903,6 +947,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         karakas={karakas}
         transitOverlay={transitOverlay}
         dashaHighlight={dashaHighlight}
+        dashaOverlay={activationOverlay}
         signPoints={signPoints}
         bavBySign={bavBySign}
         onTransitPlanetPress={handleTransitPlanetPress}
@@ -914,7 +959,7 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
         {...sizeProp}
       />
     );
-  }, [chartStyle, birthData, chartData, lagnaChartData, showDegreeNakshatra, showOuterPlanets, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, currentChartType, signPoints, bavBySign, handleTransitPlanetPress, drawingMode, aspectMode, aspectFocus, showBadhaka, showMaraka, showVargottama, showMooltrikona, t]);
+  }, [chartStyle, birthData, chartData, lagnaChartData, showDegreeNakshatra, showOuterPlanets, rotatedAscendant, handleRotate, showKarakas, karakas, onHousePress, webChartSize, fitTablet, showTransitOverlay, showDashaHighlight, dashaLords, transitOverlayChart, showDashaLens, showTransitLens, transitLensEnabled, transitLens, timingLensOverlays, currentChartType, signPoints, bavBySign, handleTransitPlanetPress, drawingMode, aspectMode, aspectFocus, showBadhaka, showMaraka, showVargottama, showMooltrikona, t]);
 
   const QuickActionButton = ({ icon, label, onPress, active, primary }) => {
     const iconColor = primary ? colors.onPrimary : (active ? colors.onAccent : colors.text);
@@ -1076,20 +1121,65 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           {drawingMode ? null : (
             <Pressable style={styles.chartMenuBackdrop} onPress={() => setShowChartMenu(false)} />
           )}
-          <View style={[styles.chartMenu, { backgroundColor: colors.chartRaised || colors.surface, borderColor: colors.chartLine }]}>
+          <View style={[styles.chartMenu, fitTablet && styles.chartMenuTablet, { backgroundColor: colors.chartRaised || colors.surface, borderColor: colors.chartLine }]}>
             <TouchableOpacity
-              style={styles.chartMenuRow}
+              style={[styles.chartMenuRow, fitTablet && styles.chartMenuRowTablet]}
+              onPress={() => {
+                if (!timingLicensed) { onRequestTimingLicense?.('dasha'); return; }
+                setShowDashaHighlight(true);
+                setDashaLensEnabled(true);
+                setShowTransitLens(false);
+                setTransitLensEnabled(false);
+                setShowTransitOverlay(false);
+                if (currentChartType !== 'lagna') onRequestBirthChart?.();
+                setShowChartMenu(false);
+                setShowDashaLens(true);
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: showDashaHighlight }}
+              accessibilityLabel={timingLicensed ? t('chartScreen.dashaLens', 'Dasha lens') : t('premiumUi.chart.licenseRequired')}
+            >
+              <Ionicons name="git-network-outline" size={chartMenuIconSize} color={colors.chartText || colors.text} />
+              <Text style={[styles.chartMenuText, fitTablet && styles.chartMenuTextTablet, { color: colors.chartText || colors.text }]}>{t('chartScreen.dashaLens', 'Dasha lens')}</Text>
+              {timingLicensed ? <Ionicons name="chevron-forward" size={chartMenuIconSize} color={colors.chartTextMuted} /> : <Ionicons name="lock-closed" size={chartMenuLockSize} color={colors.chartTextMuted} />}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.chartMenuRow, fitTablet && styles.chartMenuRowTablet]}
+              onPress={() => {
+                if (!timingLicensed) { onRequestTimingLicense?.('transit'); return; }
+                setShowTransitOverlay(true);
+                setTransitLensEnabled(true);
+                // Transit timing is meaningful alongside the active dasha.
+                // Keep the current Mahadasha as the initial comparison, then
+                // let the reader switch either row in the shared selector.
+                setDashaLensEnabled(true);
+                setDashaLensPlanet((selected) => selected || dashaLords?.mahadasha || dashaLords?.antardasha || null);
+                setShowDashaHighlight(true);
+                if (currentChartType !== 'lagna') onRequestBirthChart?.();
+                setShowChartMenu(false);
+                setShowTransitLens(true);
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: showTransitLens }}
+              accessibilityLabel={timingLicensed ? t('chartScreen.transitLens', 'Transit lens') : t('premiumUi.chart.licenseRequired')}
+            >
+              <Ionicons name="planet-outline" size={chartMenuIconSize} color={colors.chartText || colors.text} />
+              <Text style={[styles.chartMenuText, fitTablet && styles.chartMenuTextTablet, { color: colors.chartText || colors.text }]}>{t('chartScreen.transitLens', 'Transit lens')}</Text>
+              {timingLicensed ? <Ionicons name="chevron-forward" size={chartMenuIconSize} color={colors.chartTextMuted} /> : <Ionicons name="lock-closed" size={chartMenuLockSize} color={colors.chartTextMuted} />}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.chartMenuRow, fitTablet && styles.chartMenuRowTablet]}
               onPress={toggleDrawingMode}
               accessibilityRole="button"
               accessibilityState={{ selected: drawingMode }}
               accessibilityLabel={timingLicensed ? t('chartScreen.drawing.mode', 'Drawing mode') : t('premiumUi.chart.licenseRequired')}
             >
-              <Ionicons name="pencil-outline" size={16} color={colors.chartText || colors.text} />
-              <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{t('chartScreen.drawing.mode', 'Drawing mode')}</Text>
+              <Ionicons name="pencil-outline" size={chartMenuIconSize} color={colors.chartText || colors.text} />
+              <Text style={[styles.chartMenuText, fitTablet && styles.chartMenuTextTablet, { color: colors.chartText || colors.text }]}>{t('chartScreen.drawing.mode', 'Drawing mode')}</Text>
               {timingLicensed ? (
-                drawingMode ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null
+                drawingMode ? <Ionicons name="checkmark" size={chartMenuIconSize} color={colors.primary} /> : null
               ) : (
-                <Ionicons name="lock-closed" size={14} color={colors.chartTextMuted} />
+                <Ionicons name="lock-closed" size={chartMenuLockSize} color={colors.chartTextMuted} />
               )}
             </TouchableOpacity>
             {[
@@ -1099,35 +1189,35 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             ].map(([mode, label, icon]) => (
               <TouchableOpacity
                 key={mode}
-                style={styles.chartMenuRow}
+                style={[styles.chartMenuRow, fitTablet && styles.chartMenuRowTablet]}
                 onPress={() => toggleAspectMode(mode)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: aspectMode === mode }}
                 accessibilityLabel={label}
               >
-                <Ionicons name={icon} size={16} color={colors.chartText || colors.text} />
-                <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{label}</Text>
-                {aspectMode === mode ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null}
+                <Ionicons name={icon} size={chartMenuIconSize} color={colors.chartText || colors.text} />
+                <Text style={[styles.chartMenuText, fitTablet && styles.chartMenuTextTablet, { color: colors.chartText || colors.text }]}>{label}</Text>
+                {aspectMode === mode ? <Ionicons name="checkmark" size={chartMenuIconSize} color={colors.primary} /> : null}
               </TouchableOpacity>
             ))}
             {onOpenMrityuBhaga ? (
               <TouchableOpacity
-                style={styles.chartMenuRow}
+                style={[styles.chartMenuRow, fitTablet && styles.chartMenuRowTablet]}
                 onPress={() => { setShowChartMenu(false); onOpenMrityuBhaga(); }}
                 accessibilityRole="button"
               >
-                <Ionicons name="calendar-outline" size={16} color={colors.chartText || colors.text} />
-                <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{t('chartScreen.mrityuBhagaWorkspace', 'Mrityu Bhaga · Assessment & Calendar')}</Text>
+                <Ionicons name="calendar-outline" size={chartMenuIconSize} color={colors.chartText || colors.text} />
+                <Text style={[styles.chartMenuText, fitTablet && styles.chartMenuTextTablet, { color: colors.chartText || colors.text }]}>{t('chartScreen.mrityuBhagaWorkspace', 'Mrityu Bhaga · Assessment & Calendar')}</Text>
               </TouchableOpacity>
             ) : null}
             {onOpenBhriguBindu ? (
               <TouchableOpacity
-                style={styles.chartMenuRow}
+                style={[styles.chartMenuRow, fitTablet && styles.chartMenuRowTablet]}
                 onPress={() => { setShowChartMenu(false); onOpenBhriguBindu(); }}
                 accessibilityRole="button"
               >
-                <Ionicons name="calendar-outline" size={16} color={colors.chartText || colors.text} />
-                <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{t('chartScreen.bhriguBinduWorkspace', 'Bhrigu Bindu')}</Text>
+                <Ionicons name="calendar-outline" size={chartMenuIconSize} color={colors.chartText || colors.text} />
+                <Text style={[styles.chartMenuText, fitTablet && styles.chartMenuTextTablet, { color: colors.chartText || colors.text }]}>{t('chartScreen.bhriguBinduWorkspace', 'Bhrigu Bindu')}</Text>
               </TouchableOpacity>
             ) : null}
             {[
@@ -1138,15 +1228,15 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
             ].map(([key, selected, onPress, label, icon]) => (
               <TouchableOpacity
                 key={key}
-                style={styles.chartMenuRow}
+                style={[styles.chartMenuRow, fitTablet && styles.chartMenuRowTablet]}
                 onPress={() => { onPress(); setShowChartMenu(false); }}
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
                 accessibilityLabel={label}
               >
-                <Ionicons name={icon} size={16} color={colors.chartText || colors.text} />
-                <Text style={[styles.chartMenuText, { color: colors.chartText || colors.text }]}>{label}</Text>
-                {selected ? <Ionicons name="checkmark" size={16} color={colors.primary} /> : null}
+                <Ionicons name={icon} size={chartMenuIconSize} color={colors.chartText || colors.text} />
+                <Text style={[styles.chartMenuText, fitTablet && styles.chartMenuTextTablet, { color: colors.chartText || colors.text }]}>{label}</Text>
+                {selected ? <Ionicons name="checkmark" size={chartMenuIconSize} color={colors.primary} /> : null}
               </TouchableOpacity>
             ))}
           </View>
@@ -1238,6 +1328,116 @@ const ChartWidget = forwardRef(({ title, chartType, chartData, birthData, lagnaC
           />
         ) : null}
       </View>
+      {(showDashaLens || showTransitLens) ? (
+        <View style={[styles.dashaLensPicker, fitTablet && styles.dashaLensPickerTablet, { backgroundColor: colors.chartRaised || colors.surface, borderColor: colors.chartLine || colors.cardBorder }]}>
+          <View style={[styles.dashaLensControls, fitTablet && styles.dashaLensControlsTablet]}>
+            <View style={styles.timingLensRows}>
+              <Text style={[styles.timingLensRowLabel, fitTablet && styles.timingLensRowLabelTablet, { color: colors.textSecondary }]}>{t('chartScreen.dasha', 'Dasha')}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.dashaLensChoices, fitTablet && styles.dashaLensChoicesTablet]} style={styles.dashaLensScroll}>
+                {[
+                ['mahadasha', 'MD'], ['antardasha', 'AD'], ['pratyantardasha', 'PD'], ['sookshma', 'SK'], ['prana', 'PR'],
+              ].filter(([key]) => dashaLords?.[key]).map(([key, level]) => {
+                const planet = dashaLords[key];
+                const selected = planet === dashaLensPlanet;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.dashaLensChoice, fitTablet && styles.dashaLensChoiceTablet, { borderColor: selected ? colors.primary : colors.cardBorder, backgroundColor: selected ? colors.accentSoft : 'transparent' }]}
+                    onPress={() => { setDashaLensPlanet(planet); setDashaLensEnabled(true); }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                  >
+                      <Text style={[styles.dashaLensLevel, fitTablet && styles.dashaLensLevelTablet, { color: selected ? colors.primary : colors.textSecondary }]}>{level}</Text>
+                      <Text style={[styles.dashaLensPlanet, fitTablet && styles.dashaLensPlanetTablet, { color: colors.text }]}>{t(`home.planet_names.${planet}`, planet)}</Text>
+                      {selected ? <Ionicons name="arrow-down" size={fitTablet ? 18 : 13} color={colors.primary} style={styles.dashaLensChipArrow} /> : null}
+                    </TouchableOpacity>
+                );
+                })}
+              </ScrollView>
+              <Text style={[styles.timingLensRowLabel, fitTablet && styles.timingLensRowLabelTablet, { color: colors.textSecondary }]}>{t('chartScreen.transit', 'Transit')}</Text>
+              <View style={[styles.transitLensGrid, fitTablet && styles.transitLensGridTablet]}>
+                {TRANSIT_LENS_PLANETS.map((planet) => {
+                  const selected = planet === transitLensPlanet;
+                  return (
+                    <TouchableOpacity
+                      key={planet}
+                    style={[styles.dashaLensChoice, styles.transitLensChoice, fitTablet && styles.dashaLensChoiceTablet, { borderColor: selected ? colors.primary : colors.cardBorder, backgroundColor: selected ? colors.accentSoft : 'transparent' }]}
+                    onPress={() => { setTransitLensPlanet(planet); setShowTransitOverlay(true); setTransitLensEnabled(true); }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[styles.dashaLensLevel, fitTablet && styles.dashaLensLevelTablet, { color: selected ? colors.primary : colors.textSecondary }]}>{t('chartScreen.transit', 'Transit')}</Text>
+                    <Text style={[styles.dashaLensPlanet, fitTablet && styles.dashaLensPlanetTablet, { color: colors.text }]}>{t(`home.planet_names.${planet}`, planet)}</Text>
+                    {selected ? <Ionicons name="arrow-down" size={fitTablet ? 18 : 13} color={colors.primary} style={styles.dashaLensChipArrow} /> : null}
+                  </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.dashaLensClose, fitTablet && styles.dashaLensCloseTablet, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
+              onPress={() => {
+                setShowDashaLens(false);
+                setDashaLensEnabled(false);
+                setShowDashaHighlight(false);
+                setShowTransitLens(false);
+                setTransitLensEnabled(false);
+                setShowTransitOverlay(false);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('chartScreen.closeChartLens', 'Close chart lens')}
+            >
+              <Ionicons name="close" size={fitTablet ? 24 : 18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          {timingLensThemes.length ? (
+            <View style={[styles.dashaFocusPanel, fitTablet && styles.dashaFocusPanelTablet, { borderColor: colors.cardBorder, backgroundColor: colors.surfaceMuted }]}>
+              <View style={[styles.dashaFocusHeader, fitTablet && styles.dashaFocusHeaderTablet, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.dashaFocusEyebrow, fitTablet && styles.dashaFocusEyebrowTablet, { color: colors.onPrimary }]}>{t('chartScreen.lifeAreasInFocus', 'Life areas in focus')}</Text>
+                <Text style={[styles.dashaFocusTitle, fitTablet && styles.dashaFocusTitleTablet, { color: colors.onPrimary }]}>{t('chartScreen.timingLens', 'Timing lens')}</Text>
+                <Text style={[styles.dashaFocusSummary, fitTablet && styles.dashaFocusSummaryTablet, { color: colors.onPrimary }]}>
+                  {[dashaLensEnabled && dashaLens ? `${t('chartScreen.dasha', 'Dasha')} · ${t(`home.planet_names.${dashaLens.planet}`, dashaLens.planet)}` : null, transitLensEnabled && transitLens ? `${t('chartScreen.transit', 'Transit')} · ${t(`home.planet_names.${transitLens.planet}`, transitLens.planet)}` : null].filter(Boolean).join('  •  ')}
+                </Text>
+              </View>
+              {(() => {
+                const decorate = (item) => {
+                  const hasDasha = item.sources.some((entry) => entry.source === 'Dasha');
+                  const hasTransit = item.sources.some((entry) => entry.source === 'Transit');
+                  const dashaSource = item.sources.find((entry) => entry.source === 'Dasha');
+                  const transitSource = item.sources.find((entry) => entry.source === 'Transit');
+                  const samePlanet = hasDasha && hasTransit && item.sources.some((entry) => entry.source === 'Dasha' && item.sources.some((other) => other.source === 'Transit' && other.planet === entry.planet));
+                  const sourceLabel = samePlanet
+                    ? `${t(`home.planet_names.${dashaSource?.planet}`, dashaSource?.planet)} ${t('chartScreen.dasha', 'Dasha')} + ${t(`home.planet_names.${transitSource?.planet}`, transitSource?.planet)} ${t('chartScreen.transit', 'Transit')}`
+                    : (hasDasha && hasTransit ? t('chartScreen.confluence', 'Both timing signals') : item.sources[0]?.source);
+                  return { ...item, samePlanet, sourceLabel };
+                };
+                const items = timingLensThemes.map(decorate);
+                const reinforced = items.filter((item) => item.samePlanet);
+                const remaining = items.filter((item) => !item.samePlanet);
+                const renderCard = (item, featured = false) => (
+                  <View key={`${item.label}-${item.theme}`} style={[featured ? styles.dashaFocusFeatured : styles.dashaFocusCard, fitTablet && (featured ? styles.dashaFocusFeaturedTablet : styles.dashaFocusCardTablet), { backgroundColor: colors.surface, borderColor: item.samePlanet ? timingHighlightColor : colors.cardBorder, borderWidth: item.samePlanet ? 3 : 1 }]}>
+                    <Text style={[styles.dashaFocusHouse, fitTablet && styles.dashaFocusHouseTablet, { color: item.samePlanet ? timingHighlightColor : colors.primary }]}>{`${t('chartScreen.dashaLensHouse', { label: item.label, defaultValue: '{{label}} house' })} · ${item.sourceLabel}`}</Text>
+                    <Text style={[featured ? styles.dashaFocusFeaturedText : styles.dashaFocusText, fitTablet && (featured ? styles.dashaFocusFeaturedTextTablet : styles.dashaFocusTextTablet), { color: colors.text }]}>{item.theme}</Text>
+                  </View>
+                );
+                return (
+                  <>
+                    {reinforced.length ? (
+                      <View style={[styles.dashaFocusReinforced, fitTablet && styles.dashaFocusReinforcedTablet]}>
+                        <Text style={[styles.dashaFocusSectionLabel, fitTablet && styles.dashaFocusSectionLabelTablet, { color: timingHighlightColor }]}>{t('chartScreen.strongestTimingOverlap', 'Strongest timing overlap')}</Text>
+                        {reinforced.map((item) => renderCard(item, true))}
+                      </View>
+                    ) : null}
+                    <View style={[styles.dashaFocusGrid, fitTablet && styles.dashaFocusGridTablet]}>{remaining.map((item) => renderCard(item))}</View>
+                  </>
+                );
+              })()}
+            </View>
+          ) : null}
+          {showDashaLens && !dashaLords ? <Text style={[styles.dashaLensDescription, { color: colors.textSecondary }]}>{t('chartScreen.dashaLensLoading', 'Loading the running dasha periods…')}</Text> : null}
+          {showTransitLens && !transitLens ? <Text style={[styles.dashaLensDescription, { color: colors.textSecondary }]}>{t('chartScreen.transitLensLoading', 'Loading the current transits…')}</Text> : null}
+        </View>
+      ) : null}
       {aspectMode === 'parashari' || aspectMode === 'nadi' || aspectMode === 'jaimini' ? (
         <View style={[styles.aspectPickRow, { borderColor: colors.chartLine, backgroundColor: colors.chartRaised }]}>
           <ScrollView
@@ -1723,6 +1923,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 8,
   },
+  chartMenuTablet: {
+    top: 48,
+    right: 12,
+    minWidth: 296,
+    borderRadius: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+  },
   chartMenuRow: {
     minHeight: 36,
     flexDirection: 'row',
@@ -1730,10 +1938,19 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 6,
   },
+  chartMenuRowTablet: {
+    minHeight: 48,
+    gap: 11,
+    paddingHorizontal: 9,
+  },
   chartMenuText: {
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
+  },
+  chartMenuTextTablet: {
+    fontSize: 16,
+    fontWeight: '700',
   },
   aspectsOff: {
     alignSelf: 'flex-end',
@@ -2007,6 +2224,55 @@ const styles = StyleSheet.create({
   },
   infoCloseButton: { alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 },
   infoCloseButtonText: { fontSize: 14, fontWeight: '800', letterSpacing: 0.2 },
+  dashaLensPicker: { marginTop: 8, borderTopWidth: 1, borderBottomWidth: 1, paddingVertical: 8 },
+  dashaLensPickerTablet: { marginTop: 12, paddingVertical: 13 },
+  dashaLensControls: { flexDirection: 'row', alignItems: 'flex-start', paddingRight: 10 },
+  dashaLensControlsTablet: { paddingRight: 16 },
+  timingLensRows: { flex: 1, minWidth: 0, gap: 5 },
+  timingLensRowLabel: { fontSize: 9, lineHeight: 11, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase', paddingHorizontal: 12 },
+  timingLensRowLabelTablet: { fontSize: 12, lineHeight: 15, letterSpacing: 1, paddingHorizontal: 16 },
+  dashaLensScroll: { flex: 1, minWidth: 0 },
+  dashaLensDescription: { fontSize: 13, lineHeight: 19, marginTop: 8 },
+  dashaLensChoices: { flexDirection: 'row', gap: 6, paddingHorizontal: 12 },
+  dashaLensChoicesTablet: { gap: 9, paddingHorizontal: 16 },
+  dashaLensChoice: { minWidth: 64, borderWidth: 1, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 6 },
+  dashaLensChoiceTablet: { minWidth: 108, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 10 },
+  transitLensGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, paddingHorizontal: 12 },
+  transitLensGridTablet: { gap: 9, paddingHorizontal: 16 },
+  transitLensChoice: { minWidth: 0, flexBasis: '18.4%', flexGrow: 0, paddingHorizontal: 5 },
+  dashaLensClose: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
+  dashaLensCloseTablet: { width: 44, height: 44, borderRadius: 22, marginLeft: 10 },
+  dashaLensLevel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  dashaLensLevelTablet: { fontSize: 13, letterSpacing: 1 },
+  dashaLensPlanet: { fontSize: 13, lineHeight: 17, fontWeight: '800', marginTop: 2 },
+  dashaLensPlanetTablet: { fontSize: 17, lineHeight: 22, marginTop: 3 },
+  dashaLensChipArrow: { alignSelf: 'center', marginTop: 1 },
+  dashaFocusPanel: { marginHorizontal: 12, marginTop: 10, borderWidth: 1, borderRadius: 16, overflow: 'hidden', paddingBottom: 10 },
+  dashaFocusPanelTablet: { marginHorizontal: 16, marginTop: 14, borderRadius: 20, paddingBottom: 14 },
+  dashaFocusHeader: { paddingHorizontal: 14, paddingVertical: 12, alignItems: 'center' },
+  dashaFocusHeaderTablet: { paddingHorizontal: 20, paddingVertical: 16 },
+  dashaFocusEyebrow: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', opacity: 0.82 },
+  dashaFocusEyebrowTablet: { fontSize: 12, lineHeight: 15, letterSpacing: 1.2 },
+  dashaFocusTitle: { fontSize: 17, lineHeight: 21, fontWeight: '900', marginTop: 1 },
+  dashaFocusTitleTablet: { fontSize: 24, lineHeight: 29, marginTop: 2 },
+  dashaFocusSummary: { fontSize: 11, lineHeight: 15, fontWeight: '800', textAlign: 'center', marginTop: 3 },
+  dashaFocusSummaryTablet: { fontSize: 15, lineHeight: 20, marginTop: 5 },
+  dashaFocusReinforced: { paddingHorizontal: 10, paddingTop: 10 },
+  dashaFocusReinforcedTablet: { paddingHorizontal: 14, paddingTop: 14 },
+  dashaFocusSectionLabel: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 5 },
+  dashaFocusSectionLabelTablet: { fontSize: 12, lineHeight: 16, letterSpacing: 1, marginBottom: 8 },
+  dashaFocusFeatured: { borderRadius: 12, paddingHorizontal: 11, paddingVertical: 10 },
+  dashaFocusFeaturedTablet: { borderRadius: 15, paddingHorizontal: 15, paddingVertical: 14 },
+  dashaFocusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 10, paddingTop: 10 },
+  dashaFocusGridTablet: { gap: 12, paddingHorizontal: 14, paddingTop: 14 },
+  dashaFocusCard: { width: '48.7%', minHeight: 104, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 8, justifyContent: 'center' },
+  dashaFocusCardTablet: { width: '48.9%', minHeight: 132, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 12 },
+  dashaFocusHouse: { fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 0.45 },
+  dashaFocusHouseTablet: { fontSize: 12, lineHeight: 16, letterSpacing: 0.55 },
+  dashaFocusText: { fontSize: 11, lineHeight: 15, fontWeight: '700', marginTop: 4 },
+  dashaFocusTextTablet: { fontSize: 15, lineHeight: 20, marginTop: 6 },
+  dashaFocusFeaturedText: { fontSize: 12, lineHeight: 16, fontWeight: '800', marginTop: 4 },
+  dashaFocusFeaturedTextTablet: { fontSize: 16, lineHeight: 22, marginTop: 6 },
 });
 
 export default ChartWidget;

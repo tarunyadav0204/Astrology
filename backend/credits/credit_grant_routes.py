@@ -11,7 +11,7 @@ from starlette.concurrency import run_in_threadpool
 
 from auth import User, get_current_user
 from credits.credit_grant_campaigns import (create_credit_grant_campaign, get_credit_grant_recipients_for_whatsapp,
-    list_credit_grant_campaigns, mark_credit_grant_whatsapp_queued)
+    list_credit_grant_campaigns, mark_credit_grant_whatsapp_queued, mark_credit_grant_chat_opened)
 from nudge_engine.task_queue import enqueue_nudge_task
 from whatsapp.admin_routes import _find_template, _template_variables
 from db import execute, get_conn
@@ -31,7 +31,7 @@ def _template_configured() -> bool:
     return bool((os.getenv('CREDIT_GRANT_WHATSAPP_TEMPLATE_NAME') or '').strip())
 
 def _grant_chat_url() -> str:
-    """Static URL required by Meta template; may be an AppsFlyer OneLink."""
+    """Meta dynamic URL template ending in its one URL variable."""
     return (os.getenv('CREDIT_GRANT_WHATSAPP_CHAT_URL') or 'https://astroroshni.com/chat?app=1').strip()
 
 def _missing_user_ids(ids: List[int]) -> List[int]:
@@ -57,13 +57,18 @@ def _validate_grant_template(template_name: str, language: str) -> None:
                         if str(button.get('type') or '').upper() == 'URL'
                         and str(button.get('text') or '').strip().lower() == 'chat now'), None)
     if not chat_button:
-        raise HTTPException(status_code=409, detail='Credit-grant template needs a static URL button labelled “Chat Now”')
+        raise HTTPException(status_code=409, detail='Credit-grant template needs a URL button labelled “Chat Now”')
     url = str(chat_button.get('url') or '').strip()
     expected_url = _grant_chat_url()
-    if not expected_url.startswith('https://'):
-        raise HTTPException(status_code=500, detail='CREDIT_GRANT_WHATSAPP_CHAT_URL must be an HTTPS URL')
+    if not expected_url.startswith('https://') or expected_url.count('{{1}}') != 1:
+        raise HTTPException(status_code=500, detail='CREDIT_GRANT_WHATSAPP_CHAT_URL must be an HTTPS dynamic URL with exactly one {{1}} suffix')
     if url != expected_url:
         raise HTTPException(status_code=409, detail='The “Chat Now” button URL does not match CREDIT_GRANT_WHATSAPP_CHAT_URL')
+
+@router.post('/campaigns/credit-grants/{campaign_id}/chat-open')
+async def grant_chat_opened(campaign_id: int, current_user: User = Depends(get_current_user)):
+    marked = await run_in_threadpool(mark_credit_grant_chat_opened, int(campaign_id), int(current_user.userid))
+    return {'ok': True, 'marked': marked}
 
 @router.get('/admin/campaigns/credit-grants')
 async def list_grants(current_user: User = Depends(get_current_user)):

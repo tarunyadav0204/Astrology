@@ -19,12 +19,36 @@ _PREDICTION_ANSWER_MODES = frozenset({
     "comparison_choice",
 })
 
+_PREDICTION_ROUTER_MODES = frozenset({
+    "PREDICT_EVENT_TIMING",
+    "PREDICT_EVENTS_FOR_PERIOD",
+    "LIFESPAN_EVENT_TIMING",
+})
+
+
+def prediction_anchor_answer_mode(intent: Dict[str, Any] | None) -> str:
+    """Resolve the calculation mode for an eligible cross-check.
+
+    The legacy router sometimes keeps ``answer_mode`` as a broad topic-reading
+    label even while its semantic ``mode`` / ``non_daily_mode`` correctly says
+    that the user wants an event outcome.  Preserve explicit calculation modes;
+    otherwise promote only that already-routed prediction intent.
+    """
+    if not isinstance(intent, dict):
+        return ""
+    answer_mode = str(intent.get("answer_mode") or "").strip().lower()
+    if answer_mode in _PREDICTION_ANSWER_MODES:
+        return answer_mode
+    mode = str(intent.get("mode") or "").strip().upper()
+    non_daily_mode = str(intent.get("non_daily_mode") or "").strip().upper()
+    if mode in _PREDICTION_ROUTER_MODES or non_daily_mode == "PREDICT_EVENT_TIMING":
+        return "event_prediction"
+    return ""
+
 
 def is_prediction_anchor_eligible(intent: Dict[str, Any] | None) -> bool:
     """Return true only for narrowly defined prediction/timing routes."""
-    if not isinstance(intent, dict):
-        return False
-    return str(intent.get("answer_mode") or "").strip().lower() in _PREDICTION_ANSWER_MODES
+    return bool(prediction_anchor_answer_mode(intent))
 
 
 def _compact_value(value: Any, *, depth: int = 0) -> Any:
@@ -77,6 +101,28 @@ def _reason_rows(records: Iterable[Any]) -> list[Dict[str, Any]]:
     return rows
 
 
+def _immediate_outcome_rule(reasons: Iterable[Dict[str, Any]]) -> Dict[str, str]:
+    """Expose a calculated current-versus-future timing boundary to the writer.
+
+    This is not a hand-authored education/admission rule.  It is a direct
+    rendering constraint only when Instant's existing timing fusion explicitly
+    says the current period is not the materialisation period.
+    """
+    joined = " ".join(str(row.get("finding") or "") for row in reasons).lower()
+    if "future_window_available_current_not_prominent" in joined:
+        return {
+            "posture": "no_positive_immediate_prediction",
+            "instruction": (
+                "The calculated current period is not the main materialisation window. "
+                "For an outcome that is about to be announced, do not call the immediate "
+                "result likely, highly supported, a breakthrough, or a success. State that "
+                "the chart does not establish a positive prediction for the imminent outcome; "
+                "later ranked windows are later opportunities, not proof of this result."
+            ),
+        }
+    return {}
+
+
 def build_prediction_anchor_from_packet(packet: Dict[str, Any]) -> Dict[str, Any]:
     """Convert an Instant V2 packet into a safe, model-readable cross-check.
 
@@ -95,6 +141,7 @@ def build_prediction_anchor_from_packet(packet: Dict[str, Any]) -> Dict[str, Any
 
     time_scope = query_plan.get("time_scope") if isinstance(query_plan.get("time_scope"), dict) else {}
     event_rules = answer_spec.get("event_rules") if isinstance(answer_spec.get("event_rules"), dict) else {}
+    calculated_reasons = _reason_rows(ledger.get("records") or [])
     return {
         "source": "instant_v2_prediction_cross_check",
         "purpose": "Cross-check only; preserve the existing Standard/Premium reading and writing style.",
@@ -114,7 +161,8 @@ def build_prediction_anchor_from_packet(packet: Dict[str, Any]) -> Dict[str, Any
             if verdict.get(key) not in (None, "", [], {})
         },
         "ranked_windows": [_compact_value(row) for row in list(verdict.get("ranked_windows") or [])[:5] if isinstance(row, dict)],
-        "calculated_reasons": _reason_rows(ledger.get("records") or []),
+        "calculated_reasons": calculated_reasons,
+        "immediate_outcome_rule": _immediate_outcome_rule(calculated_reasons),
         "prediction_rules": {
             key: event_rules.get(key)
             for key in ("required_material_windows", "dasha_level_terms", "claim_contract")
@@ -141,12 +189,13 @@ def build_standard_premium_prediction_anchor(
     from instant_chat_v2 import build_instant_v2_packet
     from instant_chat_v2.graph_live import apply_live_graph_policy
 
-    answer_mode = str(intent.get("answer_mode") or "").strip().lower()
+    answer_mode = prediction_anchor_answer_mode(intent)
     target_subject = intent.get("target_subject") if isinstance(intent.get("target_subject"), dict) else {"key": "self", "label": "self", "base_house": 1}
+    anchor_intent = {**intent, "answer_mode": answer_mode}
     instant_context = _build_instant_context(
         birth_data=birth_data,
         question=question,
-        intent=intent,
+        intent=anchor_intent,
         history=history or [],
         answer_mode_override=answer_mode,
         target_subject_override=target_subject,
@@ -154,11 +203,11 @@ def build_standard_premium_prediction_anchor(
     )
     packet = build_instant_v2_packet(
         question=question,
-        intent=intent,
+        intent=anchor_intent,
         answer_mode=answer_mode,
         target_subject=target_subject,
         language=language,
         instant_context=instant_context,
     )
-    packet = apply_live_graph_policy(packet, intent=intent, context=instant_context)
+    packet = apply_live_graph_policy(packet, intent=anchor_intent, context=instant_context)
     return build_prediction_anchor_from_packet(packet)

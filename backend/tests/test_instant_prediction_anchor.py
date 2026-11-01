@@ -1,6 +1,7 @@
 from chat.instant_prediction_anchor import (
     build_prediction_anchor_from_packet,
     is_prediction_anchor_eligible,
+    prediction_anchor_answer_mode,
 )
 
 
@@ -10,6 +11,17 @@ def test_anchor_is_limited_to_prediction_and_timing_routes():
     assert not is_prediction_anchor_eligible({"answer_mode": "potential_capacity"})
     assert not is_prediction_anchor_eligible({"answer_mode": "topic_reading"})
     assert not is_prediction_anchor_eligible({"answer_mode": "remedy_action"})
+
+
+def test_anchor_honors_router_prediction_mode_when_legacy_answer_mode_is_broad():
+    intent = {
+        "category": "education",
+        "answer_mode": "ANALYZE_TOPIC_POTENTIAL",
+        "mode": "LIFESPAN_EVENT_TIMING",
+        "non_daily_mode": "PREDICT_EVENT_TIMING",
+    }
+    assert is_prediction_anchor_eligible(intent)
+    assert prediction_anchor_answer_mode(intent) == "event_prediction"
 
 
 def test_anchor_keeps_only_compact_prediction_evidence():
@@ -47,6 +59,11 @@ def test_anchor_keeps_only_compact_prediction_evidence():
                     "value": {"summary": "Natal support", "full_chart": {"Sun": "large raw payload"}},
                 },
                 {
+                    "kind": "primary_drivers",
+                    "strength": "primary",
+                    "value": ["Event timing verdict: future_window_available_current_not_prominent"],
+                },
+                {
                     "kind": "current_transits",
                     "strength": "supporting",
                     "value": {"planets": "not an approved reason row"},
@@ -63,3 +80,4 @@ def test_anchor_keeps_only_compact_prediction_evidence():
     assert anchor["calculated_reasons"][0]["kind"] == "natal_promise"
     assert "full_chart" not in anchor["calculated_reasons"][0]["finding"]
     assert "internal_only" not in anchor["prediction_rules"]
+    assert anchor["immediate_outcome_rule"]["posture"] == "no_positive_immediate_prediction"

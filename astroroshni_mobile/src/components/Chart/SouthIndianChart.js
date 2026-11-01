@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, Easing, Platform } from 'react-native';
-import Svg, { Circle, Rect, Text as SvgText, G, Line, ClipPath, Defs } from 'react-native-svg';
+import Svg, { Circle, Rect, Text as SvgText, G, Line, ClipPath, Defs, Path } from 'react-native-svg';
 import { dashaLevelSuffix, dashaPaint, labelBox, placeCircleClear, placeTransitLabels, roleLabelPlace, signPointAt, textHalfWidth, transitBav } from './NorthIndianChart';
 import { aspectArrow, aspectHouse, ChartAspectArrows, jaiminiTargetSigns, planetAspectCounts } from './chartAspects';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +22,7 @@ const SouthIndianChart = ({
   size = null, // PWA/web: explicit pixel square (avoids % SVG collapse)
   transitOverlay = null,
   dashaHighlight = null,
+  dashaOverlay = null,
   signPoints = null,
   bavBySign = null,
   onTransitPlanetPress = null,
@@ -335,6 +336,63 @@ const SouthIndianChart = ({
     });
   }
 
+  const activationOverlays = (Array.isArray(dashaOverlay) ? dashaOverlay : [dashaOverlay]).filter(Boolean);
+  const dashaLensPaint = activationOverlays.length ? dashaPaint(colors) : null;
+  const transitLensPaint = dashaPaint({
+    ...colors,
+    primary: colors.info || colors.primary,
+    accent: colors.success || colors.primary,
+  });
+  const samePlanetPaint = dashaPaint({
+    ...colors,
+    primary: colors.accent || colors.primary,
+    accent: colors.warning || colors.primary,
+  }).fill;
+  const dashaLensCell = (house) => gridPositions.find((cell) => getHouseNumber(cell.sign) === house);
+  const dashaLensPoint = (house) => {
+    const cell = dashaLensCell(house);
+    return cell ? { x: cell.x + cell.width * 0.73, y: cell.y + cell.height * 0.72 } : null;
+  };
+  const dashaLensSource = (overlay) => {
+    if (!overlay?.planet || !overlay?.sourceHouse) return null;
+    const cell = dashaLensCell(overlay.sourceHouse);
+    if (!cell) return null;
+    if (overlay.type === 'transit') return dashaLensPoint(overlay.sourceHouse);
+    const planets = getPlanetsInSign(cell.sign);
+    const index = planets.findIndex((planet) => planet.name === overlay.planet);
+    const slot = index >= 0 ? southPlanetSlot(cell, index, planets.length, overlay.sourceHouse) : null;
+    return slot ? { x: cell.x + cell.width / 2, y: slot.symbolY + Math.max(4, slot.symbolFont * 0.42) } : dashaLensPoint(overlay.sourceHouse);
+  };
+  const dashaLensPath = (from, to, index) => {
+    const bend = index % 2 === 0 ? 18 : -18;
+    const midX = (from.x + to.x) / 2;
+    const midY = (from.y + to.y) / 2;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    return `M ${from.x} ${from.y} Q ${midX - (dy / distance) * bend} ${midY + (dx / distance) * bend} ${to.x} ${to.y}`;
+  };
+  const dashaLensArrowhead = (from, to, index) => {
+    const bend = index % 2 === 0 ? 18 : -18;
+    const midX = (from.x + to.x) / 2;
+    const midY = (from.y + to.y) / 2;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const controlX = midX - (dy / distance) * bend;
+    const controlY = midY + (dx / distance) * bend;
+    const tangentX = to.x - controlX;
+    const tangentY = to.y - controlY;
+    const tangentLength = Math.max(1, Math.hypot(tangentX, tangentY));
+    const ux = tangentX / tangentLength;
+    const uy = tangentY / tangentLength;
+    const baseX = to.x - ux * 4;
+    const baseY = to.y - uy * 4;
+    const px = -uy * 2;
+    const py = ux * 2;
+    return `M ${baseX + px} ${baseY + py} L ${to.x} ${to.y} L ${baseX - px} ${baseY - py} Z`;
+  };
+
   return (
     <View
       style={[
@@ -452,11 +510,43 @@ const SouthIndianChart = ({
         </G>
 
         <ChartAspectArrows arrows={aspectArrows} color={colors.chartText || colors.text} />
+        {activationOverlays.length && dashaLensPaint ? (
+          <G pointerEvents="none">
+            {activationOverlays.map((overlay, overlayIndex) => {
+              const source = dashaLensSource(overlay);
+              if (!source) return null;
+              return overlay.houses.filter((item) => item.house !== overlay.sourceHouse).map((item, index) => {
+                const targetCenter = dashaLensPoint(item.house);
+                const isTransit = overlay.type === 'transit';
+                if (!targetCenter) return null;
+                const hasDasha = activationOverlays.some((candidate) => candidate.type !== 'transit' && candidate.houses?.some((entry) => entry.house === item.house));
+                const hasTransit = activationOverlays.some((candidate) => candidate.type === 'transit' && candidate.houses?.some((entry) => entry.house === item.house));
+                const markerRadius = hasDasha && hasTransit ? 12 : 10;
+                const targetDistance = Math.max(1, Math.hypot(targetCenter.x - source.x, targetCenter.y - source.y));
+                const target = {
+                  x: targetCenter.x - ((targetCenter.x - source.x) / targetDistance) * markerRadius,
+                  y: targetCenter.y - ((targetCenter.y - source.y) / targetDistance) * markerRadius,
+                };
+                const arrowIndex = index + overlayIndex;
+                const arrowPaint = isTransit ? transitLensPaint : dashaLensPaint;
+                return (
+                  <G key={`activation-path-${overlayIndex}-${item.house}`}>
+                    <Path d={dashaLensPath(source, target, arrowIndex)} fill="none" stroke={arrowPaint.fill} strokeWidth={isTransit ? 1.2 : (item.kind === 'aspect' ? 1.2 : 2)} strokeDasharray={isTransit ? '1 3' : (item.kind === 'aspect' ? '4 3' : undefined)} strokeLinecap={isTransit ? 'round' : undefined} opacity="0.88" />
+                    <Path d={dashaLensArrowhead(source, target, arrowIndex)} fill={arrowPaint.fill} opacity="0.94" />
+                  </G>
+                );
+              });
+            })}
+          </G>
+        ) : null}
 
         {/* Grid cells */}
         {gridPositions.map((pos, index) => {
           const planetsInSign = getPlanetsInSign(pos.sign);
           const houseNumber = getHouseNumber(pos.sign);
+          const dashaActivation = activationOverlays.find((overlay) => overlay.type !== 'transit' && overlay.houses?.some((item) => item.house === houseNumber));
+          const transitActivation = activationOverlays.find((overlay) => overlay.type === 'transit' && overlay.houses?.some((item) => item.house === houseNumber));
+          const samePlanetHouse = Boolean(dashaActivation && transitActivation && dashaActivation.planet === transitActivation.planet);
 
           return (
             <G key={index}>
@@ -466,6 +556,12 @@ const SouthIndianChart = ({
                 fill="transparent"
                 onPress={() => handleCellPress(pos.sign)}
               />
+              {activationOverlays.some((overlay) => overlay.houses?.some((item) => item.house === houseNumber)) ? (
+                <Rect x={pos.x + 1} y={pos.y + 1} width={pos.width - 2} height={pos.height - 2} fill={dashaLensPaint?.fill || 'transparent'} opacity="0.09" pointerEvents="none" />
+              ) : null}
+              {samePlanetHouse ? (
+                <Rect x={pos.x + 2} y={pos.y + 2} width={pos.width - 4} height={pos.height - 4} fill="none" stroke={samePlanetPaint} strokeWidth="3" pointerEvents="none" />
+              ) : null}
 
               {/* House number */}
               <SvgText
@@ -664,6 +760,22 @@ const SouthIndianChart = ({
                 </G>
                 );
               })}
+              {activationOverlays.some((overlay) => overlay.houses?.some((item) => item.house === houseNumber)) ? (() => {
+                const target = dashaLensPoint(houseNumber);
+                const matches = activationOverlays.flatMap((overlay) => overlay.houses.filter((entry) => entry.house === houseNumber).map((item) => ({ item, overlay })));
+                const item = matches[0]?.item;
+                const dashaMatches = matches.filter(({ overlay }) => overlay.type !== 'transit');
+                const transitMatches = matches.filter(({ overlay }) => overlay.type === 'transit');
+                const confluence = dashaMatches.length > 0 && transitMatches.length > 0;
+                const samePlanet = dashaMatches.some(({ overlay }) => transitMatches.some(({ overlay: transitOverlay }) => transitOverlay.planet === overlay.planet));
+                return target ? (
+                  <G pointerEvents="none">
+                    <Circle cx={target.x} cy={target.y} r={samePlanet ? "13" : (confluence ? "12" : "10")} fill={colors.chartSurface || '#fffaf2'} stroke={samePlanet ? samePlanetPaint : (dashaLensPaint?.fill || colors.primary)} strokeWidth={samePlanet ? "2.8" : (confluence ? "2" : "1.35")} />
+                    <SvgText x={target.x} y={target.y + 3.5} fontSize="9" fontWeight="900" fill={samePlanet ? samePlanetPaint : (dashaLensPaint?.fill || colors.primary)} textAnchor="middle">{houseNumber}</SvgText>
+                    <SvgText x={target.x} y={target.y + 18} fontSize="5.4" fontWeight="800" fill={samePlanet ? samePlanetPaint : (dashaLensPaint?.fill || colors.primary)} textAnchor="middle">{samePlanet || confluence ? 'BOTH' : item?.kind === 'transit' ? 'TRANSITS' : item?.kind === 'placement' ? 'SITS' : item?.kind === 'lordship' ? 'RULES' : 'ASPECTS'}</SvgText>
+                  </G>
+                ) : null;
+              })() : null}
               {(() => {
                 const transits = getTransitPlanetsInSign(pos.sign);
                 if (!transits.length) return null;
@@ -728,7 +840,11 @@ const SouthIndianChart = ({
                   bav: planet.bav,
                 })), showDegreeNakshatra);
                 if (!layout) return null;
-                const transitColor = colors.accent || colors.primary;
+                const transitColor = dashaPaint({
+                  ...colors,
+                  primary: colors.info || colors.primary,
+                  accent: colors.success || colors.primary,
+                }).fill;
                 return (
                   <>
                     <G pointerEvents="box-none">

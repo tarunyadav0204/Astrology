@@ -995,6 +995,7 @@ INSTANT PREDICTION CROSS-CHECK — INTERNAL USE ONLY:
 - Preserve the normal rich Standard/Premium analysis and write naturally. Never mention this cross-check, its JSON fields, a second system, scores, or internal calculation language to the user.
 - When it agrees with the established context, let it reinforce precision; do not mechanically repeat its contents.
 - If it conflicts with the established context, do not silently make the prediction stronger. Reconcile the conflict from the supplied chart evidence, retain only dates/dasha chains supported by the matching window, and state the resulting judgment with the appropriate confidence.
+- If `instant_prediction_cross_check.immediate_outcome_rule.posture` is `no_positive_immediate_prediction`, its instruction is a hard prediction ceiling. Do not say or imply that the imminent result is likely, highly supported, a breakthrough, an admission, a win, or a success. A later ranked window is not evidence for the outcome currently awaiting announcement.
 - User facts and conversation history can personalize the reading but are not astrological proof.
 """.strip()
         )
