@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 from typing import Optional, List, Any, Dict
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Header, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, BackgroundTasks, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
@@ -62,6 +62,16 @@ def _verify_cron_secret(x_cron_secret: Optional[str]) -> None:
         )
     if not received or not hmac.compare_digest(received, expected):
         raise HTTPException(status_code=401, detail="Invalid cron secret")
+
+
+def _verify_mtalkz_dlr_token(request: Request, x_mtalkz_dlr_token: Optional[str]) -> None:
+    """Authenticate DLR push callbacks configured in the MTalkz dashboard."""
+    expected = (os.getenv("MTALKZ_DLR_WEBHOOK_TOKEN") or "").strip()
+    received = (x_mtalkz_dlr_token or request.query_params.get("token") or "").strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="MTALKZ_DLR_WEBHOOK_TOKEN is not configured")
+    if not received or not hmac.compare_digest(received, expected):
+        raise HTTPException(status_code=401, detail="Invalid MTalkz delivery-report token")
 
 
 class DeviceTokenRequest(BaseModel):
@@ -2487,6 +2497,40 @@ async def admin_sms_campaign_config(current_user: User = Depends(get_current_use
     _require_admin(current_user)
     from .sms_channel import campaign_sms_configuration
     return {"ok": True, **campaign_sms_configuration()}
+
+
+@router.api_route("/webhooks/mtalkz/dlr", methods=["GET", "POST"])
+async def mtalkz_delivery_report(
+    request: Request,
+    x_mtalkz_dlr_token: Optional[str] = Header(None, alias="X-MTalkz-DLR-Token"),
+):
+    """Ingest an authenticated MTalkz DLR push callback for SMS campaigns."""
+    _verify_mtalkz_dlr_token(request, x_mtalkz_dlr_token)
+    payload: Dict[str, Any] = dict(request.query_params)
+    if request.method == "POST":
+        content_type = (request.headers.get("content-type") or "").lower()
+        if "application/json" in content_type:
+            try:
+                decoded = await request.json()
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="Invalid MTalkz JSON payload") from exc
+            if isinstance(decoded, dict):
+                payload = decoded
+        else:
+            form = await request.form()
+            payload = dict(form) if form else payload
+
+    from .mtalkz_dlr import apply_mtalkz_dlr, parse_mtalkz_dlr
+
+    reports = parse_mtalkz_dlr(payload)
+    if not reports:
+        raise HTTPException(status_code=422, detail="MTalkz report has no recognised message ID and delivery status")
+    with db.get_conn() as conn:
+        db.init_nudge_tables(conn)
+        matched = sum(apply_mtalkz_dlr(conn, report) for report in reports)
+        conn.commit()
+    logger.info("mtalkz-dlr: received=%s matched=%s", len(reports), matched)
+    return {"ok": True, "received": len(reports), "matched": matched}
 
 
 @router.post("/admin/campaigns")

@@ -1847,6 +1847,10 @@ def campaign_recipient_report(conn, campaign_id: int) -> List[Dict[str, Any]]:
         item["provider"] = delivery_data.get("sms_provider") if item.get("channel") == "sms" else None
         item["fallback_from"] = delivery_data.get("sms_fallback_from") if item.get("channel") == "sms" else None
         item["provider_error"] = delivery_data.get("provider_error")
+        if item.get("meta_status") in {"delivered", "failed", "sent"}:
+            item["send_status"] = item["meta_status"]
+        if item.get("meta_error"):
+            item["provider_error"] = item["meta_error"]
         for key in ("created_at", "clicked_at", "accepted_at", "sent_at", "delivered_at", "read_at", "failed_at"):
             if hasattr(item.get(key), "isoformat"):
                 item[key] = item[key].isoformat()
@@ -2095,6 +2099,7 @@ def _delivery_channel_counts(conn, where_sql: str, params: Tuple[Any, ...]) -> D
                COUNT(*) FILTER (WHERE channel = 'whatsapp' AND COALESCE(send_status, 'sent') = 'sent'
                                 AND COALESCE(data_json, '') LIKE '%%"from_template_continue": true%%') AS whatsapp_after_continue,
                COUNT(*) FILTER (WHERE channel = 'email' AND COALESCE(send_status, 'sent') = 'sent') AS email,
+               COUNT(*) FILTER (WHERE channel = 'sms' AND COALESCE(send_status, 'sent') = 'sent') AS sms,
                COUNT(*) FILTER (WHERE COALESCE(send_status, '') = 'failed') AS failed_attempts,
                COUNT(*) FILTER (WHERE COALESCE(is_primary, TRUE)
                                 AND (channel IS NULL OR TRIM(channel) = '' OR channel = 'stored')) AS stored_only,
