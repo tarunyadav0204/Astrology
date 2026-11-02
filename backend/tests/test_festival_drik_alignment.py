@@ -47,7 +47,9 @@ def _dates_for(festivals, festival_id):
         ("dussehra", "2026-10-20"),
         ("sarva_pitru_amavasya", "2026-10-10"),
         ("karva_chauth", "2026-10-29"),
+        ("ahoi_ashtami", "2026-11-01"),
         ("dhanteras", "2026-11-06"),
+        ("naraka_chaturdashi", "2026-11-08"),
         ("diwali", "2026-11-08"),
         ("govardhan_puja", "2026-11-10"),
         ("bhai_dooj", "2026-11-11"),
@@ -66,6 +68,16 @@ def test_no_duplicate_paksha_false_positives(festivals_2026):
         assert len(dates) == 1, f"{festival_id} duplicated: {dates}"
 
 
+def test_time_window_festivals_are_single_observance_days(festivals_2026):
+    for festival_id, expected in (
+        ("hanuman_jayanti", "2026-04-02"),
+        ("ganesh_chaturthi", "2026-09-14"),
+        ("dussehra", "2026-10-20"),
+        ("sharad_purnima", "2026-10-25"),
+    ):
+        assert _dates_for(festivals_2026, festival_id) == [expected]
+
+
 def test_pitra_paksha_covers_ashwin_krishna(festivals_2026):
     dates = _dates_for(festivals_2026, "pitra_paksha")
     assert dates[0] == "2026-09-27"
@@ -79,6 +91,23 @@ def test_pitra_paksha_amanta_does_not_repeat_after_sharad_purnima(calc):
     )
     dates = _dates_for(festivals, "pitra_paksha")
     assert dates == [f"2026-10-{day:02d}" for day in range(1, 11)]
+
+
+def test_ahoi_ashtami_uses_evening_tithi_for_notification_calendar(calc):
+    """The nudge trigger uses Amanta, so guard that exact production path."""
+    festivals = calc.find_festival_dates(
+        2026, 11, DELHI["lat"], DELHI["lon"], "amanta", DELHI["tz"]
+    )
+    assert _dates_for(festivals, "ahoi_ashtami") == ["2026-11-01"]
+
+
+def test_pradosh_and_sunrise_observances_use_real_solar_events(calc):
+    """Protect date-sensitive Diwali-week notifications from a bad solar API call."""
+    festivals = calc.find_festival_dates(
+        2026, 11, DELHI["lat"], DELHI["lon"], "amanta", DELHI["tz"]
+    )
+    assert _dates_for(festivals, "dhanteras") == ["2026-11-06"]
+    assert _dates_for(festivals, "naraka_chaturdashi") == ["2026-11-08"]
 
 
 def test_sharad_purnima_handles_short_tithi(festivals_2026):

@@ -116,7 +116,19 @@ class FestivalCalculator:
     def get_local_sunrise(self, jd, lat, lon):
         """Calculate local sunrise for Udaya Tithi determination"""
         try:
-            res = swe.rise_trans(jd - 0.5, swe.SUN, lon, lat, 0, 0, 0, 1)
+            # ``rise_trans`` takes the event flag and a (lon, lat, altitude)
+            # tuple.  The previous positional call used longitude as the event
+            # flag, which produced a non-solar time and silently shifted the
+            # tithi used to date festivals.
+            res = swe.rise_trans(
+                jd,
+                swe.SUN,
+                swe.CALC_RISE,
+                (lon, lat, 0.0),
+                0.0,
+                0.0,
+                swe.FLG_SWIEPH,
+            )
             return res[1][0] if res[0] == 0 else jd + 0.25
         except Exception:
             return jd + 0.25
@@ -124,14 +136,30 @@ class FestivalCalculator:
     def get_local_sunset(self, jd, lat, lon):
         """Calculate local sunset for Pradosh calculations"""
         try:
-            res = swe.rise_trans(jd - 0.5, swe.SUN, lon, lat, 0, 0, 0, 2)
+            res = swe.rise_trans(
+                jd,
+                swe.SUN,
+                swe.CALC_SET,
+                (lon, lat, 0.0),
+                0.0,
+                0.0,
+                swe.FLG_SWIEPH,
+            )
             return res[1][0] if res[0] == 0 else jd + 0.75
         except Exception:
             return jd + 0.75
 
     def get_moonrise_jd(self, jd, lat, lon):
         try:
-            res = swe.rise_trans(jd - 0.5, swe.MOON, lon, lat, 0, 0, 0, 1)
+            res = swe.rise_trans(
+                jd,
+                swe.MOON,
+                swe.CALC_RISE,
+                (lon, lat, 0.0),
+                0.0,
+                0.0,
+                swe.FLG_SWIEPH,
+            )
             if res[0] == 0:
                 return res[1][0]
         except Exception:
@@ -313,20 +341,19 @@ class FestivalCalculator:
 
         fest_base = self.base_month(festival_month)
         lunar_base = self.base_month(lunar_month)
-        if fest_base == lunar_base:
-            return True
-
-        # Catalog months are North-Indian / Purnimanta labels.
-        # Under Amanta, Krishna-paksha of Purnimanta month M = Amanta month M-1.
+        # Catalog months are North-Indian / Purnimanta labels. Under Amanta,
+        # Krishna-paksha of Purnimanta month M = Amanta month M-1.  Do this
+        # conversion *instead of* accepting the same month first: accepting
+        # both made a Krishna-paksha festival match once on the correct day and
+        # again in the following lunar month.
         if calendar_system == "amanta" and paksha == "krishna":
             try:
                 idx = MONTH_NAMES.index(fest_base)
-                if lunar_base == MONTH_NAMES[(idx - 1) % 12]:
-                    return True
+                return lunar_base == MONTH_NAMES[(idx - 1) % 12]
             except ValueError:
                 pass
 
-        return False
+        return fest_base == lunar_base
 
     def _inferred_paksha(self, festival):
         if festival.get("paksha"):
@@ -480,7 +507,11 @@ class FestivalCalculator:
 
         required_paksha = self._inferred_paksha(festival)
         if required_paksha and required_paksha != paksha:
-            return False
+            # Chaitra Pratipada can begin after sunrise while still occupying
+            # the morning ritual window.  Let its dedicated rule below make
+            # that decision instead of rejecting it from sunrise alone.
+            if festival_id not in ("gudi_padwa", "chaitra_navratri"):
+                return False
         # Safety: never match purnima/amavasya without paksha alignment
         if festival["lunar_day"] == "purnima" and paksha != "shukla":
             return False
@@ -495,6 +526,14 @@ class FestivalCalculator:
             _, pradosh_day, pradosh_paksha = self.get_tithi_at_moment(jd_pradosh)
             return pradosh_day == 15 and pradosh_paksha == "krishna"
 
+        if festival_id == "dhanteras":
+            # Dhanteras puja is observed in Pradosh, not simply on the civil
+            # day whose sunrise carries Trayodashi.  This is material when
+            # Trayodashi begins after one sunrise and ends before the next.
+            jd_pradosh = jd_sunset + (1.2 / 24.0)
+            _, pradosh_day, pradosh_paksha = self.get_tithi_at_moment(jd_pradosh)
+            return pradosh_day == 13 and pradosh_paksha == "krishna"
+
         if festival_id == "maha_shivratri":
             # Nishita Kaal: Krishna Chaturdashi near local midnight
             jd_midnight = jd_sunrise + 0.5
@@ -505,6 +544,14 @@ class FestivalCalculator:
             jd_midnight = jd_sunrise + 0.5
             _, midnight_day, midnight_paksha = self.get_tithi_at_moment(jd_midnight)
             return midnight_day == 8 and midnight_paksha == "krishna"
+
+        if festival_id == "ahoi_ashtami":
+            # Ahoi Ashtami is an evening observance: puja and tara-darshan are
+            # performed after sunset.  Udaya Tithi alone can move the festival
+            # to the following civil day when Ashtami begins on the previous
+            # afternoon (as it did in Delhi in 2026).
+            _, evening_day, evening_paksha = self.get_tithi_at_moment(jd_sunset)
+            return evening_day == 8 and evening_paksha == "krishna"
 
         if festival_id == "holika_dahan":
             # Prefer Udaya Purnima (common panchang listing day)
@@ -529,7 +576,41 @@ class FestivalCalculator:
             # Aparahna rule commonly used for Vijayadashami
             jd_aparahna = jd_sunrise + 0.6 * (jd_sunset - jd_sunrise)
             _, ap_day, ap_paksha = self.get_tithi_at_moment(jd_aparahna)
-            return ap_day == 10 and ap_paksha == "shukla"
+            if ap_day != 10 or ap_paksha != "shukla":
+                return False
+            # When Dashami spans two Aparahnas, Vijayadashami is observed on
+            # the first eligible day.  Without this guard we emitted a second
+            # Dussehra notification the following day.
+            previous_sunrise = self.get_local_sunrise(jd_sunrise - 1.25, lat, lon)
+            previous_sunset = self.get_local_sunset(previous_sunrise, lat, lon)
+            previous_aparahna = previous_sunrise + 0.6 * (previous_sunset - previous_sunrise)
+            _, previous_day, previous_paksha = self.get_tithi_at_moment(previous_aparahna)
+            return not (previous_day == 10 and previous_paksha == "shukla")
+
+        if festival_id == "ganesh_chaturthi":
+            # Ganesh Chaturthi follows Madhyahna Vyapini Chaturthi.  Udaya
+            # Tithi can otherwise put it a day late when Chaturthi starts
+            # after sunrise but is present at midday.
+            jd_mid = jd_sunrise + 0.5 * (jd_sunset - jd_sunrise)
+            _, mid_day, mid_paksha = self.get_tithi_at_moment(jd_mid)
+            return mid_day == 4 and mid_paksha == "shukla"
+
+        if festival_id in ("gudi_padwa", "chaitra_navratri"):
+            # The Chaitra new-year observance is set by Pratipada prevailing
+            # during the morning ritual window.  In 2026 it begins after
+            # sunrise but before that window, so a sunrise-only rule misses
+            # the published date altogether.
+            jd_mid = jd_sunrise + 0.5 * (jd_sunset - jd_sunrise)
+            _, mid_day, mid_paksha = self.get_tithi_at_moment(jd_mid)
+            return mid_day == 1 and mid_paksha == "shukla"
+
+        if festival_id == "devutthana_ekadashi":
+            # Devutthana is observed on the day Ekadashi enters its daytime
+            # ritual window.  This avoids dropping the festival when the
+            # tithi begins after sunrise but before midday.
+            jd_mid = jd_sunrise + 0.5 * (jd_sunset - jd_sunrise)
+            _, mid_day, mid_paksha = self.get_tithi_at_moment(jd_mid)
+            return mid_day == 11 and mid_paksha == "shukla"
 
         if festival_id == "akshaya_tritiya":
             # Prefer midday Tritiya when Udaya differs by a day
@@ -537,11 +618,25 @@ class FestivalCalculator:
             _, mid_day, mid_paksha = self.get_tithi_at_moment(jd_mid)
             return mid_day == 3 and mid_paksha == "shukla"
 
+        if festival_id == "sharad_purnima":
+            # Sharad Purnima is a moonlit evening observance.  Select the
+            # evening carrying Purnima, rather than also emitting the next
+            # civil day when Purnima remains at sunrise.
+            _, evening_day, evening_paksha = self.get_tithi_at_moment(jd_sunset)
+            return evening_day == 15 and evening_paksha == "shukla"
+
         # Short / Kshaya Purnima: tithi may not prevail at sunrise
         if festival.get("lunar_day") == "purnima":
             if lunar_day == 15 and paksha == "shukla":
                 return True
             if lunar_day == 14 and paksha == "shukla":
+                # A Purnima that lasts into the next sunrise belongs to that
+                # normal Udaya day.  The forward scan below is only for a
+                # short/Kshaya Purnima that would otherwise be missed.
+                next_sunrise = self.get_local_sunrise(jd_sunrise + 0.5, lat, lon)
+                _, next_day, next_paksha = self.get_tithi_at_moment(next_sunrise)
+                if next_day == 15 and next_paksha == "shukla":
+                    return False
                 for step in range(1, 48):
                     _, d, p = self.get_tithi_at_moment(jd_sunrise + (step / 48.0))
                     if d == 15 and p == "shukla":
