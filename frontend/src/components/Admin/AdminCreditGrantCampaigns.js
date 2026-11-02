@@ -128,6 +128,35 @@ export default function AdminCreditGrantCampaigns() {
         </div>
       </section>
     </div>}
-    <div className="credit-campaign-list"><div className="credit-campaign-list__heading"><h3>Recent grants</h3></div>{campaigns.length === 0 ? <div className="credit-campaign-empty">No permanent credit grants yet.</div> : campaigns.map((campaign) => { const metrics = campaign.metrics || {}; return <article className="credit-campaign-card" key={campaign.id}><div className="credit-campaign-card__top"><div><div className="credit-campaign-card__title-row"><h4>{campaign.name}</h4><span className="credit-campaign-status credit-campaign-status--completed">{campaign.status}</span></div><p>{campaign.credits} credits per user · {campaign.credited_count}/{campaign.recipient_count} credited</p></div><div className="credit-campaign-multiplier"><strong>+{campaign.credits}</strong><small>credits</small></div></div><div className="credit-campaign-metrics"><div><strong>{metrics.queued || 0}</strong><span>Queued</span></div><div><strong>{metrics.accepted || 0}</strong><span>Accepted</span></div><div><strong>{metrics.delivered || 0}</strong><span>Delivered</span></div><div><strong>{metrics.read || 0}</strong><span>Read</span></div><div><strong>{metrics.chat_opened || 0}</strong><span>Chat opened</span></div><div><strong>{metrics.failed || 0}</strong><span>Failed</span></div></div><div className="credit-campaign-actions"><button type="button" className="credit-campaign-report-button" disabled={!configured || sending === campaign.id} onClick={() => send(campaign)}>{sending === campaign.id ? 'Queueing…' : 'Send WhatsApp notice'}</button></div></article>})}</div>
+    <div className="credit-campaign-list">
+      <div className="credit-campaign-list__heading"><h3>Recent grants</h3></div>
+      {campaigns.length === 0 ? <div className="credit-campaign-empty">No permanent credit grants yet.</div> : campaigns.map((campaign) => {
+        const metrics = campaign.metrics || {};
+        return <article className="credit-campaign-card" key={campaign.id}>
+          <div className="credit-campaign-card__top">
+            <div><div className="credit-campaign-card__title-row"><h4>{campaign.name}</h4><span className="credit-campaign-status credit-campaign-status--completed">{campaign.status}</span></div><p>{campaign.credits} credits per user · {campaign.credited_count}/{campaign.recipient_count} credited</p></div>
+            <div className="credit-campaign-multiplier"><strong>+{campaign.credits}</strong><small>credits</small></div>
+          </div>
+
+          <div className="credit-campaign-performance-heading"><strong>Performance after grant</strong><span>Paid purchases count only real Google Play or Razorpay purchases made after a user received this grant.</span></div>
+          <div className="credit-campaign-performance-groups">
+            <section className="credit-campaign-performance-group">
+              <h5>Grant outcome</h5>
+              <div className="credit-campaign-metrics"><div><strong>{campaign.credited_count || 0}</strong><span>Credited</span></div><div className="credit-campaign-metric--grant"><strong>{metrics.credits_granted || 0}</strong><span>Total credits granted</span></div><div><strong>{metrics.grant_failed || 0}</strong><span>Grant failed</span></div></div>
+            </section>
+            <section className="credit-campaign-performance-group">
+              <h5>WhatsApp journey</h5>
+              <div className="credit-campaign-metrics"><div><strong>{metrics.whatsapp_eligible || 0}</strong><span>Eligible now</span></div><div><strong>{metrics.delivered || 0}</strong><span>Delivered</span></div><div><strong>{metrics.read || 0}</strong><span>Read</span></div><div><strong>{metrics.chat_opened || 0}</strong><span>Chat opened</span></div><div><strong>{metrics.failed || 0}</strong><span>WhatsApp failed</span></div></div>
+            </section>
+            <section className="credit-campaign-performance-group">
+              <h5>Business outcome</h5>
+              <div className="credit-campaign-metrics"><div><strong>{metrics.chat_converted || 0}</strong><span>Chat conversion</span></div><div><strong>{metrics.grant_credits_used || 0}</strong><span>Grant credits used*</span></div><div><strong>{metrics.grant_credits_remaining || 0}</strong><span>Grant credits remaining*</span></div><div><strong>{metrics.paid_buyers || 0}</strong><span>Paid buyers</span></div><div className="credit-campaign-metric--purchase"><strong>{metrics.paid_credit_purchased || 0}</strong><span>Paid credits purchased</span></div><div><strong>{metrics.paid_purchase_count || 0}</strong><span>Paid purchases</span></div></div>
+              <small>* Credits are fungible, so usage after the grant is attributed to the grant until that grant amount is exhausted for each user.</small>
+            </section>
+          </div>
+          <div className="credit-campaign-actions"><button type="button" className="credit-campaign-report-button" disabled={!configured || sending === campaign.id} onClick={() => send(campaign)}>{sending === campaign.id ? 'Queueing…' : 'Send WhatsApp notice'}</button></div>
+        </article>;
+      })}
+    </div>
   </section>;
 }

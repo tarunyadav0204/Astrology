@@ -43,10 +43,21 @@
 .credit-campaign-status--completed { background: #e7e7e7; color: #555; }
 .credit-campaign-multiplier { display: grid; min-width: 92px; text-align: right; color: #6d2b82; font-size: 32px; font-weight: 900; }
 .credit-campaign-multiplier small { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
-.credit-campaign-metrics { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 9px; }
+.credit-campaign-performance-heading { display: grid; gap: 3px; }
+.credit-campaign-performance-heading strong { font-size: 14px; }
+.credit-campaign-performance-heading span { color: #756a7c; font-size: 12px; line-height: 1.4; }
+.credit-campaign-performance-groups { display: grid; gap: 14px; }
+.credit-campaign-performance-group { display: grid; gap: 8px; padding: 14px; border: 1px solid #e8dfea; border-radius: 14px; background: #fcfaff; }
+.credit-campaign-performance-group h5 { margin: 0; color: #6d2b82; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.credit-campaign-performance-group small { color: #756a7c; font-size: 11px; line-height: 1.4; }
+.credit-campaign-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 9px; }
 .credit-campaign-metrics div { display: grid; gap: 2px; padding: 11px; border-radius: 11px; background: #f8f4fa; }
 .credit-campaign-metrics strong { font-size: 20px; }
 .credit-campaign-metrics span { color: #756a7c; font-size: 12px; }
+.credit-campaign-metrics .credit-campaign-metric--purchase { background: #edf8f2; border: 1px solid #b9e2cb; }
+.credit-campaign-metric--purchase strong { color: #17663d; }
+.credit-campaign-metrics .credit-campaign-metric--grant { background: #fff7e7; border: 1px solid #eed49a; }
+.credit-campaign-metric--grant strong { color: #865909; }
 .credit-campaign-packs { display: flex; gap: 7px; flex-wrap: wrap; }
 .credit-campaign-packs span { padding: 5px 9px; border-radius: 999px; background: #fff0e8; color: #a34425; font-size: 12px; font-weight: 750; }
 .credit-campaign-actions { display: flex; gap: 8px; }

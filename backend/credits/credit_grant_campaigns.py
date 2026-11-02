@@ -19,7 +19,25 @@ def _row_dict(row: Any) -> Dict[str, Any]:
         "id": int(row[0]), "name": str(row[1]), "credits": int(row[2]),
         "status": str(row[3]), "recipient_count": int(row[4] or 0),
         "credited_count": int(row[5] or 0), "created_at": row[6].isoformat() if row[6] else None,
-        "metrics": {"queued": int(row[7] or 0), "accepted": int(row[8] or 0), "sent": int(row[9] or 0), "delivered": int(row[10] or 0), "read": int(row[11] or 0), "failed": int(row[12] or 0), "chat_opened": int(row[13] or 0)},
+        "metrics": {
+            "grant_failed": int(row[17] or 0),
+            "credits_granted": int(row[18] or 0),
+            "queued": int(row[7] or 0), "accepted": int(row[8] or 0),
+            "sent": int(row[9] or 0), "delivered": int(row[10] or 0),
+            "read": int(row[11] or 0), "failed": int(row[12] or 0),
+            "chat_opened": int(row[13] or 0),
+            "whatsapp_eligible": int(row[19] or 0),
+            # These are deliberately paid purchases only.  They do not count the
+            # campaign's free grant, promo credits, or a later credit spend.
+            "paid_buyers": int(row[14] or 0),
+            "paid_credit_purchased": int(row[15] or 0),
+            "paid_purchase_count": int(row[16] or 0),
+            "chat_converted": int(row[20] or 0),
+            # Credits are fungible. We therefore attribute feature usage after
+            # the grant to this grant until its amount is exhausted per user.
+            "grant_credits_used": int(row[21] or 0),
+            "grant_credits_remaining": int(row[22] or 0),
+        },
     }
 
 
@@ -61,34 +79,91 @@ def ensure_credit_grant_tables(conn) -> None:
 
 
 def _campaign_row(conn, campaign_id: int):
-    return execute(conn, """
+    return execute(conn, _campaign_query("WHERE c.id = ?"), (campaign_id,)).fetchone()
+
+
+def _campaign_query(where_clause: str = "") -> str:
+    """Return campaign metrics with paid-purchase attribution after each grant.
+
+    A recipient's paid purchase is attributed when its ledger entry was created
+    at or after that recipient received this campaign's credits.  It is an
+    outcome signal, not a claim that a particular purchased credit can be
+    separated from a fungible account balance.
+    """
+    return f"""
+      WITH paid_purchase_outcomes AS (
+        SELECT r.campaign_id, r.userid,
+               COALESCE(SUM(ABS(ct.amount)), 0)::BIGINT AS paid_credit_purchased,
+               COUNT(ct.id)::BIGINT AS paid_purchase_count
+        FROM credit_grant_campaign_recipients r
+        LEFT JOIN credit_transactions ct
+          ON ct.userid = r.userid
+         AND ct.created_at >= r.credited_at
+         AND ct.transaction_type = 'earned'
+         AND ct.source IN ('google_play', 'razorpay')
+        WHERE r.grant_status = 'credited' AND r.credited_at IS NOT NULL
+        GROUP BY r.campaign_id, r.userid
+      ),
+      credit_spend_outcomes AS (
+        SELECT r.campaign_id, r.userid,
+               COALESCE(SUM(ABS(ct.amount)), 0)::BIGINT AS feature_credits_used
+        FROM credit_grant_campaign_recipients r
+        LEFT JOIN credit_transactions ct
+          ON ct.userid = r.userid
+         AND ct.created_at >= r.credited_at
+         AND ct.transaction_type = 'spent'
+         AND ct.source = 'feature_usage'
+        WHERE r.grant_status = 'credited' AND r.credited_at IS NOT NULL
+        GROUP BY r.campaign_id, r.userid
+      ),
+      chat_conversion_outcomes AS (
+        SELECT r.campaign_id, r.userid,
+               EXISTS (
+                 SELECT 1
+                 FROM chat_sessions cs
+                 JOIN chat_messages cm ON cm.session_id = cs.session_id
+                 WHERE cs.user_id = r.userid
+                   AND cm.sender = 'user'
+                   AND cm.timestamp >= r.chat_opened_at
+               ) AS chat_converted
+        FROM credit_grant_campaign_recipients r
+        WHERE r.grant_status = 'credited' AND r.chat_opened_at IS NOT NULL
+      )
       SELECT c.id, c.name, c.credits, c.status, COUNT(r.userid),
              COUNT(r.userid) FILTER (WHERE r.grant_status = 'credited'), c.created_at,
              COUNT(r.userid) FILTER (WHERE r.whatsapp_status = 'queued'), COUNT(r.userid) FILTER (WHERE r.whatsapp_message_id IS NOT NULL),
              COUNT(r.userid) FILTER (WHERE r.whatsapp_meta_status = 'sent'), COUNT(r.userid) FILTER (WHERE r.whatsapp_meta_status IN ('delivered','read')),
              COUNT(r.userid) FILTER (WHERE r.whatsapp_meta_status = 'read'), COUNT(r.userid) FILTER (WHERE r.whatsapp_meta_status = 'failed'),
-             COUNT(r.userid) FILTER (WHERE r.chat_opened_at IS NOT NULL)
+             COUNT(r.userid) FILTER (WHERE r.chat_opened_at IS NOT NULL),
+             COUNT(r.userid) FILTER (WHERE COALESCE(p.paid_credit_purchased, 0) > 0),
+             COALESCE(SUM(p.paid_credit_purchased), 0),
+             COALESCE(SUM(p.paid_purchase_count), 0),
+             COUNT(r.userid) FILTER (WHERE r.grant_status = 'failed'),
+             COALESCE(SUM(c.credits) FILTER (WHERE r.grant_status = 'credited'), 0),
+             COUNT(r.userid) FILTER (
+               WHERE r.grant_status = 'credited'
+                 AND NULLIF(BTRIM(COALESCE(u.phone, '')), '') IS NOT NULL
+                 AND u.whatsapp_marketing_opted_out_at IS NULL
+             ),
+             COUNT(r.userid) FILTER (WHERE co.chat_converted),
+             COALESCE(SUM(LEAST(c.credits::BIGINT, COALESCE(s.feature_credits_used, 0))), 0),
+             COALESCE(SUM(c.credits) FILTER (WHERE r.grant_status = 'credited'), 0)
+               - COALESCE(SUM(LEAST(c.credits::BIGINT, COALESCE(s.feature_credits_used, 0))), 0)
       FROM credit_grant_campaigns c
       LEFT JOIN credit_grant_campaign_recipients r ON r.campaign_id = c.id
-      WHERE c.id = ? GROUP BY c.id, c.name, c.credits, c.status, c.created_at
-    """, (campaign_id,)).fetchone()
+      LEFT JOIN users u ON u.userid = r.userid
+      LEFT JOIN paid_purchase_outcomes p ON p.campaign_id = r.campaign_id AND p.userid = r.userid
+      LEFT JOIN credit_spend_outcomes s ON s.campaign_id = r.campaign_id AND s.userid = r.userid
+      LEFT JOIN chat_conversion_outcomes co ON co.campaign_id = r.campaign_id AND co.userid = r.userid
+      {where_clause}
+      GROUP BY c.id, c.name, c.credits, c.status, c.created_at
+    """
 
 
 def list_credit_grant_campaigns(limit: int = 50) -> List[Dict[str, Any]]:
     with get_conn() as conn:
         ensure_credit_grant_tables(conn)
-        rows = execute(conn, """
-          SELECT c.id, c.name, c.credits, c.status, COUNT(r.userid),
-                 COUNT(r.userid) FILTER (WHERE r.grant_status = 'credited'), c.created_at,
-                 COUNT(r.userid) FILTER (WHERE r.whatsapp_status = 'queued'), COUNT(r.userid) FILTER (WHERE r.whatsapp_message_id IS NOT NULL),
-                 COUNT(r.userid) FILTER (WHERE r.whatsapp_meta_status = 'sent'), COUNT(r.userid) FILTER (WHERE r.whatsapp_meta_status IN ('delivered','read')),
-                 COUNT(r.userid) FILTER (WHERE r.whatsapp_meta_status = 'read'), COUNT(r.userid) FILTER (WHERE r.whatsapp_meta_status = 'failed'),
-                 COUNT(r.userid) FILTER (WHERE r.chat_opened_at IS NOT NULL)
-          FROM credit_grant_campaigns c
-          LEFT JOIN credit_grant_campaign_recipients r ON r.campaign_id = c.id
-          GROUP BY c.id, c.name, c.credits, c.status, c.created_at
-          ORDER BY c.id DESC LIMIT ?
-        """, (limit,)).fetchall()
+        rows = execute(conn, f"{_campaign_query()} ORDER BY c.id DESC LIMIT ?", (limit,)).fetchall()
         return [_row_dict(row) for row in rows]
 
 
