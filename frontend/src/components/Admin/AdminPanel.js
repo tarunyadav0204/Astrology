@@ -9,6 +9,7 @@ import AdminReportHistory from './AdminReportHistory';
 import AdminCreditLedger from './AdminCreditLedger';
 import AdminDailyActivity from './AdminDailyActivity';
 import AdminActivity from './AdminActivity';
+import AdminAppPulse from './AdminAppPulse';
 import AdminUserProfile from './AdminUserProfile';
 import AdminCreditsDashboard from './AdminCreditsDashboard';
 import AdminCreditsIntelligence from './AdminCreditsIntelligence';
@@ -3897,6 +3898,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           </button>
           <button
             type="button"
+            className={`subtab ${activeSubTab === 'appPulse' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('appPulse')}
+          >
+            App Pulse
+          </button>
+          <button
+            type="button"
             className={`subtab ${activeSubTab === 'deletedBackups' ? 'active' : ''}`}
             onClick={() => {
               setDeletedBackupsPage(1);
@@ -4388,6 +4396,21 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           <AdminActivity
             onOpenUserProfile={(userId) => {
               const t = new Date().toISOString().slice(0, 10);
+              setProfileJumpContext({
+                userId: String(userId),
+                dateFrom: t,
+                dateTo: t,
+                nonce: Date.now(),
+              });
+              setActiveSubTab('userProfile');
+            }}
+          />
+        )}
+
+        {activeTab === 'users' && activeSubTab === 'appPulse' && (
+          <AdminAppPulse
+            onOpenUserProfile={(userId) => {
+              const t = todayInIST();
               setProfileJumpContext({
                 userId: String(userId),
                 dateFrom: t,

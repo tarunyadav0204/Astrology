@@ -1,0 +1,45 @@
+.admin-app-pulse { padding: 22px; color: var(--admin-text, #281923); }
+.app-pulse-header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-end; border-bottom: 1px solid var(--admin-border, #e5dcd4); padding-bottom: 18px; }
+.app-pulse-kicker { color: #8a1e4d; letter-spacing: .14em; font-weight: 800; font-size: 11px; margin: 0 0 5px; }
+.app-pulse-header h2 { margin: 0; font-size: 27px; }
+.app-pulse-header p:not(.app-pulse-kicker), .app-pulse-panel-heading p, .app-pulse-updated, .app-pulse-list small, .app-pulse-live small { color: var(--admin-text-muted, #766971); margin: 5px 0 0; font-size: 13px; }
+.app-pulse-actions { display: flex; align-items: end; gap: 9px; }
+.app-pulse-actions label { display: grid; gap: 4px; font-size: 12px; font-weight: 700; }
+.app-pulse-actions input, .app-pulse-actions button { height: 36px; border-radius: 7px; border: 1px solid var(--admin-border, #d9cfc8); padding: 0 10px; }
+.app-pulse-actions button { background: #7d1e49; color: white; border-color: #7d1e49; cursor: pointer; font-weight: 700; }
+.app-pulse-actions button:disabled { opacity: .65; cursor: wait; }
+.app-pulse-updated { text-align: right; margin: 8px 0 14px; }
+.app-pulse-cards { display: grid; grid-template-columns: repeat(6, minmax(140px, 1fr)); gap: 12px; }
+.app-pulse-cards article, .app-pulse-panel { border: 1px solid var(--admin-border, #e1d7d1); border-radius: 12px; background: var(--admin-surface, #fff); }
+.app-pulse-cards article { padding: 16px; display: grid; gap: 5px; min-height: 104px; }
+.app-pulse-cards span { color: var(--admin-text-muted, #756974); font-size: 13px; font-weight: 700; }
+.app-pulse-cards strong { font-size: 28px; line-height: 1.05; }
+.app-pulse-cards small { color: var(--admin-text-muted, #756974); font-size: 12px; }
+.app-pulse-card-warn { border-color: #d79b59 !important; background: #fffaf3 !important; }
+.app-pulse-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.app-pulse-grid-main { grid-template-columns: minmax(0, 1.55fr) minmax(280px, .85fr); }
+.app-pulse-panel { overflow: hidden; padding: 17px; }
+.app-pulse-panel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.app-pulse-panel-heading h3 { margin: 0; font-size: 16px; }
+.app-pulse-legend { font-size: 11px; color: #766971; white-space: nowrap; }
+.app-pulse-legend i, .app-pulse-legend b { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 4px 0 8px; background: #8a1e4d; }
+.app-pulse-legend b { background: #d7a640; }
+.app-pulse-bars { height: 180px; display: grid; grid-template-columns: repeat(24, 1fr); gap: 3px; align-items: end; border-bottom: 1px solid #e7deda; padding: 0 4px; }
+.app-pulse-hour { height: 100%; display: grid; grid-template-rows: 1fr 18px; gap: 4px; min-width: 0; }
+.app-pulse-bar-track { display: flex; align-items: end; justify-content: center; gap: 2px; }
+.app-pulse-bar-track i, .app-pulse-bar-track b { width: 42%; min-height: 0; border-radius: 4px 4px 0 0; background: #8a1e4d; }
+.app-pulse-bar-track b { background: #d7a640; }
+.app-pulse-hour small { text-align: center; font-size: 9px; color: #80727a; }
+.app-pulse-list { display: grid; gap: 0; }
+.app-pulse-list-row, .app-pulse-endpoint, .app-pulse-live { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid #eee5df; padding: 10px 0; font-size: 14px; }
+.app-pulse-list-row:first-child, .app-pulse-endpoint:first-child, .app-pulse-live:first-child { border-top: 0; }
+.app-pulse-endpoint > div { display: grid; gap: 2px; overflow: hidden; }.app-pulse-endpoint strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-pulse-endpoint em, .app-pulse-user em { color: #287b5a; font-size: 12px; font-style: normal; white-space: nowrap; }
+.app-pulse-spend { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; border-top: 1px solid #e7deda; margin-top: 8px; padding-top: 13px; }.app-pulse-spend small { grid-column: 1 / -1; color: #756974; }
+.app-pulse-screen-usage { border-top: 1px solid #e7deda; margin-top: 14px; padding-top: 13px; }.app-pulse-screen-heading { display: grid; gap: 2px; margin-bottom: 5px; }.app-pulse-screen-heading small, .app-pulse-screen-usage .app-pulse-list-row strong small { color: #756974; font-size: 11px; font-weight: 500; }.app-pulse-screen-usage .app-pulse-list-row strong { text-align: right; font-size: 13px; }.app-pulse-screen-usage .app-pulse-list-row strong small { display: block; margin-top: 2px; white-space: nowrap; }
+.app-pulse-show-more { appearance: none; border: 0; background: transparent; color: #7d1e49; cursor: pointer; font-size: 12px; font-weight: 800; margin-top: 9px; padding: 5px 0; text-align: left; }.app-pulse-show-more:hover { text-decoration: underline; }
+.app-pulse-table-wrap { overflow: auto; }.app-pulse-table { width: 100%; border-collapse: collapse; font-size: 13px; }.app-pulse-table th, .app-pulse-table td { text-align: right; padding: 9px 6px; border-top: 1px solid #eee5df; }.app-pulse-table th:first-child, .app-pulse-table td:first-child { text-align: left; }.app-pulse-table th { color: #776b74; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.app-pulse-user { appearance: none; width: 100%; border: 0; border-top: 1px solid #eee5df; background: transparent; padding: 10px 0; text-align: left; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }.app-pulse-user:hover strong { color: #8a1e4d; }.app-pulse-user span { display: grid; gap: 3px; }.app-pulse-user small { margin: 0; }
+.app-pulse-bad { color: #b33c35 !important; }.app-pulse-empty { color: #806f78; margin: 14px 0; font-size: 13px; }.app-pulse-error { margin: 14px 0; padding: 12px; border-radius: 8px; color: #8d2424; background: #ffe9e7; }.app-pulse-loading { padding: 35px; color: #756974; }
+@media (max-width: 1250px) { .app-pulse-cards { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px) { .admin-app-pulse { padding: 14px; }.app-pulse-header, .app-pulse-grid, .app-pulse-grid-main { grid-template-columns: 1fr; display: grid; }.app-pulse-actions { justify-content: space-between; }.app-pulse-cards { grid-template-columns: repeat(2, 1fr); }.app-pulse-cards article:last-child { grid-column: 1 / -1; } }

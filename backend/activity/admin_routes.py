@@ -3,8 +3,11 @@ Admin-only API to query user activity from BigQuery (today by default, with filt
 """
 import os
 import logging
-from datetime import datetime, timezone, date
+import threading
+import time
+from datetime import datetime, timezone, date, timedelta
 from typing import Optional, Any, List, Dict
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from auth import get_current_user, User
@@ -13,6 +16,10 @@ from db import get_conn, execute
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_IST = ZoneInfo("Asia/Kolkata")
+_PULSE_CACHE: Dict[str, Any] = {"expires_at": 0.0, "payload": None}
+_PULSE_CACHE_LOCK = threading.Lock()
 
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DB_PATH = os.environ.get("ASTROLOGY_DB_PATH") or os.path.join(_BACKEND_DIR, "astrology.db")
@@ -120,6 +127,305 @@ ACTIVITY_COLUMNS = [
     "error_type", "error_message", "stack_trace",
     "ip", "user_agent", "created_at",
 ]
+
+
+def _admin_today_ist() -> date:
+    return datetime.now(_IST).date()
+
+
+def _parse_dashboard_date(value: Optional[str]) -> date:
+    if not value:
+        return _admin_today_ist()
+    try:
+        return date.fromisoformat(str(value).strip()[:10])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD") from exc
+
+
+def _dashboard_bounds_utc(day: date) -> tuple[datetime, datetime]:
+    start = datetime(day.year, day.month, day.day, tzinfo=_IST).astimezone(timezone.utc)
+    return start, start + timedelta(days=1)
+
+
+def _bigquery_client():
+    """Build the same credential-aware client used by the Activity log."""
+    from google.cloud import bigquery
+    from google.oauth2 import service_account
+    from utils.env_json import parse_json_from_env
+
+    project = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT_ID", "").strip()
+    key = (
+        os.getenv("GOOGLE_SERVICE_ACCOUNT_KEY")
+        or os.getenv("GOOGLE_TTS_SERVICE_ACCOUNT_JSON")
+        or os.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "")
+    )
+    creds = None
+    if key and str(key).strip():
+        raw = str(key).strip()
+        info = parse_json_from_env(raw)
+        if info and isinstance(info, dict):
+            creds = service_account.Credentials.from_service_account_info(info)
+        elif os.path.isfile(raw):
+            creds = service_account.Credentials.from_service_account_file(raw)
+    return bigquery.Client(project=project, credentials=creds) if creds else bigquery.Client(project=project)
+
+
+def _query_bigquery_pulse(start_utc: datetime, end_utc: datetime) -> Dict[str, Any]:
+    """Best-effort API health metrics. The dashboard remains useful without BigQuery."""
+    table = _get_bigquery_table()
+    if not table:
+        return {"available": False, "reason": "BigQuery is not configured"}
+    try:
+        from google.cloud import bigquery
+
+        client = _bigquery_client()
+        params = [
+            bigquery.ScalarQueryParameter("start_ts", "TIMESTAMP", start_utc),
+            bigquery.ScalarQueryParameter("end_ts", "TIMESTAMP", end_utc),
+        ]
+        config = bigquery.QueryJobConfig(query_parameters=params)
+        summary_sql = f"""
+            SELECT
+              COUNT(*) AS api_calls,
+              COUNT(DISTINCT CASE
+                WHEN user_id IS NOT NULL AND user_id != 0 THEN CAST(user_id AS STRING)
+                WHEN REGEXP_REPLACE(COALESCE(user_phone, ''), r'[^0-9]', '') != ''
+                  THEN REGEXP_REPLACE(user_phone, r'[^0-9]', '')
+              END) AS active_users,
+              COUNTIF(action = 'api_error' OR COALESCE(status_code, 200) < 200
+                OR COALESCE(status_code, 200) >= 300) AS error_count,
+              APPROX_QUANTILES(COALESCE(duration_ms, 0), 100)[SAFE_OFFSET(95)] AS p95_duration_ms
+            FROM {table}
+            WHERE created_at >= @start_ts AND created_at < @end_ts
+        """
+        summary_rows = list(client.query(summary_sql, job_config=config))
+        summary = dict(summary_rows[0]) if summary_rows else {}
+
+        hourly_sql = f"""
+            SELECT
+              FORMAT_TIMESTAMP('%H:00', created_at, 'Asia/Kolkata') AS hour,
+              COUNT(*) AS api_calls,
+              COUNTIF(action = 'api_error' OR COALESCE(status_code, 200) < 200
+                OR COALESCE(status_code, 200) >= 300) AS errors
+            FROM {table}
+            WHERE created_at >= @start_ts AND created_at < @end_ts
+            GROUP BY hour ORDER BY hour
+        """
+        endpoint_sql = f"""
+            SELECT COALESCE(NULLIF(path, ''), action, 'Unknown') AS path,
+                   COUNT(*) AS calls,
+                   COUNTIF(action = 'api_error' OR COALESCE(status_code, 200) < 200
+                     OR COALESCE(status_code, 200) >= 300) AS errors,
+                   APPROX_QUANTILES(COALESCE(duration_ms, 0), 100)[SAFE_OFFSET(95)] AS p95_duration_ms
+            FROM {table}
+            WHERE created_at >= @start_ts AND created_at < @end_ts
+            GROUP BY path ORDER BY calls DESC LIMIT 8
+        """
+        recent_sql = f"""
+            SELECT user_id, user_name, action, path, status_code, duration_ms, created_at
+            FROM {table}
+            WHERE created_at >= @start_ts AND created_at < @end_ts
+            ORDER BY created_at DESC LIMIT 30
+        """
+        # Native chart navigation already emits mobile_screen_view through
+        # /activity/mobile-events.  Keep this aggregate separate from generic
+        # API traffic so App Pulse can answer product questions such as
+        # "how many people opened a chart today?" without adding another
+        # client-side tracker.
+        screen_sql = f"""
+            SELECT
+              COALESCE(NULLIF(JSON_VALUE(metadata, '$.screen_name'), ''),
+                       NULLIF(resource_id, ''), 'Unknown') AS screen,
+              COALESCE(NULLIF(JSON_VALUE(metadata, '$.content_type'), ''),
+                       NULLIF(resource_type, ''), 'screen') AS content_type,
+              COUNTIF(action = 'mobile_screen_view') AS opens,
+              COUNT(DISTINCT CASE
+                WHEN action = 'mobile_screen_view' AND user_id IS NOT NULL AND user_id != 0 THEN CAST(user_id AS STRING)
+                WHEN action = 'mobile_screen_view' AND REGEXP_REPLACE(COALESCE(user_phone, ''), r'[^0-9]', '') != ''
+                  THEN REGEXP_REPLACE(user_phone, r'[^0-9]', '')
+              END) AS users
+              ,APPROX_QUANTILES(
+                IF(action = 'mobile_screen_exit', duration_ms, NULL), 100
+              )[SAFE_OFFSET(50)] AS median_duration_ms
+            FROM {table}
+            WHERE created_at >= @start_ts AND created_at < @end_ts
+              AND action IN ('mobile_screen_view', 'mobile_screen_exit')
+            GROUP BY screen, content_type
+            ORDER BY users DESC, opens DESC
+            LIMIT 60
+        """
+        return {
+            "available": True,
+            "summary": {
+                "api_calls": int(summary.get("api_calls") or 0),
+                "active_users": int(summary.get("active_users") or 0),
+                "error_count": int(summary.get("error_count") or 0),
+                "p95_duration_ms": int(summary.get("p95_duration_ms") or 0),
+            },
+            "hourly": [dict(row) for row in client.query(hourly_sql, job_config=config)],
+            "endpoints": [dict(row) for row in client.query(endpoint_sql, job_config=config)],
+            "recent": [dict(row) for row in client.query(recent_sql, job_config=config)],
+            "screens": [dict(row) for row in client.query(screen_sql, job_config=config)],
+        }
+    except Exception as exc:
+        logger.warning("App pulse BigQuery metrics unavailable: %s", exc)
+        return {"available": False, "reason": "API telemetry is temporarily unavailable"}
+
+
+@router.get("/admin/activity/dashboard")
+async def get_activity_dashboard(
+    date_value: Optional[str] = Query(None, alias="date", description="IST date YYYY-MM-DD; defaults to today"),
+    current_user: User = Depends(_require_admin),
+):
+    """Admin App Pulse: read-replica product activity plus BigQuery API health."""
+    del current_user
+    day = _parse_dashboard_date(date_value)
+    cache_key = day.isoformat()
+    now_mono = time.monotonic()
+    with _PULSE_CACHE_LOCK:
+        cached = _PULSE_CACHE.get("payload")
+        if cached and _PULSE_CACHE.get("key") == cache_key and _PULSE_CACHE["expires_at"] > now_mono:
+            return {**cached, "cached": True}
+
+    start_utc, end_utc = _dashboard_bounds_utc(day)
+    # Application timestamps are stored as UTC timestamps without timezone in
+    # the legacy schema, so send naive UTC bounds to Postgres deliberately.
+    start_db, end_db = start_utc.replace(tzinfo=None), end_utc.replace(tzinfo=None)
+    try:
+        from nudge_engine.connections import get_audience_conn
+
+        with get_audience_conn() as conn:
+            cur = execute(
+                conn,
+                """
+                WITH chat AS (
+                  SELECT s.user_id, m.sender, m.status, m.chat_tier,
+                         COALESCE(m.completed_at, m.timestamp, m.started_at) AS happened_at
+                  FROM chat_messages m
+                  JOIN chat_sessions s ON s.session_id = m.session_id
+                  WHERE COALESCE(m.completed_at, m.timestamp, m.started_at) >= %s
+                    AND COALESCE(m.completed_at, m.timestamp, m.started_at) < %s
+                ), tx AS (
+                  SELECT userid, transaction_type, amount, source, created_at
+                  FROM credit_transactions
+                  WHERE created_at >= %s AND created_at < %s
+                )
+                SELECT
+                  (SELECT COUNT(DISTINCT user_id) FROM chat) AS chat_users,
+                  (SELECT COUNT(*) FROM chat WHERE sender = 'user') AS questions,
+                  (SELECT COUNT(*) FROM chat WHERE sender <> 'user' AND status = 'completed') AS answers_delivered,
+                  (SELECT COUNT(*) FROM chat WHERE sender <> 'user' AND status = 'error') AS chat_failures,
+                  (SELECT COUNT(DISTINCT userid) FROM tx WHERE transaction_type = 'spent') AS spending_users,
+                  (SELECT COALESCE(SUM(ABS(amount)), 0) FROM tx WHERE transaction_type = 'spent') AS credits_spent,
+                  (SELECT COUNT(*) FROM tx WHERE transaction_type = 'earned' AND source IN ('google_play', 'razorpay')) AS paid_purchases,
+                  (SELECT COUNT(DISTINCT userid) FROM tx WHERE transaction_type = 'earned' AND source IN ('google_play', 'razorpay')) AS paid_buyers,
+                  (SELECT COALESCE(SUM(amount), 0) FROM tx WHERE transaction_type = 'earned' AND source IN ('google_play', 'razorpay')) AS paid_credits
+                """,
+                (start_db, end_db, start_db, end_db),
+            )
+            summary_row = cur.fetchone() or [0] * 10
+            summary = {
+                key: int(summary_row[idx] or 0)
+                for idx, key in enumerate((
+                    "chat_users", "questions", "answers_delivered", "chat_failures",
+                    "spending_users", "credits_spent", "paid_purchases", "paid_buyers", "paid_credits",
+                ))
+            }
+
+            cur = execute(
+                conn,
+                """
+                SELECT COALESCE(NULLIF(chat_tier, ''), 'standard') AS tier, COUNT(*)::int
+                FROM chat_messages m JOIN chat_sessions s ON s.session_id = m.session_id
+                WHERE m.sender = 'user'
+                  AND COALESCE(m.completed_at, m.timestamp, m.started_at) >= %s
+                  AND COALESCE(m.completed_at, m.timestamp, m.started_at) < %s
+                GROUP BY 1 ORDER BY 2 DESC
+                """, (start_db, end_db),
+            )
+            chat_by_tier = [{"name": row[0], "count": int(row[1] or 0)} for row in cur.fetchall() or []]
+
+            cur = execute(
+                conn,
+                """
+                SELECT to_char((COALESCE(m.completed_at, m.timestamp, m.started_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata', 'HH24:00') AS hour,
+                       COUNT(*) FILTER (WHERE m.sender = 'user')::int AS questions,
+                       COUNT(*) FILTER (WHERE m.sender <> 'user' AND m.status = 'completed')::int AS answers
+                FROM chat_messages m JOIN chat_sessions s ON s.session_id = m.session_id
+                WHERE COALESCE(m.completed_at, m.timestamp, m.started_at) >= %s
+                  AND COALESCE(m.completed_at, m.timestamp, m.started_at) < %s
+                GROUP BY 1 ORDER BY 1
+                """, (start_db, end_db),
+            )
+            chat_hourly = [{"hour": row[0], "questions": int(row[1] or 0), "answers": int(row[2] or 0)} for row in cur.fetchall() or []]
+
+            cur = execute(
+                conn,
+                """
+                SELECT feature, COUNT(*)::int AS started,
+                       COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+                       COUNT(*) FILTER (WHERE status = 'failed')::int AS failed,
+                       COUNT(DISTINCT userid)::int AS users
+                FROM (
+                  SELECT 'Nakshatra Blueprint' AS feature, userid, status, created_at FROM nakshatra_blueprints
+                  WHERE created_at >= %s AND created_at < %s
+                  UNION ALL
+                  SELECT 'Partner Portrait', user_id, status, created_at FROM partner_portrait_jobs
+                  WHERE created_at >= %s AND created_at < %s
+                ) reports
+                GROUP BY feature ORDER BY started DESC, feature
+                """, (start_db, end_db, start_db, end_db),
+            )
+            reports = [
+                {"feature": row[0], "started": int(row[1] or 0), "completed": int(row[2] or 0), "failed": int(row[3] or 0), "users": int(row[4] or 0)}
+                for row in cur.fetchall() or []
+            ]
+
+            cur = execute(
+                conn,
+                """
+                SELECT s.user_id, COALESCE(NULLIF(u.name, ''), 'User #' || s.user_id::text) AS name,
+                       MAX(COALESCE(m.completed_at, m.timestamp, m.started_at)) AS last_activity,
+                       COUNT(*) FILTER (WHERE m.sender = 'user')::int AS questions,
+                       COUNT(*) FILTER (WHERE m.sender <> 'user' AND m.status = 'error')::int AS failed_answers
+                FROM chat_messages m
+                JOIN chat_sessions s ON s.session_id = m.session_id
+                LEFT JOIN users u ON u.userid = s.user_id
+                WHERE COALESCE(m.completed_at, m.timestamp, m.started_at) >= %s
+                  AND COALESCE(m.completed_at, m.timestamp, m.started_at) < %s
+                GROUP BY s.user_id, u.name
+                HAVING COUNT(*) FILTER (WHERE m.sender <> 'user' AND m.status = 'error') > 0
+                ORDER BY failed_answers DESC, last_activity DESC LIMIT 20
+                """, (start_db, end_db),
+            )
+            attention = [
+                {"user_id": int(row[0]), "name": row[1], "last_activity": row[2], "questions": int(row[3] or 0), "failed_answers": int(row[4] or 0)}
+                for row in cur.fetchall() or []
+            ]
+    except Exception as exc:
+        logger.exception("App pulse replica query failed: %s", exc)
+        raise HTTPException(status_code=500, detail="App Pulse data is temporarily unavailable") from exc
+
+    api = _query_bigquery_pulse(start_utc, end_utc)
+    if api.get("available"):
+        summary["active_users"] = max(summary["chat_users"], int((api.get("summary") or {}).get("active_users") or 0))
+    else:
+        summary["active_users"] = summary["chat_users"]
+    payload = {
+        "date": day.isoformat(),
+        "timezone": "Asia/Kolkata",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "cached": False,
+        "summary": summary,
+        "chat_by_tier": chat_by_tier,
+        "chat_hourly": chat_hourly,
+        "reports": reports,
+        "attention": attention,
+        "api": api,
+    }
+    with _PULSE_CACHE_LOCK:
+        _PULSE_CACHE.update({"key": cache_key, "expires_at": time.monotonic() + 60.0, "payload": payload})
+    return payload
 
 
 @router.get("/admin/activity")
