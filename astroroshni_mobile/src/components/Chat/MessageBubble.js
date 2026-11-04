@@ -279,6 +279,14 @@ function MessageBubble({
   const [detailUnlocked, setDetailUnlocked] = useState(false);
   const [showRevealCreditsModal, setShowRevealCreditsModal] = useState(false);
   const [copyAlert, setCopyAlert] = useState({ visible: false, error: false });
+  const [showReelStudio, setShowReelStudio] = useState(false);
+  const [reelDraft, setReelDraft] = useState(null);
+  const [isPreparingReel, setIsPreparingReel] = useState(false);
+  const [isQueueingReel, setIsQueueingReel] = useState(false);
+  const [reelJobId, setReelJobId] = useState(null);
+  const [reelJobStatus, setReelJobStatus] = useState('');
+  const [reelJobError, setReelJobError] = useState('');
+  const [isSharingReel, setIsSharingReel] = useState(false);
   const [showInstantEvidence, setShowInstantEvidence] = useState(false);
   const blurShownTrackedRef = useRef(false);
   // Init from the played-ids set so FlatList remounts do not flash translateY:50 for one frame
@@ -337,6 +345,23 @@ function MessageBubble({
   const [isPodcastVisualLoading, setIsPodcastVisualLoading] = useState(false);
   const [podcastVisualError, setPodcastVisualError] = useState('');
   const podcastVisualKeyRef = useRef('');
+
+  useEffect(() => {
+    if (!reelJobId) return undefined;
+    let active = true;
+    const check = async () => {
+      try {
+        const response = await chatAPI.getReelJob(reelJobId);
+        if (!active) return;
+        const status = response?.data?.status || 'rendering';
+        setReelJobStatus(status);
+        setReelJobError(response?.data?.error_message || '');
+      } catch (_) { /* retain the last known render state */ }
+    };
+    check();
+    const timer = setInterval(check, 4000);
+    return () => { active = false; clearInterval(timer); };
+  }, [reelJobId]);
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageZoomScale, setImageZoomScale] = useState(1);
   const [isImageLoading, setIsImageLoading] = useState(true);
@@ -967,6 +992,78 @@ function MessageBubble({
       console.error('PDF export error:', error);
       Alert.alert('Export failed', userFacingPdfExportError(error));
     }
+  };
+
+  const openReelStudio = async () => {
+    const messageId = message.messageId || message.message_id;
+    if (!messageId) {
+      Alert.alert('Reel Studio', 'This answer is still being saved. Please try again in a moment.');
+      return;
+    }
+    setShowReelStudio(true);
+    setReelDraft(null);
+    setIsPreparingReel(true);
+    try {
+      const response = await chatAPI.createReelDraft({
+        messageId,
+        durationSeconds: 45,
+        language: podcastLangFromUiLanguage(language),
+        visualLevel: 'cinematic',
+      });
+      setReelDraft(response?.data || null);
+    } catch (error) {
+      Alert.alert('Reel Studio', error?.response?.data?.detail || 'Could not prepare this reel.');
+      setShowReelStudio(false);
+    } finally {
+      setIsPreparingReel(false);
+    }
+  };
+
+  const queueReel = async () => {
+    const messageId = message.messageId || message.message_id;
+    if (!messageId || !reelDraft) return;
+    setIsQueueingReel(true);
+    try {
+      const response = await chatAPI.queueReel({
+        messageId,
+        durationSeconds: 45,
+        language: podcastLangFromUiLanguage(language),
+        visualLevel: 'cinematic',
+        approvedClaimIds: reelDraft.claims.map((claim) => claim.id),
+      });
+      const amount = response?.data?.cost_projection?.estimated_total;
+      const jobId = response?.data?.job_id;
+      if (jobId) { setReelJobId(jobId); setReelJobStatus(response?.data?.status || 'queued'); }
+      const waitingForRenderer = response?.data?.status === 'awaiting_provider_configuration';
+      Alert.alert(
+        waitingForRenderer ? 'Storyboard saved' : 'Reel queued',
+        waitingForRenderer
+          ? 'The storyboard is ready, but the video-render worker is not connected yet. No video generation has started and no provider charge has been made.'
+          : `Your premium reel is rendering${amount != null ? ` · estimated production cost ₹${amount}` : ''}. Keep this sheet open to follow progress.`,
+      );
+    } catch (error) {
+      Alert.alert('Reel Studio', error?.response?.data?.detail || 'Could not queue this reel.');
+    } finally {
+      setIsQueueingReel(false);
+    }
+  };
+
+  const shareCompletedReel = async () => {
+    if (!reelJobId) return;
+    try {
+      setIsSharingReel(true);
+      const token = await AsyncStorage.getItem('authToken');
+      const base = String(API_BASE_URL || '').replace(/\/$/, '');
+      const path = getEndpoint(`/reel-studio/jobs/${encodeURIComponent(String(reelJobId))}/download`);
+      const target = `${base}${path}`;
+      const destination = `${FileSystem.cacheDirectory}astroroshni-reel-${reelJobId}.mp4`;
+      const downloaded = await FileSystem.downloadAsync(target, destination, {
+        headers: token ? { Authorization: `Bearer ${token}`, 'X-AstroRoshni-Authorization': `Bearer ${token}` } : {},
+      });
+      await Sharing.shareAsync(downloaded.uri, { mimeType: 'video/mp4', dialogTitle: 'Share AstroRoshni reel' });
+    } catch (error) {
+      Alert.alert('Reel Studio', 'The reel is ready, but it could not be downloaded. Please try again.');
+    } finally { setIsSharingReel(false); }
   };
 
   const deleteMessage = async () => {
@@ -2240,6 +2337,14 @@ function MessageBubble({
               </>
             )}
             <TouchableOpacity
+              style={[styles.actionButton, styles.reelButton, highlightedActionStyle]}
+              onPress={openReelStudio}
+              accessibilityRole="button"
+              accessibilityLabel="Create chart-grounded reel"
+            >
+              <Ionicons name="film-outline" size={17} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.actionButton, messageActionStyle]}
               onPress={sharePodcastAudio}
               disabled={isSharingPodcast || isLoadingPodcast}
@@ -3072,6 +3177,14 @@ function MessageBubble({
                     )}
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.reelButton, highlightedActionStyle]}
+                  onPress={openReelStudio}
+                  accessibilityRole="button"
+                  accessibilityLabel="Create chart-grounded reel"
+                >
+                  <Ionicons name="film-outline" size={17} color={colors.primary} />
+                </TouchableOpacity>
               </>
             )}
             <TouchableOpacity
@@ -3365,6 +3478,34 @@ function MessageBubble({
           setShowPodcastLanguageModal(false);
         }}
       />
+
+      <Modal visible={showReelStudio} transparent animationType="slide" onRequestClose={() => setShowReelStudio(false)}>
+        <View style={styles.reelModalBackdrop}>
+          <View style={[styles.reelModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>ASTROROSHNI · REEL STUDIO</Text>
+            <Text style={[styles.reelModalTitle, { color: colors.text }]}>Your premium reel</Text>
+            {reelJobId ? <View style={styles.reelModalLoading}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={{ color: colors.text, fontWeight: '800' }}>{reelJobStatus === 'completed' ? 'Your reel is ready' : String(reelJobStatus || 'queued').replaceAll('_', ' ')}</Text>
+              <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{reelJobStatus === 'completed' ? 'Your finished MP4 is ready to play or download.' : reelJobStatus === 'failed' ? (reelJobError || 'The render failed before the final MP4 could be created.') : 'Creating the animated presenter, chart and dasha inserts, editorial stills and final MP4…'}</Text>
+              {reelJobStatus === 'completed' ? <TouchableOpacity style={[styles.reelQueueButton, { backgroundColor: colors.primary }]} onPress={shareCompletedReel} disabled={isSharingReel}>{isSharingReel ? <ActivityIndicator color={colors.onPrimary || '#fff'} /> : <><Ionicons name="share-outline" size={18} color={colors.onPrimary || '#fff'} /><Text style={[styles.reelQueueText, { color: colors.onPrimary || '#fff' }]}>Open or share MP4</Text></>}</TouchableOpacity> : null}
+            </View> : isPreparingReel ? (
+              <View style={styles.reelModalLoading}><ActivityIndicator color={colors.primary} /><Text style={{ color: colors.textSecondary }}>Building a chart-grounded storyboard…</Text></View>
+            ) : reelDraft ? <>
+              <Text style={[styles.reelModalBody, { color: colors.textSecondary }]}>45 seconds · {podcastLangFromUiLanguage(language) === 'hi' ? 'Hindi' : 'English'} · animated presenter</Text>
+              <View style={[styles.reelCostCard, { backgroundColor: colors.surfaceMuted }]}><Text style={[styles.reelCostLabel, { color: colors.textSecondary }]}>Estimated production cost</Text><Text style={[styles.reelCostValue, { color: colors.primary }]}>₹{reelDraft.cost_projection?.estimated_total ?? '—'}</Text></View>
+              <Text style={[styles.reelModalSection, { color: colors.text }]}>Evidence review · {reelDraft.claims?.length || 0} claims</Text>
+              <ScrollView style={styles.reelClaimsScroll} showsVerticalScrollIndicator={false}>
+                {(reelDraft.claims || []).map((claim) => <View key={claim.id} style={[styles.reelClaim, { borderColor: colors.cardBorder }]}><Text style={[styles.reelClaimType, { color: colors.primary }]}>{claim.status === 'interpretation' ? 'INTERPRETATION' : 'CHART VALIDATION'}</Text><Text style={[styles.reelClaimText, { color: colors.text }]}>{claim.text}</Text></View>)}
+              </ScrollView>
+              <TouchableOpacity style={[styles.reelQueueButton, { backgroundColor: colors.primary }]} onPress={queueReel} disabled={isQueueingReel}>
+                {isQueueingReel ? <ActivityIndicator color={colors.onPrimary || '#fff'} /> : <><Ionicons name="film-outline" size={18} color={colors.onPrimary || '#fff'} /><Text style={[styles.reelQueueText, { color: colors.onPrimary || '#fff' }]}>Approve & queue reel</Text></>}
+              </TouchableOpacity>
+            </> : null}
+            <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.textSecondary }}>Cancel</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <AppAlertModal
         visible={copyAlert.visible}
@@ -4037,6 +4178,24 @@ function MessageActionRow({ children, style, ...props }) {
         }
       : {}),
   },
+  reelButton: { borderColor: 'rgba(255, 107, 53, 0.42)' },
+  reelModalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20, 8, 25, 0.56)' },
+  reelModalCard: { maxHeight: '84%', padding: 22, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: StyleSheet.hairlineWidth },
+  reelModalEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  reelModalTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 27, marginTop: 8 },
+  reelModalBody: { fontSize: 13, lineHeight: 20, marginTop: 6 },
+  reelModalLoading: { minHeight: 120, alignItems: 'center', justifyContent: 'center', gap: 14 },
+  reelCostCard: { marginTop: 18, padding: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reelCostLabel: { fontSize: 12, fontWeight: '700' },
+  reelCostValue: { fontSize: 22, fontWeight: '900' },
+  reelModalSection: { marginTop: 20, marginBottom: 8, fontSize: 14, fontWeight: '800' },
+  reelClaimsScroll: { maxHeight: 210 },
+  reelClaim: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 11, marginBottom: 8 },
+  reelClaimType: { fontSize: 9, fontWeight: '900', letterSpacing: .7 },
+  reelClaimText: { fontSize: 12, lineHeight: 17, marginTop: 4 },
+  reelQueueButton: { minHeight: 48, marginTop: 13, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  reelQueueText: { fontWeight: '900', fontSize: 14 },
+  reelCancelButton: { alignItems: 'center', paddingTop: 15, paddingBottom: 2 },
   listenPodcastButtonReady: {
     backgroundColor: 'rgba(22, 163, 74, 0.12)',
     borderColor: 'rgba(22, 163, 74, 0.38)',

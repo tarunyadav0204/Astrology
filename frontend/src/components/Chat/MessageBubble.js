@@ -17,6 +17,7 @@ import {
 } from './podcastPlayback';
 import PodcastLanguageModal from './PodcastLanguageModal';
 import PodcastGenerationExperience from './PodcastGenerationExperience';
+import ReelStudioModal from './ReelStudioModal';
 import { INSTANT_LOADER_TAKING_LONGER } from '../../constants/instantChatLoader';
 import { buildReadableEvidence, buildRoutingSummary } from '../../utils/instantEvidence';
 import { autoWrapGlossaryTermsInHtml, buildGlossaryTooltipHtml } from '../../utils/chatGlossary';
@@ -550,6 +551,7 @@ const MessageBubble = ({
     const [detailUnlocked, setDetailUnlocked] = useState(false);
     const blurShownTrackedRef = useRef(false);
     const [showActions, setShowActions] = useState(false);
+    const [reelStudioOpen, setReelStudioOpen] = useState(false);
     const [showInstantEvidence, setShowInstantEvidence] = useState(false);
     const [isReadingAloud, setIsReadingAloud] = useState(false);
     const readingAloudRef = useRef(false);
@@ -1744,6 +1746,15 @@ const MessageBubble = ({
                                 <IconRadioOutline />
                             )}
                         </button>
+                        <button
+                            type="button"
+                            className="action-btn action-btn--toolbar"
+                            onClick={() => setReelStudioOpen(true)}
+                            title="Create chart-grounded reel"
+                            aria-label="Create chart-grounded reel"
+                        >
+                            <span aria-hidden="true">✦</span><span className="podcast-included-label">Reel</span>
+                        </button>
                         <button type="button" className="action-btn action-btn--toolbar" onClick={handleCopyClick} title="Copy message" aria-label="Copy message">
                             <IconCopyOutline />
                         </button>
@@ -1770,6 +1781,7 @@ const MessageBubble = ({
                 {showInstantEvidence && instantEvidence ? (
                     <InstantEvidenceModal evidence={instantEvidence} onClose={() => setShowInstantEvidence(false)} />
                 ) : null}
+                {reelStudioOpen ? <ReelStudioModal messageId={message.messageId} onClose={() => setReelStudioOpen(false)} /> : null}
                 <PodcastLanguageModal
                     open={showPodcastLanguageModal}
                     selectedLang={podcastListenLang}
@@ -1888,6 +1900,11 @@ const MessageBubble = ({
                         ) : (
                             <IconRadioOutline />
                         )}
+                    </button>
+                )}
+                {isAssistant && (
+                    <button type="button" className="action-btn action-btn--toolbar" onClick={() => setReelStudioOpen(true)} title="Create chart-grounded reel" aria-label="Create chart-grounded reel">
+                        <span aria-hidden="true">✦</span><span className="podcast-included-label">Reel</span>
                     </button>
                 )}
                 <button type="button" className="action-btn action-btn--toolbar" onClick={handleCopyClick} title="Copy message">
@@ -2536,6 +2553,7 @@ const MessageBubble = ({
                     setShowPodcastLanguageModal(false);
                 }}
             />
+            {reelStudioOpen ? <ReelStudioModal messageId={message.messageId} onClose={() => setReelStudioOpen(false)} /> : null}
 
             {podcastModalOpen &&
                 createPortal(

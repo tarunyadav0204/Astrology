@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { API_BASE_URL, getEndpoint } from '../../utils/constants';
@@ -61,6 +61,7 @@ export default function AnalysisDetailScreen({ route, navigation }) {
   const analyticsScreenName = analysisType ? `AnalysisDetail:${analysisType}` : 'AnalysisDetailScreen';
   useAnalytics(analyticsScreenName);
   const { theme, colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const isDark = theme === 'dark';
   const { credits, pricing, fetchBalance } = useCredits();
   const { requireAuthForPaid } = useAuthGate();
@@ -1254,8 +1255,17 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.headerSurface} translucent={false} />
       <LinearGradient colors={screenGradientColors} style={styles.gradientBg}>
+        {Platform.OS !== 'web' && insets.top > 0 ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.statusBarBackdrop,
+              { height: insets.top, backgroundColor: colors.headerSurface },
+            ]}
+          />
+        ) : null}
         <SafeAreaView style={styles.safeArea}>
           <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cardBorder }]}>
             <TouchableOpacity 
@@ -1734,6 +1744,13 @@ export default function AnalysisDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   gradientBg: { flex: 1 },
+  statusBarBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+  },
   safeArea: { flex: 1 },
   header: {
     flexDirection: 'row',

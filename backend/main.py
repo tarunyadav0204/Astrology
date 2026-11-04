@@ -132,6 +132,7 @@ from whatsapp.admin_routes import router as whatsapp_admin_router
 from credits.razorpay_subscription_routes import router as razorpay_subscription_router
 from credits.subscription_admin import router as subscription_admin_router
 from tts.routes import router as tts_router
+from reel_studio.routes import router as reel_studio_router
 from speech.routes import router as speech_router
 from speech.ws_routes import router as speech_ws_router
 from credits.credit_request_routes import router as credit_request_router
@@ -1114,6 +1115,7 @@ app.include_router(whatsapp_admin_router, prefix="/api")
 app.include_router(razorpay_subscription_router, prefix="/api/credits")
 app.include_router(subscription_admin_router, prefix="/api/credits")
 app.include_router(tts_router, prefix="/api")
+app.include_router(reel_studio_router, prefix="/api")
 app.include_router(speech_router, prefix="/api")
 app.include_router(speech_ws_router, prefix="/api")
 app.include_router(credit_request_router, prefix="/api")

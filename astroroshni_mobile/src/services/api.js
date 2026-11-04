@@ -503,6 +503,22 @@ export const chatAPI = {
     const path = getEndpoint('/tts/podcast/stream').replace(/^\//, '');
     return `${base}/${path}?message_id=${encodeURIComponent(String(messageId))}&lang=${encodeURIComponent(langCode)}`;
   },
+  createReelDraft: ({ messageId, durationSeconds = 45, language = 'en', visualLevel = 'hybrid' }) =>
+    api.post(getEndpoint('/reel-studio/drafts/from-answer'), {
+      message_id: messageId,
+      duration_seconds: durationSeconds,
+      language,
+      visual_level: visualLevel,
+    }),
+  queueReel: ({ messageId, durationSeconds = 45, language = 'en', visualLevel = 'hybrid', approvedClaimIds = [] }) =>
+    api.post(getEndpoint('/reel-studio/jobs'), {
+      message_id: messageId,
+      duration_seconds: durationSeconds,
+      language,
+      visual_level: visualLevel,
+      approved_claim_ids: approvedClaimIds,
+    }),
+  getReelJob: (jobId) => api.get(getEndpoint(`/reel-studio/jobs/${encodeURIComponent(String(jobId))}`)),
   submitFeedback: ({ message_id, rating, comment = null, reason = null }) =>
     api.post(getEndpoint('/chat/feedback/submit'), {
       message_id,

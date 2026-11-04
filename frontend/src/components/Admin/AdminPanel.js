@@ -15,6 +15,7 @@ import AdminCreditsDashboard from './AdminCreditsDashboard';
 import AdminCreditsIntelligence from './AdminCreditsIntelligence';
 import AdminBuyerAnalysis from './AdminBuyerAnalysis';
 import AdminQuestionCostSummary from './AdminQuestionCostSummary';
+import AdminReelCosts from './AdminReelCosts';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminFreeAnswerFunnel from './AdminFreeAnswerFunnel';
 import AdminFirstPurchaseOfferFunnel from './AdminFirstPurchaseOfferFunnel';
@@ -3814,6 +3815,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Question Cost
           </button>
+          <button className={`subtab ${activeSubTab === 'reelCosts' ? 'active' : ''}`} onClick={() => setActiveSubTab('reelCosts')}>
+            Reel Costs
+          </button>
           <button 
             className={`subtab ${activeSubTab === 'requests' ? 'active' : ''}`}
             onClick={() => setActiveSubTab('requests')}
@@ -5551,6 +5555,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         {activeTab === 'credits' && activeSubTab === 'questionCost' && (
           <AdminQuestionCostSummary />
         )}
+
+        {activeTab === 'credits' && activeSubTab === 'reelCosts' && <AdminReelCosts />}
 
         {activeTab === 'credits' && activeSubTab === 'subscriptionPurchases' && (
           <AdminSubscriptionDashboard />

@@ -979,11 +979,13 @@ const ChatPage = ({ onLogin, embeddedVerified = false }) => {
     const createChatV2Session = async () => {
         try {
             const token = localStorage.getItem('token');
-            // Web flow may not have a persisted birth_chart_id (birthData.id).
-            // Backend supports null birth_chart_id; we still pass full birth_details on /ask.
-            const birthChartId = birthData?.id ?? null;
-            if (!birthData?.id) {
-                console.warn('[ChatPage] chat-v2 session: missing birthData.id (using null birth_chart_id)');
+            // Profile objects arrive from different web entry points with one
+            // of these three equivalent ID fields. Never create a personal
+            // consultation session with a missing chart binding.
+            const birthChartId = birthData?.chart_id ?? birthData?.birth_chart_id ?? birthData?.id ?? null;
+            if (!birthChartId) {
+                console.warn('[ChatPage] chat-v2 session: selected chart has no persisted ID');
+                return null;
             }
 
             const response = await fetch('/api/chat-v2/session', {
@@ -1326,6 +1328,17 @@ const ChatPage = ({ onLogin, embeddedVerified = false }) => {
         setPendingPrashnaQuestion(null);
         setPrashnaLocation(null);
         void endInstantForContextChange('consultation_context_changed');
+        // "New consultation" must be a genuinely new server thread.  Without
+        // clearing both values, the next prompt reuses the prior chatV2 session
+        // from React state (or its per-chart localStorage pointer).
+        setChatV2SessionId(null);
+        if (singleChartSessionStorageKey) {
+            try {
+                localStorage.removeItem(singleChartSessionStorageKey);
+            } catch {
+                /* Storage can be unavailable in private browsing. */
+            }
+        }
         setMessages([]);
         subjectGateOverrideRef.current = null;
         subjectGateMemoryRef.current = [];

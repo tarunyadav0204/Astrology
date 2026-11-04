@@ -14,7 +14,7 @@ import asyncio
 import time
 from datetime import datetime
 from functools import partial
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from types import SimpleNamespace
 from typing import Optional, Union
 
@@ -159,7 +159,7 @@ def _resolve_live_speech_voice(lang: str, requested_voice_name: Optional[str] = 
   return _FAST_SPEECH_VOICE_HI if normalized_lang.startswith("hi") else _FAST_SPEECH_VOICE_EN
 
 
-def _build_voice_and_config(lang: str, voice_name: Optional[str] = None):
+def _build_voice_and_config(lang: str, voice_name: Optional[str] = None, speaking_rate: Optional[float] = None):
   lang = (lang or "en").lower()
   resolved_voice_name = voice_name or get_speech_tts_voice(lang)
   if resolved_voice_name:
@@ -170,12 +170,12 @@ def _build_voice_and_config(lang: str, voice_name: Optional[str] = None):
     "audio_encoding": texttospeech.AudioEncoding.MP3,
   }
   if _voice_family(resolved_voice_name) != "journey":
-    audio_kwargs["speaking_rate"] = 0.95 if lang.startswith("hi") else 1.08
+    audio_kwargs["speaking_rate"] = speaking_rate if speaking_rate is not None else (0.95 if lang.startswith("hi") else 1.08)
   audio_config = texttospeech.AudioConfig(**audio_kwargs)
   return voice, audio_config
 
 
-def _build_beta_voice_and_config(lang: str, voice_name: Optional[str] = None):
+def _build_beta_voice_and_config(lang: str, voice_name: Optional[str] = None, speaking_rate: Optional[float] = None):
   lang = (lang or "en").lower()
   resolved_voice_name = voice_name or get_speech_tts_voice(lang)
   if resolved_voice_name:
@@ -184,7 +184,7 @@ def _build_beta_voice_and_config(lang: str, voice_name: Optional[str] = None):
     voice = texttospeech_beta.VoiceSelectionParams(language_code=language_code, name=resolved_voice_name)
   audio_config = texttospeech_beta.AudioConfig(
     audio_encoding=texttospeech_beta.AudioEncoding.MP3,
-    speaking_rate=0.95 if lang.startswith("hi") else 1.08,
+    speaking_rate=speaking_rate if speaking_rate is not None else (0.95 if lang.startswith("hi") else 1.08),
   )
   return voice, audio_config
 
@@ -1425,6 +1425,7 @@ class SpeechSynthesisRequest(BaseModel):
   include_timepoints: bool = False
   prepare_spoken: bool = False
   audio_format: str = "json"
+  speaking_rate: Optional[float] = Field(default=None, ge=0.5, le=1.5)
 
 
 @router.post("/synthesize")
@@ -1435,6 +1436,7 @@ async def synthesize(
   include_timepoints: bool = Query(default=False),
   prepare_spoken: bool = Query(default=False),
   audio_format: str = Query(default="json", pattern="^(json|binary)$"),
+  speaking_rate: Optional[float] = Query(default=None, ge=0.5, le=1.5),
   request: Optional[SpeechSynthesisRequest] = Body(default=None),
 ):
   """
@@ -1452,6 +1454,7 @@ async def synthesize(
     include_timepoints = request.include_timepoints
     prepare_spoken = request.prepare_spoken
     audio_format = request.audio_format
+    speaking_rate = request.speaking_rate
   if audio_format not in {"json", "binary"}:
     raise HTTPException(status_code=422, detail="audio_format must be json or binary")
   if not text or not text.strip():
@@ -1467,7 +1470,7 @@ async def synthesize(
     raise HTTPException(status_code=503, detail=f"TTS client initialization failed: {e}")
 
   resolved_voice_name = _resolve_live_speech_voice(lang or "en", voice_name)
-  voice, audio_config = _build_voice_and_config(lang or "en", resolved_voice_name)
+  voice, audio_config = _build_voice_and_config(lang or "en", resolved_voice_name, speaking_rate)
   try:
     tts_total_started = time.perf_counter()
     timing_mode_used = False
@@ -1499,7 +1502,7 @@ async def synthesize(
       marked_chunks = _build_marked_ssml_chunks_and_timeline(spoken_text)
       if marked_chunks:
         beta_client = texttospeech_beta.TextToSpeechClient(credentials=creds)
-        beta_voice, beta_audio_config = _build_beta_voice_and_config(lang or "en", resolved_voice_name)
+        beta_voice, beta_audio_config = _build_beta_voice_and_config(lang or "en", resolved_voice_name, speaking_rate)
         audio_parts: list[bytes] = []
         offset_ms = 0
         for chunk_index, chunk in enumerate(marked_chunks):

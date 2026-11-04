@@ -170,10 +170,16 @@ For every user query, structure your response exactly as follows:
         birth_obj = SimpleNamespace(**birth_data)
         chart_calc = ChartCalculator({})
         chart_data = chart_calc.calculate_chart(birth_obj)
+
+        # Classical Shadbala, initialized by PlanetAnalyzer below, derives
+        # Saptavargaja Bala from the full D1 varga set.  ChartCalculator
+        # returns only the natal chart, so attach the divisional map before
+        # constructing any analyzer that computes Shadbala.
+        divisional_calc = DivisionalChartCalculator(chart_data)
+        chart_data['divisions'] = divisional_calc.calculate_all_divisional_charts()
         
         # Initialize core analyzers
         planet_analyzer = PlanetAnalyzer(chart_data, birth_obj)
-        divisional_calc = DivisionalChartCalculator(chart_data)
         chara_karaka_calc = CharaKarakaCalculator(chart_data)
         yoga_calc = YogaCalculator(birth_obj, chart_data)
         badhaka_calc = BadhakaCalculator(chart_data)
