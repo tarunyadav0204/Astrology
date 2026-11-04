@@ -174,6 +174,10 @@ const normalizedPremiumUi = Object.fromEntries(
     language,
     {
       ...copy,
+      reelStudio: {
+        ...premiumUi.english?.reelStudio,
+        ...copy.reelStudio,
+      },
       shadbala: {
         ...copy.shadbala,
         ...shadbalaUi.technical,

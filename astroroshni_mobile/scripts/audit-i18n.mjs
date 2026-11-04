@@ -34,6 +34,10 @@ const normalizedPremiumCopy = Object.fromEntries(Object.entries(premiumCopy).map
   language,
   {
     ...copy,
+    reelStudio: {
+      ...premiumCopy.english?.reelStudio,
+      ...copy.reelStudio,
+    },
     chatScreen: premiumCopy[chatScreenSource[language]]?.chatScreen || copy.chatScreen,
     shadbala: {
       ...copy.shadbala,

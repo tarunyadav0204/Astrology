@@ -32,6 +32,7 @@ import { generatePDF, sharePDFOnWhatsApp, getLogoDataUriForModule, userFacingPdf
 import { getTextToSpeech } from '../../utils/textToSpeechLazy';
 import { buildReadableEvidence } from '../../utils/instantEvidence';
 import { wrapGlossaryTerms } from '../../utils/chatGlossary';
+import { apiErrorMessage } from '../../utils/apiErrorMessage';
 
 const WHY_TARA_SAYS_THIS = {
   english: 'Why Tara says this',
@@ -1006,13 +1007,13 @@ function MessageBubble({
     try {
       const response = await chatAPI.createReelDraft({
         messageId,
-        durationSeconds: 45,
+        durationSeconds: 180,
         language: podcastLangFromUiLanguage(language),
         visualLevel: 'cinematic',
       });
       setReelDraft(response?.data || null);
     } catch (error) {
-      Alert.alert('Reel Studio', error?.response?.data?.detail || 'Could not prepare this reel.');
+      Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not prepare this reel.'));
       setShowReelStudio(false);
     } finally {
       setIsPreparingReel(false);
@@ -1022,13 +1023,19 @@ function MessageBubble({
   const queueReel = async () => {
     const messageId = message.messageId || message.message_id;
     if (!messageId || !reelDraft) return;
+    if (!reelDraft.draft_id) {
+      setReelDraft(null);
+      Alert.alert('Reel Studio', 'This storyboard was prepared by an older version. Please prepare a new storyboard before queuing it.');
+      return;
+    }
     setIsQueueingReel(true);
     try {
       const response = await chatAPI.queueReel({
         messageId,
-        durationSeconds: 45,
+        durationSeconds: 180,
         language: podcastLangFromUiLanguage(language),
         visualLevel: 'cinematic',
+        draftId: reelDraft.draft_id,
         approvedClaimIds: reelDraft.claims.map((claim) => claim.id),
       });
       const amount = response?.data?.cost_projection?.estimated_total;
@@ -1042,7 +1049,7 @@ function MessageBubble({
           : `Your premium reel is rendering${amount != null ? ` · estimated production cost ₹${amount}` : ''}. Keep this sheet open to follow progress.`,
       );
     } catch (error) {
-      Alert.alert('Reel Studio', error?.response?.data?.detail || 'Could not queue this reel.');
+      Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not queue this reel.'));
     } finally {
       setIsQueueingReel(false);
     }
@@ -2340,7 +2347,7 @@ function MessageBubble({
               style={[styles.actionButton, styles.reelButton, highlightedActionStyle]}
               onPress={openReelStudio}
               accessibilityRole="button"
-              accessibilityLabel="Create chart-grounded reel"
+              accessibilityLabel={t('premiumUi.reelStudio.create', 'Create chart-grounded reel')}
             >
               <Ionicons name="film-outline" size={17} color={colors.primary} />
             </TouchableOpacity>
@@ -3181,7 +3188,7 @@ function MessageBubble({
                   style={[styles.actionButton, styles.reelButton, highlightedActionStyle]}
                   onPress={openReelStudio}
                   accessibilityRole="button"
-                  accessibilityLabel="Create chart-grounded reel"
+                    accessibilityLabel={t('premiumUi.reelStudio.create', 'Create chart-grounded reel')}
                 >
                   <Ionicons name="film-outline" size={17} color={colors.primary} />
                 </TouchableOpacity>
@@ -3482,27 +3489,27 @@ function MessageBubble({
       <Modal visible={showReelStudio} transparent animationType="slide" onRequestClose={() => setShowReelStudio(false)}>
         <View style={styles.reelModalBackdrop}>
           <View style={[styles.reelModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
-            <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>ASTROROSHNI · REEL STUDIO</Text>
-            <Text style={[styles.reelModalTitle, { color: colors.text }]}>Your premium reel</Text>
+            <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.eyebrow', 'ASTROROSHNI · REEL STUDIO')}</Text>
+            <Text style={[styles.reelModalTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.title', 'Your premium reel')}</Text>
             {reelJobId ? <View style={styles.reelModalLoading}>
               <ActivityIndicator color={colors.primary} />
               <Text style={{ color: colors.text, fontWeight: '800' }}>{reelJobStatus === 'completed' ? 'Your reel is ready' : String(reelJobStatus || 'queued').replaceAll('_', ' ')}</Text>
               <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{reelJobStatus === 'completed' ? 'Your finished MP4 is ready to play or download.' : reelJobStatus === 'failed' ? (reelJobError || 'The render failed before the final MP4 could be created.') : 'Creating the animated presenter, chart and dasha inserts, editorial stills and final MP4…'}</Text>
-              {reelJobStatus === 'completed' ? <TouchableOpacity style={[styles.reelQueueButton, { backgroundColor: colors.primary }]} onPress={shareCompletedReel} disabled={isSharingReel}>{isSharingReel ? <ActivityIndicator color={colors.onPrimary || '#fff'} /> : <><Ionicons name="share-outline" size={18} color={colors.onPrimary || '#fff'} /><Text style={[styles.reelQueueText, { color: colors.onPrimary || '#fff' }]}>Open or share MP4</Text></>}</TouchableOpacity> : null}
+              {reelJobStatus === 'completed' ? <TouchableOpacity style={[styles.reelQueueButton, { backgroundColor: colors.primary }]} onPress={shareCompletedReel} disabled={isSharingReel}>{isSharingReel ? <ActivityIndicator color={colors.onPrimary || '#fff'} /> : <><Ionicons name="share-outline" size={18} color={colors.onPrimary || '#fff'} /><Text style={[styles.reelQueueText, { color: colors.onPrimary || '#fff' }]}>{t('premiumUi.reelStudio.openOrShare', 'Open or share MP4')}</Text></>}</TouchableOpacity> : null}
             </View> : isPreparingReel ? (
-              <View style={styles.reelModalLoading}><ActivityIndicator color={colors.primary} /><Text style={{ color: colors.textSecondary }}>Building a chart-grounded storyboard…</Text></View>
+              <View style={styles.reelModalLoading}><ActivityIndicator color={colors.primary} /><Text style={{ color: colors.textSecondary }}>{t('premiumUi.reelStudio.buildingStoryboard', 'Building a chart-grounded storyboard…')}</Text></View>
             ) : reelDraft ? <>
-              <Text style={[styles.reelModalBody, { color: colors.textSecondary }]}>45 seconds · {podcastLangFromUiLanguage(language) === 'hi' ? 'Hindi' : 'English'} · animated presenter</Text>
-              <View style={[styles.reelCostCard, { backgroundColor: colors.surfaceMuted }]}><Text style={[styles.reelCostLabel, { color: colors.textSecondary }]}>Estimated production cost</Text><Text style={[styles.reelCostValue, { color: colors.primary }]}>₹{reelDraft.cost_projection?.estimated_total ?? '—'}</Text></View>
-              <Text style={[styles.reelModalSection, { color: colors.text }]}>Evidence review · {reelDraft.claims?.length || 0} claims</Text>
+              <Text style={[styles.reelModalBody, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.durationLine', '~{{seconds}} seconds · {{language}} · animated presenter', { seconds: Math.ceil((reelDraft.estimated_duration_seconds || 180) / 10) * 10, language: podcastLangFromUiLanguage(language) === 'hi' ? t('common.hindi', 'Hindi') : t('common.english', 'English') })}</Text>
+              <View style={[styles.reelCostCard, { backgroundColor: colors.surfaceMuted }]}><Text style={[styles.reelCostLabel, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.estimatedCost', 'Estimated production cost')}</Text><Text style={[styles.reelCostValue, { color: colors.primary }]}>₹{reelDraft.cost_projection?.estimated_total ?? '—'}</Text></View>
+              <Text style={[styles.reelModalSection, { color: colors.text }]}>{t('premiumUi.reelStudio.evidenceReview', 'Evidence review · {{count}} claims', { count: reelDraft.claims?.length || 0 })}</Text>
               <ScrollView style={styles.reelClaimsScroll} showsVerticalScrollIndicator={false}>
                 {(reelDraft.claims || []).map((claim) => <View key={claim.id} style={[styles.reelClaim, { borderColor: colors.cardBorder }]}><Text style={[styles.reelClaimType, { color: colors.primary }]}>{claim.status === 'interpretation' ? 'INTERPRETATION' : 'CHART VALIDATION'}</Text><Text style={[styles.reelClaimText, { color: colors.text }]}>{claim.text}</Text></View>)}
               </ScrollView>
               <TouchableOpacity style={[styles.reelQueueButton, { backgroundColor: colors.primary }]} onPress={queueReel} disabled={isQueueingReel}>
-                {isQueueingReel ? <ActivityIndicator color={colors.onPrimary || '#fff'} /> : <><Ionicons name="film-outline" size={18} color={colors.onPrimary || '#fff'} /><Text style={[styles.reelQueueText, { color: colors.onPrimary || '#fff' }]}>Approve & queue reel</Text></>}
+                {isQueueingReel ? <ActivityIndicator color={colors.onPrimary || '#fff'} /> : <><Ionicons name="film-outline" size={18} color={colors.onPrimary || '#fff'} /><Text style={[styles.reelQueueText, { color: colors.onPrimary || '#fff' }]}>{t('premiumUi.reelStudio.approveAndQueue', 'Approve & queue reel')}</Text></>}
               </TouchableOpacity>
             </> : null}
-            <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.textSecondary }}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.textSecondary }}>{t('common.cancel', 'Cancel')}</Text></TouchableOpacity>
           </View>
         </View>
       </Modal>
