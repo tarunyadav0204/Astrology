@@ -1031,7 +1031,16 @@ function MessageBubble({
     setIsPreparingReel(true);
     try {
       if (!recreate) {
-        const saved = await chatAPI.getSavedReel(messageId);
+        // During a rolling release an older API may not yet expose the
+        // saved-reel lookup. A missing saved reel is normal for a fresh
+        // generation, so continue into the credit flow rather than showing a
+        // raw “Not Found” alert.
+        let saved = null;
+        try {
+          saved = await chatAPI.getSavedReel(messageId);
+        } catch (savedError) {
+          if (savedError?.response?.status !== 404) throw savedError;
+        }
         if (saved?.data?.job) {
           const job = saved.data.job;
           setReelJobId(job.job_id);

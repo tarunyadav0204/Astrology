@@ -489,7 +489,11 @@ def get_reel_pricing(current_user: User = Depends(get_current_user)):
 
 @router.get("/saved/{message_id}")
 def saved_reel(message_id: int, language: Literal["en", "hi"] | None = None, current_user: User = Depends(get_current_user)):
-    """Reopen a completed reel or reconnect to its render without planning again."""
+    """Reopen a completed reel or reconnect to its render without planning again.
+
+    A message with no earlier reel is a normal fresh-generation state and
+    returns ``{"job": None}``, never a 404.
+    """
     with get_conn() as conn:
         _ensure_tables(conn)
         rows = execute(conn, """SELECT id, status, output_url, error_message, plan_json
