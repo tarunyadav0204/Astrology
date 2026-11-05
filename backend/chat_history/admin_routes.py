@@ -3229,6 +3229,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             CHAT_LLM_DEEPSEEK,
             CHAT_LLM_GEMMA,
             CHAT_LLM_SARVAM,
+            CHAT_LLM_SARVAM_PRISM,
             get_gemini_chat_model,
             get_gemini_premium_model,
             get_gemini_analysis_model,
@@ -3242,6 +3243,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_sarvam_instant_model,
             get_sarvam_speech_model,
             get_sarvam_verified_model,
+            get_sarvam_standard_premium_intent_model,
+            get_standard_premium_intent_router_provider,
             get_speech_chat_llm_provider,
             get_verified_chat_llm_provider,
             get_verified_chat_model, get_verified_router_model, get_verified_planner_model, get_chat_summary_model, get_conflict_resolution_model,
@@ -3345,6 +3348,8 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             "sarvam_speech_chat_model": get_sarvam_speech_model(),
             "verified_chat_llm_provider": get_verified_chat_llm_provider(),
             "sarvam_verified_chat_model": get_sarvam_verified_model(),
+            "standard_premium_intent_router_provider": get_standard_premium_intent_router_provider(),
+            "sarvam_standard_premium_intent_model": get_sarvam_standard_premium_intent_model(),
             "verified_chat_model": get_verified_chat_model(),
             "verified_router_model": get_verified_router_model(),
             "verified_planner_model": get_verified_planner_model(),
@@ -3629,7 +3634,7 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
             from utils.admin_settings import OPENAI_CHAT_MODEL_OPTIONS
             if setting.value not in {model for model, label in OPENAI_CHAT_MODEL_OPTIONS if model != "gpt-4-turbo"}:
                 raise HTTPException(400, "Select a supported OpenAI model")
-        if key in {"sarvam_instant_chat_model", "sarvam_speech_chat_model"}:
+        if key in {"sarvam_instant_chat_model", "sarvam_speech_chat_model", "sarvam_standard_premium_intent_model"}:
             from utils.admin_settings import SARVAM_CHAT_MODEL_OPTIONS
             if setting.value not in {model for model, _ in SARVAM_CHAT_MODEL_OPTIONS}:
                 raise HTTPException(400, "Select a supported Sarvam model")
@@ -3641,6 +3646,8 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
             raise HTTPException(400, "Select Gemini, OpenAI, DeepSeek or Sarvam")
         if key == "verified_chat_llm_provider" and setting.value not in {"openai", "sarvam"}:
             raise HTTPException(400, "Select OpenAI or Sarvam")
+        if key == "standard_premium_intent_router_provider" and setting.value not in {"", "gemini", "openai", "sarvam", "sarvam_prism"}:
+            raise HTTPException(400, "Select existing routing, Gemini, OpenAI, Sarvam or Sarvam Prism")
         if key in {"analysis_llm_vendor", "report_llm_vendor", "timeline_llm_vendor"} and setting.value not in {"gemini", "deepseek", "openai"}:
             raise HTTPException(400, "Select Gemini, OpenAI or DeepSeek")
         if key in {"speech_processing_bridge_model", "parallel_branch_planner_model", "event_timeline_narration_model"} or key.startswith("parallel_branch_gemini_model_"):

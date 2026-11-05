@@ -19,9 +19,13 @@ export default function ModelSettings({ groups, advanced }) {
       setSaving(group.id); setFeedback(previous => ({ ...previous, [group.id]: null }));
       try {
         for (const field of group.fields) {
+          // A masked secret field starts empty even when a value is already
+          // configured. Saving unrelated settings must never erase it.
+          if (field.skipIfEmpty && !field.value) continue;
           const response = await fetch(`/api/admin/settings/${field.key}`, { method: 'PUT', headers: { ...getAdminAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ key: field.key, value: String(field.value ?? ''), description: `${group.title}: ${field.label}` }) });
           if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.detail || `Could not save ${field.label}.`); }
         }
+        group.fields.filter(field => field.clearAfterSave).forEach(field => field.set(''));
         setFeedback(previous => ({ ...previous, [group.id]: { ok: true, text: `${group.title} settings saved.` } }));
       } catch (error) { setFeedback(previous => ({ ...previous, [group.id]: { ok: false, text: error.message } })); }
       finally { setSaving(null); }

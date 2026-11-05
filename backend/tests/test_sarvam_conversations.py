@@ -55,6 +55,47 @@ def test_compose_uses_conversations_model_without_reasoning(monkeypatch):
     assert _Client.captured["json"]["stream"] is False
 
 
+def test_prism_returns_only_a_high_confidence_single_topic_route(monkeypatch):
+    from ai import intent_router
+
+    class PrismResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "answers": {
+                    "route_shape": {
+                        "choice": "simple_topic",
+                        "probabilities": {"simple_topic": 0.97, "detailed_plan": 0.03},
+                    },
+                    "category": {
+                        "choice": "health",
+                        "probabilities": {"health": 0.94, "career": 0.06},
+                    },
+                }
+            }
+
+    class PrismClient(_Client):
+        async def post(self, url, *, headers, json):
+            type(self).captured = {"url": url, "headers": headers, "json": json}
+            return PrismResponse()
+
+    monkeypatch.setattr(intent_router, "get_sarvam_api_key", lambda: "test-key")
+    monkeypatch.setattr(intent_router.httpx, "AsyncClient", PrismClient)
+    router = object.__new__(intent_router.IntentRouter)
+
+    result = asyncio.run(router._classify_standard_premium_with_prism("How is my health?"))
+
+    assert result["category"] == "health"
+    assert result["mode"] == "ANALYZE_TOPIC_POTENTIAL"
+    assert result["answer_mode"] == "ANALYZE_TOPIC_POTENTIAL"
+    assert result["needs_transits"] is False
+    assert PrismClient.captured["url"] == "https://api.sarvam.ai/v2/systemone"
+    assert PrismClient.captured["json"]["model"] == "sarvam-prism"
+    assert "max_tokens" not in PrismClient.captured["json"]
+
+
 def test_verified_sarvam_agent_uses_supported_output_limit(monkeypatch):
     """Sarvam rejects the old 6,000-token Verified request with HTTP 422."""
     import copy

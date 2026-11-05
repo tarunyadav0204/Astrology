@@ -467,6 +467,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [sarvamSpeechChatModel, setSarvamSpeechChatModel] = useState('sarvam-105b-conversations');
   const [verifiedChatLlmProvider, setVerifiedChatLlmProvider] = useState('openai');
   const [sarvamVerifiedChatModel, setSarvamVerifiedChatModel] = useState('sarvam-105b');
+  const [sarvamApiKey, setSarvamApiKey] = useState('');
+  const [sarvamApiKeyConfigured, setSarvamApiKeyConfigured] = useState(false);
+  const [standardPremiumIntentRouterProvider, setStandardPremiumIntentRouterProvider] = useState('');
+  const [sarvamStandardPremiumIntentModel, setSarvamStandardPremiumIntentModel] = useState('sarvam-105b');
   const [parallelBranchGeminiModels, setParallelBranchGeminiModels] = useState(DEFAULT_PARALLEL_BRANCH_MODELS);
   const [parallelBranchPlannerEnabled, setParallelBranchPlannerEnabled] = useState(false);
   const [parallelBranchPlannerModel, setParallelBranchPlannerModel] = useState('');
@@ -935,6 +939,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       });
       const data = await response.json();
       setAdminSettings(data.settings || []);
+      const sarvamKeySetting = (data.settings || []).find((setting) => setting.key === 'sarvam_api_key');
+      setSarvamApiKeyConfigured(sarvamKeySetting?.value === 'configured');
+      setSarvamApiKey('');
       const debugSetting = data.settings.find(s => s.key === 'debug_logging_enabled');
       setDebugLogging(debugSetting?.value === 'true');
       const androidMin = data.settings.find(s => s.key === 'min_android_version_code');
@@ -977,6 +984,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setSarvamSpeechChatModel(data.sarvam_speech_chat_model || data.sarvam_instant_chat_model || 'sarvam-105b-conversations');
       setVerifiedChatLlmProvider(data.verified_chat_llm_provider || 'openai');
       setSarvamVerifiedChatModel(data.sarvam_verified_chat_model || 'sarvam-105b');
+      setStandardPremiumIntentRouterProvider(data.standard_premium_intent_router_provider || '');
+      setSarvamStandardPremiumIntentModel(data.sarvam_standard_premium_intent_model || 'sarvam-105b');
       setParallelBranchGeminiModels({
         ...DEFAULT_PARALLEL_BRANCH_MODELS,
         ...(data.parallel_branch_gemini_models || {}),
@@ -3590,6 +3599,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const modelField = (key, label, value, set, provider) => ({ key, label, value, set, options: modelOptionsFor(provider) });
   const modelProvider = (key, value, set, gemma = false, inherit = false, analysis = false, sarvam = false) => ({ key, label: 'Provider', value, set, required: !inherit, options: [...(inherit ? [{ value: '', label: 'Same as Standard chat' }] : []), { value: 'gemini', label: 'Google Gemini' }, { value: 'openai', label: 'OpenAI (ChatGPT)' }, { value: 'deepseek', label: 'DeepSeek' }, ...(sarvam ? [{ value: 'sarvam', label: 'Sarvam AI' }] : []), ...(gemma ? [{ value: 'gemma', label: 'Self-hosted Gemma' }] : [])] });
   const verifiedModelProvider = (value, set) => ({ key: 'verified_chat_llm_provider', label: 'Provider', value, set, options: [{ value: 'openai', label: 'OpenAI (ChatGPT)' }, { value: 'sarvam', label: 'Sarvam AI' }] });
+  const standardPremiumIntentRouterProviderField = (value, set) => ({ key: 'standard_premium_intent_router_provider', label: 'Router provider', value, set, required: false, options: [{ value: '', label: 'Existing routing' }, { value: 'gemini', label: 'Google Gemini' }, { value: 'openai', label: 'OpenAI (ChatGPT)' }, { value: 'sarvam', label: 'Sarvam AI' }, { value: 'sarvam_prism', label: 'Sarvam Prism (decisions)' }] });
   const extraModelField = (key, label) => ({ key, label, value: extraModels[key] || '', set: value => setExtraModels(previous => ({ ...previous, [key]: value })), options: openaiModelOptions.filter(option => option.value !== 'gpt-4-turbo') });
   const chatModelField = premium => {
     const provider = premium ? (chatLlmProviderPremium || chatLlmProvider) : chatLlmProvider;
@@ -6597,6 +6607,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             {settingsSubTab === 'models' && <ModelSettings groups={[
   { id: 'standard', title: 'Standard chat', description: 'Answers in Standard mode.', fields: [modelProvider('chat_llm_provider', chatLlmProvider, setChatLlmProvider, true), ...chatModelField(false)] },
   { id: 'premium', title: 'Premium chat', description: 'Detailed answers in Premium mode.', fields: [modelProvider('chat_llm_provider_premium', chatLlmProviderPremium, setChatLlmProviderPremium, true, true), ...chatModelField(true)] },
+  { id: 'sarvamCredential', title: 'Sarvam credential', description: 'Used by Sarvam 105B, Conversations, and Prism. Stored in Admin Settings, not in .env or Google Secret Manager.', fields: [{ key: 'sarvam_api_key', label: 'Sarvam API key', type: 'password', value: sarvamApiKey, set: setSarvamApiKey, required: false, skipIfEmpty: true, clearAfterSave: true, hint: sarvamApiKeyConfigured ? 'A key is configured. Leave this blank to keep it, or enter a replacement.' : 'Enter the API key supplied by Sarvam.' }] },
+  { id: 'standardPremiumIntent', title: 'Standard & Premium intent router', description: 'Classifies the question and selects chart evidence. Prism handles high-confidence single-topic decisions; complex or uncertain questions use the existing detailed router. It never writes the final answer.', fields: [standardPremiumIntentRouterProviderField(standardPremiumIntentRouterProvider, setStandardPremiumIntentRouterProvider), ...(standardPremiumIntentRouterProvider === 'sarvam' ? [modelField('sarvam_standard_premium_intent_model', 'Router model', sarvamStandardPremiumIntentModel, setSarvamStandardPremiumIntentModel, 'sarvam')] : [])] },
   { id: 'verified', title: 'Verified chat', description: 'Writes the final answer using reviewed evidence and calculators. Sarvam uses the 128K-context model required by this evidence packet.', fields: [verifiedModelProvider(verifiedChatLlmProvider, setVerifiedChatLlmProvider), verifiedChatLlmProvider === 'sarvam' ? { key: 'sarvam_verified_chat_model', label: 'Answer model', value: sarvamVerifiedChatModel, set: setSarvamVerifiedChatModel, options: sarvamVerifiedModelOptions } : extraModelField('verified_chat_model', 'Answer model')] },
   { id: 'instant', title: 'Instant chat', description: 'Handles routing and answers in Instant mode.', fields: [modelProvider('instant_chat_llm_provider', instantChatLlmProvider, setInstantChatLlmProvider, false, false, false, true), modelField(instantChatLlmProvider === 'openai' ? 'openai_instant_chat_model' : instantChatLlmProvider === 'deepseek' ? 'deepseek_instant_chat_model' : instantChatLlmProvider === 'sarvam' ? 'sarvam_instant_chat_model' : 'gemini_instant_chat_model', 'Model', instantChatLlmProvider === 'openai' ? openaiInstantChatModel : instantChatLlmProvider === 'deepseek' ? deepseekInstantChatModel : instantChatLlmProvider === 'sarvam' ? sarvamInstantChatModel : geminiInstantChatModel, instantChatLlmProvider === 'openai' ? setOpenaiInstantChatModel : instantChatLlmProvider === 'deepseek' ? setDeepseekInstantChatModel : instantChatLlmProvider === 'sarvam' ? setSarvamInstantChatModel : setGeminiInstantChatModel, instantChatLlmProvider)] },
   { id: 'speechAnswer', title: 'Talk To Tara answer', description: 'Chooses the provider for the final answer in speech conversations. Non-Sarvam providers use their existing chat model.', fields: [modelProvider('speech_chat_llm_provider', speechChatLlmProvider, setSpeechChatLlmProvider, false, false, false, true), ...(speechChatLlmProvider === 'sarvam' ? [modelField('sarvam_speech_chat_model', 'Answer model', sarvamSpeechChatModel, setSarvamSpeechChatModel, 'sarvam')] : [])] },

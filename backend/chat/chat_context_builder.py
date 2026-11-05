@@ -44,6 +44,7 @@ from utils.query_context import resolve_query_now
 from calculators.sudarshana_dasha_calculator import SudarshanaDashaCalculator
 from calculators.nakshatra_remedy_calculator import NakshatraRemedyCalculator
 from app.kp.services.chart_service import KPChartService
+from chat.llm_context_safety import strip_outer_planets_from_llm_context
 
 # Import modular system instruction config
 from .system_instruction_config import (
@@ -52,6 +53,33 @@ from .system_instruction_config import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _restrict_divisional_chart_scope(full_context: Dict[str, Any], requested_chart_codes: List[str]) -> None:
+    """Keep every chart representation aligned with the router's evidence plan.
+
+    ``d1_chart.divisions`` is a convenient calculator payload, but it used to
+    carry every computed varga after ``divisional_charts`` had been filtered.
+    That let answer models see D10 during a health-only reading. The router's
+    list is already the category/cross-domain union, so it is the sole scope.
+    """
+    allowed = {str(code).upper() for code in requested_chart_codes if str(code).strip()}
+    allowed.add("D1")
+    for key in ("d1_chart", "chart_data", "natal_chart"):
+        chart = full_context.get(key)
+        if isinstance(chart, dict) and isinstance(chart.get("divisions"), dict):
+            chart["divisions"] = {
+                str(code): payload
+                for code, payload in chart["divisions"].items()
+                if str(code).upper() in allowed
+            }
+    if "D9" not in allowed:
+        # These cached convenience fields otherwise expose Navamsa facts even
+        # when the router deliberately did not request Navamsa.
+        full_context.pop("d9_planetary_analysis", None)
+        ashtakavarga = full_context.get("ashtakavarga")
+        if isinstance(ashtakavarga, dict):
+            ashtakavarga.pop("d9_navamsa", None)
 
 
 def _context_log_event(event: str, level: int = logging.INFO, **fields) -> None:
@@ -400,11 +428,6 @@ class ChatContextBuilder:
                     filtered_divisional_charts[chart_name] = all_charts[chart_name]
                     # print(f"   ✅ Including {code} ({chart_name})")
             
-            # Always ensure D9 is included (required for analysis)
-            if 'd9_navamsa' not in filtered_divisional_charts and 'd9_navamsa' in all_charts:
-                filtered_divisional_charts['d9_navamsa'] = all_charts['d9_navamsa']
-                # print(f"   ✅ Added mandatory D9 Navamsa")
-            
             # Add Karkamsa/Swamsa if requested
             if 'Karkamsa' in requested_chart_codes or 'Swamsa' in requested_chart_codes:
                 from calculators.jaimini_chart_calculator import JaiminiChartCalculator
@@ -431,6 +454,7 @@ class ChatContextBuilder:
                         # print(f"   ✅ Added Swamsa chart (D9 planets from D9 AK lagna)")
             
             full_context['divisional_charts'] = filtered_divisional_charts
+            _restrict_divisional_chart_scope(full_context, requested_chart_codes)
             # print(f"📊 Sending {len(filtered_divisional_charts)} divisional charts to Gemini")
         else:
             _context_log_event(
@@ -471,7 +495,7 @@ class ChatContextBuilder:
             logger.exception("locational_recommendation_pack_failed")
         
         # Apply minification before returning
-        return self._minify_data(full_context)
+        return self._minify_data(strip_outer_planets_from_llm_context(full_context))
     
     def _build_static_context(self, birth_data: Dict) -> Dict[str, Any]:
         """Build static chart context (cached per birth data)"""

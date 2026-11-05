@@ -21,6 +21,7 @@ from calculators.neecha_bhanga_calculator import NeechaBhangaCalculator
 from calculators.sniper_points_calculator import SniperPointsCalculator
 from calculators.shoola_dasha_calculator import ShoolaDashaCalculator
 from shared.dasha_calculator import DashaCalculator
+from chat.llm_context_safety import strip_outer_planets_from_llm_context
 
 class BaseAIContextGenerator:
     """Base context generator for all AI analysis types (health, education, career, marriage, etc.)"""
@@ -156,10 +157,10 @@ For every user query, structure your response exactly as follows:
         dynamic_context = self._build_dynamic_base_context(birth_data)
         
         # Combine contexts
-        return {
+        return strip_outer_planets_from_llm_context({
             **static_context,
             **dynamic_context
-        }
+        })
     
     def _build_static_base_context(self, birth_data: Dict) -> Dict[str, Any]:
         """Build static base context (cached per birth data)"""

@@ -30,6 +30,7 @@ from calculators.real_transit_calculator import RealTransitCalculator
 from calculators.shadbala_calculator import ShadbalaCalculator
 from calculators.yogi_calculator import YogiCalculator
 from chat.chat_context_builder import ChatContextBuilder
+from chat.llm_context_safety import strip_outer_planets_from_llm_context
 from daily_prediction_spine import build_daily_prediction_spine
 from instant_chat_v2 import build_instant_v2_packet, finalize_instant_v2_packet
 from instant_chat_v2.career import (
@@ -14985,7 +14986,7 @@ def _build_instant_context(
         "complexity_hint": complexity_hint,
         "named_dasha_lookup": named_dasha_lookup,
     }
-    return context_result
+    return strip_outer_planets_from_llm_context(context_result)
 
 
 _FOLLOW_UPS_START = "###FOLLOW_UPS_START###"

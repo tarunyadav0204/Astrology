@@ -53,7 +53,7 @@ EVIDENCE INTEGRITY:
   Do not rename them as Sanghatta, Parivartana, or classical Sarvatobhadra Vedha.
 - Geographic regions are modern editorial analogies, not measured impact locations;
   never turn these mappings into definite province-specific disaster forecasts.
-- Outer planets are a modern supplementary method, not classical Vedic grahas.
+- Uranus, Neptune and Pluto are excluded from chat analysis and must not be used or mentioned.
 - National dasha snapshots cover their declared focus instant, not an entire forecast horizon.
   Do not fabricate future dasha changes or day/hour timing absent calculations.
 

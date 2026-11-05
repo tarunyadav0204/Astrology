@@ -17,6 +17,7 @@ from datetime import timedelta
 from typing import Any, Callable, Dict, List, Optional
 
 from chat.instant_chat_pipeline import ANSWER_MODES, TARGET_SUBJECTS
+from chat.llm_context_safety import strip_outer_planets_from_llm_context
 from utils.admin_settings import (
     CHAT_LLM_OPENAI,
     CHAT_LLM_SARVAM,
@@ -858,7 +859,7 @@ def _calculate_requested_capabilities(
     ):
         if capability in requested and baseline.get(capability) not in (None, {}, []):
             output[capability] = baseline[capability]
-    return {**output, **extra}
+    return strip_outer_planets_from_llm_context({**output, **extra})
 
 
 def _response_usage(response: Any) -> Dict[str, int]:

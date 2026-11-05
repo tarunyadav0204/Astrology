@@ -3,6 +3,7 @@ from __future__ import annotations
 # Unified Output Schema - Single Source of Truth for Response Formatting
 import json
 from datetime import datetime
+from chat.llm_context_safety import strip_outer_planets_from_llm_context
 
 
 def resolve_output_language_policy(language: str, user_question: str) -> dict:
@@ -563,7 +564,7 @@ TEMPLATE_MUNDANE = """
 2. **Chart Basis and Timing**: Identify the event/venue, timezone, chosen foundation conventions, date coverage and assumed times.
    If exact event time or national foundation is unresolved, explain how that limits the reading.
 3. **Relevant Calculated Factors**: Explain event chart/Panchang where available, relevant ingresses and lunations,
-   national periods and modern outer-planet context. Omit unsupported or irrelevant layers.
+   national periods. Uranus, Neptune and Pluto are excluded from chat analysis.
    The partial nav_nayak provides Minister only; never invent King or other offices.
 4. **Comparison and Counter-Evidence**: Compare confirmed entities where relevant.
    For sports explain supplied scorecard reasons and conditional input-order side assignment.
@@ -943,7 +944,7 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
     prompt_parts = []
     
     import copy
-    static_context = copy.deepcopy(context)
+    static_context = strip_outer_planets_from_llm_context(copy.deepcopy(context))
     if normalize_merge_response_style(response_style) == "simple":
         # The legacy analyzer stores a technical header mandate in this context
         # field.  Do not pass that contradictory presentation contract to the

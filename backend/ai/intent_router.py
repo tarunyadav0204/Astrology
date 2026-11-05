@@ -56,11 +56,14 @@ from utils.admin_settings import (
     CHAT_LLM_GEMINI,
     CHAT_LLM_OPENAI,
     CHAT_LLM_SARVAM,
+    CHAT_LLM_SARVAM_PRISM,
     get_sarvam_api_key,
     get_instant_chat_llm_provider,
     get_instant_chat_model,
     get_chat_llm_provider,
     get_openai_chat_model,
+    get_sarvam_standard_premium_intent_model,
+    get_standard_premium_intent_router_provider,
 )
 
 logger = logging.getLogger(__name__)
@@ -3271,6 +3274,120 @@ class IntentRouter:
         )
         return SimpleNamespace(text=str(result.get("text") or ""), usage_metadata=usage_metadata)
 
+    async def _generate_sarvam_standard_premium_intent(self, prompt: str, model_name: str) -> str:
+        """Run the Standard/Premium planner on Sarvam without changing answer generation."""
+        api_key = get_sarvam_api_key()
+        if not api_key:
+            raise ValueError("Sarvam API key is not configured in Admin Settings")
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+            response = await client.post(
+                "https://api.sarvam.ai/v1/chat/completions",
+                headers={"api-subscription-key": api_key, "Accept": "application/json"},
+                json={
+                    "model": str(model_name or "sarvam-105b-conversations").strip(),
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are AstroRoshni's Standard and Premium intent router. "
+                                "Return exactly one JSON object that obeys the requested schema, "
+                                "with no prose or Markdown. You classify and choose evidence only; "
+                                "you never write the user-facing astrology answer."
+                            ),
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.0,
+                    "max_tokens": 4096,
+                    "response_format": {"type": "json_object"},
+                    "stream": False,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+        choice = (data.get("choices") or [{}])[0] if isinstance(data, dict) else {}
+        return str(((choice.get("message") or {}).get("content") or "")).strip()
+
+    async def _classify_standard_premium_with_prism(self, user_question: str) -> Dict[str, Any] | None:
+        """Use Prism for safe, high-confidence single-topic routing.
+
+        Prism returns decisions rather than prose. It therefore owns only the
+        fixed routing decision; timing, explicit-chart, multi-topic, and
+        uncertain requests continue into the existing detailed router.
+        """
+        api_key = get_sarvam_api_key()
+        if not api_key:
+            raise ValueError("Sarvam API key is not configured in Admin Settings")
+        categories = {
+            "career": "job, career, business, promotion, professional direction or income from work",
+            "wealth": "money, finances, savings, gains, debt or investments",
+            "relationship": "love, relationship, marriage, spouse or partner",
+            "health": "physical health, wellbeing, illness, vitality or stress",
+            "children": "children, pregnancy, conception or parenting",
+            "education": "education, studies, examinations or learning",
+            "property": "home, property, vehicle or relocation within the country",
+            "foreign": "travel abroad, visa, overseas work, migration or settlement abroad",
+            "spirituality": "purpose, dharma, spirituality or inner growth",
+            "general": "a general chart or personality question not covered above",
+        }
+        payload = {
+            "model": "sarvam-prism",
+            "state": {"current_question": str(user_question or "").strip()},
+            "questions": {
+                "route_shape": {
+                    "type": "choice",
+                    "instructions": "Can this be answered as one timeless, single-life-area reading without a detailed plan?",
+                    "criteria": {
+                        "simple_topic": "One life-area question. It does not ask when, about a date, current transits/dasha, a named divisional chart, a comparison, remedies, a cause, or multiple unrelated topics.",
+                        "detailed_plan": "It asks about timing, dates, current conditions, a named chart or technique, comparison, remedies, root cause, multiple topics, or otherwise needs detailed planning.",
+                    },
+                },
+                "category": {
+                    "type": "choice",
+                    "instructions": "What is the primary life area of the current question?",
+                    "criteria": categories,
+                },
+            },
+        }
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            response = await client.post(
+                "https://api.sarvam.ai/v2/systemone",
+                headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+                json=payload,
+            )
+            response.raise_for_status()
+            data = response.json()
+        answers = data.get("answers") if isinstance(data, dict) else None
+        if not isinstance(answers, dict):
+            return None
+        shape = answers.get("route_shape") if isinstance(answers.get("route_shape"), dict) else {}
+        category = answers.get("category") if isinstance(answers.get("category"), dict) else {}
+        shape_choice = str(shape.get("choice") or "")
+        category_choice = str(category.get("choice") or "")
+        shape_probability = float((shape.get("probabilities") or {}).get(shape_choice) or 0.0)
+        category_probability = float((category.get("probabilities") or {}).get(category_choice) or 0.0)
+        if shape_choice != "simple_topic" or category_choice not in categories:
+            return None
+        # Use the API's top-option probability (not its rescaled confidence).
+        # Below this threshold the detailed router remains the authority.
+        if min(shape_probability, category_probability) < 0.90:
+            return None
+        return {
+            "status": "READY",
+            "mode": "ANALYZE_TOPIC_POTENTIAL",
+            # Match the legacy router's current single-topic contract so the
+            # downstream Standard/Premium pipeline sees the same shape.
+            "answer_mode": "ANALYZE_TOPIC_POTENTIAL",
+            "context_type": "birth",
+            "category": category_choice,
+            "needs_transits": False,
+            "extracted_context": {
+                "routing_source": "sarvam_prism",
+                "prism_category_probability": round(category_probability, 4),
+                "prism_shape_probability": round(shape_probability, 4),
+            },
+        }
+
     def _chart_insight_message_is_valid(self, message: Any) -> bool:
         if not isinstance(message, str):
             return False
@@ -5327,10 +5444,55 @@ CLARIFICATION FORMAT RULE:
         Categories: job, career, promotion, business, love, relationship, marriage, partner, wealth, money, finance, health, disease, property, home, child, pregnancy, education, learning, travel, visa, foreign, gain, wish, general, son, daughter, mother, father, spouse, siblings, children, family, soul, spirituality, purpose, dharma, vehicles, nakshatra, birth_star, timing
         """
         
-        # Standard Chat follows its Admin provider/model setting too.  This
-        # keeps the classifier aligned with parallel branches and the merge
-        # writer when Standard Chat is switched to Luna.
-        if get_chat_llm_provider() == CHAT_LLM_OPENAI:
+        # This is intentionally separate from the final-answer provider. The
+        # planner can use Sarvam while the existing parallel or legacy answer
+        # pipeline continues to use its configured Gemini/OpenAI/etc. writers.
+        configured_router_provider = get_standard_premium_intent_router_provider()
+        router_provider = configured_router_provider or (
+            CHAT_LLM_OPENAI if get_chat_llm_provider() == CHAT_LLM_OPENAI else CHAT_LLM_GEMINI
+        )
+        if router_provider == CHAT_LLM_SARVAM_PRISM:
+            try:
+                prism_result = await self._classify_standard_premium_with_prism(user_question)
+            except Exception as exc:
+                logger.warning("sarvam_prism_standard_premium_router_failed: %s", exc)
+                prism_result = None
+            if prism_result is not None:
+                return self._finalize_router_result(
+                    prism_result,
+                    user_question=user_question,
+                    current_year=current_year,
+                    current_month=current_month,
+                    resolved_now=resolved_now,
+                    normalized_query_context=normalized_query_context,
+                    include_chart_insights=False,
+                    d1_chart=d1_chart,
+                    force_ready=force_ready,
+                    language=language,
+                )
+            # Complex, uncertain, or unavailable Prism decisions deliberately
+            # continue through the established detailed router.
+            router_provider = (
+                CHAT_LLM_OPENAI if get_chat_llm_provider() == CHAT_LLM_OPENAI else CHAT_LLM_GEMINI
+            )
+        if router_provider == CHAT_LLM_SARVAM:
+            cleaned = await self._generate_sarvam_standard_premium_intent(
+                prompt,
+                get_sarvam_standard_premium_intent_model(),
+            )
+            return self._finalize_router_result(
+                json.loads(cleaned.replace("```json", "").replace("```", "").strip()),
+                user_question=user_question,
+                current_year=current_year,
+                current_month=current_month,
+                resolved_now=resolved_now,
+                normalized_query_context=normalized_query_context,
+                include_chart_insights=False,
+                d1_chart=d1_chart,
+                force_ready=force_ready,
+                language=language,
+            )
+        if router_provider == CHAT_LLM_OPENAI:
             from ai.gemini_chat_analyzer import GeminiChatAnalyzer
 
             routed = await GeminiChatAnalyzer().generate_text_from_prompt(

@@ -114,6 +114,7 @@ CHAT_LLM_OPENAI = "openai"
 CHAT_LLM_DEEPSEEK = "deepseek"
 CHAT_LLM_GEMMA = "gemma"
 CHAT_LLM_SARVAM = "sarvam"
+CHAT_LLM_SARVAM_PRISM = "sarvam_prism"
 
 # Self-hosted Gemma (or compatible) HTTP POST /generate-analysis — override via admin or GEMMA_CHAT_GENERATE_URL.
 DEFAULT_GEMMA_CHAT_GENERATE_URL = "http://8.231.104.209:8000/generate-analysis"
@@ -577,6 +578,29 @@ def get_sarvam_verified_model() -> str:
     """
     value = (get_setting("sarvam_verified_chat_model") or DEFAULT_SARVAM_VERIFIED_MODEL).strip()
     supported = {model for model, _ in SARVAM_VERIFIED_MODEL_OPTIONS}
+    return value if value in supported else DEFAULT_SARVAM_VERIFIED_MODEL
+
+
+def get_standard_premium_intent_router_provider() -> str:
+    """Optional provider override for Standard/Premium question classification.
+
+    This setting deliberately controls only the fast intent router. It must
+    not change the model(s) that prepare the final Standard/Premium answer.
+    An empty value preserves the existing legacy routing behaviour.
+    """
+    value = (get_setting("standard_premium_intent_router_provider") or "").strip().lower()
+    if value in {CHAT_LLM_GEMINI, CHAT_LLM_OPENAI, CHAT_LLM_SARVAM, CHAT_LLM_SARVAM_PRISM}:
+        return value
+    return ""
+
+
+def get_sarvam_standard_premium_intent_model() -> str:
+    """Sarvam model used only for Standard/Premium intent classification."""
+    # Standard/Premium routing includes history and structured facts, so use
+    # the 128K model by default. Admin can explicitly choose Conversations
+    # when its 32K window is sufficient and lower latency is preferred.
+    value = (get_setting("sarvam_standard_premium_intent_model") or DEFAULT_SARVAM_VERIFIED_MODEL).strip()
+    supported = {model for model, _ in SARVAM_CHAT_MODEL_OPTIONS}
     return value if value in supported else DEFAULT_SARVAM_VERIFIED_MODEL
 
 
