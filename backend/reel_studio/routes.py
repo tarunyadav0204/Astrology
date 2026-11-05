@@ -319,9 +319,16 @@ def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dic
             },
         },
     }
+    language_instruction = (
+        "REEL LANGUAGE: Hindi (Devanagari). Write every narration and visual instruction in natural, fluent Hindi. "
+        "Translate the approved answer faithfully; do not merely transliterate English."
+        if language == "hi" else
+        "REEL LANGUAGE: English. Write every narration and visual instruction in natural, fluent English."
+    )
     prompt = f'''Return JSON only: {{"beats":[{{"type":"", "narration":"", "evidence_ids":[], "visual_instruction":"", "focus_nodes":[], "draw_edges":[]}}]}}.
 Write a detailed {duration_seconds}-second premium vertical reel plan that ANSWERS THE USER'S ACTUAL QUESTION and explains why the approved answer reaches that conclusion. Do not make a generic astrology reel. Select 12 to 18 beats from these supported visual modules only: {sorted(_VISUAL_MODULES)}. Choose modules that fit the answer; do not force chart, dasha, Ashtakavarga, transit, or timing scenes when the evidence does not support them. Use opening first and closing last. Write complete, naturally spoken passages. The combined narration MUST contain between {round(duration_seconds * 2.35)} and {round(duration_seconds * 2.5)} words for a calm podcast pace. Never cut a sentence, use ellipses, or repeat a closing/thank-you line. Every beat must include a concrete visual_instruction describing the desired image. For chart_focus, select relevant verified focus nodes and arrows when the graph has them. For lifestyle_image, describe a real-life scene tied to the answer. All images are created by GPT Image from this directed data; no visual may introduce a fact outside the approved claims or VERIFIED VISUAL DATA. EVIDENCE RULE: every beat's evidence_ids must be a non-empty array containing only exact id values from the CLAIMS list below. Never create a new claim ID and never leave evidence_ids empty.
 Use plain text for narration and all visible image labels. Strip Markdown syntax from source copy: a heading such as 'Key Insights' must never include hash, asterisk, or backtick formatting markers.
+{language_instruction}
 USER QUESTION: {question[:2000]}
 APPROVED ANSWER: {answer[:9000]}
 CLAIMS: {json.dumps(claims, ensure_ascii=False)}

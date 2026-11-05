@@ -17,6 +17,8 @@ export default function PodcastLanguageModal({
   onSelect,
   onClose,
   colors,
+  title,
+  body,
 }) {
   const { t } = useTranslation();
   const text = colors?.text ?? '#111';
@@ -31,10 +33,10 @@ export default function PodcastLanguageModal({
       <View style={styles.overlay}>
         <View style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}>
           <Text style={[styles.title, { color: text }]}>
-            {t('chat.podcastLanguage.title', 'Choose podcast language')}
+            {title || t('chat.podcastLanguage.title', 'Choose podcast language')}
           </Text>
           <Text style={[styles.body, { color: sub }]}>
-            {included
+            {body || (included
               ? t(
                   'chat.podcastLanguage.premiumBody',
                   'This Premium answer includes a free podcast. Choose English or Hindi.',
@@ -42,7 +44,7 @@ export default function PodcastLanguageModal({
               : t(
                   'chat.podcastLanguage.body',
                   "We'll generate the audio in the language you pick. English and Hindi only.",
-                )}
+                ))}
           </Text>
           <View style={styles.options}>
             {OPTIONS.map((opt) => {

@@ -342,6 +342,13 @@ Design an award-quality Indian luxury astrology product campaign: deep burgundy,
 
 
 def _scene_image_prompt(plan: dict, beat: dict, snapshot: dict) -> str:
+    language = str((plan.get("settings") or {}).get("language") or "en").lower()
+    language_instruction = (
+        "Hindi (Devanagari). All editorial copy, headings, callouts, and app-interface labels in this image must be fluent Hindi. "
+        "Keep the official brand name AstroRoshni unchanged, and retain numeric values and dates exactly."
+        if language == "hi" else
+        "English. All editorial copy, headings, callouts, and app-interface labels in this image must be fluent English."
+    )
     claims = {str(item.get("id")): plain_text(item.get("text") or "") for item in plan.get("claims") or []}
     evidence = [claims.get(str(key), "") for key in beat.get("evidence_ids") or []]
     ascendant_sign = int(snapshot.get("ascendant_sign") or 0) % 12
@@ -428,6 +435,7 @@ VERIFIED DATA FOR THIS MODULE ONLY: {json.dumps(source, ensure_ascii=False)}
 FOCUS NODES: {json.dumps(beat.get("focus_nodes") or [])}; VERIFIED ARROWS: {json.dumps(beat.get("draw_edges") or [])}
 STRICT RENDERING RULE: {rendering_rule}
 VISIBLE TEXT: Use finished plain typography. Never print Markdown formatting markers (hashes, asterisks, backticks) in the image. Headings must read naturally, for example 'Key Insights'.
+OUTPUT LANGUAGE: {language_instruction}
 Create an award-quality Indian luxury editorial design: burgundy, champagne-gold, cream UI cards, phone/app screens where appropriate, clear arrows and pointed callout blocks. Use only the supplied claims and verified data. Do not invent astrology, dates, placements, scores, predictions, generic reports, or thank-you messages. Prefer a few short, large, readable labels over paragraphs of invented copy. All text and focal elements must remain inside 9:16 safe margins.'''
 
 

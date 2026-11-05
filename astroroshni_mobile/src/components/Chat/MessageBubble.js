@@ -308,6 +308,8 @@ function MessageBubble({
   const [showReelCreditsModal, setShowReelCreditsModal] = useState(false);
   const [reelCreditQuote, setReelCreditQuote] = useState(null);
   const [isRecreatingReel, setIsRecreatingReel] = useState(false);
+  const [showReelLanguageModal, setShowReelLanguageModal] = useState(false);
+  const [reelLanguage, setReelLanguage] = useState(() => podcastLangFromUiLanguage(language));
   const reelPrepareLock = useRef(false);
   const [showInstantEvidence, setShowInstantEvidence] = useState(false);
   const blurShownTrackedRef = useRef(false);
@@ -1050,14 +1052,28 @@ function MessageBubble({
           return;
         }
       }
-      const quote = await chatAPI.getReelPricing();
-      setReelCreditQuote(quote.data);
       setIsRecreatingReel(recreate);
       setShowReelStudio(false);
-      setShowReelCreditsModal(true);
+      setShowReelLanguageModal(true);
     } catch (error) {
       Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not prepare this reel.'));
       setShowReelStudio(false);
+    } finally {
+      setIsPreparingReel(false);
+    }
+  };
+
+  const selectReelLanguage = async (selectedLanguage) => {
+    const normalizedLanguage = podcastLangFromUiLanguage(selectedLanguage);
+    setReelLanguage(normalizedLanguage);
+    setShowReelLanguageModal(false);
+    setIsPreparingReel(true);
+    try {
+      const quote = await chatAPI.getReelPricing();
+      setReelCreditQuote(quote.data);
+      setShowReelCreditsModal(true);
+    } catch (error) {
+      Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not prepare this reel.'));
     } finally {
       setIsPreparingReel(false);
     }
@@ -1073,7 +1089,7 @@ function MessageBubble({
     setReelJobId(null); setReelJobStatus(''); setReelJobError(''); setReelDraft(null);
     setShowReelStudio(true); setIsPreparingReel(true);
     try {
-      const response = await chatAPI.createReelDraft({ messageId: message.messageId || message.message_id, durationSeconds: 180, language: podcastLangFromUiLanguage(language), visualLevel: 'cinematic' });
+      const response = await chatAPI.createReelDraft({ messageId: message.messageId || message.message_id, durationSeconds: 180, language: reelLanguage, visualLevel: 'cinematic' });
       await queueReel(response.data);
     } catch (error) {
       Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not prepare this reel.'));
@@ -1089,7 +1105,7 @@ function MessageBubble({
       const response = await chatAPI.queueReel({
         messageId,
         durationSeconds: 180,
-        language: podcastLangFromUiLanguage(language),
+        language: reelLanguage,
         visualLevel: 'cinematic',
         draftId: draftOverride.draft_id,
         approvedClaimIds: draftOverride.claims.map((claim) => claim.id),
@@ -1110,6 +1126,15 @@ function MessageBubble({
 
   const renderReelStudio = () => (<>
       {showReelPlayer && reelJobId && <ReelPlayerModal jobId={reelJobId} onClose={() => setShowReelPlayer(false)} onRecreate={recreateReel} />}
+      <PodcastLanguageModal
+        visible={showReelLanguageModal}
+        selectedLang={reelLanguage}
+        onSelect={selectReelLanguage}
+        onClose={() => setShowReelLanguageModal(false)}
+        colors={colors}
+        title={t('premiumUi.reelStudio.languageTitle', 'Choose reel language')}
+        body={t('premiumUi.reelStudio.languageDescription', 'Your narration and all on-screen editorial copy will be created in the language you choose.')}
+      />
       <ConfirmCreditsModal
         visible={showReelCreditsModal}
         onClose={() => { setShowReelCreditsModal(false); if (reelJobId) setShowReelStudio(true); }}

@@ -30,6 +30,8 @@
       "recreate": "Recreate",
       "playSaved": "Play saved reel",
       "openingSaved": "Opening saved reel…",
+      "languageTitle": "Choose reel language",
+      "languageDescription": "Your narration and all on-screen editorial copy will be created in the language you choose.",
       "streamingFallback": "Playing from your saved reel library.",
       "timeline": "Reel timeline",
       "loadError": "Could not open the saved reel. Please try again.",
