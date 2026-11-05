@@ -10,6 +10,7 @@ import random
 import logging
 import threading
 import time
+import httpx
 from types import SimpleNamespace
 from datetime import datetime, timedelta
 from typing import Any, Dict
@@ -54,6 +55,8 @@ from utils.admin_settings import (
     CHAT_LLM_DEEPSEEK,
     CHAT_LLM_GEMINI,
     CHAT_LLM_OPENAI,
+    CHAT_LLM_SARVAM,
+    get_sarvam_api_key,
     get_instant_chat_llm_provider,
     get_instant_chat_model,
     get_chat_llm_provider,
@@ -3094,6 +3097,43 @@ class IntentRouter:
 
     async def _generate_instant_content(self, prompt: str, model_name: str, timeout_s: float):
         provider = get_instant_chat_llm_provider()
+        if provider == CHAT_LLM_SARVAM:
+            api_key = get_sarvam_api_key()
+            if not api_key:
+                raise ValueError("Sarvam API key is not configured in Admin Settings")
+            async with httpx.AsyncClient(timeout=httpx.Timeout(max(3.0, timeout_s))) as client:
+                response = await client.post(
+                    "https://api.sarvam.ai/v1/chat/completions",
+                    headers={"api-subscription-key": api_key, "Accept": "application/json"},
+                    json={
+                        "model": str(model_name or "sarvam-105b-conversations").strip(),
+                        "messages": [
+                            {"role": "system", "content": (
+                                "You are AstroRoshni's intent router. Return exactly one JSON object that obeys "
+                                "the requested schema and no prose or Markdown."
+                            )},
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0.0,
+                        "max_tokens": 4096,
+                        "response_format": {"type": "json_object"},
+                        "stream": False,
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+            choice = (data.get("choices") or [{}])[0] if isinstance(data, dict) else {}
+            text = str(((choice.get("message") or {}).get("content") or "")).strip()
+            usage = data.get("usage") or {}
+            return SimpleNamespace(
+                text=text,
+                usage_metadata=SimpleNamespace(
+                    prompt_token_count=int(usage.get("prompt_tokens") or 0),
+                    candidates_token_count=int(usage.get("completion_tokens") or 0),
+                    cached_content_token_count=0,
+                    total_token_count=int(usage.get("total_tokens") or 0),
+                ),
+            )
         if provider == CHAT_LLM_OPENAI:
             try:
                 from openai import AsyncOpenAI

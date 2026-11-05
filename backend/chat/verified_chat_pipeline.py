@@ -17,7 +17,13 @@ from datetime import timedelta
 from typing import Any, Callable, Dict, List, Optional
 
 from chat.instant_chat_pipeline import ANSWER_MODES, TARGET_SUBJECTS
-from utils.admin_settings import CHAT_LLM_OPENAI, get_verified_planner_model, get_verified_router_model
+from utils.admin_settings import (
+    CHAT_LLM_OPENAI,
+    CHAT_LLM_SARVAM,
+    get_sarvam_api_key,
+    get_verified_planner_model,
+    get_verified_router_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +188,300 @@ def _json_limit(value: Any, limit: int = 14000) -> Any:
     if len(encoded) <= limit:
         return value
     return {"truncated": True, "preview": encoded[:limit]}
+
+
+def _compact_sarvam_tool_payload(value: Any, limit: int) -> Any:
+    """Bound one Sarvam tool result while retaining evidence from every root.
+
+    Sarvam's chat models retain every prior tool result in the next request. A
+    single raw Verified packet can exceed the 128K model context, especially
+    after Shadbala or Ashtakavarga results are added. Give each top-level
+    evidence branch a fair JSON budget instead of keeping only a prefix of the
+    whole packet (which tends to discard the topic evidence at the end).
+    """
+    encoded = json.dumps(value, ensure_ascii=False, default=str)
+    if len(encoded) <= limit:
+        return value
+    if not isinstance(value, dict) or not value:
+        return _json_limit(value, limit)
+    branch_limit = max(800, (limit - 600) // len(value))
+    compact = {
+        str(key): _json_limit(child, branch_limit)
+        for key, child in value.items()
+    }
+    # A small final guard covers key names and JSON punctuation.
+    if len(json.dumps(compact, ensure_ascii=False, default=str)) <= limit:
+        return compact
+    return _json_limit(compact, limit)
+
+
+def _sarvam_verified_fact_ledger(
+    instant_context: Dict[str, Any], calculated: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Small immutable fact ledger for Sarvam's final Verified writing turn."""
+    natal = instant_context.get("natal_snapshot") if isinstance(instant_context.get("natal_snapshot"), dict) else {}
+    planets = natal.get("key_planets") if isinstance(natal.get("key_planets"), dict) else {}
+    lordships = natal.get("house_lordships") if isinstance(natal.get("house_lordships"), dict) else {}
+    tenth_lord = next((planet for planet, houses in lordships.items() if 10 in (houses or [])), None)
+    d1_planets = {
+        planet: {key: row.get(key) for key in ("sign", "house", "degree", "dignity", "combust") if row.get(key) is not None}
+        for planet, row in planets.items() if isinstance(row, dict)
+    }
+    divisional_charts: Dict[str, Dict[str, Any]] = {}
+    ashtakavarga: Dict[str, Any] = {}
+    for cache_key, value in calculated.items():
+        if not isinstance(value, dict):
+            continue
+        if cache_key.startswith("parashari.divisional_confirmation:"):
+            for chart_code, chart_value in value.items():
+                rows = ((chart_value.get("divisional_chart") or {}).get("planets") or {}) if isinstance(chart_value, dict) else {}
+                if isinstance(rows, dict) and re.fullmatch(r"D\d+", str(chart_code)):
+                    divisional_charts[str(chart_code)] = {
+                        planet: {key: row.get(key) for key in ("sign_name", "house", "dignity")}
+                        for planet, row in rows.items() if isinstance(row, dict)
+                    }
+        if cache_key.startswith("parashari.ashtakavarga:"):
+            houses = value.get("houses") or {}
+            if isinstance(houses, dict):
+                ashtakavarga = {
+                    str(house): {"sav": row.get("sav"), "bav": row.get("bav")}
+                    for house, row in houses.items() if isinstance(row, dict)
+                }
+    return {
+        "D1": {
+            "tenth_lord": tenth_lord,
+            "house_lordships": lordships,
+            "planet_placements": d1_planets,
+        },
+        "D10": {"planet_placements": divisional_charts.get("D10", {})},
+        "divisional_charts": divisional_charts,
+        "ashtakavarga": ashtakavarga,
+        "current_dashas": instant_context.get("current_dashas") or {},
+    }
+
+
+_HOUSE_ORDINAL_WORDS = {
+    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6,
+    "seventh": 7, "eighth": 8, "ninth": 9, "tenth": 10, "eleventh": 11, "twelfth": 12,
+}
+_HOUSE_REFERENCE_PATTERN = r"(\d+(?:st|nd|rd|th)?|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)"
+
+
+def _sarvam_house_number(value: str) -> int | None:
+    token = str(value or "").strip().lower()
+    if token in _HOUSE_ORDINAL_WORDS:
+        return _HOUSE_ORDINAL_WORDS[token]
+    numeric = re.match(r"^(\d+)", token)
+    return int(numeric.group(1)) if numeric else None
+
+
+def _validate_sarvam_verified_fact_ledger(answer: str, ledger: Dict[str, Any]) -> List[str]:
+    """Validate factual chart claims generically against the deterministic ledger.
+
+    This deliberately checks chart identities, not the interpretive conclusion:
+    it works for every topic and every native, while preserving the model's role
+    in explaining the meaning of those facts.
+    """
+    text = str(answer or "")
+    errors: List[str] = []
+    d1 = ledger.get("D1") if isinstance(ledger.get("D1"), dict) else {}
+    d1_planets = d1.get("planet_placements") if isinstance(d1.get("planet_placements"), dict) else {}
+    lordships = d1.get("house_lordships") if isinstance(d1.get("house_lordships"), dict) else {}
+    d1_lords = {
+        int(house): planet
+        for planet, houses in lordships.items()
+        for house in (houses or [])
+        if isinstance(house, int) or (isinstance(house, str) and house.isdigit())
+    }
+    divisional_charts = ledger.get("divisional_charts") or {}
+    bav = ledger.get("ashtakavarga") or {}
+    current_dashas = ledger.get("current_dashas") if isinstance(ledger.get("current_dashas"), dict) else {}
+    pratyantardasha = next(
+        (row.get("planet") for key, row in current_dashas.items()
+         if str(key).strip().lower() in {"pratyantardasha", "pratyantar", "pd"}
+         and isinstance(row, dict) and row.get("planet")),
+        None,
+    )
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    planet_names = "Sun|Moon|Mars|Mercury|Jupiter|Venus|Saturn|Rahu|Ketu"
+    for sentence in sentences:
+        if not sentence:
+            continue
+        chart_match = re.search(r"\b(D\s*\d+)\b", sentence, re.I)
+        divisional_chart = chart_match.group(1).replace(" ", "").upper() if chart_match else ""
+        divisional_sentence = bool(divisional_chart)
+        for match in re.finditer(
+            rf"\b({planet_names})\b[^.\n]{{0,90}}\b(?:the\s+)?(\d+)(?:st|nd|rd|th)?\s+(?:house\s+)?lord\b|"
+            rf"\b({planet_names})\b[^.\n]{{0,90}}\blord\s+of\s+(?:your\s+)?(\d+)(?:st|nd|rd|th)?\s+house\b",
+            sentence, re.I,
+        ):
+            planet = next(value for value in (match.group(1), match.group(3)) if value)
+            house = int(next(value for value in (match.group(2), match.group(4)) if value))
+            expected = d1_lords.get(house)
+            if not divisional_sentence and expected and planet.lower() != str(expected).lower():
+                errors.append(f"{planet} is incorrectly described as the D1 House {house} lord; it is {expected}.")
+        if not divisional_sentence:
+            for planet, row in d1_planets.items():
+                actual_house = row.get("house") if isinstance(row, dict) else None
+                match = re.search(
+                    rf"\b{re.escape(str(planet))}\b[^.\n]{{0,90}}\b(?:in|occup(?:ies|ying)|placed\s+in|sits\s+in)\s+(?:the\s+)?{_HOUSE_REFERENCE_PATTERN}\s+house\b",
+                    sentence, re.I,
+                )
+                claimed_house = _sarvam_house_number(match.group(1)) if match else None
+                if claimed_house is not None and actual_house is not None and claimed_house != int(actual_house):
+                    errors.append(f"{planet} is stated in D1 House {match.group(1)}, but is in House {actual_house}.")
+        else:
+            for planet, row in (divisional_charts.get(divisional_chart) or {}).items():
+                actual_house = (row or {}).get("house") if isinstance(row, dict) else None
+                house_match = re.search(
+                    rf"\b{re.escape(str(planet))}\b[^.\n]{{0,100}}\b(?:in|occup(?:ies|ying)|placed\s+in|sits\s+in)\s+(?:the\s+)?{_HOUSE_REFERENCE_PATTERN}\s+house\b",
+                    sentence, re.I,
+                )
+                claimed_house = _sarvam_house_number(house_match.group(1)) if house_match else None
+                if claimed_house is not None and actual_house is not None and claimed_house != int(actual_house):
+                    errors.append(
+                        f"{divisional_chart} {planet} is stated in House {house_match.group(1)}, but is in House {actual_house}."
+                    )
+                actual_dignity = str((row or {}).get("dignity") or "").replace("_", " ").lower()
+                if not actual_dignity:
+                    continue
+                dignity_match = re.search(
+                    rf"\b{re.escape(str(planet))}\b[^.\n]{{0,100}}\b(exalted|debilitated|neutral|own\s+sign|mooltrikona)\b",
+                    sentence, re.I,
+                )
+                if dignity_match and dignity_match.group(1).replace(" ", "_").lower() != actual_dignity.replace(" ", "_"):
+                    errors.append(f"{divisional_chart} {planet} dignity is {actual_dignity}, not {dignity_match.group(1).lower()}.")
+    for house, values in bav.items():
+        planet_values = values.get("bav") if isinstance(values, dict) else {}
+        for planet, expected in (planet_values or {}).items():
+            match = re.search(
+                rf"\bBAV\b[^.\n]{{0,100}}\b{re.escape(str(planet))}\b[^.\n]{{0,100}}\b(?:House\s*)?{re.escape(str(house))}\b[^.\n]{{0,50}}\b(?:is|of)\s*(\d+)",
+                text, re.I,
+            )
+            if match and expected is not None and int(match.group(1)) != int(expected):
+                errors.append(f"{planet} BAV for House {house} is {expected}, not {match.group(1)}.")
+    if pratyantardasha:
+        pd_match = re.search(
+            rf"(?:\b({planet_names})\b\s*-\s*)?\b({planet_names})\b[^.\n]{{0,80}}"
+            r"\b(?:pratyantardasha|pratyantar|PD)\b",
+            text, re.I,
+        )
+        # In a label such as "Mercury-Jupiter ... (PD)", the final planet is
+        # the claimed PD lord. Compare that explicit label to the calculated
+        # current PD; this is a factual check, not an interpretation rewrite.
+        if pd_match and pd_match.group(2).casefold() != str(pratyantardasha).casefold():
+            errors.append(
+                f"Current PD is {pratyantardasha}, but the answer labels {pd_match.group(2)} as the PD lord."
+            )
+    return errors
+
+
+_SARVAM_FACT_ID_RE = re.compile(r"\[\[FACT:([A-Za-z0-9:_-]+)\]\]")
+
+
+def _sarvam_verified_fact_ids(ledger: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Create language-neutral, display-hidden identifiers for immutable facts."""
+    facts: Dict[str, Dict[str, Any]] = {}
+    d1 = ledger.get("D1") if isinstance(ledger.get("D1"), dict) else {}
+    for planet, houses in (d1.get("house_lordships") or {}).items():
+        for house in houses or []:
+            facts[f"D1:{planet}:LORD:H{house}"] = {"chart": "D1", "planet": planet, "fact": "lord", "house": house}
+    for planet, row in (d1.get("planet_placements") or {}).items():
+        if not isinstance(row, dict):
+            continue
+        for field in ("house", "sign", "dignity", "combust"):
+            if row.get(field) is not None:
+                facts[f"D1:{planet}:{field.upper()}:{row[field]}"] = {
+                    "chart": "D1", "planet": planet, "fact": field, "value": row[field],
+                }
+    for chart_code, planet_rows in (ledger.get("divisional_charts") or {}).items():
+        for planet, row in (planet_rows or {}).items():
+            if not isinstance(row, dict):
+                continue
+            for field in ("house", "sign_name", "dignity"):
+                if row.get(field) is not None:
+                    facts[f"{chart_code}:{planet}:{field.upper()}:{row[field]}"] = {
+                        "chart": chart_code, "planet": planet, "fact": field, "value": row[field],
+                    }
+    for house, row in (ledger.get("ashtakavarga") or {}).items():
+        if not isinstance(row, dict):
+            continue
+        if row.get("sav") is not None:
+            facts[f"SAV:H{house}:{row['sav']}"] = {"fact": "sav", "house": house, "value": row["sav"]}
+        for planet, value in (row.get("bav") or {}).items():
+            facts[f"BAV:H{house}:{planet}:{value}"] = {"fact": "bav", "house": house, "planet": planet, "value": value}
+    for level, row in (ledger.get("current_dashas") or {}).items():
+        if isinstance(row, dict) and row.get("planet"):
+            normalized_level = str(level).upper()
+            aliases = {
+                "MAHA": "MD", "MAHADASHA": "MD", "MD": "MD",
+                "ANTAR": "AD", "ANTARDASHA": "AD", "AD": "AD",
+                "PRATYANTAR": "PD", "PRATYANTARDASHA": "PD", "PD": "PD",
+            }
+            short_level = aliases.get(normalized_level, normalized_level)
+            natal_house = row.get("natal_house")
+            if natal_house is None:
+                planet_row = (d1.get("planet_placements") or {}).get(row["planet"]) or {}
+                natal_house = planet_row.get("house") if isinstance(planet_row, dict) else None
+            for prefix in ("DASHA", "Dasha"):
+                facts[f"{prefix}:{short_level}:{row['planet']}"] = {
+                    "fact": "dasha", "level": short_level, "planet": row["planet"],
+                }
+                if natal_house is not None:
+                    facts[f"{prefix}:{short_level}:H{natal_house}"] = {
+                        "fact": "dasha_natal_house", "level": short_level, "house": natal_house,
+                    }
+    return facts
+
+
+def _sarvam_verified_fact_reference_card(fact_ids: Dict[str, Dict[str, Any]]) -> List[str]:
+    """Render immutable facts as copyable sentences for Sarvam's final writer.
+
+    The JSON ledger is authoritative but dense. A compact natural-language
+    card avoids asking the model to reconstruct (and occasionally transpose)
+    a planet, lordship or house while it writes fluent prose. This is evidence
+    only; the model still writes every visible sentence itself.
+    """
+    lines: List[str] = []
+    for fact_id, detail in fact_ids.items():
+        chart = str(detail.get("chart") or "")
+        planet = str(detail.get("planet") or "")
+        fact = str(detail.get("fact") or "")
+        value = detail.get("value")
+        if fact == "lord":
+            lines.append(f"{fact_id} — In D1, {planet} is lord of House {detail.get('house')}.")
+        elif fact == "house":
+            lines.append(f"{fact_id} — In {chart}, {planet} is in House {value}.")
+        elif fact == "sign":
+            lines.append(f"{fact_id} — In D1, {planet} is in {value}.")
+        elif fact == "sign_name":
+            lines.append(f"{fact_id} — In {chart}, {planet} is in {value}.")
+        elif fact == "dignity":
+            lines.append(f"{fact_id} — In {chart}, {planet}'s dignity is {value}.")
+        elif fact == "combust":
+            lines.append(f"{fact_id} — In D1, {planet} combust status is {value}.")
+        elif fact == "sav":
+            lines.append(f"{fact_id} — SAV for House {detail.get('house')} is {value}.")
+        elif fact == "bav":
+            lines.append(f"{fact_id} — {planet} BAV for House {detail.get('house')} is {value}.")
+        elif fact == "dasha":
+            lines.append(f"{fact_id} — Current {detail.get('level')} dasha lord is {planet}.")
+        elif fact == "dasha_natal_house":
+            lines.append(f"{fact_id} — Current {detail.get('level')} dasha lord is natal House {detail.get('house')}.")
+    return lines
+
+
+def _validate_sarvam_verified_fact_ids(answer: str, fact_ids: Dict[str, Dict[str, Any]]) -> List[str]:
+    used = _SARVAM_FACT_ID_RE.findall(str(answer or ""))
+    normalized = {key.casefold(): key for key in fact_ids}
+    errors = [f"Unknown hidden fact ID: {fact_id}" for fact_id in used if fact_id.casefold() not in normalized]
+    if fact_ids and not used:
+        errors.append("No hidden canonical fact IDs were attached to the Verified answer.")
+    return errors
+
+
+def _strip_sarvam_verified_fact_ids(answer: str) -> str:
+    return re.sub(r"\s*\[\[FACT:[A-Za-z0-9:_-]+\]\]", "", str(answer or "")).strip()
 
 
 def _find_named_values(value: Any, names: set[str], found: Dict[str, Any]) -> None:
@@ -1106,6 +1406,7 @@ async def run_verified_calculator_agent(
     conversation_mode: bool = False,
     stream_callback: Optional[Callable[[str, str], None]] = None,
     calculation_callback: Optional[Callable[[List[Dict[str, str]]], None]] = None,
+    provider: str = CHAT_LLM_OPENAI,
 ) -> Dict[str, Any]:
     """Run the bounded Verified Chat calculator loop through Responses tools.
 
@@ -1114,6 +1415,14 @@ async def run_verified_calculator_agent(
     Each turn transports only the newest function outputs through the Responses
     chain; the final answer-only turn may stream to the client.
     """
+    if str(provider or "").strip().lower() == CHAT_LLM_SARVAM:
+        return await run_sarvam_verified_calculator_agent(
+            question=question, language=language, birth_data=birth_data,
+            instant_context=instant_context, history=history, model_name=model_name,
+            timeout_s=timeout_s, response_style=response_style,
+            conversation_mode=conversation_mode, stream_callback=stream_callback,
+            calculation_callback=calculation_callback,
+        )
     try:
         from openai import AsyncOpenAI
     except ImportError as exc:
@@ -1641,6 +1950,400 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
             "calculator_rounds_used": calculator_rounds_used,
             "tool_round_limit": max_calculator_rounds,
         },
+    }
+
+
+async def run_sarvam_verified_calculator_agent(
+    *,
+    question: str,
+    language: str,
+    birth_data: Dict[str, Any],
+    instant_context: Dict[str, Any],
+    history: List[Dict[str, Any]],
+    model_name: str,
+    timeout_s: float,
+    response_style: str = "technical",
+    conversation_mode: bool = False,
+    stream_callback: Optional[Callable[[str, str], None]] = None,
+    calculation_callback: Optional[Callable[[List[Dict[str, str]]], None]] = None,
+) -> Dict[str, Any]:
+    """Verified calculator loop using Sarvam Chat tool calls.
+
+    Sarvam returns function requests; this service validates them against the
+    same closed calculator registry used by the OpenAI Verified agent, runs the
+    deterministic calculation locally, and returns its JSON as a tool message.
+    Sarvam never receives authority to calculate a chart itself.
+    """
+    import httpx
+
+    api_key = get_sarvam_api_key()
+    if not api_key:
+        raise RuntimeError("Sarvam API key is not configured in Admin Settings")
+    started = time.perf_counter()
+    timeout_s = max(15.0, min(180.0, float(timeout_s)))
+    baseline = build_verified_baseline(instant_context)
+    baseline_payloads = _capability_payloads(instant_context)
+    intent_mode = _verified_presentation_mode(instant_context)
+    instructions = _premium_writer_system(
+        intent_mode, language, native_name=str(birth_data.get("name") or ""), response_style=response_style,
+    )
+    from chat.calculator_menu import CALCULATOR_EVIDENCE_INTEGRITY
+    from chat.verified_consultation import verified_consultation_instruction, verified_final_delivery_instruction
+    instructions += "\n" + CALCULATOR_EVIDENCE_INTEGRITY + "\n" + verified_consultation_instruction()
+    conversation_context = build_verified_conversation_context(
+        history,
+        instant_context.get("intent_summary") if isinstance(instant_context.get("intent_summary"), dict) else {},
+    )
+    tools = [
+        {"type": "function", "function": {
+            "name": "get_instant_baseline",
+            "description": "Get the deterministic natal, dasha, transit and topic baseline. Call before analysis.",
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        }},
+        {"type": "function", "function": {
+            "name": "get_deterministic_evidence",
+            "description": "Run one additional approved deterministic astrology calculator when needed.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "capability_id": {"type": "string", "enum": list(CAPABILITY_REGISTRY)},
+                    "parameters": {
+                        "type": "object",
+                        "description": "Calculator parameters only. For divisions, use only 1,2,3,4,5,6,7,8,9,10,11,12,16,20,24,27,30,40,45,60; never request D120.",
+                    },
+                },
+                "required": ["capability_id", "parameters"],
+                "additionalProperties": False,
+            },
+        }},
+    ]
+    messages: List[Dict[str, Any]] = [
+        {"role": "system", "content": instructions},
+        {"role": "user", "content": (
+            f"Answer in {language}. First inspect the deterministic baseline, then request only additional "
+            f"registered calculators needed for this question.\nQuestion: {question}\n"
+            f"Conversation context (not chart evidence): {json.dumps(conversation_context, ensure_ascii=False, default=str)}"
+        )},
+    ]
+    usage = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0}
+    tool_events: List[Dict[str, Any]] = []
+    information_rounds: List[Dict[str, Any]] = []
+    trace_rows: List[Dict[str, str]] = []
+    calculated: Dict[str, Any] = {}
+    unavailable: List[Dict[str, str]] = []
+    sent_chars = sum(len(str(message.get("content") or "")) for message in messages)
+
+    async def publish_trace() -> None:
+        if calculation_callback is not None:
+            await asyncio.to_thread(calculation_callback, list(trace_rows))
+
+    def add_usage(data: Dict[str, Any]) -> None:
+        row = data.get("usage") if isinstance(data, dict) else {}
+        if not isinstance(row, dict):
+            return
+        usage["input_tokens"] += int(row.get("prompt_tokens") or 0)
+        usage["output_tokens"] += int(row.get("completion_tokens") or 0)
+
+    async def request(
+        *, tool_choice: Any, response_format: Optional[Dict[str, Any]] = None,
+        request_messages: Optional[List[Dict[str, Any]]] = None,
+        request_tools: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        remaining = max(1.0, timeout_s - (time.perf_counter() - started))
+        payload = {
+            "model": model_name,
+            "messages": request_messages if request_messages is not None else messages,
+            "tools": request_tools if request_tools is not None else tools,
+            "tool_choice": tool_choice,
+            "temperature": 0.1,
+            # Sarvam's V1 Chat Completions API caps Starter-tier requests at
+            # 4,096 output tokens.  A larger value is rejected with HTTP 422
+            # before the model can execute even the mandatory baseline tool.
+            "max_tokens": 4096,
+            # Verified has already gathered deterministic calculator evidence.
+            # Disable Sarvam 105B's default thinking mode so it does not spend
+            # the output budget on reasoning_content and return blank visible
+            # content after a long tool loop.
+            "reasoning_effort": None,
+            "stream": False,
+        }
+        if response_format is not None:
+            payload["response_format"] = response_format
+        async with httpx.AsyncClient(timeout=httpx.Timeout(remaining)) as client:
+            response = await client.post(
+                "https://api.sarvam.ai/v1/chat/completions",
+                headers={"api-subscription-key": api_key, "Accept": "application/json"}, json=payload,
+            )
+            if response.is_error:
+                # Sarvam returns useful validation detail in the response body
+                # (for example, an unsupported field or context-limit breach).
+                # Preserve a bounded copy in our error log rather than losing it
+                # behind httpx's generic HTTPStatusError.
+                detail = response.text[:1000]
+                raise RuntimeError(f"Sarvam Verified request failed ({response.status_code}): {detail}")
+            response.raise_for_status()
+            data = response.json()
+        add_usage(data)
+        return data
+
+    async def execute_call(call: Dict[str, Any], round_no: int) -> Dict[str, Any]:
+        nonlocal sent_chars
+        function = call.get("function") if isinstance(call.get("function"), dict) else {}
+        name = str(function.get("name") or "")
+        try:
+            args = json.loads(str(function.get("arguments") or "{}"))
+        except json.JSONDecodeError:
+            args = {}
+        if name == "get_instant_baseline":
+            result: Any = baseline
+            capability = "get_instant_baseline"
+            success = True
+        elif name == "get_deterministic_evidence":
+            capability = str(args.get("capability_id") or "")
+            parameters = args.get("parameters") if isinstance(args.get("parameters"), dict) else {}
+            if capability not in CAPABILITY_REGISTRY:
+                result = {"error": "unavailable_calculator", "capability_id": capability}
+                unavailable.append({"code": "unavailable_calculator", "capability_id": capability})
+                success = False
+            else:
+                cache_key = capability + ":" + json.dumps(parameters, sort_keys=True)
+                if cache_key not in calculated:
+                    try:
+                        result_map = await asyncio.to_thread(
+                            _calculate_requested_capabilities, birth_data, [capability],
+                            baseline_payloads, instant_context, parameters,
+                        )
+                        calculated[cache_key] = result_map.get(capability)
+                    except Exception as exc:
+                        # A model can request unsupported calculator arguments.
+                        # Return a bounded tool error so it can continue with the
+                        # baseline or choose a valid calculator; never let one
+                        # invalid tool call abort a Verified response.
+                        logger.warning(
+                            "Sarvam Verified calculator request rejected capability=%s parameters=%s error=%s",
+                            capability, parameters, str(exc)[:300],
+                        )
+                        calculated[cache_key] = {
+                            "error": "invalid_calculator_parameters",
+                            "capability_id": capability,
+                            "message": "This calculator request is unavailable. Use a supported calculator or the inspected baseline.",
+                        }
+                result = calculated[cache_key]
+                success = not (result in (None, {}, []) or (isinstance(result, dict) and result.get("error")))
+                if success:
+                    calculated[capability] = result
+                else:
+                    if not (isinstance(result, dict) and result.get("error") == "invalid_calculator_parameters"):
+                        result = {"error": "calculation_unavailable", "capability_id": capability}
+                    unavailable.append({"code": "calculation_unavailable", "capability_id": capability})
+        else:
+            capability = name or "unknown"
+            result = {"error": "unsupported_tool"}
+            success = False
+        # The raw baseline is intentionally exhaustive for the OpenAI
+        # Responses path. Sarvam's Chat endpoint re-sends tool history on
+        # every turn, so use bounded evidence packets there to stay within its
+        # 128K context window even after several calculator calls.
+        result = _compact_sarvam_tool_payload(
+            result,
+            30000 if capability == "get_instant_baseline" else 12000,
+        )
+        tool_events.append({"round": round_no, "tool": capability, "success": success})
+        information_rounds.append({"round": round_no, "kind": "calculation", "calculator": capability,
+                                   "requested": args, "provided": result, "success": success})
+        serialized = json.dumps(result, ensure_ascii=False, default=str)
+        sent_chars += len(serialized)
+        return {"role": "tool", "tool_call_id": str(call.get("id") or ""), "content": serialized}
+
+    first = await request(tool_choice={"type": "function", "function": {"name": "get_instant_baseline"}})
+    max_rounds = 8
+    for round_no in range(0, max_rounds + 1):
+        choice = ((first.get("choices") or [{}])[0] if isinstance(first, dict) else {})
+        message = choice.get("message") if isinstance(choice.get("message"), dict) else {}
+        calls = message.get("tool_calls") if isinstance(message.get("tool_calls"), list) else []
+        if round_no == 0 and not any(
+            isinstance(call, dict)
+            and str((call.get("function") or {}).get("name") or "") == "get_instant_baseline"
+            for call in calls
+        ):
+            raise RuntimeError("sarvam_verified_agent_did_not_request_baseline")
+        # Sarvam validates the follow-up tool-call message strictly. Its API
+        # expects an assistant tool-call turn with no `content` field, whereas
+        # OpenAI accepts `content: null`. Sending the latter causes a 422 after
+        # the otherwise successful baseline request.
+        assistant_tool_message = {"role": "assistant", "tool_calls": calls}
+        if message.get("content") is not None:
+            assistant_tool_message["content"] = message["content"]
+        messages.append(assistant_tool_message)
+        if not calls:
+            break
+        tool_messages = [await execute_call(call, round_no) for call in calls if isinstance(call, dict)]
+        messages.extend(tool_messages)
+        await publish_trace()
+        first = await request(tool_choice="auto")
+    fact_ledger = _sarvam_verified_fact_ledger(instant_context, calculated)
+    fact_ids = _sarvam_verified_fact_ids(fact_ledger)
+    fact_reference_card = _sarvam_verified_fact_reference_card(fact_ids)
+    # Sarvam may acknowledge ``response_format=json_object`` yet still emit
+    # prose.  Its function-calling transport is reliable (it is already used
+    # for the calculator loop above), so make the final delivery a *forced*
+    # structured submission.  The answer remains wholly model-authored: this
+    # code only receives and validates it, and never rewrites or trims it.
+    final_submission_name = "submit_verified_answer"
+    tools.append({"type": "function", "function": {
+        "name": final_submission_name,
+        "description": "Submit the complete Verified answer and its hidden canonical fact IDs. Use only after all evidence has been inspected.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "type": "string",
+                    "description": "The complete user-visible answer. It must not contain fact IDs or correction notes.",
+                },
+                "fact_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Canonical IDs supporting every stated chart, dasha, divisional-chart, SAV or BAV fact.",
+                },
+            },
+            "required": ["answer", "fact_ids"],
+            "additionalProperties": False,
+        },
+    }})
+
+    def final_submission(response: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any], str]:
+        """Extract Sarvam's forced final tool call without modifying its answer."""
+        choice = ((response.get("choices") or [{}])[0] if isinstance(response, dict) else {})
+        message = choice.get("message") if isinstance(choice.get("message"), dict) else {}
+        calls = message.get("tool_calls") if isinstance(message.get("tool_calls"), list) else []
+        for call in calls:
+            function = call.get("function") if isinstance(call, dict) and isinstance(call.get("function"), dict) else {}
+            if str(function.get("name") or "") != final_submission_name:
+                continue
+            try:
+                payload = json.loads(str(function.get("arguments") or "{}"))
+            except json.JSONDecodeError:
+                payload = {}
+            return (
+                payload if isinstance(payload, dict) else {},
+                {"role": "assistant", "tool_calls": [call]},
+                str(call.get("id") or ""),
+            )
+
+        # Retain the text only for diagnostics/validation. It is deliberately
+        # not repaired, pruned or displayed when Sarvam violates the forced
+        # submission contract.
+        raw = str(message.get("content") or "").strip()
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            payload = {"answer": raw, "fact_ids": _SARVAM_FACT_ID_RE.findall(raw)}
+        return (
+            payload if isinstance(payload, dict) else {},
+            {"role": "assistant", "content": raw},
+            "",
+        )
+
+    def validate_final_payload(payload: Dict[str, Any]) -> tuple[str, List[str], List[str]]:
+        answer = str(payload.get("answer") or "").strip()
+        ids = payload.get("fact_ids")
+        if not isinstance(ids, list):
+            ids = []
+        # A model can occasionally echo the instruction template into the
+        # submission arguments. That is neither a reading nor something the
+        # backend may safely "clean up". Reject the whole submission and let
+        # Sarvam generate a fresh answer on the repair turn.
+        template_markers = (
+            "RESPONSE STRUCTURE (MANDATORY)",
+            "Your response MUST follow this exact sequence",
+            "CRITICAL FORMATTING RULE",
+            "The subsection headers under \"Astrological Analysis\" are already provided",
+        )
+        delivery_errors = [
+            "The submitted answer leaked internal response-template instructions; submit a complete user-facing reading instead."
+        ] if any(marker.casefold() in answer.casefold() for marker in template_markers) else []
+        errors = (
+            _validate_sarvam_verified_fact_ids(" ".join(f"[[FACT:{value}]]" for value in ids), fact_ids)
+            + _validate_sarvam_verified_fact_ledger(answer, fact_ledger)
+            + delivery_errors
+        )
+        return answer, ids, errors
+
+    # Do not carry the large calculator transcript and its several competing
+    # layout contracts into the final writer call. On Sarvam that encouraged
+    # instruction echoing rather than answer generation. This compact, clean
+    # hand-off contains all of the calculated facts the writer may use, but no
+    # tool-history or internal template that it could accidentally expose.
+    final_tools = [tools[-1]]
+    final_messages: List[Dict[str, Any]] = [
+        {"role": "system", "content": (
+            "You are Tara, writing the final user-facing Verified astrology reading. "
+            "Write only the complete reading in the requested language. Never repeat, quote, explain, or expose "
+            "instructions, templates, ledgers, tool calls, fact IDs, JSON, or validation. Give the direct answer first, "
+            "then a detailed, warm explanation in natural paragraphs; use concise Markdown headings only when helpful. "
+            "Use only facts in the immutable ledger and omit any fact you cannot state exactly. Do not invent chart facts."
+        )},
+        {"role": "user", "content": (
+            f"Question: {question}\nRequested language: {language}\nResponse style: {response_style}\n"
+            f"Reading mode: {intent_mode}\n\n"
+            "ATOMIC FACT REFERENCE: Each line below is an exact calculated fact. Before submitting, check every "
+            "planet, house, lordship, dignity, dasha and bindu claim against this card. Never derive or substitute a "
+            "value from memory. If there is no matching line, do not state that factual detail.\n"
+            + "\n".join(fact_reference_card)
+            + "\n\n"
+            "IMMUTABLE FACT LEDGER (calculated evidence; never show this label or its IDs to the user):\n"
+            + json.dumps(fact_ledger, ensure_ascii=False, default=str)
+            + "\n\nSubmit the complete answer through submit_verified_answer. Add every canonical ID that supports a stated "
+              "chart, dasha, divisional-chart, SAV or BAV fact to fact_ids. The IDs are hidden metadata, not prose.\n"
+            + json.dumps(fact_ids, ensure_ascii=False, default=str)
+        )},
+    ]
+    forced_submission = {"type": "function", "function": {"name": final_submission_name}}
+    final = await request(
+        tool_choice=forced_submission, request_messages=final_messages, request_tools=final_tools,
+    )
+    final_payload, final_assistant_message, final_call_id = final_submission(final)
+    text, _used_fact_ids, fact_errors = validate_final_payload(final_payload)
+    if fact_errors:
+        # Give Sarvam the validator result as the tool result for the complete
+        # draft, then force a fresh full submission. The backend does not edit
+        # a single claim; it accepts only Sarvam's replacement answer.
+        final_messages.append(final_assistant_message)
+        if final_call_id:
+            final_messages.append({"role": "tool", "tool_call_id": final_call_id, "content": json.dumps({
+                "accepted": False, "errors": fact_errors,
+                "instruction": "Rewrite the complete answer using only the immutable ledger, then submit it again.",
+            }, ensure_ascii=False)})
+        else:
+            final_messages.append({"role": "user", "content": (
+                "Your final submission was invalid. Rewrite the complete answer using only the immutable ledger, "
+                "then call submit_verified_answer with valid fact IDs.\n" + json.dumps(fact_errors, ensure_ascii=False)
+            )})
+        repaired = await request(
+            tool_choice=forced_submission, request_messages=final_messages, request_tools=final_tools,
+        )
+        repaired_payload, _repaired_assistant_message, _repaired_call_id = final_submission(repaired)
+        repaired_text, _repaired_ids, repaired_errors = validate_final_payload(repaired_payload)
+        if repaired_errors:
+            raise RuntimeError("sarvam_verified_fact_ledger_mismatch: " + "; ".join(repaired_errors))
+        text = repaired_text
+    if not text:
+        raise RuntimeError("sarvam_verified_agent_blank_final_answer")
+    if stream_callback is not None:
+        await asyncio.to_thread(stream_callback, text, text)
+    usage["non_cached_input_tokens"] = usage["input_tokens"]
+    usage["total_tokens"] = usage["input_tokens"] + usage["output_tokens"]
+    return {
+        "success": True, "response": text, "chat_llm_model": model_name,
+        "chat_llm_provider": CHAT_LLM_SARVAM, "token_usage": usage,
+        "elapsed_s": max(0.0, time.perf_counter() - started), "prompt_chars": sent_chars,
+        "information_rounds": {"type": "instant" if conversation_mode else "verified", "reading_mode": intent_mode,
+                                 "max_rounds": max_rounds, "events": information_rounds},
+        "packet_validation": {"missing_capabilities": [],
+            "calculated_capabilities": [key for key in calculated if key in CAPABILITY_REGISTRY],
+            "unavailable_requirements": unavailable, "tool_events": tool_events,
+            "calculation_trace": trace_rows, "calculator_rounds_used": max(0, len(tool_events) - 1),
+            "tool_round_limit": max_rounds},
     }
 
 

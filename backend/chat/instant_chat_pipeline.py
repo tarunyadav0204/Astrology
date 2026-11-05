@@ -92,6 +92,7 @@ from utils.admin_settings import (
     CHAT_LLM_DEEPSEEK,
     CHAT_LLM_GEMINI,
     CHAT_LLM_OPENAI,
+    CHAT_LLM_SARVAM,
     get_instant_chat_llm_provider,
     get_instant_chat_model,
     is_instant_response_validation_enabled,
@@ -133,6 +134,8 @@ def _instant_thinking_level(model_name: str) -> Optional[str]:
 
 
 def _instant_transport_name(provider: str, *, streaming: bool = False) -> str:
+    if provider == CHAT_LLM_SARVAM:
+        return "sarvam_sse" if streaming else "sarvam_chat_completions"
     if provider == CHAT_LLM_GEMINI:
         return "genai_rest_stream" if streaming else "genai_rest"
     if provider == CHAT_LLM_OPENAI:
@@ -2417,6 +2420,50 @@ def _marriage_timeline_selection_response(
 # multilingual intent LLM; these patterns are only a defence-in-depth circuit
 # breaker for unmistakable, actively occurring emergency symptoms.
 _OBVIOUS_ACUTE_MEDICAL_EMERGENCY_PATTERNS: tuple[Any, ...] = ()
+
+
+def _repair_explicit_health_scope(
+    intent: Optional[Dict[str, Any]],
+    question: str,
+) -> Optional[Dict[str, Any]]:
+    """Keep an explicit health question out of a stale generic/career route.
+
+    The semantic router remains the authority for multilingual intent. This
+    narrow repair applies only when it returned a weak category for an
+    unmistakable English health question. Without it, the generic composer
+    brief can retain a previous career foundation and make a health answer
+    talk about the tenth house.
+    """
+    if not isinstance(intent, dict):
+        return intent
+    category = str(intent.get("category") or "").strip().lower()
+    answer_mode = str(intent.get("answer_mode") or "").strip().lower()
+    q = str(question or "").casefold()
+    if (
+        category not in {"", "general", "timing"}
+        or answer_mode == "factual_chart_lookup"
+        or not re.search(r"\b(?:health|illness|disease|recovery|sick)\b", q)
+    ):
+        return intent
+
+    repaired = dict(intent)
+    repaired["category"] = "health"
+    repaired["divisional_charts"] = ["D1", "D9", "D30"]
+    repaired.pop("career_subtype", None)
+    repaired.pop("career_target", None)
+    repaired.pop("career_target_traits", None)
+    evidence_plan = repaired.get("evidence_plan")
+    if isinstance(evidence_plan, dict):
+        repaired_plan = dict(evidence_plan)
+        parts = repaired_plan.get("question_parts")
+        if isinstance(parts, list) and len(parts) == 1 and isinstance(parts[0], dict):
+            repaired_part = dict(parts[0])
+            if str(repaired_part.get("life_domain") or "").lower() in {"", "general", "timing"}:
+                repaired_part["life_domain"] = "health"
+            repaired_plan["question_parts"] = [repaired_part]
+        repaired["evidence_plan"] = repaired_plan
+    logger.info("instant_health_scope_repaired prior_category=%s", category or "empty")
+    return repaired
 
 
 def _instant_medical_triage_decision(
@@ -5959,6 +6006,130 @@ INPUT:
 """.strip()
 
 
+_PRISM_MODE_CRITERIA = {
+    "factual_chart_lookup": "The user requests a named chart, placement, or calculated chart fact.",
+    "explanation_mechanism": "The user asks why or how a prior chart conclusion was reached.",
+    "trait_nature": "The user asks about personality, temperament, behavior, or communication style.",
+    "relationship_person": "The user asks about the nature or characteristics of a partner or person.",
+    "timing_window": "The user asks about the quality of a named calendar period, without one event as the main ask.",
+    "event_prediction": "The user asks whether or when one specific event will happen.",
+    "potential_capacity": "The user asks what the natal chart promises, permits, or suits.",
+    "comparison_choice": "The user asks to compare two or more options.",
+    "problem_diagnosis": "The user asks why something is blocked, delayed, unstable, or difficult.",
+    "remedy_action": "The user explicitly asks for astrological remedies or actions.",
+    "topic_reading": "The user requests a focused astrology reading that fits no more specific mode.",
+    "location_recommendation": "The user asks for a place or direction recommendation for a life goal.",
+    "dedicated_muhurat_flow": "The user asks for an auspicious date or time for an action.",
+    "dedicated_partnership_flow": "The user asks for two-chart compatibility or partnership matching.",
+    "compound_plan": "The user makes multiple materially different astrology requests requiring clarification.",
+}
+
+
+def _prism_min_confidence() -> float:
+    try:
+        return max(0.5, min(0.99, float(os.getenv("INSTANT_CHAT_PRISM_MIN_CONFIDENCE", "0.85") or 0.85)))
+    except (TypeError, ValueError):
+        return 0.85
+
+
+async def _infer_answer_mode_with_prism(
+    *,
+    question: str,
+    intent: Optional[Dict[str, Any]],
+    history: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Use Prism only for a safe, high-confidence answer-mode fast path.
+
+    Clarifications and handoffs deliberately retain the text LLM router because
+    Prism does not generate the localized user-facing message those paths need.
+    """
+    try:
+        from ai.sarvam_prism import decide, is_prism_enabled
+    except Exception:
+        return None
+    if not is_prism_enabled():
+        return None
+
+    compact_intent = {
+        key: value
+        for key, value in (intent or {}).items()
+        if key in {
+            "category", "mode", "answer_mode", "requested_object", "wealth_subtype",
+            "children_subtype", "explicit_remedy_request", "needs_transits",
+        }
+        and isinstance(value, (str, int, float, bool))
+    }
+    recent_history = []
+    for item in (history or [])[-4:]:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("content") or item.get("text") or "").strip()
+        if text:
+            recent_history.append({
+                "role": str(item.get("role") or item.get("sender") or "user")[:16],
+                "content": _truncate(text, 480),
+            })
+    target_criteria = {
+        key: str((meta or {}).get("label") or key.replace("_", " "))
+        for key, meta in TARGET_SUBJECTS.items()
+    }
+    try:
+        result = await decide(
+            state={
+                "question": _truncate(question, 2000),
+                "intent": compact_intent,
+                "recent_history": recent_history,
+            },
+            questions={
+                "answer_mode": {
+                    "type": "choice",
+                    "instructions": "Choose the one answer mode that best matches the user's astrology request.",
+                    "criteria": _PRISM_MODE_CRITERIA,
+                },
+                "target_subject": {
+                    "type": "choice",
+                    "instructions": "Choose who the astrology request is about. Choose self unless another listed relation is explicit.",
+                    "criteria": target_criteria,
+                },
+            },
+        )
+    except Exception as exc:
+        logger.info("instant_prism_router_fallback reason=%s", type(exc).__name__)
+        return None
+
+    answers = result.get("answers") or {}
+    mode_answer = answers.get("answer_mode") if isinstance(answers, dict) else None
+    target_answer = answers.get("target_subject") if isinstance(answers, dict) else None
+    if not isinstance(mode_answer, dict) or not isinstance(target_answer, dict):
+        return None
+    mode = str(mode_answer.get("choice") or "").strip()
+    target_key = str(target_answer.get("choice") or "").strip()
+    try:
+        mode_confidence = float(mode_answer.get("confidence") or 0.0)
+        target_confidence = float(target_answer.get("confidence") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    confidence = min(mode_confidence, target_confidence)
+    # Text-generated routes require a localized user message, so preserve the
+    # established router for them even when Prism is confident.
+    if (
+        confidence < _prism_min_confidence()
+        or mode not in ANSWER_MODES
+        or target_key not in TARGET_SUBJECTS
+        or mode in {"compound_plan", "dedicated_partnership_flow", "dedicated_muhurat_flow"}
+    ):
+        return None
+    target_subjects = _target_subject_rows([target_key], source="sarvam_prism", confidence="high")
+    if not target_subjects:
+        return None
+    return {
+        "answer_mode": mode,
+        "target_subject": target_subjects[0],
+        "target_subjects": target_subjects,
+        "confidence": round(confidence, 4),
+    }
+
+
 async def _infer_answer_mode_with_llm(
     analyzer,
     *,
@@ -5984,6 +6155,24 @@ async def _infer_answer_mode_with_llm(
             "router_source": "secondary_answer_mode_llm",
             **extra,
         }
+
+    prism_selection = await _infer_answer_mode_with_prism(
+        question=question,
+        intent=intent,
+        history=history,
+    )
+    if prism_selection is not None:
+        return _pack(
+            prism_selection["answer_mode"],
+            prism_selection["target_subject"],
+            target_subjects=prism_selection["target_subjects"],
+            needs_year_clarification=False,
+            route_action="answer",
+            router_source="sarvam_prism",
+            router_confidence="high",
+            router_reason="High-confidence typed decision from Sarvam Prism.",
+            prism_confidence=prism_selection["confidence"],
+        )
 
     try:
         llm_result = await analyzer.generate_text_from_prompt(
@@ -20411,6 +20600,7 @@ async def generate_instant_chat_response(
             calculation_callback=verified_calculation_callback,
         )
     intent = apply_timeline_intent_guard(intent)
+    intent = _repair_explicit_health_scope(intent, latest_user_question or question)
     # Some Wealth subtypes are more specific than the broad Wealth category.
     # Normalize them before chart focus and graph selection so a router category
     # fallback cannot degrade repayment or multiple-income questions.
@@ -20580,6 +20770,9 @@ async def generate_instant_chat_response(
         target_subject_override=target_subject,
         target_subjects_override=target_subjects,
     )
+    # ``instant_conversation`` is retained as a call-site compatible name for
+    # the optional agentic experiment. Normal Live Chat continues through this
+    # pipeline, including the fast Sarvam composer below.
     if instant_conversation and not verified_evidence_review:
         from chat.instant_conversation import generate_conversation_response
         _finish_local_stage("calculations_and_evidence", calculations_started)
@@ -20852,6 +21045,135 @@ async def generate_instant_chat_response(
     instant_provider = str(provider_override or "").strip().lower() or get_instant_chat_llm_provider()
     if not verified_evidence_review:
         system_prompt, user_prompt = _split_instant_prompt_for_cache(prompt)
+    # Sarvam is selected through Admin Settings exactly like the other chat
+    # providers. It supports both text and speech-chat response composition.
+    sarvam_composer_enabled = (
+        not verified_evidence_review and instant_provider == CHAT_LLM_SARVAM
+    )
+    sarvam_prompt = ""
+    sarvam_system_prompt = ""
+    if sarvam_composer_enabled:
+        # Sarvam is the fast, conversational lane. Keep the established full
+        # prompt for fallback, but send Sarvam only the adjudicated compact
+        # brief and its concise contract.
+        is_health_topic = str((intent or {}).get("category") or "").strip().lower() in {
+            "health", "mental_wellbeing", "surgery", "accident", "recovery",
+        }
+        if answer_mode == "factual_chart_lookup":
+            factual_evidence = (
+                (prompt_context.get("evidence") or {}).get("chart_facts")
+                if isinstance(prompt_context, dict) and isinstance(prompt_context.get("evidence"), dict)
+                else {}
+            )
+            factual_contract = (
+                (prompt_context.get("answer_contract") or {}).get("chart_fact_rules")
+                if isinstance(prompt_context, dict) and isinstance(prompt_context.get("answer_contract"), dict)
+                else {}
+            )
+            # Do not let generic verdict, career, dasha, or prior-turn data
+            # compete with the requested chart packet. This is the exact
+            # factual source Sarvam must explain.
+            sarvam_context = {
+                "context_profile": "sarvam_factual_chart_source_v1",
+                "query_plan": {
+                    "answer_mode": "factual_chart_lookup",
+                    "requested_chart": list((factual_evidence or {}).get("requested_charts") or []),
+                    "requested_houses": list((factual_evidence or {}).get("requested_houses") or []),
+                },
+                "answer_contract": {"chart_fact_rules": factual_contract},
+                "evidence": {"chart_facts": factual_evidence},
+            }
+        elif is_health_topic:
+            # Read the compacted-but-complete health contract directly from
+            # the v2 packet. ``prompt_context`` can have gone through a
+            # generic prompt-budget pass by this point; that must not collapse
+            # three independently calculated health zones into one headline.
+            authoritative_health_spec = (
+                (instant_v2_packet or {}).get("answer_spec")
+                if isinstance(instant_v2_packet, dict)
+                else {}
+            )
+            authoritative_health_spec = (
+                authoritative_health_spec
+                if isinstance(authoritative_health_spec, dict)
+                else {}
+            )
+            compact_authoritative_health = _compact_answer_spec_for_composer(
+                authoritative_health_spec,
+            ).get("health_rules") or {}
+            health_evidence = (
+                compact_authoritative_health
+                or (
+                    (prompt_context.get("evidence") or {}).get("health_rules")
+                    if isinstance(prompt_context, dict) and isinstance(prompt_context.get("evidence"), dict)
+                    else {}
+                )
+            )
+            health_contract = (
+                compact_authoritative_health
+                or (
+                    (prompt_context.get("answer_contract") or {}).get("health_rules")
+                    if isinstance(prompt_context, dict) and isinstance(prompt_context.get("answer_contract"), dict)
+                    else {}
+                )
+            )
+            # A health reply must not inherit a prior career brief merely
+            # because both subjects occur in the chat history.  The body-zone
+            # calculation and its contract are the only authority here.
+            sarvam_context = {
+                "context_profile": "sarvam_health_source_v1",
+                "query_plan": {
+                    "category": "health",
+                    "answer_mode": answer_mode,
+                    "time_scope": (prompt_context.get("query_plan") or {}).get("time_scope", {}),
+                },
+                "verdict": (prompt_context.get("verdict") or {}),
+                "evidence": {"health_rules": health_evidence},
+                "answer_contract": {
+                    "health_rules": health_contract,
+                    "visible_astrology": {
+                        "required": True,
+                        "main_answer_rule": (
+                            "Use only chart factors named in health_rules.allowed_zone_evidence; "
+                            "do not add a planet merely because it appears in generic natal context."
+                        ),
+                    },
+                },
+            }
+        else:
+            sarvam_context = _fit_composer_brief(prompt_context, target_chars=6000)
+        sarvam_prompt = _build_budgeted_instant_prompt(question, sarvam_context, language)
+        if answer_mode == "factual_chart_lookup":
+            sarvam_prompt += (
+                "\n\nFACTUAL CHART SOURCE-OF-TRUTH:\n"
+                "Use only ADJUDICATED CONTEXT.evidence.chart_facts. The requested_chart and "
+                "requested_houses there are binding. Do not use a chart, placement, aspect, lordship, "
+                "or dignity from general astrology, an earlier turn, another divisional chart, or memory. "
+                "If a fact is absent, say it is not available rather than substituting a different chart."
+            )
+        elif is_health_topic:
+            sarvam_prompt += (
+                "\n\nHEALTH SOURCE-OF-TRUTH:\n"
+                "Answer only from ADJUDICATED CONTEXT.evidence.health_rules and its health_rules contract. "
+                "Do not use career, work, status, House 10, D10, or a previous-turn factor unless it is "
+                "explicitly present in that health evidence. Health statements are astrological "
+                "susceptibilities, never diagnoses.\n"
+                "For a constitutional (not time-bound) health question, explain EVERY row in "
+                "health_rules.allowed_zone_evidence in its supplied order; required_zone_count is binding. "
+                "Do not merge or omit zones. For each row, give its zone, one concrete chart reason from "
+                "anatomy_basis or why, and only that row's permitted mechanism and divisional repetition. "
+                "Then state the supplied protective factors as a balancing note. Do not substitute generic "
+                "Sun/Mars language for the listed evidence. Aim for a useful, specific 160-240 word answer."
+            )
+        sarvam_system_prompt = (
+            "You are AstroRoshni's warm, conversational astrology assistant. "
+            "Use only the supplied adjudicated context. Give the direct answer first, "
+            "stay concise, and obey every output rule in the user message."
+        )
+        logger.info(
+            "INSTANT_PERF sarvam_composer_enabled prompt_chars=%s fallback_prompt_chars=%s",
+            len(sarvam_prompt), len(prompt),
+        )
     if instant_v2_packet and not verified_evidence_review:
         instant_v2_packet["composer_brief"] = prompt_context
         instant_v2_packet["composer_metrics"] = {
@@ -20974,6 +21296,7 @@ async def generate_instant_chat_response(
             llm_result = await run_verified_calculator_agent(
                 **verified_agent_request,
                 model_name=model_name,
+                provider=instant_provider,
                 timeout_s=answer_timeout_s,
                 stream_callback=generation_stream_callback,
                 calculation_callback=verified_calculation_callback,
@@ -20991,21 +21314,43 @@ async def generate_instant_chat_response(
                 "token_usage": {},
             }
     else:
-        llm_result = await analyzer.generate_text_from_prompt(
-            user_prompt,
-            premium_analysis=False,
-            model_override=None,
-            model_name_override=model_name,
-            llm_log_tag="instant_chat",
-            request_timeout_s=answer_timeout_s,
-            force_gemini=False,
-            provider_override=instant_provider,
-            use_gemini_rest=instant_provider == CHAT_LLM_GEMINI,
-            gemini_thinking_level=(thinking_level if instant_provider == CHAT_LLM_GEMINI else None),
-            deepseek_thinking_enabled=(False if instant_provider == CHAT_LLM_DEEPSEEK else None),
-            stream_callback=generation_stream_callback,
-            system_prompt=system_prompt,
-        )
+        llm_result = None
+        if sarvam_composer_enabled:
+            try:
+                from ai.sarvam_conversations import compose
+                sarvam_out = await compose(
+                    prompt=sarvam_prompt,
+                    system_prompt=sarvam_system_prompt,
+                    model=model_name,
+                    stream_callback=generation_stream_callback,
+                    timeout_s=answer_timeout_s,
+                )
+                llm_result = {
+                    "success": True,
+                    "response": sarvam_out["text"],
+                    "error": None,
+                    "chat_llm_provider": "sarvam",
+                    "chat_llm_model": model_name,
+                    "token_usage": sarvam_out.get("usage") or {},
+                }
+            except Exception as exc:
+                logger.warning("instant_sarvam_composer_fallback reason=%s", type(exc).__name__)
+        if llm_result is None:
+            llm_result = await analyzer.generate_text_from_prompt(
+                user_prompt,
+                premium_analysis=False,
+                model_override=None,
+                model_name_override=model_name,
+                llm_log_tag="instant_chat",
+                request_timeout_s=answer_timeout_s,
+                force_gemini=False,
+                provider_override=instant_provider,
+                use_gemini_rest=instant_provider == CHAT_LLM_GEMINI,
+                gemini_thinking_level=(thinking_level if instant_provider == CHAT_LLM_GEMINI else None),
+                deepseek_thinking_enabled=(False if instant_provider == CHAT_LLM_DEEPSEEK else None),
+                stream_callback=generation_stream_callback,
+                system_prompt=system_prompt,
+            )
     elapsed_s = max(0.0, (datetime.utcnow() - started_at).total_seconds())
     pipeline_elapsed_s = max(0.0, time.perf_counter() - pipeline_started)
     stage_timings_ms["answer_model"] = round(elapsed_s * 1000.0, 1)
@@ -21033,7 +21378,11 @@ async def generate_instant_chat_response(
         )
         return {
             "success": False,
-            "response": "I’m having trouble giving the instant reading right now. Please try again in a moment.",
+            "response": (
+                "I’m having trouble preparing your verified reading right now. Please try again in a moment."
+                if verified_agent_request is not None
+                else "I’m having trouble giving the instant reading right now. Please try again in a moment."
+            ),
             "error": error_text,
             "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
             "timing": {
@@ -22122,7 +22471,8 @@ REJECTED ANSWER:
         True,
         elapsed_s,
     )
-    answer_usage_stage["llm_provider"] = instant_provider
+    response_provider = str(llm_result.get("chat_llm_provider") or instant_provider)
+    answer_usage_stage["llm_provider"] = response_provider
     event_timing_verdict = None
     try:
         ne = (prompt_context or {}).get("normalized_evidence") or {}
@@ -22155,14 +22505,15 @@ REJECTED ANSWER:
         "error": None,
         "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
         "timing": {
-            "chat_llm_provider": instant_provider,
+            "chat_llm_provider": response_provider,
             "chat_llm_model": llm_result.get("chat_llm_model") or model_name,
             "instant_chat": True,
             "total_request_time": pipeline_elapsed_s,
             "answer_model_time": elapsed_s,
             "instant_stage_timings_ms": stage_timings_ms,
-            "instant_transport": _instant_transport_name(
-                instant_provider, streaming=stream_callback is not None
+            "instant_transport": (
+                "sarvam_sse" if response_provider == "sarvam"
+                else _instant_transport_name(instant_provider, streaming=stream_callback is not None)
             ),
             "instant_thinking_level": thinking_level,
         },

@@ -113,6 +113,7 @@ CHAT_LLM_GEMINI = "gemini"
 CHAT_LLM_OPENAI = "openai"
 CHAT_LLM_DEEPSEEK = "deepseek"
 CHAT_LLM_GEMMA = "gemma"
+CHAT_LLM_SARVAM = "sarvam"
 
 # Self-hosted Gemma (or compatible) HTTP POST /generate-analysis — override via admin or GEMMA_CHAT_GENERATE_URL.
 DEFAULT_GEMMA_CHAT_GENERATE_URL = "http://8.231.104.209:8000/generate-analysis"
@@ -130,6 +131,15 @@ OPENAI_CHAT_MODEL_OPTIONS = [
 DEFAULT_OPENAI_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_OPENAI_PREMIUM_MODEL = "gpt-4o"
 DEFAULT_OPENAI_INSTANT_MODEL = "gpt-5.6-luna"
+DEFAULT_SARVAM_CHAT_MODEL = "sarvam-105b-conversations"
+DEFAULT_SARVAM_VERIFIED_MODEL = "sarvam-105b"
+SARVAM_CHAT_MODEL_OPTIONS = [
+    ("sarvam-105b-conversations", "Sarvam 105B Conversations (Instant / Speech, 32K context)"),
+    ("sarvam-105b", "Sarvam 105B (128K context)"),
+]
+SARVAM_VERIFIED_MODEL_OPTIONS = [
+    ("sarvam-105b", "Sarvam 105B (Verified, 128K context)"),
+]
 
 # DeepSeek API model IDs (OpenAI-compatible). Confirm current ids with GET
 # https://api.deepseek.com/v1/models when upgrading.  Keep only API-accepted
@@ -530,7 +540,44 @@ def get_gemini_instant_model() -> str:
 def get_instant_chat_llm_provider() -> str:
     """LLM vendor dedicated to Instant Chat; independent from standard chat."""
     value = (get_setting("instant_chat_llm_provider") or "").strip().lower()
-    return value if value in {CHAT_LLM_GEMINI, CHAT_LLM_OPENAI, CHAT_LLM_DEEPSEEK} else CHAT_LLM_GEMINI
+    return value if value in {CHAT_LLM_GEMINI, CHAT_LLM_OPENAI, CHAT_LLM_DEEPSEEK, CHAT_LLM_SARVAM} else CHAT_LLM_GEMINI
+
+
+def get_sarvam_api_key() -> str:
+    """Sarvam credential stored in admin settings, never in deployment env."""
+    return (get_setting("sarvam_api_key") or "").strip()
+
+
+def get_sarvam_instant_model() -> str:
+    return (get_setting("sarvam_instant_chat_model") or DEFAULT_SARVAM_CHAT_MODEL).strip()
+
+
+def get_speech_chat_llm_provider() -> str:
+    value = (get_setting("speech_chat_llm_provider") or "").strip().lower()
+    if value in {CHAT_LLM_GEMINI, CHAT_LLM_OPENAI, CHAT_LLM_DEEPSEEK, CHAT_LLM_SARVAM}:
+        return value
+    return get_instant_chat_llm_provider()
+
+
+def get_sarvam_speech_model() -> str:
+    return (get_setting("sarvam_speech_chat_model") or get_sarvam_instant_model()).strip()
+
+
+def get_verified_chat_llm_provider() -> str:
+    value = (get_setting("verified_chat_llm_provider") or "").strip().lower()
+    return value if value in {CHAT_LLM_OPENAI, CHAT_LLM_SARVAM} else CHAT_LLM_OPENAI
+
+
+def get_sarvam_verified_model() -> str:
+    """Verified needs the 128K model for its full deterministic evidence packet.
+
+    The Conversations variant has a 32K context window and cannot accept the
+    calculator baseline that Verified supplies after its first tool call.
+    Keep this guard for old Admin values as well as the default.
+    """
+    value = (get_setting("sarvam_verified_chat_model") or DEFAULT_SARVAM_VERIFIED_MODEL).strip()
+    supported = {model for model, _ in SARVAM_VERIFIED_MODEL_OPTIONS}
+    return value if value in supported else DEFAULT_SARVAM_VERIFIED_MODEL
 
 
 def get_deepseek_instant_model() -> str:
@@ -572,6 +619,8 @@ def get_instant_chat_model() -> str:
         return get_deepseek_instant_model()
     if provider == CHAT_LLM_OPENAI:
         return get_openai_instant_model()
+    if provider == CHAT_LLM_SARVAM:
+        return get_sarvam_instant_model()
     return get_gemini_instant_model()
 
 

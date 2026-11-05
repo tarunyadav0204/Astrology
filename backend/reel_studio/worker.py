@@ -515,13 +515,11 @@ def _run_video(prompt: str, *, image: bytes | None = None) -> tuple[bytes, dict]
 
 
 def _still_clip(ffmpeg: str, image: Path, output: Path, seconds: float) -> None:
-    # Correct 9:16 images fill the frame; malformed provider output is padded
-    # instead of silently centre-cropped and losing factual callouts.
-    # Zoom from the exact centre.  The prior accumulated floating-point zoom
-    # position was rounded differently on neighbouring frames, producing a
-    # visible left/right shimmer on fine chart lines and phone edges.
-    frames = max(1, int(seconds * 30))
-    motion = f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih):color=#160a16,zoompan=z='min(1+on*0.04/{frames},1.04)':x='trunc((iw-iw/zoom)/4)*2':y='trunc((ih-ih/zoom)/4)*2':d={frames}:s={WIDTH}x{HEIGHT}:fps=30,format=yuv420p"
+    # GPT Image outputs finished 9:16 editorial compositions. Do not apply a
+    # Ken-Burns zoom: it trims safe-edge headlines/callouts and makes detailed
+    # chart boundaries appear to shake. Invalid source ratios are letterboxed,
+    # never cropped, so the whole factual visual remains visible.
+    motion = f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih):color=#160a16,fps=30,format=yuv420p"
     subprocess.run([ffmpeg, "-nostdin", "-y", "-loop", "1", "-i", str(image), "-t", str(seconds), "-vf", motion, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(output)], check=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=120)
 
 

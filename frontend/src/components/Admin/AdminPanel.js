@@ -460,6 +460,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [instantChatLlmProvider, setInstantChatLlmProvider] = useState('gemini');
   const [deepseekInstantChatModel, setDeepseekInstantChatModel] = useState('');
   const [openaiInstantChatModel, setOpenaiInstantChatModel] = useState('gpt-5.6-luna');
+  const [sarvamModelOptions, setSarvamModelOptions] = useState([]);
+  const [sarvamVerifiedModelOptions, setSarvamVerifiedModelOptions] = useState([]);
+  const [sarvamInstantChatModel, setSarvamInstantChatModel] = useState('sarvam-105b-conversations');
+  const [speechChatLlmProvider, setSpeechChatLlmProvider] = useState('gemini');
+  const [sarvamSpeechChatModel, setSarvamSpeechChatModel] = useState('sarvam-105b-conversations');
+  const [verifiedChatLlmProvider, setVerifiedChatLlmProvider] = useState('openai');
+  const [sarvamVerifiedChatModel, setSarvamVerifiedChatModel] = useState('sarvam-105b');
   const [parallelBranchGeminiModels, setParallelBranchGeminiModels] = useState(DEFAULT_PARALLEL_BRANCH_MODELS);
   const [parallelBranchPlannerEnabled, setParallelBranchPlannerEnabled] = useState(false);
   const [parallelBranchPlannerModel, setParallelBranchPlannerModel] = useState('');
@@ -963,6 +970,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       setInstantChatLlmProvider(data.instant_chat_llm_provider || 'gemini');
       setDeepseekInstantChatModel(data.deepseek_instant_chat_model || 'deepseek-chat');
       setOpenaiInstantChatModel(data.openai_instant_chat_model || 'gpt-5.6-luna');
+      setSarvamModelOptions(data.sarvam_model_options || []);
+      setSarvamVerifiedModelOptions(data.sarvam_verified_model_options || []);
+      setSarvamInstantChatModel(data.sarvam_instant_chat_model || 'sarvam-105b-conversations');
+      setSpeechChatLlmProvider(data.speech_chat_llm_provider || data.instant_chat_llm_provider || 'gemini');
+      setSarvamSpeechChatModel(data.sarvam_speech_chat_model || data.sarvam_instant_chat_model || 'sarvam-105b-conversations');
+      setVerifiedChatLlmProvider(data.verified_chat_llm_provider || 'openai');
+      setSarvamVerifiedChatModel(data.sarvam_verified_chat_model || 'sarvam-105b');
       setParallelBranchGeminiModels({
         ...DEFAULT_PARALLEL_BRANCH_MODELS,
         ...(data.parallel_branch_gemini_models || {}),
@@ -3572,9 +3586,10 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   }
 
 
-  const modelOptionsFor = provider => provider === 'mixed' ? [...geminiModelOptions, ...openaiModelOptions.filter(option => option.value !== 'gpt-4-turbo')] : provider === 'openai' ? openaiModelOptions : provider === 'deepseek' ? deepseekModelOptions : geminiModelOptions;
+  const modelOptionsFor = provider => provider === 'mixed' ? [...geminiModelOptions, ...openaiModelOptions.filter(option => option.value !== 'gpt-4-turbo')] : provider === 'openai' ? openaiModelOptions : provider === 'deepseek' ? deepseekModelOptions : provider === 'sarvam' ? sarvamModelOptions : geminiModelOptions;
   const modelField = (key, label, value, set, provider) => ({ key, label, value, set, options: modelOptionsFor(provider) });
-  const modelProvider = (key, value, set, gemma = false, inherit = false, analysis = false) => ({ key, label: 'Provider', value, set, required: !inherit, options: [...(inherit ? [{ value: '', label: 'Same as Standard chat' }] : []), { value: 'gemini', label: 'Google Gemini' }, { value: 'openai', label: 'OpenAI (ChatGPT)' }, { value: 'deepseek', label: 'DeepSeek' }, ...(gemma ? [{ value: 'gemma', label: 'Self-hosted Gemma' }] : [])] });
+  const modelProvider = (key, value, set, gemma = false, inherit = false, analysis = false, sarvam = false) => ({ key, label: 'Provider', value, set, required: !inherit, options: [...(inherit ? [{ value: '', label: 'Same as Standard chat' }] : []), { value: 'gemini', label: 'Google Gemini' }, { value: 'openai', label: 'OpenAI (ChatGPT)' }, { value: 'deepseek', label: 'DeepSeek' }, ...(sarvam ? [{ value: 'sarvam', label: 'Sarvam AI' }] : []), ...(gemma ? [{ value: 'gemma', label: 'Self-hosted Gemma' }] : [])] });
+  const verifiedModelProvider = (value, set) => ({ key: 'verified_chat_llm_provider', label: 'Provider', value, set, options: [{ value: 'openai', label: 'OpenAI (ChatGPT)' }, { value: 'sarvam', label: 'Sarvam AI' }] });
   const extraModelField = (key, label) => ({ key, label, value: extraModels[key] || '', set: value => setExtraModels(previous => ({ ...previous, [key]: value })), options: openaiModelOptions.filter(option => option.value !== 'gpt-4-turbo') });
   const chatModelField = premium => {
     const provider = premium ? (chatLlmProviderPremium || chatLlmProvider) : chatLlmProvider;
@@ -6582,8 +6597,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             {settingsSubTab === 'models' && <ModelSettings groups={[
   { id: 'standard', title: 'Standard chat', description: 'Answers in Standard mode.', fields: [modelProvider('chat_llm_provider', chatLlmProvider, setChatLlmProvider, true), ...chatModelField(false)] },
   { id: 'premium', title: 'Premium chat', description: 'Detailed answers in Premium mode.', fields: [modelProvider('chat_llm_provider_premium', chatLlmProviderPremium, setChatLlmProviderPremium, true, true), ...chatModelField(true)] },
-  { id: 'verified', title: 'Verified chat', description: 'Writes the final answer using the reviewed evidence.', providerLabel: 'OpenAI', fields: [extraModelField('verified_chat_model', 'Answer model')] },
-  { id: 'instant', title: 'Instant chat', description: 'Handles routing and answers in Instant mode.', fields: [modelProvider('instant_chat_llm_provider', instantChatLlmProvider, setInstantChatLlmProvider), modelField(instantChatLlmProvider === 'openai' ? 'openai_instant_chat_model' : instantChatLlmProvider === 'deepseek' ? 'deepseek_instant_chat_model' : 'gemini_instant_chat_model', 'Model', instantChatLlmProvider === 'openai' ? openaiInstantChatModel : instantChatLlmProvider === 'deepseek' ? deepseekInstantChatModel : geminiInstantChatModel, instantChatLlmProvider === 'openai' ? setOpenaiInstantChatModel : instantChatLlmProvider === 'deepseek' ? setDeepseekInstantChatModel : setGeminiInstantChatModel, instantChatLlmProvider)] },
+  { id: 'verified', title: 'Verified chat', description: 'Writes the final answer using reviewed evidence and calculators. Sarvam uses the 128K-context model required by this evidence packet.', fields: [verifiedModelProvider(verifiedChatLlmProvider, setVerifiedChatLlmProvider), verifiedChatLlmProvider === 'sarvam' ? { key: 'sarvam_verified_chat_model', label: 'Answer model', value: sarvamVerifiedChatModel, set: setSarvamVerifiedChatModel, options: sarvamVerifiedModelOptions } : extraModelField('verified_chat_model', 'Answer model')] },
+  { id: 'instant', title: 'Instant chat', description: 'Handles routing and answers in Instant mode.', fields: [modelProvider('instant_chat_llm_provider', instantChatLlmProvider, setInstantChatLlmProvider, false, false, false, true), modelField(instantChatLlmProvider === 'openai' ? 'openai_instant_chat_model' : instantChatLlmProvider === 'deepseek' ? 'deepseek_instant_chat_model' : instantChatLlmProvider === 'sarvam' ? 'sarvam_instant_chat_model' : 'gemini_instant_chat_model', 'Model', instantChatLlmProvider === 'openai' ? openaiInstantChatModel : instantChatLlmProvider === 'deepseek' ? deepseekInstantChatModel : instantChatLlmProvider === 'sarvam' ? sarvamInstantChatModel : geminiInstantChatModel, instantChatLlmProvider === 'openai' ? setOpenaiInstantChatModel : instantChatLlmProvider === 'deepseek' ? setDeepseekInstantChatModel : instantChatLlmProvider === 'sarvam' ? setSarvamInstantChatModel : setGeminiInstantChatModel, instantChatLlmProvider)] },
+  { id: 'speechAnswer', title: 'Talk To Tara answer', description: 'Chooses the provider for the final answer in speech conversations. Non-Sarvam providers use their existing chat model.', fields: [modelProvider('speech_chat_llm_provider', speechChatLlmProvider, setSpeechChatLlmProvider, false, false, false, true), ...(speechChatLlmProvider === 'sarvam' ? [modelField('sarvam_speech_chat_model', 'Answer model', sarvamSpeechChatModel, setSarvamSpeechChatModel, 'sarvam')] : [])] },
   { id: 'summary', title: 'Answer summaries', description: 'Summarizes 1–3 selected answers from any chat mode.', providerLabel: 'OpenAI', fields: [extraModelField('chat_summary_model', 'Summary model')] },
   { id: 'conflict', title: 'Conflict resolution', description: 'Compares two answers against Verified context, with up to eight information rounds.', providerLabel: 'OpenAI', fields: [extraModelField('conflict_resolution_model', 'Resolution model')] },
   { id: 'speech', title: 'Speech progress narration', description: 'Short spoken updates while the main answer is being prepared. Does not write the final answer.', providerLabel: 'Gemini / OpenAI', fields: [modelField('speech_processing_bridge_model', 'Progress narration model', speechProcessingBridgeModel, setSpeechProcessingBridgeModel, 'mixed')] },

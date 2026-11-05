@@ -112,6 +112,7 @@ def test_production_conversation_keeps_baseline_and_bypasses_legacy_composer(mon
     from chat import instant_chat_pipeline as pipeline
     from chat import instant_conversation
     baseline = {'natal_snapshot': {'ascendant': 42}, 'normalized_evidence': {'career': {'facts': [1, 2]}}}
+    monkeypatch.setenv('INSTANT_CHAT_AGENTIC_CONVERSATION_ENABLED', 'true')
     monkeypatch.setattr(pipeline, '_build_instant_context', lambda **kwargs: baseline)
     def forbidden(*args, **kwargs): raise AssertionError('legacy composer must not constrain the agent')
     monkeypatch.setattr(pipeline, '_build_instant_prompt', forbidden)

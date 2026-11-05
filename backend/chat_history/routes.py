@@ -3937,7 +3937,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
     from credits.credit_service import CreditService
     from ai.intent_router import IntentRouter
     from charts.house_insight_service import build_chart_preview_insights
-    from utils.admin_settings import get_verified_chat_model
+    from utils.admin_settings import (
+        CHAT_LLM_SARVAM,
+        get_sarvam_speech_model,
+        get_sarvam_verified_model,
+        get_speech_chat_llm_provider,
+        get_verified_chat_llm_provider,
+        get_verified_chat_model,
+    )
     from chat.fact_extractor import FactExtractor
     from ai.death_query_guard import is_death_override_unlocked, is_death_related, REFUSAL_MESSAGE
     from chat.instant_chat_pipeline import (
@@ -5308,10 +5315,24 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 stream_callback=_persist_instant_stream_delta,
                 preview_callback=_persist_instant_preview,
                 response_validation_enabled_override=False if is_verified_chat else None,
-                model_name_override=get_verified_chat_model() if is_verified_chat else None,
-                provider_override="openai" if is_verified_chat else None,
+                model_name_override=(
+                    get_sarvam_verified_model()
+                    if is_verified_chat and get_verified_chat_llm_provider() == CHAT_LLM_SARVAM
+                    else get_verified_chat_model() if is_verified_chat
+                    else get_sarvam_speech_model() if is_speech_chat and get_speech_chat_llm_provider() == CHAT_LLM_SARVAM
+                    else None
+                ),
+                provider_override=(
+                    get_verified_chat_llm_provider() if is_verified_chat
+                    else get_speech_chat_llm_provider() if is_speech_chat
+                    else None
+                ),
                 calculator_first=is_calculator_first,
-                instant_conversation=is_instant_chat and not is_speech_chat and os.getenv("INSTANT_CHAT_CONVERSATION_ENABLED", "true").lower() in {"true", "1", "yes"},
+                # Live Chat stays conversational in the normal Instant pipeline.
+                # The calculator agent is an expensive experimental path, not
+                # the definition of a live conversation, so it must never be
+                # enabled implicitly for every Live Chat turn.
+                instant_conversation=is_instant_chat and not is_speech_chat and os.getenv("INSTANT_CHAT_AGENTIC_CONVERSATION_ENABLED", "false").lower() in {"true", "1", "yes"},
                 verified_evidence_review=is_verified_chat,
                 verified_partner_birth_data=partner_birth_details if is_verified_chat and partnership_mode else None,
                 verified_calculation_callback=(

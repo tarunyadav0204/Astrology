@@ -27,6 +27,46 @@ class _FakeAnalyzer:
         }
 
 
+def test_explicit_health_question_repairs_weak_router_category():
+    repaired = pipeline._repair_explicit_health_scope(
+        {
+            "category": "general",
+            "answer_mode": "topic_reading",
+            "divisional_charts": ["D1", "D9", "D10"],
+            "career_subtype": "general",
+            "evidence_plan": {
+                "question_parts": [{"part_id": "p1", "life_domain": "general"}],
+            },
+        },
+        "How is my health?",
+    )
+
+    assert repaired["category"] == "health"
+    assert repaired["divisional_charts"] == ["D1", "D9", "D30"]
+    assert "career_subtype" not in repaired
+    assert repaired["evidence_plan"]["question_parts"][0]["life_domain"] == "health"
+
+
+def test_health_composer_contract_keeps_every_zone_and_its_reason():
+    compact = pipeline._compact_answer_spec_for_composer({
+        "health_rules": {
+            "is_time_bound_question": False,
+            "required_zone_count": 3,
+            "allowed_zone_evidence": [
+                {"zone": "sides", "why": ["Saturn nakshatra reason"], "mechanisms": ["chronic"]},
+                {"zone": "calves", "anatomy_basis": ["Saturn in Aquarius"], "mechanisms": ["chronic"]},
+                {"zone": "knees", "why": ["Capricorn sixth house"], "mechanisms": ["degenerative"]},
+            ],
+            "protective_factors": ["Jupiter supports House 8"],
+        },
+    })["health_rules"]
+
+    assert compact["required_zone_count"] == 3
+    assert [row["zone"] for row in compact["allowed_zone_evidence"]] == ["sides", "calves", "knees"]
+    assert compact["allowed_zone_evidence"][0]["why"] == ["Saturn nakshatra reason"]
+    assert compact["allowed_zone_evidence"][1]["anatomy_basis"] == ["Saturn in Aquarius"]
+
+
 def test_instant_answer_uses_exactly_one_generation_call(monkeypatch):
     analyzer = _FakeAnalyzer()
     compact_context = {
@@ -83,6 +123,54 @@ def test_instant_answer_uses_exactly_one_generation_call(monkeypatch):
     assert debug["contract_enforcement"]["reason"] == "single_call_contract_in_primary_prompt"
     assert debug["composer_metrics"]["generation_calls"] == 1
     assert debug["composer_metrics"]["within_prompt_budget"] is True
+
+
+def test_instant_answer_uses_sarvam_fast_composer_when_enabled(monkeypatch):
+    analyzer = _FakeAnalyzer()
+    compact_context = {
+        "birth_summary": {"name": "Test"},
+        "intent_summary": {"category": "career", "answer_mode": "timing_window"},
+        "normalized_evidence": {"natal_promise": {"status": "supported"}},
+        "recent_history": [],
+    }
+    packet = {
+        "query_plan": {"category": "career", "answer_mode": "timing_window", "language": "english"},
+        "verdict": {"direction": "improving", "confidence": 0.8},
+        "answer_spec": {"max_words": 120, "answer_order": ["direct_answer", "follow_up"]},
+        "evidence_ledger": {"records": []},
+        "verification": {"passed": True},
+    }
+    captured = {}
+
+    async def fake_compose(**kwargs):
+        captured.update(kwargs)
+        return {
+            "text": "Career momentum improves steadily. What change are you considering now?\n"
+                    'NEXT_ACTION_META: {"type":"none","title":"","reason":"","confidence":""}',
+            "usage": {"input_tokens": 50, "output_tokens": 20},
+        }
+
+    from ai import sarvam_conversations
+
+    monkeypatch.setattr(sarvam_conversations, "compose", fake_compose)
+    monkeypatch.setattr(pipeline, "_build_instant_context", lambda **kwargs: compact_context)
+    monkeypatch.setattr(pipeline, "build_instant_v2_packet", lambda **kwargs: packet)
+    monkeypatch.setattr(pipeline, "get_instant_chat_llm_provider", lambda: "sarvam")
+    monkeypatch.setattr(pipeline, "get_instant_chat_model", lambda: "sarvam-105b-conversations")
+    monkeypatch.setattr(pipeline, "finalize_instant_v2_packet", lambda current, answer: current)
+
+    result = asyncio.run(pipeline.generate_instant_chat_response(
+        analyzer,
+        question="How is my career this year?",
+        birth_data={"name": "Test"},
+        intent={"category": "career", "answer_mode": "timing_window", "target_subject_key": "self"},
+        history=[], language="english", response_validation_enabled_override=False,
+    ))
+
+    assert analyzer.generate_calls == 0
+    assert result["timing"]["chat_llm_provider"] == "sarvam"
+    assert result["timing"]["instant_transport"] == "sarvam_sse"
+    assert "ADJUDICATED CONTEXT:" in captured["prompt"]
 
 
 def test_disabled_response_validation_streams_without_running_fact_validator(monkeypatch):

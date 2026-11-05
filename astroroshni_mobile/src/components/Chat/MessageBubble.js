@@ -1151,8 +1151,23 @@ function MessageBubble({
           <View style={[styles.reelModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
             <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.eyebrow', 'ASTROROSHNI · REEL STUDIO')}</Text>
             <Text style={[styles.reelModalTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.title', 'Your personal reel')}</Text>
-            {(reelJobId || isPreparingReel) ? <View style={styles.reelModalLoading}>
-              {reelJobStatus === 'failed' ? <>
+            {(reelJobId || isPreparingReel) ? <View style={reelJobStatus === 'completed' ? styles.reelReadyState : styles.reelModalLoading}>
+              {reelJobStatus === 'completed' ? <>
+                <View style={[styles.reelReadyMedallion, { backgroundColor: colors.accentSoft, borderColor: colors.primary }]}>
+                  <Ionicons name="play" size={30} color={colors.primary} />
+                </View>
+                <Text style={[styles.reelReadyEyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.readyEyebrow', 'YOUR FILM IS READY')}</Text>
+                <Text style={[styles.reelReadyTitle, { color: colors.text }]}>{currentReelProgress.title}</Text>
+                <Text style={[styles.reelReadyBody, { color: colors.textSecondary }]}>{currentReelProgress.detail}</Text>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('premiumUi.reelStudio.playSaved', 'Play saved reel')} style={[styles.reelReadyPrimary, { backgroundColor: colors.primary }]} onPress={() => setShowReelPlayer(true)}>
+                  <Ionicons name="play" size={19} color={colors.onPrimary || '#fff'} />
+                  <Text numberOfLines={1} style={[styles.reelReadyPrimaryText, { color: colors.onPrimary || '#fff' }]}>{t('premiumUi.reelStudio.playSaved', 'Play saved reel')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity accessibilityRole="button" style={styles.reelReadySecondary} onPress={recreateReel}>
+                  <Ionicons name="refresh" size={17} color={colors.primary} />
+                  <Text style={[styles.reelReadySecondaryText, { color: colors.primary }]}>{t('premiumUi.reelStudio.recreate', 'Recreate')}</Text>
+                </TouchableOpacity>
+              </> : reelJobStatus === 'failed' ? <>
                 <Text style={{ color: colors.text, fontWeight: '800' }}>{t('premiumUi.reelStudio.failedTitle', 'We couldn’t finish your reel')}</Text>
                 <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{reelJobError || t('premiumUi.reelStudio.failedDescription', 'Please try again. Your credits will be returned if creation did not complete.')}</Text>
                 <TouchableOpacity style={styles.reelCancelButton} onPress={recreateReel}><Text style={{ color: colors.primary }}>{t('common.tryAgain', 'Try again')}</Text></TouchableOpacity>
@@ -1164,7 +1179,6 @@ function MessageBubble({
                 <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{currentReelProgress.detail}</Text>
                 {reelJobStatus !== 'completed' && <Text style={[styles.reelProgressNote, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.progressWaitNote', 'This can take up to five minutes. You can leave this page and come back anytime.')}</Text>}
               </>}
-              {reelJobStatus === 'completed' ? <><TouchableOpacity style={[styles.reelQueueButton, { backgroundColor: colors.primary }]} onPress={() => setShowReelPlayer(true)}><Ionicons name="play" size={18} color={colors.onPrimary || '#fff'} /><Text style={[styles.reelQueueText, { color: colors.onPrimary || '#fff' }]}>{t('premiumUi.reelStudio.playSaved', 'Play saved reel')}</Text></TouchableOpacity><TouchableOpacity style={styles.reelCancelButton} onPress={recreateReel}><Text style={{ color: colors.primary }}>{t('premiumUi.reelStudio.recreate', 'Recreate')}</Text></TouchableOpacity></> : null}
             </View> : <View style={styles.reelModalLoading}><Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{t('premiumUi.reelStudio.savedReelHint', 'Your saved reel will appear here when it is ready.')}</Text></View>}
             <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.textSecondary }}>{t('common.cancel', 'Cancel')}</Text></TouchableOpacity>
           </View>
@@ -4265,7 +4279,16 @@ function MessageActionRow({ children, style, ...props }) {
   reelModalEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   reelModalTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 27, marginTop: 8 },
   reelModalBody: { fontSize: 13, lineHeight: 20, marginTop: 6 },
-  reelModalLoading: { minHeight: 120, alignItems: 'center', justifyContent: 'center', gap: 14 },
+  reelModalLoading: { minHeight: 170, alignItems: 'center', justifyContent: 'center', gap: 14, paddingTop: 12 },
+  reelReadyState: { alignItems: 'center', width: '100%', paddingTop: 20, paddingBottom: 4 },
+  reelReadyMedallion: { width: 72, height: 72, borderRadius: 36, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginBottom: 13, shadowColor: '#7d173e', shadowOpacity: 0.22, shadowRadius: 14, shadowOffset: { width: 0, height: 7 }, elevation: 4 },
+  reelReadyEyebrow: { fontSize: 10, letterSpacing: 1.8, fontWeight: '900', marginBottom: 6 },
+  reelReadyTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 25, lineHeight: 31, textAlign: 'center' },
+  reelReadyBody: { fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 7, marginBottom: 21, paddingHorizontal: 8 },
+  reelReadyPrimary: { width: '100%', minHeight: 56, paddingHorizontal: 20, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10, shadowColor: '#5a1031', shadowOpacity: 0.25, shadowRadius: 9, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  reelReadyPrimaryText: { flexShrink: 1, fontSize: 16, lineHeight: 20, fontWeight: '900', textAlign: 'center' },
+  reelReadySecondary: { minHeight: 46, paddingHorizontal: 14, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  reelReadySecondaryText: { fontSize: 14, fontWeight: '800' },
   reelProgressTrack: { width: '100%', height: 9, overflow: 'hidden', borderRadius: 99, borderWidth: StyleSheet.hairlineWidth },
   reelProgressFill: { height: '100%', borderRadius: 99 },
   reelProgressPercent: { fontSize: 11, letterSpacing: .8, fontWeight: '900' },
