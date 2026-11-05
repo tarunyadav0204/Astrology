@@ -510,7 +510,7 @@ export const chatAPI = {
       language,
       visual_level: visualLevel,
     }),
-  queueReel: ({ messageId, durationSeconds = 180, language = 'en', visualLevel = 'hybrid', draftId, approvedClaimIds = [] }) =>
+  queueReel: ({ messageId, durationSeconds = 180, language = 'en', visualLevel = 'hybrid', draftId, approvedClaimIds = [], confirmedCreditCost }) =>
     api.post(getEndpoint('/reel-studio/jobs'), {
       message_id: messageId,
       duration_seconds: durationSeconds,
@@ -518,8 +518,11 @@ export const chatAPI = {
       visual_level: visualLevel,
       draft_id: draftId,
       approved_claim_ids: approvedClaimIds,
+      confirmed_credit_cost: confirmedCreditCost,
     }),
   getReelJob: (jobId) => api.get(getEndpoint(`/reel-studio/jobs/${encodeURIComponent(String(jobId))}`)),
+  getSavedReel: (messageId) => api.get(getEndpoint(`/reel-studio/saved/${encodeURIComponent(String(messageId))}`)),
+  getReelPricing: () => api.get(getEndpoint('/reel-studio/pricing')),
   submitFeedback: ({ message_id, rating, comment = null, reason = null }) =>
     api.post(getEndpoint('/chat/feedback/submit'), {
       message_id,

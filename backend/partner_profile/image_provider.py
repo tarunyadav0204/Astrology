@@ -72,9 +72,9 @@ class OpenAIPartnerPortraitProvider:
         return {"provider": self.provider_name, "model": self.model,
                 "image_size": self.image_size, "quality": self.quality}
 
-    async def _generate(self, prompt: str, reference: tuple[bytes, str] | None = None) -> GeneratedImage:
-        request = {"model": self.model, "prompt": prompt, "size": self.image_size,
-                   "quality": self.quality, "n": 1, "output_format": "png"}
+    async def _generate(self, prompt: str, reference: tuple[bytes, str] | None = None, *, quality: str | None = None, size: str | None = None) -> GeneratedImage:
+        request = {"model": self.model, "prompt": prompt, "size": size or self.image_size,
+                   "quality": quality or self.quality, "n": 1, "output_format": "png"}
         headers = {"Authorization": f"Bearer {self.api_key}"}
         async with httpx.AsyncClient(timeout=httpx.Timeout(240.0), follow_redirects=True) as client:
             if reference:
@@ -109,11 +109,15 @@ class OpenAIPartnerPortraitProvider:
         content_type = response.headers.get("content-type", "image/png").split(";", 1)[0]
         return response.content, content_type
 
-    async def generate_portrait(self, prompt: str, seed: int) -> GeneratedImage:
+    async def generate_portrait(self, prompt: str, seed: int, *, quality: str | None = None, size: str | None = None) -> GeneratedImage:
         # GPT image generation does not expose a seed. Identity is
         # established by passing this generated image into the second request.
         del seed
-        return await self._generate(prompt)
+        return await self._generate(prompt, quality=quality, size=size)
+
+    async def edit_image(self, prompt: str, content: bytes, mime_type: str = "image/png", *, quality: str | None = None, size: str | None = None) -> GeneratedImage:
+        """Apply an Image API edit while retaining the supplied image as source."""
+        return await self._generate(prompt, (content, mime_type), quality=quality, size=size)
 
     async def generate_full_body(self, prompt: str, portrait_uri: str, seed: int) -> GeneratedImage:
         del seed

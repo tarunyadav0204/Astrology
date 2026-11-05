@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 # Safe prices used only while a newly deployed setting has not yet been seeded.
 # Most legacy settings intentionally retain the historical one-credit fallback.
 _CREDIT_SETTING_FALLBACKS = {
+    "reel_generation_cost": 25,
     "chart_chat_cost": 2,
     "prashna_analysis_cost": 3,
     "partner_portrait_cost": 44,
@@ -47,6 +48,7 @@ LEDGER_FEATURE_FILTERS = {
     "partner_portrait": (
         {"reference_ids": ("partner_portrait",)},
     ),
+    "reel": ({"reference_ids": ("reel",)},),
 }
 
 _LEDGER_FEATURE_ALIASES = {
@@ -68,6 +70,7 @@ _LEDGER_FEATURE_ALIASES = {
     "partnership_chat": "partnership_chat",
     "partnership_analysis": "partnership_chat",
     "partner_portrait": "partner_portrait",
+    "reel": "reel",
 }
 
 
@@ -575,6 +578,7 @@ class CreditService:
                 ("karma_analysis_cost", 25, "Credits per karma analysis"),
                 ("ashtakavarga_life_predictions_cost", 15, "Credits per Ashtakavarga life predictions (Dots of Destiny)"),
                 ("podcast_cost", 2, "Credits per podcast (listen to message as audio)"),
+                ("reel_generation_cost", 25, "Reel Studio — credits per new or recreated reel"),
                 ("prashna_analysis_cost", 3, "Credits per classical Prashna question chart"),
                 ("partner_portrait_cost", 44, "Credits per AI Partner Portrait with face and full-body views"),
                 ("nakshatra_blueprint_cost", 9, "Credits per Nakshatra Blueprint reading"),
@@ -4093,6 +4097,7 @@ class CreditService:
             "instant_chat_first_minute_cost": "Credits for the first minute of Instant Chat",
             "instant_chat_per_minute_cost": "Credits per following started minute of Instant Chat",
             "prashna_analysis_cost": "Credits per classical Prashna question chart",
+            "reel_generation_cost": "Reel Studio — credits per new or recreated reel",
             "partner_portrait_cost": "Credits per AI Partner Portrait with face and full-body views",
             "nakshatra_blueprint_cost": "Credits per Nakshatra Blueprint reading",
             "nakshatra_blueprint_images_addon_cost": "Additional credits for illustrated Nakshatra Blueprint",
@@ -4309,7 +4314,7 @@ class CreditService:
             'progeny_analysis_cost', 'partnership_report_cost', 'career_report_cost', 'wealth_report_cost',
             'health_report_cost', 'janam_kundli_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
             'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost',
-            'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost',
+            'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost', 'reel_generation_cost',
             'prashna_analysis_cost', 'partner_portrait_cost', 'nakshatra_blueprint_cost', 'nakshatra_blueprint_images_addon_cost'
         )
         placeholders = ", ".join(["?"] * len(keys))
@@ -4431,6 +4436,14 @@ class CreditService:
                     })
                 except Exception:
                     pass
+            # Make the new rate editable on existing installations as well.
+            if not any(s["key"] == "reel_generation_cost" for s in settings):
+                execute(conn, """INSERT INTO credit_settings (setting_key, setting_value, description)
+                    VALUES ('reel_generation_cost', 25, 'Reel Studio — credits per new or recreated reel')
+                    ON CONFLICT (setting_key) DO NOTHING""")
+                conn.commit()
+                row = execute(conn, "SELECT setting_value, discount FROM credit_settings WHERE setting_key='reel_generation_cost'").fetchone()
+                settings.append({"key": "reel_generation_cost", "value": row[0], "description": "Reel Studio — credits per new or recreated reel", "discount": row[1]})
             # Ensure podcast_cost exists so admin Feature Costs always shows it
             if not any(s["key"] == "podcast_cost" for s in settings):
                 try:

@@ -15,12 +15,14 @@ import json
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from auth import User, get_current_user
 from db import execute, get_conn
+from reel_studio.text import plain_text
+from reel_studio.billing import charge_reel, reel_pricing
 
 router = APIRouter(prefix="/reel-studio", tags=["reel-studio"])
 
@@ -36,7 +38,11 @@ DEFAULT_BASE_COSTS_INR = {
 # estimate at the current USD/INR budget rate, not a provider invoice.
 VIDEO_COST_PER_SECOND_INR = {"none": 0.0, "hybrid": 9.65, "cinematic": 9.65}
 OMNI_VIDEO_ENABLED = os.getenv("REEL_ENABLE_OMNI_VIDEO", "false").strip().lower() in {"1", "true", "yes", "on"}
-_BEAT_TYPES = ("presenter", "presenter", "chart", "lifestyle_image", "dasha", "ashtakavarga", "lifestyle_image", "lifestyle_image", "closing")
+_VISUAL_MODULES = {
+    "opening", "chart_focus", "evidence_card", "dasha_stack", "timing_window",
+    "transit_overlay", "ashtakavarga", "support_caution", "lifestyle_image", "closing",
+}
+_SIGN_NAMES = ("Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces")
 _OMNI_VIDEO_TOKEN_INR = 17.50 * 95 / 1_000_000
 _OMNI_INPUT_TOKEN_INR = 1.50 * 95 / 1_000_000
 _OMNI_THOUGHT_TOKEN_INR = 9.00 * 95 / 1_000_000
@@ -87,6 +93,7 @@ class RenderRequest(DraftRequest):
     """An explicitly approved plan to be consumed by the render worker."""
     draft_id: str = Field(min_length=8, max_length=80)
     approved_claim_ids: list[str] = Field(min_length=1, max_length=24)
+    confirmed_credit_cost: int = Field(ge=0)
 
 
 def _ensure_tables(conn) -> None:
@@ -153,8 +160,9 @@ def _answer_for_user(message_id: int, user_id: int) -> tuple[str, int | None, st
 def _chart_snapshot(chart_id: int | None, user_id: int) -> dict | None:
     """Create a privacy-safe, deterministic visual source for the reel.
 
-    The reel deliberately stores placements and dasha dates, never the person's
-    name, date of birth, time, coordinates, or place of birth.
+    The reel deliberately stores placements, dasha dates, and only a coarse
+    visual-presentation value; it never stores the person's name, date of
+    birth, time, coordinates, or place of birth.
     """
     if not chart_id:
         return None
@@ -173,16 +181,29 @@ def _chart_snapshot(chart_id: int | None, user_id: int) -> dict | None:
         for planet, value in (chart.get("planets") or {}).items():
             if planet not in {"Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"}:
                 continue
-            placements.append({"planet": planet, "house": int(value.get("house") or 0), "sign": int(value.get("longitude", 0) // 30)})
+            longitude = float(value.get("longitude") or 0)
+            sign_index = int(longitude // 30) % 12
+            placements.append({
+                "planet": planet,
+                "house": int(value.get("house") or 0),
+                # Reel plans use display-safe zodiac values only. Internal
+                # zero-based sign indexes must never be sent to an image model.
+                "rashi_number": sign_index + 1,
+                "rashi_name": _SIGN_NAMES[sign_index],
+                "degree_in_sign": round(longitude % 30, 1),
+            })
         raw_sav = (AshtakavargaCalculator(dict(birth), chart).calculate_sarvashtakavarga() or {}).get("sarvashtakavarga") or {}
         asc = int(float(chart.get("ascendant") or 0) // 30) % 12
+        gender = str(birth.get("gender") or "").strip().lower()
+        presentation = "female" if gender in {"female", "woman", "f"} else "male" if gender in {"male", "man", "m"} else "unspecified"
         snapshot = {
             "chart_id": chart_id,
+            "native_presentation": presentation,
             "ascendant_sign": int(float(chart.get("ascendant") or 0) // 30),
             "placements": placements,
             "current_dashas": {
                 level: {key: value for key, value in (dashas.get(level) or {}).items() if key in {"planet", "start", "end"}}
-                for level in ("mahadasha", "antardasha", "pratyantardasha")
+                for level in ("mahadasha", "antardasha", "pratyantardasha", "sookshma", "prana")
             },
             "ashtakavarga": {"sav_by_house": {str(h): int(raw_sav.get(str((asc + h - 1) % 12), raw_sav.get((asc + h - 1) % 12, 0))) for h in range(1, 13)}},
         }
@@ -200,7 +221,7 @@ def _chart_snapshot(chart_id: int | None, user_id: int) -> dict | None:
 
 
 def _clean_text(value: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", value)).strip()
+    return plain_text(value)
 
 
 def _sentences(value: str) -> list[str]:
@@ -235,11 +256,14 @@ def _extract_claims(answer: str, max_claims: int = 24) -> list[dict]:
 
 
 def _cost_projection(duration: int, visual_level: str) -> dict:
-    # One 10-second Omni presenter source is split into two five-second beats.
-    video_seconds = 10 if visual_level != "none" and OMNI_VIDEO_ENABLED else 0
+    # This edit is intentionally narrator-led rather than avatar-led. It does
+    # not generate a presenter video or a presenter image.
+    video_seconds = 0
     base = sum(DEFAULT_BASE_COSTS_INR.values())
     video = VIDEO_COST_PER_SECOND_INR[visual_level] * video_seconds
-    image = 12.0 if visual_level != "none" else 0.0
+    # The dynamic planner creates 12–18 images. Every scene uses GPT Image's
+    # low-quality 9:16 tier; the worker records the exact final scene count.
+    image = round(12 * (0.005 * 1.1875 * 95), 2) if visual_level != "none" else 0.0
     total = round(base + video + image, 2)
     return {
         "currency": "INR",
@@ -248,7 +272,7 @@ def _cost_projection(duration: int, visual_level: str) -> dict:
             {"label": label.replace("_", " ").title(), "estimated_inr": cost}
             for label, cost in DEFAULT_BASE_COSTS_INR.items()
         ] + ([{"label": f"{video_seconds}s generated video", "estimated_inr": round(video, 2)}] if video else [])
-          + ([{"label": "Supporting images", "estimated_inr": image}] if image else []),
+          + ([{"label": "Minimum 12-scene LLM image plan: all low-quality images (9:16)", "estimated_inr": image}] if image else []),
         "assumptions": {
             "duration_seconds": duration,
             "generated_video_seconds": video_seconds,
@@ -259,7 +283,7 @@ def _cost_projection(duration: int, visual_level: str) -> dict:
 
 def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dict | None, language: str, duration_seconds: int) -> list[dict]:
     """Text model directs the creative edit; rendering remains fact-bound."""
-    types = _BEAT_TYPES
+    answer = plain_text(answer)
     def complete_line(value: object) -> str | None:
         text = _clean_text(str(value or ""))
         # Never replace failed direction with a generic line: that creates a
@@ -279,7 +303,7 @@ def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dic
         "required": ["beats"],
         "properties": {
             "beats": {
-                "type": "array", "minItems": 9, "maxItems": 9,
+                "type": "array", "minItems": 12, "maxItems": 18,
                 "items": {
                     "type": "object", "additionalProperties": False,
                     "required": ["type", "narration", "evidence_ids", "visual_instruction", "focus_nodes", "draw_edges"],
@@ -296,7 +320,8 @@ def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dic
         },
     }
     prompt = f'''Return JSON only: {{"beats":[{{"type":"", "narration":"", "evidence_ids":[], "visual_instruction":"", "focus_nodes":[], "draw_edges":[]}}]}}.
-Write a detailed {duration_seconds}-second premium vertical reel plan that ANSWERS THE USER'S ACTUAL QUESTION and explains why the approved answer reaches that conclusion. Do not make a generic astrology reel. Use exactly nine directed beats in this order: presenter, presenter, chart, lifestyle_image, dasha, ashtakavarga, lifestyle_image, lifestyle_image, closing. Write complete, naturally spoken passages. The combined narration MUST contain between {round(duration_seconds * 2.35)} and {round(duration_seconds * 2.5)} words for a calm podcast pace. Never cut a sentence, use ellipses, or repeat a closing/thank-you line. The two presenter beats form the opening explanation. For the chart beat, select at least one relevant verified focus node and edge when the graph has one. Each lifestyle_image needs a concrete prompt tied to the answer. Chart, dasha, ashtakavarga and closing are deterministic data visual directions only. Do not invent facts or use facts not in the approved answer. EVIDENCE RULE: every beat's evidence_ids must be a non-empty array containing only exact id values from the CLAIMS list below. Never create a new claim ID and never leave evidence_ids empty.
+Write a detailed {duration_seconds}-second premium vertical reel plan that ANSWERS THE USER'S ACTUAL QUESTION and explains why the approved answer reaches that conclusion. Do not make a generic astrology reel. Select 12 to 18 beats from these supported visual modules only: {sorted(_VISUAL_MODULES)}. Choose modules that fit the answer; do not force chart, dasha, Ashtakavarga, transit, or timing scenes when the evidence does not support them. Use opening first and closing last. Write complete, naturally spoken passages. The combined narration MUST contain between {round(duration_seconds * 2.35)} and {round(duration_seconds * 2.5)} words for a calm podcast pace. Never cut a sentence, use ellipses, or repeat a closing/thank-you line. Every beat must include a concrete visual_instruction describing the desired image. For chart_focus, select relevant verified focus nodes and arrows when the graph has them. For lifestyle_image, describe a real-life scene tied to the answer. All images are created by GPT Image from this directed data; no visual may introduce a fact outside the approved claims or VERIFIED VISUAL DATA. EVIDENCE RULE: every beat's evidence_ids must be a non-empty array containing only exact id values from the CLAIMS list below. Never create a new claim ID and never leave evidence_ids empty.
+Use plain text for narration and all visible image labels. Strip Markdown syntax from source copy: a heading such as 'Key Insights' must never include hash, asterisk, or backtick formatting markers.
 USER QUESTION: {question[:2000]}
 APPROVED ANSWER: {answer[:9000]}
 CLAIMS: {json.dumps(claims, ensure_ascii=False)}
@@ -307,8 +332,8 @@ VERIFIED VISUAL DATA: {json.dumps(source, ensure_ascii=False)}'''
             model=os.getenv("REEL_PLANNER_MODEL", "gpt-5.6-luna"), input=prompt, store=False,
             text={"format": {"type": "json_schema", "name": "reel_plan", "strict": True, "schema": output_schema}}, max_output_tokens=3600)
         generated = json.loads(response.output_text).get("beats")
-        if not isinstance(generated, list) or len(generated) != 9:
-            raise ValueError("The director did not return nine complete beats.")
+        if not isinstance(generated, list) or not 12 <= len(generated) <= 18:
+            raise ValueError("The director must return 12 to 18 complete beats.")
         valid_ids = {c["id"] for c in claims}
         node_ids = {str(node.get("id")) for node in graph.get("nodes", [])}
         edge_ids = {str(edge.get("id")) for edge in graph.get("edges", [])}
@@ -316,14 +341,14 @@ VERIFIED VISUAL DATA: {json.dumps(source, ensure_ascii=False)}'''
         for i, item in enumerate(generated):
             if not isinstance(item, dict):
                 raise ValueError(f"Beat {i + 1} is not an object.")
-            if item.get("type") != types[i]:
-                raise ValueError(f"Beat {i + 1} must be a {types[i]} scene.")
+            if item.get("type") not in _VISUAL_MODULES:
+                raise ValueError(f"Beat {i + 1} has an unsupported visual module.")
             narration = complete_line(item.get("narration"))
             if not narration:
                 raise ValueError(f"Beat {i + 1} is not a complete short sentence.")
             visual_instruction = _clean_text(str(item.get("visual_instruction") or ""))
-            if item.get("type") == "lifestyle_image" and not visual_instruction:
-                raise ValueError(f"Lifestyle beat {i + 1} has no visual direction.")
+            if not visual_instruction:
+                raise ValueError(f"Beat {i + 1} has no visual direction.")
             focus_nodes = [str(x) for x in item.get("focus_nodes", [])]
             draw_edges = [str(x) for x in item.get("draw_edges", [])]
             if any(node not in node_ids for node in focus_nodes) or any(edge not in edge_ids for edge in draw_edges):
@@ -332,11 +357,12 @@ VERIFIED VISUAL DATA: {json.dumps(source, ensure_ascii=False)}'''
             if not ids:
                 raise ValueError(f"Beat {i + 1} is not grounded in an approved claim.")
             beats.append({"id": f"beat_{i + 1}", "start_seconds": 0, "end_seconds": 0,
-                          "type": types[i], "narrator": "omni" if types[i] == "presenter" else "podcast",
+                          "type": str(item["type"]), "narrator": "podcast",
                           "narration": narration, "visual_instruction": visual_instruction,
                           "focus_nodes": focus_nodes, "draw_edges": draw_edges, "evidence_ids": ids})
-        if not beats[2]["focus_nodes"] or not beats[2]["draw_edges"]:
-            raise ValueError("The chart explanation must select verified nodes and at least one verified arrow.")
+        for beat in beats:
+            if beat["type"] == "chart_focus" and graph.get("nodes") and (not beat["focus_nodes"] or not beat["draw_edges"]):
+                raise ValueError("Every chart-focus scene must select verified nodes and at least one verified arrow.")
         total_words = sum(len(beat["narration"].split()) for beat in beats)
         if total_words > 900:
             raise ValueError("The director returned more than 900 spoken words; split this reading into separate reels.")
@@ -367,24 +393,28 @@ def _draft_payload(request: DraftRequest, user_id: int) -> dict:
         "chart_snapshot": chart_snapshot,
         "premium_readiness": {
             "real_chart": bool(chart_snapshot),
-            "presenter": True,
+            "presenter": False,
             "generated_lifestyle_broll": request.visual_level in {"hybrid", "cinematic"},
-            "note": "The final reel uses an on-screen AI presenter, deterministic chart/dasha inserts, and generated live-action b-roll. Uploaded licensed b-roll can replace generated b-roll in a later pass.",
+            "note": "The final reel uses chart and dasha source images transformed into editorial 9:16 visuals, deterministic astrology inserts, and generated live-action b-roll. Uploaded licensed b-roll can replace generated b-roll in a later pass.",
         },
         "settings": request.model_dump(),
         "claims": claims,
         "storyboard": scenes,
         "estimated_duration_seconds": scenes[-1]["end_seconds"] if scenes else 0,
-        "creative_plan": {"planner": "text-model-with-deterministic-rendering", "beat_count": 9},
+        "creative_plan": {"planner": "text-model-with-gpt-image-rendering", "beat_count": len(scenes)},
         "cost_projection": _cost_projection(request.duration_seconds, request.visual_level),
         "approval_required": True,
-        "privacy_note": "Client identifiers and birth details are excluded from the reel plan by default.",
+        "privacy_note": "Client identifiers and birth details are excluded from the reel plan; only a coarse visual-presentation value is retained to avoid depicting the native as a different gender.",
     }
 
 
 @router.post("/drafts/from-answer")
 def create_draft(request: DraftRequest, current_user: User = Depends(get_current_user)):
+    quote = reel_pricing(current_user.userid)
+    if quote["credits"] < quote["credit_cost"]:
+        raise HTTPException(status_code=402, detail=f"Insufficient credits. You need {quote['credit_cost']} credits.")
     draft = _draft_payload(request, current_user.userid)
+    draft["credit_cost"] = quote["credit_cost"]
     # The approval screen must queue precisely the plan the user reviewed.
     # Persist it rather than directing the LLM again at queue time.
     draft_id = f"draft_{uuid.uuid4().hex}"
@@ -401,49 +431,80 @@ def create_draft(request: DraftRequest, current_user: User = Depends(get_current
 
 @router.post("/jobs")
 def queue_render(request: RenderRequest, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
-    """Persist an approved job; a separately deployed worker renders it.
-
-    The worker must reject any generated-video scene carrying evidence IDs. This
-    prevents cinematic footage from becoming a false visual proof of a claim.
-    """
+    """Commit the approved job and credit debit together, once per draft."""
+    quote = reel_pricing(current_user.userid)
+    job_id = f"job_{uuid.uuid5(uuid.NAMESPACE_URL, f'reel:{current_user.userid}:{request.draft_id}').hex}"
+    renderer_ready = bool(os.getenv("OPENAI_API_KEY") or os.getenv("PARTNER_PORTRAIT_OPENAI_API_KEY"))
+    if renderer_ready:
+        # Resolve renderer dependencies before a debit can be committed.
+        from reel_studio.worker import process_reel_job
     with get_conn() as conn:
         _ensure_tables(conn)
         row = execute(conn, """
             SELECT plan_json FROM reel_storyboard_drafts
-            WHERE id=%s AND user_id=%s AND source_message_id=%s
+            WHERE id=%s AND user_id=%s AND source_message_id=%s FOR UPDATE
         """, (request.draft_id, current_user.userid, request.message_id)).fetchone()
-        conn.commit()
-    if not row:
-        raise HTTPException(status_code=409, detail="This storyboard has expired or does not belong to this answer. Prepare a new storyboard before queuing it.")
-    try:
-        draft = json.loads(row[0])
-    except (TypeError, json.JSONDecodeError):
-        raise HTTPException(status_code=503, detail="The approved storyboard could not be read. Prepare it again before queuing.")
-    settings = draft.get("settings") or {}
-    if any(settings.get(key) != getattr(request, key) for key in ("message_id", "duration_seconds", "language", "visual_level")):
-        raise HTTPException(status_code=422, detail="Queue settings do not match the storyboard you approved. Prepare a new storyboard.")
-    available = {claim["id"] for claim in draft["claims"]}
-    if not set(request.approved_claim_ids).issubset(available):
-        raise HTTPException(status_code=422, detail="Approval contains an unknown claim.")
-    job_id = f"job_{uuid.uuid4().hex}"
-    draft["approved_claim_ids"] = request.approved_claim_ids
-    renderer_ready = bool(os.getenv("OPENAI_API_KEY") or os.getenv("PARTNER_PORTRAIT_OPENAI_API_KEY"))
-    status = "queued" if renderer_ready else "awaiting_provider_configuration"
-    with get_conn() as conn:
-        _ensure_tables(conn)
+        if not row:
+            raise HTTPException(status_code=409, detail="This storyboard has expired or does not belong to this answer. Prepare a new storyboard before queuing it.")
+        try:
+            draft = json.loads(row[0])
+        except (TypeError, json.JSONDecodeError):
+            raise HTTPException(status_code=503, detail="The approved storyboard could not be read. Prepare it again before queuing.")
+        existing = execute(conn, "SELECT status FROM reel_render_jobs WHERE id=%s", (job_id,)).fetchone()
+        if existing:
+            return {"job_id": job_id, "run_id": draft["run_id"], "status": existing[0], "cost_projection": draft["cost_projection"], "credit_cost": draft.get("credit_cost"), "reused": True}
+        settings = draft.get("settings") or {}
+        if any(settings.get(key) != getattr(request, key) for key in ("message_id", "duration_seconds", "language", "visual_level")):
+            raise HTTPException(status_code=422, detail="Queue settings do not match the storyboard you approved. Prepare a new storyboard.")
+        available = {claim["id"] for claim in draft["claims"]}
+        if not set(request.approved_claim_ids).issubset(available):
+            raise HTTPException(status_code=422, detail="Approval contains an unknown claim.")
+        if quote["credit_cost"] != request.confirmed_credit_cost:
+            raise HTTPException(status_code=409, detail="Reel credit pricing has changed. Reopen Reel Studio to review the current price.")
+        if not renderer_ready:
+            raise HTTPException(status_code=503, detail="Reel generation is not configured. No credits were charged.")
+        if not charge_reel(conn, current_user.userid, quote["credit_cost"], job_id, request.message_id):
+            raise HTTPException(status_code=402, detail=f"Insufficient credits. You need {quote['credit_cost']} credits.")
+        status = "queued"
+        draft["approved_claim_ids"] = request.approved_claim_ids
+        draft["credit_charge"] = {"cost": quote["credit_cost"], "refunded": False}
         execute(conn, """
             INSERT INTO reel_render_jobs (id, user_id, source_message_id, mode, status, plan_json)
             VALUES (%s, %s, %s, %s, %s, %s)
         """, (job_id, current_user.userid, request.message_id, request.visual_level, status, json.dumps(draft)))
         conn.commit()
     if renderer_ready:
-        from reel_studio.worker import process_reel_job
         background_tasks.add_task(process_reel_job, job_id)
     return {
         "job_id": job_id, "run_id": draft["run_id"], "status": status,
-        "cost_projection": draft["cost_projection"],
+        "cost_projection": draft["cost_projection"], "credit_cost": quote["credit_cost"],
         "next_step": None if renderer_ready else "Configure OpenAI image generation before this storyboard can become an MP4.",
     }
+
+
+@router.get("/pricing")
+def get_reel_pricing(current_user: User = Depends(get_current_user)):
+    return reel_pricing(current_user.userid)
+
+
+@router.get("/saved/{message_id}")
+def saved_reel(message_id: int, language: Literal["en", "hi"] | None = None, current_user: User = Depends(get_current_user)):
+    """Reopen a completed reel or reconnect to its render without planning again."""
+    with get_conn() as conn:
+        _ensure_tables(conn)
+        rows = execute(conn, """SELECT id, status, output_url, error_message, plan_json
+            FROM reel_render_jobs WHERE user_id=%s AND source_message_id=%s
+            ORDER BY created_at DESC""", (current_user.userid, message_id)).fetchall()
+        conn.commit()
+    for job_id, status, output_url, error, raw in rows:
+        plan = json.loads(raw or "{}")
+        if language and plan.get("settings", {}).get("language", "en") != language:
+            continue
+        if status == "failed":
+            continue
+        return {"job": {"job_id": job_id, "status": status, "output_url": output_url,
+                        "error_message": error, "settings": plan.get("settings", {}), "cached": status == "completed"}}
+    return {"job": None}
 
 
 @router.get("/jobs/{job_id}")
@@ -469,16 +530,47 @@ def get_render_job(job_id: str, current_user: User = Depends(get_current_user)):
 
 
 @router.get("/jobs/{job_id}/download")
-def download_render(job_id: str, current_user: User = Depends(get_current_user)):
-    from reel_studio.worker import ROOT
+def download_render(job_id: str, request: Request, current_user: User = Depends(get_current_user)):
+    from reel_studio.storage import load_reel
     with get_conn() as conn:
         row = execute(conn, "SELECT user_id, status FROM reel_render_jobs WHERE id=%s AND user_id=%s", (job_id, current_user.userid)).fetchone()
     if not row or row[1] != "completed":
         raise HTTPException(status_code=404, detail="Reel is not ready yet.")
-    output = ROOT / str(row[0]) / job_id / "final-reel.mp4"
-    if not output.is_file():
+    output = load_reel(row[0], job_id)
+    if output is None:
         raise HTTPException(status_code=404, detail="Reel output is unavailable.")
-    return FileResponse(output, media_type="video/mp4", filename="astroroshni-reel.mp4")
+    return _video_response(output, request.headers.get("range"))
+
+
+def _video_response(path, range_header: str | None):
+    """Authenticated byte ranges allow native/web video players to seek."""
+    size = path.stat().st_size
+    start, end, status = 0, size - 1, 200
+    headers = {"Accept-Ranges": "bytes", "Content-Disposition": 'inline; filename="astroroshni-reel.mp4"',
+               "Cache-Control": "private, max-age=86400"}
+    if range_header:
+        match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip())
+        if not match or not any(match.groups()):
+            raise HTTPException(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+        left, right = match.groups()
+        start = int(left) if left else max(0, size - int(right))
+        end = min(int(right), size - 1) if left and right else size - 1
+        if start > end or start >= size:
+            raise HTTPException(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+        status = 206
+        headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+    headers["Content-Length"] = str(end - start + 1)
+    def chunks():
+        with path.open("rb") as handle:
+            handle.seek(start)
+            remaining = end - start + 1
+            while remaining:
+                data = handle.read(min(1024 * 1024, remaining))
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+    return StreamingResponse(chunks(), status_code=status, media_type="video/mp4", headers=headers)
 
 
 @router.post("/cost-events")

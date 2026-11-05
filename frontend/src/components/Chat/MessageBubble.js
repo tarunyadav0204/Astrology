@@ -206,6 +206,13 @@ const IconCopyOutline = (p) => (
         <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
     </svg>
 );
+const IconReelOutline = (p) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} aria-hidden="true" {...IC.s(p)}>
+        <rect x="3" y="3" width="18" height="18" rx="4" />
+        <path d="M3 8h18M8 3l4 5M15 3l4 5" />
+        <path d="m10 11 6 3.5-6 3.5z" fill="currentColor" stroke="none" />
+    </svg>
+);
 const IconShareSocialOutline = (p) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={IC.w} height={IC.h} viewBox={IC.vb} {...IC.s(p)}>
         <circle cx="18" cy="5" r="3" />
@@ -1753,7 +1760,7 @@ const MessageBubble = ({
                             title="Create chart-grounded reel"
                             aria-label="Create chart-grounded reel"
                         >
-                            <span aria-hidden="true">✦</span><span className="podcast-included-label">Reel</span>
+                            <IconReelOutline />
                         </button>
                         <button type="button" className="action-btn action-btn--toolbar" onClick={handleCopyClick} title="Copy message" aria-label="Copy message">
                             <IconCopyOutline />
@@ -1904,7 +1911,7 @@ const MessageBubble = ({
                 )}
                 {isAssistant && (
                     <button type="button" className="action-btn action-btn--toolbar" onClick={() => setReelStudioOpen(true)} title="Create chart-grounded reel" aria-label="Create chart-grounded reel">
-                        <span aria-hidden="true">✦</span><span className="podcast-included-label">Reel</span>
+                        <IconReelOutline />
                     </button>
                 )}
                 <button type="button" className="action-btn action-btn--toolbar" onClick={handleCopyClick} title="Copy message">

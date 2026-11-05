@@ -1,26 +1,63 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { showToast } from '../../utils/toast';
 import './ReelStudioModal.css';
+import ReelPlayer from './ReelPlayer';
+import { ThemeButton, ThemeModal } from '../Theme';
+import CreditsModal from '../Credits/CreditsModal';
 
-const LEVELS = [
-    { id: 'none', title: 'Chart-led', note: 'Animated real kundali, dashas and voice', estimate: 'Lowest cost' },
-    { id: 'hybrid', title: 'Studio', note: 'On-screen narrator, real chart and live-action B-roll', estimate: 'Recommended' },
-    { id: 'cinematic', title: 'Premium', note: 'Narrator-led cinematic edit with chart and dasha inserts', estimate: 'Premium credits' },
-];
+const REEL_SETTINGS = { duration: 180, language: 'en', visualLevel: 'cinematic' };
+
+function reelProgress(status, preparing = false) {
+    if (preparing) return { value: 8, title: 'Preparing your reel', detail: 'Organising your reading into a clear visual story.' };
+    if (status === 'queued') return { value: 14, title: 'Your reel is in line', detail: 'We’ll begin creating it shortly.' };
+    const assetMatch = String(status).match(/^creating_your_reel_(\d+)_of_(\d+)$/);
+    if (assetMatch) {
+        const done = Number(assetMatch[1]); const total = Number(assetMatch[2]);
+        return { value: Math.min(82, 18 + Math.round((done / total) * 64)), title: 'Bringing your story to life', detail: `${done} of ${total} moments ready` };
+    }
+    if (status === 'creating_planned_shots') return { value: 18, title: 'Bringing your story to life', detail: 'Creating the visuals and narration for your reading.' };
+    if (status === 'premium_compositing') return { value: 87, title: 'Putting your reel together', detail: 'Finishing the visual story and sound.' };
+    if (status === 'saving_reel') return { value: 96, title: 'Almost ready', detail: 'Saving your reel securely.' };
+    if (status === 'completed') return { value: 100, title: 'Your reel is ready', detail: 'Play, share or download it whenever you like.' };
+    return { value: 10, title: 'Preparing your reel', detail: 'Your personal reel is being prepared.' };
+}
 
 export default function ReelStudioModal({ messageId, onClose }) {
-    const [duration, setDuration] = useState(180);
-    const [language, setLanguage] = useState('en');
-    const [visualLevel, setVisualLevel] = useState('cinematic');
-    const [draft, setDraft] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [approved, setApproved] = useState(false);
-    const [queueing, setQueueing] = useState(false);
     const [job, setJob] = useState(null);
     const [jobStatus, setJobStatus] = useState('');
     const [jobError, setJobError] = useState('');
-    const selectedLevel = useMemo(() => LEVELS.find((level) => level.id === visualLevel), [visualLevel]);
+    const [checkingCache, setCheckingCache] = useState(true);
+    const [showPlayer, setShowPlayer] = useState(false);
+    const [creditQuote, setCreditQuote] = useState(null);
+    const [showCreditConfirm, setShowCreditConfirm] = useState(false);
+    const [showBuyCredits, setShowBuyCredits] = useState(false);
+    const [isRecreating, setIsRecreating] = useState(false);
+    const prepareLock = useRef(false);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        const lookup = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/reel-studio/saved/${encodeURIComponent(messageId)}`, {
+                    signal: controller.signal, headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                if (!response.ok) throw new Error('Could not check for your saved reel. Please reopen Reel Studio.');
+                const payload = await response.json();
+                if (controller.signal.aborted) return;
+                if (payload.job) {
+                    setJob(payload.job); setJobStatus(payload.job.status);
+                    if (payload.job.status === 'completed') setShowPlayer(true);
+                }
+            } catch (error) {
+                if (error.name !== 'AbortError') { setJobError(error.message); setJobStatus('cache_error'); }
+            } finally { if (!controller.signal.aborted) setCheckingCache(false); }
+        };
+        lookup();
+        return () => controller.abort();
+    }, [messageId]);
 
     useEffect(() => {
         if (!job?.job_id || ['completed', 'failed'].includes(jobStatus)) return undefined;
@@ -32,6 +69,8 @@ export default function ReelStudioModal({ messageId, onClose }) {
                 const payload = await response.json();
                 if (!active || !response.ok) return;
                 setJobStatus(payload.status || 'rendering');
+                if (['completed', 'failed'].includes(payload.status)) window.dispatchEvent(new Event('creditUpdated'));
+                if (payload.status === 'completed') setShowPlayer(true);
                 setJobError(payload.error_message || '');
             } catch (_) { /* Retain the last state while a request is retried. */ }
         };
@@ -40,52 +79,58 @@ export default function ReelStudioModal({ messageId, onClose }) {
         return () => { active = false; window.clearInterval(timer); };
     }, [job?.job_id, jobStatus]);
 
+    const requestCreditConfirmation = async (recreating = false) => {
+        if (loading) return;
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/reel-studio/pricing', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.detail || 'Could not load reel pricing.');
+            setCreditQuote(payload); setIsRecreating(recreating); setShowPlayer(false); setShowCreditConfirm(true);
+        } catch (error) { showToast(error.message, 'error'); }
+        finally { setLoading(false); }
+    };
     const prepare = async () => {
+        if (prepareLock.current || !creditQuote) return;
+        prepareLock.current = true;
+        setShowCreditConfirm(false);
+        setJob(null); setJobStatus('preparing'); setJobError('');
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
             const response = await fetch('/api/reel-studio/drafts/from-answer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify({ message_id: messageId, duration_seconds: duration, language, visual_level: visualLevel }),
+                body: JSON.stringify({ message_id: messageId, duration_seconds: REEL_SETTINGS.duration, language: REEL_SETTINGS.language, visual_level: REEL_SETTINGS.visualLevel }),
             });
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.detail || 'Could not prepare this reel.');
-            setDraft(payload);
+            await queue(payload);
         } catch (error) {
             showToast(error.message || 'Could not prepare this reel.', 'error');
         } finally {
+            prepareLock.current = false;
             setLoading(false);
         }
     };
 
-    const cost = draft?.cost_projection?.estimated_total;
-    const queue = async () => {
-        // A plan prepared before server-side approved-plan persistence was
-        // introduced cannot be safely queued: re-planning here would defeat
-        // the evidence review and can produce a different script.
-        if (!draft?.draft_id) {
-            setApproved(false);
-            setDraft(null);
-            showToast('This storyboard was prepared by an older Reel Studio version. Please prepare a fresh storyboard before queuing.', 'error');
-            return;
-        }
-        setQueueing(true);
+    const recreate = () => requestCreditConfirmation(true);
+    const queue = async (draft) => {
+        if (!draft?.draft_id) throw new Error('Your reel could not be prepared. Please try again.');
         try {
             const token = localStorage.getItem('token');
             const response = await fetch('/api/reel-studio/jobs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify({ message_id: messageId, duration_seconds: duration, language, visual_level: visualLevel, draft_id: draft.draft_id, approved_claim_ids: draft.claims.map((claim) => claim.id) }),
+                body: JSON.stringify({ message_id: messageId, duration_seconds: REEL_SETTINGS.duration, language: REEL_SETTINGS.language, visual_level: REEL_SETTINGS.visualLevel, draft_id: draft.draft_id, approved_claim_ids: draft.claims.map((claim) => claim.id), confirmed_credit_cost: creditQuote.credit_cost }),
             });
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.detail || 'Could not queue this reel.');
             setJob(payload);
             setJobStatus(payload.status || 'queued');
-            showToast(`Reel rendering · estimated production cost ₹${payload.cost_projection.estimated_total}`, 'success');
-        } catch (error) {
-            showToast(error.message || 'Could not queue this reel.', 'error');
-        } finally { setQueueing(false); }
+            window.dispatchEvent(new Event('creditUpdated'));
+        } catch (error) { throw new Error(error.message || 'Could not create this reel.'); }
     };
     const download = async () => {
         if (!job?.job_id) return;
@@ -97,52 +142,37 @@ export default function ReelStudioModal({ messageId, onClose }) {
             const link = document.createElement('a'); link.href = url; link.download = 'astroroshni-reel.mp4'; link.click(); URL.revokeObjectURL(url);
         } catch (error) { showToast(error.message || 'Could not download the reel.', 'error'); }
     };
+    if (showBuyCredits) return <CreditsModal isOpen onClose={() => { setShowBuyCredits(false); requestCreditConfirmation(isRecreating); }} />;
+    if (showCreditConfirm) return <ThemeModal isOpen onClose={() => setShowCreditConfirm(false)} size="sm" className="reel-credit-confirm"
+        title={isRecreating ? 'Recreate this reel?' : 'Create your reel'}
+        description="Your personal reel will be created after confirmation. Credits are charged once creation begins. Replaying a saved reel is free.">
+        <div className="reel-credit-summary"><span>Generation cost</span><strong>{creditQuote.credit_cost} credits</strong><span>Your balance: {creditQuote.credits} credits</span></div>
+        <div className="reel-credit-actions"><ThemeButton variant="secondary" onClick={() => setShowCreditConfirm(false)}>Cancel</ThemeButton>
+            <ThemeButton onClick={creditQuote.credits < creditQuote.credit_cost ? () => { setShowCreditConfirm(false); setShowBuyCredits(true); } : prepare}>
+                {creditQuote.credits < creditQuote.credit_cost ? 'Buy credits' : 'Continue'}
+            </ThemeButton></div>
+    </ThemeModal>;
+    if (showPlayer && job?.job_id) return <ReelPlayer jobId={job.job_id} onClose={() => setShowPlayer(false)} onRecreate={recreate} />;
     return createPortal(
         <div className="reel-studio-backdrop" role="presentation" onMouseDown={onClose}>
             <section className="reel-studio-modal" role="dialog" aria-modal="true" aria-labelledby="reel-studio-title" onMouseDown={(event) => event.stopPropagation()}>
                 <button type="button" className="reel-studio-close" onClick={onClose} aria-label="Close Reel Studio">×</button>
                 <div className="reel-studio-eyebrow">ASTROROSHNI · REEL STUDIO</div>
-                <h2 id="reel-studio-title">Turn this reading into a reel</h2>
-                <p className="reel-studio-intro">A narrator-led edit: an animated astrologer portrait, your actual kundali and dasha periods, plus generated editorial stills. You approve the claims before anything renders.</p>
+                <h2 id="reel-studio-title">Your personal reel</h2>
+                <p className="reel-studio-intro">A polished visual reading shaped from your chart, timing and the guidance in this conversation.</p>
 
-                {job ? <div className="reel-studio-job" aria-live="polite">
+                {checkingCache ? <p role="status">Checking your saved reel…</p> : jobStatus === 'cache_error' ? <p role="alert">{jobError}</p> : (job || loading) ? <div className="reel-studio-job" aria-live="polite">
+                    {jobStatus === 'failed' ? <><span>!</span><h3>We couldn’t finish your reel</h3><p>{jobError || 'Please try again. Your credits will be returned if creation did not complete.'}</p><button type="button" className="reel-studio-secondary" onClick={recreate}>Try again</button></> : <>
                     <span className={jobStatus === 'completed' ? 'is-complete' : ''}>{jobStatus === 'completed' ? '✓' : '◌'}</span>
-                    <h3>{jobStatus === 'completed' ? 'Your reel is ready' : String(jobStatus || 'queued').replaceAll('_', ' ')}</h3>
-                    <p>{jobStatus === 'completed' ? 'Your final vertical MP4 is ready to download or share.' : jobStatus === 'failed' ? (jobError || 'The reel could not be completed.') : 'Creating the animated presenter, chart and dasha inserts, editorial stills and final MP4…'}</p>
-                    {jobStatus === 'completed' ? <button type="button" className="reel-studio-primary" onClick={download}>Download MP4</button> : null}
-                </div> : !draft ? <>
-                    <div className="reel-studio-field">
-                        <span>Length</span>
-                        <div className="reel-studio-segmented">
-                            {[60, 120, 180].map((seconds) => <button type="button" key={seconds} className={duration === seconds ? 'is-selected' : ''} onClick={() => setDuration(seconds)}>{seconds < 60 ? `${seconds}s` : `${seconds / 60}m`}</button>)}
-                        </div>
-                    </div>
-                    <div className="reel-studio-field">
-                        <span>Voice language</span>
-                        <div className="reel-studio-segmented">
-                            <button type="button" className={language === 'en' ? 'is-selected' : ''} onClick={() => setLanguage('en')}>English</button>
-                            <button type="button" className={language === 'hi' ? 'is-selected' : ''} onClick={() => setLanguage('hi')}>Hindi</button>
-                        </div>
-                    </div>
-                    <div className="reel-studio-field"><span>Visual treatment</span></div>
-                    <div className="reel-studio-levels">
-                        {LEVELS.map((level) => <button type="button" key={level.id} onClick={() => setVisualLevel(level.id)} className={`reel-studio-level ${visualLevel === level.id ? 'is-selected' : ''}`}>
-                            <strong>{level.title}</strong><small>{level.note}</small><em>{level.estimate}</em>
-                        </button>)}
-                    </div>
-                    <div className="reel-studio-privacy">◇ Client name and birth details stay hidden by default.</div>
-                    <button type="button" className="reel-studio-primary" onClick={prepare} disabled={loading}>{loading ? 'Building your storyboard…' : `Prepare ${selectedLevel.title} storyboard`}</button>
-                </> : <>
-                    <div className="reel-studio-ready"><span>✓</span><div><strong>Storyboard ready</strong><small>{draft.storyboard.length} scenes · ~{Math.ceil((draft.estimated_duration_seconds || duration) / 10) * 10}s · {language === 'hi' ? 'Hindi' : 'English'}</small></div><b>₹{cost}</b></div>
-                    <div className="reel-studio-section-title">Evidence review</div>
-                    <div className="reel-studio-claims">
-                        {draft.claims.map((claim) => <div key={claim.id} className={`reel-studio-claim reel-studio-claim--${claim.status}`}><span>{claim.status === 'interpretation' ? '◇' : '◌'}</span><div><small>{claim.status === 'interpretation' ? 'Interpretation' : 'Needs chart validation'}</small><p>{claim.text}</p></div></div>)}
-                    </div>
-                    <div className="reel-studio-section-title">Scene plan</div>
-                    <ol className="reel-studio-scenes">{draft.storyboard.map((scene) => <li key={scene.id}><b>{scene.type.replaceAll('_', ' ')}</b><span>{scene.start_seconds}s–{scene.end_seconds}s</span><p>{scene.narration}</p></li>)}</ol>
-                    <label className="reel-studio-approve"><input type="checkbox" checked={approved} onChange={(event) => setApproved(event.target.checked)} /> I’ve reviewed the claims and approve this plan.</label>
-                    <button type="button" className="reel-studio-primary" disabled={!approved || queueing} onClick={queue}>{queueing ? 'Queuing render…' : 'Approve & queue render'}</button>
-                    <button type="button" className="reel-studio-secondary" onClick={() => setDraft(null)}>Adjust format</button>
+                    <h3>{reelProgress(jobStatus, loading && !job).title}</h3>
+                    <div className="reel-progress" role="progressbar" aria-valuenow={reelProgress(jobStatus, loading && !job).value} aria-valuemin="0" aria-valuemax="100"><i style={{ width: `${reelProgress(jobStatus, loading && !job).value}%` }} /></div>
+                    <strong className="reel-progress-value">{reelProgress(jobStatus, loading && !job).value}%</strong>
+                    <p>{reelProgress(jobStatus, loading && !job).detail}</p>
+                    {jobStatus !== 'completed' && <small className="reel-progress-note">This can take up to five minutes. You can leave this page and come back anytime.</small>}
+                    {jobStatus === 'completed' ? <><button type="button" className="reel-studio-primary" onClick={() => setShowPlayer(true)}>Play saved reel</button><button type="button" className="reel-studio-secondary" onClick={download}>Download MP4</button><button type="button" className="reel-studio-secondary" onClick={recreate}>Recreate reel</button></> : null}
+                </>}</div> : <>
+                    <div className="reel-studio-privacy">◇ Your name and birth details stay private.</div>
+                    <button type="button" className="reel-studio-primary" onClick={() => requestCreditConfirmation()} disabled={loading}>Create my reel</button>
                 </>}
             </section>
         </div>, document.body,

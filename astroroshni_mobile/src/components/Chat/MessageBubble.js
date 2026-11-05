@@ -57,6 +57,21 @@ const whyTaraSaysThis = (language) => WHY_TARA_SAYS_THIS[
   CHAT_LANGUAGE_ALIASES[String(language || '').toLowerCase()] || String(language || 'english').toLowerCase()
 ] || WHY_TARA_SAYS_THIS.english;
 
+const reelProgressState = (t, status, preparing = false) => {
+  if (preparing) return { value: 8, title: t('premiumUi.reelStudio.progressPreparingTitle', 'Preparing your reel'), detail: t('premiumUi.reelStudio.progressPreparingDetail', 'Organising your reading into a clear visual story.') };
+  if (status === 'queued') return { value: 14, title: t('premiumUi.reelStudio.progressQueuedTitle', 'Your reel is in line'), detail: t('premiumUi.reelStudio.progressQueuedDetail', 'You can leave this page — we’ll keep creating it in the background.') };
+  const assetMatch = String(status || '').match(/^creating_your_reel_(\d+)_of_(\d+)$/);
+  if (assetMatch) {
+    const done = Number(assetMatch[1]); const total = Number(assetMatch[2]);
+    return { value: Math.min(82, 18 + Math.round((done / total) * 64)), title: t('premiumUi.reelStudio.progressCreatingTitle', 'Bringing your story to life'), detail: t('premiumUi.reelStudio.progressMoments', '{{done}} of {{total}} moments ready', { done, total }) };
+  }
+  if (status === 'creating_planned_shots') return { value: 18, title: t('premiumUi.reelStudio.progressCreatingTitle', 'Bringing your story to life'), detail: t('premiumUi.reelStudio.progressCreatingDetail', 'Creating the visuals and narration for your reading.') };
+  if (status === 'premium_compositing') return { value: 87, title: t('premiumUi.reelStudio.progressFinishingTitle', 'Putting your reel together'), detail: t('premiumUi.reelStudio.progressFinishingDetail', 'Finishing the visual story and sound.') };
+  if (status === 'saving_reel') return { value: 96, title: t('premiumUi.reelStudio.progressSavingTitle', 'Almost ready'), detail: t('premiumUi.reelStudio.progressSavingDetail', 'Saving your reel securely.') };
+  if (status === 'completed') return { value: 100, title: t('premiumUi.reelStudio.progressCompleteTitle', 'Your reel is ready'), detail: t('premiumUi.reelStudio.progressCompleteDetail', 'Play, share or download it whenever you like.') };
+  return { value: 10, title: t('premiumUi.reelStudio.progressPreparingTitle', 'Preparing your reel'), detail: t('premiumUi.reelStudio.progressPreparingFallback', 'Your personal reel is being prepared.') };
+};
+
 const InstantEvidenceDetails = ({ evidence, colors, t }) => {
   const sections = buildReadableEvidence(evidence);
   return (
@@ -112,6 +127,8 @@ import { useAuthGate } from '../../auth/AuthGateContext';
 import ConfirmCreditsModal from '../ConfirmCreditsModal';
 import AppAlertModal from '../Common/AppAlertModal';
 import PodcastPlayerModal from '../PodcastPlayerModal';
+import ReelPlayerModal from '../ReelPlayerModal';
+import ReelIcon from '../ReelIcon';
 import PodcastLanguageModal from './PodcastLanguageModal';
 import { creditAPI } from '../../services/api';
 import { sharePodcastBase64OnWeb } from '../../utils/sharePodcastWeb';
@@ -287,7 +304,11 @@ function MessageBubble({
   const [reelJobId, setReelJobId] = useState(null);
   const [reelJobStatus, setReelJobStatus] = useState('');
   const [reelJobError, setReelJobError] = useState('');
-  const [isSharingReel, setIsSharingReel] = useState(false);
+  const [showReelPlayer, setShowReelPlayer] = useState(false);
+  const [showReelCreditsModal, setShowReelCreditsModal] = useState(false);
+  const [reelCreditQuote, setReelCreditQuote] = useState(null);
+  const [isRecreatingReel, setIsRecreatingReel] = useState(false);
+  const reelPrepareLock = useRef(false);
   const [showInstantEvidence, setShowInstantEvidence] = useState(false);
   const blurShownTrackedRef = useRef(false);
   // Init from the played-ids set so FlatList remounts do not flash translateY:50 for one frame
@@ -348,7 +369,7 @@ function MessageBubble({
   const podcastVisualKeyRef = useRef('');
 
   useEffect(() => {
-    if (!reelJobId) return undefined;
+    if (!reelJobId || ['completed', 'failed'].includes(reelJobStatus)) return undefined;
     let active = true;
     const check = async () => {
       try {
@@ -356,13 +377,15 @@ function MessageBubble({
         if (!active) return;
         const status = response?.data?.status || 'rendering';
         setReelJobStatus(status);
+        if (['completed', 'failed'].includes(status)) refreshCredits();
+        if (status === 'completed') setShowReelPlayer(true);
         setReelJobError(response?.data?.error_message || '');
       } catch (_) { /* retain the last known render state */ }
     };
     check();
     const timer = setInterval(check, 4000);
     return () => { active = false; clearInterval(timer); };
-  }, [reelJobId]);
+  }, [reelJobId, reelJobStatus]);
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageZoomScale, setImageZoomScale] = useState(1);
   const [isImageLoading, setIsImageLoading] = useState(true);
@@ -995,23 +1018,34 @@ function MessageBubble({
     }
   };
 
-  const openReelStudio = async () => {
+  const openReelStudio = async (recreate = false) => {
+    if (isPreparingReel || reelPrepareLock.current) return;
     const messageId = message.messageId || message.message_id;
     if (!messageId) {
       Alert.alert('Reel Studio', 'This answer is still being saved. Please try again in a moment.');
       return;
     }
     setShowReelStudio(true);
+    setShowReelPlayer(false);
     setReelDraft(null);
     setIsPreparingReel(true);
     try {
-      const response = await chatAPI.createReelDraft({
-        messageId,
-        durationSeconds: 180,
-        language: podcastLangFromUiLanguage(language),
-        visualLevel: 'cinematic',
-      });
-      setReelDraft(response?.data || null);
+      if (!recreate) {
+        const saved = await chatAPI.getSavedReel(messageId);
+        if (saved?.data?.job) {
+          const job = saved.data.job;
+          setReelJobId(job.job_id);
+          setReelJobStatus(job.status);
+          setReelJobError(job.error_message || '');
+          if (job.status === 'completed') setShowReelPlayer(true);
+          return;
+        }
+      }
+      const quote = await chatAPI.getReelPricing();
+      setReelCreditQuote(quote.data);
+      setIsRecreatingReel(recreate);
+      setShowReelStudio(false);
+      setShowReelCreditsModal(true);
     } catch (error) {
       Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not prepare this reel.'));
       setShowReelStudio(false);
@@ -1020,14 +1054,27 @@ function MessageBubble({
     }
   };
 
-  const queueReel = async () => {
+  const confirmReelCredits = async () => {
+    if (reelPrepareLock.current || !reelCreditQuote) return;
+    setShowReelCreditsModal(false);
+    if (reelCreditQuote.credits < reelCreditQuote.credit_cost) { navigation.navigate('Credits'); return; }
+    const authOk = await requireAuthForPaid({ feature: 'reel', message: 'Sign in to create a reel from this answer.', resume: { resumeRoute: 'Home', resumeParams: {} } });
+    if (!authOk) return;
+    reelPrepareLock.current = true;
+    setReelJobId(null); setReelJobStatus(''); setReelJobError(''); setReelDraft(null);
+    setShowReelStudio(true); setIsPreparingReel(true);
+    try {
+      const response = await chatAPI.createReelDraft({ messageId: message.messageId || message.message_id, durationSeconds: 180, language: podcastLangFromUiLanguage(language), visualLevel: 'cinematic' });
+      await queueReel(response.data);
+    } catch (error) {
+      Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not prepare this reel.'));
+      setShowReelStudio(false);
+    } finally { reelPrepareLock.current = false; setIsPreparingReel(false); }
+  };
+
+  const queueReel = async (draftOverride = reelDraft) => {
     const messageId = message.messageId || message.message_id;
-    if (!messageId || !reelDraft) return;
-    if (!reelDraft.draft_id) {
-      setReelDraft(null);
-      Alert.alert('Reel Studio', 'This storyboard was prepared by an older version. Please prepare a new storyboard before queuing it.');
-      return;
-    }
+    if (!messageId || !draftOverride?.draft_id) throw new Error('Your reel could not be prepared. Please try again.');
     setIsQueueingReel(true);
     try {
       const response = await chatAPI.queueReel({
@@ -1035,43 +1082,61 @@ function MessageBubble({
         durationSeconds: 180,
         language: podcastLangFromUiLanguage(language),
         visualLevel: 'cinematic',
-        draftId: reelDraft.draft_id,
-        approvedClaimIds: reelDraft.claims.map((claim) => claim.id),
+        draftId: draftOverride.draft_id,
+        approvedClaimIds: draftOverride.claims.map((claim) => claim.id),
+        confirmedCreditCost: reelCreditQuote?.credit_cost,
       });
-      const amount = response?.data?.cost_projection?.estimated_total;
       const jobId = response?.data?.job_id;
       if (jobId) { setReelJobId(jobId); setReelJobStatus(response?.data?.status || 'queued'); }
-      const waitingForRenderer = response?.data?.status === 'awaiting_provider_configuration';
-      Alert.alert(
-        waitingForRenderer ? 'Storyboard saved' : 'Reel queued',
-        waitingForRenderer
-          ? 'The storyboard is ready, but the video-render worker is not connected yet. No video generation has started and no provider charge has been made.'
-          : `Your premium reel is rendering${amount != null ? ` · estimated production cost ₹${amount}` : ''}. Keep this sheet open to follow progress.`,
-      );
+      refreshCredits();
     } catch (error) {
-      Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not queue this reel.'));
+      throw new Error(apiErrorMessage(error, 'Could not create this reel.'));
     } finally {
       setIsQueueingReel(false);
     }
   };
 
-  const shareCompletedReel = async () => {
-    if (!reelJobId) return;
-    try {
-      setIsSharingReel(true);
-      const token = await AsyncStorage.getItem('authToken');
-      const base = String(API_BASE_URL || '').replace(/\/$/, '');
-      const path = getEndpoint(`/reel-studio/jobs/${encodeURIComponent(String(reelJobId))}/download`);
-      const target = `${base}${path}`;
-      const destination = `${FileSystem.cacheDirectory}astroroshni-reel-${reelJobId}.mp4`;
-      const downloaded = await FileSystem.downloadAsync(target, destination, {
-        headers: token ? { Authorization: `Bearer ${token}`, 'X-AstroRoshni-Authorization': `Bearer ${token}` } : {},
-      });
-      await Sharing.shareAsync(downloaded.uri, { mimeType: 'video/mp4', dialogTitle: 'Share AstroRoshni reel' });
-    } catch (error) {
-      Alert.alert('Reel Studio', 'The reel is ready, but it could not be downloaded. Please try again.');
-    } finally { setIsSharingReel(false); }
-  };
+  const recreateReel = () => openReelStudio(true);
+  const currentReelProgress = reelProgressState(t, reelJobStatus, isPreparingReel && !reelJobId);
+
+  const renderReelStudio = () => (<>
+      {showReelPlayer && reelJobId && <ReelPlayerModal jobId={reelJobId} onClose={() => setShowReelPlayer(false)} onRecreate={recreateReel} />}
+      <ConfirmCreditsModal
+        visible={showReelCreditsModal}
+        onClose={() => { setShowReelCreditsModal(false); if (reelJobId) setShowReelStudio(true); }}
+        onConfirm={confirmReelCredits}
+        title={isRecreatingReel ? t('premiumUi.reelStudio.recreateTitle', 'Recreate this reel?') : t('premiumUi.reelStudio.createTitle', 'Create your reel')}
+        description={t('premiumUi.reelStudio.creditDescription', 'Your personal reel will be created after confirmation. Credits are charged once creation begins. Replaying a saved reel is free.')}
+        cost={reelCreditQuote?.credit_cost}
+        credits={reelCreditQuote?.credits ?? credits}
+        confirmLabel={reelCreditQuote && reelCreditQuote.credits < reelCreditQuote.credit_cost ? t('credits.buyCredits', 'Buy Credits') : t('common.continue', 'Continue')}
+        iconName="film-outline"
+      />
+      <Modal visible={showReelStudio && !showReelPlayer} transparent animationType="slide" onRequestClose={() => setShowReelStudio(false)}>
+        <View style={styles.reelModalBackdrop}>
+          <View style={[styles.reelModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.eyebrow', 'ASTROROSHNI · REEL STUDIO')}</Text>
+            <Text style={[styles.reelModalTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.title', 'Your personal reel')}</Text>
+            {(reelJobId || isPreparingReel) ? <View style={styles.reelModalLoading}>
+              {reelJobStatus === 'failed' ? <>
+                <Text style={{ color: colors.text, fontWeight: '800' }}>{t('premiumUi.reelStudio.failedTitle', 'We couldn’t finish your reel')}</Text>
+                <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{reelJobError || t('premiumUi.reelStudio.failedDescription', 'Please try again. Your credits will be returned if creation did not complete.')}</Text>
+                <TouchableOpacity style={styles.reelCancelButton} onPress={recreateReel}><Text style={{ color: colors.primary }}>{t('common.tryAgain', 'Try again')}</Text></TouchableOpacity>
+              </> : <>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={{ color: colors.text, fontWeight: '800' }}>{currentReelProgress.title}</Text>
+                <View style={[styles.reelProgressTrack, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: currentReelProgress.value }}><View style={[styles.reelProgressFill, { width: `${currentReelProgress.value}%`, backgroundColor: colors.primary }]} /></View>
+                <Text style={[styles.reelProgressPercent, { color: colors.primary }]}>{currentReelProgress.value}%</Text>
+                <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{currentReelProgress.detail}</Text>
+                {reelJobStatus !== 'completed' && <Text style={[styles.reelProgressNote, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.progressWaitNote', 'This can take up to five minutes. You can leave this page and come back anytime.')}</Text>}
+              </>}
+              {reelJobStatus === 'completed' ? <><TouchableOpacity style={[styles.reelQueueButton, { backgroundColor: colors.primary }]} onPress={() => setShowReelPlayer(true)}><Ionicons name="play" size={18} color={colors.onPrimary || '#fff'} /><Text style={[styles.reelQueueText, { color: colors.onPrimary || '#fff' }]}>{t('premiumUi.reelStudio.playSaved', 'Play saved reel')}</Text></TouchableOpacity><TouchableOpacity style={styles.reelCancelButton} onPress={recreateReel}><Text style={{ color: colors.primary }}>{t('premiumUi.reelStudio.recreate', 'Recreate')}</Text></TouchableOpacity></> : null}
+            </View> : <View style={styles.reelModalLoading}><Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{t('premiumUi.reelStudio.savedReelHint', 'Your saved reel will appear here when it is ready.')}</Text></View>}
+            <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.textSecondary }}>{t('common.cancel', 'Cancel')}</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+  </>);
 
   const deleteMessage = async () => {
     const serverId = message.messageId || message.message_id;
@@ -2345,11 +2410,11 @@ function MessageBubble({
             )}
             <TouchableOpacity
               style={[styles.actionButton, styles.reelButton, highlightedActionStyle]}
-              onPress={openReelStudio}
+              onPress={() => openReelStudio()}
               accessibilityRole="button"
               accessibilityLabel={t('premiumUi.reelStudio.create', 'Create chart-grounded reel')}
             >
-              <Ionicons name="film-outline" size={17} color={colors.primary} />
+              <ReelIcon size={20} color={colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionButton, messageActionStyle]}
@@ -2448,6 +2513,7 @@ function MessageBubble({
             </View>
           </View>
         </Modal>
+        {renderReelStudio()}
         <ConfirmCreditsModal
           visible={showPodcastCreditsModal}
           onClose={() => setShowPodcastCreditsModal(false)}
@@ -3186,11 +3252,11 @@ function MessageBubble({
                 )}
                 <TouchableOpacity
                   style={[styles.actionButton, styles.reelButton, highlightedActionStyle]}
-                  onPress={openReelStudio}
+                  onPress={() => openReelStudio()}
                   accessibilityRole="button"
                     accessibilityLabel={t('premiumUi.reelStudio.create', 'Create chart-grounded reel')}
                 >
-                  <Ionicons name="film-outline" size={17} color={colors.primary} />
+                  <ReelIcon size={20} color={colors.primary} />
                 </TouchableOpacity>
               </>
             )}
@@ -3486,33 +3552,7 @@ function MessageBubble({
         }}
       />
 
-      <Modal visible={showReelStudio} transparent animationType="slide" onRequestClose={() => setShowReelStudio(false)}>
-        <View style={styles.reelModalBackdrop}>
-          <View style={[styles.reelModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
-            <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.eyebrow', 'ASTROROSHNI · REEL STUDIO')}</Text>
-            <Text style={[styles.reelModalTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.title', 'Your premium reel')}</Text>
-            {reelJobId ? <View style={styles.reelModalLoading}>
-              <ActivityIndicator color={colors.primary} />
-              <Text style={{ color: colors.text, fontWeight: '800' }}>{reelJobStatus === 'completed' ? 'Your reel is ready' : String(reelJobStatus || 'queued').replaceAll('_', ' ')}</Text>
-              <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{reelJobStatus === 'completed' ? 'Your finished MP4 is ready to play or download.' : reelJobStatus === 'failed' ? (reelJobError || 'The render failed before the final MP4 could be created.') : 'Creating the animated presenter, chart and dasha inserts, editorial stills and final MP4…'}</Text>
-              {reelJobStatus === 'completed' ? <TouchableOpacity style={[styles.reelQueueButton, { backgroundColor: colors.primary }]} onPress={shareCompletedReel} disabled={isSharingReel}>{isSharingReel ? <ActivityIndicator color={colors.onPrimary || '#fff'} /> : <><Ionicons name="share-outline" size={18} color={colors.onPrimary || '#fff'} /><Text style={[styles.reelQueueText, { color: colors.onPrimary || '#fff' }]}>{t('premiumUi.reelStudio.openOrShare', 'Open or share MP4')}</Text></>}</TouchableOpacity> : null}
-            </View> : isPreparingReel ? (
-              <View style={styles.reelModalLoading}><ActivityIndicator color={colors.primary} /><Text style={{ color: colors.textSecondary }}>{t('premiumUi.reelStudio.buildingStoryboard', 'Building a chart-grounded storyboard…')}</Text></View>
-            ) : reelDraft ? <>
-              <Text style={[styles.reelModalBody, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.durationLine', '~{{seconds}} seconds · {{language}} · animated presenter', { seconds: Math.ceil((reelDraft.estimated_duration_seconds || 180) / 10) * 10, language: podcastLangFromUiLanguage(language) === 'hi' ? t('common.hindi', 'Hindi') : t('common.english', 'English') })}</Text>
-              <View style={[styles.reelCostCard, { backgroundColor: colors.surfaceMuted }]}><Text style={[styles.reelCostLabel, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.estimatedCost', 'Estimated production cost')}</Text><Text style={[styles.reelCostValue, { color: colors.primary }]}>₹{reelDraft.cost_projection?.estimated_total ?? '—'}</Text></View>
-              <Text style={[styles.reelModalSection, { color: colors.text }]}>{t('premiumUi.reelStudio.evidenceReview', 'Evidence review · {{count}} claims', { count: reelDraft.claims?.length || 0 })}</Text>
-              <ScrollView style={styles.reelClaimsScroll} showsVerticalScrollIndicator={false}>
-                {(reelDraft.claims || []).map((claim) => <View key={claim.id} style={[styles.reelClaim, { borderColor: colors.cardBorder }]}><Text style={[styles.reelClaimType, { color: colors.primary }]}>{claim.status === 'interpretation' ? 'INTERPRETATION' : 'CHART VALIDATION'}</Text><Text style={[styles.reelClaimText, { color: colors.text }]}>{claim.text}</Text></View>)}
-              </ScrollView>
-              <TouchableOpacity style={[styles.reelQueueButton, { backgroundColor: colors.primary }]} onPress={queueReel} disabled={isQueueingReel}>
-                {isQueueingReel ? <ActivityIndicator color={colors.onPrimary || '#fff'} /> : <><Ionicons name="film-outline" size={18} color={colors.onPrimary || '#fff'} /><Text style={[styles.reelQueueText, { color: colors.onPrimary || '#fff' }]}>{t('premiumUi.reelStudio.approveAndQueue', 'Approve & queue reel')}</Text></>}
-              </TouchableOpacity>
-            </> : null}
-            <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.textSecondary }}>{t('common.cancel', 'Cancel')}</Text></TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {renderReelStudio()}
 
       <AppAlertModal
         visible={copyAlert.visible}
@@ -4192,6 +4232,10 @@ function MessageActionRow({ children, style, ...props }) {
   reelModalTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 27, marginTop: 8 },
   reelModalBody: { fontSize: 13, lineHeight: 20, marginTop: 6 },
   reelModalLoading: { minHeight: 120, alignItems: 'center', justifyContent: 'center', gap: 14 },
+  reelProgressTrack: { width: '100%', height: 9, overflow: 'hidden', borderRadius: 99, borderWidth: StyleSheet.hairlineWidth },
+  reelProgressFill: { height: '100%', borderRadius: 99 },
+  reelProgressPercent: { fontSize: 11, letterSpacing: .8, fontWeight: '900' },
+  reelProgressNote: { marginTop: 4, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   reelCostCard: { marginTop: 18, padding: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   reelCostLabel: { fontSize: 12, fontWeight: '700' },
   reelCostValue: { fontSize: 22, fontWeight: '900' },

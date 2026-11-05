@@ -27,6 +27,7 @@ FEATURE_PRICING_ROWS: List[Tuple[str, str]] = [
     ("trading", "Daily trading forecast"),
     ("trading_monthly", "Monthly trading calendar"),
     ("podcast", "Podcast (audio)"),
+    ("reel", "Reel Studio"),
     ("prashna", "Classical Prashna question chart"),
 ]
 
@@ -140,6 +141,7 @@ def get_base_pricing_with_originals(credit_service: Any) -> Tuple[Dict[str, int]
         ("karma", "karma_analysis_cost"),
         ("ashtakavarga", "ashtakavarga_life_predictions_cost"),
         ("podcast", "podcast_cost"),
+        ("reel", "reel_generation_cost"),
         ("prashna", "prashna_analysis_cost"),
         ("partner_portrait", "partner_portrait_cost"),
     ]

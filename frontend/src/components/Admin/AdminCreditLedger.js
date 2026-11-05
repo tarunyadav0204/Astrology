@@ -35,6 +35,7 @@ const LEDGER_FEATURE_OPTIONS = [
   { value: 'premium_chat', label: 'Premium Chat' },
   { value: 'partnership_chat', label: 'Partnership Chat' },
   { value: 'partner_portrait', label: 'Partner Portrait' },
+  { value: 'reel', label: 'Reel Studio' },
 ];
 
 /** 1 credit = ₹1 until 2026-07-14; ₹2 per credit from 2026-07-15 (IST calendar date). */
@@ -396,6 +397,7 @@ const AdminCreditLedger = ({ onOpenUserProfile, ledgerJumpContext }) => {
         karma_analysis: 'Karma Analysis',
         mundane_chat: 'Mundane Chat',
         partner_portrait: 'Partner Portrait',
+        reel: 'Reel Studio',
       };
       return names[referenceId] || referenceId || 'Feature';
     }

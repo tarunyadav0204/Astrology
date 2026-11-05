@@ -24,6 +24,7 @@ from db import execute, get_conn
 from partner_profile.image_provider import OpenAIPartnerPortraitProvider
 from tts.routes import SpeechSynthesisRequest, synthesize
 from utils.admin_settings import get_podcast_tts_voices
+from reel_studio.text import plain_text
 
 ROOT = Path(os.getenv("REEL_LOCAL_OUTPUT_DIR", "storage/reels"))
 VIDEO_MODEL = "gemini-omni-1.1-flash"
@@ -31,12 +32,33 @@ VIDEO_MODEL = "gemini-omni-1.1-flash"
 # do not invoke it unless this is explicitly enabled in deployment.
 OMNI_VIDEO_ENABLED = os.getenv("REEL_ENABLE_OMNI_VIDEO", "false").strip().lower() in {"1", "true", "yes", "on"}
 WIDTH, HEIGHT = 1080, 1920
+REEL_IMAGE_SIZE = "1024x1824"  # exact 9:16; both dimensions are valid GPT Image 2 multiples of 16
 PLANET_ABBR = {"Jupiter": "Ju", "Mercury": "Me", "Saturn": "Sa", "Venus": "Ve", "Mars": "Ma", "Moon": "Mo", "Sun": "Su", "Rahu": "Ra", "Ketu": "Ke"}
+SIGN_NAMES = ("Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces")
+# Standard North Indian kundali geometry: the four cardinal houses are
+# diamonds around the chart's central junction; the other eight are perimeter
+# wedges. This is deliberately not the generic "one central diamond + X" grid.
+NORTH_INDIAN_HOUSE_SLOTS = (
+    {"house": 1, "slot": "top central diamond"},
+    {"house": 2, "slot": "upper-left top wedge"},
+    {"house": 3, "slot": "upper-left side wedge"},
+    {"house": 4, "slot": "left central diamond"},
+    {"house": 5, "slot": "lower-left side wedge"},
+    {"house": 6, "slot": "lower-left bottom wedge"},
+    {"house": 7, "slot": "bottom central diamond"},
+    {"house": 8, "slot": "lower-right bottom wedge"},
+    {"house": 9, "slot": "lower-right side wedge"},
+    {"house": 10, "slot": "right central diamond"},
+    {"house": 11, "slot": "upper-right side wedge"},
+    {"house": 12, "slot": "upper-right top wedge"},
+)
 USD_TO_INR = float(os.getenv("REEL_USD_TO_INR", "95"))
 VIDEO_TOKEN_COST_INR = 17.50 * USD_TO_INR / 1_000_000
 OMNI_INPUT_TOKEN_COST_INR = 1.50 * USD_TO_INR / 1_000_000
 OMNI_TEXT_TOKEN_COST_INR = 9.00 * USD_TO_INR / 1_000_000
-GPT_IMAGE_COST_INR = 0.041 * USD_TO_INR  # GPT Image 2, 1024x1536 medium
+# GPT Image 2 output cost scales with output-image tokens. 1024x1824 is 19%
+# larger than the published 1024x1536 reference price.
+GPT_IMAGE_LOW_COST_INR = 0.005 * 1.1875 * USD_TO_INR
 CHIRP_TTS_CHAR_COST_INR = 30.0 * USD_TO_INR / 1_000_000
 
 
@@ -45,6 +67,15 @@ def _update(job_id: str, status: str, *, output_url: str | None = None, error: s
         execute(conn, """UPDATE reel_render_jobs SET status=%s, output_url=COALESCE(%s, output_url),
             error_message=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s""", (status, output_url, error, job_id))
         conn.commit()
+
+
+def _fail_reel(job_id: str, error: str) -> None:
+    from reel_studio.billing import refund_reel
+    try:
+        refund_reel(job_id)
+    except Exception as exc:
+        error += f" Credit refund could not be completed: {type(exc).__name__}: {exc}"
+    _update(job_id, "failed", error=error[:1000])
 
 
 def _record(user_id: int, run_id: str, stage: str, provider: str, units: float, metadata: dict, unit_cost_inr: float = 0.0) -> None:
@@ -75,11 +106,13 @@ def _display_font(size: int, bold: bool = False):
     return _font(size, bold)
 
 
-def _base_canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
+def _base_canvas(*, transparent: bool = False) -> tuple[Image.Image, ImageDraw.ImageDraw]:
     # The data cards use the same warm editorial language as the product, not
     # generic "AI astrology" gradients.
-    image = Image.new("RGB", (WIDTH, HEIGHT), "#31040f")
+    image = Image.new("RGBA" if transparent else "RGB", (WIDTH, HEIGHT), (0, 0, 0, 0) if transparent else "#31040f")
     draw = ImageDraw.Draw(image)
+    if transparent:
+        return image, draw
     draw.ellipse((-620, -480, 800, 850), fill="#520c20")
     draw.ellipse((400, -240, 1420, 740), fill="#66172b")
     draw.ellipse((-380, 1260, 650, 2270), fill="#1d0610")
@@ -100,7 +133,12 @@ def _phone_shell(draw: ImageDraw.ImageDraw, title: str, selected_tab: str) -> tu
     draw.rounded_rectangle((88, 386, 992, 532), radius=66, fill="#550b22")
     draw.rectangle((88, 470, 992, 532), fill="#550b22")
     draw.rounded_rectangle((430, 402, 650, 436), radius=18, fill="#09070a")
+    draw.text((128, 407), "9:41", fill="#fff0d2", font=_font(17, True))
+    draw.text((946, 407), "5G", anchor="ra", fill="#fff0d2", font=_font(17, True))
     draw.text((136, 416), "‹", fill="#f7e2b7", font=_display_font(46))
+    draw.ellipse((875, 401, 923, 449), outline="#b78348", width=2)
+    draw.line((890, 430, 910, 410), fill="#f7e2b7", width=3)
+    draw.polygon([(910, 410), (899, 412), (908, 421)], fill="#f7e2b7")
     draw.text((540, 420), title, anchor="mm", fill="#fff0d2", font=_display_font(31, True))
     tabs = ("Chart", "Dasha", "SAV")
     for i, tab in enumerate(tabs):
@@ -119,8 +157,8 @@ def _wrapped(draw: ImageDraw.ImageDraw, text: str, xy: tuple[int, int], width: i
         y += int(size * 1.32)
 
 
-def _chart_visual(path: Path, snapshot: dict, *, focus_nodes: list[str] | None = None, draw_edges: list[str] | None = None) -> None:
-    image, draw = _base_canvas()
+def _chart_visual(path: Path, snapshot: dict, *, focus_nodes: list[str] | None = None, draw_edges: list[str] | None = None, callout_text: str | None = None, transparent: bool = False) -> None:
+    image, draw = _base_canvas(transparent=transparent)
     draw.text((540, 150), "Chart Clues", anchor="mm", fill="#ffe4a2", font=_display_font(68, True))
     draw.text((540, 224), "from your verified birth chart", anchor="mm", fill="#ebc985", font=_display_font(28))
     _phone_shell(draw, "D1 Lagna", "Chart")
@@ -141,7 +179,9 @@ def _chart_visual(path: Path, snapshot: dict, *, focus_nodes: list[str] | None =
     for placement in snapshot.get("placements") or []:
         planet = str(placement.get("planet") or "")
         house = int(placement.get("house") or 0)
-        by_house.get(house, []).append(PLANET_ABBR.get(planet, "?")); planet_houses[planet.lower()] = house
+        degree = placement.get("degree_in_sign")
+        degree_label = f" {float(degree):.1f}°" if isinstance(degree, (int, float)) else ""
+        by_house.get(house, []).append(f"{PLANET_ABBR.get(planet, '?')}{degree_label}"); planet_houses[planet.lower()] = house
     graph = snapshot.get("visual_graph") or {}
     graph_nodes = {str(row.get("id")): row for row in graph.get("nodes", [])}
     graph_edges = {str(row.get("id")): row for row in graph.get("edges", [])}
@@ -188,36 +228,38 @@ def _chart_visual(path: Path, snapshot: dict, *, focus_nodes: list[str] | None =
         if house == 1:
             draw.text((x + 55, y - 64), "ASC", anchor="mm", fill="#8d1b38", font=_font(18, True))
         planets = by_house[house]
-        lines = ([" ".join(planets)] if len(planets) <= 2 else planets) if planets else []
+        lines = planets if planets else []
         for index, line in enumerate(lines):
-            draw.text((x, y + 10 + index * 31 - (len(lines) - 1) * 15), line, anchor="mm", fill="#211713", font=_font(26 if len(lines) < 3 else 23, True))
+            draw.text((x, y + 10 + index * 31 - (len(lines) - 1) * 15), line, anchor="mm", fill="#211713", font=_font(23 if len(lines) < 3 else 20, True))
     draw.rounded_rectangle((118, 1530, 962, 1690), radius=26, fill="#fffaf1", outline="#bd8629", width=3)
     draw.text((152, 1562), "READING RULE", fill="#8d1b38", font=_font(20, True))
-    for line_index, line in enumerate(textwrap.wrap("Every highlighted placement and arrow is resolved from the saved chart.", width=54)):
+    for line_index, line in enumerate(textwrap.wrap(callout_text or "Every highlighted placement and arrow is resolved from the saved chart.", width=54)[:2]):
         draw.text((152, 1600 + line_index * 31), line, fill="#33251f", font=_font(22))
     image.save(path, "PNG")
 
 
-def _dasha_visual(path: Path, snapshot: dict) -> None:
-    image, draw = _base_canvas()
+def _dasha_visual(path: Path, snapshot: dict, *, callout_text: str | None = None, transparent: bool = False) -> None:
+    image, draw = _base_canvas(transparent=transparent)
     draw.text((540, 150), "Dasha Stack", anchor="mm", fill="#ffe4a2", font=_display_font(68, True))
     draw.text((540, 224), "the timing behind the reading", anchor="mm", fill="#ebc985", font=_display_font(28))
     _phone_shell(draw, "Dasha Browser", "Dasha")
     dashas = snapshot.get("current_dashas") or {}
-    for index, (key, label) in enumerate((("mahadasha", "MAHADASHA"), ("antardasha", "ANTARDASHA"), ("pratyantardasha", "PRATYANTARDASHA"))):
-        y = 625 + index * 280; period = dashas.get(key) or {}
+    levels = (("mahadasha", "MAHA DASHA"), ("antardasha", "ANTAR DASHA"), ("pratyantardasha", "PRATYANTAR DASHA"), ("sookshma", "SOOKSHMA DASHA"), ("prana", "PRANA DASHA"))
+    for index, (key, label) in enumerate(levels):
+        y = 605 + index * 177; period = dashas.get(key) or {}
         draw.text((142, y), f"0{index + 1}", fill="#8d1b38", font=_font(20, True))
-        draw.text((205, y), label, fill="#471421", font=_display_font(31, True))
-        draw.rounded_rectangle((142, y + 52, 938, y + 217), radius=24, fill="#fffaf1", outline="#d5b37b", width=2)
-        draw.rounded_rectangle((165, y + 72, 505, y + 195), radius=19, fill="#68142d", outline="#e5b855", width=4)
-        draw.text((195, y + 100), str(period.get("planet") or "Not available"), fill="#fff0d0", font=_display_font(39, True))
-        draw.text((195, y + 156), " → ".join(filter(None, (str(period.get("start") or ""), str(period.get("end") or "")))) or "Current period", fill="#f3dcae", font=_font(17))
-        if index < 2:
-            draw.line((190, y + 220, 190, y + 268), fill="#bd8629", width=4)
-            draw.polygon([(190, y + 270), (181, y + 256), (199, y + 256)], fill="#bd8629")
+        draw.text((205, y), label, fill="#471421", font=_display_font(25, True))
+        draw.rounded_rectangle((142, y + 38, 938, y + 152), radius=20, fill="#fffaf1", outline="#d5b37b", width=2)
+        draw.rounded_rectangle((165, y + 52, 505, y + 139), radius=17, fill="#68142d", outline="#e5b855", width=4)
+        draw.text((195, y + 72), str(period.get("planet") or "Unavailable"), fill="#fff0d0", font=_display_font(29, True))
+        draw.text((195, y + 111), " → ".join(filter(None, (str(period.get("start") or ""), str(period.get("end") or "")))) or "No verified period", fill="#f3dcae", font=_font(14))
+        if index < len(levels) - 1:
+            draw.line((190, y + 155, 190, y + 170), fill="#bd8629", width=4)
+            draw.polygon([(190, y + 174), (181, y + 160), (199, y + 160)], fill="#bd8629")
     draw.rounded_rectangle((140, 1518, 940, 1665), radius=25, fill="#fff9ef", outline="#bd8629", width=3)
     draw.text((175, 1553), "TIMING, NOT CERTAINTY", fill="#8d1b38", font=_font(19, True))
-    _wrapped(draw, "Dashas show the active sequence used in this reading.", (175, 1590), 48, 24)
+    for line_index, line in enumerate(textwrap.wrap(callout_text or "This is the verified active sequence used in this reading.", width=52)[:2]):
+        draw.text((175, 1590 + line_index * 29), line, fill="#33251f", font=_font(22))
     image.save(path, "PNG")
 
 
@@ -238,8 +280,165 @@ def _ashtakavarga_visual(path: Path, snapshot: dict) -> None:
     image.save(path, "PNG")
 
 
-async def _gpt_image(prompt: str) -> bytes:
-    return (await OpenAIPartnerPortraitProvider().generate_portrait(prompt, 0)).content
+def _brand_logo() -> bytes:
+    default = Path(__file__).resolve().parents[2] / "astroroshni_mobile" / "assets" / "logo.png"
+    path = Path(os.getenv("REEL_BRAND_LOGO_PATH") or default)
+    if not path.is_file():
+        raise RuntimeError("Official reel logo is missing. Configure REEL_BRAND_LOGO_PATH to the AstroRoshni PNG logo.")
+    content = path.read_bytes()
+    if not content:
+        raise RuntimeError("Official reel logo is empty.")
+    return content
+
+
+async def _gpt_image(prompt: str, *, logo: bytes, quality: str = "low") -> bytes:
+    # A single image request can occasionally hit a transient read/connect
+    # timeout. Retrying that request is much safer than discarding a whole
+    # 12–18 scene reel after the other parallel work has already started.
+    for attempt in range(2):
+        try:
+            return (await OpenAIPartnerPortraitProvider().edit_image(
+                prompt, logo, mime_type="image/png", quality=quality, size=REEL_IMAGE_SIZE,
+            )).content
+        except (httpx.TimeoutException, httpx.NetworkError, asyncio.TimeoutError) as exc:
+            if attempt:
+                raise RuntimeError(
+                    f"GPT Image request timed out after {attempt + 1} attempts: {type(exc).__name__}"
+                ) from exc
+            await asyncio.sleep(1.0)
+
+
+async def _gpt_image_edit(prompt: str, source: Path, *, quality: str = "low") -> bytes:
+    return (await OpenAIPartnerPortraitProvider().edit_image(prompt, source.read_bytes(), quality=quality, size=REEL_IMAGE_SIZE)).content
+
+
+def _premium_factual_edit_prompt(plan: dict, beat: dict, *, visual: str) -> str:
+    question = re.sub(r"\s+", " ", str((plan.get("source") or {}).get("question") or "")).strip()[:280]
+    claims = {str(item.get("id")): str(item.get("text") or "") for item in plan.get("claims") or []}
+    evidence = "\n".join(f"- {claims[key][:220]}" for key in beat.get("evidence_ids") or [] if claims.get(str(key)))
+    layout = "complete North Indian kundali with highlighted placements and arrows" if visual == "chart" else "five-level dasha stack with selected periods and dates"
+    return f'''Create a finished, high-end 9:16 AstroRoshni editorial keyframe from the supplied factual source image.
+Question: {question}
+Verified supporting points only:\n{evidence or '- Use only the supplied source.'}
+
+The supplied chart/dasha data is immutable: preserve every rashi, house, planet placement, degree, highlighted target, arrow, dasha level, planet, and date exactly. Do not omit, move, combine, alter, or invent any factual value. Redesign the presentation around the same data; do not merely upscale the source.
+
+Visual target: an award-quality Indian luxury astrology product campaign. Full 9:16 composition; large elegant gold serif headline in the top safe area; a realistic premium black-and-champagne-gold phone centred in a burgundy, candlelit, marble-and-brass environment; rich app header/navigation; cream cards with sharp readable typography; luminous thin gold arrows connecting at most three concise factual callouts to the relevant source locations. The phone must contain a rich, legible app screen with {layout}. All callouts must sit completely within safe margins. Use the verified points above only; omit text rather than fabricate it. No generic poster, no empty UI, no cropped cards, no illegible text, no altered astrology.'''
+
+
+def _ashtakavarga_prompt(plan: dict, beat: dict, snapshot: dict) -> str:
+    question = re.sub(r"\s+", " ", str((plan.get("source") or {}).get("question") or "")).strip()[:280]
+    narration = re.sub(r"\s+", " ", str(beat.get("narration") or "")).strip()[:480]
+    claims = {str(item.get("id")): str(item.get("text") or "") for item in plan.get("claims") or []}
+    evidence = "\n".join(f"- {claims[key][:240]}" for key in beat.get("evidence_ids") or [] if claims.get(str(key)))
+    sav = (snapshot.get("ashtakavarga") or {}).get("sav_by_house") or {}
+    return f'''Create a finished, high-end 9:16 AstroRoshni Ashtakavarga editorial keyframe.
+Question: {question}
+Narration: {narration}
+Verified supporting points only:\n{evidence or '- Use the SAV data only.'}
+Exact Sarvashtakavarga values by house: {json.dumps(sav, sort_keys=True)}
+
+Design an award-quality Indian luxury astrology product campaign: deep burgundy, champagne-gold, refined cream panels, realistic black-and-gold phone, premium app navigation, clean infographic hierarchy, and a concise headline. Build a beautiful SAV screen with all twelve houses and their exact supplied values. Use highlighted rings, arrows, callout cards, or a bar/house-strength visual only where grounded in the values or verified points. Every visible house value must exactly match the supplied JSON. Do not invent any planet placement, dasha, date, yoga, house score, or prediction. No generic poster, no illegible microtext, no cropped content, no watermark.'''
+
+
+def _scene_image_prompt(plan: dict, beat: dict, snapshot: dict) -> str:
+    claims = {str(item.get("id")): plain_text(item.get("text") or "") for item in plan.get("claims") or []}
+    evidence = [claims.get(str(key), "") for key in beat.get("evidence_ids") or []]
+    ascendant_sign = int(snapshot.get("ascendant_sign") or 0) % 12
+    houses = [{"house": house, "rashi_number": ((ascendant_sign + house - 1) % 12) + 1,
+               "rashi_name": SIGN_NAMES[(ascendant_sign + house - 1) % 12]} for house in range(1, 13)]
+
+    # Resolve a planet's rashi from its verified house and ascendant. This is
+    # deliberately independent of legacy raw-sign fields, which were stored as
+    # zero-based indexes and could contradict the display rashi in image prompts.
+    canonical_placements = []
+    for placement in snapshot.get("placements") or []:
+        house = int(placement.get("house") or 0)
+        if house not in range(1, 13):
+            continue
+        rashi_number = ((ascendant_sign + house - 1) % 12) + 1
+        canonical_placements.append({
+            "planet": str(placement.get("planet") or ""),
+            "house": house,
+            "rashi_number": rashi_number,
+            "rashi_name": SIGN_NAMES[rashi_number - 1],
+            "degree_in_sign": placement.get("degree_in_sign"),
+        })
+    kind = str(beat.get("type") or "")
+    original_visual_direction = plain_text(beat.get("visual_instruction") or "")
+    visual_direction = original_visual_direction
+    if kind == "chart_focus":
+        chart_cells = [
+            {"slot": item["slot"], "exact_cell_label": f"House {item['house']} — {houses[item['house'] - 1]['rashi_name']} ({houses[item['house'] - 1]['rashi_number']})"}
+            for item in NORTH_INDIAN_HOUSE_SLOTS
+        ]
+        source = {
+            "chart_type": "North Indian D1 natal chart",
+            "ascendant": {"house": 1, "rashi_number": ascendant_sign + 1, "rashi_name": SIGN_NAMES[ascendant_sign]},
+            "houses": houses,
+            "fixed_counterclockwise_house_slots": list(NORTH_INDIAN_HOUSE_SLOTS),
+            "copy_exactly_one_label_per_cell": chart_cells,
+            "planet_placements": canonical_placements,
+            "allowed_highlights": {"nodes": beat.get("focus_nodes") or [], "arrows": beat.get("draw_edges") or []},
+        }
+        rendering_rule = (
+            "Render exactly ONE standard North Indian D1 natal chart in TEXT-ONLY ACCURACY MODE. Follow FIXED_COUNTERCLOCKWISE_HOUSE_SLOTS precisely: "
+            "House 1 is the TOP CENTRAL DIAMOND, House 4 is the LEFT CENTRAL DIAMOND, House 7 is the BOTTOM CENTRAL DIAMOND, and House 10 is the RIGHT CENTRAL DIAMOND. "
+            "Houses 2 through 12 proceed COUNTER-CLOCKWISE around the chart. Never run house order clockwise. HOUSE is its fixed chart position; "
+            "RASHI NUMBER is the one zodiac sign inside that house. They are different concepts. Use COPY_EXACTLY_ONE_LABEL_PER_CELL as a twelve-cell proof sheet: "
+            "each listed label occurs once, in its named slot, and no other sign or number may appear. The supplied ascendant is House 1. For every planet, "
+            "copy its supplied house and rashi only. Do not add a planet, move a planet, change the ascendant, or turn rashi numbers into house numbers. "
+            "Do not use planetary icons, zodiac glyphs, decorative duplicate labels, a planet legend, generic report, or unsupplied placement. "
+            "If a cell cannot be made legible, leave that cell blank rather than inventing or duplicating any label."
+        )
+        visual_direction = (
+            "LOCKED BASE COMPOSITION: render the complete standard North Indian D1 chart as the dominant, upright, unwarped visual. "
+            "GEOMETRY BLUEPRINT — draw a square outer border containing FOUR cardinal diamond compartments around the centre: House 1 top, House 4 left, "
+            "House 7 bottom, and House 10 right. Place the remaining eight houses as the triangular perimeter wedges specified in FIXED_COUNTERCLOCKWISE_HOUSE_SLOTS. "
+            "This is the entire grid: exactly 12 compartments, no single central diamond, no full-corner X, no curved boundaries, no extra subdivisions, "
+            "no missing boundary, and no alternate South Indian or wheel layout. "
+            "Keep all boundaries thin, straight, continuous, and visible. The chart may be full-frame or a smaller composed element, "
+            "but whenever it appears, show the complete unwarped 12-compartment grid rather than cropping or reshaping it. "
+            "Do not turn the chart into an infographic, pathway diagram, dashboard, split screen, or a non-North-Indian grid. "
+            "Use the planner direction only for a small external callout, gold highlight, arrow, or background atmosphere; it may never alter, crop, "
+            f"replace, or obscure the twelve-cell chart. Planner direction to adapt safely: {original_visual_direction}"
+        )
+    elif kind == "ashtakavarga":
+        source = {"metric": "Sarvashtakavarga (SAV)", "sav_by_house": ((snapshot.get("ashtakavarga") or {}).get("sav_by_house") or {})}
+        rendering_rule = (
+            "Render only the supplied Sarvashtakavarga values. Every key in SAV_BY_HOUSE is a HOUSE NUMBER 1 through 12, "
+            "not a rashi/sign number and not a planet. Label any value visibly as ‘House N — value’. "
+            "Do not render a natal chart, zodiac-rashi grid, planet placements, dashas, or a house interpretation that was not supplied."
+        )
+    elif kind == "dasha_stack":
+        source = {"active_dasha_hierarchy": snapshot.get("current_dashas") or {}}
+        rendering_rule = "Render only the supplied active dasha hierarchy. Copy each level, planet name, and date exactly. Do not render a natal chart, invent alternate periods, or infer timing beyond the supplied values."
+    else:
+        source = {}
+        rendering_rule = "Do not render a natal chart, rashi grid, planetary placements, SAV table, or dasha stack in this scene. This is a focused editorial/narrative visual only."
+        visual_direction = original_visual_direction
+    return f'''Create a finished premium 9:16 AstroRoshni reel image.
+BRAND REFERENCE: The attached image is the official AstroRoshni gold AR logo. Use it as a brand asset within the new scene. Preserve the AR monogram, its geometry, colours, and proportions. Place the actual logo beside the exact brand name 'AstroRoshni' in a tasteful header or footer inside safe margins. The reference is a small logo, not the full scene or layout: create the complete scene described below around it. Do not substitute a lotus, star, sun, zodiac symbol, invented emblem, or invented tagline for the supplied logo. Keep branding separate from the chart and its factual labels.
+VISUAL MODULE: {kind}
+NON-NEGOTIABLE FACTUAL RULE: {rendering_rule}
+VISUAL DIRECTION: {visual_direction}
+NARRATION: {plain_text(beat.get("narration") or "")}
+APPROVED CLAIMS: {json.dumps([item for item in evidence if item], ensure_ascii=False)}
+VERIFIED DATA FOR THIS MODULE ONLY: {json.dumps(source, ensure_ascii=False)}
+FOCUS NODES: {json.dumps(beat.get("focus_nodes") or [])}; VERIFIED ARROWS: {json.dumps(beat.get("draw_edges") or [])}
+STRICT RENDERING RULE: {rendering_rule}
+VISIBLE TEXT: Use finished plain typography. Never print Markdown formatting markers (hashes, asterisks, backticks) in the image. Headings must read naturally, for example 'Key Insights'.
+Create an award-quality Indian luxury editorial design: burgundy, champagne-gold, cream UI cards, phone/app screens where appropriate, clear arrows and pointed callout blocks. Use only the supplied claims and verified data. Do not invent astrology, dates, placements, scores, predictions, generic reports, or thank-you messages. Prefer a few short, large, readable labels over paragraphs of invented copy. All text and focal elements must remain inside 9:16 safe margins.'''
+
+
+def _native_subject_direction(snapshot: dict) -> str:
+    presentation = str(snapshot.get("native_presentation") or "unspecified").lower()
+    if presentation in {"male", "female"}:
+        return (
+            f"The saved native is an adult {presentation}. When the scene depicts the native, make the primary subject an adult Indian {presentation}; "
+            "never depict the native as another gender. If the scene includes another person, make their role visually distinct rather than presenting them as the native."
+        )
+    return "The saved native's gender is unspecified. Do not assign a gender to a central native; use an object, place, hands, silhouette, or a gender-neutral composition instead."
 
 
 async def _podcast_audio(text: str, language: str) -> tuple[bytes, str]:
@@ -308,16 +507,23 @@ def _run_video(prompt: str, *, image: bytes | None = None) -> tuple[bytes, dict]
 
 
 def _still_clip(ffmpeg: str, image: Path, output: Path, seconds: float) -> None:
-    motion = f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},zoompan=z='min(zoom+0.00065,1.08)':d={int(seconds * 30)}:s={WIDTH}x{HEIGHT}:fps=30,format=yuv420p"
-    subprocess.run([ffmpeg, "-y", "-loop", "1", "-i", str(image), "-t", str(seconds), "-vf", motion, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(output)], check=True, capture_output=True, timeout=120)
+    # Correct 9:16 images fill the frame; malformed provider output is padded
+    # instead of silently centre-cropped and losing factual callouts.
+    # Explicitly centre the zoom crop. Without x/y, FFmpeg's zoompan starts
+    # from an edge, which makes a portrait image appear to drift and overflow
+    # toward one side as it enlarges.
+    motion = f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih):color=#160a16,zoompan=z='min(zoom+0.00065,1.08)':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d={int(seconds * 30)}:s={WIDTH}x{HEIGHT}:fps=30,format=yuv420p"
+    subprocess.run([ffmpeg, "-nostdin", "-y", "-loop", "1", "-i", str(image), "-t", str(seconds), "-vf", motion, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(output)], check=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=120)
 
 
 def _video_segment(ffmpeg: str, source: Path, output: Path, start: float) -> None:
-    subprocess.run([ffmpeg, "-y", "-ss", str(start), "-i", str(source), "-t", "5", "-c", "copy", str(output)], check=True, capture_output=True, timeout=120)
+    subprocess.run([ffmpeg, "-nostdin", "-y", "-ss", str(start), "-i", str(source), "-t", "5", "-c", "copy", str(output)], check=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=120)
 
 
 def _duration(ffmpeg: str, media: Path) -> float:
-    probe = subprocess.run([ffmpeg, "-i", str(media)], capture_output=True, text=True, check=False, timeout=30)
+    # Background workers must never inherit an interactive stdin; that can make
+    # FFmpeg hang even though the MP3 is already complete on disk.
+    probe = subprocess.run([ffmpeg, "-nostdin", "-hide_banner", "-i", str(media)], capture_output=True, text=True, check=False, stdin=subprocess.DEVNULL, timeout=10)
     match = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", probe.stderr)
     if not match:
         raise RuntimeError(f"Could not determine duration of {media.name}")
@@ -344,7 +550,7 @@ def _compose(ffmpeg: str, clips: list[Path], narration: list[Path | None], outpu
             inputs += ["-i", str(audio)]
     filters: list[str] = []
     for index in range(len(clips)):
-        filters.append(f"[{index}:v]trim=duration={durations[index]:.3f},setpts=PTS-STARTPTS,scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},fps=30,format=yuv420p[v{index}]")
+        filters.append(f"[{index}:v]trim=duration={durations[index]:.3f},setpts=PTS-STARTPTS,scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih):color=#160a16,fps=30,format=yuv420p[v{index}]")
         if index in source_audio:
             filters.append(f"[{index}:a]aresample=44100,apad,atrim=duration={durations[index]:.3f},asetpts=PTS-STARTPTS[a{index}]")
         elif index in audio_indexes:
@@ -352,7 +558,7 @@ def _compose(ffmpeg: str, clips: list[Path], narration: list[Path | None], outpu
         else:
             filters.append(f"anullsrc=r=44100:cl=stereo,atrim=duration={durations[index]:.3f}[a{index}]")
     filters.append("".join(f"[v{i}][a{i}]" for i in range(len(clips))) + f"concat=n={len(clips)}:v=1:a=1[v][a]")
-    subprocess.run([ffmpeg, "-y", *inputs, "-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", str(output)], check=True, capture_output=True, timeout=600)
+    subprocess.run([ffmpeg, "-nostdin", "-y", *inputs, "-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", str(output)], check=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=600)
 
 
 def process_reel_job(job_id: str) -> None:
@@ -362,76 +568,101 @@ def process_reel_job(job_id: str) -> None:
     user_id, raw_plan = row; plan = json.loads(raw_plan); run_id = plan["run_id"]
     snapshot = plan.get("chart_snapshot")
     if not snapshot:
-        _update(job_id, "failed", error="Premium reels require the chat to be linked to a saved birth chart. No chart visual was generated.")
+        _fail_reel(job_id, "Premium reels require the chat to be linked to a saved birth chart. No chart visual was generated.")
         return
     work = ROOT / str(user_id) / job_id
     try:
         work.mkdir(parents=True, exist_ok=True); ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
         language = plan.get("settings", {}).get("language", "en")
         beats = plan.get("storyboard") or []
-        if len(beats) != 9:
-            raise RuntimeError("The approved reel plan must contain exactly nine directed beats.")
-        _update(job_id, "creating_presenter")
-        portrait_path = work / "presenter.png"
-        portrait = portrait_path.read_bytes() if portrait_path.exists() else asyncio.run(_gpt_image("Original fictional Indian woman astrologer in her early thirties, warm confident expression, editorial studio portrait, deep indigo sari-inspired outfit, subtle gold jewellery, soft cinematic key light, centred vertical composition with clean negative space, premium social video, no text, no logos"))
-        portrait_path.write_bytes(portrait)
-        _record(user_id, run_id, "image", "openai:gpt-image-2", 1, {"role": "original_presenter", "pricing": "gpt-image-2-1024x1536-medium"}, GPT_IMAGE_COST_INR)
-        chart_image, dasha_image, av_image = work / "chart.png", work / "dashas.png", work / "ashtakavarga.png"
-        _chart_visual(chart_image, snapshot); _dasha_visual(dasha_image, snapshot); _ashtakavarga_visual(av_image, snapshot)
-        stills = {"chart": chart_image, "dasha": dasha_image, "ashtakavarga": av_image, "closing": chart_image}
+        if not 12 <= len(beats) <= 18:
+            raise RuntimeError("The approved reel plan must contain 12 to 18 directed beats.")
+        # Validate the asset before starting any paid TTS/image requests.
+        logo = _brand_logo()
         _update(job_id, "creating_planned_shots")
-        clips: list[Path] = []
-        timeline_audio: list[Path | None] = []
-        presenter_audio_positions: set[int] = set()
-        presenter_source: Path | None = None
-        presenter_uses = 0
-        presenter_script = " ".join(str(beat.get("narration") or "").strip() for beat in beats if beat.get("type") == "presenter")
-        for index, beat in enumerate(beats):
-            kind = str(beat.get("type") or "")
-            line = str(beat.get("narration") or "").strip()
-            if not line:
-                raise RuntimeError(f"Beat {index + 1} has no narration.")
-            if kind == "presenter":
-                if OMNI_VIDEO_ENABLED and presenter_source is None:
-                    video, usage = _run_video(f"Use the reference portrait as the same original fictional Indian astrologer. In one continuous 10-second shot she faces camera and says exactly: \"{presenter_script}\". Warm clear {'Hindi' if language == 'hi' else 'Indian English'} female voice and accent, synchronized natural speech, precise lip movements and restrained hand gestures. Editorial studio lighting. No text, charts, symbols, captions, or extra voices.", image=portrait)
-                    presenter_source = work / "presenter-source.mp4"; presenter_source.write_bytes(video)
-                    _record_omni_usage(user_id, run_id, "10_second_presenter", usage)
-                if OMNI_VIDEO_ENABLED and presenter_uses == 0:
-                    clip = presenter_source
-                elif OMNI_VIDEO_ENABLED:
-                    clip = work / f"presenter-{index}.mp4"; _video_segment(ffmpeg, presenter_source, clip, 5)
-                else:
-                    audio, voice = asyncio.run(_podcast_audio(line, language))
-                    audio_path = work / f"podcast-presenter-{index}.mp3"; audio_path.write_bytes(audio)
-                    clip = work / f"presenter-still-{index}.mp4"; _still_clip(ffmpeg, portrait_path, clip, max(4.0, _duration(ffmpeg, audio_path) + 0.35))
-                presenter_uses += 1
-                clips.append(clip)
-                if OMNI_VIDEO_ENABLED:
-                    presenter_audio_positions.add(len(clips) - 1); timeline_audio.append(None)
-                else:
-                    timeline_audio.append(audio_path)
-                    _record(user_id, run_id, "tts", f"google-tts:{voice}", len(line), {"role": "presenter", "unit": "characters"}, CHIRP_TTS_CHAR_COST_INR)
-            elif kind == "lifestyle_image":
-                image_bytes = asyncio.run(_gpt_image(f"Luxury editorial photograph for an AstroRoshni astrology reel: {beat.get('visual_instruction')}. Refined Indian editorial art direction, warm champagne-gold highlights, deep burgundy and espresso palette, realistic tactile materials, soft cinematic bokeh, sophisticated magazine composition, natural human emotion, photographic realism. No text, no logos, no charts, no astrology symbols, no cheap fantasy, no plastic AI look."))
-                image_path = work / f"lifestyle-{index}.png"; image_path.write_bytes(image_bytes)
-                audio, voice = asyncio.run(_podcast_audio(line, language)); audio_path = work / f"podcast-{index}.mp3"; audio_path.write_bytes(audio); timeline_audio.append(audio_path)
-                clip = work / f"lifestyle-{index}.mp4"; _still_clip(ffmpeg, image_path, clip, max(4.0, _duration(ffmpeg, audio_path) + 0.35)); clips.append(clip)
-                _record(user_id, run_id, "image", "openai:gpt-image-2", 1, {"role": "lifestyle_image", "pricing": "gpt-image-2-1024x1536-medium"}, GPT_IMAGE_COST_INR)
-                _record(user_id, run_id, "tts", f"google-tts:{voice}", len(line), {"role": kind, "unit": "characters"}, CHIRP_TTS_CHAR_COST_INR)
-            else:
-                if kind == "chart":
-                    image = work / f"chart-focus-{index}.png"
-                    _chart_visual(image, snapshot, focus_nodes=list(beat.get("focus_nodes") or []), draw_edges=list(beat.get("draw_edges") or []))
-                else:
-                    image = stills.get(kind)
-                    if image is None:
-                        raise RuntimeError(f"No deterministic renderer is registered for reel beat type: {kind}")
-                audio, voice = asyncio.run(_podcast_audio(line, language)); audio_path = work / f"podcast-{index}.mp3"; audio_path.write_bytes(audio); timeline_audio.append(audio_path)
-                clip = work / f"{kind}-{index}.mp4"; _still_clip(ffmpeg, image, clip, max(4.0, _duration(ffmpeg, audio_path) + 0.35)); clips.append(clip)
-                _record(user_id, run_id, "tts", f"google-tts:{voice}", len(line), {"role": kind, "unit": "characters"}, CHIRP_TTS_CHAR_COST_INR)
+
+        async def limited(semaphore: asyncio.Semaphore, operation):
+            async with semaphore:
+                return await operation
+
+        async def create_assets_and_clips() -> list[tuple[Path, Path, str, str, str]]:
+            # Google TTS and OpenAI Images have independent quotas. Use enough
+            # concurrency to overlap a full reel's remote work, while retaining
+            # environment overrides if a deployment has tighter rate limits.
+            tts_semaphore = asyncio.Semaphore(int(os.getenv("REEL_TTS_CONCURRENCY", "6")))
+            image_semaphore = asyncio.Semaphore(int(os.getenv("REEL_IMAGE_CONCURRENCY", "4")))
+            audio_tasks = {
+                index: asyncio.create_task(limited(tts_semaphore, _podcast_audio(str(beat.get("narration") or "").strip(), language)))
+                for index, beat in enumerate(beats)
+            }
+            image_tasks: dict[str, asyncio.Task[bytes]] = {}
+            async def generate_scene(index: int, beat: dict) -> bytes:
+                kind = str(beat.get("type") or "unknown")
+                try:
+                    prompt = _scene_image_prompt(plan, beat, snapshot)
+                    if kind == "lifestyle_image":
+                        prompt += f"\n{_native_subject_direction(snapshot)}"
+                    return await limited(image_semaphore, _gpt_image(prompt, logo=logo, quality="low"))
+                except Exception as exc:
+                    detail = str(exc).strip() or repr(exc)
+                    raise RuntimeError(f"Image generation failed for beat {index + 1} ({kind}): {type(exc).__name__}: {detail}") from exc
+
+            for index, beat in enumerate(beats):
+                # Cost-control policy: every Reel Studio image uses GPT Image's
+                # low-quality tier, including factual chart/SAV/dasha scenes.
+                image_tasks[f"beat-{index}"] = asyncio.create_task(generate_scene(index, beat))
+            async def materialize(path: Path, task: asyncio.Task[bytes]) -> Path:
+                path.write_bytes(await task)
+                return path
+
+            image_paths: dict[str, asyncio.Task[Path]] = {}
+            for index, beat in enumerate(beats):
+                image_paths[f"beat-{index}"] = asyncio.create_task(materialize(work / f"scene-{index}.png", image_tasks[f"beat-{index}"]))
+
+            clip_semaphore = asyncio.Semaphore(int(os.getenv("REEL_CLIP_CONCURRENCY", "4")))
+
+            async def prepare_beat(index: int, beat: dict) -> tuple[Path, Path, str, str, str]:
+                kind = str(beat.get("type") or "")
+                line = str(beat.get("narration") or "").strip()
+                if not line:
+                    raise RuntimeError(f"Beat {index + 1} has no narration.")
+                audio, voice = await audio_tasks[index]
+                audio_path = work / f"podcast-{index}.mp3"; audio_path.write_bytes(audio)
+                image = await image_paths[f"beat-{index}"]
+                clip = work / f"beat-{index}.mp4"
+                def encode() -> None:
+                    _still_clip(ffmpeg, image, clip, max(4.0, _duration(ffmpeg, audio_path) + 0.35))
+                async with clip_semaphore:
+                    await asyncio.to_thread(encode)
+                return clip, audio_path, voice, kind, line
+
+            async def indexed_prepare(index: int, beat: dict):
+                return index, await prepare_beat(index, beat)
+
+            prepared_by_index: dict[int, tuple[Path, Path, str, str, str]] = {}
+            completed = 0
+            for task in asyncio.as_completed([indexed_prepare(index, beat) for index, beat in enumerate(beats)]):
+                index, prepared_beat = await task
+                prepared_by_index[index] = prepared_beat
+                completed += 1
+                # This is a real completed scene, not a time-based estimate.
+                # The client turns it into a branded progress experience.
+                _update(job_id, f"creating_your_reel_{completed}_of_{len(beats)}")
+            return [prepared_by_index[index] for index in range(len(beats))]
+
+        prepared = asyncio.run(create_assets_and_clips())
+        clips, timeline_audio = [], []
+        for clip, audio_path, voice, kind, line in prepared:
+            clips.append(clip); timeline_audio.append(audio_path)
+            _record(user_id, run_id, "tts", f"google-tts:{voice}", len(line), {"role": kind, "unit": "characters"}, CHIRP_TTS_CHAR_COST_INR)
+            _record(user_id, run_id, "image", "openai:gpt-image-2", 1, {"role": kind, "pricing": "gpt-image-2-1024x1824-low", "reference": "official_astroroshni_logo", "input_image_cost_included": False}, GPT_IMAGE_LOW_COST_INR)
         _update(job_id, "premium_compositing")
-        output = work / "final-reel.mp4"; _compose(ffmpeg, clips, timeline_audio, output, source_audio=presenter_audio_positions)
-        _record(user_id, run_id, "render", "ffmpeg", 1, {"composition": "gpt_images+deterministic_astrology_visuals+podcast_tts", "omni_video_enabled": OMNI_VIDEO_ENABLED})
+        output = work / "final-reel.mp4"; _compose(ffmpeg, clips, timeline_audio, output, source_audio=set())
+        _record(user_id, run_id, "render", "ffmpeg", 1, {"composition": "gpt_image_edits+deterministic_astrology_visuals+podcast_tts", "omni_video_enabled": False})
+        from reel_studio.storage import store_reel
+        _update(job_id, "saving_reel")
+        store_reel(user_id, job_id, output)
         _update(job_id, "completed", output_url=f"/api/reel-studio/jobs/{job_id}/download")
     except Exception as exc:
-        _update(job_id, "failed", error=str(exc)[:1000])
+        detail = str(exc).strip() or repr(exc)
+        _fail_reel(job_id, f"{type(exc).__name__}: {detail}")
