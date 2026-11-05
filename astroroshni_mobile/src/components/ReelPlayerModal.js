@@ -23,6 +23,7 @@ export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
   const [preview, setPreview] = useState(null);
   const [sharing, setSharing] = useState(false);
   const mediaRef = useRef(null);
+  const remoteMediaRef = useRef(null);
   const statusRef = useRef({});
   const widthRef = useRef(1);
   const dragRef = useRef({ start: 0, value: 0, active: false });
@@ -92,12 +93,14 @@ export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
               message: downloadError?.message || String(downloadError),
             });
             if (active) {
+              remoteMediaRef.current = { uri: url, headers };
               setNotice(t('premiumUi.reelStudio.streamingFallback', 'Playing from your saved reel library.'));
               setSource({ uri: url, headers });
             }
             return;
           }
         }
+        remoteMediaRef.current = null;
         if (active) setSource({ uri });
       } catch (err) { if (active && err.name !== 'AbortError') setError(t('premiumUi.reelStudio.loadError', 'Could not open the saved reel. Please try again.')); }
     };
@@ -144,8 +147,26 @@ export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
   const downloadWeb = () => {
     const link = document.createElement('a'); link.href = source.uri; link.download = 'astroroshni-reel.mp4'; link.click();
   };
+
+  const shareableNativeUri = async () => {
+    if (typeof mediaRef.current === 'string') return mediaRef.current;
+    const remote = remoteMediaRef.current;
+    if (!remote?.uri) throw new Error('Saved reel source is unavailable');
+    // Streaming is ideal for playback, but Android's share sheet needs a local
+    // content URI. Retry independently with a unique filename so a stale player
+    // cache lock never prevents the user from sharing an otherwise playable reel.
+    const uri = `${FileSystem.cacheDirectory}astroroshni-reel-share-${jobId}-${Date.now()}.mp4`;
+    const downloaded = await FileSystem.downloadAsync(remote.uri, uri, { headers: remote.headers });
+    if (downloaded.status !== 200) {
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+      throw new Error(`HTTP ${downloaded.status}`);
+    }
+    mediaRef.current = uri;
+    return uri;
+  };
+
   const share = async (destination) => {
-    if (!mediaRef.current || sharing) return;
+    if (!source || sharing) return;
     video.current?.pauseAsync().catch(() => {});
     setSharing(true);
     try {
@@ -161,8 +182,9 @@ export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
         }
       } else {
         if (!await Sharing.isAvailableAsync()) throw new Error('Sharing unavailable');
+        const shareUri = await shareableNativeUri();
         if (destination) setNotice(t('premiumUi.reelStudio.chooseShareApp', 'Choose {{app}} in the share sheet to continue publishing.', { app: destination }));
-        await Sharing.shareAsync(mediaRef.current, { mimeType: 'video/mp4', UTI: 'public.mpeg-4', dialogTitle: destination || t('premiumUi.reelStudio.share', 'Share') });
+        await Sharing.shareAsync(shareUri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4', dialogTitle: destination || t('premiumUi.reelStudio.share', 'Share') });
       }
     } catch (err) {
       if (err.name !== 'AbortError') Alert.alert(t('premiumUi.reelStudio.title', 'Your premium reel'), t('premiumUi.reelStudio.shareError', 'Could not share this reel. Please try again.'));

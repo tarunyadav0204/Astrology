@@ -509,10 +509,11 @@ def _run_video(prompt: str, *, image: bytes | None = None) -> tuple[bytes, dict]
 def _still_clip(ffmpeg: str, image: Path, output: Path, seconds: float) -> None:
     # Correct 9:16 images fill the frame; malformed provider output is padded
     # instead of silently centre-cropped and losing factual callouts.
-    # Explicitly centre the zoom crop. Without x/y, FFmpeg's zoompan starts
-    # from an edge, which makes a portrait image appear to drift and overflow
-    # toward one side as it enlarges.
-    motion = f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih):color=#160a16,zoompan=z='min(zoom+0.00065,1.08)':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d={int(seconds * 30)}:s={WIDTH}x{HEIGHT}:fps=30,format=yuv420p"
+    # Zoom from the exact centre.  The prior accumulated floating-point zoom
+    # position was rounded differently on neighbouring frames, producing a
+    # visible left/right shimmer on fine chart lines and phone edges.
+    frames = max(1, int(seconds * 30))
+    motion = f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih):color=#160a16,zoompan=z='min(1+on*0.04/{frames},1.04)':x='trunc((iw-iw/zoom)/4)*2':y='trunc((ih-ih/zoom)/4)*2':d={frames}:s={WIDTH}x{HEIGHT}:fps=30,format=yuv420p"
     subprocess.run([ffmpeg, "-nostdin", "-y", "-loop", "1", "-i", str(image), "-t", str(seconds), "-vf", motion, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(output)], check=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=120)
 
 
