@@ -30,6 +30,7 @@
       "recreate": "Recreate",
       "playSaved": "Play saved reel",
       "openingSaved": "Opening saved reel…",
+      "streamingFallback": "Playing from your saved reel library.",
       "timeline": "Reel timeline",
       "loadError": "Could not open the saved reel. Please try again.",
       "playbackError": "Playback failed. Please reopen the reel.",

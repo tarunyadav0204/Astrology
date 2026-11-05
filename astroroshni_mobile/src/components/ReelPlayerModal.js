@@ -71,16 +71,32 @@ export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
           // Downloading into a temporary file and swapping it atomically keeps
           // the player on one complete, current MP4 every time it opens.
           const temporary = `${uri}.part`;
-          await FileSystem.deleteAsync(temporary, { idempotent: true });
-          const downloaded = await FileSystem.downloadAsync(url, temporary, { headers });
-          if (downloaded.status !== 200) {
+          try {
             await FileSystem.deleteAsync(temporary, { idempotent: true });
-            throw new Error(`HTTP ${downloaded.status}`);
+            const downloaded = await FileSystem.downloadAsync(url, temporary, { headers });
+            if (downloaded.status !== 200) {
+              throw new Error(`HTTP ${downloaded.status}`);
+            }
+            await FileSystem.deleteAsync(uri, { idempotent: true });
+            await FileSystem.moveAsync({ from: temporary, to: uri });
+            mediaRef.current = uri;
+            await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false });
+          } catch (downloadError) {
+            // A reel remains playable if Android cannot write a local cache file
+            // (low device storage, a stale OS file lock, or a transient download
+            // interruption). Video accepts authenticated remote sources directly.
+            // Do not turn a successfully saved reel into an inaccessible one.
+            await FileSystem.deleteAsync(temporary, { idempotent: true }).catch(() => {});
+            console.warn('[ReelPlayer] local reel cache unavailable; streaming instead', {
+              jobId,
+              message: downloadError?.message || String(downloadError),
+            });
+            if (active) {
+              setNotice(t('premiumUi.reelStudio.streamingFallback', 'Playing from your saved reel library.'));
+              setSource({ uri: url, headers });
+            }
+            return;
           }
-          await FileSystem.deleteAsync(uri, { idempotent: true });
-          await FileSystem.moveAsync({ from: temporary, to: uri });
-          mediaRef.current = uri;
-          await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false });
         }
         if (active) setSource({ uri });
       } catch (err) { if (active && err.name !== 'AbortError') setError(t('premiumUi.reelStudio.loadError', 'Could not open the saved reel. Please try again.')); }
