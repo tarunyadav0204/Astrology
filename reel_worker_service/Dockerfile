@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir -r /tmp/backend-requirements.txt
 
 COPY backend/ /app/
 COPY reel_worker_service /app/reel_worker_service
+COPY assets/logo.png /app/assets/logo.png
 
 RUN chmod +x /app/reel_worker_service/start.sh
 

@@ -19,4 +19,10 @@ for path in backend reel_worker_service; do
     "${APP_ROOT}/${path}/" "${OUT_DIR}/${path}/"
 done
 
+# The renderer passes the official logo as the required image reference for
+# every generated scene. It is intentionally copied into the worker context
+# rather than relying on the mobile source tree at runtime.
+mkdir -p "${OUT_DIR}/assets"
+cp "${APP_ROOT}/astroroshni_mobile/assets/logo.png" "${OUT_DIR}/assets/logo.png"
+
 echo "Prepared Reel worker build context at ${OUT_DIR}"
