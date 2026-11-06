@@ -9,23 +9,28 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 import os
 import re
 import subprocess
 import textwrap
+import time
 import uuid
 from pathlib import Path
 from typing import Any
 
 import httpx
 import imageio_ffmpeg
+from google.cloud import texttospeech
 from PIL import Image, ImageDraw, ImageFont
 
 from db import execute, get_conn
 from partner_profile.image_provider import OpenAIPartnerPortraitProvider
-from tts.routes import SpeechSynthesisRequest, synthesize
+from tts.routes import _build_voice_and_config, _get_google_credentials, _segment_text_to_plain
 from utils.admin_settings import get_podcast_tts_voices
 from reel_studio.text import plain_text
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(os.getenv("REEL_LOCAL_OUTPUT_DIR", "storage/reels"))
 VIDEO_MODEL = "gemini-omni-1.1-flash"
@@ -453,15 +458,36 @@ def _native_subject_direction(snapshot: dict) -> str:
     return "The saved native's gender is unspecified. Do not assign a gender to a central native; use an object, place, hands, silhouette, or a gender-neutral composition instead."
 
 
-async def _podcast_audio(text: str, language: str) -> tuple[bytes, str]:
-    """Use the admin-selected Indian podcast voice at its natural cadence."""
-    female_voice, _ = get_podcast_tts_voices(language)
-    response = await synthesize(request=SpeechSynthesisRequest(
-        text=text, lang=language, voice_name=female_voice, prepare_spoken=True,
-        speaking_rate=0.95 if language.startswith("hi") else 1.0,
-    ))
-    payload = json.loads(response.body)
-    return base64.b64decode(payload["audio"]), str(payload.get("voice_name") or female_voice)
+async def _podcast_audio(text: str, language: str, voice_name: str) -> tuple[bytes, str]:
+    """Synthesize one Reel beat without an LLM rewrite or an SSML retry.
+
+    A Reel already has approved, short narration for every beat.  Sending every
+    beat through the general speech endpoint used to make a separate Gemini
+    rewrite, then attempt an SSML request that Chirp rejected before retrying
+    as plain text.  Those synchronous preparation calls stopped the event loop
+    from even starting image generation.  Use the same Google voice and spoken
+    text cleanup directly, with its blocking RPC isolated in the thread pool.
+    """
+    plain_text = _segment_text_to_plain(text)
+    if not plain_text:
+        raise RuntimeError("Reel narration is empty after speech preparation.")
+
+    def synthesize_beat() -> bytes:
+        credentials = _get_google_credentials()
+        client = texttospeech.TextToSpeechClient(credentials=credentials)
+        voice, audio_config = _build_voice_and_config(
+            language,
+            voice_name,
+            0.95 if language.startswith("hi") else 1.0,
+        )
+        response = client.synthesize_speech(
+            input=texttospeech.SynthesisInput(text=plain_text),
+            voice=voice,
+            audio_config=audio_config,
+        )
+        return response.audio_content
+
+    return await asyncio.to_thread(synthesize_beat), voice_name
 
 
 def _video_output_tokens(usage: dict) -> int:
@@ -640,14 +666,23 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
             # and the environment values remain an immediate escape hatch if a
             # quota responds poorly under real load.
             scene_count = max(1, len(beats))
-            tts_semaphore = asyncio.Semaphore(
-                int(os.getenv("REEL_TTS_CONCURRENCY", str(scene_count)))
-            )
-            image_semaphore = asyncio.Semaphore(
-                int(os.getenv("REEL_IMAGE_CONCURRENCY", str(scene_count)))
-            )
+            tts_limit = int(os.getenv("REEL_TTS_CONCURRENCY", str(scene_count)))
+            image_limit = int(os.getenv("REEL_IMAGE_CONCURRENCY", str(scene_count)))
+            tts_semaphore = asyncio.Semaphore(tts_limit)
+            image_semaphore = asyncio.Semaphore(image_limit)
+            female_voice, _ = get_podcast_tts_voices(language)
+            asset_started = time.perf_counter()
             audio_tasks = {
-                index: asyncio.create_task(limited(tts_semaphore, _podcast_audio(str(beat.get("narration") or "").strip(), language)))
+                index: asyncio.create_task(
+                    limited(
+                        tts_semaphore,
+                        _podcast_audio(
+                            str(beat.get("narration") or "").strip(),
+                            language,
+                            female_voice,
+                        ),
+                    )
+                )
                 for index, beat in enumerate(beats)
             }
             image_tasks: dict[str, asyncio.Task[bytes]] = {}
@@ -666,6 +701,18 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
                 # Cost-control policy: every Reel Studio image uses GPT Image's
                 # low-quality tier, including factual chart/SAV/dasha scenes.
                 image_tasks[f"beat-{index}"] = asyncio.create_task(generate_scene(index, beat))
+            # Give every task one event-loop turn now. The direct TTS call
+            # immediately moves its blocking RPC to a thread, allowing image
+            # HTTP requests to begin before any audio result is awaited.
+            await asyncio.sleep(0)
+            logger.info(
+                "REEL_ASSET_FANOUT job_id=%s beats=%s tts_concurrency=%s image_concurrency=%s elapsed_ms=%.1f",
+                job_id,
+                scene_count,
+                tts_limit,
+                image_limit,
+                (time.perf_counter() - asset_started) * 1000,
+            )
             async def materialize(path: Path, task: asyncio.Task[bytes]) -> Path:
                 path.write_bytes(await task)
                 return path
