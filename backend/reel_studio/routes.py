@@ -534,9 +534,15 @@ def queue_render(request: RenderRequest, background_tasks: BackgroundTasks, curr
 
 @router.get("/pricing")
 def get_reel_pricing(
-    duration_seconds: Literal[REEL_SHORT_DURATION_SECONDS, REEL_DEEP_DURATION_SECONDS] = REEL_SHORT_DURATION_SECONDS,
+    duration_seconds: int = Query(default=REEL_SHORT_DURATION_SECONDS, ge=1),
     current_user: User = Depends(get_current_user),
 ):
+    # Query parameters arrive as text. Pydantic's Literal[int, int] performs
+    # an exact literal match before coercion on some supported versions, so a
+    # valid URL such as ?duration_seconds=90 was rejected. Parse first, then
+    # enforce the two supported formats explicitly.
+    if duration_seconds not in {REEL_SHORT_DURATION_SECONDS, REEL_DEEP_DURATION_SECONDS}:
+        raise HTTPException(status_code=422, detail="duration_seconds must be 90 or 180")
     return reel_pricing(current_user.userid, duration_seconds)
 
 
