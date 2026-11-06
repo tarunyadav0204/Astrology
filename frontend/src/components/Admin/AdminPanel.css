@@ -376,6 +376,29 @@
 .feature-costs-table th.feature-costs-th-name {
   text-align: left;
 }
+.feature-costs-table .feature-costs-group-row th {
+  padding: 13px 14px 11px;
+  border-top: 1px solid var(--admin-border-strong);
+  background: color-mix(in srgb, var(--admin-accent) 9%, var(--admin-surface));
+  color: var(--admin-text);
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.feature-costs-group-row span,
+.feature-costs-group-row small {
+  display: block;
+}
+.feature-costs-group-row span {
+  font-size: 14px;
+  font-weight: 750;
+}
+.feature-costs-group-row small {
+  margin-top: 3px;
+  color: var(--admin-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
 .feature-costs-table td {
   padding: 12px;
   border-top: 1px solid var(--admin-border);

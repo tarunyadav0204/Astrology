@@ -81,6 +81,63 @@ function withRequiredInstantChatSettings(settings) {
   return normalized;
 }
 
+// Keep the catalogue readable as it grows. Feature keys are the billing
+// contract, so group on those stable keys rather than on descriptions edited
+// by administrators.
+const CREDIT_SETTING_GROUPS = [
+  {
+    key: 'chat',
+    title: 'Chat & consultations',
+    hint: 'Per-answer and Talk to Tara pricing.',
+    keys: ['chat_question_cost', 'chart_chat_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'verified_chat_cost'],
+  },
+  {
+    key: 'readings',
+    title: 'Life readings & analyses',
+    hint: 'Focused chart readings and analysis experiences.',
+    keys: ['wealth_analysis_cost', 'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost', 'progeny_analysis_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost'],
+  },
+  {
+    key: 'reports',
+    title: 'Reports & blueprints',
+    hint: 'Long-form reports, PDFs and structured readings.',
+    keys: ['partnership_report_cost', 'career_report_cost', 'wealth_report_cost', 'health_report_cost', 'janam_kundli_report_cost', 'progeny_report_cost', 'nakshatra_blueprint_cost', 'nakshatra_blueprint_images_addon_cost'],
+  },
+  {
+    key: 'timing',
+    title: 'Timing, planning & Muhurat',
+    hint: 'Event timing, planning tools and auspicious-time readings.',
+    keys: ['trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'marriage_muhurat_cost', 'event_timeline_cost', 'prashna_analysis_cost'],
+  },
+  {
+    key: 'media',
+    title: 'Media & creations',
+    hint: 'Audio, visual and generated experiences.',
+    keys: ['podcast_cost', 'reel_short_generation_cost', 'reel_deep_generation_cost', 'partner_portrait_cost'],
+  },
+];
+
+function groupCreditSettings(settings) {
+  const byKey = new Map((settings || []).map((setting) => [setting.key, setting]));
+  const grouped = CREDIT_SETTING_GROUPS.map((group) => ({
+    ...group,
+    settings: group.keys.map((key) => byKey.get(key)).filter(Boolean),
+  })).filter((group) => group.settings.length);
+  const assigned = new Set(CREDIT_SETTING_GROUPS.flatMap((group) => group.keys));
+  const otherSettings = (settings || [])
+    .filter((setting) => !assigned.has(setting.key))
+    .sort((left, right) => String(left.description || left.key).localeCompare(String(right.description || right.key)));
+  if (otherSettings.length) {
+    grouped.push({
+      key: 'other',
+      title: 'Other feature costs',
+      hint: 'Settings added by newer or legacy features.',
+      settings: otherSettings,
+    });
+  }
+  return grouped;
+}
+
 function todayInIST() {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Kolkata',
@@ -4921,39 +4978,51 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
                     </tr>
                   </thead>
                   <tbody>
-                    {creditSettings.map(setting => (
-                      <tr key={setting.key}>
-                        <td className="feature-costs-td-name" title={setting.key}>{setting.description}</td>
-                        <td className="feature-costs-td">
-                          <input
-                            type="number"
-                            value={setting.value}
-                            onChange={(e) => handleSettingChange(setting.key, e.target.value)}
-                            min="1"
-                            placeholder="—"
-                            title="Original cost (credits)"
-                            aria-label={`${setting.description} price`}
-                            className="feature-costs-input"
-                          />
-                        </td>
-                        <td className="feature-costs-td">
-                          <input
-                            type="number"
-                            value={setting.discount ?? ''}
-                            onChange={(e) => handleSettingDiscountChange(setting.key, e.target.value)}
-                            min="0"
-                            placeholder="—"
-                            title="Discounted cost (empty = no discount)"
-                            aria-label={`${setting.description} discount`}
-                            className="feature-costs-input"
-                          />
-                        </td>
-                        {vipTiers.map(t => (
-                          <td key={t.name} className="feature-costs-td-vip" title={`${t.name} (${t.discount}% off): ${calcVipPrice(setting.value, t.discount)} credits`}>
-                            {calcVipPrice(setting.value, t.discount)}
-                          </td>
+                    {groupCreditSettings(
+                      creditSettings.filter((setting) => !INSTANT_CHAT_CREDIT_SETTINGS.some((instant) => instant.key === setting.key))
+                    ).map((group) => (
+                      <React.Fragment key={group.key}>
+                        <tr className="feature-costs-group-row">
+                          <th colSpan={3 + vipTiers.length} scope="colgroup">
+                            <span>{group.title}</span>
+                            <small>{group.hint}</small>
+                          </th>
+                        </tr>
+                        {group.settings.map((setting) => (
+                          <tr key={setting.key}>
+                            <td className="feature-costs-td-name" title={setting.key}>{setting.description}</td>
+                            <td className="feature-costs-td">
+                              <input
+                                type="number"
+                                value={setting.value}
+                                onChange={(e) => handleSettingChange(setting.key, e.target.value)}
+                                min="1"
+                                placeholder="—"
+                                title="Original cost (credits)"
+                                aria-label={`${setting.description} price`}
+                                className="feature-costs-input"
+                              />
+                            </td>
+                            <td className="feature-costs-td">
+                              <input
+                                type="number"
+                                value={setting.discount ?? ''}
+                                onChange={(e) => handleSettingDiscountChange(setting.key, e.target.value)}
+                                min="0"
+                                placeholder="—"
+                                title="Discounted cost (empty = no discount)"
+                                aria-label={`${setting.description} discount`}
+                                className="feature-costs-input"
+                              />
+                            </td>
+                            {vipTiers.map(t => (
+                              <td key={t.name} className="feature-costs-td-vip" title={`${t.name} (${t.discount}% off): ${calcVipPrice(setting.value, t.discount)} credits`}>
+                                {calcVipPrice(setting.value, t.discount)}
+                              </td>
+                            ))}
+                          </tr>
                         ))}
-                      </tr>
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
