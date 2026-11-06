@@ -6,12 +6,14 @@ and public API readiness. Failed updates stop before touching the next VM.
 """
 import argparse
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
 import re
 import shlex
 import subprocess
+import threading
 import time
 
 
@@ -32,39 +34,51 @@ def run(*args, timeout=120):
     return result.stdout.strip()
 
 
-def ready_instances(group, instances, backends, minimum):
+def readiness_issues(group, instances, backends, minimum):
     """Fail closed on missing/unknown health, membership changes and ongoing repairs."""
-    if not group.get("status", {}).get("isStable") or group.get("targetSize", 0) < minimum:
-        return False
+    issues = []
+    if not group.get("status", {}).get("isStable"):
+        issues.append("MIG has an operation in progress")
+    if group.get("targetSize", 0) < minimum:
+        issues.append(f"requires at least {minimum} servers")
     if len(instances) != group["targetSize"]:
-        return False
+        issues.append("instance count differs from target size")
     healthy = {
         h.get("instance")
         for backend in backends
         for h in backend.get("status", {}).get("healthStatus", [])
         if h.get("healthState") == "HEALTHY"
     }
-    return all(
-        vm.get("currentAction") == "NONE"
-        and vm.get("instanceStatus") == "RUNNING"
-        and vm.get("instanceHealth")
-        and all(h.get("detailedHealthState") == "HEALTHY" for h in vm["instanceHealth"])
-        and vm["instance"] in healthy
-        for vm in instances
-    )
+    for vm in instances:
+        name = vm["instance"].rsplit("/", 1)[-1]
+        if vm.get("currentAction") != "NONE":
+            issues.append(f"{name}: action={vm.get('currentAction', 'unknown')}")
+        if vm.get("instanceStatus") != "RUNNING":
+            issues.append(f"{name}: status={vm.get('instanceStatus', 'unknown')}")
+        health = vm.get("instanceHealth", [])
+        if not health or any(h.get("detailedHealthState") != "HEALTHY" for h in health):
+            issues.append(f"{name}: auto-repair health=" + ",".join(h.get("detailedHealthState", "unknown") for h in health or [{}]))
+        if vm["instance"] not in healthy:
+            issues.append(f"{name}: load balancer has not marked it healthy")
+    return issues
+
+
+def ready_instances(group, instances, backends, minimum):
+    return not readiness_issues(group, instances, backends, minimum)
 
 
 class Deployment:
     def __init__(self, args):
         self.args = args
         self.scope = [f"--project={args.project}", f"--zone={args.zone}", "--quiet"]
+        self.ssh_key_lock = threading.Lock()
 
     def mig(self, action, *args):
         if action == "rolling-action":
             return run("gcloud", "compute", "instance-groups", "managed", action, args[0],
                        self.args.mig, *self.scope, *args[1:])
         return run("gcloud", "compute", "instance-groups", "managed", action,
-                   self.args.mig, *self.scope, *args, timeout=960 if action == "wait-until" else 120)
+                   self.args.mig, *self.scope, *args, timeout=960 if action in ("wait-until", "update") else 120)
 
     def state(self):
         group = json.loads(self.mig("describe", "--format=json"))
@@ -75,8 +89,14 @@ class Deployment:
         return group, instances, backends
 
     def ssh(self, instance, command, timeout=120):
+        # Parallel gcloud calls must not both generate the same fresh runner key.
+        key = Path.home() / ".ssh" / "google_compute_engine"
+        with self.ssh_key_lock:
+            if not key.exists():
+                key.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                run("ssh-keygen", "-q", "-t", "rsa", "-b", "3072", "-N", "", "-f", str(key))
         return run("gcloud", "compute", "ssh", f"tarun_yadav@{instance}", *self.scope,
-                   "--tunnel-through-iap", "--command", command, timeout=timeout)
+                   "--tunnel-through-iap", f"--ssh-key-file={key}", "--command", command, timeout=timeout)
 
     def public_health(self):
         run("curl", "--fail", "--silent", "--show-error", "--max-time", "20",
@@ -90,30 +110,66 @@ class Deployment:
             names = sorted(vm["instance"].rsplit("/", 1)[-1] for vm in instances)
             if expected is not None and names != expected:
                 raise DeploymentError("MIG membership changed during app deployment; stopping")
-            if ready_instances(group, instances, backends, minimum):
+            issues = readiness_issues(group, instances, backends, minimum)
+            if not issues:
                 try:
-                    for name in names:
-                        self.ssh(name, "curl -fsS --max-time 10 http://127.0.0.1:8001/api/keepalive >/dev/null && "
-                                 "curl -fsS --max-time 10 http://127.0.0.1:8001/api/health >/dev/null")
                     self.public_health()
-                except (subprocess.SubprocessError, DeploymentError):
-                    healthy_since = None
-                else:
                     if healthy_since is None:
                         healthy_since = time.monotonic()
-                    if time.monotonic() - healthy_since >= self.args.soak_seconds:
-                        return group, instances
+                    remaining = self.args.soak_seconds - (time.monotonic() - healthy_since)
+                    if remaining <= 0:
+                        # SSH is expensive over IAP. Check apps once per gate,
+                        # in parallel, after the cheap cloud checks have settled.
+                        def check_app(name):
+                            try:
+                                self.ssh(name, "curl -fsS --max-time 10 http://127.0.0.1:8001/api/keepalive >/dev/null && "
+                                         "curl -fsS --max-time 10 http://127.0.0.1:8001/api/health >/dev/null")
+                            except (subprocess.SubprocessError, DeploymentError) as error:
+                                raise DeploymentError(f"{name}: local application readiness failed: {error}") from error
+                        with ThreadPoolExecutor(max_workers=min(4, len(names))) as pool:
+                            list(pool.map(check_app, names))
+                        # A repair may begin during SSH; don't admit stale state.
+                        final_group, final_instances, final_backends = self.state()
+                        final_names = sorted(vm["instance"].rsplit("/", 1)[-1] for vm in final_instances)
+                        issues = readiness_issues(final_group, final_instances, final_backends, minimum)
+                        if names != final_names or issues:
+                            raise DeploymentError("State changed during app checks: " + "; ".join(issues or ["membership changed"]))
+                        print(f"Ready: {self.args.mig}; all servers, LB and app checks passed", flush=True)
+                        return final_group, final_instances
+                    issues = [f"all cloud/public checks healthy; observing for {remaining:.0f}s more"]
+                except (subprocess.SubprocessError, DeploymentError) as error:
+                    healthy_since = None
+                    issues = [str(error)]
             else:
                 healthy_since = None
-            print(f"Waiting for {self.args.mig}: stable membership, app and LB health", flush=True)
+            print(f"Waiting for {self.args.mig}: {'; '.join(issues)}", flush=True)
             time.sleep(10)
         raise DeploymentError(f"Readiness timed out for {self.args.mig}; no further servers will be updated")
 
     def safe_policy(self):
+        check_name = "astroroshni-autohealing"
+        health = json.loads(run("gcloud", "compute", "health-checks", "describe", check_name,
+                                f"--project={self.args.project}", "--global", "--format=json"))
+        if (health.get("type") != "HTTP" or health.get("httpHealthCheck", {}).get("port") != 8001
+                or health.get("httpHealthCheck", {}).get("requestPath") != "/api/keepalive"
+                or health.get("checkIntervalSec", 0) * health.get("unhealthyThreshold", 0) < 180):
+            raise DeploymentError("Auto-repair check is too aggressive or invalid; run scripts/configure-mig-autohealing.sh first")
+        group = json.loads(self.mig("describe", "--format=json"))
+        policy = group.get("updatePolicy", {})
+        healing = group.get("autoHealingPolicies", [])
+        if (policy.get("type") == "OPPORTUNISTIC"
+                and policy.get("maxUnavailable", {}).get("fixed") == 0
+                and policy.get("maxSurge", {}).get("fixed") == 1
+                and policy.get("replacementMethod") == "SUBSTITUTE"
+                and len(healing) == 1
+                and healing[0].get("healthCheck", "").endswith("/" + check_name)
+                and healing[0].get("initialDelaySec", 0) >= 600):
+            return  # Avoid a slow policy mutation when it is already correct.
         # Explicitly enforce policy even if a previous manual rollout left it proactive.
         self.mig("update", "--update-policy-type=opportunistic",
                  "--update-policy-max-unavailable=0", "--update-policy-max-surge=1",
-                 "--update-policy-replacement-method=substitute")
+                 "--update-policy-replacement-method=substitute",
+                 f"--health-check={check_name}", "--initial-delay=600")
 
     def deploy_instance(self, name, commit, rollback=False):
         if not re.fullmatch(r"[0-9a-f]{40}", commit):
@@ -150,7 +206,8 @@ test "$(git rev-parse HEAD)" = "$DEPLOY_COMMIT"
         _, instances = self.wait_ready(minimum=2)
         names = sorted(vm["instance"].rsplit("/", 1)[-1] for vm in instances)
         for name in names:
-            self.wait_ready(expected=names, minimum=2)
+            # Initial readiness, then the preceding server's post-deploy gate,
+            # already protects the next update. Do not run the same gate twice.
             previous = self.ssh(name, "cd /home/tarun_yadav/AstrologyApp && git rev-parse HEAD")
             if not re.fullmatch(r"[0-9a-f]{40}", previous):
                 raise DeploymentError(f"Cannot capture rollback commit on {name}")

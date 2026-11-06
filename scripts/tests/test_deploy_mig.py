@@ -63,7 +63,7 @@ class DeploymentTests(unittest.TestCase):
     def test_lb_failure_after_successful_deploy_also_rolls_back(self):
         self.fake_live()
         healthy = (self.group, self.instances)
-        self.d.wait_ready.side_effect = [healthy, healthy, m.DeploymentError("LB unhealthy"), healthy]
+        self.d.wait_ready.side_effect = [healthy, m.DeploymentError("LB unhealthy"), healthy]
         with self.assertRaisesRegex(m.DeploymentError, "restored"):
             self.d.live()
         self.assertEqual(self.d.deploy_instance.call_count, 2)
@@ -85,10 +85,41 @@ class DeploymentTests(unittest.TestCase):
         self.d.state = Mock(return_value=(self.group, self.instances, self.backends))
         self.d.ssh = Mock(side_effect=subprocess.CalledProcessError(22, "curl"))
         self.d.public_health = Mock()
-        with patch.object(m.time, "monotonic", side_effect=[0, 1, 70]), patch.object(m.time, "sleep"):
+        with patch.object(m.time, "monotonic", side_effect=[0, 1, 2, 2, 70]), patch.object(m.time, "sleep"):
             with self.assertRaisesRegex(m.DeploymentError, "timed out"):
                 self.d.wait_ready()
-        self.d.public_health.assert_not_called()
+        self.d.public_health.assert_called_once()
+
+    def test_healthy_gate_does_not_repeat_ssh_during_soak(self):
+        self.d.args.soak_seconds = 30
+        self.d.state = Mock(return_value=(self.group, self.instances, self.backends))
+        self.d.ssh = Mock(return_value="")
+        self.d.public_health = Mock()
+        with patch.object(m.time, "monotonic", side_effect=[0, 1, 2, 2, 12, 12, 33, 33]), patch.object(m.time, "sleep"):
+            self.d.wait_ready()
+        self.assertEqual(self.d.ssh.call_count, 2)
+
+    def test_live_reuses_previous_post_deploy_gate(self):
+        self.fake_live()
+        self.d.live()
+        self.assertEqual(self.d.wait_ready.call_count, 3)  # Initial + one after each VM.
+
+    def test_diagnostic_names_recreating_vm(self):
+        self.group["status"]["isStable"] = False
+        self.instances[1]["currentAction"] = "RECREATING"
+        issues = m.readiness_issues(self.group, self.instances, self.backends, 2)
+        self.assertIn("vm-1: action=RECREATING", issues)
+        self.assertFalse(any("load balancer" in s for s in issues))
+
+    def test_aggressive_repair_check_blocks_deploy(self):
+        import json
+        self.d.mig = Mock()
+        health = {"type": "HTTP", "httpHealthCheck": {"port": 8001, "requestPath": "/api/keepalive"},
+                  "checkIntervalSec": 10, "unhealthyThreshold": 3}
+        with patch.object(m, "run", return_value=json.dumps(health)):
+            with self.assertRaisesRegex(m.DeploymentError, "too aggressive"):
+                self.d.safe_policy()
+        self.d.mig.assert_not_called()
 
     def test_replacement_failure_restores_template_with_zero_unavailable(self):
         self.d.safe_policy = Mock()

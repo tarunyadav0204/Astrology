@@ -746,7 +746,7 @@ jobs:
           gcloud run deploy "${GCP_REEL_WORKER_SERVICE_NAME}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REEL_WORKER_SERVICE_REGION}" \
             --image "${{ steps.reel_worker_image.outputs.image_uri }}" \
-            --platform managed --allow-unauthenticated --ingress all \
+            --platform managed --quiet --ingress all \
             --service-account "800681558445-compute@developer.gserviceaccount.com" \
             --execution-environment gen2 --network default --subnet default \
             --vpc-egress private-ranges-only --cpu 4 --memory 4Gi \
@@ -761,9 +761,15 @@ jobs:
           # Cloud Run invokable so it can deliver that request; some existing
           # services have an empty IAM policy despite --allow-unauthenticated
           # on deploy, which otherwise leaves paid jobs queued forever.
-          gcloud run services add-iam-policy-binding "${GCP_REEL_WORKER_SERVICE_NAME}" \
-            --project "${GCP_PROJECT_ID}" --region "${GCP_REEL_WORKER_SERVICE_REGION}" \
-            --member="allUsers" --role="roles/run.invoker"
+          policy="$(gcloud run services get-iam-policy "${GCP_REEL_WORKER_SERVICE_NAME}" \
+            --project "${GCP_PROJECT_ID}" --region "${GCP_REEL_WORKER_SERVICE_REGION}" --format=json)"
+          if jq -e '.bindings[]? | select(.role == "roles/run.invoker") | .members[]? | select(. == "allUsers")' <<< "$policy" >/dev/null; then
+            echo "Reel worker invocation policy is already configured"
+          else
+            gcloud run services add-iam-policy-binding "${GCP_REEL_WORKER_SERVICE_NAME}" \
+              --project "${GCP_PROJECT_ID}" --region "${GCP_REEL_WORKER_SERVICE_REGION}" \
+              --member="allUsers" --role="roles/run.invoker"
+          fi
           for _ in $(seq 1 30); do
             if curl -fsS --max-time 20 "${SERVICE_URL}/" >/dev/null; then
               exit 0
