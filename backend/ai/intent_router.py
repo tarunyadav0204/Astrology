@@ -3696,6 +3696,55 @@ class IntentRouter:
         result["dialogue_state"] = state
         return result
 
+    @staticmethod
+    def _recover_resolved_compound_choice(result: Dict[str, Any]) -> Dict[str, Any]:
+        """Turn a repeated pick-one clarification into a calculable route.
+
+        A compound-choice card is rendered from a model-authored question. Once
+        the user submits one of those cards, asking them to pick again is an
+        invalid state transition, not a new missing fact.  Keep the model's
+        selected topic and all of its calculation fields; only repair the
+        dialogue protocol so the request can proceed.
+
+        This intentionally does not inspect or rewrite user language, chart
+        facts, category, subject, or evidence.  It is a structural recovery for
+        a known UI action after the model has ignored that action twice.
+        """
+        recovered = dict(result or {})
+        recovered["status"] = "READY"
+        recovered["route_action"] = "answer"
+        if str(recovered.get("answer_mode") or "").strip().lower() == "compound_plan":
+            # compound_plan is only valid before a card has been selected.
+            recovered["answer_mode"] = "topic_reading"
+        recovered["clarification_question"] = ""
+        recovered["clarification_choices"] = []
+
+        state = recovered.get("dialogue_state")
+        if not isinstance(state, dict):
+            extracted = recovered.get("extracted_context")
+            state = (
+                extracted.get("instant_dialogue")
+                if isinstance(extracted, dict)
+                and isinstance(extracted.get("instant_dialogue"), dict)
+                else {}
+            )
+        state = dict(state or {})
+        state["unresolved_facts"] = []
+        state["ready_to_calculate"] = True
+        state["readiness_reason"] = "A displayed compound-topic choice was selected."
+        state.pop("last_clarification_question", None)
+        state.pop("pending_choice_kind", None)
+        state.pop("clarification_choices", None)
+        recovered["dialogue_state"] = state
+
+        extracted_context = recovered.get("extracted_context")
+        if not isinstance(extracted_context, dict):
+            extracted_context = {}
+            recovered["extracted_context"] = extracted_context
+        extracted_context["instant_dialogue"] = state
+        recovered["router_recovery"] = "resolved_compound_choice"
+        return recovered
+
     def _finalize_instant_router_result(
         self,
         result: Dict[str, Any],
@@ -4893,7 +4942,32 @@ Invalid previous JSON:
                 repaired_question = str(
                     final.get("clarification_question") or ""
                 ).strip()
-                if (
+                repair_repeated_compound_choice = (
+                    repeated_compound_choice
+                    and str(final.get("status") or "").upper() == "CLARIFY"
+                    and str(final.get("answer_mode") or "").strip() == "compound_plan"
+                )
+                if repair_repeated_compound_choice:
+                    # The user submitted one of our own cards.  Do not fail the
+                    # chat because the model repeated the already-resolved
+                    # compound clarification; preserve its selected route and
+                    # repair only the dialogue-state contract.
+                    final = self._finalize_instant_router_result(
+                        self._recover_resolved_compound_choice(repair_result),
+                        current_year=current_year,
+                        normalized_query_context=normalized_query_context,
+                    )
+                    final = self._finalize_instant_dialogue_state(
+                        final,
+                        prior_dialogue_state=prior_dialogue_state,
+                    )
+                    logger.warning(
+                        "instant_intent_router_repeated_compound_choice_recovered model=%s category=%s mode=%s",
+                        model_name,
+                        final.get("category"),
+                        final.get("mode"),
+                    )
+                elif (
                     final.get("status") == "CLARIFY"
                     and " ".join(repaired_question.casefold().split())
                     == " ".join(prior_question.casefold().split())
