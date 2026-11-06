@@ -1,12 +1,13 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 
 /**
  * Shown after a completed chat answer to offer podcast playback.
  * Premium answers use included copy (no extra credits).
  */
-export default function PodcastPromoModal({ visible, onClose, onGenerate, podcastCost, included, colors }) {
+export default function PodcastPromoModal({ visible, onClose, onGenerate, onCreateReel, podcastCost, included, colors }) {
   const { t } = useTranslation();
   const cost = podcastCost ?? 2;
   const text = colors?.text ?? '#111';
@@ -15,19 +16,10 @@ export default function PodcastPromoModal({ visible, onClose, onGenerate, podcas
   const cardBg = colors?.backgroundSecondary ?? colors?.background ?? '#fff';
   const border = colors?.cardBorder ?? colors?.strokeMuted ?? '#eee';
   const primary = colors?.primary ?? '#e91e63';
-  const title = included
-    ? t('chat.podcastPromo.premiumTitle', 'You earned a free podcast')
-    : t('chat.podcastPromo.title', 'Turn this answer into a podcast');
+  const title = t('chat.podcastPromo.mediaTitle', 'Take your reading with you');
   const body = included
-    ? t(
-        'chat.podcastPromo.premiumBody',
-        'This Premium question includes a podcast at no extra cost. Choose English or Hindi to listen.',
-      )
-    : t(
-        'chat.podcastPromo.body',
-        'Listen to this consultation on the go. Choose English or Hindi — first-time generation uses {{cost}} credits; replaying the same saved audio is free.',
-        { cost }
-      );
+    ? t('chat.podcastPromo.mediaPremiumBody', 'Listen to the included podcast, or turn this reading into a visual reel.')
+    : t('chat.podcastPromo.mediaBody', 'Listen on the go or create a visual reel you can revisit and share.');
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -39,6 +31,14 @@ export default function PodcastPromoModal({ visible, onClose, onGenerate, podcas
           <Text style={[styles.body, { color: sub }]}>
             {body}
           </Text>
+          <View style={[styles.mediaSection, { borderColor: border }]}>
+            <View style={styles.mediaHeading}>
+              <Ionicons name="headset-outline" size={19} color={primary} />
+              <Text style={[styles.mediaTitle, { color: text }]}>{t('chat.podcastPromo.listenTitle', 'Listen as a podcast')}</Text>
+            </View>
+            <Text style={[styles.mediaDescription, { color: sub }]}>
+              {included ? t('chat.podcastPromo.listenIncluded', 'Included with this Premium question.') : t('chat.podcastPromo.listenCost', 'English or Hindi · {{cost}} credits', { cost })}
+            </Text>
           <View style={styles.options}>
             <TouchableOpacity
               style={[styles.option, { borderColor: primary, backgroundColor: `${primary}14` }]}
@@ -57,6 +57,21 @@ export default function PodcastPromoModal({ visible, onClose, onGenerate, podcas
               </Text>
             </TouchableOpacity>
           </View>
+          </View>
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={[styles.reelOption, { borderColor: primary, backgroundColor: `${primary}0D` }]}
+            onPress={onCreateReel}
+          >
+            <View style={[styles.reelIcon, { backgroundColor: `${primary}1A` }]}>
+              <Ionicons name="film-outline" size={20} color={primary} />
+            </View>
+            <View style={styles.reelCopy}>
+              <Text style={[styles.reelTitle, { color: text }]}>{t('chat.podcastPromo.reelTitle', 'Create a visual reel')}</Text>
+              <Text style={[styles.reelDescription, { color: sub }]}>{t('chat.podcastPromo.reelBody', 'Choose a Short or Deep Reel, then make it your own.')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={primary} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.btn,
@@ -98,8 +113,12 @@ const styles = StyleSheet.create({
   body: {
     fontSize: 14,
     lineHeight: 21,
-    marginBottom: 18,
+    marginBottom: 16,
   },
+  mediaSection: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 13 },
+  mediaHeading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  mediaTitle: { fontSize: 15, fontWeight: '700' },
+  mediaDescription: { marginTop: 4, fontSize: 12, lineHeight: 17 },
   row: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -108,7 +127,8 @@ const styles = StyleSheet.create({
   },
   options: {
     gap: 10,
-    marginBottom: 14,
+    marginTop: 11,
+    marginBottom: 12,
   },
   option: {
     paddingVertical: 14,
@@ -121,6 +141,11 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
   },
+  reelOption: { minHeight: 78, marginBottom: 14, padding: 13, borderRadius: 13, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  reelIcon: { width: 39, height: 39, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  reelCopy: { flex: 1 },
+  reelTitle: { fontSize: 15, fontWeight: '700' },
+  reelDescription: { marginTop: 3, fontSize: 12, lineHeight: 17 },
   btn: {
     paddingVertical: 12,
     paddingHorizontal: 16,

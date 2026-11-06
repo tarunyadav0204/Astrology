@@ -1910,8 +1910,12 @@ export default function ChatScreen({ navigation, route }) {
   const [podcastPromoIncluded, setPodcastPromoIncluded] = useState(false);
   const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
   const [podcastAutoLaunchLang, setPodcastAutoLaunchLang] = useState('en');
+  const [reelAutoLaunchKey, setReelAutoLaunchKey] = useState(0);
   const consumePodcastAutoLaunch = useCallback(() => {
     setPodcastAutoLaunchKey(0);
+  }, []);
+  const consumeReelAutoLaunch = useCallback(() => {
+    setReelAutoLaunchKey(0);
   }, []);
   const [ratingPromptVisible, setRatingPromptVisible] = useState(false);
   const [ratingPromptPending, setRatingPromptPending] = useState(false);
@@ -7858,6 +7862,9 @@ export default function ChatScreen({ navigation, route }) {
                       podcastAutoLaunchKey={podcastAutoLaunchKey}
                       podcastAutoLaunchLang={podcastAutoLaunchLang}
                       onPodcastAutoLaunchConsumed={consumePodcastAutoLaunch}
+                      reelAutoLaunchMessageId={podcastPromoMessageId}
+                      reelAutoLaunchKey={reelAutoLaunchKey}
+                      onReelAutoLaunchConsumed={consumeReelAutoLaunch}
                       // Presentation belongs to the message that was produced,
                       // not the mode currently selected for the next question.
                       // Otherwise a previously completed Verified response is
@@ -10010,6 +10017,15 @@ export default function ChatScreen({ navigation, route }) {
           if (ratingPromptPending && ratingPromptMessageId) {
             setRatingPromptPending(false);
             triggerRatingPrompt(ratingPromptMessageId, 'after_podcast_generate');
+          }
+        }}
+        onCreateReel={() => {
+          setPodcastPromoVisible(false);
+          setPodcastPromoIncluded(false);
+          setReelAutoLaunchKey((key) => key + 1);
+          if (ratingPromptPending && ratingPromptMessageId) {
+            setRatingPromptPending(false);
+            triggerRatingPrompt(ratingPromptMessageId, 'after_reel_prompt');
           }
         }}
       />

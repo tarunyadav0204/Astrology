@@ -277,6 +277,9 @@ function MessageBubble({
   podcastAutoLaunchKey = 0,
   podcastAutoLaunchLang = 'en',
   onPodcastAutoLaunchConsumed,
+  reelAutoLaunchMessageId = null,
+  reelAutoLaunchKey = 0,
+  onReelAutoLaunchConsumed,
   forceInstantPresentation = false,
 }) {
   const { t, i18n } = useTranslation();
@@ -366,6 +369,7 @@ function MessageBubble({
   const skipPodcastCreditsRef = useRef(false);
   const podcastCacheCheckRef = useRef(false);
   const lastPodcastPromoKeyRef = useRef(0);
+  const lastReelPromoKeyRef = useRef(0);
   const [showPodcastPlayerModal, setShowPodcastPlayerModal] = useState(false);
   const showPodcastPlayerModalRef = useRef(false);
   const [podcastPlayerMode, setPodcastPlayerMode] = useState('generating');
@@ -2268,6 +2272,41 @@ function MessageBubble({
     message.role,
     message.isTyping,
     message.content,
+    isClarification,
+    isNativeGate,
+  ]);
+
+  // The post-answer media prompt can send the user directly into Reel Studio.
+  // Keep this one-shot, just like the podcast path, so FlatList remounts do
+  // not re-open the sheet after the user dismisses it.
+  useEffect(() => {
+    if (!reelAutoLaunchKey) {
+      lastReelPromoKeyRef.current = 0;
+      return undefined;
+    }
+    if (isInstantChatMessage || !reelAutoLaunchMessageId) return undefined;
+    const mid = message.messageId;
+    if (!mid || String(mid) !== String(reelAutoLaunchMessageId)) return undefined;
+    if (message.role !== 'assistant' || message.isTyping || isClarification || isNativeGate) return undefined;
+    if (lastReelPromoKeyRef.current === reelAutoLaunchKey) return undefined;
+    const body = getCleanMessageText();
+    if (!body || body.length < 80) return undefined;
+
+    const timer = setTimeout(() => {
+      lastReelPromoKeyRef.current = reelAutoLaunchKey;
+      onReelAutoLaunchConsumed?.();
+      openReelStudio();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [
+    reelAutoLaunchKey,
+    reelAutoLaunchMessageId,
+    onReelAutoLaunchConsumed,
+    message.messageId,
+    message.role,
+    message.isTyping,
+    message.content,
+    isInstantChatMessage,
     isClarification,
     isNativeGate,
   ]);
