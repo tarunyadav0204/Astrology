@@ -89,7 +89,7 @@ const CREDIT_SETTING_GROUPS = [
     key: 'chat',
     title: 'Chat & consultations',
     hint: 'Per-answer and Talk to Tara pricing.',
-    keys: ['chat_question_cost', 'chart_chat_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'verified_chat_cost'],
+    keys: ['chat_question_cost', 'chart_chat_cost', 'instant_chat_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'verified_chat_cost'],
   },
   {
     key: 'readings',
@@ -113,7 +113,7 @@ const CREDIT_SETTING_GROUPS = [
     key: 'media',
     title: 'Media & creations',
     hint: 'Audio, visual and generated experiences.',
-    keys: ['podcast_cost', 'reel_short_generation_cost', 'reel_deep_generation_cost', 'partner_portrait_cost'],
+    keys: ['podcast_cost', 'reel_generation_cost', 'reel_short_generation_cost', 'reel_deep_generation_cost', 'partner_portrait_cost'],
   },
 ];
 
