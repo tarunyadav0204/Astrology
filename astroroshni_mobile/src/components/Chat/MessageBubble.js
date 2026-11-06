@@ -312,6 +312,7 @@ function MessageBubble({
   const [reelJobId, setReelJobId] = useState(null);
   const [reelJobStatus, setReelJobStatus] = useState('');
   const [reelJobError, setReelJobError] = useState('');
+  const [reelErrorAlert, setReelErrorAlert] = useState('');
   const [showReelPlayer, setShowReelPlayer] = useState(false);
   const [showReelCreditsModal, setShowReelCreditsModal] = useState(false);
   const [reelCreditQuote, setReelCreditQuote] = useState(null);
@@ -322,6 +323,7 @@ function MessageBubble({
   const [showReelLanguageModal, setShowReelLanguageModal] = useState(false);
   const [reelLanguage, setReelLanguage] = useState(() => podcastLangFromUiLanguage(language));
   const reelPrepareLock = useRef(false);
+  const showReelError = (message) => setReelErrorAlert(String(message || t('premiumUi.reelStudio.errorGeneric', 'Could not prepare this reel.')));
   const [showInstantEvidence, setShowInstantEvidence] = useState(false);
   const blurShownTrackedRef = useRef(false);
   // Init from the played-ids set so FlatList remounts do not flash translateY:50 for one frame
@@ -1036,7 +1038,7 @@ function MessageBubble({
     if (isPreparingReel || reelPrepareLock.current) return;
     const messageId = message.messageId || message.message_id;
     if (!messageId) {
-      Alert.alert('Reel Studio', 'This answer is still being saved. Please try again in a moment.');
+      showReelError(t('premiumUi.reelStudio.answerSaving', 'This answer is still being saved. Please try again in a moment.'));
       return;
     }
     setShowReelStudio(true);
@@ -1076,7 +1078,7 @@ function MessageBubble({
         // here if an older API does not support duration-specific quotes yet.
       });
     } catch (error) {
-      Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not prepare this reel.'));
+      showReelError(apiErrorMessage(error, t('premiumUi.reelStudio.errorGeneric', 'Could not prepare this reel.')));
       setShowReelStudio(false);
     } finally {
       setIsPreparingReel(false);
@@ -1099,7 +1101,7 @@ function MessageBubble({
       setReelCreditQuote(quote.data);
       setShowReelCreditsModal(true);
     } catch (error) {
-      Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not prepare this reel.'));
+      showReelError(apiErrorMessage(error, t('premiumUi.reelStudio.errorGeneric', 'Could not prepare this reel.')));
     } finally {
       setIsPreparingReel(false);
     }
@@ -1118,7 +1120,7 @@ function MessageBubble({
       const response = await chatAPI.createReelDraft({ messageId: message.messageId || message.message_id, durationSeconds: REEL_FORMATS[reelFormat].duration, language: reelLanguage, visualLevel: 'cinematic' });
       await queueReel(response.data);
     } catch (error) {
-      Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not prepare this reel.'));
+      showReelError(apiErrorMessage(error, t('premiumUi.reelStudio.errorGeneric', 'Could not prepare this reel.')));
       setShowReelStudio(false);
     } finally { reelPrepareLock.current = false; setIsPreparingReel(false); }
   };
@@ -1151,6 +1153,16 @@ function MessageBubble({
   const currentReelProgress = reelProgressState(t, reelJobStatus, isPreparingReel && !reelJobId);
 
   const renderReelStudio = () => (<>
+      <AppAlertModal
+        visible={Boolean(reelErrorAlert)}
+        variant="error"
+        icon="alert-circle-outline"
+        title={t('premiumUi.reelStudio.errorTitle', 'Reel Studio')}
+        message={reelErrorAlert}
+        primaryText={t('common.ok', 'OK')}
+        onPrimaryPress={() => setReelErrorAlert('')}
+        onRequestClose={() => setReelErrorAlert('')}
+      />
       {showReelPlayer && reelJobId && <ReelPlayerModal jobId={reelJobId} onClose={() => setShowReelPlayer(false)} onRecreate={recreateReel} />}
       <Modal visible={showReelFormatModal} transparent animationType="slide" onRequestClose={() => setShowReelFormatModal(false)}>
         <View style={styles.reelModalBackdrop}>

@@ -68,7 +68,10 @@
       "notNow": "Not now",
       "closeStudio": "Close reel studio",
       "progressBackgroundNote": "This can take up to two minutes. It will keep creating in the background if you close this window.",
-      "closeKeepCreating": "Close — keep creating"
+      "closeKeepCreating": "Close — keep creating",
+      "errorTitle": "Reel Studio",
+      "errorGeneric": "Could not prepare this reel.",
+      "answerSaving": "This answer is still being saved. Please try again in a moment."
     }
   },
   "hindi": {
