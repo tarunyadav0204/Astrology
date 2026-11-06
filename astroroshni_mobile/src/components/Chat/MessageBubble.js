@@ -1156,7 +1156,7 @@ function MessageBubble({
             <Text style={[styles.reelModalBody, { color: colors.textSecondary }]}>Choose a focused shareable answer or a fuller visual reading.</Text>
             <View style={styles.reelFormatOptions}>
               {Object.entries(REEL_FORMATS).map(([key, format]) => <TouchableOpacity key={key} accessibilityRole="button" style={[styles.reelFormatOption, { borderColor: key === 'short' ? colors.primary : colors.cardBorder, backgroundColor: key === 'short' ? colors.accentSoft : colors.surface }]} onPress={() => selectReelFormat(key)}>
-                <Text style={[styles.reelFormatBadge, { color: colors.primary }]}>{key === 'short' ? 'RECOMMENDED' : 'MORE DETAIL'}</Text><Text style={[styles.reelFormatTitle, { color: colors.text }]}>{format.label}</Text><Text style={[styles.reelFormatDetail, { color: colors.textSecondary }]}>{format.detail}{Number.isFinite(Number(reelFormatQuotes[key]?.credit_cost)) ? ` · ${reelFormatQuotes[key].credit_cost} credits` : ''}</Text><Text style={[styles.reelFormatDescription, { color: colors.textSecondary }]}>{format.description}</Text>
+                <Text style={[styles.reelFormatBadge, { color: colors.primary }]}>{key === 'short' ? 'RECOMMENDED' : 'MORE DETAIL'}</Text><Text style={[styles.reelFormatTitle, { color: colors.primary }]}>{format.label}</Text><Text style={[styles.reelFormatDetail, { color: colors.textSecondary }]}>{format.detail}{Number.isFinite(Number(reelFormatQuotes[key]?.credit_cost)) ? ` · ${reelFormatQuotes[key].credit_cost} credits` : ''}</Text><Text style={[styles.reelFormatDescription, { color: colors.textSecondary }]}>{format.description}</Text>
               </TouchableOpacity>)}
             </View>
             <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelFormatModal(false)}><Text style={{ color: colors.textSecondary }}>Not now</Text></TouchableOpacity>
@@ -4328,9 +4328,9 @@ function MessageActionRow({ children, style, ...props }) {
   reelModalBody: { fontSize: 13, lineHeight: 20, marginTop: 6 },
   reelFormatOptions: { gap: 10, marginTop: 19 },
   reelFormatOption: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 15, paddingVertical: 14 },
-  reelFormatBadge: { fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 1.1 },
-  reelFormatTitle: { marginTop: 3, fontSize: 18, lineHeight: 23, fontWeight: '900' },
-  reelFormatDetail: { marginTop: 2, fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  reelFormatBadge: { fontSize: 9, lineHeight: 13, fontWeight: '800', letterSpacing: 1.1 },
+  reelFormatTitle: { marginTop: 4, fontSize: 17, lineHeight: 22, fontWeight: '700' },
+  reelFormatDetail: { marginTop: 3, fontSize: 12, lineHeight: 18, fontWeight: '500' },
   reelFormatDescription: { marginTop: 5, fontSize: 12, lineHeight: 18 },
   reelModalLoading: { minHeight: 170, alignItems: 'center', justifyContent: 'center', gap: 14, paddingTop: 12 },
   reelReadyState: { alignItems: 'center', width: '100%', paddingTop: 20, paddingBottom: 4 },
