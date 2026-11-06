@@ -1187,6 +1187,14 @@ function MessageBubble({
       <Modal visible={showReelStudio && !showReelPlayer} transparent animationType="slide" onRequestClose={() => setShowReelStudio(false)}>
         <View style={styles.reelModalBackdrop}>
           <View style={[styles.reelModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Close reel studio"
+              style={[styles.reelModalCloseButton, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
+              onPress={() => setShowReelStudio(false)}
+            >
+              <Ionicons name="close" size={21} color={colors.textSecondary} />
+            </TouchableOpacity>
             <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.eyebrow', 'ASTROROSHNI · REEL STUDIO')}</Text>
             <Text style={[styles.reelModalTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.title', 'Your personal reel')}</Text>
             {(reelJobId || isPreparingReel) ? <View style={reelJobStatus === 'completed' ? styles.reelReadyState : styles.reelModalLoading}>
@@ -4314,6 +4322,7 @@ function MessageActionRow({ children, style, ...props }) {
   reelButton: { borderColor: 'rgba(255, 107, 53, 0.42)' },
   reelModalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20, 8, 25, 0.56)' },
   reelModalCard: { maxHeight: '84%', padding: 22, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: StyleSheet.hairlineWidth },
+  reelModalCloseButton: { position: 'absolute', top: 17, right: 17, zIndex: 2, width: 38, height: 38, borderRadius: 19, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
   reelModalEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   reelModalTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 27, marginTop: 8 },
   reelModalBody: { fontSize: 13, lineHeight: 20, marginTop: 6 },
