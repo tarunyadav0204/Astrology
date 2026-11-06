@@ -849,6 +849,13 @@ jobs:
           gcloud run services update "${GCP_REEL_WORKER_SERVICE_NAME}" \
             --project "${GCP_PROJECT_ID}" --region "${GCP_REEL_WORKER_SERVICE_REGION}" \
             --update-env-vars "REEL_WORKER_PUBLIC_URL=${SERVICE_URL}"
+          # Cloud Tasks carries the private shared secret to the worker. Keep
+          # Cloud Run invokable so it can deliver that request; some existing
+          # services have an empty IAM policy despite --allow-unauthenticated
+          # on deploy, which otherwise leaves paid jobs queued forever.
+          gcloud run services add-iam-policy-binding "${GCP_REEL_WORKER_SERVICE_NAME}" \
+            --project "${GCP_PROJECT_ID}" --region "${GCP_REEL_WORKER_SERVICE_REGION}" \
+            --member="allUsers" --role="roles/run.invoker"
           for _ in $(seq 1 30); do
             if curl -fsS --max-time 20 "${SERVICE_URL}/" >/dev/null; then
               exit 0
