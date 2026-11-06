@@ -549,7 +549,10 @@ def _still_clip(ffmpeg: str, image: Path, output: Path, seconds: float) -> None:
     # Ken-Burns zoom: it trims safe-edge headlines/callouts and makes detailed
     # chart boundaries appear to shake. Invalid source ratios are letterboxed,
     # never cropped, so the whole factual visual remains visible.
-    motion = f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih):color=#160a16,fps=30,format=yuv420p"
+    # Generated images may be 2:3 despite the requested 9:16 frame. Use a
+    # cover transform, not decrease+pad: black letterboxing makes a Reel look
+    # unfinished. Cropping is centred and only removes the side excess.
+    motion = f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},fps=30,format=yuv420p"
     subprocess.run([ffmpeg, "-nostdin", "-y", "-loop", "1", "-i", str(image), "-t", str(seconds), "-vf", motion, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(output)], check=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=120)
 
 
@@ -587,7 +590,7 @@ def _compose(ffmpeg: str, clips: list[Path], narration: list[Path | None], outpu
             inputs += ["-i", str(audio)]
     filters: list[str] = []
     for index in range(len(clips)):
-        filters.append(f"[{index}:v]trim=duration={durations[index]:.3f},setpts=PTS-STARTPTS,scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih):color=#160a16,fps=30,format=yuv420p[v{index}]")
+        filters.append(f"[{index}:v]trim=duration={durations[index]:.3f},setpts=PTS-STARTPTS,scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,crop={WIDTH}:{HEIGHT},fps=30,format=yuv420p[v{index}]")
         if index in source_audio:
             filters.append(f"[{index}:a]aresample=44100,apad,atrim=duration={durations[index]:.3f},asetpts=PTS-STARTPTS[a{index}]")
         elif index in audio_indexes:
