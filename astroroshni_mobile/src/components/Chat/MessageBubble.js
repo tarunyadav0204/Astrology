@@ -1155,15 +1155,15 @@ function MessageBubble({
       <Modal visible={showReelFormatModal} transparent animationType="slide" onRequestClose={() => setShowReelFormatModal(false)}>
         <View style={styles.reelModalBackdrop}>
           <View style={[styles.reelModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
-            <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>ASTROROSHNI · REEL STUDIO</Text>
-            <Text style={[styles.reelModalTitle, { color: colors.text }]}>Choose your reel</Text>
-            <Text style={[styles.reelModalBody, { color: colors.textSecondary }]}>Choose a focused shareable answer or a fuller visual reading.</Text>
+            <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.eyebrow', 'ASTROROSHNI · REEL STUDIO')}</Text>
+            <Text style={[styles.reelModalTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.formatTitle', 'Choose your reel')}</Text>
+            <Text style={[styles.reelModalBody, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.formatDescription', 'Choose a focused shareable answer or a fuller visual reading.')}</Text>
             <View style={styles.reelFormatOptions}>
               {Object.entries(REEL_FORMATS).map(([key, format]) => <TouchableOpacity key={key} accessibilityRole="button" style={[styles.reelFormatOption, { borderColor: key === 'short' ? colors.primary : colors.cardBorder, backgroundColor: key === 'short' ? colors.accentSoft : colors.surface }]} onPress={() => selectReelFormat(key)}>
                 <Text style={[styles.reelFormatBadge, { color: colors.primary }]}>{key === 'short' ? 'RECOMMENDED' : 'MORE DETAIL'}</Text><Text style={[styles.reelFormatTitle, { color: colors.primary }]}>{format.label}</Text><Text style={[styles.reelFormatDetail, { color: colors.textSecondary }]}>{format.detail}{Number.isFinite(Number(reelFormatQuotes[key]?.credit_cost)) ? ` · ${reelFormatQuotes[key].credit_cost} credits` : ''}</Text><Text style={[styles.reelFormatDescription, { color: colors.textSecondary }]}>{format.description}</Text>
               </TouchableOpacity>)}
             </View>
-            <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelFormatModal(false)}><Text style={{ color: colors.textSecondary }}>Not now</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelFormatModal(false)}><Text style={{ color: colors.textSecondary }}>{t('premiumUi.reelStudio.notNow', 'Not now')}</Text></TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1193,7 +1193,7 @@ function MessageBubble({
           <View style={[styles.reelModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Close reel studio"
+              accessibilityLabel={t('premiumUi.reelStudio.closeStudio', 'Close reel studio')}
               style={[styles.reelModalCloseButton, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
               onPress={() => setShowReelStudio(false)}
             >
@@ -1227,10 +1227,10 @@ function MessageBubble({
                 <View style={[styles.reelProgressTrack, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: currentReelProgress.value }}><View style={[styles.reelProgressFill, { width: `${currentReelProgress.value}%`, backgroundColor: colors.primary }]} /></View>
                 <Text style={[styles.reelProgressPercent, { color: colors.primary }]}>{currentReelProgress.value}%</Text>
                 <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{currentReelProgress.detail}</Text>
-                {reelJobStatus !== 'completed' && <><Text style={[styles.reelProgressNote, { color: colors.textSecondary }]}>This can take up to two minutes. It will keep creating in the background if you close this window.</Text><TouchableOpacity accessibilityRole="button" style={styles.reelKeepCreatingButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.primary, fontWeight: '800' }}>Close — keep creating</Text></TouchableOpacity></>}
+                {reelJobStatus !== 'completed' && <><Text style={[styles.reelProgressNote, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.progressBackgroundNote', 'This can take up to two minutes. It will keep creating in the background if you close this window.')}</Text><TouchableOpacity accessibilityRole="button" style={styles.reelKeepCreatingButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.primary, fontWeight: '800' }}>{t('premiumUi.reelStudio.closeKeepCreating', 'Close — keep creating')}</Text></TouchableOpacity></>}
               </>}
             </View> : <View style={styles.reelModalLoading}><Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{t('premiumUi.reelStudio.savedReelHint', 'Your saved reel will appear here when it is ready.')}</Text></View>}
-            {!reelJobId && !isPreparingReel && <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.textSecondary }}>Not now</Text></TouchableOpacity>}
+            {!reelJobId && !isPreparingReel && <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.textSecondary }}>{t('premiumUi.reelStudio.notNow', 'Not now')}</Text></TouchableOpacity>}
           </View>
         </View>
       </Modal>
