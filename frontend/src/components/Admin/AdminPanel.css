@@ -35,6 +35,16 @@
 }
 
 /* Credit Management Styles */
+.credit-settings-load-error {
+  margin: 0 0 1rem;
+  padding: .75rem 1rem;
+  color: var(--color-danger, #9f1239);
+  background: color-mix(in srgb, var(--color-danger, #9f1239) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger, #9f1239) 35%, transparent);
+  border-radius: .75rem;
+  font-size: .9rem;
+  font-weight: 650;
+}
 .credits-management {
   padding: 20px;
 }

@@ -4438,12 +4438,37 @@ class CreditService:
                     pass
             # Make the new rate editable on existing installations as well.
             if not any(s["key"] == "reel_generation_cost" for s in settings):
-                execute(conn, """INSERT INTO credit_settings (setting_key, setting_value, description)
-                    VALUES ('reel_generation_cost', 25, 'Reel Studio — credits per new or recreated reel')
-                    ON CONFLICT (setting_key) DO NOTHING""")
-                conn.commit()
-                row = execute(conn, "SELECT setting_value, discount FROM credit_settings WHERE setting_key='reel_generation_cost'").fetchone()
-                settings.append({"key": "reel_generation_cost", "value": row[0], "description": "Reel Studio — credits per new or recreated reel", "discount": row[1]})
+                # Older production databases predate the unique setting_key
+                # constraint.  Do not use ON CONFLICT here: Postgres rejects it
+                # when that constraint is absent, which previously made the
+                # entire Admin settings read fail despite all other rows being
+                # present.
+                row = execute(
+                    conn,
+                    "SELECT setting_value, discount FROM credit_settings WHERE setting_key = ? LIMIT 1",
+                    ("reel_generation_cost",),
+                ).fetchone()
+                if row is None:
+                    execute(
+                        conn,
+                        """
+                        INSERT INTO credit_settings (setting_key, setting_value, description)
+                        VALUES (?, ?, ?)
+                        """,
+                        (
+                            "reel_generation_cost",
+                            25,
+                            "Reel Studio — credits per new or recreated reel",
+                        ),
+                    )
+                    conn.commit()
+                    row = (25, None)
+                settings.append({
+                    "key": "reel_generation_cost",
+                    "value": row[0],
+                    "description": "Reel Studio — credits per new or recreated reel",
+                    "discount": row[1] if len(row) > 1 else None,
+                })
             # Ensure podcast_cost exists so admin Feature Costs always shows it
             if not any(s["key"] == "podcast_cost" for s in settings):
                 try:

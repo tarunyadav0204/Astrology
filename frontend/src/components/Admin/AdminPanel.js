@@ -424,6 +424,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [creditSettings, setCreditSettings] = useState(() =>
     withRequiredInstantChatSettings([])
   );
+  const [creditSettingsError, setCreditSettingsError] = useState('');
   const [editingPromoCode, setEditingPromoCode] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [campaignDraftPrefill, setCampaignDraftPrefill] = useState(null);
@@ -2961,10 +2962,19 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
       const response = await fetch('/api/credits/admin/settings', {
         headers: getAdminAuthHeaders()
       });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.detail || `Could not load feature costs (${response.status}).`);
+      }
       const data = await response.json();
+      if (!Array.isArray(data.settings)) {
+        throw new Error('The server returned an invalid feature-cost catalogue.');
+      }
       setCreditSettings(withRequiredInstantChatSettings(data.settings));
+      setCreditSettingsError('');
     } catch (error) {
       console.error('Error fetching credit settings:', error);
+      setCreditSettingsError(error.message || 'Could not load feature costs. Refresh and try again.');
     }
   };
 
@@ -4856,6 +4866,11 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         {activeTab === 'credits' && activeSubTab === 'management' && (
           <div className="credits-management">
             <h2>Credit Management</h2>
+            {creditSettingsError && (
+              <p className="credit-settings-load-error" role="alert">
+                Feature costs could not be loaded: {creditSettingsError}
+              </p>
+            )}
 
             <div className="credit-settings instant-chat-billing-settings">
               <h3>Instant Chat billing</h3>

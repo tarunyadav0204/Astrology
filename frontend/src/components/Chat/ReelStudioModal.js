@@ -146,7 +146,11 @@ export default function ReelStudioModal({ messageId, onClose }) {
     if (showCreditConfirm) return <ThemeModal isOpen onClose={() => setShowCreditConfirm(false)} size="sm" className="reel-credit-confirm"
         title={isRecreating ? 'Recreate this reel?' : 'Create your reel'}
         description="Your personal reel will be created after confirmation. Credits are charged once creation begins. Replaying a saved reel is free.">
-        <div className="reel-credit-summary"><span>Generation cost</span><strong>{creditQuote.credit_cost} credits</strong><span>Your balance: {creditQuote.credits} credits</span></div>
+        <div className="reel-credit-summary">
+            <span className="reel-credit-summary__label">Generation cost</span>
+            <div className="reel-credit-price"><strong>{creditQuote.credit_cost}</strong><span>credits</span></div>
+            <span className="reel-credit-summary__balance">Your balance: <b>{creditQuote.credits}</b> credits</span>
+        </div>
         <div className="reel-credit-actions"><ThemeButton variant="secondary" onClick={() => setShowCreditConfirm(false)}>Cancel</ThemeButton>
             <ThemeButton onClick={creditQuote.credits < creditQuote.credit_cost ? () => { setShowCreditConfirm(false); setShowBuyCredits(true); } : prepare}>
                 {creditQuote.credits < creditQuote.credit_cost ? 'Buy credits' : 'Continue'}

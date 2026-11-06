@@ -38,6 +38,31 @@ def test_unseeded_default_admin_update_and_discount_roundtrip(settings_db, monke
     assert 'Astrologer License' in listed['chart_chat_cost']['description']
 
 
+def test_admin_settings_loads_when_legacy_table_lacks_unique_setting_key(monkeypatch):
+    """The production table predates the unique constraint used by ON CONFLICT."""
+    conn = sqlite3.connect(':memory:')
+    conn.execute(
+        'CREATE TABLE credit_settings (setting_key TEXT, setting_value INTEGER, discount INTEGER, description TEXT, updated_at TEXT)'
+    )
+    conn.execute(
+        "INSERT INTO credit_settings (setting_key, setting_value, description) VALUES ('career_analysis_cost', 99, 'Credits per career analysis')"
+    )
+
+    @contextmanager
+    def connection():
+        yield conn
+
+    monkeypatch.setattr(db, 'get_conn', connection)
+    monkeypatch.setattr(db, 'execute', lambda active_conn, sql, params=(): active_conn.execute(sql, params))
+    service = CreditService.__new__(CreditService)
+
+    listed = {row['key']: row for row in service.get_all_credit_settings()}
+
+    assert listed['career_analysis_cost']['value'] == 99
+    assert listed['reel_generation_cost']['value'] == 25
+    conn.close()
+
+
 @pytest.mark.parametrize('role,entitlement_rows,expected', [
     ('user', [('astrologer_tools',)], 0),
     ('user', [], 2),  # expired/inactive licenses are excluded by the DB predicate
