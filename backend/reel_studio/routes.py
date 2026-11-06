@@ -22,7 +22,12 @@ from pydantic import BaseModel, Field
 from auth import User, get_current_user
 from db import execute, get_conn
 from reel_studio.text import plain_text
-from reel_studio.billing import charge_reel, reel_pricing
+from reel_studio.billing import (
+    REEL_DEEP_DURATION_SECONDS,
+    REEL_SHORT_DURATION_SECONDS,
+    charge_reel,
+    reel_pricing,
+)
 
 router = APIRouter(prefix="/reel-studio", tags=["reel-studio"])
 
@@ -74,7 +79,7 @@ def _recovered_video_cost(metadata: dict) -> float:
 
 class DraftRequest(BaseModel):
     message_id: int
-    duration_seconds: int = Field(default=180, ge=30, le=180)
+    duration_seconds: Literal[REEL_SHORT_DURATION_SECONDS, REEL_DEEP_DURATION_SECONDS] = REEL_SHORT_DURATION_SECONDS
     language: Literal["en", "hi"] = "en"
     visual_level: Literal["none", "hybrid", "cinematic"] = "none"
     brand_name: str = Field(default="AstroRoshni", max_length=80)
@@ -269,9 +274,10 @@ def _cost_projection(duration: int, visual_level: str) -> dict:
     video_seconds = 0
     base = sum(DEFAULT_BASE_COSTS_INR.values())
     video = VIDEO_COST_PER_SECOND_INR[visual_level] * video_seconds
-    # The dynamic planner creates 12–18 images. Every scene uses GPT Image's
+    min_scenes, _ = _scene_count_range(duration)
+    # The dynamic planner creates a format-specific number of images. Every scene uses GPT Image's
     # low-quality 9:16 tier; the worker records the exact final scene count.
-    image = round(12 * (0.005 * 1.1875 * 95), 2) if visual_level != "none" else 0.0
+    image = round(min_scenes * (0.005 * 1.1875 * 95), 2) if visual_level != "none" else 0.0
     total = round(base + video + image, 2)
     return {
         "currency": "INR",
@@ -280,13 +286,17 @@ def _cost_projection(duration: int, visual_level: str) -> dict:
             {"label": label.replace("_", " ").title(), "estimated_inr": cost}
             for label, cost in DEFAULT_BASE_COSTS_INR.items()
         ] + ([{"label": f"{video_seconds}s generated video", "estimated_inr": round(video, 2)}] if video else [])
-          + ([{"label": "Minimum 12-scene LLM image plan: all low-quality images (9:16)", "estimated_inr": image}] if image else []),
+          + ([{"label": f"Minimum {min_scenes}-scene LLM image plan: all low-quality images (9:16)", "estimated_inr": image}] if image else []),
         "assumptions": {
             "duration_seconds": duration,
             "generated_video_seconds": video_seconds,
             "retry_allowance_included": DEFAULT_BASE_COSTS_INR["retry_allowance"],
         },
     }
+
+
+def _scene_count_range(duration_seconds: int) -> tuple[int, int]:
+    return (8, 10) if int(duration_seconds) == REEL_SHORT_DURATION_SECONDS else (12, 18)
 
 
 def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dict | None, language: str, duration_seconds: int) -> list[dict]:
@@ -305,13 +315,14 @@ def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dic
         raise HTTPException(status_code=503, detail="Reel direction is unavailable: the text planner is not configured.")
     graph = (snapshot or {}).get("visual_graph") or {"nodes": [], "edges": []}
     source = {"placements": (snapshot or {}).get("placements", []), "dashas": (snapshot or {}).get("current_dashas", {}), "ashtakavarga": (snapshot or {}).get("ashtakavarga", {}), "visual_graph": graph}
+    min_beats, max_beats = _scene_count_range(duration_seconds)
     output_schema = {
         "type": "object",
         "additionalProperties": False,
         "required": ["beats"],
         "properties": {
             "beats": {
-                "type": "array", "minItems": 12, "maxItems": 18,
+                "type": "array", "minItems": min_beats, "maxItems": max_beats,
                 "items": {
                     "type": "object", "additionalProperties": False,
                     "required": ["type", "narration", "evidence_ids", "visual_instruction", "focus_nodes", "draw_edges"],
@@ -334,7 +345,7 @@ def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dic
         "REEL LANGUAGE: English. Write every narration and visual instruction in natural, fluent English."
     )
     prompt = f'''Return JSON only: {{"beats":[{{"type":"", "narration":"", "evidence_ids":[], "visual_instruction":"", "focus_nodes":[], "draw_edges":[]}}]}}.
-Write a detailed {duration_seconds}-second premium vertical reel plan that ANSWERS THE USER'S ACTUAL QUESTION and explains why the approved answer reaches that conclusion. Do not make a generic astrology reel. Select 12 to 18 beats from these supported visual modules only: {sorted(_VISUAL_MODULES)}. Choose modules that fit the answer; do not force chart, dasha, Ashtakavarga, transit, or timing scenes when the evidence does not support them. Use opening first and closing last. Write complete, naturally spoken passages. The combined narration MUST contain between {round(duration_seconds * 2.35)} and {round(duration_seconds * 2.5)} words for a calm podcast pace. Never cut a sentence, use ellipses, or repeat a closing/thank-you line. Every beat must include a concrete visual_instruction describing the desired image. For chart_focus, select relevant verified focus nodes and arrows when the graph has them. For lifestyle_image, describe a real-life scene tied to the answer. All images are created by GPT Image from this directed data; no visual may introduce a fact outside the approved claims or VERIFIED VISUAL DATA. EVIDENCE RULE: every beat's evidence_ids must be a non-empty array containing only exact id values from the CLAIMS list below. Never create a new claim ID and never leave evidence_ids empty.
+Write a detailed {duration_seconds}-second premium vertical reel plan that ANSWERS THE USER'S ACTUAL QUESTION and explains why the approved answer reaches that conclusion. Do not make a generic astrology reel. Select {min_beats} to {max_beats} beats from these supported visual modules only: {sorted(_VISUAL_MODULES)}. Choose modules that fit the answer; do not force chart, dasha, Ashtakavarga, transit, or timing scenes when the evidence does not support them. Use opening first and closing last. Write complete, naturally spoken passages. The combined narration MUST contain between {round(duration_seconds * 2.35)} and {round(duration_seconds * 2.5)} words for a calm podcast pace. Never cut a sentence, use ellipses, or repeat a closing/thank-you line. Every beat must include a concrete visual_instruction describing the desired image. For chart_focus, select relevant verified focus nodes and arrows when the graph has them. For lifestyle_image, describe a real-life scene tied to the answer. All images are created by GPT Image from this directed data; no visual may introduce a fact outside the approved claims or VERIFIED VISUAL DATA. EVIDENCE RULE: every beat's evidence_ids must be a non-empty array containing only exact id values from the CLAIMS list below. Never create a new claim ID and never leave evidence_ids empty.
 Use plain text for narration and all visible image labels. Strip Markdown syntax from source copy: a heading such as 'Key Insights' must never include hash, asterisk, or backtick formatting markers.
 {language_instruction}
 USER QUESTION: {question[:2000]}
@@ -347,8 +358,8 @@ VERIFIED VISUAL DATA: {json.dumps(source, ensure_ascii=False)}'''
             model=os.getenv("REEL_PLANNER_MODEL", "gpt-5.6-luna"), input=prompt, store=False,
             text={"format": {"type": "json_schema", "name": "reel_plan", "strict": True, "schema": output_schema}}, max_output_tokens=3600)
         generated = json.loads(response.output_text).get("beats")
-        if not isinstance(generated, list) or not 12 <= len(generated) <= 18:
-            raise ValueError("The director must return 12 to 18 complete beats.")
+        if not isinstance(generated, list) or not min_beats <= len(generated) <= max_beats:
+            raise ValueError(f"The director must return {min_beats} to {max_beats} complete beats.")
         valid_ids = {c["id"] for c in claims}
         node_ids = {str(node.get("id")) for node in graph.get("nodes", [])}
         edge_ids = {str(edge.get("id")) for edge in graph.get("edges", [])}
@@ -425,7 +436,7 @@ def _draft_payload(request: DraftRequest, user_id: int) -> dict:
 
 @router.post("/drafts/from-answer")
 def create_draft(request: DraftRequest, current_user: User = Depends(get_current_user)):
-    quote = reel_pricing(current_user.userid)
+    quote = reel_pricing(current_user.userid, request.duration_seconds)
     if quote["credits"] < quote["credit_cost"]:
         raise HTTPException(status_code=402, detail=f"Insufficient credits. You need {quote['credit_cost']} credits.")
     draft = _draft_payload(request, current_user.userid)
@@ -447,7 +458,7 @@ def create_draft(request: DraftRequest, current_user: User = Depends(get_current
 @router.post("/jobs")
 def queue_render(request: RenderRequest, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     """Commit the approved job and credit debit together, once per draft."""
-    quote = reel_pricing(current_user.userid)
+    quote = reel_pricing(current_user.userid, request.duration_seconds)
     job_id = f"job_{uuid.uuid5(uuid.NAMESPACE_URL, f'reel:{current_user.userid}:{request.draft_id}').hex}"
     renderer_ready = bool(os.getenv("OPENAI_API_KEY") or os.getenv("PARTNER_PORTRAIT_OPENAI_API_KEY"))
     if renderer_ready:
@@ -522,8 +533,11 @@ def queue_render(request: RenderRequest, background_tasks: BackgroundTasks, curr
 
 
 @router.get("/pricing")
-def get_reel_pricing(current_user: User = Depends(get_current_user)):
-    return reel_pricing(current_user.userid)
+def get_reel_pricing(
+    duration_seconds: Literal[REEL_SHORT_DURATION_SECONDS, REEL_DEEP_DURATION_SECONDS] = REEL_SHORT_DURATION_SECONDS,
+    current_user: User = Depends(get_current_user),
+):
+    return reel_pricing(current_user.userid, duration_seconds)
 
 
 @router.get("/saved/{message_id}")

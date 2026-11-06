@@ -6,10 +6,19 @@ from db import execute, get_conn
 
 credit_service = CreditService()
 
+REEL_SHORT_DURATION_SECONDS = 90
+REEL_DEEP_DURATION_SECONDS = 180
 
-def reel_pricing(user_id: int) -> dict:
-    base = credit_service.get_credit_setting("reel_generation_cost")
-    cost = credit_service.get_effective_cost(user_id, base, "reel_generation_cost")
+
+def reel_pricing(user_id: int, duration_seconds: int = REEL_SHORT_DURATION_SECONDS) -> dict:
+    """Return the server-authoritative price for one supported Reel format."""
+    key = (
+        "reel_short_generation_cost"
+        if int(duration_seconds) == REEL_SHORT_DURATION_SECONDS
+        else "reel_deep_generation_cost"
+    )
+    base = credit_service.get_credit_setting(key)
+    cost = credit_service.get_effective_cost(user_id, base, key)
     return {"credit_cost": cost, "credits": credit_service.get_user_credits(user_id)}
 
 

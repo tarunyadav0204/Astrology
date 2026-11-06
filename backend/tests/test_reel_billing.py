@@ -22,7 +22,7 @@ def reel_db(monkeypatch):
             mode TEXT, status TEXT, plan_json TEXT, error_message TEXT, updated_at TEXT);
         INSERT INTO user_credits VALUES (18, 100, NULL);
     """)
-    request = routes.RenderRequest(message_id=42, visual_level="cinematic", draft_id="draft_test", approved_claim_ids=["c1"], confirmed_credit_cost=25)
+    request = routes.RenderRequest(message_id=42, duration_seconds=180, visual_level="cinematic", draft_id="draft_test", approved_claim_ids=["c1"], confirmed_credit_cost=25)
     plan = {"run_id": "reel_test", "credit_cost": 25, "claims": [{"id": "c1"}], "cost_projection": {},
             "settings": {"message_id": 42, "duration_seconds": 180, "language": "en", "visual_level": "cinematic"}}
     conn.execute("INSERT INTO reel_storyboard_drafts VALUES (?, ?, ?, ?)", ("draft_test", 18, 42, json.dumps(plan)))
@@ -40,7 +40,7 @@ def reel_db(monkeypatch):
         monkeypatch.setattr(module, "get_conn", connection)
         monkeypatch.setattr(module, "execute", execute)
     monkeypatch.setattr(routes, "_ensure_tables", lambda _: None)
-    monkeypatch.setattr(routes, "reel_pricing", lambda _: {"credit_cost": 25, "credits": 100})
+    monkeypatch.setattr(routes, "reel_pricing", lambda *_: {"credit_cost": 25, "credits": 100})
     monkeypatch.setenv("OPENAI_API_KEY", "test-no-network")
     yield conn, request, SimpleNamespace(userid=18)
     conn.close()
@@ -106,7 +106,7 @@ def test_insufficient_balance_does_not_create_job(reel_db):
 
 def test_changed_price_requires_new_confirmation(reel_db, monkeypatch):
     conn, request, user = reel_db
-    monkeypatch.setattr(routes, "reel_pricing", lambda _: {"credit_cost": 30, "credits": 100})
+    monkeypatch.setattr(routes, "reel_pricing", lambda *_: {"credit_cost": 30, "credits": 100})
     with pytest.raises(HTTPException) as error:
         routes.queue_render(request, BackgroundTasks(), user)
     assert error.value.status_code == 409
@@ -123,7 +123,7 @@ def test_unconfigured_renderer_does_not_charge(reel_db, monkeypatch):
     assert conn.execute("SELECT credits FROM user_credits").fetchone()[0] == 100
 
 
-def test_reel_pricing_uses_shared_admin_and_vip_rates(monkeypatch):
+def test_reel_pricing_uses_format_specific_admin_and_vip_rates(monkeypatch):
     calls = []
     monkeypatch.setattr(billing, "credit_service", SimpleNamespace(
         get_credit_setting=lambda key: calls.append(key) or 25,
@@ -131,7 +131,8 @@ def test_reel_pricing_uses_shared_admin_and_vip_rates(monkeypatch):
         get_user_credits=lambda uid: 75,
     ))
     assert billing.reel_pricing(18) == {"credit_cost": 20, "credits": 75}
-    assert calls == ["reel_generation_cost"]
+    assert billing.reel_pricing(18, 180) == {"credit_cost": 20, "credits": 75}
+    assert calls == ["reel_short_generation_cost", "reel_deep_generation_cost"]
 
 
 def test_job_insert_failure_rolls_back_charge(reel_db, monkeypatch):

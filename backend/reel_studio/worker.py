@@ -650,8 +650,10 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
         work.mkdir(parents=True, exist_ok=True); ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
         language = plan.get("settings", {}).get("language", "en")
         beats = plan.get("storyboard") or []
-        if not 12 <= len(beats) <= 18:
-            raise RuntimeError("The approved reel plan must contain 12 to 18 directed beats.")
+        duration_seconds = int((plan.get("settings") or {}).get("duration_seconds") or 180)
+        min_beats, max_beats = (8, 10) if duration_seconds == 90 else (12, 18)
+        if not min_beats <= len(beats) <= max_beats:
+            raise RuntimeError(f"The approved {duration_seconds}-second reel plan must contain {min_beats} to {max_beats} directed beats.")
         # Validate the asset before starting any paid TTS/image requests.
         logo = _brand_logo()
         _update(job_id, "creating_planned_shots")
