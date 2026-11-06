@@ -29,7 +29,9 @@ if [ ! -x "${BOOTSTRAP_SCRIPT}" ]; then
 fi
 
 if [ -f "${WATCHDOG_INSTALLER}" ]; then
-  APP_USER="${APP_USER}" APP_DIR="${APP_DIR}" bash "${WATCHDOG_INSTALLER}"
+  # Bootstrap owns startup; MIG autohealing owns recovery. A second supervisor
+  # races bootstrap and can kill the backend it has just started.
+  APP_USER="${APP_USER}" APP_DIR="${APP_DIR}" START_RUNTIME_WATCHDOG="false" bash "${WATCHDOG_INSTALLER}"
 else
   echo "⚠️ Watchdog installer missing: ${WATCHDOG_INSTALLER}"
 fi

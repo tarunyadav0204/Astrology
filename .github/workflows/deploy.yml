@@ -40,6 +40,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
   id-token: write
 
 env:
@@ -66,6 +67,7 @@ jobs:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app' }}
     runs-on: ubuntu-latest
     outputs:
+      source_sha: ${{ steps.detect.outputs.source_sha }}
       backend_required: ${{ steps.detect.outputs.backend_required }}
       payment_required: ${{ steps.detect.outputs.payment_required }}
       nudge_required: ${{ steps.detect.outputs.nudge_required }}
@@ -77,7 +79,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.sha }}
 
       - name: Detect deploy target changes
         id: detect
@@ -86,17 +88,24 @@ jobs:
           FORCE_BACKEND_PIP: ${{ github.event_name == 'workflow_dispatch' && inputs.force_backend_pip || false }}
           FORCE_FRONTEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_frontend_deploy || false }}
           FORCE_FULL_DEPLOY: ${{ github.event_name == 'workflow_dispatch' && inputs.force_full_deploy || false }}
-          BEFORE_SHA: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
-          changed_files=""
-          if [[ -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
-            changed_files="$(git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}" || true)"
-          elif git rev-parse HEAD^ >/dev/null 2>&1; then
-            changed_files="$(git diff --name-only HEAD^ HEAD || true)"
+          echo "source_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+          # Pending runs may be coalesced by concurrency. Include changes from
+          # skipped/failed pushes, not just the final push's immediate parent.
+          baseline=""
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            baseline="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy.yml/runs" \
+              -f branch=main -f event=push -f status=success -f per_page=1 \
+              --jq '.workflow_runs[0].head_sha // empty')"
+          fi
+          if [[ -n "${baseline}" ]] && git merge-base --is-ancestor "${baseline}" HEAD; then
+            changed_files="$(git diff --name-only "${baseline}" HEAD)"
           else
-            changed_files="$(git ls-files || true)"
+            # First deploy, manual rollback/ref, or unavailable history: deploy all.
+            changed_files="$(git ls-files)"
           fi
 
           echo "Changed files:"
@@ -129,7 +138,7 @@ jobs:
             # Prefix patterns must not use a trailing `$` after `backend/` / `play_payment_service/`
             # or only the exact directory path would match (never files under it).
             if printf '%s\n' "${changed_files}" | grep -E -q \
-              '^backend/|^deploy\.sh$|^scripts/check_backend_syntax\.py$|^scripts/(deploy-release|build-gce-release-image|prepare-image-release|bootstrap-runtime|gce-startup-bootstrap|install_runtime_watchdog|compile_knowledge_graph_runtime)\.sh$|^\.github/workflows/deploy\.yml$'; then
+              '^backend/|^deploy\.sh$|^scripts/(check_backend_syntax|deploy_mig)\.py$|^scripts/(deploy-release|build-gce-release-image|prepare-image-release|bootstrap-runtime|gce-startup-bootstrap|install_runtime_watchdog|compile_knowledge_graph_runtime)\.sh$|^\.github/workflows/deploy\.yml$'; then
               backend_required=true
             fi
 
@@ -175,7 +184,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+          ref: ${{ needs.detect_changes.outputs.source_sha }}
+
+      - name: Load deployment safeguards from the workflow commit
+        env:
+          TOOLING_COMMIT: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin "${TOOLING_COMMIT}"
+          mkdir -p "${RUNNER_TEMP}/deploy-tools/tests"
+          for file in deploy_mig.py deploy-release.sh gce-startup-bootstrap.sh tests/test_deploy_mig.py; do
+            git show "${TOOLING_COMMIT}:scripts/${file}" > "${RUNNER_TEMP}/deploy-tools/${file}"
+          done
 
       - name: Set up production Python
         uses: actions/setup-python@v5
@@ -184,6 +204,11 @@ jobs:
 
       - name: Validate backend Python syntax
         run: python scripts/check_backend_syntax.py backend
+
+      - name: Test deployment failure and rollback safeguards
+        run: |
+          python -m unittest discover -s "${RUNNER_TEMP}/deploy-tools/tests" -v
+          bash -n "${RUNNER_TEMP}/deploy-tools/deploy-release.sh" "${RUNNER_TEMP}/deploy-tools/gce-startup-bootstrap.sh"
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -209,139 +234,13 @@ jobs:
           echo "========== GitHub Actions: rolling app deploy start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
           gcloud config set project "${GCP_PROJECT_ID}"
 
-          clear_gcloud_known_hosts() {
-            rm -f "${HOME}/.ssh/google_compute_known_hosts" || true
-          }
-
-          retry_gcloud_remote() {
-            local attempts="$1"
-            local sleep_seconds="$2"
-            shift 2
-            local try
-            for try in $(seq 1 "${attempts}"); do
-              clear_gcloud_known_hosts
-              if "$@"; then
-                return 0
-              fi
-              if [ "${try}" -lt "${attempts}" ]; then
-                echo "⚠️ Remote command failed (attempt ${try}/${attempts}); retrying in ${sleep_seconds}s..."
-                sleep "${sleep_seconds}"
-              fi
-            done
-            echo "❌ Remote command failed after ${attempts} attempts"
-            return 1
-          }
-
-          deploy_mig_instances() {
-            local mig_name="$1"
-            local mig_zone="$2"
-            local serve_frontend_locally="$3"
-            local mig_label="$4"
-            local frontend_required="${FRONTEND_ARTIFACT_REQUIRED:-false}"
-
-            instance_is_running() {
-              local instance_name="$1"
-              local status
-              status="$(
-                gcloud compute instances describe "${instance_name}" \
-                  --project "${GCP_PROJECT_ID}" \
-                  --zone "${mig_zone}" \
-                  --format="value(status)" 2>/dev/null || true
-              )"
-              [ "${status}" = "RUNNING" ]
-            }
-
-            mapfile -t INSTANCES < <(
-              gcloud compute instance-groups managed list-instances "${mig_name}" \
-                --project "${GCP_PROJECT_ID}" \
-                --zone "${mig_zone}" \
-                --filter="instanceStatus=RUNNING" \
-                --format="value(instance.basename())" \
-              | sort
-            )
-
-            if [ "${#INSTANCES[@]}" -eq 0 ]; then
-              echo "❌ No RUNNING instances found in ${mig_label} MIG ${mig_name}"
-              exit 1
-            fi
-
-            echo "📋 Deploying to ${#INSTANCES[@]} ${mig_label} instance(s): ${INSTANCES[*]}"
-            for INSTANCE in "${INSTANCES[@]}"; do
-              echo "========== Deploying ${mig_label} instance ${INSTANCE} $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
-              if ! instance_is_running "${INSTANCE}"; then
-                echo "⚠️ Skipping ${mig_label} instance ${INSTANCE}: no longer RUNNING in ${mig_name}"
-                continue
-              fi
-
-              if ! retry_gcloud_remote 3 10 \
-                gcloud compute ssh "tarun_yadav@${INSTANCE}" \
-                  --project "${GCP_PROJECT_ID}" \
-                  --zone "${mig_zone}" \
-                  --tunnel-through-iap \
-                  --quiet \
-                  --command "for i in \$(seq 1 60); do if [ -f /home/tarun_yadav/AstrologyApp/deploy.sh ] && [ -d /home/tarun_yadav/AstrologyApp/backend ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then exit 0; fi; sleep 5; done; echo 'AstrologyApp repo or deploy key not ready on ${INSTANCE}'; exit 1"; then
-                if ! instance_is_running "${INSTANCE}"; then
-                  echo "⚠️ Skipping ${mig_label} instance ${INSTANCE}: it disappeared during readiness check"
-                  continue
-                fi
-                exit 1
-              fi
-
-              FRONTEND_REMOTE_ARCHIVE=""
-              if [ "${serve_frontend_locally}" = "true" ] && [ "${frontend_required}" = "true" ]; then
-                FRONTEND_REMOTE_ARCHIVE="/tmp/frontend-build-${GITHUB_SHA}.tgz"
-                if ! retry_gcloud_remote 3 10 \
-                  gcloud compute scp "${RUNNER_TEMP}/frontend-build-${GITHUB_SHA}.tgz" "tarun_yadav@${INSTANCE}:${FRONTEND_REMOTE_ARCHIVE}" \
-                    --project "${GCP_PROJECT_ID}" \
-                    --zone "${mig_zone}" \
-                    --tunnel-through-iap \
-                    --quiet; then
-                  if ! instance_is_running "${INSTANCE}"; then
-                    echo "⚠️ Skipping ${mig_label} instance ${INSTANCE}: it disappeared during frontend artifact copy"
-                    continue
-                  fi
-                  exit 1
-                fi
-              fi
-
-              if ! retry_gcloud_remote 3 15 \
-                gcloud compute ssh "tarun_yadav@${INSTANCE}" \
-                  --project "${GCP_PROJECT_ID}" \
-                  --zone "${mig_zone}" \
-                  --tunnel-through-iap \
-                  --quiet \
-                  --command "cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' DEPLOY_BRANCH='main' FORCE_BACKEND_PIP='${FORCE_BACKEND_PIP}' FORCE_FRONTEND_DEPLOY='${FORCE_FRONTEND_DEPLOY}' FORCE_FULL_DEPLOY='${FORCE_FULL_DEPLOY}' FRONTEND_PREBUILT_ARCHIVE='${FRONTEND_REMOTE_ARCHIVE}' SERVE_FRONTEND_LOCALLY='${serve_frontend_locally}' SYNC_GCP_SECRETS='true' && export DEPLOY_PREV_HEAD=\$(git rev-parse HEAD) && git fetch origin main && git reset --hard origin/main && bash deploy.sh && if [ -n '${FRONTEND_REMOTE_ARCHIVE}' ]; then rm -f '${FRONTEND_REMOTE_ARCHIVE}'; fi"; then
-                if ! instance_is_running "${INSTANCE}"; then
-                  echo "⚠️ Skipping ${mig_label} instance ${INSTANCE}: it disappeared during deploy"
-                  continue
-                fi
-                exit 1
-              fi
-
-              echo "🔎 Waiting for ${mig_label} instance ${INSTANCE} local app health"
-              if ! retry_gcloud_remote 3 10 \
-                gcloud compute ssh "tarun_yadav@${INSTANCE}" \
-                  --project "${GCP_PROJECT_ID}" \
-                  --zone "${mig_zone}" \
-                  --tunnel-through-iap \
-                  --quiet \
-                  --command "for i in \$(seq 1 30); do curl -fsS --max-time 5 http://127.0.0.1:8001/api/health >/dev/null && exit 0; sleep 5; done; echo 'backend health check failed on ${INSTANCE}'; exit 1"; then
-                if ! instance_is_running "${INSTANCE}"; then
-                  echo "⚠️ Skipping ${mig_label} instance ${INSTANCE}: it disappeared during health check"
-                  continue
-                fi
-                exit 1
-              fi
-
-              echo "✅ ${mig_label} instance ${INSTANCE} deployed and healthy"
-            done
-          }
-
-          deploy_mig_instances "${GCP_API_MIG_NAME}" "${GCP_API_MIG_ZONE}" "false" "api"
-          deploy_mig_instances "${GCP_CHAT_WORKER_MIG_NAME}" "${GCP_CHAT_WORKER_MIG_ZONE}" "false" "chat-worker"
-
-          echo "🔎 Final public API health check"
-          curl -fsS --max-time 20 "https://astroroshni.com/api/health" >/dev/null
+          COMMIT="$(git rev-parse HEAD)"
+          python3 "${RUNNER_TEMP}/deploy-tools/deploy_mig.py" live \
+            --project "${GCP_PROJECT_ID}" --mig "${GCP_API_MIG_NAME}" --zone "${GCP_API_MIG_ZONE}" \
+            --backend-service astrology-backend-mig-service --commit "${COMMIT}"
+          python3 "${RUNNER_TEMP}/deploy-tools/deploy_mig.py" live \
+            --project "${GCP_PROJECT_ID}" --mig "${GCP_CHAT_WORKER_MIG_NAME}" --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
+            --backend-service astrology-chat-worker-service --commit "${COMMIT}"
           echo "========== GitHub Actions: rolling app deploy end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
 
       - name: Mark backend ready for testing
@@ -368,7 +267,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+          ref: ${{ needs.detect_changes.outputs.source_sha }}
+
+      - name: Load deployment safeguards from the workflow commit
+        env:
+          TOOLING_COMMIT: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin "${TOOLING_COMMIT}"
+          mkdir -p "${RUNNER_TEMP}/deploy-tools/tests"
+          for file in deploy_mig.py deploy-release.sh gce-startup-bootstrap.sh tests/test_deploy_mig.py; do
+            git show "${TOOLING_COMMIT}:scripts/${file}" > "${RUNNER_TEMP}/deploy-tools/${file}"
+          done
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -386,7 +296,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SHORT_SHA="${GITHUB_SHA::12}"
+          SHORT_SHA="$(git rev-parse --short=12 HEAD)"
           IMAGE_NAME="astroroshni-release-backend-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
           ACTIVE_TEMPLATE="$(gcloud compute instance-groups managed describe "${GCP_API_MIG_NAME}" \
             --project="${GCP_PROJECT_ID}" \
@@ -417,7 +327,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SHORT_SHA="${GITHUB_SHA::12}"
+          SHORT_SHA="$(git rev-parse --short=12 HEAD)"
           TEMPLATE_NAME="astro-baked-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
           SUBNET_REGION="${GCP_API_MIG_ZONE%-*}"
           SUBNET_SELF_LINK="projects/${GCP_PROJECT_ID}/regions/${SUBNET_REGION}/subnetworks/default"
@@ -435,18 +345,17 @@ jobs:
             --tags="web-server" \
             --image="${{ steps.baked_image.outputs.image_name }}" \
             --image-project="${GCP_PROJECT_ID}" \
-            --metadata-from-file="startup-script=${GITHUB_WORKSPACE}/scripts/gce-startup-bootstrap.sh"
+            --metadata-from-file="startup-script=${RUNNER_TEMP}/deploy-tools/gce-startup-bootstrap.sh"
 
-          gcloud compute instance-groups managed set-instance-template "${GCP_API_MIG_NAME}" \
-            --project="${GCP_PROJECT_ID}" \
-            --zone="${GCP_API_MIG_ZONE}" \
-            --template="${TEMPLATE_NAME}"
+          python3 "${RUNNER_TEMP}/deploy-tools/deploy_mig.py" template \
+            --project "${GCP_PROJECT_ID}" --mig "${GCP_API_MIG_NAME}" --zone "${GCP_API_MIG_ZONE}" \
+            --backend-service astrology-backend-mig-service --template "${TEMPLATE_NAME}"
 
       - name: Refresh chat worker MIG baked-image template for future replacements
         shell: bash
         run: |
           set -euo pipefail
-          SHORT_SHA="${GITHUB_SHA::12}"
+          SHORT_SHA="$(git rev-parse --short=12 HEAD)"
           TEMPLATE_NAME="astro-chat-worker-${SHORT_SHA}-${GITHUB_RUN_NUMBER}"
           SUBNET_REGION="${GCP_CHAT_WORKER_MIG_ZONE%-*}"
           SUBNET_SELF_LINK="projects/${GCP_PROJECT_ID}/regions/${SUBNET_REGION}/subnetworks/default"
@@ -464,12 +373,11 @@ jobs:
             --tags="web-server" \
             --image="${{ steps.baked_image.outputs.image_name }}" \
             --image-project="${GCP_PROJECT_ID}" \
-            --metadata-from-file="startup-script=${GITHUB_WORKSPACE}/scripts/gce-startup-bootstrap.sh"
+            --metadata-from-file="startup-script=${RUNNER_TEMP}/deploy-tools/gce-startup-bootstrap.sh"
 
-          gcloud compute instance-groups managed set-instance-template "${GCP_CHAT_WORKER_MIG_NAME}" \
-            --project="${GCP_PROJECT_ID}" \
-            --zone="${GCP_CHAT_WORKER_MIG_ZONE}" \
-            --template="${TEMPLATE_NAME}"
+          python3 "${RUNNER_TEMP}/deploy-tools/deploy_mig.py" template \
+            --project "${GCP_PROJECT_ID}" --mig "${GCP_CHAT_WORKER_MIG_NAME}" --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
+            --backend-service astrology-chat-worker-service --template "${TEMPLATE_NAME}"
 
       - name: Prune obsolete release templates and images
         shell: bash
@@ -491,7 +399,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+          ref: ${{ needs.detect_changes.outputs.source_sha }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -556,7 +464,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+          ref: ${{ needs.detect_changes.outputs.source_sha }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -787,7 +695,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+          ref: ${{ needs.detect_changes.outputs.source_sha }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -874,7 +782,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+          ref: ${{ needs.detect_changes.outputs.source_sha }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -962,7 +870,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+          ref: ${{ needs.detect_changes.outputs.source_sha }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -1027,6 +935,8 @@ jobs:
     if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') }}
     needs:
       - backend_and_chat_live
+      - backend_rollout_image
+      - reel_worker
       - detect_changes
       - payment_service
       - nudge_services
@@ -1045,9 +955,15 @@ jobs:
           curl -fsS --max-time 20 -o /dev/null -w "%{http_code}\n" "https://astroroshni.com/mobile/index.html" || true
 
   replace_vms:
+    # Uses the existing baked templates; does not reset/restart all new VMs again.
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_mode == 'replace_vms' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout deployment tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -1059,66 +975,17 @@ jobs:
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
 
-      - name: Emergency rolling VM replacement
+      - name: Rolling VM replacement with spare capacity
         shell: bash
         run: |
           set -euo pipefail
           echo "========== GitHub Actions: MIG replacement start $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
           gcloud config set project "${GCP_PROJECT_ID}"
 
-          deploy_current_main_to_replacements() {
-            local mig_name="$1"
-            local mig_zone="$2"
-            local instance
-            mapfile -t replacement_instances < <(
-              gcloud compute instance-groups managed list-instances "${mig_name}" \
-                --project "${GCP_PROJECT_ID}" \
-                --zone "${mig_zone}" \
-                --filter="instanceStatus=RUNNING" \
-                --format="value(instance.basename())" \
-              | sort
-            )
-            if [ "${#replacement_instances[@]}" -eq 0 ]; then
-              echo "❌ No running replacement instances found for ${mig_name}"
-              exit 1
-            fi
-            for instance in "${replacement_instances[@]}"; do
-              echo "📦 Updating replacement ${instance} to current main"
-              gcloud compute ssh "tarun_yadav@${instance}" \
-                --project "${GCP_PROJECT_ID}" \
-                --zone "${mig_zone}" \
-                --tunnel-through-iap \
-                --quiet \
-                --command "for i in \$(seq 1 60); do if [ -d /home/tarun_yadav/AstrologyApp/.git ] && [ -f /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key ]; then break; fi; sleep 5; done; cd /home/tarun_yadav/AstrologyApp && export GIT_SSH_COMMAND='ssh -i /home/tarun_yadav/.ssh/astroroshni_startup_deploy_key -o IdentitiesOnly=yes' && export DEPLOY_PREV_HEAD=\$(git rev-parse HEAD) && git fetch origin main && git reset --hard origin/main && DEPLOY_BRANCH=main SERVE_FRONTEND_LOCALLY=false SYNC_GCP_SECRETS=true bash deploy.sh"
-            done
-          }
-
-          gcloud compute instance-groups managed rolling-action replace "${GCP_API_MIG_NAME}" \
-            --project "${GCP_PROJECT_ID}" \
-            --zone "${GCP_API_MIG_ZONE}" \
-            --max-unavailable 1 \
-            --max-surge 1
-          gcloud compute instance-groups managed wait-until "${GCP_API_MIG_NAME}" \
-            --project "${GCP_PROJECT_ID}" \
-            --stable \
-            --zone "${GCP_API_MIG_ZONE}" \
-            --timeout 3600
-          gcloud compute instance-groups managed list-instances "${GCP_API_MIG_NAME}" \
-            --project "${GCP_PROJECT_ID}" \
-            --zone "${GCP_API_MIG_ZONE}"
-          deploy_current_main_to_replacements "${GCP_API_MIG_NAME}" "${GCP_API_MIG_ZONE}"
-          gcloud compute instance-groups managed rolling-action replace "${GCP_CHAT_WORKER_MIG_NAME}" \
-            --project "${GCP_PROJECT_ID}" \
-            --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
-            --max-unavailable 1 \
-            --max-surge 1
-          gcloud compute instance-groups managed wait-until "${GCP_CHAT_WORKER_MIG_NAME}" \
-            --project "${GCP_PROJECT_ID}" \
-            --stable \
-            --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
-            --timeout 3600
-          gcloud compute instance-groups managed list-instances "${GCP_CHAT_WORKER_MIG_NAME}" \
-            --project "${GCP_PROJECT_ID}" \
-            --zone "${GCP_CHAT_WORKER_MIG_ZONE}"
-          deploy_current_main_to_replacements "${GCP_CHAT_WORKER_MIG_NAME}" "${GCP_CHAT_WORKER_MIG_ZONE}"
+          python3 scripts/deploy_mig.py replace \
+            --project "${GCP_PROJECT_ID}" --mig "${GCP_API_MIG_NAME}" --zone "${GCP_API_MIG_ZONE}" \
+            --backend-service astrology-backend-mig-service
+          python3 scripts/deploy_mig.py replace \
+            --project "${GCP_PROJECT_ID}" --mig "${GCP_CHAT_WORKER_MIG_NAME}" --zone "${GCP_CHAT_WORKER_MIG_ZONE}" \
+            --backend-service astrology-chat-worker-service
           echo "========== GitHub Actions: MIG replacement end   $(date -u '+%Y-%m-%d %H:%M:%S UTC') =========="
