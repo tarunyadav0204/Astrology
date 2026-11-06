@@ -60,6 +60,7 @@ def test_admin_settings_loads_when_legacy_table_lacks_unique_setting_key(monkeyp
 
     assert listed['career_analysis_cost']['value'] == 99
     assert listed['reel_generation_cost']['value'] == 25
+    assert listed['marriage_muhurat_cost']['value'] == 30
     conn.close()
 
 
