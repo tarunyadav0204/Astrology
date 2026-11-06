@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import textwrap
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -65,7 +66,10 @@ CHIRP_TTS_CHAR_COST_INR = 30.0 * USD_TO_INR / 1_000_000
 def _update(job_id: str, status: str, *, output_url: str | None = None, error: str | None = None) -> None:
     with get_conn() as conn:
         execute(conn, """UPDATE reel_render_jobs SET status=%s, output_url=COALESCE(%s, output_url),
-            error_message=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s""", (status, output_url, error, job_id))
+            error_message=%s,
+            task_claim_id=CASE WHEN %s IN ('completed', 'failed') THEN NULL ELSE task_claim_id END,
+            task_claimed_until=CASE WHEN %s IN ('completed', 'failed') THEN NULL ELSE task_claimed_until END,
+            updated_at=CURRENT_TIMESTAMP WHERE id=%s""", (status, output_url, error, status, status, job_id))
         conn.commit()
 
 
@@ -568,15 +572,53 @@ def _compose(ffmpeg: str, clips: list[Path], narration: list[Path | None], outpu
     subprocess.run([ffmpeg, "-nostdin", "-y", *inputs, "-filter_complex", ";".join(filters), "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", str(output)], check=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=600)
 
 
-def process_reel_job(job_id: str) -> None:
+def _claim_reel_job(job_id: str, claim_id: str, *, claim_minutes: int) -> str:
+    """Atomically claim a durable job; Cloud Tasks delivery is at-least-once."""
+    with get_conn() as conn:
+        row = execute(
+            conn,
+            """
+            UPDATE reel_render_jobs
+            SET status = 'processing', task_claim_id = %s,
+                task_claimed_until = CURRENT_TIMESTAMP + (%s * INTERVAL '1 minute'),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+              AND status NOT IN ('completed', 'failed')
+              AND (task_claimed_until IS NULL OR task_claimed_until < CURRENT_TIMESTAMP)
+            RETURNING id
+            """,
+            (claim_id, max(1, int(claim_minutes)), job_id),
+        ).fetchone()
+        if row:
+            conn.commit()
+            return "claimed"
+        existing = execute(conn, "SELECT status FROM reel_render_jobs WHERE id = %s", (job_id,)).fetchone()
+        conn.commit()
+    if not existing:
+        return "missing"
+    return "terminal" if str(existing[0]) in {"completed", "failed"} else "busy"
+
+
+def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
+    claim_id = str(claim_id or uuid.uuid4())
+    claim_state = _claim_reel_job(
+        job_id,
+        claim_id,
+        # The Cloud Tasks request itself can run for 30 minutes. Leave a
+        # recovery buffer beyond that deadline before a retry may take over.
+        claim_minutes=int(os.getenv("REEL_TASK_CLAIM_MINUTES", "45") or "45"),
+    )
+    if claim_state != "claimed":
+        return claim_state
     with get_conn() as conn:
         row = execute(conn, "SELECT user_id, plan_json FROM reel_render_jobs WHERE id=%s", (job_id,)).fetchone()
-    if not row: return
+    if not row:
+        return "missing"
     user_id, raw_plan = row; plan = json.loads(raw_plan); run_id = plan["run_id"]
     snapshot = plan.get("chart_snapshot")
     if not snapshot:
         _fail_reel(job_id, "Premium reels require the chat to be linked to a saved birth chart. No chart visual was generated.")
-        return
+        return "failed"
     work = ROOT / str(user_id) / job_id
     try:
         work.mkdir(parents=True, exist_ok=True); ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
@@ -593,11 +635,17 @@ def process_reel_job(job_id: str) -> None:
                 return await operation
 
         async def create_assets_and_clips() -> list[tuple[Path, Path, str, str, str]]:
-            # Google TTS and OpenAI Images have independent quotas. Use enough
-            # concurrency to overlap a full reel's remote work, while retaining
-            # environment overrides if a deployment has tighter rate limits.
-            tts_semaphore = asyncio.Semaphore(int(os.getenv("REEL_TTS_CONCURRENCY", "6")))
-            image_semaphore = asyncio.Semaphore(int(os.getenv("REEL_IMAGE_CONCURRENCY", "4")))
+            # Local performance experiment: launch one TTS and one image job
+            # for every storyboard beat at once.  The providers are independent
+            # and the environment values remain an immediate escape hatch if a
+            # quota responds poorly under real load.
+            scene_count = max(1, len(beats))
+            tts_semaphore = asyncio.Semaphore(
+                int(os.getenv("REEL_TTS_CONCURRENCY", str(scene_count)))
+            )
+            image_semaphore = asyncio.Semaphore(
+                int(os.getenv("REEL_IMAGE_CONCURRENCY", str(scene_count)))
+            )
             audio_tasks = {
                 index: asyncio.create_task(limited(tts_semaphore, _podcast_audio(str(beat.get("narration") or "").strip(), language)))
                 for index, beat in enumerate(beats)
@@ -673,3 +721,5 @@ def process_reel_job(job_id: str) -> None:
     except Exception as exc:
         detail = str(exc).strip() or repr(exc)
         _fail_reel(job_id, f"{type(exc).__name__}: {detail}")
+        return "failed"
+    return "completed"

@@ -55,6 +55,8 @@ env:
   GCP_NUDGE_DISPATCH_SERVICE_NAME: astroroshni-nudge-dispatch
   GCP_NUDGE_WORKER_SERVICE_NAME: astroroshni-nudge-worker
   GCP_NUDGE_SERVICE_REGION: asia-south1
+  GCP_REEL_WORKER_SERVICE_NAME: astroroshni-reel-worker
+  GCP_REEL_WORKER_SERVICE_REGION: asia-south2
   GCP_API_BACKEND_MACHINE_TYPE: e2-standard-4
   GCP_CHAT_WORKER_MACHINE_TYPE: e2-standard-4
   GCP_IMAGE_BUILDER_MACHINE_TYPE: ${{ vars.GCP_IMAGE_BUILDER_MACHINE_TYPE || 'e2-standard-4' }}
@@ -67,6 +69,7 @@ jobs:
       backend_required: ${{ steps.detect.outputs.backend_required }}
       payment_required: ${{ steps.detect.outputs.payment_required }}
       nudge_required: ${{ steps.detect.outputs.nudge_required }}
+      reel_worker_required: ${{ steps.detect.outputs.reel_worker_required }}
       frontend_required: ${{ steps.detect.outputs.frontend_required }}
       mobile_web_required: ${{ steps.detect.outputs.mobile_web_required }}
     steps:
@@ -102,6 +105,7 @@ jobs:
           backend_required=false
           payment_required=false
           nudge_required=false
+          reel_worker_required=false
           frontend_required=false
           mobile_web_required=false
 
@@ -109,6 +113,7 @@ jobs:
             backend_required=true
             payment_required=true
             nudge_required=true
+            reel_worker_required=true
             frontend_required=true
             mobile_web_required=true
           else
@@ -138,6 +143,11 @@ jobs:
               nudge_required=true
             fi
 
+            if printf '%s\n' "${changed_files}" | grep -E -q \
+              '^reel_worker_service/|^backend/reel_studio/|^scripts/prepare-reel-worker-build-context\.sh$|^\.github/workflows/deploy\.yml$'; then
+              reel_worker_required=true
+            fi
+
             if printf '%s\n' "${changed_files}" | grep -E -q '^frontend/|^frontend-next/'; then
               frontend_required=true
             fi
@@ -151,6 +161,7 @@ jobs:
           echo "backend_required=${backend_required}" >> "${GITHUB_OUTPUT}"
           echo "payment_required=${payment_required}" >> "${GITHUB_OUTPUT}"
           echo "nudge_required=${nudge_required}" >> "${GITHUB_OUTPUT}"
+          echo "reel_worker_required=${reel_worker_required}" >> "${GITHUB_OUTPUT}"
           echo "frontend_required=${frontend_required}" >> "${GITHUB_OUTPUT}"
           echo "mobile_web_required=${mobile_web_required}" >> "${GITHUB_OUTPUT}"
 
@@ -766,6 +777,86 @@ jobs:
             "${DISPATCH_URL}/api/nudge/cron/kp-daily"
           upsert_engagement_job astroroshni-moon-tara-daily "0 3 * * *" \
             "${DISPATCH_URL}/api/nudge/cron/moon-tara-daily"
+
+  reel_worker:
+    if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.reel_worker_required == 'true' }}
+    needs: [detect_changes]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Build dedicated Reel worker image
+        id: reel_worker_image
+        shell: bash
+        env:
+          GCP_ARTIFACT_REGISTRY_REGION: ${{ vars.GCP_ARTIFACT_REGISTRY_REGION || 'asia-south2' }}
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${GCP_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/cloud-run/reel-worker:${GITHUB_SHA}"
+          echo "image_uri=${IMAGE_URI}" >> "${GITHUB_OUTPUT}"
+          BUILD_DIR="${RUNNER_TEMP}/reel-worker-build-context"
+          bash "${GITHUB_WORKSPACE}/scripts/prepare-reel-worker-build-context.sh" "${BUILD_DIR}"
+          gcloud builds submit "${BUILD_DIR}" \
+            --project "${GCP_PROJECT_ID}" \
+            --config reel_worker_service/cloudbuild.yaml \
+            --substitutions "_IMAGE_URI=${IMAGE_URI}"
+
+      - name: Create the durable Reel queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gcloud tasks queues describe reel-render-queue --project "${GCP_PROJECT_ID}" --location "${GCP_REEL_WORKER_SERVICE_REGION}" >/dev/null 2>&1; then
+            gcloud tasks queues create reel-render-queue --project "${GCP_PROJECT_ID}" --location "${GCP_REEL_WORKER_SERVICE_REGION}"
+          fi
+          gcloud tasks queues update reel-render-queue \
+            --project "${GCP_PROJECT_ID}" --location "${GCP_REEL_WORKER_SERVICE_REGION}" \
+            --max-attempts 5 --min-backoff 30s --max-backoff 600s \
+            --max-concurrent-dispatches 2 --max-dispatches-per-second 1
+
+      - name: Deploy and register dedicated Reel worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The URL is known only after the first Cloud Run deployment. A
+          # second lightweight revision receives it and registers it in the
+          # application database during startup.
+          gcloud run deploy "${GCP_REEL_WORKER_SERVICE_NAME}" \
+            --project "${GCP_PROJECT_ID}" --region "${GCP_REEL_WORKER_SERVICE_REGION}" \
+            --image "${{ steps.reel_worker_image.outputs.image_uri }}" \
+            --platform managed --allow-unauthenticated --ingress all \
+            --service-account "800681558445-compute@developer.gserviceaccount.com" \
+            --execution-environment gen2 --network default --subnet default \
+            --vpc-egress private-ranges-only --cpu 4 --memory 4Gi \
+            --concurrency 1 --timeout 1800 --min-instances 0 --max-instances 3 --port 8080 \
+            --set-env-vars "REEL_WORKER_ENV_FILE=/secrets/app_env/.env,GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID},REEL_WORKER_PUBLIC_URL=https://placeholder.invalid,REEL_TTS_CONCURRENCY=6,REEL_IMAGE_CONCURRENCY=4,REEL_CLIP_CONCURRENCY=4" \
+            --update-secrets "/secrets/app_env/.env=APP_ENV_FILE:latest,REEL_TASKS_SECRET=NUDGE_TASKS_SECRET:latest"
+          SERVICE_URL="$(gcloud run services describe "${GCP_REEL_WORKER_SERVICE_NAME}" --project "${GCP_PROJECT_ID}" --region "${GCP_REEL_WORKER_SERVICE_REGION}" --format='value(status.url)')"
+          gcloud run services update "${GCP_REEL_WORKER_SERVICE_NAME}" \
+            --project "${GCP_PROJECT_ID}" --region "${GCP_REEL_WORKER_SERVICE_REGION}" \
+            --update-env-vars "REEL_WORKER_PUBLIC_URL=${SERVICE_URL}"
+          for _ in $(seq 1 30); do
+            if curl -fsS --max-time 20 "${SERVICE_URL}/" >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Reel worker failed its registration health check"
+          exit 1
 
   frontend:
     if: ${{ (github.event_name != 'workflow_dispatch' || inputs.deployment_mode == 'app') && needs.detect_changes.outputs.frontend_required == 'true' }}

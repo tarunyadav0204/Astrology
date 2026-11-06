@@ -121,6 +121,8 @@ def _ensure_tables(conn) -> None:
             plan_json TEXT NOT NULL,
             output_url TEXT,
             error_message TEXT,
+            task_claim_id TEXT,
+            task_claimed_until TIMESTAMP,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
@@ -137,6 +139,12 @@ def _ensure_tables(conn) -> None:
     execute(conn, """
         CREATE INDEX IF NOT EXISTS reel_generation_costs_user_run_idx
         ON reel_generation_costs (user_id, run_id, created_at)
+    """)
+    execute(conn, "ALTER TABLE reel_render_jobs ADD COLUMN IF NOT EXISTS task_claim_id TEXT")
+    execute(conn, "ALTER TABLE reel_render_jobs ADD COLUMN IF NOT EXISTS task_claimed_until TIMESTAMP")
+    execute(conn, """
+        CREATE INDEX IF NOT EXISTS reel_render_jobs_worker_claim_idx
+        ON reel_render_jobs (status, task_claimed_until, created_at)
     """)
 
 
@@ -480,7 +488,31 @@ def queue_render(request: RenderRequest, background_tasks: BackgroundTasks, curr
             VALUES (%s, %s, %s, %s, %s, %s)
         """, (job_id, current_user.userid, request.message_id, request.visual_level, status, json.dumps(draft)))
         conn.commit()
-    if renderer_ready:
+    from reel_studio.task_queue import enqueue_reel_render_task, reel_tasks_enabled
+
+    if reel_tasks_enabled():
+        if not enqueue_reel_render_task(job_id):
+            # A paid render must never be left in a queue that no worker can
+            # reach. Mark/refund it atomically through the existing idempotent
+            # refund path, then make the client retryable.
+            from reel_studio.billing import refund_reel
+
+            refund_reel(job_id)
+            with get_conn() as conn:
+                execute(
+                    conn,
+                    """
+                    UPDATE reel_render_jobs
+                    SET status = 'failed', error_message = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    """,
+                    ("The Reel worker queue could not accept this job. Your credits were returned.", job_id),
+                )
+                conn.commit()
+            raise HTTPException(status_code=503, detail="Reel worker queue is temporarily unavailable. Your credits were returned; please try again.")
+    else:
+        # Local development remains self-contained. Production enables the
+        # durable path automatically once the Cloud Run worker registers.
         background_tasks.add_task(process_reel_job, job_id)
     return {
         "job_id": job_id, "run_id": draft["run_id"], "status": status,

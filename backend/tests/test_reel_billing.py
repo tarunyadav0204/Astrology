@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import BackgroundTasks, HTTPException
 
-from reel_studio import billing, routes
+from reel_studio import billing, routes, task_queue
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def reel_db(monkeypatch):
             balance_after INTEGER, source TEXT, reference_id TEXT, description TEXT, metadata TEXT);
         CREATE TABLE reel_storyboard_drafts (id TEXT PRIMARY KEY, user_id INTEGER, source_message_id INTEGER, plan_json TEXT);
         CREATE TABLE reel_render_jobs (id TEXT PRIMARY KEY, user_id INTEGER, source_message_id INTEGER,
-            mode TEXT, status TEXT, plan_json TEXT);
+            mode TEXT, status TEXT, plan_json TEXT, error_message TEXT, updated_at TEXT);
         INSERT INTO user_credits VALUES (18, 100, NULL);
     """)
     request = routes.RenderRequest(message_id=42, visual_level="cinematic", draft_id="draft_test", approved_claim_ids=["c1"], confirmed_credit_cost=25)
@@ -56,6 +56,32 @@ def test_queue_retries_charge_once_and_schedule_once(reel_db):
     assert conn.execute("SELECT credits FROM user_credits").fetchone()[0] == 75
     assert conn.execute("SELECT COUNT(*) FROM credit_transactions").fetchone()[0] == 1
     assert len(tasks.tasks) == 1
+
+
+def test_queue_uses_dedicated_worker_without_api_background_task(reel_db, monkeypatch):
+    _, request, user = reel_db
+    dispatched = []
+    monkeypatch.setattr(task_queue, "reel_tasks_enabled", lambda: True)
+    monkeypatch.setattr(task_queue, "enqueue_reel_render_task", lambda job_id: dispatched.append(job_id) or True)
+
+    tasks = BackgroundTasks()
+    result = routes.queue_render(request, tasks, user)
+
+    assert dispatched == [result["job_id"]]
+    assert tasks.tasks == []
+
+
+def test_failed_durable_dispatch_refunds_the_new_job(reel_db, monkeypatch):
+    conn, request, user = reel_db
+    monkeypatch.setattr(task_queue, "reel_tasks_enabled", lambda: True)
+    monkeypatch.setattr(task_queue, "enqueue_reel_render_task", lambda _job_id: False)
+
+    with pytest.raises(HTTPException) as error:
+        routes.queue_render(request, BackgroundTasks(), user)
+
+    assert error.value.status_code == 503
+    assert conn.execute("SELECT credits FROM user_credits").fetchone()[0] == 100
+    assert conn.execute("SELECT status FROM reel_render_jobs").fetchone()[0] == "failed"
 
 
 def test_failure_refunds_once(reel_db):
