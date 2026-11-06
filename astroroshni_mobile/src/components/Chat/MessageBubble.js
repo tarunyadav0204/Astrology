@@ -53,6 +53,11 @@ const CHAT_LANGUAGE_ALIASES = {
   ta: 'tamil', te: 'telugu', gu: 'gujarati', mr: 'marathi',
 };
 
+const REEL_FORMATS = {
+  short: { duration: 90, label: 'Short Reel', detail: 'About 90 seconds · 8–10 scenes', description: 'A focused visual answer that is easy to watch and share.' },
+  deep: { duration: 180, label: 'Deep Reel', detail: 'About 3 minutes · 12–18 scenes', description: 'A fuller visual reading with more chart and timing detail.' },
+};
+
 const whyTaraSaysThis = (language) => WHY_TARA_SAYS_THIS[
   CHAT_LANGUAGE_ALIASES[String(language || '').toLowerCase()] || String(language || 'english').toLowerCase()
 ] || WHY_TARA_SAYS_THIS.english;
@@ -308,6 +313,9 @@ function MessageBubble({
   const [showReelCreditsModal, setShowReelCreditsModal] = useState(false);
   const [reelCreditQuote, setReelCreditQuote] = useState(null);
   const [isRecreatingReel, setIsRecreatingReel] = useState(false);
+  const [reelFormat, setReelFormat] = useState('short');
+  const [reelFormatQuotes, setReelFormatQuotes] = useState({});
+  const [showReelFormatModal, setShowReelFormatModal] = useState(false);
   const [showReelLanguageModal, setShowReelLanguageModal] = useState(false);
   const [reelLanguage, setReelLanguage] = useState(() => podcastLangFromUiLanguage(language));
   const reelPrepareLock = useRef(false);
@@ -1048,13 +1056,21 @@ function MessageBubble({
           setReelJobId(job.job_id);
           setReelJobStatus(job.status);
           setReelJobError(job.error_message || '');
+          setReelFormat(Number(job?.settings?.duration_seconds) === 180 ? 'deep' : 'short');
           if (job.status === 'completed') setShowReelPlayer(true);
           return;
         }
       }
       setIsRecreatingReel(recreate);
       setShowReelStudio(false);
-      setShowReelLanguageModal(true);
+      setShowReelFormatModal(true);
+      Promise.all(Object.entries(REEL_FORMATS).map(async ([key, format]) => {
+        const quote = await chatAPI.getReelPricing(format.duration);
+        return [key, quote.data];
+      })).then((quotes) => setReelFormatQuotes(Object.fromEntries(quotes))).catch(() => {
+        // The confirmation request remains authoritative; leave prices blank
+        // here if an older API does not support duration-specific quotes yet.
+      });
     } catch (error) {
       Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not prepare this reel.'));
       setShowReelStudio(false);
@@ -1063,13 +1079,19 @@ function MessageBubble({
     }
   };
 
+  const selectReelFormat = (format) => {
+    setReelFormat(format);
+    setShowReelFormatModal(false);
+    setShowReelLanguageModal(true);
+  };
+
   const selectReelLanguage = async (selectedLanguage) => {
     const normalizedLanguage = podcastLangFromUiLanguage(selectedLanguage);
     setReelLanguage(normalizedLanguage);
     setShowReelLanguageModal(false);
     setIsPreparingReel(true);
     try {
-      const quote = await chatAPI.getReelPricing();
+      const quote = await chatAPI.getReelPricing(REEL_FORMATS[reelFormat].duration);
       setReelCreditQuote(quote.data);
       setShowReelCreditsModal(true);
     } catch (error) {
@@ -1089,7 +1111,7 @@ function MessageBubble({
     setReelJobId(null); setReelJobStatus(''); setReelJobError(''); setReelDraft(null);
     setShowReelStudio(true); setIsPreparingReel(true);
     try {
-      const response = await chatAPI.createReelDraft({ messageId: message.messageId || message.message_id, durationSeconds: 180, language: reelLanguage, visualLevel: 'cinematic' });
+      const response = await chatAPI.createReelDraft({ messageId: message.messageId || message.message_id, durationSeconds: REEL_FORMATS[reelFormat].duration, language: reelLanguage, visualLevel: 'cinematic' });
       await queueReel(response.data);
     } catch (error) {
       Alert.alert('Reel Studio', apiErrorMessage(error, 'Could not prepare this reel.'));
@@ -1104,7 +1126,7 @@ function MessageBubble({
     try {
       const response = await chatAPI.queueReel({
         messageId,
-        durationSeconds: 180,
+        durationSeconds: REEL_FORMATS[reelFormat].duration,
         language: reelLanguage,
         visualLevel: 'cinematic',
         draftId: draftOverride.draft_id,
@@ -1126,6 +1148,21 @@ function MessageBubble({
 
   const renderReelStudio = () => (<>
       {showReelPlayer && reelJobId && <ReelPlayerModal jobId={reelJobId} onClose={() => setShowReelPlayer(false)} onRecreate={recreateReel} />}
+      <Modal visible={showReelFormatModal} transparent animationType="slide" onRequestClose={() => setShowReelFormatModal(false)}>
+        <View style={styles.reelModalBackdrop}>
+          <View style={[styles.reelModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
+            <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>ASTROROSHNI · REEL STUDIO</Text>
+            <Text style={[styles.reelModalTitle, { color: colors.text }]}>Choose your reel</Text>
+            <Text style={[styles.reelModalBody, { color: colors.textSecondary }]}>Choose a focused shareable answer or a fuller visual reading.</Text>
+            <View style={styles.reelFormatOptions}>
+              {Object.entries(REEL_FORMATS).map(([key, format]) => <TouchableOpacity key={key} accessibilityRole="button" style={[styles.reelFormatOption, { borderColor: key === 'short' ? colors.primary : colors.cardBorder, backgroundColor: key === 'short' ? colors.accentSoft : colors.surface }]} onPress={() => selectReelFormat(key)}>
+                <Text style={[styles.reelFormatBadge, { color: colors.primary }]}>{key === 'short' ? 'RECOMMENDED' : 'MORE DETAIL'}</Text><Text style={[styles.reelFormatTitle, { color: colors.text }]}>{format.label}</Text><Text style={[styles.reelFormatDetail, { color: colors.textSecondary }]}>{format.detail}{Number.isFinite(Number(reelFormatQuotes[key]?.credit_cost)) ? ` · ${reelFormatQuotes[key].credit_cost} credits` : ''}</Text><Text style={[styles.reelFormatDescription, { color: colors.textSecondary }]}>{format.description}</Text>
+              </TouchableOpacity>)}
+            </View>
+            <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelFormatModal(false)}><Text style={{ color: colors.textSecondary }}>Not now</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       <PodcastLanguageModal
         visible={showReelLanguageModal}
         selectedLang={reelLanguage}
@@ -1139,11 +1176,12 @@ function MessageBubble({
         visible={showReelCreditsModal}
         onClose={() => { setShowReelCreditsModal(false); if (reelJobId) setShowReelStudio(true); }}
         onConfirm={confirmReelCredits}
-        title={isRecreatingReel ? t('premiumUi.reelStudio.recreateTitle', 'Recreate this reel?') : t('premiumUi.reelStudio.createTitle', 'Create your reel')}
-        description={t('premiumUi.reelStudio.creditDescription', 'Your personal reel will be created after confirmation. Credits are charged once creation begins. Replaying a saved reel is free.')}
+        title={isRecreatingReel ? `Recreate this ${REEL_FORMATS[reelFormat].label}?` : `Create your ${REEL_FORMATS[reelFormat].label}`}
+        description={`${REEL_FORMATS[reelFormat].detail}. Credits are charged once creation begins. Replaying a saved reel is free.`}
         cost={reelCreditQuote?.credit_cost}
         credits={reelCreditQuote?.credits ?? credits}
         confirmLabel={reelCreditQuote && reelCreditQuote.credits < reelCreditQuote.credit_cost ? t('credits.buyCredits', 'Buy Credits') : t('common.continue', 'Continue')}
+        cancelLabel="Not now"
         iconName="film-outline"
       />
       <Modal visible={showReelStudio && !showReelPlayer} transparent animationType="slide" onRequestClose={() => setShowReelStudio(false)}>
@@ -1177,10 +1215,10 @@ function MessageBubble({
                 <View style={[styles.reelProgressTrack, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: currentReelProgress.value }}><View style={[styles.reelProgressFill, { width: `${currentReelProgress.value}%`, backgroundColor: colors.primary }]} /></View>
                 <Text style={[styles.reelProgressPercent, { color: colors.primary }]}>{currentReelProgress.value}%</Text>
                 <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{currentReelProgress.detail}</Text>
-                {reelJobStatus !== 'completed' && <Text style={[styles.reelProgressNote, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.progressWaitNote', 'This can take up to five minutes. You can leave this page and come back anytime.')}</Text>}
+                {reelJobStatus !== 'completed' && <><Text style={[styles.reelProgressNote, { color: colors.textSecondary }]}>This can take up to two minutes. It will keep creating in the background if you close this window.</Text><TouchableOpacity accessibilityRole="button" style={styles.reelKeepCreatingButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.primary, fontWeight: '800' }}>Close — keep creating</Text></TouchableOpacity></>}
               </>}
             </View> : <View style={styles.reelModalLoading}><Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{t('premiumUi.reelStudio.savedReelHint', 'Your saved reel will appear here when it is ready.')}</Text></View>}
-            <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.textSecondary }}>{t('common.cancel', 'Cancel')}</Text></TouchableOpacity>
+            {!reelJobId && !isPreparingReel && <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.textSecondary }}>Not now</Text></TouchableOpacity>}
           </View>
         </View>
       </Modal>
@@ -4279,6 +4317,12 @@ function MessageActionRow({ children, style, ...props }) {
   reelModalEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   reelModalTitle: { fontFamily: DISPLAY_FONT_FAMILY, fontSize: 27, marginTop: 8 },
   reelModalBody: { fontSize: 13, lineHeight: 20, marginTop: 6 },
+  reelFormatOptions: { gap: 10, marginTop: 19 },
+  reelFormatOption: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 15, paddingVertical: 14 },
+  reelFormatBadge: { fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 1.1 },
+  reelFormatTitle: { marginTop: 3, fontSize: 18, lineHeight: 23, fontWeight: '900' },
+  reelFormatDetail: { marginTop: 2, fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  reelFormatDescription: { marginTop: 5, fontSize: 12, lineHeight: 18 },
   reelModalLoading: { minHeight: 170, alignItems: 'center', justifyContent: 'center', gap: 14, paddingTop: 12 },
   reelReadyState: { alignItems: 'center', width: '100%', paddingTop: 20, paddingBottom: 4 },
   reelReadyMedallion: { width: 72, height: 72, borderRadius: 36, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginBottom: 13, shadowColor: '#7d173e', shadowOpacity: 0.22, shadowRadius: 14, shadowOffset: { width: 0, height: 7 }, elevation: 4 },
@@ -4293,6 +4337,7 @@ function MessageActionRow({ children, style, ...props }) {
   reelProgressFill: { height: '100%', borderRadius: 99 },
   reelProgressPercent: { fontSize: 11, letterSpacing: .8, fontWeight: '900' },
   reelProgressNote: { marginTop: 4, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  reelKeepCreatingButton: { minHeight: 44, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   reelCostCard: { marginTop: 18, padding: 14, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   reelCostLabel: { fontSize: 12, fontWeight: '700' },
   reelCostValue: { fontSize: 22, fontWeight: '900' },

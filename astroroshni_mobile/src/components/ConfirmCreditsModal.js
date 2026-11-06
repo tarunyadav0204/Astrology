@@ -25,11 +25,13 @@ export default function ConfirmCreditsModal({
   cost,
   credits,
   confirmLabel,
+  cancelLabel,
   iconName = 'card-outline',
 }) {
   const { colors, getCardElevation } = useTheme();
   const { t } = useTranslation();
   const actionLabel = confirmLabel || t('creditConfirmation.continue');
+  const dismissLabel = cancelLabel || t('creditConfirmation.cancel');
 
   if (!visible) return null;
 
@@ -53,7 +55,7 @@ export default function ConfirmCreditsModal({
                 style={[styles.closeButton, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
                 onPress={onClose}
                 accessibilityRole="button"
-                accessibilityLabel={t('creditConfirmation.cancel')}
+                accessibilityLabel={dismissLabel}
               >
                 <Ionicons name="close" size={18} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -90,7 +92,7 @@ export default function ConfirmCreditsModal({
                   ]}
                   onPress={onClose}
                 >
-                  <Text style={[styles.modalCancelText, { color: colors.text }]}>{t('creditConfirmation.cancel')}</Text>
+                  <Text style={[styles.modalCancelText, { color: colors.text }]}>{dismissLabel}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.modalConfirmButton, { backgroundColor: colors.primaryStrong }]} onPress={onConfirm}>
                   <View style={styles.modalConfirmGradient}>
