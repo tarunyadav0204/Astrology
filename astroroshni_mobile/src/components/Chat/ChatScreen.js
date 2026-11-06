@@ -5186,7 +5186,11 @@ export default function ChatScreen({ navigation, route }) {
             const mt = status.message_type || 'answer';
             const body = (status.content || '').trim();
             const isPremiumTierResponse = resolvedChatTier === 'premium';
-            if (!wasFreeQuestion && !gatedNoCharge && !isInstantTierResponse && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
+            // This media prompt belongs to the considered-answer tiers. Keep
+            // the list explicit: it must include Verified, rather than merely
+            // relying on it not being classified as Instant during polling.
+            const supportsPostAnswerMedia = ['standard', 'premium', 'verified'].includes(resolvedChatTier);
+            if (!wasFreeQuestion && !gatedNoCharge && supportsPostAnswerMedia && mt !== 'clarification' && mt !== 'native_gate' && body.length >= 80) {
               setRatingEligibleMessageId(messageId);
               setPodcastPromoMessageId(messageId);
               setPodcastPromoIncluded(isPremiumTierResponse);
