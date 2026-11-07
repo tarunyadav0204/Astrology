@@ -483,6 +483,17 @@ export const chatAPI = {
       ...(nativeName ? { native_name: nativeName } : {}),
       ...(birthChartId ? { birth_chart_id: Number(birthChartId) } : {}),
     }),
+  createPodcastJob: (messageContent, language = 'en', messageId = null, sessionId = null, preview = null, nativeName = null, birthChartId = null) =>
+    api.post(getEndpoint('/tts/podcast/jobs'), {
+      message_content: messageContent,
+      language,
+      ...(messageId ? { message_id: messageId } : {}),
+      ...(sessionId ? { session_id: sessionId } : {}),
+      ...(preview ? { preview } : {}),
+      ...(nativeName ? { native_name: nativeName } : {}),
+      ...(birthChartId ? { birth_chart_id: Number(birthChartId) } : {}),
+    }),
+  getPodcastJob: (jobId) => api.get(getEndpoint(`/tts/podcast/jobs/${encodeURIComponent(String(jobId))}`)),
   checkPodcastCache: (messageId, lang = 'en') =>
     api.get(getEndpoint('/tts/podcast/check-cache'), {
       params: { message_id: messageId, lang: lang?.toLowerCase?.()?.startsWith?.('hi') ? 'hi' : 'en' },

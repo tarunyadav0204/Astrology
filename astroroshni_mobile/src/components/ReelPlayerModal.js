@@ -252,7 +252,11 @@ export default function ReelPlayerModal({
             return;
           }
         }
-        remoteMediaRef.current = null;
+        // Retain the authenticated source even when playback uses the local
+        // cache. Android's media player can keep that cache file open while a
+        // reel is playing; sharing that same file then fails on some devices.
+        // A share gets its own verified copy below instead.
+        remoteMediaRef.current = { uri: url, headers };
         if (active) setSource({ uri });
       } catch (err) {
         if (active && err.name !== "AbortError")
@@ -363,21 +367,45 @@ export default function ReelPlayerModal({
   };
 
   const shareableNativeUri = async () => {
-    if (typeof mediaRef.current === "string") return mediaRef.current;
     const remote = remoteMediaRef.current;
-    if (!remote?.uri) throw new Error("Saved reel source is unavailable");
-    // Streaming is ideal for playback, but Android's share sheet needs a local
-    // content URI. Retry independently with a unique filename so a stale player
-    // cache lock never prevents the user from sharing an otherwise playable reel.
-    const uri = `${FileSystem.cacheDirectory}astroroshni-reel-share-${jobId}-${Date.now()}.mp4`;
-    const downloaded = await FileSystem.downloadAsync(remote.uri, uri, {
-      headers: remote.headers,
-    });
-    if (downloaded.status !== 200) {
-      await FileSystem.deleteAsync(uri, { idempotent: true });
-      throw new Error(`HTTP ${downloaded.status}`);
+    // Never hand the share sheet the file currently used by the player. On
+    // Android, MediaPlayer may retain a decoder lock on the cache file even
+    // after pause, causing the provider to reject it for every share target.
+    // First copy the MP4 that was already successfully downloaded for
+    // playback. This avoids a second authenticated network request at the
+    // exact moment the user taps Share — the device-only failure we saw.
+    // expo-sharing exposes the app's private files area through FileProvider.
+    const directory = `${FileSystem.documentDirectory}shared-reels/`;
+    await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+    const uri = `${directory}astroroshni-reel-${jobId}-${Date.now()}.mp4`;
+    const playerUri = typeof mediaRef.current === "string" ? mediaRef.current : null;
+    let copied = false;
+    if (playerUri?.startsWith("file:")) {
+      const playerFile = await FileSystem.getInfoAsync(playerUri, { size: true });
+      if (playerFile.exists && Number(playerFile.size) >= 1024) {
+        try {
+          await FileSystem.copyAsync({ from: playerUri, to: uri });
+          copied = true;
+        } catch (_) {
+          await FileSystem.deleteAsync(uri, { idempotent: true });
+        }
+      }
     }
-    mediaRef.current = uri;
+    if (!copied) {
+      if (!remote?.uri) throw new Error("Saved reel source is unavailable");
+      const downloaded = await FileSystem.downloadAsync(remote.uri, uri, {
+        headers: remote.headers,
+      });
+      if (downloaded.status !== 200) {
+        await FileSystem.deleteAsync(uri, { idempotent: true });
+        throw new Error(`HTTP ${downloaded.status}`);
+      }
+    }
+    const info = await FileSystem.getInfoAsync(uri, { size: true });
+    if (!info.exists || !Number.isFinite(info.size) || info.size < 1024) {
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+      throw new Error("Downloaded reel is incomplete");
+    }
     return uri;
   };
 
@@ -432,6 +460,11 @@ export default function ReelPlayerModal({
         });
       }
     } catch (err) {
+      console.warn("[ReelPlayer] reel share failed", {
+        jobId,
+        destination: destination || "system",
+        message: err?.message || String(err),
+      });
       if (err.name !== "AbortError")
         Alert.alert(
           t("premiumUi.reelStudio.title", "Your premium reel"),

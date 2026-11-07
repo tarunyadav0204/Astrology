@@ -1099,7 +1099,7 @@ const MessageBubble = ({
         setPodcastDuration(0);
 
         try {
-            const res = await fetch('/api/tts/podcast', {
+            const jobRes = await fetch('/api/tts/podcast/jobs', {
                 method: 'POST',
                 signal: ac.signal,
                 headers: {
@@ -1116,7 +1116,7 @@ const MessageBubble = ({
                 }),
             });
 
-            if (res.status === 402) {
+            if (jobRes.status === 402) {
                 const cost = podcastCost ?? 2;
                 showToast(`Insufficient credits. You need ${cost} credits to generate this podcast.`, 'error');
                 refreshBalance();
@@ -1124,9 +1124,50 @@ const MessageBubble = ({
                 return;
             }
 
+            if (!jobRes.ok) {
+                const t = await jobRes.text().catch(() => '');
+                throw new Error(t || `Podcast request failed (${jobRes.status})`);
+            }
+
+            const createdJob = await jobRes.json();
+            const jobId = createdJob?.job_id;
+            if (!jobId) throw new Error('Podcast job was not created');
+            let job = createdJob;
+            const deadline = Date.now() + (12 * 60 * 1000);
+            while (job?.status === 'queued' || job?.status === 'processing') {
+                if (Date.now() >= deadline) throw new Error('Podcast generation is taking longer than expected');
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+                const statusRes = await fetch(`/api/tts/podcast/jobs/${encodeURIComponent(jobId)}`, {
+                    signal: ac.signal,
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!statusRes.ok) {
+                    const t = await statusRes.text().catch(() => '');
+                    throw new Error(t || `Podcast status failed (${statusRes.status})`);
+                }
+                job = await statusRes.json();
+            }
+            if (job?.status !== 'completed') throw new Error(job?.error || 'Podcast generation failed');
+
+            const res = await fetch('/api/tts/podcast', {
+                method: 'POST',
+                signal: ac.signal,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message_content: cleanText,
+                    language: langCode,
+                    ...(mid ? { message_id: mid } : {}),
+                    ...(sessionId ? { session_id: sessionId } : {}),
+                    preview: (cleanText || message.content || '').slice(0, 150),
+                    ...(message.native_name ? { native_name: message.native_name } : {}),
+                }),
+            });
             if (!res.ok) {
                 const t = await res.text().catch(() => '');
-                throw new Error(t || `Podcast request failed (${res.status})`);
+                throw new Error(t || `Podcast audio request failed (${res.status})`);
             }
 
             const data = await res.json();

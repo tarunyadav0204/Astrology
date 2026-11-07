@@ -976,6 +976,31 @@ export const textToSpeech = {
 
       const lang = language?.toLowerCase().startsWith('hi') ? 'hi' : 'en';
       console.log('[Podcast] Requesting podcast audio', { lang, messageId: messageId || 'none', length: messageContent?.length, nativeName: nativeName || null });
+      if (!messageId) {
+        throw new Error('Podcast playback requires a saved message.');
+      }
+      const jobResponse = await chatAPI.createPodcastJob(
+        messageContent,
+        lang,
+        messageId,
+        sessionId || null,
+        preview || null,
+        nativeName || null,
+        birthChartId || null,
+      );
+      const jobId = jobResponse?.data?.job_id;
+      if (!jobId) throw new Error('Podcast job was not created.');
+      const deadline = Date.now() + (12 * 60 * 1000);
+      let job = jobResponse.data;
+      while (job?.status === 'queued' || job?.status === 'processing') {
+        if (Date.now() >= deadline) throw new Error('Podcast generation is taking longer than expected.');
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const statusResponse = await chatAPI.getPodcastJob(jobId);
+        job = statusResponse?.data;
+      }
+      if (job?.status !== 'completed') {
+        throw new Error(job?.error || 'Podcast generation failed.');
+      }
       const response = await chatAPI.getPodcastAudio(messageContent, lang, messageId || null, sessionId || null, preview || null, nativeName || null, birthChartId || null);
       const base64Audio = response?.data?.audio;
       if (!base64Audio || typeof base64Audio !== 'string') {

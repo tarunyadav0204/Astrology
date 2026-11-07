@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, Header, Query, Body
 from fastapi.responses import JSONResponse, Response
 import base64
 import os
 import re
 import html
 import hashlib
+import json
 from google.cloud import texttospeech
 from google.cloud import texttospeech_v1beta1 as texttospeech_beta
 import logging
 import asyncio
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import partial
 from pydantic import BaseModel, Field
 from types import SimpleNamespace
@@ -50,6 +51,7 @@ from utils.admin_settings import (
 
 credit_service = CreditService()
 _podcast_history_table_ready = False
+_podcast_jobs_table_ready = False
 
 
 def _ensure_podcast_history_table():
@@ -72,6 +74,32 @@ def _ensure_podcast_history_table():
         execute(conn, "ALTER TABLE podcast_history ADD COLUMN IF NOT EXISTS birth_chart_id BIGINT")
         conn.commit()
     _podcast_history_table_ready = True
+
+
+def _ensure_podcast_jobs_table():
+    """Persist podcast work so generation survives client/network timeouts."""
+    global _podcast_jobs_table_ready
+    if _podcast_jobs_table_ready:
+        return
+    with get_conn() as conn:
+        execute(conn, """
+            CREATE TABLE IF NOT EXISTS podcast_generation_jobs (
+                id TEXT PRIMARY KEY,
+                userid INTEGER NOT NULL,
+                message_id TEXT NOT NULL,
+                lang TEXT NOT NULL,
+                request_json TEXT NOT NULL,
+                user_json TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'queued',
+                error_message TEXT,
+                claimed_at TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(userid, message_id, lang)
+            )
+        """)
+        conn.commit()
+    _podcast_jobs_table_ready = True
 
 
 def _add_podcast_history(userid: int, message_id: str, session_id: Optional[str], lang: str, preview: Optional[str], birth_chart_id: Optional[int] = None):
@@ -2275,8 +2303,7 @@ async def podcast_check_cache(
   })
 
 
-@router.post("/podcast")
-async def podcast(request: PodcastRequest, current_user: User = Depends(get_current_user)):
+async def _generate_podcast_response(request: PodcastRequest, current_user: User):
   """
   Generate a podcast from a chat message: Gemini produces a two-host (FEMALE/MALE) script,
   then each segment is synthesized with the matching voice and concatenated.
@@ -2508,6 +2535,200 @@ async def podcast(request: PodcastRequest, current_user: User = Depends(get_curr
       status_code=500,
       detail="Podcast generation failed. Check server logs for details.",
     )
+
+
+def _podcast_job_id(userid: int, message_id: str, lang: str) -> str:
+  digest = hashlib.sha256(f"podcast:{userid}:{message_id}:{_podcast_cache_lang(lang)}".encode("utf-8")).hexdigest()
+  return f"podcast_{digest[:32]}"
+
+
+def _podcast_job_payload(row) -> dict:
+  return {
+    "job_id": row[0],
+    "status": row[1],
+    "message_id": row[2],
+    "language": row[3],
+    "error": row[4],
+  }
+
+
+def _claim_podcast_job(job_id: str) -> tuple[str, Optional[PodcastRequest], Optional[User]]:
+  """Atomically claim one queued job; duplicate Cloud Task deliveries are harmless."""
+  _ensure_podcast_jobs_table()
+  with get_conn() as conn:
+    row = execute(
+      conn,
+      """
+      SELECT status, request_json, user_json, claimed_at
+      FROM podcast_generation_jobs WHERE id = %s FOR UPDATE
+      """,
+      (job_id,),
+    ).fetchone()
+    if not row:
+      return "missing", None, None
+    status = str(row[0])
+    if status == "processing":
+      claim_minutes = max(5, int(os.getenv("PODCAST_TASK_CLAIM_MINUTES", "20") or "20"))
+      claimed_at = row[3]
+      if claimed_at and claimed_at > datetime.now() - timedelta(minutes=claim_minutes):
+        return status, None, None
+      logger.warning("Reclaiming stale podcast job job_id=%s claimed_at=%s", job_id, claimed_at)
+    elif status != "queued":
+      return status, None, None
+    execute(
+      conn,
+      """UPDATE podcast_generation_jobs
+         SET status = 'processing', error_message = NULL, claimed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE id = %s""",
+      (job_id,),
+    )
+    conn.commit()
+  try:
+    return "claimed", PodcastRequest(**json.loads(row[1])), User(**json.loads(row[2]))
+  except Exception:
+    logger.exception("Podcast job has invalid persisted payload job_id=%s", job_id)
+    return "invalid", None, None
+
+
+async def _process_podcast_job(job_id: str) -> str:
+  state, request, user = _claim_podcast_job(job_id)
+  if state != "claimed":
+    return state
+  try:
+    await _generate_podcast_response(request, user)
+  except Exception as exc:
+    detail = exc.detail if isinstance(exc, HTTPException) else "Podcast generation failed. Please try again."
+    logger.exception("Podcast job failed job_id=%s", job_id)
+    with get_conn() as conn:
+      execute(
+        conn,
+        """UPDATE podcast_generation_jobs
+           SET status = 'failed', error_message = %s, updated_at = CURRENT_TIMESTAMP
+           WHERE id = %s""",
+        (str(detail)[:1000], job_id),
+      )
+      conn.commit()
+    return "failed"
+  with get_conn() as conn:
+    execute(
+      conn,
+      """UPDATE podcast_generation_jobs
+         SET status = 'completed', error_message = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE id = %s""",
+      (job_id,),
+    )
+    conn.commit()
+  logger.info("Podcast job completed job_id=%s", job_id)
+  return "completed"
+
+
+@router.post("/podcast/jobs")
+async def create_podcast_job(
+  request: PodcastRequest,
+  background_tasks: BackgroundTasks,
+  current_user: User = Depends(get_current_user),
+):
+  """Queue a podcast and return immediately; clients poll the persisted job."""
+  text = (request.message_content or "").strip()
+  message_id = str(request.message_id or "").strip()
+  if not text:
+    raise HTTPException(status_code=400, detail="message_content is required")
+  if not message_id:
+    raise HTTPException(status_code=400, detail="message_id is required for podcast jobs")
+  if request.prepare_only:
+    raise HTTPException(status_code=403, detail="Automatic podcast preparation is disabled.")
+
+  cache_lang = _podcast_cache_lang(request.language)
+  request_data = request.model_dump()
+  request_data["language"] = cache_lang
+  request_data["message_id"] = message_id
+  job_id = _podcast_job_id(current_user.userid, message_id, cache_lang)
+  _ensure_podcast_jobs_table()
+  with get_conn() as conn:
+    existing = execute(
+      conn,
+      """SELECT id, status, message_id, lang, error_message
+         FROM podcast_generation_jobs
+         WHERE id = %s AND userid = %s FOR UPDATE""",
+      (job_id, current_user.userid),
+    ).fetchone()
+    if existing and existing[1] == "completed":
+      conn.commit()
+      return _podcast_job_payload(existing)
+    if existing and existing[1] in {"queued", "processing"}:
+      conn.commit()
+      return _podcast_job_payload(existing)
+    # Keep the existing immediate insufficient-credit behaviour; the actual
+    # debit remains in the worker after a successful cache write.
+    premium_included = _premium_podcast_included(current_user.userid, message_id)
+    base_cost = credit_service.get_credit_setting("podcast_cost")
+    effective_cost = 0 if premium_included else credit_service.get_effective_cost(
+      current_user.userid, base_cost or 2, "podcast_cost"
+    )
+    effective_cost = 0 if premium_included else (max(1, int(effective_cost)) if effective_cost else 2)
+    if effective_cost > 0 and credit_service.get_user_credits(current_user.userid) < effective_cost:
+      raise HTTPException(status_code=402, detail=f"Insufficient credits. Need {effective_cost}.")
+    if existing:
+      execute(
+        conn,
+        """UPDATE podcast_generation_jobs
+           SET status = 'queued', error_message = NULL, request_json = %s, user_json = %s,
+               claimed_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = %s""",
+        (json.dumps(request_data), json.dumps(current_user.model_dump()), job_id),
+      )
+    else:
+      execute(
+        conn,
+        """INSERT INTO podcast_generation_jobs
+           (id, userid, message_id, lang, request_json, user_json, status)
+           VALUES (%s, %s, %s, %s, %s, %s, 'queued')""",
+        (job_id, current_user.userid, message_id, cache_lang, json.dumps(request_data), json.dumps(current_user.model_dump())),
+      )
+    conn.commit()
+
+  from tts.podcast_task_queue import enqueue_podcast_generation_task, podcast_tasks_enabled
+  if podcast_tasks_enabled():
+    if not enqueue_podcast_generation_task(job_id):
+      with get_conn() as conn:
+        execute(conn, "UPDATE podcast_generation_jobs SET status = 'failed', error_message = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s", ("Podcast queue is temporarily unavailable. Please try again.", job_id))
+        conn.commit()
+      raise HTTPException(status_code=503, detail="Podcast queue is temporarily unavailable. Please try again.")
+  else:
+    background_tasks.add_task(_process_podcast_job, job_id)
+  return {"job_id": job_id, "status": "queued", "message_id": message_id, "language": cache_lang}
+
+
+@router.get("/podcast/jobs/{job_id}")
+async def get_podcast_job(job_id: str, current_user: User = Depends(get_current_user)):
+  _ensure_podcast_jobs_table()
+  with get_conn() as conn:
+    row = execute(
+      conn,
+      """SELECT id, status, message_id, lang, error_message
+         FROM podcast_generation_jobs WHERE id = %s AND userid = %s""",
+      (job_id, current_user.userid),
+    ).fetchone()
+  if not row:
+    raise HTTPException(status_code=404, detail="Podcast job not found")
+  return _podcast_job_payload(row)
+
+
+@router.post("/podcast/internal/process")
+async def process_podcast_task(payload: dict, x_podcast_task_secret: Optional[str] = Header(None, alias="X-Podcast-Task-Secret")):
+  from tts.podcast_task_queue import podcast_task_secret
+  expected_secret = podcast_task_secret()
+  if not expected_secret or x_podcast_task_secret != expected_secret:
+    raise HTTPException(status_code=401, detail="Unauthorized")
+  job_id = str(payload.get("job_id") or "").strip()
+  if not job_id:
+    raise HTTPException(status_code=400, detail="job_id is required")
+  return {"job_id": job_id, "status": await _process_podcast_job(job_id)}
+
+
+@router.post("/podcast")
+async def podcast(request: PodcastRequest, current_user: User = Depends(get_current_user)):
+  """Legacy synchronous endpoint retained for old clients and cached-audio retrieval."""
+  return await _generate_podcast_response(request, current_user)
 
 
 @router.get("/podcast/visuals")
