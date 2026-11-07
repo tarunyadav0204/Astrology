@@ -27,3 +27,11 @@ def test_reel_audio_uses_direct_plain_google_tts(monkeypatch):
     assert (audio, voice_name) == (b"mp3", "hi-IN-Chirp-HD-F")
     assert calls["text"] == "plain:narration"
     assert calls["credentials"] == "credentials"
+
+
+def test_reel_transition_pauses_are_semantic_with_legacy_default():
+    assert worker._transition_pause_seconds({"pause_after": "none"}) == 0.0
+    assert worker._transition_pause_seconds({"pause_after": "medium"}) == 0.6
+    assert worker._transition_pause_seconds({"pause_after": "long"}) == 0.9
+    assert worker._transition_pause_seconds({}) == 0.35
+    assert worker._transition_pause_seconds({"pause_after": "unexpected"}) == 0.35

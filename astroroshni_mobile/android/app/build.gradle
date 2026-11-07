@@ -81,8 +81,8 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
-def appVersionCode = (findProperty('ANDROID_VERSION_CODE') ?: '279').toInteger()
-def appVersionName = findProperty('ANDROID_VERSION_NAME') ?: '1.2.21'
+def appVersionCode = (findProperty('ANDROID_VERSION_CODE') ?: '280').toInteger()
+def appVersionName = findProperty('ANDROID_VERSION_NAME') ?: '1.2.22'
 
 android {
     ndkVersion rootProject.ext.ndkVersion

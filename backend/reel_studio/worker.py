@@ -41,6 +41,19 @@ WIDTH, HEIGHT = 1080, 1920
 REEL_IMAGE_SIZE = "1024x1824"  # exact 9:16; both dimensions are valid GPT Image 2 multiples of 16
 PLANET_ABBR = {"Jupiter": "Ju", "Mercury": "Me", "Saturn": "Sa", "Venus": "Ve", "Mars": "Ma", "Moon": "Mo", "Sun": "Su", "Rahu": "Ra", "Ketu": "Ke"}
 SIGN_NAMES = ("Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces")
+HINDI_SIGN_NAMES = {
+    "Aries": "मेष", "Taurus": "वृषभ", "Gemini": "मिथुन", "Cancer": "कर्क",
+    "Leo": "सिंह", "Virgo": "कन्या", "Libra": "तुला", "Scorpio": "वृश्चिक",
+    "Sagittarius": "धनु", "Capricorn": "मकर", "Aquarius": "कुंभ", "Pisces": "मीन",
+}
+HINDI_PLANET_NAMES = {
+    "Sun": "सूर्य", "Moon": "चंद्र", "Mars": "मंगल", "Mercury": "बुध",
+    "Jupiter": "गुरु", "Venus": "शुक्र", "Saturn": "शनि", "Rahu": "राहु", "Ketu": "केतु",
+}
+HINDI_DASHA_LEVELS = {
+    "mahadasha": "महादशा", "antardasha": "अंतरदशा", "pratyantardasha": "प्रत्यंतरदशा",
+    "sookshma": "सूक्ष्म दशा", "prana": "प्राण दशा",
+}
 # Standard North Indian kundali geometry: the four cardinal houses are
 # diamonds around the chart's central junction; the other eight are perimeter
 # wedges. This is deliberately not the generic "one central diamond + X" grid.
@@ -66,6 +79,12 @@ OMNI_TEXT_TOKEN_COST_INR = 9.00 * USD_TO_INR / 1_000_000
 # larger than the published 1024x1536 reference price.
 GPT_IMAGE_LOW_COST_INR = 0.005 * 1.1875 * USD_TO_INR
 CHIRP_TTS_CHAR_COST_INR = 30.0 * USD_TO_INR / 1_000_000
+TRANSITION_PAUSE_SECONDS = {"none": 0.0, "short": 0.35, "medium": 0.6, "long": 0.9}
+
+
+def _transition_pause_seconds(beat: dict) -> float:
+    """Use the director's semantic pause, with a safe legacy-plan default."""
+    return TRANSITION_PAUSE_SECONDS.get(str(beat.get("pause_after") or "short").lower(), 0.35)
 
 
 def _update(job_id: str, status: str, *, output_url: str | None = None, error: str | None = None) -> None:
@@ -352,6 +371,7 @@ Design an award-quality Indian luxury astrology product campaign: deep burgundy,
 
 def _scene_image_prompt(plan: dict, beat: dict, snapshot: dict) -> str:
     language = str((plan.get("settings") or {}).get("language") or "en").lower()
+    is_hindi = language == "hi"
     language_instruction = (
         "Hindi (Devanagari). All editorial copy, headings, callouts, and app-interface labels in this image must be fluent Hindi. "
         "Keep the official brand name AstroRoshni unchanged, and retain numeric values and dates exactly."
@@ -384,19 +404,50 @@ def _scene_image_prompt(plan: dict, beat: dict, snapshot: dict) -> str:
     original_visual_direction = plain_text(beat.get("visual_instruction") or "")
     visual_direction = original_visual_direction
     if kind == "chart_focus":
-        chart_cells = [
-            {"slot": item["slot"], "exact_cell_label": f"House {item['house']} — {houses[item['house'] - 1]['rashi_name']} ({houses[item['house'] - 1]['rashi_number']})"}
-            for item in NORTH_INDIAN_HOUSE_SLOTS
-        ]
-        source = {
-            "chart_type": "North Indian D1 natal chart",
-            "ascendant": {"house": 1, "rashi_number": ascendant_sign + 1, "rashi_name": SIGN_NAMES[ascendant_sign]},
-            "houses": houses,
-            "fixed_counterclockwise_house_slots": list(NORTH_INDIAN_HOUSE_SLOTS),
-            "copy_exactly_one_label_per_cell": chart_cells,
-            "planet_placements": canonical_placements,
-            "allowed_highlights": {"nodes": beat.get("focus_nodes") or [], "arrows": beat.get("draw_edges") or []},
-        }
+        if is_hindi:
+            chart_cells = [
+                {
+                    "position": item["slot"],
+                    "exact_hindi_cell_label": f"भाव {item['house']} — {HINDI_SIGN_NAMES[houses[item['house'] - 1]['rashi_name']]} ({houses[item['house'] - 1]['rashi_number']})",
+                }
+                for item in NORTH_INDIAN_HOUSE_SLOTS
+            ]
+            display_houses = [
+                {"भाव": house["house"], "राशि_संख्या": house["rashi_number"], "राशि": HINDI_SIGN_NAMES[house["rashi_name"]]}
+                for house in houses
+            ]
+            display_placements = [
+                {
+                    "ग्रह": HINDI_PLANET_NAMES.get(placement["planet"], placement["planet"]),
+                    "भाव": placement["house"],
+                    "राशि_संख्या": placement["rashi_number"],
+                    "राशि": HINDI_SIGN_NAMES[placement["rashi_name"]],
+                    "अंश": placement["degree_in_sign"],
+                }
+                for placement in canonical_placements
+            ]
+            source = {
+                "चार्ट_प्रकार": "उत्तर भारतीय D1 जन्म कुंडली",
+                "लग्न": {"भाव": 1, "राशि_संख्या": ascendant_sign + 1, "राशि": HINDI_SIGN_NAMES[SIGN_NAMES[ascendant_sign]]},
+                "भाव": display_houses,
+                "हर_खाने_का_सटीक_हिंदी_लेबल": chart_cells,
+                "ग्रह_स्थिति": display_placements,
+                "अनुमत_हाइलाइट": {"नोड": beat.get("focus_nodes") or [], "तीर": beat.get("draw_edges") or []},
+            }
+        else:
+            chart_cells = [
+                {"slot": item["slot"], "exact_cell_label": f"House {item['house']} — {houses[item['house'] - 1]['rashi_name']} ({houses[item['house'] - 1]['rashi_number']})"}
+                for item in NORTH_INDIAN_HOUSE_SLOTS
+            ]
+            source = {
+                "chart_type": "North Indian D1 natal chart",
+                "ascendant": {"house": 1, "rashi_number": ascendant_sign + 1, "rashi_name": SIGN_NAMES[ascendant_sign]},
+                "houses": houses,
+                "fixed_counterclockwise_house_slots": list(NORTH_INDIAN_HOUSE_SLOTS),
+                "copy_exactly_one_label_per_cell": chart_cells,
+                "planet_placements": canonical_placements,
+                "allowed_highlights": {"nodes": beat.get("focus_nodes") or [], "arrows": beat.get("draw_edges") or []},
+            }
         rendering_rule = (
             "Render exactly ONE standard North Indian D1 natal chart in TEXT-ONLY ACCURACY MODE. Follow FIXED_COUNTERCLOCKWISE_HOUSE_SLOTS precisely: "
             "House 1 is the TOP CENTRAL DIAMOND, House 4 is the LEFT CENTRAL DIAMOND, House 7 is the BOTTOM CENTRAL DIAMOND, and House 10 is the RIGHT CENTRAL DIAMOND. "
@@ -420,14 +471,30 @@ def _scene_image_prompt(plan: dict, beat: dict, snapshot: dict) -> str:
             f"replace, or obscure the twelve-cell chart. Planner direction to adapt safely: {original_visual_direction}"
         )
     elif kind == "ashtakavarga":
-        source = {"metric": "Sarvashtakavarga (SAV)", "sav_by_house": ((snapshot.get("ashtakavarga") or {}).get("sav_by_house") or {})}
+        sav = ((snapshot.get("ashtakavarga") or {}).get("sav_by_house") or {})
+        source = (
+            {"माप": "सर्वाष्टकवर्ग (एसएवी)", "भाव_के_अनुसार_बिंदु": {f"भाव {house}": value for house, value in sav.items()}}
+            if is_hindi else
+            {"metric": "Sarvashtakavarga (SAV)", "sav_by_house": sav}
+        )
         rendering_rule = (
             "Render only the supplied Sarvashtakavarga values. Every key in SAV_BY_HOUSE is a HOUSE NUMBER 1 through 12, "
             "not a rashi/sign number and not a planet. Label any value visibly as ‘House N — value’. "
             "Do not render a natal chart, zodiac-rashi grid, planet placements, dashas, or a house interpretation that was not supplied."
         )
     elif kind == "dasha_stack":
-        source = {"active_dasha_hierarchy": snapshot.get("current_dashas") or {}}
+        raw_dashas = snapshot.get("current_dashas") or {}
+        source = (
+            {"सक्रिय_दशा_क्रम": {
+                HINDI_DASHA_LEVELS.get(key, key): {
+                    "ग्रह": HINDI_PLANET_NAMES.get(str(value.get("planet") or ""), str(value.get("planet") or "")),
+                    "आरंभ": value.get("start"), "समाप्ति": value.get("end"),
+                }
+                for key, value in raw_dashas.items() if isinstance(value, dict)
+            }}
+            if is_hindi else
+            {"active_dasha_hierarchy": raw_dashas}
+        )
         rendering_rule = "Render only the supplied active dasha hierarchy. Copy each level, planet name, and date exactly. Do not render a natal chart, invent alternate periods, or infer timing beyond the supplied values."
     else:
         source = {}
@@ -445,6 +512,7 @@ FOCUS NODES: {json.dumps(beat.get("focus_nodes") or [])}; VERIFIED ARROWS: {json
 STRICT RENDERING RULE: {rendering_rule}
 VISIBLE TEXT: Use finished plain typography. Never print Markdown formatting markers (hashes, asterisks, backticks) in the image. Headings must read naturally, for example 'Key Insights'.
 OUTPUT LANGUAGE: {language_instruction}
+HINDI TYPOGRAPHY LOCK: {"Every visible non-brand word MUST use Devanagari Hindi. Do not display English house names, sign names, planet names, dasha names, claims, headings, explanations, or UI labels. Arabic numerals and dates are allowed. ‘AstroRoshni’ is the only permitted Latin-script text. When a chart is shown, copy only the exact Hindi cell labels supplied in VERIFIED DATA." if is_hindi else "Not applicable."}
 Create an award-quality Indian luxury editorial design: burgundy, champagne-gold, cream UI cards, phone/app screens where appropriate, clear arrows and pointed callout blocks. Use only the supplied claims and verified data. Do not invent astrology, dates, placements, scores, predictions, generic reports, or thank-you messages. Prefer a few short, large, readable labels over paragraphs of invented copy. All text and focal elements must remain inside 9:16 safe margins.'''
 
 
@@ -738,7 +806,12 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
                 image = await image_paths[f"beat-{index}"]
                 clip = work / f"beat-{index}.mp4"
                 def encode() -> None:
-                    _still_clip(ffmpeg, image, clip, max(4.0, _duration(ffmpeg, audio_path) + 0.35))
+                    # Do not impose a four-second minimum here. It made a short
+                    # spoken beat leave a conspicuous, arbitrary silent tail.
+                    # The planner explicitly decides whether this transition is
+                    # continuous or deserves a deliberate pause.
+                    seconds = max(2.0, _duration(ffmpeg, audio_path) + _transition_pause_seconds(beat))
+                    _still_clip(ffmpeg, image, clip, seconds)
                 async with clip_semaphore:
                     await asyncio.to_thread(encode)
                 return clip, audio_path, voice, kind, line

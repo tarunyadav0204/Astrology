@@ -29,6 +29,7 @@ const destinations = {
   Facebook: "https://www.facebook.com/",
   YouTube: "https://studio.youtube.com/",
 };
+const REEL_FEED_HINT_SEEN_KEY = "reel_feed_swipe_hint_seen";
 const webVideoStyle = {
   position: "absolute",
   inset: 0,
@@ -57,6 +58,7 @@ export default function ReelPlayerModal({
   const [notice, setNotice] = useState("");
   const [preview, setPreview] = useState(null);
   const [sharing, setSharing] = useState(false);
+  const [showFeedHint, setShowFeedHint] = useState(false);
   const mediaRef = useRef(null);
   const remoteMediaRef = useRef(null);
   const statusRef = useRef({});
@@ -65,8 +67,10 @@ export default function ReelPlayerModal({
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideTimer = useRef(null);
+  const feedHintTimer = useRef(null);
   const reelFeedRef = useRef({ jobId, reelIds, onSwipeToReel });
   reelFeedRef.current = { jobId, reelIds, onSwipeToReel };
+  const hasReelFeed = Array.isArray(reelIds) && reelIds.length > 1;
   const revealControls = useCallback(
     function reveal() {
       setControlsVisible(true);
@@ -145,9 +149,26 @@ export default function ReelPlayerModal({
     revealControls();
     return () => {
       clearTimeout(hideTimer.current);
+      clearTimeout(feedHintTimer.current);
       controlsOpacity.stopAnimation();
     };
   }, [controlsOpacity, revealControls]);
+  useEffect(() => {
+    if (!hasReelFeed) return undefined;
+    let active = true;
+    AsyncStorage.getItem(REEL_FEED_HINT_SEEN_KEY).then((seen) => {
+      if (!active || seen) return;
+      setShowFeedHint(true);
+      // Store on first display rather than after a completed swipe: the hint is
+      // onboarding, not a permanent player control.
+      AsyncStorage.setItem(REEL_FEED_HINT_SEEN_KEY, "1").catch(() => {});
+      feedHintTimer.current = setTimeout(() => setShowFeedHint(false), 3200);
+    });
+    return () => {
+      active = false;
+      clearTimeout(feedHintTimer.current);
+    };
+  }, [hasReelFeed]);
   useEffect(() => {
     if (source) revealControls();
   }, [source, revealControls]);
@@ -425,7 +446,6 @@ export default function ReelPlayerModal({
   };
   const position = preview ?? status.positionMillis ?? 0;
   const duration = status.durationMillis || 0;
-  const hasReelFeed = Array.isArray(reelIds) && reelIds.length > 1;
   // Expo's ExoPlayer path is dropping the later AAC segments on the Android
   // emulator. MediaPlayer handles this standard local MP4 independently;
   // web continues to use the browser player.
@@ -527,7 +547,7 @@ export default function ReelPlayerModal({
           </Text>
           {button(t("common.close", "Close"), "close", close)}
         </Animated.View>
-        {hasReelFeed && (
+        {showFeedHint && (
           <Animated.View
             pointerEvents="none"
             style={[

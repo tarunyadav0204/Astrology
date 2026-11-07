@@ -325,10 +325,11 @@ def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dic
                 "type": "array", "minItems": min_beats, "maxItems": max_beats,
                 "items": {
                     "type": "object", "additionalProperties": False,
-                    "required": ["type", "narration", "evidence_ids", "visual_instruction", "focus_nodes", "draw_edges"],
+                    "required": ["type", "narration", "pause_after", "evidence_ids", "visual_instruction", "focus_nodes", "draw_edges"],
                     "properties": {
                         "type": {"type": "string", "minLength": 1},
                         "narration": {"type": "string", "minLength": 1},
+                        "pause_after": {"type": "string", "enum": ["none", "short", "medium", "long"]},
                         "evidence_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
                         "visual_instruction": {"type": "string"},
                         "focus_nodes": {"type": "array", "items": {"type": "string"}},
@@ -344,8 +345,8 @@ def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dic
         if language == "hi" else
         "REEL LANGUAGE: English. Write every narration and visual instruction in natural, fluent English."
     )
-    prompt = f'''Return JSON only: {{"beats":[{{"type":"", "narration":"", "evidence_ids":[], "visual_instruction":"", "focus_nodes":[], "draw_edges":[]}}]}}.
-Write a detailed {duration_seconds}-second premium vertical reel plan that ANSWERS THE USER'S ACTUAL QUESTION and explains why the approved answer reaches that conclusion. Do not make a generic astrology reel. Select {min_beats} to {max_beats} beats from these supported visual modules only: {sorted(_VISUAL_MODULES)}. Choose modules that fit the answer; do not force chart, dasha, Ashtakavarga, transit, or timing scenes when the evidence does not support them. Use opening first and closing last. Write complete, naturally spoken passages. The combined narration MUST contain between {round(duration_seconds * 2.35)} and {round(duration_seconds * 2.5)} words for a calm podcast pace. Never cut a sentence, use ellipses, or repeat a closing/thank-you line. Every beat must include a concrete visual_instruction describing the desired image. For chart_focus, select relevant verified focus nodes and arrows when the graph has them. For lifestyle_image, describe a real-life scene tied to the answer. All images are created by GPT Image from this directed data; no visual may introduce a fact outside the approved claims or VERIFIED VISUAL DATA. EVIDENCE RULE: every beat's evidence_ids must be a non-empty array containing only exact id values from the CLAIMS list below. Never create a new claim ID and never leave evidence_ids empty.
+    prompt = f'''Return JSON only: {{"beats":[{{"type":"", "narration":"", "pause_after":"short", "evidence_ids":[], "visual_instruction":"", "focus_nodes":[], "draw_edges":[]}}]}}.
+Write a detailed {duration_seconds}-second premium vertical reel plan that ANSWERS THE USER'S ACTUAL QUESTION and explains why the approved answer reaches that conclusion. Do not make a generic astrology reel. Select {min_beats} to {max_beats} beats from these supported visual modules only: {sorted(_VISUAL_MODULES)}. Choose modules that fit the answer; do not force chart, dasha, Ashtakavarga, transit, or timing scenes when the evidence does not support them. Use opening first and closing last. Write complete, naturally spoken passages. The combined narration MUST contain between {round(duration_seconds * 2.35)} and {round(duration_seconds * 2.5)} words for a calm podcast pace. Never cut a sentence, use ellipses, or repeat a closing/thank-you line. Every beat must include a concrete visual_instruction describing the desired image. Set pause_after to none, short, medium, or long to direct the silence between this beat and the next: use none when the next beat continues the same thought; use short for ordinary sentence transitions; use medium or long only after a complete conclusion, important shift, or final line. Never use a pause within an unfinished sentence. Every beat must include a concrete visual_instruction describing the desired image. For chart_focus, select relevant verified focus nodes and arrows when the graph has them. For lifestyle_image, describe a real-life scene tied to the answer. All images are created by GPT Image from this directed data; no visual may introduce a fact outside the approved claims or VERIFIED VISUAL DATA. EVIDENCE RULE: every beat's evidence_ids must be a non-empty array containing only exact id values from the CLAIMS list below. Never create a new claim ID and never leave evidence_ids empty.
 Use plain text for narration and all visible image labels. Strip Markdown syntax from source copy: a heading such as 'Key Insights' must never include hash, asterisk, or backtick formatting markers.
 {language_instruction}
 USER QUESTION: {question[:2000]}
@@ -372,6 +373,9 @@ VERIFIED VISUAL DATA: {json.dumps(source, ensure_ascii=False)}'''
             narration = complete_line(item.get("narration"))
             if not narration:
                 raise ValueError(f"Beat {i + 1} is not a complete short sentence.")
+            pause_after = str(item.get("pause_after") or "").strip().lower()
+            if pause_after not in {"none", "short", "medium", "long"}:
+                raise ValueError(f"Beat {i + 1} has an invalid transition pause.")
             visual_instruction = _clean_text(str(item.get("visual_instruction") or ""))
             if not visual_instruction:
                 raise ValueError(f"Beat {i + 1} has no visual direction.")
@@ -384,7 +388,7 @@ VERIFIED VISUAL DATA: {json.dumps(source, ensure_ascii=False)}'''
                 raise ValueError(f"Beat {i + 1} is not grounded in an approved claim.")
             beats.append({"id": f"beat_{i + 1}", "start_seconds": 0, "end_seconds": 0,
                           "type": str(item["type"]), "narrator": "podcast",
-                          "narration": narration, "visual_instruction": visual_instruction,
+                          "narration": narration, "pause_after": pause_after, "visual_instruction": visual_instruction,
                           "focus_nodes": focus_nodes, "draw_edges": draw_edges, "evidence_ids": ids})
         for beat in beats:
             if beat["type"] == "chart_focus" and graph.get("nodes") and (not beat["focus_nodes"] or not beat["draw_edges"]):
@@ -400,7 +404,8 @@ VERIFIED VISUAL DATA: {json.dumps(source, ensure_ascii=False)}'''
     for beat in beats:
         # This is only a planning estimate; the renderer measures the actual
         # TTS MP3 and never cuts speech to make it fit a template.
-        seconds = max(4.0, len(beat["narration"].split()) / 2.5 + 0.35)
+        pause_seconds = {"none": 0.0, "short": 0.35, "medium": 0.6, "long": 0.9}[beat["pause_after"]]
+        seconds = max(2.0, len(beat["narration"].split()) / 2.5 + pause_seconds)
         beat["start_seconds"] = round(cursor, 1)
         cursor += seconds
         beat["end_seconds"] = round(cursor, 1)
