@@ -10,7 +10,7 @@ REEL_SHORT_DURATION_SECONDS = 90
 REEL_DEEP_DURATION_SECONDS = 180
 
 
-def reel_pricing(user_id: int, duration_seconds: int = REEL_SHORT_DURATION_SECONDS) -> dict:
+def reel_pricing(user_id: int, duration_seconds: int = REEL_SHORT_DURATION_SECONDS, presenter_enabled: bool = False) -> dict:
     """Return the server-authoritative price for one supported Reel format."""
     key = (
         "reel_short_generation_cost"
@@ -19,7 +19,11 @@ def reel_pricing(user_id: int, duration_seconds: int = REEL_SHORT_DURATION_SECON
     )
     base = credit_service.get_credit_setting(key)
     cost = credit_service.get_effective_cost(user_id, base, key)
-    return {"credit_cost": cost, "credits": credit_service.get_user_credits(user_id)}
+    addon_key = 'reel_presenter_addon_cost'
+    addon = credit_service.get_effective_cost(user_id, credit_service.get_credit_setting(addon_key), addon_key)
+    return {"credit_cost": cost + (addon if presenter_enabled else 0), "base_credit_cost": cost,
+            "presenter_addon_cost": addon, "presenter_enabled": presenter_enabled,
+            "credits": credit_service.get_user_credits(user_id)}
 
 
 def charge_reel(conn, user_id: int, cost: int, job_id: str, message_id: int) -> bool:

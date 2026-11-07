@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
  * Premium answers use included copy (no extra credits).
  */
 export default function PodcastPromoModal({ visible, onClose, onGenerate, onCreateReel, podcastCost, reelCost, included, colors }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [selectedFormat, setSelectedFormat] = useState(null);
   const cost = podcastCost ?? 2;
   const text = colors?.text ?? '#111';
@@ -48,7 +48,7 @@ export default function PodcastPromoModal({ visible, onClose, onGenerate, onCrea
             <TouchableOpacity
               accessibilityRole="button"
               style={[styles.formatOption, { borderColor: primary, backgroundColor: `${primary}0D` }]}
-              onPress={() => setSelectedFormat('reel')}
+              onPress={() => onCreateReel?.(i18n.language?.startsWith('hi') ? 'hi' : 'en')}
             >
               <View style={[styles.reelIcon, { backgroundColor: `${primary}1A` }]}><Ionicons name="film-outline" size={20} color={primary} /></View>
               <View style={styles.reelCopy}><Text style={[styles.reelTitle, { color: text }]}>{t('chat.podcastPromo.reelTitle', 'Create a visual reel')}</Text><Text style={[styles.reelDescription, { color: sub }]}>{Number.isFinite(Number(reelCost)) ? t('chat.podcastPromo.reelCost', 'English or Hindi · {{cost}} credits', { cost: reelCost }) : t('chat.podcastPromo.reelCostLoading', 'Checking credits…')}</Text></View>

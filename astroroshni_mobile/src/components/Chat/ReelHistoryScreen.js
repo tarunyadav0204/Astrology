@@ -10,6 +10,7 @@ import { useAnalytics } from '../../hooks/useAnalytics';
 import { goBackOrHome } from '../../navigation/navHelpers';
 import FocusedStatusBar from '../Common/FocusedStatusBar';
 import ReelPlayerModal from '../ReelPlayerModal';
+import ReelArtwork from '../ReelArtwork';
 
 const isReady = (status) => status === 'completed';
 
@@ -57,8 +58,10 @@ export default function ReelHistoryScreen({ navigation }) {
     const hindi = String(item.language || '').toLowerCase().startsWith('hi');
     return <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
       <TouchableOpacity disabled={!ready} onPress={() => setSelectedReel(item)} style={styles.cardTop} accessibilityRole="button" accessibilityLabel={ready ? t('premiumUi.reelStudio.historyPlay', 'Play reel') : statusLabel(item.status)}>
-        <View style={[styles.playButton, { backgroundColor: ready ? colors.accentSoft : colors.surfaceMuted }]}>
-          <Ionicons name={ready ? 'play' : item.status === 'failed' ? 'alert-circle-outline' : 'time-outline'} size={22} color={ready ? colors.onAccent : colors.textSecondary} />
+        <View style={styles.cover}>
+          <ReelArtwork jobId={ready ? item.job_id : null} style={StyleSheet.absoluteFill} />
+          <View style={styles.coverPlay}><Ionicons name={ready ? 'play' : item.status === 'failed' ? 'alert-circle-outline' : 'time-outline'} size={20} color="#fff" /></View>
+          {!!item.duration_seconds && <Text style={styles.coverDuration}>{Math.floor(item.duration_seconds / 60)}:{String(Math.floor(item.duration_seconds % 60)).padStart(2, '0')}</Text>}
         </View>
         <View style={styles.cardCopy}>
           <Text style={[styles.eyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.historyItem', 'REEL {{number}}', { number: list.length - index })}</Text>
@@ -89,8 +92,8 @@ export default function ReelHistoryScreen({ navigation }) {
       </View>
     </SafeAreaView>
     {selectedReel && <ReelPlayerModal
-      key={selectedReel.job_id}
       jobId={selectedReel.job_id}
+      reels={playableReels}
       reelIds={playableReels.map((item) => item.job_id)}
       onSwipeToReel={(jobId) => {
         const nextReel = playableReels.find((item) => item.job_id === jobId);
@@ -103,6 +106,9 @@ export default function ReelHistoryScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  cover: { width: 96, height: 160, borderRadius: 14, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  coverPlay: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#0007', alignItems: 'center', justifyContent: 'center' },
+  coverDuration: { position: 'absolute', bottom: 6, right: 6, fontSize: 10, color: '#fff', backgroundColor: '#000a', paddingHorizontal: 5, paddingVertical: 3, borderRadius: 5 },
   container: { flex: 1 }, safeArea: { flex: 1 }, content: { flex: 1 },
   header: { minHeight: 78, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1 }, back: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, headerCopy: { flex: 1, paddingHorizontal: 14 }, headerEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 2 }, headerTitle: { fontSize: 23, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '600', marginTop: 2 }, count: { minWidth: 38, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 }, countText: { fontSize: 13, fontWeight: '900' },
   intro: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 }, introTitle: { fontSize: 29, lineHeight: 35, fontFamily: Platform.select({ web: 'Georgia', ios: 'Georgia', android: 'serif' }), fontWeight: '500' }, introBody: { fontSize: 14, lineHeight: 21, marginTop: 8 }, list: { paddingHorizontal: 20, paddingBottom: 100, gap: 12 }, emptyList: { flexGrow: 1 },

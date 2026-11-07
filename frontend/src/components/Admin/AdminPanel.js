@@ -113,7 +113,7 @@ const CREDIT_SETTING_GROUPS = [
     key: 'media',
     title: 'Media & creations',
     hint: 'Audio, visual and generated experiences.',
-    keys: ['podcast_cost', 'reel_generation_cost', 'reel_short_generation_cost', 'reel_deep_generation_cost', 'partner_portrait_cost'],
+    keys: ['podcast_cost', 'reel_generation_cost', 'reel_short_generation_cost', 'reel_deep_generation_cost', 'reel_presenter_addon_cost', 'partner_portrait_cost'],
   },
 ];
 

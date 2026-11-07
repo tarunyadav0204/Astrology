@@ -16,6 +16,7 @@ _CREDIT_SETTING_FALLBACKS = {
     "reel_generation_cost": 25,
     "reel_short_generation_cost": 15,
     "reel_deep_generation_cost": 25,
+    "reel_presenter_addon_cost": 10,
     "chart_chat_cost": 2,
     "prashna_analysis_cost": 3,
     "partner_portrait_cost": 44,
@@ -585,6 +586,7 @@ class CreditService:
                 ("reel_generation_cost", 25, "Legacy Reel Studio rate (retained for older app versions)"),
                 ("reel_short_generation_cost", 15, "Short Reel (about 90 seconds, 8–10 scenes) — credits per new or recreated reel"),
                 ("reel_deep_generation_cost", 25, "Deep Reel (about 3 minutes, 12–18 scenes) — credits per new or recreated reel"),
+                ("reel_presenter_addon_cost", 10, "Additional credits for 5-second opening and closing presenter clips (360p)"),
                 ("prashna_analysis_cost", 3, "Credits per classical Prashna question chart"),
                 ("partner_portrait_cost", 44, "Credits per AI Partner Portrait with face and full-body views"),
                 ("nakshatra_blueprint_cost", 9, "Credits per Nakshatra Blueprint reading"),
@@ -4106,6 +4108,7 @@ class CreditService:
             "reel_generation_cost": "Legacy Reel Studio rate (retained for older app versions)",
             "reel_short_generation_cost": "Short Reel (about 90 seconds, 8–10 scenes) — credits per new or recreated reel",
             "reel_deep_generation_cost": "Deep Reel (about 3 minutes, 12–18 scenes) — credits per new or recreated reel",
+            "reel_presenter_addon_cost": "Additional credits for 5-second opening and closing presenter clips (360p)",
             "partner_portrait_cost": "Credits per AI Partner Portrait with face and full-body views",
             "nakshatra_blueprint_cost": "Credits per Nakshatra Blueprint reading",
             "nakshatra_blueprint_images_addon_cost": "Additional credits for illustrated Nakshatra Blueprint",
@@ -4322,7 +4325,7 @@ class CreditService:
             'progeny_analysis_cost', 'partnership_report_cost', 'career_report_cost', 'wealth_report_cost',
             'health_report_cost', 'janam_kundli_report_cost', 'progeny_report_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost',
             'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'marriage_muhurat_cost',
-            'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost', 'reel_short_generation_cost', 'reel_deep_generation_cost',
+            'event_timeline_cost', 'karma_analysis_cost', 'ashtakavarga_life_predictions_cost', 'podcast_cost', 'reel_short_generation_cost', 'reel_deep_generation_cost', 'reel_presenter_addon_cost',
             'prashna_analysis_cost', 'partner_portrait_cost', 'nakshatra_blueprint_cost', 'nakshatra_blueprint_images_addon_cost'
         )
         placeholders = ", ".join(["?"] * len(keys))
@@ -4450,6 +4453,7 @@ class CreditService:
             for key, default, description in (
                 ("reel_short_generation_cost", 15, "Short Reel (about 90 seconds, 8–10 scenes) — credits per new or recreated reel"),
                 ("reel_deep_generation_cost", 25, "Deep Reel (about 3 minutes, 12–18 scenes) — credits per new or recreated reel"),
+                ("reel_presenter_addon_cost", 10, "Additional credits for 5-second opening and closing presenter clips (360p)"),
             ):
                 if any(s["key"] == key for s in settings):
                     continue

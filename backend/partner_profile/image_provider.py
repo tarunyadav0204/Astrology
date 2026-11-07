@@ -59,6 +59,7 @@ class OpenAIPartnerPortraitProvider:
     provider_name = "openai"
 
     def __init__(self) -> None:
+        self.usage_observer = None
         self.api_key = _api_key()
         if not self.api_key:
             raise RuntimeError("Partner Portrait image provider is not configured")
@@ -95,7 +96,11 @@ class OpenAIPartnerPortraitProvider:
             except (ValueError, AttributeError):
                 message = ""
             raise RuntimeError(f"OpenAI image generation failed: {message or f'HTTP {response.status_code}'}")
-        return _extract_image(response.json())
+        payload = response.json()
+        # Observe before decoding: an invalid/missing asset may still be billed.
+        if self.usage_observer:
+            self.usage_observer(payload.get('usage'), response.headers.get('x-request-id'))
+        return _extract_image(payload)
 
     async def _load_reference(self, portrait_uri: str) -> tuple[bytes, str]:
         embedded = _decode_data_uri(portrait_uri)

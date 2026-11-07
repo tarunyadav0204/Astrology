@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { showToast } from '../../utils/toast';
 import './ReelStudioModal.css';
 import ReelPlayer from './ReelPlayer';
-import { ThemeButton, ThemeModal } from '../Theme';
+import { ThemeButton } from '../Theme';
 import CreditsModal from '../Credits/CreditsModal';
 
 const REEL_FORMATS = {
@@ -20,7 +20,7 @@ const REEL_FORMATS = {
         description: 'A fuller visual reading with more chart and timing detail.',
     },
 };
-const REEL_SETTINGS = { language: 'en', visualLevel: 'cinematic' };
+const REEL_SETTINGS = { visualLevel: 'cinematic' };
 
 function reelProgress(status, preparing = false) {
     if (preparing) return { value: 8, title: 'Preparing your reel', detail: 'Organising your reading into a clear visual story.' };
@@ -45,11 +45,14 @@ export default function ReelStudioModal({ messageId, onClose }) {
     const [checkingCache, setCheckingCache] = useState(true);
     const [showPlayer, setShowPlayer] = useState(false);
     const [creditQuote, setCreditQuote] = useState(null);
-    const [showCreditConfirm, setShowCreditConfirm] = useState(false);
+    const [showSetup, setShowSetup] = useState(false);
+    const [language, setLanguage] = useState(() => localStorage.getItem('reelLanguage') === 'hi' ? 'hi' : 'en');
+    const [presenterEnabled, setPresenterEnabled] = useState(false);
+    const [pricingError, setPricingError] = useState(false);
+    const [pricingRetry, setPricingRetry] = useState(0);
     const [showBuyCredits, setShowBuyCredits] = useState(false);
     const [isRecreating, setIsRecreating] = useState(false);
     const [reelFormat, setReelFormat] = useState('short');
-    const [formatQuotes, setFormatQuotes] = useState({});
     const prepareLock = useRef(false);
 
     useEffect(() => {
@@ -77,17 +80,19 @@ export default function ReelStudioModal({ messageId, onClose }) {
 
     useEffect(() => {
         let active = true;
-        const loadFormatQuotes = async () => {
-            const token = localStorage.getItem('token');
-            const entries = await Promise.all(Object.entries(REEL_FORMATS).map(async ([key, format]) => {
-                const response = await fetch(`/api/reel-studio/pricing?duration_seconds=${format.duration}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-                return response.ok ? [key, await response.json()] : null;
-            }));
-            if (active) setFormatQuotes(Object.fromEntries(entries.filter(Boolean)));
-        };
-        loadFormatQuotes().catch(() => { /* The confirmation still loads its authoritative quote. */ });
+        setCreditQuote(null); setPricingError(false);
+        const token = localStorage.getItem('token');
+        fetch(`/api/reel-studio/pricing?duration_seconds=${REEL_FORMATS[reelFormat].duration}&presenter_enabled=${presenterEnabled}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+            .then(async (response) => {
+                if (!response.ok) throw new Error('Could not load pricing');
+                const data = await response.json();
+                if (!Number.isFinite(data.credit_cost) || !Number.isFinite(data.credits)) throw new Error('Invalid price');
+                if (presenterEnabled && data.presenter_enabled !== true) throw new Error('Presenter pricing is not available yet');
+                if (active) setCreditQuote({ ...data, format: reelFormat, presenter: presenterEnabled });
+            }).catch(() => { if (active) setPricingError(true); });
         return () => { active = false; };
-    }, []);
+    }, [reelFormat, presenterEnabled, pricingRetry]);
+    const quoteReady = creditQuote && creditQuote.format === reelFormat && creditQuote.presenter === presenterEnabled;
 
     useEffect(() => {
         if (!job?.job_id || ['completed', 'failed'].includes(jobStatus)) return undefined;
@@ -109,24 +114,12 @@ export default function ReelStudioModal({ messageId, onClose }) {
         return () => { active = false; window.clearInterval(timer); };
     }, [job?.job_id, jobStatus]);
 
-    const requestCreditConfirmation = async (format = 'short', recreating = false) => {
-        if (loading) return;
-        const selectedFormat = REEL_FORMATS[format] || REEL_FORMATS.short;
-        setReelFormat(format in REEL_FORMATS ? format : 'short');
-        setLoading(true);
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/reel-studio/pricing?duration_seconds=${selectedFormat.duration}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-            const payload = await response.json();
-            if (!response.ok) throw new Error(payload.detail || 'Could not load reel pricing.');
-            setCreditQuote(payload); setIsRecreating(recreating); setShowPlayer(false); setShowCreditConfirm(true);
-        } catch (error) { showToast(error.message, 'error'); }
-        finally { setLoading(false); }
-    };
     const prepare = async () => {
-        if (prepareLock.current || !creditQuote) return;
+        if (prepareLock.current || !quoteReady) return;
+        if (creditQuote.credits < creditQuote.credit_cost) { setShowBuyCredits(true); return; }
         prepareLock.current = true;
-        setShowCreditConfirm(false);
+        setShowSetup(false);
+        localStorage.setItem('reelLanguage', language);
         setJob(null); setJobStatus('preparing'); setJobError('');
         setLoading(true);
         try {
@@ -134,7 +127,7 @@ export default function ReelStudioModal({ messageId, onClose }) {
             const response = await fetch('/api/reel-studio/drafts/from-answer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify({ message_id: messageId, duration_seconds: REEL_FORMATS[reelFormat].duration, language: REEL_SETTINGS.language, visual_level: REEL_SETTINGS.visualLevel }),
+                body: JSON.stringify({ message_id: messageId, duration_seconds: REEL_FORMATS[reelFormat].duration, language, presenter_enabled: presenterEnabled, visual_level: REEL_SETTINGS.visualLevel }),
             });
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.detail || 'Could not prepare this reel.');
@@ -150,7 +143,7 @@ export default function ReelStudioModal({ messageId, onClose }) {
     const recreate = () => {
         const priorDuration = Number(job?.settings?.duration_seconds);
         const format = priorDuration === REEL_FORMATS.deep.duration ? 'deep' : 'short';
-        requestCreditConfirmation(format, true);
+        setReelFormat(format); setPresenterEnabled(false); setIsRecreating(true); setShowPlayer(false); setShowSetup(true);
     };
     const queue = async (draft) => {
         if (!draft?.draft_id) throw new Error('Your reel could not be prepared. Please try again.');
@@ -159,7 +152,7 @@ export default function ReelStudioModal({ messageId, onClose }) {
             const response = await fetch('/api/reel-studio/jobs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                body: JSON.stringify({ message_id: messageId, duration_seconds: REEL_FORMATS[reelFormat].duration, language: REEL_SETTINGS.language, visual_level: REEL_SETTINGS.visualLevel, draft_id: draft.draft_id, approved_claim_ids: draft.claims.map((claim) => claim.id), confirmed_credit_cost: creditQuote.credit_cost }),
+                body: JSON.stringify({ message_id: messageId, duration_seconds: REEL_FORMATS[reelFormat].duration, language, presenter_enabled: presenterEnabled, visual_level: REEL_SETTINGS.visualLevel, draft_id: draft.draft_id, approved_claim_ids: draft.claims.map((claim) => claim.id), confirmed_credit_cost: creditQuote.credit_cost }),
             });
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.detail || 'Could not queue this reel.');
@@ -178,20 +171,7 @@ export default function ReelStudioModal({ messageId, onClose }) {
             const link = document.createElement('a'); link.href = url; link.download = 'astroroshni-reel.mp4'; link.click(); URL.revokeObjectURL(url);
         } catch (error) { showToast(error.message || 'Could not download the reel.', 'error'); }
     };
-    if (showBuyCredits) return <CreditsModal isOpen onClose={() => { setShowBuyCredits(false); requestCreditConfirmation(reelFormat, isRecreating); }} />;
-    if (showCreditConfirm) return <ThemeModal isOpen onClose={() => setShowCreditConfirm(false)} size="sm" className="reel-credit-confirm"
-        title={isRecreating ? `Recreate this ${REEL_FORMATS[reelFormat].label}?` : `Create your ${REEL_FORMATS[reelFormat].label}`}
-        description={`${REEL_FORMATS[reelFormat].detail}. Credits are charged once creation begins. Replaying a saved reel is free.`}>
-        <div className="reel-credit-summary">
-            <span className="reel-credit-summary__label">{REEL_FORMATS[reelFormat].label} cost</span>
-            <div className="reel-credit-price"><strong>{creditQuote.credit_cost}</strong><span>credits</span></div>
-            <span className="reel-credit-summary__balance">Your balance: <b>{creditQuote.credits}</b> credits</span>
-        </div>
-        <div className="reel-credit-actions"><ThemeButton variant="secondary" onClick={() => setShowCreditConfirm(false)}>Not now</ThemeButton>
-            <ThemeButton onClick={creditQuote.credits < creditQuote.credit_cost ? () => { setShowCreditConfirm(false); setShowBuyCredits(true); } : prepare}>
-                {creditQuote.credits < creditQuote.credit_cost ? 'Buy credits' : 'Continue'}
-            </ThemeButton></div>
-    </ThemeModal>;
+    if (showBuyCredits) return <CreditsModal isOpen onClose={() => { setShowBuyCredits(false); setPricingRetry((n) => n + 1); }} />;
     if (showPlayer && job?.job_id) return <ReelPlayer jobId={job.job_id} onClose={() => setShowPlayer(false)} onRecreate={recreate} />;
     return createPortal(
         <div className="reel-studio-backdrop" role="presentation" onMouseDown={onClose}>
@@ -201,21 +181,28 @@ export default function ReelStudioModal({ messageId, onClose }) {
                 <h2 id="reel-studio-title">Your personal reel</h2>
                 <p className="reel-studio-intro">A polished visual reading shaped from your chart, timing and the guidance in this conversation.</p>
 
-                {checkingCache ? <p role="status">Checking your saved reel…</p> : jobStatus === 'cache_error' ? <p role="alert">{jobError}</p> : (job || loading) ? <div className="reel-studio-job" aria-live="polite">
-                    {jobStatus === 'failed' ? <><span>!</span><h3>We couldn’t finish your reel</h3><p>{jobError || 'Please try again. Your credits will be returned if creation did not complete.'}</p><button type="button" className="reel-studio-secondary" onClick={recreate}>Try again</button></> : <>
+                {checkingCache ? <p role="status">Checking your saved reel…</p> : jobStatus === 'cache_error' ? <p role="alert">{jobError}</p> : ((job && !showSetup) || loading) ? <div className="reel-studio-job" aria-live="polite">
+                    {jobStatus === 'failed' ? <><span>!</span><h3>We couldn’t finish your reel</h3><p>Please try again. Your credits will be returned if creation did not complete.</p><button type="button" className="reel-studio-secondary" onClick={recreate}>Try again</button></> : <>
                     <span className={jobStatus === 'completed' ? 'is-complete' : ''}>{jobStatus === 'completed' ? '✓' : '◌'}</span>
                     <h3>{reelProgress(jobStatus, loading && !job).title}</h3>
                     <div className="reel-progress" role="progressbar" aria-valuenow={reelProgress(jobStatus, loading && !job).value} aria-valuemin="0" aria-valuemax="100"><i style={{ width: `${reelProgress(jobStatus, loading && !job).value}%` }} /></div>
                     <strong className="reel-progress-value">{reelProgress(jobStatus, loading && !job).value}%</strong>
                     <p>{reelProgress(jobStatus, loading && !job).detail}</p>
-                    {jobStatus !== 'completed' && <><small className="reel-progress-note">This can take up to two minutes. It will keep creating in the background if you close this window.</small><button type="button" className="reel-studio-secondary reel-studio-keep-creating" onClick={onClose}>Close — keep creating</button></>}
+                    {jobStatus !== 'completed' && <><small className="reel-progress-note">This can take around five minutes. It will keep creating in the background if you close this window.</small><button type="button" className="reel-studio-secondary reel-studio-keep-creating" onClick={onClose}>Close — keep creating</button></>}
                     {jobStatus === 'completed' ? <><button type="button" className="reel-studio-primary" onClick={() => setShowPlayer(true)}>Play saved reel</button><button type="button" className="reel-studio-secondary" onClick={download}>Download MP4</button><button type="button" className="reel-studio-secondary" onClick={recreate}>Recreate reel</button></> : null}
                 </>}</div> : <>
-                    <div className="reel-studio-privacy">◇ Your name and birth details stay private.</div>
-                    <div className="reel-format-options">
-                        {Object.entries(REEL_FORMATS).map(([key, format]) => <button type="button" key={key} className={`reel-format-option ${key === 'short' ? 'is-recommended' : ''}`} onClick={() => requestCreditConfirmation(key)} disabled={loading}>
-                            <span>{key === 'short' ? 'Recommended' : 'More detail'}</span><strong>{format.label}</strong><small>{format.detail} · {formatQuotes[key]?.credit_cost ?? '…'} credits</small><p>{format.description}</p>
-                        </button>)}
+                    <div className="reel-setup">
+                        <h3>{isRecreating ? 'Recreate your reel' : 'Make it your reel'}</h3>
+                        <fieldset><legend>Language</legend><div className="reel-setup-options">
+                            {[['en', 'English'], ['hi', 'हिन्दी']].map(([code, label]) => <button type="button" key={code} aria-pressed={language === code} onClick={() => setLanguage(code)}>{label}</button>)}
+                        </div></fieldset>
+                        <fieldset><legend>Length</legend><div className="reel-setup-options">
+                            {Object.entries(REEL_FORMATS).map(([key, format]) => <button type="button" key={key} aria-pressed={reelFormat === key} onClick={() => setReelFormat(key)}>{key === 'short' ? 'Short · ~90 sec' : 'Detailed · ~3 min'}</button>)}
+                        </div></fieldset>
+                        <label className="reel-setup-presenter"><span><strong>Add a presenter</strong><small>An Indian female host opens and closes your reel, 5 seconds each.</small>{quoteReady && <small>+{creditQuote.presenter_addon_cost} credits</small>}</span><input type="checkbox" checked={presenterEnabled} onChange={(event) => setPresenterEnabled(event.target.checked)} /></label>
+                        <div className="reel-credit-summary" aria-live="polite">{quoteReady ? <><strong>{creditQuote.credit_cost} credits total</strong><span>Your balance: {creditQuote.credits} credits</span></> : pricingError ? <button type="button" onClick={() => setPricingRetry((n) => n + 1)}>Could not load pricing. Retry</button> : <span>Checking credits…</span>}</div>
+                        <small>Saved reels are free to replay. Credits are charged when creation begins.</small>
+                        <ThemeButton disabled={!quoteReady || loading} onClick={prepare}>{quoteReady && creditQuote.credits < creditQuote.credit_cost ? 'Buy credits' : 'Create reel'}</ThemeButton>
                     </div>
                 </>}
             </section>

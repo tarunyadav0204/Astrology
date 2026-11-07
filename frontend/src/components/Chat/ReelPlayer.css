@@ -1,2 +1,37 @@
-.reel-player{position:fixed;inset:0;z-index:11000;background:#000;color:#fff;display:flex;justify-content:center;font-family:Arial,sans-serif}.reel-player-video{width:100%;height:100%;object-fit:contain}.reel-player-top{position:absolute;top:0;left:0;right:0;padding:calc(16px + env(safe-area-inset-top)) 20px 32px;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(#000b,transparent)}.reel-player-top>span{font:24px Georgia,serif;color:#f7db9d}.reel-player button{border:1px solid #ffffff42;border-radius:24px;padding:10px 16px;background:#151515cf;color:#fff;cursor:pointer;min-height:42px}.reel-player button:disabled{opacity:.45;cursor:default}.reel-player-top button{margin-left:8px}.reel-player-controls{position:absolute;bottom:0;left:0;right:0;padding:36px max(20px,env(safe-area-inset-left)) calc(20px + env(safe-area-inset-bottom));background:linear-gradient(transparent,#000e 35%)}.reel-player-controls input{display:block;width:100%;accent-color:#f4d295;cursor:pointer}.reel-player-actions,.reel-player-social{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}.reel-player-actions>span{font-size:12px;font-variant-numeric:tabular-nums}.reel-player-social button{font-size:12px;color:#f4d295}.reel-player-controls p{text-align:center;font-size:13px}.reel-player-loading{position:absolute;top:45%}@media(min-width:900px){.reel-player-controls{padding-left:max(20px,calc((100vw - 800px)/2));padding-right:max(20px,calc((100vw - 800px)/2))}}
-.reel-player-top,.reel-player-controls{transition:opacity .2s ease,visibility .2s ease}.reel-player[data-controls-visible="false"]{cursor:none}.reel-player[data-controls-visible="false"] .reel-player-top,.reel-player[data-controls-visible="false"] .reel-player-controls{opacity:0;visibility:hidden;pointer-events:none}
+.reel-player{position:fixed;inset:0;z-index:11000;background:#24121e;color:#fff;overflow:hidden;font-family:Arial,sans-serif;isolation:isolate}
+.reel-player-scene{position:absolute;inset:0;will-change:transform}
+.reel-player-backdrop{position:absolute;inset:-8%;width:116%;height:116%;object-fit:cover;filter:blur(32px) brightness(.35);pointer-events:none}
+.reel-player-video,.reel-player-poster{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.reel-player-gesture{position:absolute;inset:0;touch-action:none}
+.reel-player button{border:1px solid #ffffff35;border-radius:24px;padding:10px;background:#170e23b8;color:#fff;cursor:pointer;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center}
+.reel-player button:disabled{opacity:.4;cursor:default}
+.reel-player button:focus-visible{outline:2px solid #f5d699;outline-offset:3px}
+.reel-player-top{position:absolute;top:0;left:0;right:0;padding:calc(12px + env(safe-area-inset-top)) 20px 24px;display:flex;gap:20px;align-items:center;background:linear-gradient(#130c18b0,transparent)}
+.reel-player-top>span{display:flex;align-items:center;gap:9px;flex:1;font:20px Georgia,serif;color:#f7db9d}
+.reel-player-top img{width:30px;height:30px;border-radius:8px}
+.reel-player-top small{font-variant-numeric:tabular-nums}
+.reel-player-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:68px;height:68px;border-radius:50%!important}
+.reel-player-center svg{width:32px;height:32px}
+.reel-player-rail{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:calc(140px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px}
+.reel-player-rail button{width:62px;min-height:62px;flex-direction:column;gap:6px;font-size:10px}
+.reel-player-controls{position:absolute;bottom:0;left:0;right:0;padding:28px max(20px,env(safe-area-inset-left)) calc(16px + env(safe-area-inset-bottom));background:linear-gradient(transparent,#100a16dd 40%)}
+.reel-player-controls input{display:block;box-sizing:border-box;width:100%;height:28px;accent-color:#f4d295;cursor:pointer;margin:0}
+.reel-player-controls input::-webkit-slider-runnable-track{height:3px;background:#ffffff60;border-radius:4px}
+.reel-player-controls input:active::-webkit-slider-runnable-track{height:7px}
+.reel-player-controls input::-webkit-slider-thumb{margin-top:-6px}
+.reel-player-controls input:active::-webkit-slider-thumb{margin-top:-4px}
+.reel-player-time{display:block;text-align:right;font-size:11px;font-variant-numeric:tabular-nums;color:#ddd}
+.reel-player-controls p{font-size:13px;color:#f4d295;margin:0 0 6px}
+.reel-player-controls p.reel-player-question{color:white;font-size:15px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.reel-player-loading{position:absolute;top:48%;left:0;right:0;text-align:center;font-size:13px;color:#f4d295;pointer-events:none}
+.reel-player-overlay{transition:opacity .2s ease,visibility .2s ease}
+.reel-player[data-controls-visible="false"]{cursor:none}
+.reel-player[data-controls-visible="false"] .reel-player-overlay{opacity:0;visibility:hidden;pointer-events:none}
+.reel-player-passive{position:absolute;bottom:max(4px,env(safe-area-inset-bottom));left:20px;right:20px;height:2px;background:#ffffff20;pointer-events:none}
+.reel-player-passive i{display:block;height:100%;background:#f4d295}
+.reel-player-menu-backdrop{position:absolute;inset:0;background:#0008;display:flex;align-items:flex-end;justify-content:center;cursor:auto}
+.reel-player-menu{width:min(100%,440px);box-sizing:border-box;padding:24px 24px calc(20px + env(safe-area-inset-bottom));border-radius:24px 24px 0 0;background:var(--surface-raised,#fff8ef);color:var(--text-primary,#291222);box-shadow:0 -12px 50px #0004}
+.reel-player-menu h3{font:24px Georgia,serif;margin:0 0 18px}
+.reel-player-menu button{display:flex;width:100%;justify-content:flex-start;border:0;border-bottom:1px solid #6e183326;border-radius:0;background:transparent;color:inherit;padding:16px 4px;font-size:15px}
+@media(min-width:900px){.reel-player-controls,.reel-player-top{padding-left:max(24px,calc((100vw - 800px)/2));padding-right:max(24px,calc((100vw - 800px)/2))}.reel-player-rail{right:max(24px,calc((100vw - 800px)/2))}}
+@media(prefers-reduced-motion:reduce){.reel-player-scene,.reel-player-overlay{transition:none!important}}

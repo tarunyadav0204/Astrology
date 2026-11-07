@@ -130,9 +130,10 @@ def test_reel_pricing_uses_format_specific_admin_and_vip_rates(monkeypatch):
         get_effective_cost=lambda uid, base, key: 20,
         get_user_credits=lambda uid: 75,
     ))
-    assert billing.reel_pricing(18) == {"credit_cost": 20, "credits": 75}
-    assert billing.reel_pricing(18, 180) == {"credit_cost": 20, "credits": 75}
-    assert calls == ["reel_short_generation_cost", "reel_deep_generation_cost"]
+    assert billing.reel_pricing(18)["credit_cost"] == 20
+    assert billing.reel_pricing(18, 180)["credit_cost"] == 20
+    assert calls == ["reel_short_generation_cost", "reel_presenter_addon_cost", "reel_deep_generation_cost", "reel_presenter_addon_cost"]
+    assert billing.reel_pricing(18, 180, True)["credit_cost"] == 40
 
 
 def test_job_insert_failure_rolls_back_charge(reel_db, monkeypatch):
@@ -147,3 +148,30 @@ def test_job_insert_failure_rolls_back_charge(reel_db, monkeypatch):
         routes.queue_render(request, BackgroundTasks(), user)
     assert conn.execute("SELECT credits FROM user_credits").fetchone()[0] == 100
     assert conn.execute("SELECT COUNT(*) FROM credit_transactions").fetchone()[0] == 0
+
+
+def test_presenter_selection_cannot_change_after_approval(reel_db, monkeypatch):
+    conn, request, user = reel_db
+    monkeypatch.setenv('GEMINI_API_KEY', 'no-network')
+    request.presenter_enabled = True
+    with pytest.raises(HTTPException) as error:
+        routes.queue_render(request, BackgroundTasks(), user)
+    assert error.value.status_code == 422
+    assert conn.execute('SELECT credits FROM user_credits').fetchone()[0] == 100
+
+
+def test_presenter_total_is_charged_and_refunded_once(reel_db, monkeypatch):
+    conn, request, user = reel_db
+    monkeypatch.setenv('GEMINI_API_KEY', 'no-network')
+    monkeypatch.setattr(routes, 'reel_pricing', lambda *_: {'credit_cost': 35, 'credits': 100})
+    plan = json.loads(conn.execute('SELECT plan_json FROM reel_storyboard_drafts').fetchone()[0])
+    plan['settings']['presenter_enabled'] = True
+    plan['credit_cost'] = 35
+    conn.execute('UPDATE reel_storyboard_drafts SET plan_json=?', (json.dumps(plan),))
+    conn.commit()
+    request.presenter_enabled = True
+    request.confirmed_credit_cost = 35
+    job = routes.queue_render(request, BackgroundTasks(), user)
+    assert conn.execute('SELECT credits FROM user_credits').fetchone()[0] == 65
+    billing.refund_reel(job['job_id']); billing.refund_reel(job['job_id'])
+    assert conn.execute('SELECT credits FROM user_credits').fetchone()[0] == 100

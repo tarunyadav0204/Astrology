@@ -29,14 +29,13 @@ from partner_profile.image_provider import OpenAIPartnerPortraitProvider
 from tts.routes import _build_voice_and_config, _get_google_credentials, _segment_text_to_plain
 from utils.admin_settings import get_podcast_tts_voices
 from reel_studio.text import plain_text
+from reel_studio import costs
+from reel_studio.presenter import MODEL as VIDEO_MODEL, RESOLUTION as PRESENTER_RESOLUTION, SECONDS as PRESENTER_SECONDS, prepare_presenter, portrait_prompt, validate_presenter_beats, video_prompt
 
 logger = logging.getLogger(__name__)
 
 ROOT = Path(os.getenv("REEL_LOCAL_OUTPUT_DIR", "storage/reels"))
-VIDEO_MODEL = "gemini-omni-1.1-flash"
-# Temporary cost-control mode.  Keep the Omni call below intact for later, but
-# do not invoke it unless this is explicitly enabled in deployment.
-OMNI_VIDEO_ENABLED = os.getenv("REEL_ENABLE_OMNI_VIDEO", "false").strip().lower() in {"1", "true", "yes", "on"}
+# Presenter calls are controlled by the user's approved, billed plan only.
 WIDTH, HEIGHT = 1080, 1920
 REEL_IMAGE_SIZE = "1024x1824"  # exact 9:16; both dimensions are valid GPT Image 2 multiples of 16
 PLANET_ABBR = {"Jupiter": "Ju", "Mercury": "Me", "Saturn": "Sa", "Venus": "Ve", "Mars": "Ma", "Moon": "Mo", "Sun": "Su", "Rahu": "Ra", "Ketu": "Ke"}
@@ -71,14 +70,6 @@ NORTH_INDIAN_HOUSE_SLOTS = (
     {"house": 11, "slot": "upper-right side wedge"},
     {"house": 12, "slot": "upper-right top wedge"},
 )
-USD_TO_INR = float(os.getenv("REEL_USD_TO_INR", "95"))
-VIDEO_TOKEN_COST_INR = 17.50 * USD_TO_INR / 1_000_000
-OMNI_INPUT_TOKEN_COST_INR = 1.50 * USD_TO_INR / 1_000_000
-OMNI_TEXT_TOKEN_COST_INR = 9.00 * USD_TO_INR / 1_000_000
-# GPT Image 2 output cost scales with output-image tokens. 1024x1824 is 19%
-# larger than the published 1024x1536 reference price.
-GPT_IMAGE_LOW_COST_INR = 0.005 * 1.1875 * USD_TO_INR
-CHIRP_TTS_CHAR_COST_INR = 30.0 * USD_TO_INR / 1_000_000
 TRANSITION_PAUSE_SECONDS = {"none": 0.0, "short": 0.35, "medium": 0.6, "long": 0.9}
 
 
@@ -104,14 +95,6 @@ def _fail_reel(job_id: str, error: str) -> None:
     except Exception as exc:
         error += f" Credit refund could not be completed: {type(exc).__name__}: {exc}"
     _update(job_id, "failed", error=error[:1000])
-
-
-def _record(user_id: int, run_id: str, stage: str, provider: str, units: float, metadata: dict, unit_cost_inr: float = 0.0) -> None:
-    with get_conn() as conn:
-        execute(conn, """INSERT INTO reel_generation_costs
-          (user_id, run_id, stage, provider, units, unit_cost_inr, total_cost_inr, metadata_json)
-          VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", (user_id, run_id, stage, provider, units, unit_cost_inr, units * unit_cost_inr, json.dumps(metadata)))
-        conn.commit()
 
 
 def _font(size: int, bold: bool = False):
@@ -319,15 +302,22 @@ def _brand_logo() -> bytes:
     return content
 
 
-async def _gpt_image(prompt: str, *, logo: bytes, quality: str = "low") -> bytes:
+async def _gpt_image(prompt: str, *, logo: bytes | None = None, identity_reference: bytes | None = None, quality: str = "low") -> bytes:
     # A single image request can occasionally hit a transient read/connect
     # timeout. Retrying that request is much safer than discarding a whole
     # 12–18 scene reel after the other parallel work has already started.
+    source = identity_reference if identity_reference is not None else logo
+    if not source:
+        raise RuntimeError('The image reference is missing.')
     for attempt in range(2):
         try:
-            return (await OpenAIPartnerPortraitProvider().edit_image(
-                prompt, logo, mime_type="image/png", quality=quality, size=REEL_IMAGE_SIZE,
-            )).content
+            provider = OpenAIPartnerPortraitProvider()
+            with costs.attempt('image', provider.model, quality=quality, size=REEL_IMAGE_SIZE, retry=attempt,
+                               reference_role='presenter_identity' if identity_reference is not None else 'brand_logo') as event:
+                provider.usage_observer = event.finish
+                return (await provider.edit_image(
+                    prompt, source, mime_type="image/png", quality=quality, size=REEL_IMAGE_SIZE,
+                )).content
         except (httpx.TimeoutException, httpx.NetworkError, asyncio.TimeoutError) as exc:
             if attempt:
                 raise RuntimeError(
@@ -337,7 +327,7 @@ async def _gpt_image(prompt: str, *, logo: bytes, quality: str = "low") -> bytes
 
 
 async def _gpt_image_edit(prompt: str, source: Path, *, quality: str = "low") -> bytes:
-    return (await OpenAIPartnerPortraitProvider().edit_image(prompt, source.read_bytes(), quality=quality, size=REEL_IMAGE_SIZE)).content
+    return await _gpt_image(prompt, logo=source.read_bytes(), quality=quality)
 
 
 def _premium_factual_edit_prompt(plan: dict, beat: dict, *, visual: str) -> str:
@@ -548,49 +538,21 @@ async def _podcast_audio(text: str, language: str, voice_name: str) -> tuple[byt
             voice_name,
             0.95 if language.startswith("hi") else 1.0,
         )
-        response = client.synthesize_speech(
-            input=texttospeech.SynthesisInput(text=plain_text),
-            voice=voice,
-            audio_config=audio_config,
-        )
+        with costs.attempt('tts', voice_name) as event:
+            response = client.synthesize_speech(
+                input=texttospeech.SynthesisInput(text=plain_text),
+                voice=voice,
+                audio_config=audio_config,
+                retry=None, timeout=120,
+            )
+            event.finish({'characters': len(plain_text)})
         return response.audio_content
 
     return await asyncio.to_thread(synthesize_beat), voice_name
 
 
-def _video_output_tokens(usage: dict) -> int:
-    """Extract Omni video tokens without trusting a particular API response shape."""
-    for row in (usage or {}).get("output_tokens_by_modality") or []:
-        if str(row.get("modality") or "").lower() == "video":
-            try: return int(row.get("tokens") or 0)
-            except (TypeError, ValueError): pass
-    for key in ("video_output_tokens", "output_video_tokens", "total_output_tokens", "output_tokens"):
-        try:
-            value = int((usage or {}).get(key) or 0)
-            if value:
-                return value
-        except (TypeError, ValueError):
-            pass
-    details = (usage or {}).get("output_token_details") or {}
-    try:
-        return int(details.get("video_tokens") or 0)
-    except (TypeError, ValueError):
-        return 0
-
-
-def _usage_tokens(usage: dict, key: str) -> int:
-    try: return int((usage or {}).get(key) or 0)
-    except (TypeError, ValueError): return 0
-
-
-def _record_omni_usage(user_id: int, run_id: str, role: str, usage: dict) -> None:
-    metadata = {"role": role, "usage": usage}
-    video_tokens = _video_output_tokens(usage)
-    _record(user_id, run_id, "video", "google:gemini-omni-1.1-flash", video_tokens, {**metadata, "unit": "video_output_tokens"}, VIDEO_TOKEN_COST_INR)
-    input_tokens = _usage_tokens(usage, "total_input_tokens") or _usage_tokens(usage, "input_tokens")
-    thought_tokens = _usage_tokens(usage, "total_thought_tokens") or _usage_tokens(usage, "thought_tokens")
-    if input_tokens: _record(user_id, run_id, "video_input", "google:gemini-omni-1.1-flash", input_tokens, {**metadata, "unit": "input_tokens"}, OMNI_INPUT_TOKEN_COST_INR)
-    if thought_tokens: _record(user_id, run_id, "video_thinking", "google:gemini-omni-1.1-flash", thought_tokens, {**metadata, "unit": "thought_tokens"}, OMNI_TEXT_TOKEN_COST_INR)
+class _TransientVideoError(RuntimeError):
+    pass
 
 
 def _run_video(prompt: str, *, image: bytes | None = None) -> tuple[bytes, dict]:
@@ -600,16 +562,52 @@ def _run_video(prompt: str, *, image: bytes | None = None) -> tuple[bytes, dict]
     inputs: list[dict] = []
     if image: inputs.append({"type": "image", "data": base64.b64encode(image).decode(), "mime_type": "image/png"})
     inputs.append({"type": "text", "text": prompt})
-    payload = {"model": VIDEO_MODEL, "input": inputs, "response_format": {"type": "video", "aspect_ratio": "9:16", "resolution": "720p"}, "generation_config": {"video_config": {"task": "image_to_video" if image else "text_to_video"}}}
-    with httpx.Client(timeout=480, follow_redirects=True) as client:
-        response = client.post("https://generativelanguage.googleapis.com/v1beta/interactions", headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=payload)
-        if response.is_error: raise RuntimeError(f"Gemini Omni generation failed: {response.text[:800]}")
-        result = response.json()
-        for step in result.get("steps") or []:
-            for part in step.get("content") or []:
-                if part.get("type") == "video" and part.get("data"):
-                    return base64.b64decode(part["data"]), result.get("usage") or {}
-    raise RuntimeError("Gemini Omni returned no video output")
+    payload = {"model": VIDEO_MODEL, "input": inputs, "store": False,
+               "response_format": {"type": "video", "aspect_ratio": "9:16", "resolution": PRESENTER_RESOLUTION, "duration": f"{PRESENTER_SECONDS}s"}}
+    for retry in range(3):
+        try:
+            with costs.attempt('video', VIDEO_MODEL, resolution=PRESENTER_RESOLUTION,
+                               duration_seconds=PRESENTER_SECONDS, retry=retry) as event, httpx.Client(timeout=480, follow_redirects=True) as client:
+                response = client.post("https://generativelanguage.googleapis.com/v1beta/interactions", headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=payload)
+                if response.is_error:
+                    try:
+                        error = (response.json().get('error') or {})
+                        code = str(error.get('code') or error.get('status') or '')
+                    except (ValueError, AttributeError):
+                        code = ''
+                    detail = f'Gemini Omni generation failed: HTTP {response.status_code}, code={code or "unknown"}'
+                    # Only temporary provider/transport failures are retried.
+                    # Keep the same model, face, resolution and approved line.
+                    if response.status_code in {429, 500, 502, 503, 504} or (
+                        response.status_code == 400 and code in {'api_error', 'INTERNAL'}
+                    ):
+                        raise _TransientVideoError(detail)
+                    raise RuntimeError(detail)
+                result = response.json()
+                event.finish(result.get('usage'), result.get('id'))
+                if (result.get('output_video') or {}).get('data'):
+                    return base64.b64decode(result['output_video']['data'], validate=True), result.get('usage') or {}
+                for step in result.get("steps") or []:
+                    for part in step.get("content") or []:
+                        if part.get("type") == "video" and part.get("data"):
+                            return base64.b64decode(part["data"], validate=True), result.get("usage") or {}
+                raise RuntimeError("Gemini Omni returned no video output")
+        except (_TransientVideoError, httpx.TimeoutException, httpx.NetworkError) as exc:
+            logger.warning('REEL_PRESENTER_ATTEMPT_FAILED attempt=%s of=3 error=%s detail=%s', retry + 1, type(exc).__name__, str(exc)[:300])
+            if retry == 2:
+                raise RuntimeError('Presenter video service remained unavailable after three attempts.') from exc
+            time.sleep(2 * (2 ** retry))
+
+
+def _validate_presenter_clip(ffmpeg: str, clip: Path) -> None:
+    if abs(_duration(ffmpeg, clip) - PRESENTER_SECONDS) > 0.15:
+        raise RuntimeError('Presenter provider returned a clip other than five seconds; refusing to cut its speech.')
+    probe = subprocess.run([ffmpeg, '-nostdin', '-hide_banner', '-i', str(clip)],
+                           capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=10)
+    if not re.search(r'Stream.*Audio:', probe.stderr):
+        raise RuntimeError('Presenter clip has no voice track.')
+    if not re.search(r'Stream.*Video:.*\b360x640\b', probe.stderr):
+        raise RuntimeError('Presenter clip must be portrait 360x640; no higher-resolution fallback is allowed.')
 
 
 def _still_clip(ffmpeg: str, image: Path, output: Path, seconds: float) -> None:
@@ -642,7 +640,7 @@ def _compose(ffmpeg: str, clips: list[Path], narration: list[Path | None], outpu
     """Normalise provider clips and lay the exact narration back in sequence.
 
     This avoids a fragile stream-copy concat when generated clips have different
-    codecs/audio layouts, and guarantees silence during chart/dasha inserts.
+    codecs/audio layouts, retaining presenter speech and the middle-scene TTS.
     """
     if len(clips) != len(narration):
         raise RuntimeError("Video/audio timeline mismatch")
@@ -711,6 +709,13 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
         row = execute(conn, "SELECT user_id, plan_json FROM reel_render_jobs WHERE id=%s", (job_id,)).fetchone()
     if not row:
         return "missing"
+    with costs.session(row[0], json.loads(row[1])["run_id"]):
+        result = _render_claimed_job(job_id, row)
+        costs.set_status(json.loads(row[1])["run_id"], result)
+        return result
+
+
+def _render_claimed_job(job_id: str, row) -> str:
     user_id, raw_plan = row; plan = json.loads(raw_plan); run_id = plan["run_id"]
     snapshot = plan.get("chart_snapshot")
     if not snapshot:
@@ -721,12 +726,17 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
         work.mkdir(parents=True, exist_ok=True); ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
         language = plan.get("settings", {}).get("language", "en")
         beats = plan.get("storyboard") or []
-        duration_seconds = int((plan.get("settings") or {}).get("duration_seconds") or 180)
-        min_beats, max_beats = (8, 10) if duration_seconds == 90 else (12, 18)
-        if not min_beats <= len(beats) <= max_beats:
-            raise RuntimeError(f"The approved {duration_seconds}-second reel plan must contain {min_beats} to {max_beats} directed beats.")
+        presenter_enabled = bool((plan.get('settings') or {}).get('presenter_enabled', False))
+        if presenter_enabled:
+            validate_presenter_beats(beats)
+            if not os.getenv('GEMINI_API_KEY'):
+                raise RuntimeError('Presenter video generation is not configured.')
+        presenter_indices = {0, len(beats) - 1} if presenter_enabled else set()
+        from reel_studio.planning import validate_scene_count
+        validate_scene_count(beats)
         # Validate the asset before starting any paid TTS/image requests.
         logo = _brand_logo()
+        presenter_source, presenter_look = prepare_presenter(user_id, job_id, plan) if presenter_enabled else (None, None)
         _update(job_id, "creating_planned_shots")
 
         async def limited(semaphore: asyncio.Semaphore, operation):
@@ -745,6 +755,13 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
             image_semaphore = asyncio.Semaphore(image_limit)
             female_voice, _ = get_podcast_tts_voices(language)
             asset_started = time.perf_counter()
+            async def presenter_reference() -> bytes:
+                portrait = await limited(image_semaphore, _gpt_image(
+                    portrait_prompt(presenter_look), identity_reference=presenter_source, quality='low'))
+                (work / 'scene-0.png').write_bytes(portrait)
+                return portrait
+            portrait_task = asyncio.create_task(presenter_reference()) if presenter_enabled else None
+            video_semaphore = asyncio.Semaphore(2)
             audio_tasks = {
                 index: asyncio.create_task(
                     limited(
@@ -756,7 +773,7 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
                         ),
                     )
                 )
-                for index, beat in enumerate(beats)
+                for index, beat in enumerate(beats) if index not in presenter_indices
             }
             image_tasks: dict[str, asyncio.Task[bytes]] = {}
             async def generate_scene(index: int, beat: dict) -> bytes:
@@ -771,6 +788,8 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
                     raise RuntimeError(f"Image generation failed for beat {index + 1} ({kind}): {type(exc).__name__}: {detail}") from exc
 
             for index, beat in enumerate(beats):
+                if index in presenter_indices:
+                    continue
                 # Cost-control policy: every Reel Studio image uses GPT Image's
                 # low-quality tier, including factual chart/SAV/dasha scenes.
                 image_tasks[f"beat-{index}"] = asyncio.create_task(generate_scene(index, beat))
@@ -792,6 +811,8 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
 
             image_paths: dict[str, asyncio.Task[Path]] = {}
             for index, beat in enumerate(beats):
+                if index in presenter_indices:
+                    continue
                 image_paths[f"beat-{index}"] = asyncio.create_task(materialize(work / f"scene-{index}.png", image_tasks[f"beat-{index}"]))
 
             clip_semaphore = asyncio.Semaphore(int(os.getenv("REEL_CLIP_CONCURRENCY", "4")))
@@ -801,6 +822,14 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
                 line = str(beat.get("narration") or "").strip()
                 if not line:
                     raise RuntimeError(f"Beat {index + 1} has no narration.")
+                if index in presenter_indices:
+                    reference = await portrait_task
+                    async with video_semaphore:
+                        content, usage = await asyncio.to_thread(_run_video, video_prompt(line, language, kind), image=reference)
+                    clip = work / f'beat-{index}.mp4'
+                    clip.write_bytes(content)
+                    await asyncio.to_thread(_validate_presenter_clip, ffmpeg, clip)
+                    return clip, None, 'omni', f'presenter_{kind}', line
                 audio, voice = await audio_tasks[index]
                 audio_path = work / f"podcast-{index}.mp3"; audio_path.write_bytes(audio)
                 image = await image_paths[f"beat-{index}"]
@@ -821,27 +850,38 @@ def process_reel_job(job_id: str, *, claim_id: str | None = None) -> str:
 
             prepared_by_index: dict[int, tuple[Path, Path, str, str, str]] = {}
             completed = 0
-            for task in asyncio.as_completed([indexed_prepare(index, beat) for index, beat in enumerate(beats)]):
-                index, prepared_beat = await task
+            # Let already-started provider calls finish and settle their ledgers,
+            # even when another scene fails. Cancelling them can hide paid work.
+            async def collect(index, beat):
+                nonlocal completed
+                index, prepared_beat = await indexed_prepare(index, beat)
                 prepared_by_index[index] = prepared_beat
                 completed += 1
                 # This is a real completed scene, not a time-based estimate.
                 # The client turns it into a branded progress experience.
                 _update(job_id, f"creating_your_reel_{completed}_of_{len(beats)}")
+            results = await asyncio.gather(*(collect(i, b) for i, b in enumerate(beats)), return_exceptions=True)
+            await asyncio.gather(*audio_tasks.values(), *image_paths.values(), return_exceptions=True)
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
             return [prepared_by_index[index] for index in range(len(beats))]
 
         prepared = asyncio.run(create_assets_and_clips())
         clips, timeline_audio = [], []
         for clip, audio_path, voice, kind, line in prepared:
             clips.append(clip); timeline_audio.append(audio_path)
-            _record(user_id, run_id, "tts", f"google-tts:{voice}", len(line), {"role": kind, "unit": "characters"}, CHIRP_TTS_CHAR_COST_INR)
-            _record(user_id, run_id, "image", "openai:gpt-image-2", 1, {"role": kind, "pricing": "gpt-image-2-1024x1824-low", "reference": "official_astroroshni_logo", "input_image_cost_included": False}, GPT_IMAGE_LOW_COST_INR)
         _update(job_id, "premium_compositing")
-        output = work / "final-reel.mp4"; _compose(ffmpeg, clips, timeline_audio, output, source_audio=set())
-        _record(user_id, run_id, "render", "ffmpeg", 1, {"composition": "gpt_image_edits+deterministic_astrology_visuals+podcast_tts", "omni_video_enabled": False})
-        from reel_studio.storage import store_reel
+        output = work / "final-reel.mp4"; _compose(ffmpeg, clips, timeline_audio, output, source_audio=presenter_indices)
+        from reel_studio.storage import store_reel, store_thumbnail
         _update(job_id, "saving_reel")
         store_reel(user_id, job_id, output)
+        store_thumbnail(user_id, job_id, work / "scene-0.png")
+        plan["media"] = {"duration_seconds": round(_duration(ffmpeg, output), 2),
+                         "thumbnail_url": f"/api/reel-studio/jobs/{job_id}/thumbnail"}
+        with get_conn() as conn:
+            execute(conn, "UPDATE reel_render_jobs SET plan_json=%s WHERE id=%s", (json.dumps(plan), job_id))
+            conn.commit()
         _update(job_id, "completed", output_url=f"/api/reel-studio/jobs/{job_id}/download")
     except Exception as exc:
         detail = str(exc).strip() or repr(exc)

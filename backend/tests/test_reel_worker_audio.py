@@ -11,7 +11,9 @@ def test_reel_audio_uses_direct_plain_google_tts(monkeypatch):
         def __init__(self, credentials):
             calls["credentials"] = credentials
 
-        def synthesize_speech(self, *, input, voice, audio_config):
+        def synthesize_speech(self, *, input, voice, audio_config, retry, timeout):
+            assert retry is None
+            assert timeout == 120
             calls["text"] = input.text
             calls["voice"] = voice
             calls["audio_config"] = audio_config

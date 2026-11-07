@@ -1,0 +1,49 @@
+diff --git a/node_modules/expo-sharing/android/build.gradle b/node_modules/expo-sharing/android/build.gradle
+--- a/node_modules/expo-sharing/android/build.gradle
++++ b/node_modules/expo-sharing/android/build.gradle
+@@ -15,5 +15,6 @@ android {
+ }
+ 
+ dependencies {
++  implementation "com.facebook.react:react-android"
+   api "androidx.legacy:legacy-support-v4:1.0.0"
+ }
+diff --git a/node_modules/expo-sharing/android/src/main/java/expo/modules/sharing/SharingModule.kt b/node_modules/expo-sharing/android/src/main/java/expo/modules/sharing/SharingModule.kt
+--- a/node_modules/expo-sharing/android/src/main/java/expo/modules/sharing/SharingModule.kt
++++ b/node_modules/expo-sharing/android/src/main/java/expo/modules/sharing/SharingModule.kt
+@@ -5,6 +5,7 @@ import android.content.Intent
+ import android.content.pm.PackageManager
+ import android.net.Uri
+ import androidx.core.content.FileProvider
++import com.facebook.react.bridge.ReadableMap
+ import expo.modules.core.errors.InvalidArgumentException
+ import expo.modules.interfaces.filesystem.Permission
+ import expo.modules.kotlin.Promise
+@@ -21,7 +22,9 @@ class SharingModule : Module() {
+   override fun definition() = ModuleDefinition {
+     Name("ExpoSharing")
+ 
+-    AsyncFunction("shareAsync") { url: String?, params: SharingOptions, promise: Promise ->
++    // Parse the bridge map directly: Record annotation reflection crashes in
++    // the minified Play release before the share intent can be created.
++    AsyncFunction("shareAsync") { url: String?, params: ReadableMap, promise: Promise ->
+       if (pendingPromise != null) {
+         throw SharingInProgressException()
+       }
+@@ -32,12 +35,13 @@ class SharingModule : Module() {
+           context.applicationInfo.packageName + ".SharingFileProvider",
+           fileToShare
+         )
+-        val mimeType = params.mimeType
++        val mimeType = if (params.hasKey("mimeType") && !params.isNull("mimeType")) params.getString("mimeType") else null
++        val resolvedMimeType = mimeType
+           ?: URLConnection.guessContentTypeFromName(fileToShare.name)
+           ?: "*/*"
+         val intent = Intent.createChooser(
+-          createSharingIntent(contentUri, mimeType),
+-          params.dialogTitle
++          createSharingIntent(contentUri, resolvedMimeType),
++          if (params.hasKey("dialogTitle") && !params.isNull("dialogTitle")) params.getString("dialogTitle") else null
+         )
+         val resInfoList = context.packageManager.queryIntentActivities(
+           intent,

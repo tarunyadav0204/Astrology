@@ -45,6 +45,7 @@
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.19",
     "expo-linear-gradient": "~15.0.8",
+    "expo-media-library": "~18.2.1",
     "expo-notifications": "^0.31.5",
     "expo-print": "~15.0.8",
     "expo-sharing": "~14.0.8",
@@ -82,6 +83,15 @@
     "patch-package": "^8.0.0",
     "react-native-svg-transformer": "^1.5.3",
     "sharp": "^0.33.5"
+  },
+  "expo": {
+    "autolinking": {
+      "android": {
+        "buildFromSource": [
+          "expo-sharing"
+        ]
+      }
+    }
   },
   "private": true
 }

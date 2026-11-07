@@ -514,27 +514,29 @@ export const chatAPI = {
     const path = getEndpoint('/tts/podcast/stream').replace(/^\//, '');
     return `${base}/${path}?message_id=${encodeURIComponent(String(messageId))}&lang=${encodeURIComponent(langCode)}`;
   },
-  createReelDraft: ({ messageId, durationSeconds = 90, language = 'en', visualLevel = 'hybrid' }) =>
+  createReelDraft: ({ messageId, durationSeconds = 90, language = 'en', visualLevel = 'hybrid', presenterEnabled = false }) =>
     api.post(getEndpoint('/reel-studio/drafts/from-answer'), {
       message_id: messageId,
       duration_seconds: durationSeconds,
       language,
       visual_level: visualLevel,
+      presenter_enabled: presenterEnabled,
     }),
-  queueReel: ({ messageId, durationSeconds = 90, language = 'en', visualLevel = 'hybrid', draftId, approvedClaimIds = [], confirmedCreditCost }) =>
+  queueReel: ({ messageId, durationSeconds = 90, language = 'en', visualLevel = 'hybrid', presenterEnabled = false, draftId, approvedClaimIds = [], confirmedCreditCost }) =>
     api.post(getEndpoint('/reel-studio/jobs'), {
       message_id: messageId,
       duration_seconds: durationSeconds,
       language,
       visual_level: visualLevel,
       draft_id: draftId,
+      presenter_enabled: presenterEnabled,
       approved_claim_ids: approvedClaimIds,
       confirmed_credit_cost: confirmedCreditCost,
     }),
   getReelJob: (jobId) => api.get(getEndpoint(`/reel-studio/jobs/${encodeURIComponent(String(jobId))}`)),
   getSavedReel: (messageId) => api.get(getEndpoint(`/reel-studio/saved/${encodeURIComponent(String(messageId))}`)),
   getReelHistory: () => api.get(getEndpoint('/reel-studio/history')),
-  getReelPricing: (durationSeconds = 90) => api.get(getEndpoint('/reel-studio/pricing'), { params: { duration_seconds: durationSeconds } }),
+  getReelPricing: (durationSeconds = 90, presenterEnabled = false) => api.get(getEndpoint('/reel-studio/pricing'), { params: { duration_seconds: durationSeconds, presenter_enabled: presenterEnabled } }),
   submitFeedback: ({ message_id, rating, comment = null, reason = null }) =>
     api.post(getEndpoint('/chat/feedback/submit'), {
       message_id,

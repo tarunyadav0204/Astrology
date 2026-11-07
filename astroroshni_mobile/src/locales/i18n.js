@@ -11,6 +11,10 @@ import de from './de.json';
 import fr from './fr.json';
 import ru from './ru.json';
 import zh from './zh.json';
+import reelPlayer from './reel-player.json';
+import reelSetup from './reel-setup.json';
+[[en, 'en'], [es, 'es'], [hi, 'hi'], [tamil, 'ta'], [te, 'te'], [gu, 'gu'], [mr, 'mr'],
+ [de, 'de'], [fr, 'fr'], [ru, 'ru'], [zh, 'zh']].forEach(([copy, language]) => { copy.reelPlayer = reelPlayer[language]; copy.reelSetup = reelSetup[language]; });
 import prashnaV2 from './prashna-v2.json';
 import premiumUi from './premium-ui.json';
 import shadbalaUi from './shadbala-ui.json';

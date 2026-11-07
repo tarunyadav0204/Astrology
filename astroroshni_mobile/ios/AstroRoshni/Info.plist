@@ -74,7 +74,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>AstroRoshni uses the microphone so you can ask chat questions by speaking.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>AstroRoshni does not access your photo library for core features. If a future feature lets you save an image, we will ask for permission first.</string>
+	<string>Save reels you choose to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>AstroRoshni does not access your photo library for core features. If a future feature lets you attach an image, we will ask for permission first.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

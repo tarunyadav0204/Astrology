@@ -15,6 +15,10 @@
 
 # @generated begin expo-build-properties - expo prebuild (DO NOT MODIFY)
 # Keep enough native-bridge surface for release R8 without disabling obfuscation.
+# Expo reflects on record annotations and descriptors when converting JS maps.
+# R8 otherwise optimizes the annotation descriptor away, breaking file-system
+# options before downloads, copies, directory creation or sharing can run.
+-keep class expo.modules.kotlin.records.** { *; }
 -keepattributes SourceFile,LineNumberTable,Signature,*Annotation*,Exceptions,InnerClasses,EnclosingMethod,JavascriptInterface
 -renamesourcefileattribute SourceFile
 -keep class com.facebook.hermes.unicode.** { *; }
