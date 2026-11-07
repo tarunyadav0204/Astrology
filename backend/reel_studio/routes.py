@@ -570,6 +570,42 @@ def saved_reel(message_id: int, language: Literal["en", "hi"] | None = None, cur
     return {"job": None}
 
 
+@router.get("/history")
+def reel_history(current_user: User = Depends(get_current_user)):
+    """The caller's reel library, including in-progress renders."""
+    with get_conn() as conn:
+        _ensure_tables(conn)
+        rows = execute(conn, """
+            SELECT id, source_message_id, status, output_url, error_message, plan_json, created_at, updated_at
+            FROM reel_render_jobs
+            WHERE user_id=%s
+            ORDER BY created_at DESC
+            LIMIT 100
+        """, (current_user.userid,)).fetchall()
+        conn.commit()
+    reels = []
+    for job_id, message_id, status, output_url, error_message, raw_plan, created_at, updated_at in rows:
+        try:
+            plan = json.loads(raw_plan or "{}")
+        except (TypeError, json.JSONDecodeError):
+            plan = {}
+        source = plan.get("source") or {}
+        settings = plan.get("settings") or {}
+        reels.append({
+            "job_id": job_id,
+            "message_id": int(message_id),
+            "status": status,
+            "output_url": output_url,
+            "error_message": error_message,
+            "question": str(source.get("question") or "").strip(),
+            "language": settings.get("language", "en"),
+            "duration_seconds": settings.get("duration_seconds"),
+            "created_at": created_at.isoformat() if created_at else None,
+            "updated_at": updated_at.isoformat() if updated_at else None,
+        })
+    return {"reels": reels}
+
+
 @router.get("/jobs/{job_id}")
 def get_render_job(job_id: str, current_user: User = Depends(get_current_user)):
     with get_conn() as conn:

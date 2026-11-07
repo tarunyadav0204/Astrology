@@ -279,6 +279,7 @@ function MessageBubble({
   onPodcastAutoLaunchConsumed,
   reelAutoLaunchMessageId = null,
   reelAutoLaunchKey = 0,
+  reelAutoLaunchLang = 'en',
   onReelAutoLaunchConsumed,
   forceInstantPresentation = false,
 }) {
@@ -1034,7 +1035,7 @@ function MessageBubble({
     }
   };
 
-  const openReelStudio = async (recreate = false) => {
+  const openReelStudio = async (recreate = false, directLanguage = null) => {
     if (isPreparingReel || reelPrepareLock.current) return;
     const messageId = message.messageId || message.message_id;
     if (!messageId) {
@@ -1067,6 +1068,42 @@ function MessageBubble({
           return;
         }
       }
+      if (directLanguage) {
+        const selectedLanguage = podcastLangFromUiLanguage(directLanguage);
+        const selectedFormat = 'short';
+        setReelFormat(selectedFormat);
+        setReelLanguage(selectedLanguage);
+        const quote = (await chatAPI.getReelPricing(REEL_FORMATS[selectedFormat].duration)).data;
+        if (Number(quote?.credits) < Number(quote?.credit_cost)) {
+          navigation.navigate('Credits');
+          setShowReelStudio(false);
+          return;
+        }
+        const authOk = await requireAuthForPaid({ feature: 'reel', message: 'Sign in to create a reel from this answer.', resume: { resumeRoute: 'Home', resumeParams: {} } });
+        if (!authOk) {
+          setShowReelStudio(false);
+          return;
+        }
+        reelPrepareLock.current = true;
+        setReelCreditQuote(quote);
+        setReelJobId(null); setReelJobStatus(''); setReelJobError(''); setReelDraft(null);
+        const draft = (await chatAPI.createReelDraft({ messageId, durationSeconds: REEL_FORMATS[selectedFormat].duration, language: selectedLanguage, visualLevel: 'cinematic' })).data;
+        const response = await chatAPI.queueReel({
+          messageId,
+          durationSeconds: REEL_FORMATS[selectedFormat].duration,
+          language: selectedLanguage,
+          visualLevel: 'cinematic',
+          draftId: draft.draft_id,
+          approvedClaimIds: draft.claims.map((claim) => claim.id),
+          confirmedCreditCost: quote.credit_cost,
+        });
+        const jobId = response?.data?.job_id;
+        if (!jobId) throw new Error('Your reel could not be created. Please try again.');
+        setReelJobId(jobId);
+        setReelJobStatus(response?.data?.status || 'queued');
+        refreshCredits();
+        return;
+      }
       setIsRecreatingReel(recreate);
       setShowReelStudio(false);
       setShowReelFormatModal(true);
@@ -1081,6 +1118,7 @@ function MessageBubble({
       showReelError(apiErrorMessage(error, t('premiumUi.reelStudio.errorGeneric', 'Could not prepare this reel.')));
       setShowReelStudio(false);
     } finally {
+      reelPrepareLock.current = false;
       setIsPreparingReel(false);
     }
   };
@@ -2306,13 +2344,18 @@ function MessageBubble({
 
     const timer = setTimeout(() => {
       lastReelPromoKeyRef.current = reelAutoLaunchKey;
-      onReelAutoLaunchConsumed?.();
-      openReelStudio();
+      // Open the Studio before clearing the parent launch signal. Clearing it
+      // first can remount this FlatList row and cancel the reel hand-off on
+      // mobile before its bottom sheet becomes visible.
+      openReelStudio(false, reelAutoLaunchLang).finally(() => {
+        onReelAutoLaunchConsumed?.();
+      });
     }, 250);
     return () => clearTimeout(timer);
   }, [
     reelAutoLaunchKey,
     reelAutoLaunchMessageId,
+    reelAutoLaunchLang,
     onReelAutoLaunchConsumed,
     message.messageId,
     message.role,

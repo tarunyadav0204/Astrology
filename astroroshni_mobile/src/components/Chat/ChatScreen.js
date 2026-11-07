@@ -1908,15 +1908,26 @@ export default function ChatScreen({ navigation, route }) {
   const [podcastPromoVisible, setPodcastPromoVisible] = useState(false);
   const [podcastPromoMessageId, setPodcastPromoMessageId] = useState(null);
   const [podcastPromoIncluded, setPodcastPromoIncluded] = useState(false);
+  const [podcastPromoReelCost, setPodcastPromoReelCost] = useState(null);
   const [podcastAutoLaunchKey, setPodcastAutoLaunchKey] = useState(0);
   const [podcastAutoLaunchLang, setPodcastAutoLaunchLang] = useState('en');
   const [reelAutoLaunchKey, setReelAutoLaunchKey] = useState(0);
+  const [reelAutoLaunchLang, setReelAutoLaunchLang] = useState('en');
   const consumePodcastAutoLaunch = useCallback(() => {
     setPodcastAutoLaunchKey(0);
   }, []);
   const consumeReelAutoLaunch = useCallback(() => {
     setReelAutoLaunchKey(0);
   }, []);
+  useEffect(() => {
+    if (!podcastPromoVisible) return undefined;
+    let active = true;
+    setPodcastPromoReelCost(null);
+    chatAPI.getReelPricing(90)
+      .then((response) => { if (active) setPodcastPromoReelCost(response?.data?.credit_cost ?? null); })
+      .catch(() => { if (active) setPodcastPromoReelCost(null); });
+    return () => { active = false; };
+  }, [podcastPromoVisible, podcastPromoMessageId]);
   const [ratingPromptVisible, setRatingPromptVisible] = useState(false);
   const [ratingPromptPending, setRatingPromptPending] = useState(false);
   const [ratingPromptMessageId, setRatingPromptMessageId] = useState(null);
@@ -7868,6 +7879,7 @@ export default function ChatScreen({ navigation, route }) {
                       onPodcastAutoLaunchConsumed={consumePodcastAutoLaunch}
                       reelAutoLaunchMessageId={podcastPromoMessageId}
                       reelAutoLaunchKey={reelAutoLaunchKey}
+                      reelAutoLaunchLang={reelAutoLaunchLang}
                       onReelAutoLaunchConsumed={consumeReelAutoLaunch}
                       // Presentation belongs to the message that was produced,
                       // not the mode currently selected for the next question.
@@ -8853,6 +8865,7 @@ export default function ChatScreen({ navigation, route }) {
                 <View style={styles.drawerMenuBody}>
                   {!showGreeting ? (
                     <>
+                      <Text style={[styles.drawerSectionLabel, { color: colors.primary }]}>{t('premiumUi.chatScreen.yourSpace')}</Text>
                       {!partnershipMode && !isMundane && !freeQuestionAvailable ? renderDrawerMenuRow({
                         icon: 'options-outline',
                         label: t('chat.modeIntro.eyebrow', 'Chat mode'),
@@ -8867,6 +8880,12 @@ export default function ChatScreen({ navigation, route }) {
                         label: t('quickActions.language'),
                         action: () => setShowLanguageModal(true),
                       })}
+                      {pricingFeatures?.partner_portrait_enabled ? renderDrawerMenuRow({
+                        icon: 'sparkles-outline',
+                        label: t('partnerPortrait.title', 'Partner Portrait'),
+                        action: () => navigation.navigate('PartnerPortrait'),
+                      }) : null}
+                      <Text style={[styles.drawerSectionLabel, styles.drawerSectionLabelSpaced, { color: colors.primary }]}>{t('premiumUi.chatScreen.vedicToolkit')}</Text>
                       {renderDrawerMenuRow({
                         icon: 'pie-chart-outline',
                         label: t('quickActions.chart'),
@@ -8878,11 +8897,6 @@ export default function ChatScreen({ navigation, route }) {
                           navigation.navigate('BirthForm', { returnTo: 'Home' });
                         },
                       })}
-                      {pricingFeatures?.partner_portrait_enabled ? renderDrawerMenuRow({
-                        icon: 'sparkles-outline',
-                        label: t('partnerPortrait.title', 'Partner Portrait'),
-                        action: () => navigation.navigate('PartnerPortrait'),
-                      }) : null}
                       {renderDrawerMenuRow({
                         icon: 'time-outline',
                         label: t('quickActions.dasha'),
@@ -8899,6 +8913,7 @@ export default function ChatScreen({ navigation, route }) {
                           exitPartnershipMode();
                         },
                       }) : null}
+                      <Text style={[styles.drawerSectionLabel, styles.drawerSectionLabelSpaced, { color: colors.primary }]}>{t('premiumUi.profile.library')}</Text>
                       {renderDrawerMenuRow({
                         icon: 'add-circle-outline',
                         label: t('menu.newConversation', 'New conversation'),
@@ -8909,6 +8924,22 @@ export default function ChatScreen({ navigation, route }) {
                         label: t('menu.chatHistory', 'Chat History'),
                         action: () => navigation.navigate('ChatHistory'),
                       })}
+                      {renderDrawerMenuRow({
+                        icon: 'mic-outline',
+                        label: t('menu.podcastHistory', 'Podcast History'),
+                        action: () => navigation.navigate('PodcastHistory'),
+                      })}
+                      {renderDrawerMenuRow({
+                        icon: 'film-outline',
+                        label: t('premiumUi.reelStudio.historyTitle', 'Reel History'),
+                        action: () => navigation.navigate('ReelHistory'),
+                      })}
+                      {renderDrawerMenuRow({
+                        icon: 'document-text-outline',
+                        label: t('reports.reportHistoryMenu', 'Report History'),
+                        action: () => navigation.navigate('ReportHistory'),
+                      })}
+                      <Text style={[styles.drawerSectionLabel, styles.drawerSectionLabelSpaced, { color: colors.primary }]}>{t('premiumUi.chatScreen.more')}</Text>
                       {renderDrawerMenuRow({
                         icon: 'wallet-outline',
                         label: t('menu.credits', 'Credits'),
@@ -9304,7 +9335,6 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
-                  <Text style={[styles.drawerSectionLabel, styles.drawerSectionLabelSpaced, { color: colors.primary }]}>{t('premiumUi.profile.library')}</Text>
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -9351,6 +9381,7 @@ export default function ChatScreen({ navigation, route }) {
                     </LinearGradient>
                   </TouchableOpacity>
 
+                  <Text style={[styles.drawerSectionLabel, styles.drawerSectionLabelSpaced, { color: colors.primary }]}>{t('premiumUi.profile.library')}</Text>
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
                     onPress={() => {
@@ -9418,6 +9449,29 @@ export default function ChatScreen({ navigation, route }) {
                         </LinearGradient>
                       </View>
                       <Text style={[styles.menuText, { color: colors.text }]}>{t('menu.podcastHistory', 'Podcast History')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => {
+                      closeMenuDrawer(() => { navigation.navigate('ReelHistory'); });
+                    }}
+                  >
+                    <LinearGradient
+                      colors={menuRowGradient}
+                      style={[styles.menuGradient, { borderColor: menuRowBorder }]}
+                    >
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient
+                          colors={menuAccentIconGradient}
+                          style={styles.menuIconGradient}
+                        >
+                          <Ionicons name="film-outline" size={19} color={colors.selectionText} />
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('premiumUi.reelStudio.historyTitle', 'Reel History')}</Text>
                       <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -10002,6 +10056,7 @@ export default function ChatScreen({ navigation, route }) {
       <PodcastPromoModal
         visible={!showGreeting && podcastPromoVisible}
         podcastCost={podcastCost}
+        reelCost={podcastPromoReelCost}
         included={podcastPromoIncluded}
         colors={colors}
         onClose={() => {
@@ -10023,9 +10078,10 @@ export default function ChatScreen({ navigation, route }) {
             triggerRatingPrompt(ratingPromptMessageId, 'after_podcast_generate');
           }
         }}
-        onCreateReel={() => {
+        onCreateReel={(lang) => {
           setPodcastPromoVisible(false);
           setPodcastPromoIncluded(false);
+          setReelAutoLaunchLang(String(lang || '').toLowerCase().startsWith('hi') ? 'hi' : 'en');
           setReelAutoLaunchKey((key) => key + 1);
           if (ratingPromptPending && ratingPromptMessageId) {
             setRatingPromptPending(false);

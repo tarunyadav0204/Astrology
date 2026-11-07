@@ -40,7 +40,14 @@ const webVideoStyle = {
   backgroundColor: "#000",
 };
 
-export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
+export default function ReelPlayerModal({
+  jobId,
+  onClose,
+  onRecreate,
+  allowRecreate = true,
+  reelIds = [],
+  onSwipeToReel,
+}) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const video = useRef(null);
@@ -58,6 +65,8 @@ export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideTimer = useRef(null);
+  const reelFeedRef = useRef({ jobId, reelIds, onSwipeToReel });
+  reelFeedRef.current = { jobId, reelIds, onSwipeToReel };
   const revealControls = useCallback(
     function reveal() {
       setControlsVisible(true);
@@ -297,6 +306,28 @@ export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
       },
     }),
   ).current;
+  // Keep the player itself focused on a single MP4.  The surrounding saved-reel
+  // library supplies the ordered IDs, so an intentional vertical swipe can
+  // replace this one player with the next reel without preloading multiple
+  // videos or audio tracks on a phone.
+  const feedSwipe = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_event, gesture) =>
+        Math.abs(gesture.dy) > 14 &&
+        Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.25,
+      onPanResponderRelease: (_event, gesture) => {
+        const { jobId: activeJobId, reelIds: feedIds, onSwipeToReel: selectReel } = reelFeedRef.current;
+        if (!selectReel || !Array.isArray(feedIds) || feedIds.length < 2 || Math.abs(gesture.dy) < 72) return;
+        const currentIndex = feedIds.indexOf(activeJobId);
+        if (currentIndex < 0) return;
+        // The history is newest first: swipe up for the next saved reel and
+        // down to return to the more recent one, matching short-video feeds.
+        const nextIndex = gesture.dy < 0 ? currentIndex + 1 : currentIndex - 1;
+        if (nextIndex >= 0 && nextIndex < feedIds.length) selectReel(feedIds[nextIndex]);
+      },
+    }),
+  ).current;
   const stop = () => command(stopPlayback);
   const close = () => {
     pausePlayback().catch(() => {});
@@ -394,6 +425,7 @@ export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
   };
   const position = preview ?? status.positionMillis ?? 0;
   const duration = status.durationMillis || 0;
+  const hasReelFeed = Array.isArray(reelIds) && reelIds.length > 1;
   // Expo's ExoPlayer path is dropping the later AAC segments on the Android
   // emulator. MediaPlayer handles this standard local MP4 independently;
   // web continues to use the browser player.
@@ -431,6 +463,7 @@ export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
         style={styles.root}
         onTouchStart={revealControls}
         {...(Platform.OS === "web" ? { onPointerMove: revealControls } : {})}
+        {...feedSwipe.panHandlers}
       >
         <StatusBar hidden />
         {source && Platform.OS === "web" && (
@@ -494,6 +527,26 @@ export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
           </Text>
           {button(t("common.close", "Close"), "close", close)}
         </Animated.View>
+        {hasReelFeed && (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.feedHint,
+              {
+                top: Math.max(insets.top, 16) + 52,
+                opacity: controlsOpacity,
+              },
+            ]}
+          >
+            <Ionicons name="swap-vertical-outline" size={15} color="#eecb86" />
+            <Text style={styles.feedHintText}>
+              {t(
+                "premiumUi.reelStudio.swipeFeedHint",
+                "Swipe up or down to browse your reels",
+              )}
+            </Text>
+          </Animated.View>
+        )}
         {!source && !error && (
           <View style={styles.loading}>
             <ActivityIndicator color="#eecb86" />
@@ -597,12 +650,12 @@ export default function ReelPlayerModal({ jobId, onClose, onRecreate }) {
               () => share(),
               !source || sharing,
             )}
-            {button(
+            {allowRecreate && button(
               t("premiumUi.reelStudio.recreate", "Recreate"),
               "refresh",
               () => {
                 pausePlayback().catch(() => {});
-                onRecreate();
+                onRecreate?.();
               },
             )}
           </View>
@@ -639,6 +692,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#0007",
   },
   brand: { color: "#eecb86", fontSize: 22 },
+  feedHint: {
+    position: "absolute",
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: "#000a",
+  },
+  feedHintText: { color: "#f3d99d", fontSize: 11, fontWeight: "700" },
   controls: {
     position: "absolute",
     bottom: 0,

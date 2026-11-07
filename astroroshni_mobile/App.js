@@ -23,6 +23,7 @@ import ChatScreen from './src/components/Chat/ChatScreen';
 import ChatHistoryScreen from './src/components/Chat/ChatHistoryScreen';
 import ChatViewScreen from './src/components/Chat/ChatViewScreen';
 import PodcastHistoryScreen from './src/components/Chat/PodcastHistoryScreen';
+import ReelHistoryScreen from './src/components/Chat/ReelHistoryScreen';
 import SpeechChatScreen from './src/components/Chat/SpeechChatScreen';
 import BirthFormScreen from './src/components/BirthForm/BirthFormScreen';
 import BirthProfileIntroScreen from './src/components/BirthProfileIntro/BirthProfileIntroScreen';
@@ -1167,6 +1168,11 @@ export default function App() {
           <Stack.Screen 
             name="PodcastHistory" 
             component={PodcastHistoryScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ReelHistory"
+            component={ReelHistoryScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

@@ -786,19 +786,19 @@ export default function ProfileScreen({ navigation, route }) {
                   onPress={() => navigation.navigate('Home', { startChat: true })}
                 />
                 <ActionButton
-                  icon="pie-chart"
-                  label={t('profile.quickActions.viewChart')}
-                  onPress={() => openChartsHub()}
-                />
-                <ActionButton
-                  icon="time"
-                  label={t('profile.quickActions.dashas')}
-                  onPress={openDashaBrowser}
-                />
-                <ActionButton
                   icon="calendar"
                   label={t('profile.quickActions.history')}
                   onPress={() => navigation.navigate('ChatHistory')}
+                />
+                <ActionButton
+                  icon="mic"
+                  label={t('menu.podcastHistory', 'Podcast History')}
+                  onPress={() => navigation.navigate('PodcastHistory')}
+                />
+                <ActionButton
+                  icon="film"
+                  label={t('premiumUi.reelStudio.historyTitle', 'Reel History')}
+                  onPress={() => navigation.navigate('ReelHistory')}
                 />
                 <ActionButton
                   icon="list"

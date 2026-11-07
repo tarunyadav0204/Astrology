@@ -2227,6 +2227,23 @@ const loadHomeData = async (nativeData = null) => {
           </LinearGradient>
         </View>
 
+        {!isPanditMode && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('premiumUi.reelStudio.historyTitle', 'Reel History')}
+            style={[styles.reelHistoryShortcut, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
+            onPress={() => navigation.navigate('ReelHistory')}
+          >
+            <View style={[styles.reelHistoryShortcutIcon, { backgroundColor: `${colors.primary}18` }]}>
+              <Icon name="film-outline" size={18} color={colors.primary} />
+            </View>
+            <Text style={[styles.reelHistoryShortcutText, { color: colors.text }]}>
+              {t('premiumUi.reelStudio.historyTitle', 'Reel History')}
+            </Text>
+            <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+
         {isPanditMode ? (
           <>
             <PanditHomePanel navigation={navigation} showExit={false} />
@@ -4032,6 +4049,28 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 107, 53, 0.3)',
     paddingVertical: 4,
     paddingHorizontal: 10,
+  },
+  reelHistoryShortcut: {
+    minHeight: 52,
+    marginBottom: 16,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  reelHistoryShortcutIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reelHistoryShortcutText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '800',
   },
   headerBigThree: {
     flexDirection: 'row',

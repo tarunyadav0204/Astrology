@@ -522,6 +522,7 @@ export const chatAPI = {
     }),
   getReelJob: (jobId) => api.get(getEndpoint(`/reel-studio/jobs/${encodeURIComponent(String(jobId))}`)),
   getSavedReel: (messageId) => api.get(getEndpoint(`/reel-studio/saved/${encodeURIComponent(String(messageId))}`)),
+  getReelHistory: () => api.get(getEndpoint('/reel-studio/history')),
   getReelPricing: (durationSeconds = 90) => api.get(getEndpoint('/reel-studio/pricing'), { params: { duration_seconds: durationSeconds } }),
   submitFeedback: ({ message_id, rating, comment = null, reason = null }) =>
     api.post(getEndpoint('/chat/feedback/submit'), {

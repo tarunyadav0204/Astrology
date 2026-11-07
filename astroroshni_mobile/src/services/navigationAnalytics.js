@@ -12,6 +12,7 @@ const ROUTE_VIEW_META = {
   ChatHistory: { content_id: 'chat_history', content_type: 'chat' },
   ChatView: { content_id: 'chat_thread', content_type: 'chat' },
   PodcastHistory: { content_id: 'podcast_history', content_type: 'chat' },
+  ReelHistory: { content_id: 'reel_history', content_type: 'chat' },
   SpeechChat: { content_id: 'speech_chat', content_type: 'chat' },
   MundaneHub: { content_id: 'mundane_hub', content_type: 'mundane' },
   Credits: { content_id: 'credits_store', content_type: 'monetization' },
