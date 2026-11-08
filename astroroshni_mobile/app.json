@@ -3,7 +3,7 @@
     "name": "AstroRoshni",
     "slug": "astroroshni-mobile",
     "scheme": "astroroshni",
-    "version": "1.2.25",
+    "version": "1.2.26",
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
@@ -44,7 +44,7 @@
       },
       "package": "com.astroroshni.mobile",
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.astroroshni.mobile",
-      "versionCode": 283,
+      "versionCode": 284,
       "newArchEnabled": false,
       "googleServicesFile": "./google-services.json",
       "permissions": [

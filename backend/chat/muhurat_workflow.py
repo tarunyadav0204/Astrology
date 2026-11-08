@@ -52,6 +52,9 @@ async def generate_chat_muhurat(analyzer, *, question, intent, birth, language, 
                                 premium_analysis=False, parallel=False, model_name=None, provider=None,
                                 stream_callback=None):
     import asyncio, json, time
+    from festivals.verified_puja import normalize_festival_request
+    intent = {**intent, 'query_context': {**intent['query_context'],
+        'muhurat_request': normalize_festival_request(intent['query_context']['muhurat_request'])}}
     started = time.monotonic()
     baseline = await asyncio.to_thread(calculate_chat_muhurat, intent, birth)
     language = intent.get('response_language') or intent.get('detected_language') or language

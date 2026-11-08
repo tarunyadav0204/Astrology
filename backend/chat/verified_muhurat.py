@@ -22,6 +22,12 @@ class MuhuratRequest(BaseModel):
     personalized: bool = False
     retrospective: bool = False
     check_time: Optional[str] = None
+    @model_validator(mode='before')
+    @classmethod
+    def canonical_festival(cls, value):
+        from festivals.verified_puja import normalize_festival_request
+        return normalize_festival_request(value) if isinstance(value, dict) else value
+
     @model_validator(mode='after')
     def check(self):
         from datetime import time
@@ -67,15 +73,16 @@ def prepare_muhurat_intent(intent, question, context):
     elif choice=='all_weekdays': base['weekdays']=[]
     resolved=str(intent.get('resolved_question') or question)
     from calculators.verified_muhurat_calculator import SUPPORTED_EVENTS
-    from festivals.verified_puja import resolve_festival, HINDU_FESTIVALS
+    from festivals.verified_puja import resolve_festival, HINDU_FESTIVALS, normalize_festival_request
+    base = normalize_festival_request(base)
     # Canonical setup activity, including unnamed puja requests. Never leave a
     # raw 'puja' value for a client select whose first option is a purchase.
     activity = str(base.get('event_type') or '').casefold().replace('_',' ').replace('pooja','puja').strip()
-    if activity in {'puja','puja muhurat','festival','festival puja','festival puja muhurat','puja vrat'}:
+    if activity in {'puja','puja muhurat','festival','festival puja','festival puja muhurat','puja vrat', 'worship', 'religious ceremony'}:
         base['event_type'] = 'festival_puja'
     festival = base.get('festival_id') or resolve_festival(base.get('event_type'))
     if not festival and base.get('event_type') in {'festival_puja','festival','puja'}:
-        festival = resolve_festival(resolved)
+        festival = resolve_festival(base.get('ritual')) or resolve_festival(resolved)
     if festival:
         if festival not in HINDU_FESTIVALS:
             base.pop('festival_id', None)
@@ -117,6 +124,8 @@ def prepare_muhurat_intent(intent, question, context):
 
 
 def muhurat_contract(style, request=None):
+    from festivals.verified_puja import normalize_festival_request
+    request = normalize_festival_request(request)
     if (request or {}).get('festival_id'):
         return FESTIVAL_CONTRACT + (' Explain technical factors clearly.' if style != 'simple' else ' Use simple, practical language.')
     return '''VERIFIED MUHURAT ELECTION CONTRACT
@@ -197,6 +206,8 @@ MUHURAT_CAPABILITIES={
 
 
 def calculate_muhurat_tool(capability, request, birth, parameters=None):
+    from festivals.verified_puja import normalize_festival_request
+    request = normalize_festival_request(request)
     if capability=='election.muhurat':
         if parameters and any(v is not None for v in parameters.values()): raise ValueError('Search parameters require user confirmation')
         if request.get('festival_id'):
@@ -225,7 +236,9 @@ def calculate_muhurat_tool(capability, request, birth, parameters=None):
 async def generate_muhurat_response(*,question,intent,birth,history,language,response_style,model_name,stream_callback,calculation_callback):
     import asyncio
     from chat.verified_chat_pipeline import run_verified_calculator_agent
-    request=intent['query_context']['muhurat_request']
+    from festivals.verified_puja import normalize_festival_request
+    request=normalize_festival_request(intent['query_context']['muhurat_request'])
+    intent={**intent,'query_context':{**intent['query_context'],'muhurat_request':request}}
     from datetime import datetime,timezone
     # The ask endpoint injects this trusted clock; never use the caller's local clock.
     received=intent['query_context'].get('_question_received_at')
@@ -253,6 +266,10 @@ async def generate_muhurat_response(*,question,intent,birth,history,language,res
 FESTIVAL_CONTRACT = """VERIFIED FESTIVAL PUJA CONTRACT
 Answer the latest question in its requested language and script, including Roman Hindi when typed.
 Lead with actual calculated LOCAL dates and times, ritual, city and timezone. Explain practical meaning.
+When status=completed and candidates contains a ritual window, give that window directly. Never say
+the puja timing is unavailable or the ritual rule engine is missing for that successful result.
+Do not require an optional natal comparison or every supplementary Panchang factor before sharing
+an established general festival window. Keep internal engine/tool terminology out of the answer.
 The calculator's festival, ritual and coverage are binding. These are festival-specific rules, not the
 purchase election engine. Do not impose purchase restrictions, daylight-only rules, Choghadiya, avoidance
 of Amavasya, or fourth-house vehicle interpretations. Do not move a festival to improve a natal score.

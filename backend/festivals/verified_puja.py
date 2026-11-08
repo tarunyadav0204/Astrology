@@ -27,7 +27,7 @@ PROFILES = {
 }
 ALIASES = {
     'dussehra': ['dusehra', 'dusshera', 'dasara', 'dashera', 'vijayadashami', 'vijaya dashami', 'दशहरा', 'विजयादशमी'],
-    'diwali': ['deepavali', 'dipavali', 'lakshmi puja', 'laxmi puja', 'दीवाली', 'दिवाली', 'दीपावली', 'लक्ष्मी पूजा'],
+    'diwali': ['deepavali', 'dipavali', 'deepawali', 'lakshmi puja', 'laxmi puja', 'lakshmee puja', 'lakshmi ganesh puja', 'laxmi ganesh puja', 'लक्ष्मी पूजा', 'लक्ष्मी पूजन', 'लक्ष्मीपूजन', 'लक्ष्मी गणेश पूजा', 'लक्ष्मी गणेश पूजन', 'दीवाली', 'दिवाली', 'दीपावली'],
     'ram_navami': ['rama navami', 'ramnavami', 'राम नवमी'],
     'maha_shivratri': ['maha shivaratri', 'mahashivratri', 'shivratri', 'महाशिवरात्रि'],
     'ganesh_chaturthi': ['ganesha chaturthi', 'ganesh chauth', 'गणेश चतुर्थी'],
@@ -43,7 +43,7 @@ ALIASES = {
 # accidental substitution of immersion/parana/Tantrik rites.
 RITUAL_ALIASES = {
     'dussehra': ('aparajita puja','aparajita','shami puja','shami','aparajita shami puja','shami aparajita puja','अपराजिता पूजा','शमी पूजा','अपराजिता पूजन','शमी पूजन'),
-    'diwali': ('lakshmi puja','laxmi puja','diwali puja','lakshmi ganesh puja','लक्ष्मी पूजा','लक्ष्मी पूजन','दीवाली पूजा','दिवाली पूजा'),
+    'diwali': ('lakshmi puja','laxmi puja','lakshmee puja','diwali puja','deepavali puja','dipavali puja','deepawali puja','lakshmi ganesh puja','laxmi ganesh puja','लक्ष्मी पूजा','लक्ष्मी पूजन','लक्ष्मीपूजन','लक्ष्मी गणेश पूजा','लक्ष्मी गणेश पूजन','दीवाली पूजा','दिवाली पूजा','दीपावली पूजा','दीपावली पूजन'),
     'dhanteras': ('dhanteras puja','dhantrayodashi puja','धनतेरस पूजा'),
     'ganesh_chaturthi': ('ganesh puja','ganesha puja','ganesh sthapana','ganapati sthapana','गणेश पूजा','गणेश स्थापना'),
     'ram_navami': ('ram navami puja','rama navami puja','ram janma puja','राम नवमी पूजा'),
@@ -70,10 +70,13 @@ TITHIS['amavasya'] = 15
 
 
 def resolve_festival(value):
-    text = re.sub(r'[_\-]+', ' ', str(value or '').lower()).strip()
+    # Routers and saved requests use both Pooja/Puja/Poojan and underscored IDs.
+    # Normalize the aliases AND input with the same rules used for ritual names.
+    text = _ritual_name(value)
     matches = []
     for key, item in HINDU_FESTIVALS.items():
-        names = [key.replace('_', ' '), item['name'].lower(), *ALIASES.get(key, [])]
+        names = [_ritual_name(name) for name in
+                 (key, item['name'], *ALIASES.get(key, []))]
         for name in names:
             for match in re.finditer(r'(?<!\w)' + re.escape(name) + r'(?!\w)', text):
                 matches.append((key, match.start(), match.end()))
@@ -82,6 +85,23 @@ def resolve_festival(value):
     keys = {key for key, a, b in matches if not any(
         other != key and c <= a and d >= b and d-c > b-a for other, c, d in matches)}
     return next(iter(keys)) if len(keys) == 1 else None
+
+
+def normalize_festival_request(request):
+    """Canonicalize already-routed election fields, including saved requests.
+
+    Do not infer a festival from incidental prose or replace a purchase election
+    merely because it takes place on Diwali. Explicit ritual/tradition constraints
+    remain intact for the ritual coverage check.
+    """
+    normalized = dict(request or {})
+    supplied_id = normalized.get('festival_id')
+    festival = (supplied_id if supplied_id in HINDU_FESTIVALS else resolve_festival(supplied_id))
+    if not supplied_id:
+        festival = resolve_festival(normalized.get('event_type'))
+    if festival:
+        normalized.update(event_type='festival_puja', festival_id=festival)
+    return normalized
 
 
 def coverage_catalog():
