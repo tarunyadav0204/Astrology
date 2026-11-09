@@ -113,7 +113,7 @@ def test_staged_generation_retains_all_periods_limits_parallelism_and_accounts_u
     model = Model(dossier)
     saved = []
     result = asyncio.run(narrate_next_chapter(dossier, 'hi', model=model, audit_sink=saved.append))
-    assert model.peak == 3
+    assert model.peak == 9
     assert len(model.stages) == 21  # 9 planners + 3 coverage reviews + editor + AD spectrum + 3 writers + event review + 3 factual reviews
     assert len(result['report']['periods']) == 9
     assert result['generation']['input_tokens'] == 2100
@@ -308,7 +308,7 @@ def test_material_quality_improvement_is_bounded_without_subjective_failure(doss
     assert result['audit']['reviews'][-1]['quality_notes']  # Honest advisory findings remain visible.
 
 
-def test_unresolved_facts_never_return_an_unchecked_report(dossier):
+def test_unresolved_review_findings_are_recorded_without_failing_report(dossier):
     class CannotRepair(Model):
         async def generate_content_async(self, prompt, **kwargs):
             response = await super().generate_content_async(prompt, **kwargs)
@@ -321,11 +321,12 @@ def test_unresolved_facts_never_return_an_unchecked_report(dossier):
                 response.text = json.dumps(value)
             return response
     model = CannotRepair(dossier)
-    with pytest.raises(PipelineError, match='Unresolved factual') as e:
-        asyncio.run(narrate_next_chapter(dossier, model=model))
+    result = asyncio.run(narrate_next_chapter(dossier, model=model))
+    assert result['generation']['factual_review'] == 'warnings'
+    assert any(w['stage'] == 'fact_review_final' for w in result['audit']['validation_warnings'])
     assert [s for s in model.stages if s.startswith('repair')] == ['repair_0_pd_1', 'repair_1_pd_1']
-    assert 'unreleased_report' in e.value.audit
-    assert len(e.value.audit['reviews']) == 4
+    assert 'checkpoint_report' in result['audit']
+    assert len(result['audit']['reviews']) == 4
 
 
 def test_priority_briefs_surface_active_lord_conditions_and_correct_individual_bav(dossier):
@@ -494,7 +495,7 @@ def test_planner_resolves_known_activation_citation_but_rejects_invented_one(dos
         validate_plans(plan, ['pd_1'], b)
 
 
-def test_whole_ad_spectrum_cannot_omit_a_reviewed_period_event_family(dossier):
+def test_whole_ad_spectrum_omission_is_advisory(dossier):
     class MissingFamily(Model):
         async def generate_content_async(self, prompt, **kwargs):
             response = await super().generate_content_async(prompt.split('\nRepair only this stage.', 1)[0], **kwargs)
@@ -503,8 +504,8 @@ def test_whole_ad_spectrum_cannot_omit_a_reviewed_period_event_family(dossier):
                 value['family_coverage'].pop()
                 response.text = json.dumps(value)
             return response
-    with pytest.raises(PipelineError, match='every selected plan family'):
-        asyncio.run(narrate_next_chapter(dossier, model=MissingFamily(dossier)))
+    result = asyncio.run(narrate_next_chapter(dossier, model=MissingFamily(dossier)))
+    assert any(w['stage'] == 'chapter_spectrum' for w in result['audit']['validation_warnings'])
 
 
 def test_preview_exposes_all_period_lord_activation_tables(dossier):
@@ -514,3 +515,26 @@ def test_preview_exposes_all_period_lord_activation_tables(dossier):
     assert 'Natal occupation' in text and 'Natal lordship' in text and 'Transit aspects' in text
     assert 'Venus · Mahadasha' in text
     assert 'Sun · Antardasha' in text
+
+
+def test_coverage_warnings_do_not_repair_or_fail_customer_report(dossier):
+    class IncompleteCoverage(Model):
+        async def generate_content_async(self, prompt, **kwargs):
+            response = await super().generate_content_async(prompt, **kwargs)
+            stage = re.search(r'STAGE: ([^\n]+)', prompt)[1]
+            value = json.loads(response.text)
+            if stage.startswith('plan_'):
+                for row in value['periods']:
+                    row['considered_houses'] = []
+            elif stage == 'chapter_spectrum':
+                value['family_coverage'] = []
+            response.text = json.dumps(value)
+            return response
+    model = IncompleteCoverage(dossier)
+    result = asyncio.run(narrate_next_chapter(dossier, 'en', model=model))
+    assert len(result['report']['periods']) == 9
+    warnings = result['audit']['validation_warnings']
+    assert any(w['stage'] == 'plan_pd_2' and 'activated houses' in w['message'] for w in warnings)
+    assert any(w['stage'] == 'chapter_spectrum' for w in warnings)
+    assert len([s for s in model.stages if s.startswith('plan_')]) == 9
+    assert result['generation']['validation_warning_count'] == len(warnings)

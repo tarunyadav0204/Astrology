@@ -147,6 +147,7 @@ def narration_context(dossier):
 
 
 def attach_narration(dossier, narrative):
+    from .validation import warn
     """Validate structure/references only; do not gate possibilities through event scoring."""
     if not isinstance(narrative, dict):
         raise ValueError('Next Chapter narration must be an object')
@@ -189,15 +190,16 @@ def attach_narration(dossier, narrative):
             for key, allowed in valid_refs.items():
                 refs = item.get(key)
                 if not isinstance(refs, list) or not all(isinstance(ref, str) and ref in allowed for ref in refs):
-                    raise ValueError(f'Unknown {key} in {pd["id"]}')
+                    warn(f'Unknown {key} in {pd["id"]}')
+                    item = {**item, key: [r for r in refs if isinstance(r, str)] if isinstance(refs, list) else []}
             if not item['house_refs'] or not item['planet_refs']:
-                raise ValueError('A manifestation needs natal house and planet evidence')
+                warn('A manifestation needs natal house and planet evidence')
             zone = ZoneInfo(dossier['spine']['timezone'])
             enriched.append({**item, 'timing_basis': 'transit_contacts' if item['contact_refs'] else 'pratyantardasha',
                 'timing_windows': [{**contacts[ref],
                     'local_start_at': utc(contacts[ref]['start_at']).astimezone(zone).isoformat(),
                     'local_end_at': utc(contacts[ref]['end_at']).astimezone(zone).isoformat()}
-                    for ref in dict.fromkeys(item['contact_refs'])]})
+                    for ref in dict.fromkeys(item['contact_refs']) if ref in contacts]})
         periods.append({**row, 'start_at': pd['start_at'], 'end_at': pd['end_at'],
             'planet': pd['planet'], 'manifestations': enriched})
     return {**narrative, 'periods': periods}

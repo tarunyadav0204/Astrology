@@ -55,3 +55,32 @@ async def preview_next_chapter(payload: NextChapterPreviewRequest, current_user=
         raise HTTPException(status_code=503, detail='Next Chapter could not be completed. Please try again.') from exc
     finally:
         _preview_slot.release()
+
+
+def load_validation_runs():
+    import json
+    from db import get_conn, execute
+    with get_conn() as conn:
+        rows = execute(conn, '''SELECT id, status, stage, created_at, audit_json
+            FROM next_chapter_jobs ORDER BY created_at DESC LIMIT 100''').fetchall()
+    runs = []
+    for job_id, status, stage, created, raw in rows:
+        audit = json.loads(raw) if isinstance(raw, str) and raw else (raw or {})
+        calls = {c.get('stage'): c for c in audit.get('calls', [])}
+        warnings = [{**w, 'raw_response': calls.get(w.get('stage'), {}).get('raw_response')}
+                    for w in audit.get('validation_warnings', [])]
+        for call in audit.get('calls', []):
+            if call.get('validation_error'):
+                warnings.append({'stage': call.get('stage'), 'message': call['validation_error'],
+                                 'attempt': call.get('attempt'), 'raw_response': call.get('raw_response')})
+        if warnings:
+            runs.append({'id': job_id, 'status': status, 'stage': stage,
+                         'created_at': str(created), 'warnings': warnings})
+    return {'runs': runs}
+
+
+@router.get('/admin/validation-warnings')
+async def validation_warnings(current_user=Depends(get_current_user)):
+    if getattr(current_user, 'role', None) != 'admin':
+        raise HTTPException(status_code=403, detail='Admin only')
+    return await run_in_threadpool(load_validation_runs)

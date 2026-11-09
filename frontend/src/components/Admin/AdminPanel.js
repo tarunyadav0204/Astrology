@@ -16,6 +16,7 @@ import AdminCreditsIntelligence from './AdminCreditsIntelligence';
 import AdminBuyerAnalysis from './AdminBuyerAnalysis';
 import AdminQuestionCostSummary from './AdminQuestionCostSummary';
 import AdminReelCosts from './AdminReelCosts';
+import AdminChapterWarnings from './AdminChapterWarnings';
 import AdminUserCreditManagement from './AdminUserCreditManagement';
 import AdminFreeAnswerFunnel from './AdminFreeAnswerFunnel';
 import AdminFirstPurchaseOfferFunnel from './AdminFirstPurchaseOfferFunnel';
@@ -3907,6 +3908,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Question Cost
           </button>
+          <button className={`subtab ${activeSubTab === 'chapterWarnings' ? 'active' : ''}`} onClick={() => setActiveSubTab('chapterWarnings')}>Chapter Validation</button>
           <button className={`subtab ${activeSubTab === 'reelCosts' ? 'active' : ''}`} onClick={() => setActiveSubTab('reelCosts')}>
             Video Reading Costs
           </button>
@@ -5666,6 +5668,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         )}
 
         {activeTab === 'credits' && activeSubTab === 'reelCosts' && <AdminReelCosts />}
+        {activeTab === 'credits' && activeSubTab === 'chapterWarnings' && <AdminChapterWarnings />}
 
         {activeTab === 'credits' && activeSubTab === 'subscriptionPurchases' && (
           <AdminSubscriptionDashboard />
