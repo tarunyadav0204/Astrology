@@ -30,11 +30,12 @@ export default function NextChapterScreen({navigation,route}) {
   const [error,setError]=useState(''),[busy,setBusy]=useState(false),[confirm,setConfirm]=useState(false),[revision,setRevision]=useState(0),[loading,setLoading]=useState(true);
   const sequence=useRef(0), lock=useRef(false), scroll=useRef(null);
   const [connectionLost,setConnectionLost]=useState(false);
+  const [regenerateError,setRegenerateError] = useState(false);
   const [loadError,setLoadError] = useState(false), [quoteError,setQuoteError] = useState(false);
   const [reelSource,setReelSource]=useState(null),[reelLaunch,setReelLaunch]=useState(0),[reelBusy,setReelBusy]=useState(false),[reelError,setReelError]=useState(false);
   const reelLock=useRef(false), activeChapter=useRef(null);
   activeChapter.current=job?.id;
-  useEffect(()=>{setReelSource(null);setReelLaunch(0);setReelError(false);},[job?.id]);
+  useEffect(()=>{setRegenerateError(false);setConfirm(false);setReelSource(null);setReelLaunch(0);setReelError(false);},[job?.id]);
   const openReel=async()=>{
     if(reelLock.current||!job?.report)return;
     const chapterId=job.id;
@@ -48,7 +49,7 @@ export default function NextChapterScreen({navigation,route}) {
     finally{reelLock.current=false;setReelBusy(false);}
   };
   const hasJob = Boolean(job);
-  const visibleError = hasJob ? (job.report && connectionLost ? 'connectionLost' : '') : error || (loadError || quoteError ? 'previewError' : '');
+  const visibleError = regenerateError ? 'error' : hasJob ? (job.report && connectionLost ? 'connectionLost' : '') : error || (loadError || quoteError ? 'previewError' : '');
   const planet=name=>language==='hi'?hindiPlanets[name]||name:name;
   const dates=p=>p?`${new Date(p.start_at).toLocaleDateString(language==='hi'?'hi-IN':'en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:job?.spine?.timezone||quote?.spine?.timezone || periodPreview?.spine?.timezone})} — ${new Date(p.end_at).toLocaleDateString(language==='hi'?'hi-IN':'en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:job?.spine?.timezone||quote?.spine?.timezone || periodPreview?.spine?.timezone})}`:'';
   useEffect(() => {
@@ -106,7 +107,18 @@ export default function NextChapterScreen({navigation,route}) {
   }, [job?.id, job?.status, navigation]);
   useEffect(()=>navigation.addListener('focus',()=>setRevision(v=>v+1)),[navigation]);
   const open=async id=>{setBusy(true);setError('');setConnectionLost(false);scroll.current?.scrollTo({y:0,animated:false});try{const j=await get(`/next-chapter/jobs/${id}`);setConnectionLost(false);setError('');setJob(j);setLanguage(j.language);setPhase(-1);setExpanded({});scroll.current?.scrollTo({y:0,animated:false});}catch{setError('error');setConnectionLost(true);}finally{setBusy(false);}};
-  const purchase=async()=>{if(lock.current||!quote)return;lock.current=true;setConfirm(false);setBusy(true);setError('');setConnectionLost(false);setJob({id:null,status:'queued',stage:'queued',progress_percent:0,native_name:quote.native_name,spine:quote.spine});scroll.current?.scrollTo({y:0,animated:false});try{const j=await post('/next-chapter/jobs',{quote_id:quote.quote_id});setJob(previous=>({...previous,id:j.id}));await open(j.id);setRevision(v=>v+1);}catch(e){setJob(null);setError(e.response?.status===409?'changed':'error');if(e.response?.status===402)navigation.navigate('Credits');setRevision(v=>v+1);}finally{setBusy(false);lock.current=false;}};
+  const regenerate=async()=>{
+    if(lock.current||busy||!job?.id)return;
+    lock.current=true;const sourceId=job.id;setBusy(true);setRegenerateError(false);
+    try {
+      const q=await post(`/next-chapter/jobs/${sourceId}/regeneration-quote`,{});
+      if(activeChapter.current!==sourceId)return;
+      if(q.saved_job_id){await open(q.saved_job_id);return;}
+      setQuote(q);
+      if(q.credits<q.credit_cost)navigation.navigate('Credits');else setConfirm(true);
+    } catch {setRegenerateError(true);} finally {lock.current=false;setBusy(false);}
+  };
+  const purchase=async()=>{if(lock.current||!quote)return;lock.current=true;const previousJob=job;setConfirm(false);setBusy(true);setError('');setConnectionLost(false);setJob({id:null,status:'queued',stage:'queued',progress_percent:0,native_name:quote.native_name,spine:quote.spine});scroll.current?.scrollTo({y:0,animated:false});try{const j=await post('/next-chapter/jobs',{quote_id:quote.quote_id});setJob(previous=>({...previous,id:j.id}));await open(j.id);setRevision(v=>v+1);}catch(e){setJob(quote.regenerated_from?previousJob:null);if(quote.regenerated_from)setRegenerateError(true);setError(e.response?.status===409?'changed':'error');if(e.response?.status===402)navigation.navigate('Credits');setRevision(v=>v+1);}finally{setBusy(false);lock.current=false;}};
   const toggle=key=>setExpanded(v=>({...v,[key]:!v[key]}));
   const body=text=><Text style={[s.body,{color:colors.textSecondary}]}>{text}</Text>;
   const heading=text=><Text accessibilityRole="header" style={[s.heading,{color:colors.text}]}>{text}</Text>;
@@ -123,11 +135,11 @@ export default function NextChapterScreen({navigation,route}) {
         <View style={s.headerCopy}><Text style={[s.headerText,{color:colors.textInverse}]}>{t('title')}</Text>
           <NativeSelectorChip birthData={job?{name:job.native_name}:native} onPress={selectNative} showIcon={false} style={{alignSelf:'flex-start',backgroundColor:colors.cosmicRaised,borderColor:colors.cosmicLine}} textStyle={{color:colors.textInverseMuted}} iconColor={colors.accent}/>
         </View>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('refresh')} onPress={()=>{setRevision(v=>v+1);if(job?.id)open(job.id);}} style={s.icon}><Ionicons name="refresh-outline" size={21} color={colors.textInverse}/></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={t(job?.report?'regenerate':'refresh')} disabled={busy} onPress={()=>job?.report?regenerate():(setRevision(v=>v+1),job?.id&&open(job.id))} style={s.icon}><>{busy?<ActivityIndicator color={colors.textInverse}/>:<Ionicons name="refresh-outline" size={21} color={colors.textInverse}/>}</></TouchableOpacity>
       </View>
     </SafeAreaView></View>
     <ScrollView ref={scroll} contentContainerStyle={s.content}>
-      {!!visibleError&&<View accessibilityRole="alert" style={card}>{body(t(visibleError))}{button(t('retry'),()=>{setError('');setRevision(v=>v+1);if(job?.id)open(job.id);},true)}</View>}
+      {!!visibleError&&<View accessibilityRole="alert" style={card}>{body(t(visibleError))}{button(t('retry'),()=>{if(regenerateError){regenerate();return;}setError('');setRevision(v=>v+1);if(job?.id)open(job.id);},true)}</View>}
       {busy&&!job&&<ActivityIndicator color={colors.primary} accessibilityLabel={t('loading')}/>}
       {!job?<><View style={s.hero}><View style={[s.emblem,{borderColor:colors.accent,backgroundColor:colors.accentSoft}]}><Ionicons name="sparkles-outline" size={34} color={colors.onAccent}/></View><Text style={[s.eyebrow,{color:colors.primary}]}>{t('eyebrow')}</Text><Text accessibilityRole="header" style={[s.title,{color:colors.text}]}>{t('hero')}</Text>{body(t('intro'))}</View>
         <View style={s.formSection}>{heading(t('chooseChapter'))}<View style={s.chapterChoices}>{['current','next'].map(value=><TouchableOpacity key={value} accessibilityRole="button" accessibilityState={{selected:selection===value,disabled:busy}} disabled={busy} onPress={()=>{if(selection===value)return;setQuote(null);setConfirm(false);setError('');setSelection(value);}} style={[s.card,s.choiceCard,{backgroundColor:selection===value?colors.selectionSurface:colors.surfaceRaised,borderColor:selection===value?colors.selectionBorder:colors.cardBorder}]}><View style={s.choiceHeader}><Text style={[s.label,{color:selection===value?colors.selectionText:colors.text}]}>{t(value+'Chapter')}</Text><Ionicons name={selection===value?'radio-button-on':'radio-button-off'} size={22} color={selection===value?colors.selectionText:colors.primary}/></View><Text style={[s.body,{color:selection===value?colors.selectionTextMuted:colors.textSecondary}]}>{t(value+'ChapterBody')}</Text>{periodFor(value)&&<View style={s.periodMeta}><Text style={[s.label,{color:selection===value?colors.selectionText:colors.text}]}>{planet(periodFor(value).planet)}</Text><Text style={[s.body,{color:selection===value?colors.selectionTextMuted:colors.textSecondary}]}>{dates(periodFor(value))}</Text></View>}</TouchableOpacity>)}</View></View>
@@ -142,7 +154,7 @@ export default function NextChapterScreen({navigation,route}) {
         </>}
     </ScrollView>
     {report&&reelSource&&<MessageBubble key={reelSource.messageId} reelOnly message={reelSource} language={job.language} reelAutoLaunchMessageId={reelSource.messageId} reelAutoLaunchKey={reelLaunch} reelAutoLaunchLang={job.language}/>}
-    <ConfirmCreditsModal visible={confirm} onClose={()=>setConfirm(false)} onConfirm={purchase} title={t('confirm')} description={t('confirmBody')} cost={quote?.credit_cost} credits={quote?.credits} confirmLabel={t('create')} iconName="sparkles-outline"/>
+    <ConfirmCreditsModal visible={confirm} onClose={()=>setConfirm(false)} onConfirm={purchase} title={t(quote?.regenerated_from?'regenerate':'confirm')} description={t(quote?.regenerated_from?'regenerateBody':'confirmBody')} cost={quote?.credit_cost} credits={quote?.credits} confirmLabel={t(quote?.regenerated_from?'regenerate':'create')} iconName="sparkles-outline"/>
   </View>;
 }
 const s = StyleSheet.create({

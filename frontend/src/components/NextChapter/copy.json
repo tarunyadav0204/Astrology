@@ -63,7 +63,9 @@
     "currentChapter": "My current chapter",
     "currentChapterBody": "Understand the period you’re living through and what lies ahead.",
     "nextChapter": "My next chapter",
-    "nextChapterBody": "Prepare for your next Antardasha."
+    "nextChapterBody": "Prepare for your next Antardasha.",
+    "regenerate": "Regenerate chapter",
+    "regenerateBody": "Create a fresh reading for this same period and language. Your saved chapter stays available. The displayed credits will be charged when you confirm."
   },
   "hi": {
     "title": "आपका अगला अध्याय",
@@ -129,7 +131,9 @@
     "currentChapter": "मेरा वर्तमान अध्याय",
     "currentChapterBody": "अपने चल रहे समय और आगे की संभावनाओं को समझें।",
     "nextChapter": "मेरा अगला अध्याय",
-    "nextChapterBody": "अपनी अगली अंतर्दशा की तैयारी करें।"
+    "nextChapterBody": "अपनी अगली अंतर्दशा की तैयारी करें।",
+    "regenerate": "अध्याय फिर से बनाएँ",
+    "regenerateBody": "इसी अवधि और भाषा में नई रीडिंग बनाएँ। आपका सहेजा गया अध्याय उपलब्ध रहेगा। पुष्टि करने पर दिखाए गए क्रेडिट काटे जाएँगे।"
   },
   "ta": {
     "title": "உங்கள் அடுத்த அத்தியாயம்",
@@ -195,7 +199,9 @@
     "currentChapter": "எனது தற்போதைய அத்தியாயம்",
     "currentChapterBody": "நீங்கள் வாழும் காலத்தையும் அடுத்து வரக்கூடியவற்றையும் புரிந்துகொள்ளுங்கள்.",
     "nextChapter": "எனது அடுத்த அத்தியாயம்",
-    "nextChapterBody": "உங்கள் அடுத்த அந்தர்தசைக்குத் தயாராகுங்கள்."
+    "nextChapterBody": "உங்கள் அடுத்த அந்தர்தசைக்குத் தயாராகுங்கள்.",
+    "regenerate": "அத்தியாயத்தை மீண்டும் உருவாக்கு",
+    "regenerateBody": "அதே காலம் மற்றும் மொழியில் புதிய வாசிப்பை உருவாக்கவும். சேமித்த அத்தியாயம் தொடர்ந்து கிடைக்கும். உறுதிப்படுத்தும்போது காட்டப்பட்ட கிரெடிட்கள் கழிக்கப்படும்."
   },
   "es": {
     "title": "Tu próximo capítulo",
@@ -261,7 +267,9 @@
     "currentChapter": "Mi capítulo actual",
     "currentChapterBody": "Comprende el período que estás viviendo y lo que viene.",
     "nextChapter": "Mi próximo capítulo",
-    "nextChapterBody": "Prepárate para tu próxima Antardasha."
+    "nextChapterBody": "Prepárate para tu próxima Antardasha.",
+    "regenerate": "Regenerar capítulo",
+    "regenerateBody": "Crea una nueva lectura para el mismo período e idioma. Tu capítulo guardado seguirá disponible. Al confirmar se cobrarán los créditos indicados."
   },
   "te": {
     "title": "మీ తదుపరి అధ్యాయం",
@@ -327,7 +335,9 @@
     "currentChapter": "నా ప్రస్తుత అధ్యాయం",
     "currentChapterBody": "మీరు గడుపుతున్న కాలాన్ని, ముందున్న అవకాశాలను అర్థం చేసుకోండి.",
     "nextChapter": "నా తదుపరి అధ్యాయం",
-    "nextChapterBody": "మీ తదుపరి అంతర్దశకు సిద్ధం కండి."
+    "nextChapterBody": "మీ తదుపరి అంతర్దశకు సిద్ధం కండి.",
+    "regenerate": "అధ్యాయాన్ని మళ్లీ రూపొందించండి",
+    "regenerateBody": "అదే కాలం మరియు భాషలో కొత్త పఠనాన్ని రూపొందించండి. సేవ్ చేసిన అధ్యాయం అందుబాటులో ఉంటుంది. నిర్ధారించినప్పుడు చూపిన క్రెడిట్‌లు తీసివేయబడతాయి."
   },
   "mr": {
     "title": "तुमचा पुढचा अध्याय",
@@ -393,7 +403,9 @@
     "currentChapter": "माझा सध्याचा अध्याय",
     "currentChapterBody": "तुमचा सध्याचा काळ आणि पुढील शक्यता समजून घ्या.",
     "nextChapter": "माझा पुढचा अध्याय",
-    "nextChapterBody": "तुमच्या पुढील अंतर्दशेची तयारी करा."
+    "nextChapterBody": "तुमच्या पुढील अंतर्दशेची तयारी करा.",
+    "regenerate": "अध्याय पुन्हा तयार करा",
+    "regenerateBody": "याच कालावधीसाठी आणि भाषेत नवीन वाचन तयार करा. तुमचा जतन केलेला अध्याय उपलब्ध राहील. पुष्टी केल्यावर दाखवलेले क्रेडिट वजा होतील."
   },
   "gu": {
     "title": "તમારો આગામી અધ્યાય",
@@ -459,7 +471,9 @@
     "currentChapter": "મારો વર્તમાન અધ્યાય",
     "currentChapterBody": "તમારો વર્તમાન સમય અને આગળની શક્યતાઓ સમજો.",
     "nextChapter": "મારો આગામી અધ્યાય",
-    "nextChapterBody": "તમારી આગામી અંતર્દશાની તૈયારી કરો."
+    "nextChapterBody": "તમારી આગામી અંતર્દશાની તૈયારી કરો.",
+    "regenerate": "અધ્યાય ફરી બનાવો",
+    "regenerateBody": "આ જ સમયગાળા અને ભાષામાં નવું વાંચન બનાવો. તમારો સાચવેલો અધ્યાય ઉપલબ્ધ રહેશે. પુષ્ટિ કરવાથી દર્શાવેલા ક્રેડિટ કપાશે."
   },
   "de": {
     "title": "Dein nächstes Kapitel",
@@ -525,7 +539,9 @@
     "currentChapter": "Mein aktuelles Kapitel",
     "currentChapterBody": "Verstehe deine gegenwärtige Phase und was vor dir liegt.",
     "nextChapter": "Mein nächstes Kapitel",
-    "nextChapterBody": "Bereite dich auf deine nächste Antardasha vor."
+    "nextChapterBody": "Bereite dich auf deine nächste Antardasha vor.",
+    "regenerate": "Kapitel neu erstellen",
+    "regenerateBody": "Erstelle eine neue Deutung für denselben Zeitraum und dieselbe Sprache. Dein gespeichertes Kapitel bleibt verfügbar. Die angezeigten Credits werden bei Bestätigung abgebucht."
   },
   "fr": {
     "title": "Votre prochain chapitre",
@@ -591,7 +607,9 @@
     "currentChapter": "Mon chapitre actuel",
     "currentChapterBody": "Comprenez la période que vous vivez et ce qui vous attend.",
     "nextChapter": "Mon prochain chapitre",
-    "nextChapterBody": "Préparez votre prochaine Antardasha."
+    "nextChapterBody": "Préparez votre prochaine Antardasha.",
+    "regenerate": "Régénérer le chapitre",
+    "regenerateBody": "Créez une nouvelle lecture pour la même période et la même langue. Votre chapitre enregistré reste disponible. Les crédits affichés seront débités à la confirmation."
   },
   "ru": {
     "title": "Ваша следующая глава",
@@ -657,7 +675,9 @@
     "currentChapter": "Мой текущий этап",
     "currentChapterBody": "Поймите период, который вы проживаете, и что вас ждёт впереди.",
     "nextChapter": "Мой следующий этап",
-    "nextChapterBody": "Подготовьтесь к следующей Антардаше."
+    "nextChapterBody": "Подготовьтесь к следующей Антардаше.",
+    "regenerate": "Создать главу заново",
+    "regenerateBody": "Создайте новое прочтение для того же периода и языка. Сохранённая глава останется доступной. Указанные кредиты спишутся после подтверждения."
   },
   "zh": {
     "title": "你的下一个篇章",
@@ -723,6 +743,8 @@
     "currentChapter": "我当前的篇章",
     "currentChapterBody": "了解正在经历的时期，以及接下来可能的发展。",
     "nextChapter": "我的下一篇章",
-    "nextChapterBody": "为下一段小运做好准备。"
+    "nextChapterBody": "为下一段小运做好准备。",
+    "regenerate": "重新生成篇章",
+    "regenerateBody": "为同一时期和语言创建新的解读。已保存的篇章仍可查看。确认后将扣除显示的积分。"
   }
 }

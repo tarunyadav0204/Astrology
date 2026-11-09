@@ -194,8 +194,9 @@ def validate_transit_story(story, required, facts):
 
 
 def validate_chapter(value, briefs):
+    normalize_chapter_text(value)
     if not isinstance(value, dict) or not all(nonempty(value.get(k)) for k in HEADERS):
-        raise ValueError('Missing chapter introduction/closing')
+        raise ValueError('Chapter fields must be nonempty text or paragraph lists; invalid fields: ' + str([k for k in HEADERS if not nonempty(value.get(k))]) if isinstance(value, dict) else 'Chapter must be an object')
     events = value.get('antardasha_events')
     if not isinstance(events, list) or not events:
         raise ValueError('Missing Antardasha event spectrum')
@@ -219,8 +220,30 @@ def nonempty(value):
     return isinstance(value, str) and bool(value.strip())
 
 
+def normalize_chapter_text(value):
+    """Preserve model-written paragraphs when returned as a list of strings."""
+    if isinstance(value, dict):
+        for key in HEADERS:
+            parts = value.get(key)
+            if isinstance(parts, list) and parts and all(nonempty(part) for part in parts):
+                value[key] = '\n\n'.join(parts)
+    return value
+
+
 def normalize_period_wrapper(value, ids):
     """Relocate complete supplied rows only; never synthesize/drop a period."""
+    # JSON-mode providers sometimes wrap the entire object in a singleton array.
+    if (isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict)
+            and ('periods' in value[0] or set(value[0]) == set(ids))):
+        value = value[0]
+    # Accept [{"pd_4": {...}}, {"pd_5": {...}}] without changing IDs/content.
+    if isinstance(value, list) and len(value) == len(ids):
+        if all(isinstance(row, dict) and set(row) == {pid}
+               and isinstance(row[pid], dict) and row[pid].get('period_id') == pid
+               for row, pid in zip(value, ids)):
+            value = [row[pid] for row, pid in zip(value, ids)]
+    if isinstance(value, dict):
+        value = normalize_chapter_text(deepcopy(value))
     if isinstance(value, dict) and set(value) == {'section'} and isinstance(value['section'], dict):
         section = normalize_period_wrapper(value['section'], ids)
         if (isinstance(section, dict) and isinstance(section.get('periods'), list)
@@ -685,6 +708,7 @@ async def generate(dossier, language, model, model_id, vendor, *, audit_sink=Non
             'Return {"chapter":{title,overview,mahadasha_context,antardasha_themes,closing,antardasha_events,antardasha_transits},'
             '"family_coverage":[{"period_id":"pd_1","planned_theme":"exact reviewed plan theme",'
             '"chapter_theme":"exact antardasha_events theme heading"}]}. '
+            'The chapter title, overview, mahadasha_context, antardasha_themes and closing are text strings (not arrays). '
             'Map EVERY selected planned theme from every PD to a chapter group; several may map to the same group. '
             'Use the full MD/AD transit sequence and exact supplied facts. ' + CHAPTER_SCHEMA,
             {'plans': plans, 'chapter_editor': editorial, 'spine': briefs['shared']['spine'],

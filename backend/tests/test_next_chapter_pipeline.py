@@ -538,3 +538,32 @@ def test_coverage_warnings_do_not_repair_or_fail_customer_report(dossier):
     assert any(w['stage'] == 'chapter_spectrum' for w in warnings)
     assert len([s for s in model.stages if s.startswith('plan_')]) == 9
     assert result['generation']['validation_warning_count'] == len(warnings)
+
+
+def test_production_response_shapes_complete_without_repair(dossier):
+    class ProductionShapes(Model):
+        async def generate_content_async(self, prompt, **kwargs):
+            response = await super().generate_content_async(prompt, **kwargs)
+            stage = re.search(r'STAGE: ([^\n]+)', prompt)[1]
+            value = json.loads(response.text)
+            if stage == 'plan_pd_9':
+                value = [value]
+            elif stage == 'write_pd_4':
+                value = [{row['period_id']: row for row in value['periods']}]
+            elif stage == 'chapter_spectrum':
+                value['chapter']['antardasha_themes'] = ['First model-written theme.', 'Second model-written theme.']
+            response.text = json.dumps(value)
+            return response
+    model = ProductionShapes(dossier)
+    result = asyncio.run(narrate_next_chapter(dossier, model=model))
+    assert len(result['report']['periods']) == 9
+    assert result['report']['antardasha_themes'] == 'First model-written theme.\n\nSecond model-written theme.'
+    for stage in ('plan_pd_9', 'write_pd_4', 'chapter_spectrum'):
+        assert model.stages.count(stage) == 1
+
+
+def test_normalization_does_not_guess_period_identity():
+    from next_chapter.pipeline import normalize_period_wrapper, rows_for
+    value = [{'pd_4': {'period_id': 'pd_5', 'summary': 'Do not relabel this'}}]
+    with pytest.raises(ValueError):
+        rows_for(normalize_period_wrapper(value, ['pd_4']), ['pd_4'])

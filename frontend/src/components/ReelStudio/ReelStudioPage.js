@@ -49,7 +49,7 @@ export default function ReelStudioPage({user,onLogout,onAdminClick}){
     <section><h2 className="rs-section-title">{t('topics')}</h2><nav className="rs-filters" aria-label={t('topics')}>{['all','relationships','identity','careerGroup','future'].map(group=><button key={group} aria-pressed={group===filter} onClick={()=>setFilter(group)}>{t(group)}</button>)}</nav><div className="rs-grid">{topics.filter(item=>filter==='all'||item[1]===filter).map(item=>card(item))}</div></section>
     <section className="rs-library"><h2 className="rs-section-title">{t('saved')}</h2>{loading?<p role="status">{t('loading')}</p>:!history.length?<p>{t('empty')}</p>:<div className="rs-saved-grid">{history.map(item=><button key={item.job_id} className="rs-saved" onClick={()=>item.status==='completed'?setPlayer(item.job_id):setSource(item.message_id)}><div className="rs-cover"><Artwork id={item.status==='completed'?item.job_id:null}/><span className="rs-play" aria-hidden="true">{item.status==='completed'?'▷':'◷'}</span></div><strong>{item.question||t('title')}</strong><small>{t(item.status==='completed'?'play':item.status==='failed'?'failed':'inProgress')}</small></button>)}</div>}</section>
     <BirthFormModal isOpen={addChart} onClose={()=>setAddChart(false)} title={t('choose')} onChartPick={value=>{setBirthData(value);load();}} onSubmit={value=>{setBirthData(value);load();}}/>
-    {source&&<ReelStudioModal key={source} messageId={source} initialLanguage={language==='hi'?'hi':'en'} onClose={()=>{setSource(null);refreshHistory();}}/>}
+    {source&&<ReelStudioModal key={source} messageId={source} onClose={()=>{setSource(null);refreshHistory();}}/>}
     {player&&<ReelPlayer jobId={player} onClose={()=>setPlayer(null)}/>}
   </div></main></>;
 }

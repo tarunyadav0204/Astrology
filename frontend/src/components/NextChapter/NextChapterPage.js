@@ -31,11 +31,12 @@ export default function NextChapterPage({user,onLogout,onAdminClick}) {
   const [error,setError] = useState(''), [busy,setBusy] = useState(false), [confirm,setConfirm] = useState(false), [buy,setBuy] = useState(false), [refresh,setRefresh] = useState(0);
   const lock = useRef(false), quoteSequence = useRef(0);
   const t = (key,args={}) => Object.entries(args).reduce((s,[k,v])=>s.replace(`{{${k}}}`,v), (copy[language] || copy.en)[key]);
+  const [regenerateError,setRegenerateError] = useState(false);
   const [loadError,setLoadError] = useState(false), [quoteError,setQuoteError] = useState(false);
   const [reelSource,setReelSource]=useState(null),[reelBusy,setReelBusy]=useState(false),[reelError,setReelError]=useState(false);
   const reelLock=useRef(false),activeChapter=useRef(null);
   activeChapter.current=job?.id;
-  useEffect(()=>{setReelSource(null);setReelError(false);},[job?.id]);
+  useEffect(()=>{setRegenerateError(false);setConfirm(false);setReelSource(null);setReelError(false);},[job?.id]);
   const openReel=async()=>{
     if(reelLock.current||!job?.report)return;
     const chapterId=job.id;
@@ -45,7 +46,7 @@ export default function NextChapterPage({user,onLogout,onAdminClick}) {
     finally{reelLock.current=false;setReelBusy(false);}
   };
   const hasJob = Boolean(job);
-  const visibleError = hasJob ? (job.report && connectionLost ? 'connectionLost' : '') : error || (loadError || quoteError ? 'previewError' : '');
+  const visibleError = regenerateError ? 'error' : hasJob ? (job.report && connectionLost ? 'connectionLost' : '') : error || (loadError || quoteError ? 'previewError' : '');
   const planet = name => language==='hi' ? planetHi[name] || name : name;
   const dates = p => p ? `${new Date(p.start_at).toLocaleDateString(language==='hi'?'hi-IN':'en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:job?.spine?.timezone || quote?.spine?.timezone || periodPreview?.spine?.timezone})} — ${new Date(p.end_at).toLocaleDateString(language==='hi'?'hi-IN':'en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:job?.spine?.timezone || quote?.spine?.timezone || periodPreview?.spine?.timezone})}` : '';
   useEffect(() => {
@@ -95,12 +96,23 @@ export default function NextChapterPage({user,onLogout,onAdminClick}) {
     return()=>{active=false;clearTimeout(timer);document.removeEventListener('visibilitychange',onVisible);};
   },[job?.id,job?.status]);
   const open = async id => {setBusy(true);setError('');window.scrollTo({top:0,behavior:'instant'});try{const j=await request(`/next-chapter/jobs/${id}`);setConnectionLost(false);setError('');setLanguage(j.language);setJob(j);setPhase(-1);window.scrollTo({top:0,behavior:'instant'});}catch{setError('error');setConnectionLost(true);}finally{setBusy(false);}};
-  const purchase = async()=>{if(lock.current || !quote)return;lock.current=true;setConfirm(false);setBusy(true);setError('');setConnectionLost(false);setJob({id:null,status:'queued',stage:'queued',progress_percent:0,native_name:quote.native_name,spine:quote.spine});window.scrollTo({top:0,behavior:'instant'});try{const j=await request('/next-chapter/jobs',{quote_id:quote.quote_id});setJob(previous=>({...previous,id:j.id}));await open(j.id);setRefresh(v=>v+1);}catch(e){setJob(null);setError(e.status===409?'changed':'error');if(e.status===402)setBuy(true);setRefresh(v=>v+1);}finally{setBusy(false);lock.current=false;}};
+  const regenerate = async()=>{
+    if(lock.current||busy||!job?.id)return;
+    lock.current=true;const sourceId=job.id;setBusy(true);setRegenerateError(false);
+    try {
+      const q=await request(`/next-chapter/jobs/${sourceId}/regeneration-quote`,{});
+      if(activeChapter.current!==sourceId)return;
+      if(q.saved_job_id){await open(q.saved_job_id);return;}
+      setQuote(q);
+      if(q.credits<q.credit_cost)setBuy(true);else setConfirm(true);
+    } catch {setRegenerateError(true);} finally {lock.current=false;setBusy(false);}
+  };
+  const purchase = async()=>{if(lock.current || !quote)return;lock.current=true;const previousJob=job;setConfirm(false);setBusy(true);setError('');setConnectionLost(false);setJob({id:null,status:'queued',stage:'queued',progress_percent:0,native_name:quote.native_name,spine:quote.spine});window.scrollTo({top:0,behavior:'instant'});try{const j=await request('/next-chapter/jobs',{quote_id:quote.quote_id});setJob(previous=>({...previous,id:j.id}));await open(j.id);setRefresh(v=>v+1);}catch(e){setJob(quote.regenerated_from?previousJob:null);if(quote.regenerated_from)setRegenerateError(true);setError(e.status===409?'changed':'error');if(e.status===402)setBuy(true);setRefresh(v=>v+1);}finally{setBusy(false);lock.current=false;}};
   const report=job?.report, period=phase>=0?report?.periods[phase]:null;
   const cards = period?.manifestations || report?.antardasha_events || [];
   return <><ModernNavigationHeader user={user} onLogout={onLogout} onAdminClick={onAdminClick}/><main className="nc-page"><div className="nc-shell">
-    {busy&&!job&&<p role="status">{t('loading')}</p>}<header className="nc-top"><ThemeButton variant="ghost" onClick={()=>job?(setJob(null),setRefresh(v=>v+1)):navigate('/profile')}>{t('back')}</ThemeButton><span>{t('eyebrow')}</span><select aria-label={t('language')} value={language} onChange={e=>{setLanguage(e.target.value);localStorage.setItem('nextChapterLanguage',e.target.value);setJob(null);}}><option value="en">{t('en')}</option><option value="hi">{t('hi')}</option></select></header>
-    {visibleError&&<div role="alert" className="nc-error">{t(visibleError)} <ThemeButton variant="secondary" onClick={()=>{setError('');setRefresh(v=>v+1);if(job?.id)open(job.id);}}>{t('retry')}</ThemeButton></div>}
+    {busy&&!job&&<p role="status">{t('loading')}</p>}<header className="nc-top"><ThemeButton variant="ghost" onClick={()=>job?(setJob(null),setRefresh(v=>v+1)):navigate('/profile')}>{t('back')}</ThemeButton><span>{t('eyebrow')}</span><select aria-label={t('language')} value={language} onChange={e=>{setLanguage(e.target.value);localStorage.setItem('nextChapterLanguage',e.target.value);setJob(null);}}><option value="en">{t('en')}</option><option value="hi">{t('hi')}</option></select>{job?.report&&<ThemeButton variant="secondary" disabled={busy} onClick={regenerate}>{t(busy?'loading':'regenerate')}</ThemeButton>}</header>
+    {visibleError&&<div role="alert" className="nc-error">{t(visibleError)} <ThemeButton variant="secondary" onClick={()=>{if(regenerateError){regenerate();return;}setError('');setRefresh(v=>v+1);if(job?.id)open(job.id);}}>{t('retry')}</ThemeButton></div>}
     {!job ? <><section className="nc-hero"><div className="nc-orbit" aria-hidden="true">✦</div><p className="nc-eyebrow">{t('title')}</p><h1>{t('hero')}</h1><p className="nc-lead">{t('intro')}</p>
       <div className="nc-chapter-choice" role="group" aria-label={t('chooseChapter')}>{['current','next'].map(value=><button key={value} type="button" aria-pressed={selection===value} disabled={busy} onClick={()=>{if(selection===value)return;setQuote(null);setConfirm(false);setError('');setSelection(value);}}><strong>{t(value+'Chapter')}</strong><span>{t(value+'ChapterBody')}</span>{periodFor(value)&&<span><strong>{planet(periodFor(value).planet)}</strong><br/>{dates(periodFor(value))}</span>}</button>)}</div>
       {quote ? <div className="nc-offer"><span className="nc-eyebrow">{quote.native_name}</span><h2>{planet(quote.spine.mahadasha.planet)} · {planet(quote.spine.antardasha.planet)}</h2><p>{dates(quote.spine.antardasha)}</p><div className="nc-mini-timeline" aria-hidden="true">{quote.spine.pratyantardashas.map(p=><span key={p.id}>{planet(p.planet)}</span>)}</div><ThemeButton disabled={busy||(!quote.saved_job_id&&quote.credit_cost===null)} onClick={()=>quote.saved_job_id?open(quote.saved_job_id):quote.credits<quote.credit_cost?setBuy(true):setConfirm(true)}>{quote.saved_job_id?t('open'):t('create')}</ThemeButton><p>{quote.saved_job_id?t('privacy'):quote.credit_cost===null?t('unavailable'):t('cost',{count:quote.credit_cost})}</p></div>:<div role="status"><p>{loading||chart?t('loading'):t('noCharts')}</p>{!loading&&!chart&&<ThemeButton variant="secondary" onClick={()=>setAddChart(true)}>{t('addChart')}</ThemeButton>}</div>}
@@ -113,7 +125,7 @@ export default function NextChapterPage({user,onLogout,onAdminClick}) {
         <details className="nc-evidence"><summary>{t('evidence')}</summary>{period&&<p>{period.conditions_and_cautions}</p>}{(period?.transit_story || report.antardasha_transits || []).map((r,i)=><p key={i}>{r.explanation}</p>)}</details>{phase===-1&&report.closing&&<aside><h3>{t('guidance')}</h3><p>{report.closing}</p></aside>}<p className="nc-note">{t('note')}</p>
       </section></>}
     {report&&reelSource&&<ReelStudioModal key={reelSource} messageId={reelSource} initialLanguage={job.language} onClose={()=>setReelSource(null)}/>}
-    <ThemeModal isOpen={confirm} onClose={()=>setConfirm(false)} title={t('confirm')} closeLabel={t('cancel')}><p>{t('confirmBody')}</p><h2>{t('cost',{count:quote?.credit_cost})}</h2><p>{t('balance',{count:quote?.credits})}</p><ThemeButton onClick={purchase} disabled={busy}>{t('create')}</ThemeButton><ThemeButton variant="ghost" onClick={()=>setConfirm(false)}>{t('cancel')}</ThemeButton></ThemeModal>
+    <ThemeModal isOpen={confirm} onClose={()=>setConfirm(false)} title={t(quote?.regenerated_from?'regenerate':'confirm')} closeLabel={t('cancel')}><p>{t(quote?.regenerated_from?'regenerateBody':'confirmBody')}</p><h2>{t('cost',{count:quote?.credit_cost})}</h2><p>{t('balance',{count:quote?.credits})}</p><ThemeButton onClick={purchase} disabled={busy}>{t(quote?.regenerated_from?'regenerate':'create')}</ThemeButton><ThemeButton variant="ghost" onClick={()=>setConfirm(false)}>{t('cancel')}</ThemeButton></ThemeModal>
     <BirthFormModal isOpen={addChart} onClose={()=>setAddChart(false)} onSubmit={()=>setRefresh(v=>v+1)} title={t('addChart')} />
     <CreditsModal isOpen={buy} onClose={()=>{setBuy(false);setRefresh(v=>v+1);}} />
   </div></main></>;

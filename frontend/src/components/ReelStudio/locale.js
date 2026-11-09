@@ -1,5 +1,6 @@
-// Match the mobile language names as well as browser language codes.
+// The website interface is English. Report/narration preferences and the
+// browser locale must not independently translate Studio or navigation labels.
+// Keep the content language selection in ReelStudioModal separate from UI copy.
 export function studioLanguage() {
-  const raw=(localStorage.getItem('language') || localStorage.getItem('nextChapterLanguage') || navigator.language || 'en').toLowerCase().split('-')[0];
-  return ({english:'en',hindi:'hi',tamil:'ta',telugu:'te',gujarati:'gu',marathi:'mr',german:'de',french:'fr',russian:'ru',chinese:'zh',spanish:'es'})[raw] || raw;
+  return 'en';
 }

@@ -72,11 +72,40 @@ def quote(payload, user_id):
     quote_id = uuid.uuid4().hex
     with get_conn() as conn:
         schema(conn)
-        saved = execute(conn, "SELECT id FROM next_chapter_jobs WHERE user_id=%s AND cache_key=%s AND status IN ('queued','processing','completed')", (user_id, cache_key)).fetchone()
+        saved = execute(conn, "SELECT id FROM next_chapter_jobs WHERE user_id=%s AND (cache_key=%s OR cache_key LIKE %s) AND status IN ('queued','processing','completed') ORDER BY created_at DESC LIMIT 1", (user_id, cache_key, cache_key + ':regenerate:%')).fetchone()
         execute(conn, 'INSERT INTO next_chapter_quotes(id,user_id,payload) VALUES (%s,%s,%s)', (quote_id,user_id,json.dumps(request,default=str)))
         conn.commit()
     return {'quote_id': quote_id, 'credit_cost': cost, 'credits': credits,
             'spine': spine, 'native_name': birth.get('name'), 'saved_job_id': saved[0] if saved else None}
+
+
+def regeneration_quote(job_id, user_id):
+    with get_conn() as conn:
+        row = execute(conn, 'SELECT request_json,status FROM next_chapter_jobs WHERE id=%s AND user_id=%s', (job_id, user_id)).fetchone()
+        if not row:
+            raise HTTPException(404, 'Chapter not found')
+        if row[1] != 'completed':
+            raise HTTPException(409, 'Chapter is not complete')
+        request = json.loads(row[0])
+        # Keep the purchased period, language and as-of date, even if it is now past.
+        birth = owned_birth(request['chart_id'], user_id)
+        cost, credits = price(user_id)
+        base_key = request['cache_key'].split(':regenerate:')[0]
+        request.update(birth=birth, cost=cost,
+                       fingerprint=hashlib.sha256(json.dumps(birth, sort_keys=True, default=str).encode()).hexdigest(),
+                       cache_key=base_key + ':regenerate:' + job_id, regenerated_from=job_id)
+        saved = execute(conn, "SELECT id FROM next_chapter_jobs WHERE user_id=%s AND cache_key=%s AND status IN ('queued','processing','completed')", (user_id, request['cache_key'])).fetchone()
+        quote_id = uuid.uuid4().hex
+        execute(conn, 'INSERT INTO next_chapter_quotes(id,user_id,payload) VALUES (%s,%s,%s)', (quote_id,user_id,json.dumps(request)))
+        conn.commit()
+    return {'quote_id': quote_id, 'credit_cost': cost, 'credits': credits,
+            'spine': request['spine'], 'native_name': birth.get('name'),
+            'saved_job_id': saved[0] if saved else None, 'regenerated_from': job_id}
+
+
+@router.post('/jobs/{job_id}/regeneration-quote')
+async def get_regeneration_quote(job_id: str, user=Depends(get_current_user)):
+    return await run_in_threadpool(regeneration_quote, job_id, user.userid)
 
 
 @router.post('/quote')
