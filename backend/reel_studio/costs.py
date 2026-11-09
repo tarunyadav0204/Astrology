@@ -13,7 +13,8 @@ import os
 import time
 import uuid
 
-from db import execute, get_conn
+from db import execute
+from reel_studio.database import get_conn
 
 CURRENT = ContextVar('reel_cost_run', default=None)
 DEFAULTS = {

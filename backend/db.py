@@ -2,12 +2,21 @@ import os
 import socket
 import time
 import logging
+import threading
 from contextlib import contextmanager
 from typing import Dict, Iterable, Tuple
 
 
 _POOLS: Dict[Tuple[int, bool], object] = {}
 logger = logging.getLogger(__name__)
+_POOL_INIT_LOCK = threading.Lock()
+
+def _reset_pool_init_lock():
+    global _POOL_INIT_LOCK
+    _POOL_INIT_LOCK = threading.Lock()
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_reset_pool_init_lock)
 
 
 def _postgres_dsn() -> str:
@@ -159,27 +168,28 @@ def _get_pool(*, dict_rows: bool = False):
     if not _pool_enabled():
         return None
 
-    _close_stale_pools()
-    key = _pool_key(dict_rows=dict_rows)
-    pool = _POOLS.get(key)
-    if pool is not None:
+    with _POOL_INIT_LOCK:
+        _close_stale_pools()
+        key = _pool_key(dict_rows=dict_rows)
+        pool = _POOLS.get(key)
+        if pool is not None:
+            return pool
+
+        pool = ThreadedConnectionPool(
+            _pool_min_conn(),
+            _pool_max_conn(),
+            _postgres_dsn(),
+            **_connection_kwargs(dict_rows=dict_rows),
+        )
+        _POOLS[key] = pool
         return pool
 
-    pool = ThreadedConnectionPool(
-        _pool_min_conn(),
-        _pool_max_conn(),
-        _postgres_dsn(),
-        **_connection_kwargs(dict_rows=dict_rows),
-    )
-    _POOLS[key] = pool
-    return pool
 
-
-def _connect_postgres():
+def _connect_postgres(*, acquire_timeout=None):
     pool = _get_pool(dict_rows=False)
     if pool is None:
         return _new_connection(dict_rows=False)
-    return _acquire_from_pool(pool, dict_rows=False)
+    return _acquire_from_pool(pool, dict_rows=False, timeout=acquire_timeout)
 
 
 def _pool_occupancy(pool) -> Dict[str, int]:
@@ -195,7 +205,7 @@ def _pool_occupancy(pool) -> Dict[str, int]:
     return {"used": used, "free": free}
 
 
-def _acquire_from_pool(pool, *, dict_rows: bool):
+def _acquire_from_pool(pool, *, dict_rows: bool, timeout=None):
     """
     Wait briefly for a returned connection instead of failing on a transient
     fifth checkout. The wait is deliberately bounded so request threads cannot
@@ -204,7 +214,7 @@ def _acquire_from_pool(pool, *, dict_rows: bool):
     from psycopg2 import OperationalError
     from psycopg2.pool import PoolError
 
-    timeout = _pool_acquire_timeout_seconds()
+    timeout = _pool_acquire_timeout_seconds() if timeout is None else max(0.0, timeout)
     deadline = time.monotonic() + timeout
     while True:
         try:
@@ -288,9 +298,9 @@ def _release_connection(conn, *, dict_rows: bool) -> None:
 
 
 @contextmanager
-def get_conn():
+def get_conn(*, acquire_timeout=None):
     """Get a Postgres connection (Cloud SQL / optional PgBouncer) with pooling."""
-    conn = _connect_postgres()
+    conn = _connect_postgres(acquire_timeout=acquire_timeout)
     try:
         yield conn
     finally:

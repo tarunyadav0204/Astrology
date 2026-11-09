@@ -24,7 +24,8 @@ import imageio_ffmpeg
 from google.cloud import texttospeech
 from PIL import Image, ImageDraw, ImageFont
 
-from db import execute, get_conn
+from db import execute
+from reel_studio.database import get_conn
 from partner_profile.image_provider import OpenAIPartnerPortraitProvider
 from tts.routes import _get_google_credentials, _synthesize_podcast_segment, _language_code_from_voice_name
 from utils.admin_settings import get_podcast_tts_voices

@@ -66,3 +66,42 @@ def test_pool_acquire_reuses_connection_returned_while_pool_growth_times_out(mon
     pool = RecoveringPool()
     assert db._acquire_from_pool(pool, dict_rows=False) is connection
     assert pool.calls == 2
+
+
+def test_worker_can_wait_longer_without_changing_api_default(monkeypatch):
+    class BusyPool:
+        calls = 0
+        def getconn(self):
+            self.calls += 1
+            if self.calls < 3:
+                raise PoolError('connection pool exhausted')
+            return 'connection'
+    monkeypatch.setenv('DB_POOL_ACQUIRE_TIMEOUT_MS', '0')
+    monkeypatch.setenv('DB_POOL_ACQUIRE_POLL_MS', '1')
+    assert db._acquire_from_pool(BusyPool(), dict_rows=False, timeout=.1) == 'connection'
+    with pytest.raises(PoolError):
+        db._acquire_from_pool(BusyPool(), dict_rows=False)
+
+
+def test_concurrent_initialization_creates_one_pool(monkeypatch):
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    import psycopg2.pool
+    calls = []
+    pool = object()
+    def create(*args, **kwargs):
+        calls.append(1)
+        time.sleep(.01)
+        return pool
+    monkeypatch.setattr(db, '_POOLS', {})
+    monkeypatch.setattr(db, '_postgres_dsn', lambda: 'test')
+    monkeypatch.setattr(db, '_pool_enabled', lambda: True)
+    monkeypatch.setattr(psycopg2.pool, 'ThreadedConnectionPool', create)
+    barrier = threading.Barrier(8)
+    def acquire(_):
+        barrier.wait(timeout=3)
+        return db._get_pool()
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        assert all(result is pool for result in executor.map(acquire, range(8)))
+    assert len(calls) == 1
