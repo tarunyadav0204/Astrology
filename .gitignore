@@ -138,6 +138,9 @@ backend/gcp_key.json
 !knowledge_graph/wealth_poc/wealth-runtime-preview.json
 !knowledge_graph/manifestation/competency-cases.json
 !astroroshni_mobile/src/locales/*.json
+# Customer-facing web translations must ship with the app.
+!frontend/src/components/ReelStudio/copy.json
+!frontend/src/components/NextChapter/copy.json
 !backend/data/chat_glossary_terms_v2.json
 !backend/data/chat_glossary_terms_v3.json
 !astroroshni_mobile/src/data/eventTimelineYearlySample.json
