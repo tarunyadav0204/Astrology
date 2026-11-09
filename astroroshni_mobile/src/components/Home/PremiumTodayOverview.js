@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Line } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
-import { DISPLAY_FONT_FAMILY } from '../../theme/tokens';
+import { DISPLAY_FONT_FAMILY, layoutTokens, typographyTokens } from '../../theme/tokens';
 import { useTranslation } from 'react-i18next';
 import { buildKpHomeRecommendations } from '../../utils/kpHomeRecommendations';
 import ComingUpChartCard from './ComingUpChartCard';
@@ -598,7 +598,29 @@ function CatalogueGroup({ eyebrow, title, items, onSelect, colors, typography, t
   );
 }
 
+function ExploreExperience({ title, description, icon, onPress, secondaryLabel, onSecondaryPress }) {
+  const { colors } = useTheme();
+  return <View style={[styles.experienceCard, {backgroundColor:colors.surfaceRaised, borderColor:colors.cardBorder}]}>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={title} activeOpacity={0.82} onPress={onPress} style={styles.experienceAction}>
+      <View style={[styles.experienceIcon,{backgroundColor:colors.accentSoft}]}><Ionicons name={icon} size={24} color={colors.onAccent}/></View>
+      <View style={styles.experienceCopy}>
+        <Text style={[typographyTokens.sectionTitle,{color:colors.text}]}>{title}</Text>
+        <Text style={[typographyTokens.bodyMd,{color:colors.textSecondary}]}>{description}</Text>
+      </View>
+      <Ionicons name="arrow-forward" size={20} color={colors.primary}/>
+    </TouchableOpacity>
+    {onSecondaryPress && <TouchableOpacity accessibilityRole="button" onPress={onSecondaryPress} style={[styles.experienceLibrary,{borderTopColor:colors.cardBorder}]}>
+      <Ionicons name="albums-outline" size={18} color={colors.primary}/>
+      <Text style={[typographyTokens.label,styles.experienceCopy,{color:colors.primary}]}>{secondaryLabel}</Text>
+      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary}/>
+    </TouchableOpacity>}
+  </View>;
+}
+
 export function PremiumExploreIntro({
+  onOpenStudio,
+  onOpenNextChapter,
+  onOpenVideoHistory,
   onOpenCharts,
   onOpenReports,
   onOpenPanchang,
@@ -624,6 +646,7 @@ export function PremiumExploreIntro({
   const { colors, typography } = useTheme();
   const { t } = useTranslation();
   const shortcuts = [
+    ['sparkles-outline', t('nakshatraBlueprint.title'), t('nakshatraBlueprint.exploreBody'), onOpenNakshatraBlueprint, nakshatraBlueprintCost, nakshatraBlueprintOriginalCost],
     ['grid-outline', t('premiumUi.home.chartsDashas'), t('premiumUi.home.technicalWorkbench'), onOpenCharts],
     ['help-circle-outline', t('prashna.exploreTitle', 'Ask About a Situation'), t('prashna.discoveryBody', 'Classical Prashna · Will they contact you? Will a relationship, job, payment, or journey work out?'), onOpenPrashna, prashnaCost, prashnaOriginalCost],
     ['document-text-outline', t('premiumUi.home.premiumReports'), t('premiumUi.home.longReadings'), onOpenReports],
@@ -673,10 +696,10 @@ export function PremiumExploreIntro({
         onPress={onOpenPartnerPortrait}
       />
       <TouchableOpacity
-        onPress={onOpenNakshatraBlueprint}
+        onPress={onOpenStudio}
         activeOpacity={0.88}
         accessibilityRole="button"
-        accessibilityLabel={t('nakshatraBlueprint.exploreLabel', 'Open Nakshatra Blueprint')}
+        accessibilityLabel={t('reelStudio.title')}
         style={[styles.nakshatraBlueprintShell, { shadowColor: colors.primaryStrong || colors.primary }]}
       >
         <LinearGradient
@@ -688,39 +711,38 @@ export function PremiumExploreIntro({
           <View pointerEvents="none" style={[styles.nakshatraBlueprintHalo, { borderColor: nakshatraPalette.line, backgroundColor: nakshatraPalette.glow }]} accessibilityElementsHidden />
           <View style={styles.nakshatraBlueprintHeader}>
             <View style={[styles.nakshatraBlueprintMark, { backgroundColor: nakshatraPalette.glow, borderColor: nakshatraPalette.line }]}>
-              <Ionicons name="sparkles" size={23} color={nakshatraPalette.accent} />
+              <Ionicons name="film-outline" size={23} color={nakshatraPalette.accent} />
             </View>
             <View style={styles.nakshatraBlueprintCopy}>
               <View style={styles.nakshatraBlueprintLabelRow}>
                 <Text style={[styles.nakshatraBlueprintEyebrow, { color: nakshatraPalette.accent }]}>
-                  {t('nakshatraBlueprint.exploreEyebrow', 'CELESTIAL IDENTITY')}
+                  {t('reelStudio.featured')}
                 </Text>
                 <View style={[styles.nakshatraBlueprintNewPill, { backgroundColor: nakshatraPalette.accent }]}>
                   <Text style={[styles.nakshatraBlueprintNewText, { color: nakshatraPalette.onAccent }]}>{t('common.new', 'NEW')}</Text>
                 </View>
               </View>
               <Text style={[styles.nakshatraBlueprintTitle, { color: nakshatraPalette.inverse }]}>
-                {t('nakshatraBlueprint.title', 'Nakshatra Blueprint')}
+                {t('reelStudio.title')}
               </Text>
             </View>
           </View>
+          <Text style={[typography.title, { color: nakshatraPalette.inverse }]}>{t('reelStudio.hero')}</Text>
           <Text style={[styles.nakshatraBlueprintBody, { color: nakshatraPalette.inverseMuted }]}>
-            {t('nakshatraBlueprint.exploreBody', 'A complete natal reading through every graha, nakshatra and pada — character, gifts, patterns and life themes.')}
+            {t('reelStudio.intro')}
           </Text>
           <View style={styles.nakshatraBlueprintFooter}>
             <View style={styles.nakshatraBlueprintCta}>
-              <Text style={[styles.nakshatraBlueprintCtaText, { color: nakshatraPalette.accent }]}>{t('nakshatraBlueprint.exploreCta', 'Discover your blueprint')}</Text>
+              <Text style={[styles.nakshatraBlueprintCtaText, { color: nakshatraPalette.accent }]}>{t('reelStudio.topics')}</Text>
               <Ionicons name="arrow-forward" size={15} color={nakshatraPalette.accent} />
-            </View>
-            <View style={[styles.nakshatraBlueprintCost, { backgroundColor: colors.cosmicSurface, borderColor: nakshatraPalette.line }]}>
-              <Ionicons name="diamond-outline" size={12} color={nakshatraPalette.accent} />
-              {Number(nakshatraBlueprintOriginalCost) > Number(nakshatraBlueprintCost) ? (
-                <Text style={[styles.nakshatraBlueprintOriginalCost, { color: nakshatraPalette.inverseMuted }]}>{nakshatraBlueprintOriginalCost}</Text>
-              ) : null}
-              <Text style={[styles.nakshatraBlueprintCostText, { color: nakshatraPalette.inverse }]}>{nakshatraBlueprintCost}</Text>
             </View>
           </View>
         </LinearGradient>
+      </TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" onPress={onOpenVideoHistory} style={[styles.studioHistoryLink,{borderColor:colors.cardBorder}]}>
+        <Ionicons name="albums-outline" size={18} color={colors.primary}/>
+        <Text style={[typographyTokens.label,styles.experienceCopy,{color:colors.primary}]}>{t('reelStudio.history')}</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary}/>
       </TouchableOpacity>
       <View style={[styles.timingSpotlight, { backgroundColor: colors.cosmicSurface, borderColor: colors.cosmicLine }]}>
         <View pointerEvents="none" style={styles.timingSpotlightGlow} />
@@ -791,6 +813,7 @@ export function PremiumExploreIntro({
           </TouchableOpacity>
         </View>
       </View>
+      <ExploreExperience title={t('nextChapter.title')} description={t('nextChapter.intro')} icon="sparkles-outline" onPress={onOpenNextChapter}/>
       <CatalogueGroup eyebrow={t('premiumUi.home.waysBegin')} title={t('premiumUi.home.guidedExperiences')} items={guidedPaths} onSelect={onSelectPath} colors={colors} typography={typography} t={t} />
       <CatalogueGroup eyebrow={t('premiumUi.home.completeChart')} title={t('premiumUi.home.personalReadings')} items={personalAnalyses} onSelect={onSelectAnalysis} colors={colors} typography={typography} t={t} />
       <View style={[styles.studioDirectory, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -818,6 +841,12 @@ export function PremiumExploreIntro({
 }
 
 const styles = StyleSheet.create({
+  studioHistoryLink: {marginHorizontal:layoutTokens.space5,padding:layoutTokens.space4,minHeight:layoutTokens.touchTarget,flexDirection:'row',alignItems:'center',gap:layoutTokens.space3,borderBottomWidth:1},
+  experienceCard: {marginHorizontal:layoutTokens.space5,borderWidth:1,borderRadius:layoutTokens.radiusLg,overflow:'hidden'},
+  experienceAction: {flexDirection:'row',alignItems:'center',gap:layoutTokens.space3,padding:layoutTokens.space5,minHeight:layoutTokens.touchTarget},
+  experienceIcon: {padding:layoutTokens.space3,borderRadius:layoutTokens.radiusMd},
+  experienceCopy: {flex:1,minWidth:0,gap:layoutTokens.space2},
+  experienceLibrary: {flexDirection:'row',alignItems:'center',gap:layoutTokens.space3,borderTopWidth:1,padding:layoutTokens.space4,minHeight:layoutTokens.touchTarget},
   container: { gap: 18 },
   identityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   identityCopy: { flex: 1, minWidth: 0 },

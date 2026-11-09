@@ -780,6 +780,8 @@ export default function ProfileScreen({ navigation, route }) {
                 {t('profile.quickActionsTitle', 'Continue your journey')}
               </Text>
               <View style={styles.actionsGrid}>
+                <ActionButton icon="film-outline" label={t('reelStudio.title')} onPress={() => navigation.navigate('ReelStudio')} />
+                <ActionButton icon="sparkles" label={t('nextChapter.title')} onPress={() => navigation.navigate('NextChapter', { birthChartId: birthData?.id })} />
                 <ActionButton
                   icon="chatbubbles"
                   label={t('profile.quickActions.newChat')}
@@ -797,7 +799,7 @@ export default function ProfileScreen({ navigation, route }) {
                 />
                 <ActionButton
                   icon="film"
-                  label={t('premiumUi.reelStudio.historyTitle', 'Reel History')}
+                  label={t('premiumUi.reelStudio.historyTitle', "Video Reading History")}
                   onPress={() => navigation.navigate('ReelHistory')}
                 />
                 <ActionButton

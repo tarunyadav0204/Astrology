@@ -21,8 +21,8 @@ export default function PodcastPromoModal({ visible, onClose, onGenerate, onCrea
   const isPodcast = selectedFormat === 'podcast';
   const title = selectedFormat ? t('chat.podcastPromo.languageTitle', 'Choose a language') : t('chat.podcastPromo.mediaTitle', 'Take your reading with you');
   const body = selectedFormat
-    ? t('chat.podcastPromo.languageBody', 'Choose the language for your {{format}}.', { format: isPodcast ? t('chat.podcastPromo.listenTitle', 'podcast') : t('chat.podcastPromo.reelTitle', 'reel') })
-    : (included ? t('chat.podcastPromo.mediaPremiumBody', 'Listen to the included podcast, or turn this reading into a visual reel.') : t('chat.podcastPromo.mediaBody', 'Listen on the go or create a visual reel you can revisit and share.'));
+    ? t('chat.podcastPromo.languageBody', 'Choose the language for your {{format}}.', { format: isPodcast ? t('chat.podcastPromo.listenTitle', 'podcast') : t('chat.podcastPromo.reelTitle', 'video reading') })
+    : (included ? t('chat.podcastPromo.mediaPremiumBody', "Listen to the included podcast, or turn this reading into a visual video reading.") : t('chat.podcastPromo.mediaBody', "Listen on the go or create a visual video reading you can revisit and share."));
   const chooseLanguage = (lang) => { if (isPodcast) onGenerate?.(lang); else onCreateReel?.(lang); };
 
   return (
@@ -51,11 +51,11 @@ export default function PodcastPromoModal({ visible, onClose, onGenerate, onCrea
               onPress={() => onCreateReel?.(i18n.language?.startsWith('hi') ? 'hi' : 'en')}
             >
               <View style={[styles.reelIcon, { backgroundColor: `${primary}1A` }]}><Ionicons name="film-outline" size={20} color={primary} /></View>
-              <View style={styles.reelCopy}><Text style={[styles.reelTitle, { color: text }]}>{t('chat.podcastPromo.reelTitle', 'Create a visual reel')}</Text><Text style={[styles.reelDescription, { color: sub }]}>{Number.isFinite(Number(reelCost)) ? t('chat.podcastPromo.reelCost', 'English or Hindi · {{cost}} credits', { cost: reelCost }) : t('chat.podcastPromo.reelCostLoading', 'Checking credits…')}</Text></View>
+              <View style={styles.reelCopy}><Text style={[styles.reelTitle, { color: text }]}>{t('chat.podcastPromo.reelTitle', "Create a Video Reading")}</Text><Text style={[styles.reelDescription, { color: sub }]}>{Number.isFinite(Number(reelCost)) ? t('chat.podcastPromo.reelCost', 'English or Hindi · {{cost}} credits', { cost: reelCost }) : t('chat.podcastPromo.reelCostLoading', 'Checking credits…')}</Text></View>
               <Ionicons name="chevron-forward" size={20} color={primary} />
             </TouchableOpacity>
           </> : <>
-            <View style={[styles.mediaSection, { borderColor: border }]}><View style={styles.mediaHeading}><Ionicons name={isPodcast ? 'headset-outline' : 'film-outline'} size={19} color={primary} /><Text style={[styles.mediaTitle, { color: text }]}>{isPodcast ? t('chat.podcastPromo.listenTitle', 'Listen as a podcast') : t('chat.podcastPromo.reelTitle', 'Create a visual reel')}</Text></View></View>
+            <View style={[styles.mediaSection, { borderColor: border }]}><View style={styles.mediaHeading}><Ionicons name={isPodcast ? 'headset-outline' : 'film-outline'} size={19} color={primary} /><Text style={[styles.mediaTitle, { color: text }]}>{isPodcast ? t('chat.podcastPromo.listenTitle', 'Listen as a podcast') : t('chat.podcastPromo.reelTitle', "Create a Video Reading")}</Text></View></View>
             <View style={styles.options}>
               <TouchableOpacity style={[styles.option, { borderColor: primary, backgroundColor: `${primary}14` }]} onPress={() => chooseLanguage('en')}><Text style={[styles.optionLabel, { color: primary }]}>{t('chat.podcastLanguage.english', 'English')}</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.option, { borderColor: border }]} onPress={() => chooseLanguage('hi')}><Text style={[styles.optionLabel, { color: text }]}>{t('chat.podcastLanguage.hindi', 'हिन्दी')}</Text></TouchableOpacity>

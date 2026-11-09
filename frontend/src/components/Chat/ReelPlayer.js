@@ -47,9 +47,9 @@ export default function ReelPlayer({ jobId, onClose, onRecreate }) {
         if (cache.current.has(id)) return cache.current.get(id);
         const promise = (async () => {
             const response = await fetch(`/api/reel-studio/jobs/${encodeURIComponent(id)}/download`, { headers: headers() });
-            if (!response.ok) throw new Error('Could not load the saved reel.');
+            if (!response.ok) throw new Error("Could not load the saved video reading.");
             const blob = await response.blob();
-            return { url: URL.createObjectURL(blob), file: new File([blob], 'astroroshni-reel.mp4', { type: 'video/mp4' }) };
+            return { url: URL.createObjectURL(blob), file: new File([blob], 'astroroshni-video-reading.mp4', { type: 'video/mp4' }) };
         })();
         cache.current.set(id, promise);
         promise.catch(() => { if (cache.current.get(id) === promise) cache.current.delete(id); });
@@ -131,13 +131,13 @@ export default function ReelPlayer({ jobId, onClose, onRecreate }) {
         try {
             if (navigator.canShare?.({ files: [media.file] }) && navigator.share) {
                 if (destination) setNotice(`Choose ${destination} in the share sheet to continue publishing.`);
-                await navigator.share({ files: [media.file], title: 'AstroRoshni reel' });
+                await navigator.share({ files: [media.file], title: "AstroRoshni video reading" });
             } else {
                 download();
                 if (destination) window.open(destinations[destination], '_blank', 'noopener,noreferrer');
                 setNotice(destination ? `MP4 downloaded. Select it in ${destination} to finish uploading.` : 'MP4 downloaded. You can share the saved file.');
             }
-        } catch (err) { if (err.name !== 'AbortError') setError('Could not share this reel. Try saving the MP4.'); }
+        } catch (err) { if (err.name !== 'AbortError') setError("Could not share this video reading. Try saving the MP4."); }
         revealControls();
     };
     const close = async () => {
@@ -146,7 +146,7 @@ export default function ReelPlayer({ jobId, onClose, onRecreate }) {
         onClose();
     };
     const railButton = (name, label, action) => <button disabled={!media} onClick={action}><Icon name={name} /><span>{label}</span></button>;
-    return createPortal(<div className="reel-player" ref={container} role="dialog" aria-modal="true" aria-label="Reel player" tabIndex={-1}
+    return createPortal(<div className="reel-player" ref={container} role="dialog" aria-modal="true" aria-label="Video Reading player" tabIndex={-1}
         data-controls-visible={controlsVisible || !!error} onMouseMove={revealControls} onPointerDown={revealControls} onFocus={revealControls}>
         <div className="reel-player-scene" style={{ transform: `translateY(${offset}px)`, transition: settling ? 'transform 180ms ease-out' : 'none' }}>
             {cover && <img className="reel-player-backdrop" src={cover} alt="" />}
@@ -161,7 +161,7 @@ export default function ReelPlayer({ jobId, onClose, onRecreate }) {
                     if (Date.now() - lastSaved.current > 5000) { remember(); lastSaved.current = Date.now(); }
                 }}
                 onCanPlay={() => setReady(true)} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); remember(); revealControls(); }}
-                onError={() => { if (media) setError('This reel could not be played. Try saving the MP4.'); }} />
+                onError={() => { if (media) setError("This video reading could not be played. Try saving the MP4."); }} />
             {!ready && cover && <img className="reel-player-poster" src={cover} alt="" />}
         </div>
         <div className="reel-player-gesture" onPointerDown={(e) => { pointer.current = { y: e.clientY, x: e.clientX }; e.currentTarget.setPointerCapture(e.pointerId); }}
@@ -178,8 +178,8 @@ export default function ReelPlayer({ jobId, onClose, onRecreate }) {
             }} onPointerCancel={() => { pointer.current = null; setOffset(0); }} />
         <div className="reel-player-top reel-player-overlay"><span><img src="/images/astroroshni-icon.png" alt="" />AstroRoshni</span>
             {index >= 0 && <small>{index + 1} / {library.length}</small>}
-            <button onClick={close} aria-label="Close reel player"><Icon name="close" /></button></div>
-        {!ready && !error && <p className="reel-player-loading" role="status">Opening saved reel…</p>}
+            <button onClick={close} aria-label="Close video reading player"><Icon name="close" /></button></div>
+        {!ready && !error && <p className="reel-player-loading" role="status">Opening saved video reading…</p>}
         {ready && <button className="reel-player-center reel-player-overlay" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}><Icon name={playing ? 'pause' : 'play'} /></button>}
         <div className="reel-player-rail reel-player-overlay">
             {railButton('share', 'Share', () => setMenu('share'))}
@@ -189,7 +189,7 @@ export default function ReelPlayer({ jobId, onClose, onRecreate }) {
         <div className="reel-player-controls reel-player-overlay">
             {reel?.question && <p className="reel-player-question">{reel.question}</p>}
             {(error || notice) && <p role="status">{error || notice}</p>}
-            <input type="range" aria-label="Reel timeline" min="0" max={duration || 0} step="0.1" value={time}
+            <input type="range" aria-label="Video Reading timeline" min="0" max={duration || 0} step="0.1" value={time}
                 onPointerDown={() => { scrubbing.current = true; }} onPointerUp={() => { scrubbing.current = false; revealControls(); }}
                 onPointerCancel={() => { scrubbing.current = false; }} onBlur={() => { scrubbing.current = false; }}
                 disabled={!duration} onChange={(e) => { const value = Number(e.target.value); video.current.currentTime = value; setTime(value); }} />
@@ -197,8 +197,8 @@ export default function ReelPlayer({ jobId, onClose, onRecreate }) {
         </div>
         {!controlsVisible && <div className="reel-player-passive"><i style={{ width: `${duration ? time / duration * 100 : 0}%` }} /></div>}
         {menu && <div className="reel-player-menu-backdrop" onClick={() => setMenu(null)}>
-            <div className="reel-player-menu" role="dialog" aria-label={menu === 'share' ? 'Share reel' : 'Reel options'} onClick={(e) => e.stopPropagation()}>
-                <h3>{menu === 'share' ? 'Share reel' : 'Reel options'}</h3>
+            <div className="reel-player-menu" role="dialog" aria-label={menu === 'share' ? "Share video reading" : "Video Reading options"} onClick={(e) => e.stopPropagation()}>
+                <h3>{menu === 'share' ? "Share video reading" : "Video Reading options"}</h3>
                 {menu === 'share' ? <>
                     <button onClick={() => share()}>Share with another app</button>
                     {Object.keys(destinations).map((name) => <button key={name} onClick={() => share(name)}>{name}</button>)}

@@ -2227,10 +2227,40 @@ const loadHomeData = async (nativeData = null) => {
           </LinearGradient>
         </View>
 
-        {!isPanditMode && (
+        {!isPanditMode && !showExploreCatalog && (
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel={t('premiumUi.reelStudio.historyTitle', 'Reel History')}
+            accessibilityLabel={t('reelStudio.title')}
+            style={[styles.reelHistoryShortcut, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
+            onPress={() => navigation.navigate('ReelStudio')}
+          >
+            <View style={[styles.reelHistoryShortcutIcon, { backgroundColor: colors.accentSoft }]}>
+              <Icon name="film-outline" size={18} color={colors.primary} />
+            </View>
+            <Text style={[styles.reelHistoryShortcutText, { color: colors.text }]}>{t('reelStudio.title')}</Text>
+            <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+
+        {!isPanditMode && !showExploreCatalog && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('nextChapter.title')}
+            style={[styles.reelHistoryShortcut, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
+            onPress={() => navigation.navigate('NextChapter')}
+          >
+            <View style={[styles.reelHistoryShortcutIcon, { backgroundColor: colors.accentSoft }]}>
+              <Icon name="sparkles-outline" size={18} color={colors.primary} />
+            </View>
+            <Text style={[styles.reelHistoryShortcutText, { color: colors.text }]}>{t('nextChapter.title')}</Text>
+            <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+
+        {!isPanditMode && !showExploreCatalog && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('premiumUi.reelStudio.historyTitle', "Video Reading History")}
             style={[styles.reelHistoryShortcut, { borderColor: colors.cardBorder, backgroundColor: colors.surface }]}
             onPress={() => navigation.navigate('ReelHistory')}
           >
@@ -2238,7 +2268,7 @@ const loadHomeData = async (nativeData = null) => {
               <Icon name="film-outline" size={18} color={colors.primary} />
             </View>
             <Text style={[styles.reelHistoryShortcutText, { color: colors.text }]}>
-              {t('premiumUi.reelStudio.historyTitle', 'Reel History')}
+              {t('premiumUi.reelStudio.historyTitle', "Video Reading History")}
             </Text>
             <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
@@ -2336,6 +2366,9 @@ const loadHomeData = async (nativeData = null) => {
             />
           ) : null}
         /> : <PremiumExploreIntro
+          onOpenStudio={() => navigation.navigate('ReelStudio')}
+          onOpenNextChapter={() => navigation.navigate('NextChapter')}
+          onOpenVideoHistory={() => navigation.navigate('ReelHistory')}
           onOpenCharts={() => requireBirthChart((data) => navigation.navigate('ChartsHub', { birthData: data }))}
           onOpenReports={async () => {
             const ok = await requireAuthForPaid({

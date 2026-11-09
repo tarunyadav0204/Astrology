@@ -464,7 +464,12 @@
     "preparingInsights": "Bereite deine kosmischen Einblicke vor...",
     "fascinatingInsights": "In der Zwischenzeit zeige ich dir einige faszinierende Details über dein Horoskop...",
     "thankYou": "Vielen Dank, dass du dich mit deiner Frage an AstroRoshni gewandt hast.",
-    "deeplyAnalyzing": "Ich analysiere dein Himmelsdiagramm tiefgehend, um dir die genauesten Einblicke zu geben. Dieser heilige Prozess dauert einen Moment..."
+    "deeplyAnalyzing": "Ich analysiere dein Himmelsdiagramm tiefgehend, um dir die genauesten Einblicke zu geben. Dieser heilige Prozess dauert einen Moment...",
+    "podcastPromo": {
+      "mediaBody": "Unterwegs anhören oder eine visuelle Video-Deutung erstellen, die Sie jederzeit ansehen und teilen können.",
+      "mediaPremiumBody": "Hören Sie sich den enthaltenen Podcast an oder verwandeln Sie diese Deutung in eine visuelle Video-Deutung.",
+      "reelTitle": "Visuelle Video-Deutung erstellen"
+    }
   },
   "home": {
     "greeting": {
@@ -1496,5 +1501,9 @@
       "travel": "Reisen",
       "legal": "Rechtliches"
     }
+  },
+  "nakshatraBlueprint": {
+    "title": "Nakshatra-Profil",
+    "exploreBody": "Eine vollständige Geburtsdeutung aller Planeten, Nakshatras und Padas: Charakter, Talente, Muster und Lebensthemen."
   }
 }

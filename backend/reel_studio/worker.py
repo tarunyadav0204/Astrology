@@ -26,9 +26,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 from db import execute, get_conn
 from partner_profile.image_provider import OpenAIPartnerPortraitProvider
-from tts.routes import _build_voice_and_config, _get_google_credentials, _segment_text_to_plain
+from tts.routes import _get_google_credentials, _synthesize_podcast_segment, _language_code_from_voice_name
 from utils.admin_settings import get_podcast_tts_voices
-from reel_studio.text import plain_text
+from reel_studio.text import plain_text, speech_punctuation
+from reel_studio.podcast_speech import MeteredSpeechClient
 from reel_studio import costs
 from reel_studio.presenter import MODEL as VIDEO_MODEL, RESOLUTION as PRESENTER_RESOLUTION, SECONDS as PRESENTER_SECONDS, prepare_presenter, portrait_prompt, validate_presenter_beats, video_prompt
 
@@ -517,38 +518,25 @@ def _native_subject_direction(snapshot: dict) -> str:
 
 
 async def _podcast_audio(text: str, language: str, voice_name: str) -> tuple[bytes, str]:
-    """Synthesize one Reel beat without an LLM rewrite or an SSML retry.
+    """Single female narrator through the exact podcast synthesis path.
 
-    A Reel already has approved, short narration for every beat.  Sending every
-    beat through the general speech endpoint used to make a separate Gemini
-    rewrite, then attempt an SSML request that Chirp rejected before retrying
-    as plain text.  Those synchronous preparation calls stopped the event loop
-    from even starting image generation.  Use the same Google voice and spoken
-    text cleanup directly, with its blocking RPC isolated in the thread pool.
+    The Admin voice, voice-specific preparation, rate and compatibility handling
+    all come from podcast code. Do not preprocess through a second pronunciation
+    pass, split at commas, or force a separate reel speaking rate.
     """
-    plain_text = _segment_text_to_plain(text)
-    if not plain_text:
+    spoken_text = speech_punctuation(str(text or '').strip(), language)
+    if not spoken_text:
         raise RuntimeError("Reel narration is empty after speech preparation.")
-
-    def synthesize_beat() -> bytes:
-        credentials = _get_google_credentials()
-        client = texttospeech.TextToSpeechClient(credentials=credentials)
-        voice, audio_config = _build_voice_and_config(
-            language,
-            voice_name,
-            0.95 if language.startswith("hi") else 1.0,
+    credentials = await asyncio.to_thread(_get_google_credentials)
+    client = MeteredSpeechClient(texttospeech.TextToSpeechClient(credentials=credentials))
+    try:
+        audio = await _synthesize_podcast_segment(
+            client, voice_name, 'female', spoken_text,
+            _language_code_from_voice_name(voice_name, 'hi-IN' if language.startswith('hi') else 'en-IN'),
         )
-        with costs.attempt('tts', voice_name) as event:
-            response = client.synthesize_speech(
-                input=texttospeech.SynthesisInput(text=plain_text),
-                voice=voice,
-                audio_config=audio_config,
-                retry=None, timeout=120,
-            )
-            event.finish({'characters': len(plain_text)})
-        return response.audio_content
-
-    return await asyncio.to_thread(synthesize_beat), voice_name
+        return audio, voice_name
+    finally:
+        client.client.transport.close()
 
 
 class _TransientVideoError(RuntimeError):
@@ -749,7 +737,7 @@ def _render_claimed_job(job_id: str, row) -> str:
             # and the environment values remain an immediate escape hatch if a
             # quota responds poorly under real load.
             scene_count = max(1, len(beats))
-            tts_limit = int(os.getenv("REEL_TTS_CONCURRENCY", str(scene_count)))
+            tts_limit = max(1, int(os.getenv("REEL_TTS_CONCURRENCY", "4")))
             image_limit = int(os.getenv("REEL_IMAGE_CONCURRENCY", str(scene_count)))
             tts_semaphore = asyncio.Semaphore(tts_limit)
             image_semaphore = asyncio.Semaphore(image_limit)
@@ -884,6 +872,7 @@ def _render_claimed_job(job_id: str, row) -> str:
             conn.commit()
         _update(job_id, "completed", output_url=f"/api/reel-studio/jobs/{job_id}/download")
     except Exception as exc:
+        logger.exception("REEL_RENDER_FAILED job_id=%s", job_id)
         detail = str(exc).strip() or repr(exc)
         _fail_reel(job_id, f"{type(exc).__name__}: {detail}")
         return "failed"

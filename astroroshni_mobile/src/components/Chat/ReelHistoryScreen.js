@@ -51,44 +51,44 @@ export default function ReelHistoryScreen({ navigation }) {
   const statusLabel = (status) => {
     if (status === 'completed') return t('premiumUi.reelStudio.historyReady', 'Ready to play');
     if (status === 'failed') return t('premiumUi.reelStudio.historyFailed', 'Could not be completed');
-    return t('premiumUi.reelStudio.historyCreating', 'Creating your reel');
+    return t('premiumUi.reelStudio.historyCreating', "Creating your video reading");
   };
   const renderItem = ({ item, index }) => {
     const ready = isReady(item.status);
     const hindi = String(item.language || '').toLowerCase().startsWith('hi');
     return <View style={[styles.card, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
-      <TouchableOpacity disabled={!ready} onPress={() => setSelectedReel(item)} style={styles.cardTop} accessibilityRole="button" accessibilityLabel={ready ? t('premiumUi.reelStudio.historyPlay', 'Play reel') : statusLabel(item.status)}>
+      <TouchableOpacity disabled={!ready} onPress={() => setSelectedReel(item)} style={styles.cardTop} accessibilityRole="button" accessibilityLabel={ready ? t('premiumUi.reelStudio.historyPlay', "Play video reading") : statusLabel(item.status)}>
         <View style={styles.cover}>
           <ReelArtwork jobId={ready ? item.job_id : null} style={StyleSheet.absoluteFill} />
           <View style={styles.coverPlay}><Ionicons name={ready ? 'play' : item.status === 'failed' ? 'alert-circle-outline' : 'time-outline'} size={20} color="#fff" /></View>
           {!!item.duration_seconds && <Text style={styles.coverDuration}>{Math.floor(item.duration_seconds / 60)}:{String(Math.floor(item.duration_seconds % 60)).padStart(2, '0')}</Text>}
         </View>
         <View style={styles.cardCopy}>
-          <Text style={[styles.eyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.historyItem', 'REEL {{number}}', { number: list.length - index })}</Text>
-          <Text style={[styles.question, { color: colors.text }]} numberOfLines={2}>{item.question || t('premiumUi.reelStudio.historyFallbackTitle', 'Your AstroRoshni reel')}</Text>
+          <Text style={[styles.eyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.historyItem', "VIDEO READING {{number}}", { number: list.length - index })}</Text>
+          <Text style={[styles.question, { color: colors.text }]} numberOfLines={2}>{item.question || t('premiumUi.reelStudio.historyFallbackTitle', "Your AstroRoshni video reading")}</Text>
           <Text style={[styles.meta, { color: colors.textSecondary }]}>{formatDate(item.created_at)} · {hindi ? t('premiumUi.reelStudio.hindi', 'Hindi') : t('premiumUi.reelStudio.english', 'English')}</Text>
         </View>
         {ready && <Ionicons name="chevron-forward" size={20} color={colors.primary} />}
       </TouchableOpacity>
       <View style={[styles.footer, { borderTopColor: colors.cardBorder }]}>
         <Text style={[styles.status, { color: item.status === 'failed' ? colors.error : colors.textSecondary }]}>{statusLabel(item.status)}</Text>
-        {ready && <TouchableOpacity onPress={() => setSelectedReel(item)}><Text style={[styles.playText, { color: colors.primary }]}>{t('premiumUi.reelStudio.historyPlay', 'Play reel')}</Text></TouchableOpacity>}
+        {ready && <TouchableOpacity onPress={() => setSelectedReel(item)}><Text style={[styles.playText, { color: colors.primary }]}>{t('premiumUi.reelStudio.historyPlay', "Play video reading")}</Text></TouchableOpacity>}
       </View>
     </View>;
   };
-  const empty = <View style={styles.empty}><View style={[styles.emptyIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="film-outline" size={31} color={colors.onAccent} /></View><Text style={[styles.emptyTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.historyEmptyTitle', 'No reels yet')}</Text><Text style={[styles.emptyBody, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.historyEmptyBody', 'Reels you create from your readings will appear here for playback and sharing.')}</Text><TouchableOpacity onPress={() => navigation.navigate('Home', { startChat: true })} style={[styles.emptyCta, { backgroundColor: colors.primary }]}><Text style={[styles.emptyCtaText, { color: colors.onPrimary }]}>{t('premiumUi.reelStudio.historyGoToChat', 'Go to Ask Tara')}</Text></TouchableOpacity></View>;
+  const empty = <View style={styles.empty}><View style={[styles.emptyIcon, { backgroundColor: colors.accentSoft }]}><Ionicons name="film-outline" size={31} color={colors.onAccent} /></View><Text style={[styles.emptyTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.historyEmptyTitle', "No video readings yet")}</Text><Text style={[styles.emptyBody, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.historyEmptyBody', "Video Readings you create from your readings will appear here for playback and sharing.")}</Text><TouchableOpacity onPress={() => navigation.navigate('Home', { startChat: true })} style={[styles.emptyCta, { backgroundColor: colors.primary }]}><Text style={[styles.emptyCtaText, { color: colors.onPrimary }]}>{t('premiumUi.reelStudio.historyGoToChat', 'Go to Ask Tara')}</Text></TouchableOpacity></View>;
 
   return <View style={[styles.container, { backgroundColor: colors.background }]}>
     <FocusedStatusBar backgroundColor={colors.headerSurface} />
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.headerSurface }]} edges={['top']}>
       <View style={[styles.header, { backgroundColor: colors.headerSurface, borderBottomColor: colors.cardBorder }]}>
         <TouchableOpacity onPress={() => goBackOrHome(navigation)} style={[styles.back, { borderColor: colors.cosmicLine || colors.cardBorder }]}><Ionicons name="arrow-back" size={21} color={colors.textInverse} /></TouchableOpacity>
-        <View style={styles.headerCopy}><Text style={[styles.headerEyebrow, { color: colors.accent }]}>{t('historyUi.library')}</Text><Text style={[styles.headerTitle, { color: colors.textInverse }]}>{t('premiumUi.reelStudio.historyTitle', 'Reel History')}</Text></View>
+        <View style={styles.headerCopy}><Text style={[styles.headerEyebrow, { color: colors.accent }]}>{t('historyUi.library')}</Text><Text style={[styles.headerTitle, { color: colors.textInverse }]}>{t('premiumUi.reelStudio.historyTitle', "Video Reading History")}</Text></View>
         <View style={[styles.count, { backgroundColor: colors.accentSoft }]}><Text style={[styles.countText, { color: colors.onAccent }]}>{list.length}</Text></View>
       </View>
       <View style={[styles.content, { backgroundColor: colors.background }]}>
-        <View style={styles.intro}><Text style={[styles.introTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.historyHeroTitle', 'Your visual readings, ready whenever you are.')}</Text><Text style={[styles.introBody, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.historyHeroBody', 'Every reel created from your consultations is kept here privately for playback and sharing.')}</Text></View>
-        {loading ? <View style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={[styles.meta, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.historyLoading', 'Loading your reels…')}</Text></View> : <FlatList data={list} renderItem={renderItem} keyExtractor={(item) => item.job_id} contentContainerStyle={[styles.list, !list.length && styles.emptyList]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadHistory(); }} tintColor={colors.primary} />} ListEmptyComponent={empty} />}
+        <View style={styles.intro}><Text style={[styles.introTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.historyHeroTitle', 'Your visual readings, ready whenever you are.')}</Text><Text style={[styles.introBody, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.historyHeroBody', "Every video reading created from your consultations is kept here privately for playback and sharing.")}</Text></View>
+        {loading ? <View style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={[styles.meta, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.historyLoading', "Loading your video readings…")}</Text></View> : <FlatList data={list} renderItem={renderItem} keyExtractor={(item) => item.job_id} contentContainerStyle={[styles.list, !list.length && styles.emptyList]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadHistory(); }} tintColor={colors.primary} />} ListEmptyComponent={empty} />}
       </View>
     </SafeAreaView>
     {selectedReel && <ReelPlayerModal

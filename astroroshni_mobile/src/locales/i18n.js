@@ -57,6 +57,9 @@ import chartSourceClarity from './chart-source-clarity.json';
 import partnerPortrait from './partner-portrait.json';
 import verifiedChat from './verified-chat.json';
 import festivalPuja from './festival-puja.json';
+import nextChapter from './next-chapter.json';
+import reelStudio from './reel-studio.json';
+[[en,'en'],[hi,'hi'],[es,'es'],[tamil,'ta'],[te,'te'],[gu,'gu'],[mr,'mr'],[de,'de'],[fr,'fr'],[ru,'ru'],[zh,'zh']].forEach(([baseCopy, language]) => { baseCopy.nextChapter = nextChapter[language] || nextChapter.en; baseCopy.reelStudio = reelStudio[language] || reelStudio.en; });
 
 const INSTANT_MODE_ACTION_COPY = Object.freeze({
   english: 'Mode',

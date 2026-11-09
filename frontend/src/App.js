@@ -90,6 +90,8 @@ const KarmaAnalysis = lazy(() => import('./components/KarmaAnalysis/KarmaAnalysi
 const SubscriptionPage = lazy(() => import('./components/Subscription/SubscriptionPage'));
 const OrderManagementPage = lazy(() => import('./components/OrderManagement/OrderManagementPage'));
 const ProfilePage = lazy(() => import('./components/Profile/ProfilePage'));
+const ReelStudioPage = lazy(() => import('./components/ReelStudio/ReelStudioPage'));
+const NextChapterPage = lazy(() => import('./components/NextChapter/NextChapterPage'));
 const PolicyPage = lazy(() => import('./components/Policy/PolicyPage'));
 const TermsPage = lazy(() => import('./components/Policy/TermsPage'));
 const DeleteAccountPage = lazy(() => import('./components/Policy/DeleteAccountPage'));
@@ -1223,6 +1225,8 @@ function App() {
               }
             />
             <Route path="/speech-chat" element={user ? <SpeechChatPage /> : <Navigate to="/" replace />} />
+            <Route path="/reel-studio" element={user ? <ReelStudioPage user={user} onLogout={handleLogout} onAdminClick={handleAdminClick} /> : <Navigate to="/" replace />} />
+            <Route path="/next-chapter" element={user ? <NextChapterPage user={user} onLogout={handleLogout} onAdminClick={handleAdminClick} /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={user ? <ProfilePage user={user} onLogout={handleLogout} onAdminClick={handleAdminClick} /> : <Navigate to="/" replace />} />
             <Route path="/admin/blog" element={
               user && user.role === 'admin' ? (

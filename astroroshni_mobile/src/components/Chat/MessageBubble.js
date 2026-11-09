@@ -54,8 +54,8 @@ const CHAT_LANGUAGE_ALIASES = {
 };
 
 const REEL_FORMATS = {
-  short: { duration: 90, label: 'Short Reel', detail: 'About 90 seconds · 8–10 scenes', description: 'A focused visual answer that is easy to watch and share.' },
-  deep: { duration: 180, label: 'Deep Reel', detail: 'About 3 minutes · 12–18 scenes', description: 'A fuller visual reading with more chart and timing detail.' },
+  short: { duration: 90, label: "Short Video Reading", detail: 'About 90 seconds · 8–10 scenes', description: 'A focused visual answer that is easy to watch and share.' },
+  deep: { duration: 180, label: "Deep Video Reading", detail: 'About 3 minutes · 12–18 scenes', description: 'A fuller visual reading with more chart and timing detail.' },
 };
 
 const whyTaraSaysThis = (language) => WHY_TARA_SAYS_THIS[
@@ -63,18 +63,18 @@ const whyTaraSaysThis = (language) => WHY_TARA_SAYS_THIS[
 ] || WHY_TARA_SAYS_THIS.english;
 
 const reelProgressState = (t, status, preparing = false) => {
-  if (preparing) return { value: 8, title: t('premiumUi.reelStudio.progressPreparingTitle', 'Preparing your reel'), detail: t('premiumUi.reelStudio.progressPreparingDetail', 'Organising your reading into a clear visual story.') };
-  if (status === 'queued') return { value: 14, title: t('premiumUi.reelStudio.progressQueuedTitle', 'Your reel is in line'), detail: t('premiumUi.reelStudio.progressQueuedDetail', 'You can leave this page — we’ll keep creating it in the background.') };
+  if (preparing) return { value: 8, title: t('premiumUi.reelStudio.progressPreparingTitle', "Preparing your video reading"), detail: t('premiumUi.reelStudio.progressPreparingDetail', 'Organising your reading into a clear visual story.') };
+  if (status === 'queued') return { value: 14, title: t('premiumUi.reelStudio.progressQueuedTitle', "Your video reading is in line"), detail: t('premiumUi.reelStudio.progressQueuedDetail', 'You can leave this page — we’ll keep creating it in the background.') };
   const assetMatch = String(status || '').match(/^creating_your_reel_(\d+)_of_(\d+)$/);
   if (assetMatch) {
     const done = Number(assetMatch[1]); const total = Number(assetMatch[2]);
     return { value: Math.min(82, 18 + Math.round((done / total) * 64)), title: t('premiumUi.reelStudio.progressCreatingTitle', 'Bringing your story to life'), detail: t('premiumUi.reelStudio.progressMoments', '{{done}} of {{total}} moments ready', { done, total }) };
   }
   if (status === 'creating_planned_shots') return { value: 18, title: t('premiumUi.reelStudio.progressCreatingTitle', 'Bringing your story to life'), detail: t('premiumUi.reelStudio.progressCreatingDetail', 'Creating the visuals and narration for your reading.') };
-  if (status === 'premium_compositing') return { value: 87, title: t('premiumUi.reelStudio.progressFinishingTitle', 'Putting your reel together'), detail: t('premiumUi.reelStudio.progressFinishingDetail', 'Finishing the visual story and sound.') };
-  if (status === 'saving_reel') return { value: 96, title: t('premiumUi.reelStudio.progressSavingTitle', 'Almost ready'), detail: t('premiumUi.reelStudio.progressSavingDetail', 'Saving your reel securely.') };
-  if (status === 'completed') return { value: 100, title: t('premiumUi.reelStudio.progressCompleteTitle', 'Your reel is ready'), detail: t('premiumUi.reelStudio.progressCompleteDetail', 'Play, share or download it whenever you like.') };
-  return { value: 10, title: t('premiumUi.reelStudio.progressPreparingTitle', 'Preparing your reel'), detail: t('premiumUi.reelStudio.progressPreparingFallback', 'Your personal reel is being prepared.') };
+  if (status === 'premium_compositing') return { value: 87, title: t('premiumUi.reelStudio.progressFinishingTitle', "Putting your video reading together"), detail: t('premiumUi.reelStudio.progressFinishingDetail', 'Finishing the visual story and sound.') };
+  if (status === 'saving_reel') return { value: 96, title: t('premiumUi.reelStudio.progressSavingTitle', 'Almost ready'), detail: t('premiumUi.reelStudio.progressSavingDetail', "Saving your video reading securely.") };
+  if (status === 'completed') return { value: 100, title: t('premiumUi.reelStudio.progressCompleteTitle', "Your video reading is ready"), detail: t('premiumUi.reelStudio.progressCompleteDetail', 'Play, share or download it whenever you like.') };
+  return { value: 10, title: t('premiumUi.reelStudio.progressPreparingTitle', "Preparing your video reading"), detail: t('premiumUi.reelStudio.progressPreparingFallback', "Your personal video reading is being prepared.") };
 };
 
 const InstantEvidenceDetails = ({ evidence, colors, t }) => {
@@ -283,6 +283,8 @@ function MessageBubble({
   reelAutoLaunchLang = 'en',
   onReelAutoLaunchConsumed,
   forceInstantPresentation = false,
+  reelOnly = false,
+  onReelCompleted,
 }) {
   const { t, i18n } = useTranslation();
   const { theme, colors } = useTheme();
@@ -313,6 +315,9 @@ function MessageBubble({
   const [isQueueingReel, setIsQueueingReel] = useState(false);
   const [reelJobId, setReelJobId] = useState(null);
   const [reelJobStatus, setReelJobStatus] = useState('');
+  useEffect(() => {
+    if (reelJobStatus === 'completed' || reelJobStatus === 'failed') onReelCompleted?.();
+  }, [reelJobStatus, onReelCompleted]);
   const [reelErrorAlert, setReelErrorAlert] = useState('');
   const [showReelPlayer, setShowReelPlayer] = useState(false);
   const [isRecreatingReel, setIsRecreatingReel] = useState(false);
@@ -320,7 +325,7 @@ function MessageBubble({
   const [showReelFormatModal, setShowReelFormatModal] = useState(false);
   const [reelLanguage, setReelLanguage] = useState(() => podcastLangFromUiLanguage(language));
   const reelPrepareLock = useRef(false);
-  const showReelError = (message) => setReelErrorAlert(String(message || t('premiumUi.reelStudio.errorGeneric', 'Could not prepare this reel.')));
+  const showReelError = (message) => setReelErrorAlert(String(message || t('premiumUi.reelStudio.errorGeneric', "Could not prepare this video reading.")));
   const [showInstantEvidence, setShowInstantEvidence] = useState(false);
   const blurShownTrackedRef = useRef(false);
   // Init from the played-ids set so FlatList remounts do not flash translateY:50 for one frame
@@ -1077,7 +1082,7 @@ function MessageBubble({
       setShowReelStudio(false);
       setShowReelFormatModal(true);
     } catch (error) {
-      showReelError(apiErrorMessage(error, t('premiumUi.reelStudio.errorGeneric', 'Could not prepare this reel.')));
+      showReelError(apiErrorMessage(error, t('premiumUi.reelStudio.errorGeneric', "Could not prepare this video reading.")));
       setShowReelStudio(false);
     } finally {
       reelPrepareLock.current = false;
@@ -1091,7 +1096,7 @@ function MessageBubble({
     setShowReelFormatModal(false);
     setShowReelStudio(true); setIsPreparingReel(true);
     try {
-      const authOk = await requireAuthForPaid({ feature: 'reel', message: 'Sign in to create a reel from this answer.', resume: { resumeRoute: 'Home', resumeParams: {} } });
+      const authOk = await requireAuthForPaid({ feature: 'reel', message: "Sign in to create a video reading from this answer.", resume: { resumeRoute: 'Home', resumeParams: {} } });
       if (!authOk) { setShowReelStudio(false); return; }
       setReelLanguage(selection.language);
       setReelFormat(selection.durationSeconds === 180 ? 'deep' : 'short');
@@ -1100,12 +1105,12 @@ function MessageBubble({
       const draft = (await chatAPI.createReelDraft(request)).data;
       setIsQueueingReel(true);
       const response = await chatAPI.queueReel({ ...request, draftId: draft.draft_id, approvedClaimIds: draft.claims.map((claim) => claim.id) });
-      if (!response?.data?.job_id) throw new Error(t('premiumUi.reelStudio.errorGeneric', 'Could not prepare this reel.'));
+      if (!response?.data?.job_id) throw new Error(t('premiumUi.reelStudio.errorGeneric', "Could not prepare this video reading."));
       setReelJobId(response.data.job_id);
       setReelJobStatus(response.data.status || 'queued');
       refreshCredits();
     } catch (error) {
-      showReelError(apiErrorMessage(error, t('premiumUi.reelStudio.errorGeneric', 'Could not prepare this reel.')));
+      showReelError(apiErrorMessage(error, t('premiumUi.reelStudio.errorGeneric', "Could not prepare this video reading.")));
       setShowReelStudio(false);
     } finally {
       reelPrepareLock.current = false; setIsPreparingReel(false); setIsQueueingReel(false);
@@ -1120,7 +1125,7 @@ function MessageBubble({
         visible={Boolean(reelErrorAlert)}
         variant="error"
         icon="alert-circle-outline"
-        title={t('premiumUi.reelStudio.errorTitle', 'Reel Studio')}
+        title={t('premiumUi.reelStudio.errorTitle', "AstroRoshni Studio")}
         message={reelErrorAlert}
         primaryText={t('common.ok', 'OK')}
         onPrimaryPress={() => setReelErrorAlert('')}
@@ -1136,14 +1141,14 @@ function MessageBubble({
           <View style={[styles.reelModalCard, { backgroundColor: colors.surfaceRaised, borderColor: colors.cardBorder }]}>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={t('premiumUi.reelStudio.closeStudio', 'Close reel studio')}
+              accessibilityLabel={t('premiumUi.reelStudio.closeStudio', "Close AstroRoshni Studio")}
               style={[styles.reelModalCloseButton, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}
               onPress={() => setShowReelStudio(false)}
             >
               <Ionicons name="close" size={21} color={colors.textSecondary} />
             </TouchableOpacity>
-            <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.eyebrow', 'ASTROROSHNI · REEL STUDIO')}</Text>
-            <Text style={[styles.reelModalTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.title', 'Your personal reel')}</Text>
+            <Text style={[styles.reelModalEyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.eyebrow', "ASTROROSHNI STUDIO")}</Text>
+            <Text style={[styles.reelModalTitle, { color: colors.text }]}>{t('premiumUi.reelStudio.title', "Your personal video reading")}</Text>
             {(reelJobId || isPreparingReel) ? <View style={reelJobStatus === 'completed' ? styles.reelReadyState : styles.reelModalLoading}>
               {reelJobStatus === 'completed' ? <>
                 <View style={[styles.reelReadyMedallion, { backgroundColor: colors.accentSoft, borderColor: colors.primary }]}>
@@ -1152,16 +1157,16 @@ function MessageBubble({
                 <Text style={[styles.reelReadyEyebrow, { color: colors.primary }]}>{t('premiumUi.reelStudio.readyEyebrow', 'YOUR FILM IS READY')}</Text>
                 <Text style={[styles.reelReadyTitle, { color: colors.text }]}>{currentReelProgress.title}</Text>
                 <Text style={[styles.reelReadyBody, { color: colors.textSecondary }]}>{currentReelProgress.detail}</Text>
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('premiumUi.reelStudio.playSaved', 'Play saved reel')} style={[styles.reelReadyPrimary, { backgroundColor: colors.primary }]} onPress={() => setShowReelPlayer(true)}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('premiumUi.reelStudio.playSaved', "Play saved video reading")} style={[styles.reelReadyPrimary, { backgroundColor: colors.primary }]} onPress={() => setShowReelPlayer(true)}>
                   <Ionicons name="play" size={19} color={colors.onPrimary || '#fff'} />
-                  <Text numberOfLines={1} style={[styles.reelReadyPrimaryText, { color: colors.onPrimary || '#fff' }]}>{t('premiumUi.reelStudio.playSaved', 'Play saved reel')}</Text>
+                  <Text numberOfLines={1} style={[styles.reelReadyPrimaryText, { color: colors.onPrimary || '#fff' }]}>{t('premiumUi.reelStudio.playSaved', "Play saved video reading")}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity accessibilityRole="button" style={styles.reelReadySecondary} onPress={recreateReel}>
                   <Ionicons name="refresh" size={17} color={colors.primary} />
                   <Text style={[styles.reelReadySecondaryText, { color: colors.primary }]}>{t('premiumUi.reelStudio.recreate', 'Recreate')}</Text>
                 </TouchableOpacity>
               </> : reelJobStatus === 'failed' ? <>
-                <Text style={{ color: colors.text, fontWeight: '800' }}>{t('premiumUi.reelStudio.failedTitle', 'We couldn’t finish your reel')}</Text>
+                <Text style={{ color: colors.text, fontWeight: '800' }}>{t('premiumUi.reelStudio.failedTitle', "We couldn’t finish your video reading")}</Text>
                 <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{t('premiumUi.reelStudio.failedDescription', 'Please try again. Your credits will be returned if creation did not complete.')}</Text>
                 <TouchableOpacity style={styles.reelCancelButton} onPress={recreateReel}><Text style={{ color: colors.primary }}>{t('common.tryAgain', 'Try again')}</Text></TouchableOpacity>
               </> : <>
@@ -1172,7 +1177,7 @@ function MessageBubble({
                 <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{currentReelProgress.detail}</Text>
                 {reelJobStatus !== 'completed' && <><Text style={[styles.reelProgressNote, { color: colors.textSecondary }]}>{t('premiumUi.reelStudio.progressBackgroundNote', 'This can take up to two minutes. It will keep creating in the background if you close this window.')}</Text><TouchableOpacity accessibilityRole="button" style={styles.reelKeepCreatingButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.primary, fontWeight: '800' }}>{t('premiumUi.reelStudio.closeKeepCreating', 'Close — keep creating')}</Text></TouchableOpacity></>}
               </>}
-            </View> : <View style={styles.reelModalLoading}><Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{t('premiumUi.reelStudio.savedReelHint', 'Your saved reel will appear here when it is ready.')}</Text></View>}
+            </View> : <View style={styles.reelModalLoading}><Text style={{ color: colors.textSecondary, textAlign: 'center' }}>{t('premiumUi.reelStudio.savedReelHint', "Your saved video reading will appear here when it is ready.")}</Text></View>}
             {!reelJobId && !isPreparingReel && <TouchableOpacity style={styles.reelCancelButton} onPress={() => setShowReelStudio(false)}><Text style={{ color: colors.textSecondary }}>{t('premiumUi.reelStudio.notNow', 'Not now')}</Text></TouchableOpacity>}
           </View>
         </View>
@@ -2143,7 +2148,7 @@ function MessageBubble({
   }, [contentStr, isInstantChatMessage, message.instantStartedAt, message.instantStreaming]);
 
   useEffect(() => {
-    if (isInstantChatMessage) return;
+    if (reelOnly || isInstantChatMessage) return;
     if (message.role !== 'assistant' || message.isTyping || message.isProcessing) return;
     if (isClarification || isNativeGate) return;
     const messageId = message.messageId || null;
@@ -2234,7 +2239,7 @@ function MessageBubble({
     if (message.role !== 'assistant' || message.isTyping || isClarification || isNativeGate) return undefined;
     if (lastReelPromoKeyRef.current === reelAutoLaunchKey) return undefined;
     const body = getCleanMessageText();
-    if (!body || body.length < 80) return undefined;
+    if (!body || (!reelOnly && body.length < 80)) return undefined;
 
     const timer = setTimeout(() => {
       lastReelPromoKeyRef.current = reelAutoLaunchKey;
@@ -2247,6 +2252,7 @@ function MessageBubble({
     }, 250);
     return () => clearTimeout(timer);
   }, [
+    reelOnly,
     reelAutoLaunchKey,
     reelAutoLaunchMessageId,
     reelAutoLaunchLang,
@@ -2343,8 +2349,12 @@ function MessageBubble({
     }, [canBlurFreeDetail, detailUnlocked, credits, refreshCredits, message.messageId, message.id]),
   );
 
+  // Reuse the Studio controller for saved reports without rendering a chat bubble.
+  if (reelOnly) return renderReelStudio();
+
   // Calculated context is visible before the first LLM token. Do not discard
   // that message just because its answer is still empty.
+
   if (!contentStr.trim()) {
     return null;
   }
@@ -2495,7 +2505,7 @@ function MessageBubble({
               style={[styles.actionButton, styles.reelButton, highlightedActionStyle]}
               onPress={() => openReelStudio()}
               accessibilityRole="button"
-              accessibilityLabel={t('premiumUi.reelStudio.create', 'Create chart-grounded reel')}
+              accessibilityLabel={t('premiumUi.reelStudio.create', "Create chart-grounded video reading")}
             >
               <ReelIcon size={20} color={colors.primary} />
             </TouchableOpacity>
@@ -3337,7 +3347,7 @@ function MessageBubble({
                   style={[styles.actionButton, styles.reelButton, highlightedActionStyle]}
                   onPress={() => openReelStudio()}
                   accessibilityRole="button"
-                    accessibilityLabel={t('premiumUi.reelStudio.create', 'Create chart-grounded reel')}
+                    accessibilityLabel={t('premiumUi.reelStudio.create', "Create chart-grounded video reading")}
                 >
                   <ReelIcon size={20} color={colors.primary} />
                 </TouchableOpacity>
@@ -3686,6 +3696,8 @@ const areMessageBubblePropsEqual = (prevProps, nextProps) => {
   if (prevProps.podcastAutoLaunchLang !== nextProps.podcastAutoLaunchLang) return false;
   // The promo changes these props without changing the answer object. Skipping
   // this render drops the language selection before the launch effect sees it.
+  if (prevProps.onReelCompleted !== nextProps.onReelCompleted) return false;
+  if (prevProps.reelOnly !== nextProps.reelOnly) return false;
   if (prevProps.reelAutoLaunchMessageId !== nextProps.reelAutoLaunchMessageId) return false;
   if (prevProps.reelAutoLaunchKey !== nextProps.reelAutoLaunchKey) return false;
   if (prevProps.reelAutoLaunchLang !== nextProps.reelAutoLaunchLang) return false;

@@ -57,7 +57,7 @@ export default function AdminReelCosts() {
   const total = runs.reduce((sum, run) => sum + Number(run.estimated_total_inr || 0), 0);
   const incomplete = runs.filter(run => !run.cost_complete).length;
   return <div className="credits-dashboard">
-    <h2>Reel Generation Costs</h2>
+    <h2>Video Reading Generation Costs</h2>
     <p className="credit-settings-hint">Planning, repairs, images (including input images), narration, presenter videos, compute and storage. Includes unsuccessful attempts. Usage estimates are separate from invoice-confirmed costs.</p>
     <button type="button" className="preset-btn active" onClick={load} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
     {error && <div role="alert" className="credits-dashboard-error">{error}</div>}
@@ -92,7 +92,7 @@ export default function AdminReelCosts() {
               <pre style={{ whiteSpace: 'pre-wrap', maxWidth: 480 }}>{JSON.stringify({ usage: charge.metadata?.usage, components: charge.metadata?.components, request_id: charge.metadata?.request_id }, null, 2)}</pre>
             </details>)}{!run.charges.length && <small>No usage recorded yet.</small>}
           </td></tr>)}
-        {!runs.length && <tr><td colSpan="4">No reel runs yet.</td></tr>}
+        {!runs.length && <tr><td colSpan="4">No video reading runs yet.</td></tr>}
       </tbody></table></div>
     </>}
     {reconcile && <form onSubmit={confirmInvoice} style={{ padding: 20, border: '1px solid #ccc', marginTop: 20 }}>

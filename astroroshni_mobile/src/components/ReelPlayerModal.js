@@ -6,6 +6,7 @@ import {
   AppState,
   Image,
   Modal,
+  NativeModules,
   PanResponder,
   Platform,
   StatusBar,
@@ -235,7 +236,7 @@ function ReelPlayback({
       mediaRef.current = Platform.OS === "web" ? media.file : media.uri;
       setSource({ uri: media.uri });
     }).catch(() => {
-      if (active) setError(t("premiumUi.reelStudio.loadError", "Could not open the saved reel. Please try again."));
+      if (active) setError(t("premiumUi.reelStudio.loadError", "Could not open the saved video reading. Please try again."));
     });
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") { savePosition(); pausePlayback().catch(() => {}); }
@@ -262,7 +263,7 @@ function ReelPlayback({
       setError(
         t(
           "premiumUi.reelStudio.playbackError",
-          "Playback failed. Please reopen the reel.",
+          "Playback failed. Please reopen the video reading.",
         ),
       );
     }
@@ -355,7 +356,7 @@ function ReelPlayback({
   const downloadWeb = () => {
     const link = document.createElement("a");
     link.href = source.uri;
-    link.download = "astroroshni-reel.mp4";
+    link.download = "astroroshni-video-reading.mp4";
     link.click();
   };
 
@@ -365,7 +366,7 @@ function ReelPlayback({
     // the exported copy in the private files area exposed by FileProvider.
     const directory = `${FileSystem.documentDirectory}shared-reels/`;
     await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-    const uri = `${directory}astroroshni-reel-${jobId}-${Date.now()}.mp4`;
+    const uri = `${directory}astroroshni-video-reading-${jobId}-${Date.now()}.mp4`;
     const playerUri = typeof mediaRef.current === "string" ? mediaRef.current : null;
     let copied = false;
     if (playerUri?.startsWith("file:")) {
@@ -380,7 +381,7 @@ function ReelPlayback({
       }
     }
     if (!copied) {
-      if (!remote?.uri) throw new Error("Saved reel source is unavailable");
+      if (!remote?.uri) throw new Error("Saved video reading source is unavailable");
       const downloaded = await FileSystem.downloadAsync(remote.uri, uri, {
         headers: remote.headers,
       });
@@ -392,7 +393,7 @@ function ReelPlayback({
     const info = await FileSystem.getInfoAsync(uri, { size: true });
     if (!info.exists || !Number.isFinite(info.size) || info.size < 1024) {
       await FileSystem.deleteAsync(uri, { idempotent: true });
-      throw new Error("Downloaded reel is incomplete");
+      throw new Error("Downloaded video reading is incomplete");
     }
     return uri;
   };
@@ -431,9 +432,21 @@ function ReelPlayback({
           );
         }
       } else {
+        const shareUri = await shareableNativeUri();
+        if (Platform.OS === "android" && destination && NativeModules.ReelShare?.shareToApp) {
+          try {
+            const opened = await NativeModules.ReelShare.shareToApp(shareUri, destination);
+            if (opened) {
+              setNotice(null);
+              return;
+            }
+          } catch (error) {
+            // Preserve sharing on devices whose target app rejects this intent.
+            console.warn("[ReelPlayer] direct share unavailable", destination, error?.message);
+          }
+        }
         if (!(await Sharing.isAvailableAsync()))
           throw new Error("Sharing unavailable");
-        const shareUri = await shareableNativeUri();
         if (destination)
           setNotice(
             t(
@@ -449,17 +462,17 @@ function ReelPlayback({
         });
       }
     } catch (err) {
-      console.warn("[ReelPlayer] reel share failed", {
+      console.warn("[ReelPlayer] video reading share failed", {
         jobId,
         destination: destination || "system",
         message: err?.message || String(err),
       });
       if (err.name !== "AbortError")
         Alert.alert(
-          t("premiumUi.reelStudio.title", "Your premium reel"),
+          t("premiumUi.reelStudio.title", "Your premium video reading"),
           t(
             "premiumUi.reelStudio.shareError",
-            "Could not share this reel. Please try again.",
+            "Could not share this video reading. Please try again.",
           ),
         );
     } finally {
@@ -526,11 +539,11 @@ function ReelPlayback({
         {source && Platform.OS === 'web' && <video ref={video} src={source.uri} autoPlay playsInline style={webVideoStyle}
           onLoadedMetadata={(e) => { if (resume < e.currentTarget.duration * 1000 - 1500) e.currentTarget.currentTime = resume / 1000; updateWebStatus(e); }}
           onCanPlay={() => setReady(true)} onTimeUpdate={updateWebStatus} onPlay={updateWebStatus} onPause={updateWebStatus} onEnded={(e) => { updateWebStatus(e); revealControls(); }}
-          onError={() => setError(t('premiumUi.reelStudio.playbackError', 'Playback failed. Please reopen the reel.'))} />}
+          onError={() => setError(t('premiumUi.reelStudio.playbackError', "Playback failed. Please reopen the video reading."))} />}
         {source && Platform.OS !== 'web' && <Video ref={video} source={source} style={videoFrame}
           resizeMode={ResizeMode.CONTAIN} status={playbackStatus} useNativeControls={false} progressUpdateIntervalMillis={250}
           onReadyForDisplay={() => setReady(true)} onPlaybackStatusUpdate={(value) => { statusRef.current = value; setStatus(value); }}
-          onError={() => setError(t('premiumUi.reelStudio.playbackError', 'Playback failed. Please reopen the reel.'))} />}
+          onError={() => setError(t('premiumUi.reelStudio.playbackError', "Playback failed. Please reopen the video reading."))} />}
         {!ready && <ReelArtwork jobId={jobId} style={StyleSheet.absoluteFill} />}
         {peekId && <ReelArtwork jobId={peekId} style={{ position: 'absolute', left: 0, right: 0, height,
           top: reelIds.indexOf(peekId) > feedIndex ? height : -height }} />}
@@ -545,9 +558,9 @@ function ReelPlayback({
           <Ionicons name="close" size={25} color="#fff" /></TouchableOpacity>
       </Animated.View>
       {showFeedHint && <View pointerEvents="none" style={[styles.feedHint, { top: Math.max(insets.top, 16) + 56 }]}>
-        <Text style={styles.feedHintText}>{t('premiumUi.reelStudio.swipeFeedHint', 'Swipe up or down to browse your reels')}</Text></View>}
+        <Text style={styles.feedHintText}>{t('premiumUi.reelStudio.swipeFeedHint', "Swipe up or down to browse your video readings")}</Text></View>}
       {!ready && !error && <View pointerEvents="none" style={styles.loading}><ActivityIndicator color="#eecb86" />
-        <Text style={styles.label}>{t('premiumUi.reelStudio.openingSaved', 'Opening saved reel…')}</Text></View>}
+        <Text style={styles.label}>{t('premiumUi.reelStudio.openingSaved', "Opening saved video reading…")}</Text></View>}
       {ready && <Animated.View {...overlayProps} style={[styles.center, { opacity: controlsOpacity }]}>
         <TouchableOpacity style={styles.centerButton} accessibilityRole="button"
           accessibilityLabel={status.isPlaying ? t('premiumUi.reelStudio.pause', 'Pause') : t('premiumUi.reelStudio.play', 'Play')}
@@ -563,7 +576,7 @@ function ReelPlayback({
         {!!reel?.question && <Text style={styles.question} numberOfLines={2}>{reel.question}</Text>}
         {!!(error || notice) && <Text style={styles.notice} accessibilityLiveRegion="polite">{error || notice}</Text>}
         <View style={styles.seekTouch} onLayout={(e) => { widthRef.current = e.nativeEvent.layout.width; }} {...scrubber.panHandlers}
-          accessible accessibilityRole="adjustable" accessibilityLabel={t('premiumUi.reelStudio.timeline', 'Reel timeline')}
+          accessible accessibilityRole="adjustable" accessibilityLabel={t('premiumUi.reelStudio.timeline', "Video Reading timeline")}
           accessibilityValue={{ min: 0, max: Math.floor(duration / 1000), now: Math.floor(position / 1000) }}
           accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
           onAccessibilityAction={(e) => command(() => setPlaybackPosition(Math.max(0, Math.min(duration,

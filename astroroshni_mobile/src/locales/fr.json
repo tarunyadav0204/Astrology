@@ -464,7 +464,12 @@
     "preparingInsights": "Préparation de vos analyses cosmiques...",
     "fascinatingInsights": "En attendant, laissez-moi vous montrer quelques détails fascinants sur votre thème...",
     "thankYou": "Merci d'avoir contacté AstroRoshni avec votre question.",
-    "deeplyAnalyzing": "J'analyse profondément votre thème céleste pour vous fournir les informations les plus précises. Ce processus sacré prend un moment..."
+    "deeplyAnalyzing": "J'analyse profondément votre thème céleste pour vous fournir les informations les plus précises. Ce processus sacré prend un moment...",
+    "podcastPromo": {
+      "mediaBody": "Écoutez n'importe où ou créez une lecture vidéo visuelle que vous pourrez revoir et partager.",
+      "mediaPremiumBody": "Écoutez le podcast inclus ou transformez cette consultation en lecture vidéo visuelle.",
+      "reelTitle": "Créer une lecture vidéo visuelle"
+    }
   },
   "home": {
     "greeting": {
@@ -1496,5 +1501,9 @@
       "travel": "Voyage",
       "legal": "Juridique"
     }
+  },
+  "nakshatraBlueprint": {
+    "title": "Portrait des nakshatras",
+    "exploreBody": "Une lecture natale complète de chaque planète, nakshatra et pada : caractère, talents, schémas et thèmes de vie."
   }
 }

@@ -7,7 +7,7 @@ SHADBALA_PLANETS = {"Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Satur
 class HouseAnalyzer(BaseCalculator):
     """Comprehensive house analyzer - reusable for any house analysis"""
     
-    def __init__(self, chart_data=None, birth_data=None, *, shadbala_chart_data=None):
+    def __init__(self, chart_data=None, birth_data=None, *, shadbala_chart_data=None, node_aspects=None):
         super().__init__(chart_data or {})
         self.birth_data = birth_data
         # Classical Shadbala is always a D1 + varga worksheet. When the house
@@ -27,11 +27,12 @@ class HouseAnalyzer(BaseCalculator):
             chart_data,
             birth_data,
             shadbala_chart_data=self.shadbala_chart_data,
+            node_aspects=node_aspects,
         )
         self.house_strength_calc = HouseStrengthCalculator(chart_data)
         self.yogi_calc = YogiCalculator(chart_data)
         self.badhaka_calc = BadhakaCalculator(chart_data)
-        self.aspect_calc = AspectCalculator(chart_data)
+        self.aspect_calc = AspectCalculator(chart_data, node_aspects=node_aspects)
         self.gandanta_calc = GandantaCalculator(chart_data)
         
         # Get calculated data

@@ -1025,6 +1025,9 @@ async def process_report_task(
     if not report_id:
         raise HTTPException(status_code=400, detail="report_id is required")
 
+    if report_id.startswith('chapter_'):
+        from next_chapter.customer import process_job
+        return await process_job(report_id)
     return await _process_report_job(report_id)
 
 

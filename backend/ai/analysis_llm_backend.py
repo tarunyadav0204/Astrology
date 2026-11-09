@@ -248,6 +248,18 @@ def build_report_llm_model() -> Tuple[Any, str, str]:
     return m, name, CHAT_LLM_GEMINI
 
 
+def build_next_chapter_llm_model() -> Tuple[Any, str, str]:
+    """Your Next Chapter uses the explicitly selected Gemini 3 Flash model."""
+    import google.generativeai as genai
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY environment variable is not set")
+    genai.configure(api_key=api_key)
+    model_id = "models/gemini-3-flash-preview"
+    return genai.GenerativeModel(model_id), model_id, CHAT_LLM_GEMINI
+
+
 def build_timeline_llm_model() -> Tuple[Any, str, str]:
     """
     Model for yearly/monthly event timeline (EventPredictor).

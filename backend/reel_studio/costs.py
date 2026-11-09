@@ -124,7 +124,7 @@ def price(stage, model, usage, config):
             if sum(c['units'] for c in components) != usage.get('input_tokens'):
                 raise ValueError('Input modality totals do not match')
             add('image_output_tokens', usage.get('output_tokens'), rates.get('output'))
-        elif stage in ('planning', 'plan_repair', 'presenter_rewrite'):
+        elif stage in ('planning', 'plan_repair', 'presenter_rewrite', 'studio_reading'):
             cached = (usage.get('input_tokens_details') or {}).get('cached_tokens', 0)
             total = usage.get('input_tokens')
             add('input_tokens', None if total is None else total-cached, rates.get('input'))

@@ -21,7 +21,7 @@ export function createReelMediaCache() {
     else await FileSystem.deleteAsync(media.uri, { idempotent: true }).catch(() => {});
   };
   const prepare = (jobId) => {
-    if (closed) return Promise.reject(new Error('Reel player is closed'));
+    if (closed) return Promise.reject(new Error("Video Reading player is closed"));
     if (entries.has(jobId)) return entries.get(jobId);
     const requestNumber = ++sequence;
     const promise = (async () => {
@@ -32,7 +32,7 @@ export function createReelMediaCache() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const blob = await response.blob();
         return { ...remote, uri: URL.createObjectURL(blob), remote,
-          file: new File([blob], 'astroroshni-reel.mp4', { type: 'video/mp4' }) };
+          file: new File([blob], 'astroroshni-video-reading.mp4', { type: 'video/mp4' }) };
       }
       const uri = `${FileSystem.cacheDirectory}reel-player-${prefix}-${requestNumber}-${jobId}.mp4`;
       const temporary = `${uri}.part`;

@@ -101,6 +101,8 @@ def validate_presenter_beats(beats: list[dict]) -> None:
 
 def video_prompt(line: str, language: str, role: str) -> str:
     spoken_language = 'natural Hindi, entirely in Hindi' if language == 'hi' else 'English with a natural Indian accent'
+    date_direction = ('Pronounce any dates, months, years and times entirely in Hindi, never in English. '
+                      if language == 'hi' else '')
     return (
         f'Create exactly {SECONDS} seconds of portrait 9:16 presenter video with audible synchronized speech. '
         f'{IDENTITY} Match the supplied reference woman exactly: same face, hair, attire, lighting and set. '
@@ -109,5 +111,5 @@ def video_prompt(line: str, language: str, role: str) -> str:
         'Use the same vocal character for both takes. No music, no voice-over, no other speaker, '
         'no captions, no chart, no invented logo or additional words. A steady locked camera, subtle natural gestures. '
         'Begin speaking within 0.2 seconds, finish the complete sentence by 4.5 seconds, then hold a warm expression. '
-        f'Say ONLY this exact approved line, once: {line}'
+        f'{date_direction}Say ONLY this exact approved line, once: {line}'
     )

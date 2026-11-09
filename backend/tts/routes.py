@@ -759,7 +759,7 @@ def _segment_text_to_plain(segment_text: str) -> str:
   text = _normalize_pause_cues(text)
   text = _strip_literal_punctuation_words(text)
   text = _apply_pronunciation_plain(text)
-  text = re.sub(r"\[PAUSE:(?:short|medium|long)\]", ". ", text, flags=re.IGNORECASE)
+  # The punctuation-aware cleanup below handles cues without creating `,.`.
   text = re.sub(r"\[(?:EMPHASIS|RISE|FALL|SLOW):([^\]]+)\]", r"\1", text, flags=re.IGNORECASE)
   return _strip_spoken_control_cues_for_plain_tts(text)
 

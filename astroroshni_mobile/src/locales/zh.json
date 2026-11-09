@@ -464,7 +464,12 @@
     "preparingInsights": "正在准备您的宇宙见解...",
     "fascinatingInsights": "在此期间，让我向您展示一些关于您星盘的有趣事实...",
     "thankYou": "感谢您向 AstroRoshni 提问。",
-    "deeplyAnalyzing": "我正在深度分析您的星图，以提供最准确的见解。这个神圣的过程需要一点时间..."
+    "deeplyAnalyzing": "我正在深度分析您的星图，以提供最准确的见解。这个神圣的过程需要一点时间...",
+    "podcastPromo": {
+      "mediaBody": "随时随地收听，或创建可供回顾与分享的视觉视频解读。",
+      "mediaPremiumBody": "收听内置播客，或将此解读转换为视觉视频解读。",
+      "reelTitle": "创建视觉视频解读"
+    }
   },
   "home": {
     "greeting": {
@@ -1496,5 +1501,9 @@
       "travel": "旅行",
       "legal": "法律"
     }
+  },
+  "nakshatraBlueprint": {
+    "title": "星宿蓝图",
+    "exploreBody": "通过每颗行星、星宿及其分区，全面解读你的本命星盘：性格、天赋、行为模式与人生主题。"
   }
 }

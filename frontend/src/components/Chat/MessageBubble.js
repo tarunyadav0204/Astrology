@@ -1798,8 +1798,8 @@ const MessageBubble = ({
                             type="button"
                             className="action-btn action-btn--toolbar"
                             onClick={() => setReelStudioOpen(true)}
-                            title="Create chart-grounded reel"
-                            aria-label="Create chart-grounded reel"
+                            title="Create chart-grounded video reading"
+                            aria-label="Create chart-grounded video reading"
                         >
                             <IconReelOutline />
                         </button>
@@ -1951,7 +1951,7 @@ const MessageBubble = ({
                     </button>
                 )}
                 {isAssistant && (
-                    <button type="button" className="action-btn action-btn--toolbar" onClick={() => setReelStudioOpen(true)} title="Create chart-grounded reel" aria-label="Create chart-grounded reel">
+                    <button type="button" className="action-btn action-btn--toolbar" onClick={() => setReelStudioOpen(true)} title="Create chart-grounded video reading" aria-label="Create chart-grounded video reading">
                         <IconReelOutline />
                     </button>
                 )}

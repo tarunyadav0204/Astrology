@@ -964,7 +964,9 @@ def _collect_house_factors(
     try:
         ashtakavarga = AshtakavargaCalculator(birth_data, chart_data)
         sav = ashtakavarga.calculate_sarvashtakavarga()
-        sav_points_list = sav.get("house_points") or []
+        # The calculator returns sign-indexed bindus, not house_points.
+        sav_by_sign = sav['sarvashtakavarga']
+        sav_points_list = [sav_by_sign[str(row['sign'])] for row in chart_data['houses']]
         if len(sav_points_list) >= house_num:
             sav_points = sav_points_list[house_num - 1]
             if sav_points >= 34:
@@ -987,7 +989,7 @@ def _collect_house_factors(
         try:
             ashtakavarga = AshtakavargaCalculator(birth_data, chart_data)
             bav = ashtakavarga.calculate_individual_ashtakavarga(lord)
-            house_points = bav.get("house_points") or []
+            house_points = [bav['bindus'][row['sign']] for row in chart_data['houses']]
             if len(house_points) >= house_num:
                 lord_bav = house_points[house_num - 1]
                 if lord_bav >= 5:
@@ -1247,6 +1249,30 @@ def _collect_house_factors(
             "ashtakavarga": ashtakavarga_summary,
         },
     }
+
+
+def build_natal_insight_bundle(birth_data, reference_date, calculation_profile=None, *, node_aspects=None):
+    """Reuse ChartScreen's complete worksheets with one shared strength calculation.
+
+    Consumers must distinguish the natal foundation from the drawer's point-in-time
+    activation/timing fields; those are not a future-period prediction.
+    """
+    birth_obj = _birth_obj(birth_data)
+    chart = _natal_chart_for_shadbala(birth_obj, calculation_profile)
+    analyzer = HouseAnalyzer(chart, birth_obj, shadbala_chart_data=chart, node_aspects=node_aspects)
+    houses = {
+        str(house): _collect_house_factors(
+            birth_data, chart, house, 'lagna', reference_date,
+            shadbala_chart_data=chart, analyzer=analyzer,
+            calculation_profile=calculation_profile,
+        ) for house in range(1, 13)
+    }
+    planets = {
+        name: analyzer.planet_analyzer.analyze_planet(name)
+        for name in (*sorted(SHADBALA_PLANETS), 'Rahu', 'Ketu')
+    }
+    return {'chart': chart, 'houses': houses, 'planets': planets,
+            'shadbala': analyzer.planet_analyzer.shadbala_data}
 
 
 def build_house_insight(

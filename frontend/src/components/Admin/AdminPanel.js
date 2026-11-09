@@ -107,7 +107,7 @@ const CREDIT_SETTING_GROUPS = [
     key: 'timing',
     title: 'Timing, planning & Muhurat',
     hint: 'Event timing, planning tools and auspicious-time readings.',
-    keys: ['trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'marriage_muhurat_cost', 'event_timeline_cost', 'prashna_analysis_cost'],
+    keys: ['next_chapter_cost', 'trading_daily_cost', 'trading_monthly_cost', 'childbirth_planner_cost', 'vehicle_purchase_cost', 'griha_pravesh_cost', 'gold_purchase_cost', 'business_opening_cost', 'marriage_muhurat_cost', 'event_timeline_cost', 'prashna_analysis_cost'],
   },
   {
     key: 'media',
@@ -3908,7 +3908,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             Question Cost
           </button>
           <button className={`subtab ${activeSubTab === 'reelCosts' ? 'active' : ''}`} onClick={() => setActiveSubTab('reelCosts')}>
-            Reel Costs
+            Video Reading Costs
           </button>
           <button 
             className={`subtab ${activeSubTab === 'requests' ? 'active' : ''}`}

@@ -6,6 +6,9 @@ import { useCredits } from '../../context/CreditContext';
 import ConsultationHistory from './ConsultationHistory';
 import CreditLedger from './CreditLedger';
 import './ProfilePage.css';
+import studioCopy from '../ReelStudio/copy.json';
+import { studioLanguage } from '../ReelStudio/locale';
+import chapterCopy from '../NextChapter/copy.json';
 
 const ProfilePage = ({ user, onLogout, onAdminClick }) => {
   const navigate = useNavigate();
@@ -30,6 +33,8 @@ const ProfilePage = ({ user, onLogout, onAdminClick }) => {
       />
 
       <main className="profile-main">
+        <button className="ar-button ar-button--secondary" onClick={() => navigate('/reel-studio')}>{(studioCopy[studioLanguage()] || studioCopy.en).title} →</button>
+        <button className="ar-button ar-button--secondary" onClick={() => navigate('/next-chapter')}>{chapterCopy[localStorage.getItem('nextChapterLanguage') || 'en']?.title || chapterCopy.en.title} →</button>
         <section className="profile-hero" aria-labelledby="profile-title">
           <div className="profile-hero__identity">
             <span className="profile-eyebrow">Your AstroRoshni</span>

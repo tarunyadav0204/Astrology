@@ -356,15 +356,42 @@
       "name": "Swamsha (D9)",
       "description": "D9 from the Atmakaraka’s D9 sign"
     },
-    "chandraLagna": { "name": "Chandra Lagna", "description": "Natal chart viewed from the Moon" },
-    "suryaLagna": { "name": "Surya Lagna", "description": "Natal chart viewed from the Sun" },
-    "arudhaLagna": { "name": "Arudha Lagna", "description": "Public image and manifestation" },
-    "upapadaLagna": { "name": "Upapada Lagna", "description": "Marriage and spouse context" },
-    "bhavaLagna": { "name": "Bhava Lagna", "description": "Time-derived life reference" },
-    "horaLagna": { "name": "Hora Lagna", "description": "Time-derived wealth reference" },
-    "ghatikaLagna": { "name": "Ghatika Lagna", "description": "Time-derived authority reference" },
-    "pranapadaLagna": { "name": "Pranapada Lagna", "description": "Vitality reference point" },
-    "induLagna": { "name": "Indu Lagna", "description": "Wealth reference point" },
+    "chandraLagna": {
+      "name": "Chandra Lagna",
+      "description": "Natal chart viewed from the Moon"
+    },
+    "suryaLagna": {
+      "name": "Surya Lagna",
+      "description": "Natal chart viewed from the Sun"
+    },
+    "arudhaLagna": {
+      "name": "Arudha Lagna",
+      "description": "Public image and manifestation"
+    },
+    "upapadaLagna": {
+      "name": "Upapada Lagna",
+      "description": "Marriage and spouse context"
+    },
+    "bhavaLagna": {
+      "name": "Bhava Lagna",
+      "description": "Time-derived life reference"
+    },
+    "horaLagna": {
+      "name": "Hora Lagna",
+      "description": "Time-derived wealth reference"
+    },
+    "ghatikaLagna": {
+      "name": "Ghatika Lagna",
+      "description": "Time-derived authority reference"
+    },
+    "pranapadaLagna": {
+      "name": "Pranapada Lagna",
+      "description": "Vitality reference point"
+    },
+    "induLagna": {
+      "name": "Indu Lagna",
+      "description": "Wealth reference point"
+    },
     "hora": {
       "name": "Hora (D2)",
       "description": "Wealth & Family"
@@ -956,12 +983,12 @@
       "premiumTitle": "You earned a free podcast",
       "premiumBody": "This Premium question includes a podcast at no extra cost. Choose English or Hindi to listen.",
       "mediaTitle": "Take your reading with you",
-      "mediaBody": "Listen on the go or create a visual reel you can revisit and share.",
-      "mediaPremiumBody": "Listen to the included podcast, or turn this reading into a visual reel.",
+      "mediaBody": "Listen on the go or create a visual video reading you can revisit and share.",
+      "mediaPremiumBody": "Listen to the included podcast, or turn this reading into a visual video reading.",
       "listenTitle": "Listen as a podcast",
       "listenIncluded": "Included with this Premium question.",
       "listenCost": "English or Hindi · {{cost}} credits",
-      "reelTitle": "Create a visual reel",
+      "reelTitle": "Create a Video Reading",
       "reelBody": "A shareable visual version of this reading.",
       "reelCost": "English or Hindi · {{cost}} credits",
       "reelCostLoading": "Checking credits…",
@@ -2480,7 +2507,44 @@
       "notEnoughCredits": "Not enough credits"
     },
     "marriage": {
-      "title": "Marriage Muhurat", "intro": "Find ceremony-start windows for the wedding venue. Add both charts for couple natal Moon checks; otherwise the result remains Panchang-only.", "notice": "This is a timing election, not a compatibility verdict. Family tradition and priest guidance can apply additional rules.", "couple": "COUPLE", "bride": "Bride / partner one", "groom": "Groom / partner two", "profileHint": "Both charts are optional, but complete birth time and place make the couple check available.", "venue": "CEREMONY VENUE", "chooseCity": "Choose wedding city", "chooseVenue": "Choose venue", "chooseVenueBody": "Choose the city where the ceremony will take place.", "checkDates": "Check dates", "checkDatesBody": "Choose an inclusive range of 1 to 180 days.", "through": "Through", "next30": "Next 30 days", "next90": "Next 3 months", "next180": "Next 6 months", "horizonHint": "One search covers the full selected period and is charged once, not once per date.", "hours": "CEREMONY HOURS", "day": "Day\n08:00–17:00", "evening": "Evening\n18:00–23:30", "overnight": "Overnight\n20:00–01:00", "overnightHint": "Overnight means the ceremony may finish after midnight on the following civil day.", "find": "Find Marriage Muhurat · {{cost}} credits", "confirmTitle": "Confirm Marriage Muhurat", "confirmBody": "This search costs {{cost}} credits. Credits are charged only when suitable windows are found.", "continue": "Continue", "signIn": "Sign in to calculate a marriage Muhurat.", "balanceChanged": "Your balance is no longer enough for this search.", "calculationFailed": "Could not calculate a marriage Muhurat. Please try again.", "chooseChart": "Choose saved chart", "savedLocation": "Saved location", "noCharts": "Add a birth chart first to use couple personalization.", "withoutChart": "Continue without this chart", "addChart": "Add chart (optional)", "results": "Recommended ceremony windows", "noResults": "No window met this policy in the chosen range. Try a different range or ceremony-hours preference; the search did run.", "lagna": "Lagna"
+      "title": "Marriage Muhurat",
+      "intro": "Find ceremony-start windows for the wedding venue. Add both charts for couple natal Moon checks; otherwise the result remains Panchang-only.",
+      "notice": "This is a timing election, not a compatibility verdict. Family tradition and priest guidance can apply additional rules.",
+      "couple": "COUPLE",
+      "bride": "Bride / partner one",
+      "groom": "Groom / partner two",
+      "profileHint": "Both charts are optional, but complete birth time and place make the couple check available.",
+      "venue": "CEREMONY VENUE",
+      "chooseCity": "Choose wedding city",
+      "chooseVenue": "Choose venue",
+      "chooseVenueBody": "Choose the city where the ceremony will take place.",
+      "checkDates": "Check dates",
+      "checkDatesBody": "Choose an inclusive range of 1 to 180 days.",
+      "through": "Through",
+      "next30": "Next 30 days",
+      "next90": "Next 3 months",
+      "next180": "Next 6 months",
+      "horizonHint": "One search covers the full selected period and is charged once, not once per date.",
+      "hours": "CEREMONY HOURS",
+      "day": "Day\n08:00–17:00",
+      "evening": "Evening\n18:00–23:30",
+      "overnight": "Overnight\n20:00–01:00",
+      "overnightHint": "Overnight means the ceremony may finish after midnight on the following civil day.",
+      "find": "Find Marriage Muhurat · {{cost}} credits",
+      "confirmTitle": "Confirm Marriage Muhurat",
+      "confirmBody": "This search costs {{cost}} credits. Credits are charged only when suitable windows are found.",
+      "continue": "Continue",
+      "signIn": "Sign in to calculate a marriage Muhurat.",
+      "balanceChanged": "Your balance is no longer enough for this search.",
+      "calculationFailed": "Could not calculate a marriage Muhurat. Please try again.",
+      "chooseChart": "Choose saved chart",
+      "savedLocation": "Saved location",
+      "noCharts": "Add a birth chart first to use couple personalization.",
+      "withoutChart": "Continue without this chart",
+      "addChart": "Add chart (optional)",
+      "results": "Recommended ceremony windows",
+      "noResults": "No window met this policy in the chosen range. Try a different range or ceremony-hours preference; the search did run.",
+      "lagna": "Lagna"
     },
     "panchang": {
       "title": "Daily Panchang",
@@ -2545,13 +2609,42 @@
       "dashaHint": "The opening Vimshottari period is derived from the Moon’s Nakshatra."
     },
     "labels": {
-      "date": "Date", "time": "Local time", "place": "Place", "coordinates": "Coordinates", "timezone": "Timezone",
-      "tithi": "Tithi", "vara": "Vāra", "nakshatra": "Nakshatra", "yoga": "Yoga", "karana": "Karaṇa",
-      "moon": "Moon placement", "gana": "Gana", "nadi": "Nadi", "yoni": "Yoni", "animal": "Animal", "symbol": "Symbol", "element": "Element", "guna": "Guna", "shakti": "Shakti", "namingSyllable": "Naming syllable",
-      "lagna": "Lagna", "sun": "Sun", "ayanamsa": "Ayanamsa", "nodeType": "Node type",
-      "sunrise": "Sunrise", "sunset": "Sunset", "moonrise": "Moonrise", "moonset": "Moonset",
-      "lunarMonth": "Lunar month", "solarMonth": "Solar month", "ritu": "Ritu", "ayana": "Ayana", "vikramSamvat": "Vikram Samvat", "kaliYear": "Kali year",
-      "startingMahadasha": "Starting Mahadasha", "balanceAtBirth": "Balance at birth"
+      "date": "Date",
+      "time": "Local time",
+      "place": "Place",
+      "coordinates": "Coordinates",
+      "timezone": "Timezone",
+      "tithi": "Tithi",
+      "vara": "Vāra",
+      "nakshatra": "Nakshatra",
+      "yoga": "Yoga",
+      "karana": "Karaṇa",
+      "moon": "Moon placement",
+      "gana": "Gana",
+      "nadi": "Nadi",
+      "yoni": "Yoni",
+      "animal": "Animal",
+      "symbol": "Symbol",
+      "element": "Element",
+      "guna": "Guna",
+      "shakti": "Shakti",
+      "namingSyllable": "Naming syllable",
+      "lagna": "Lagna",
+      "sun": "Sun",
+      "ayanamsa": "Ayanamsa",
+      "nodeType": "Node type",
+      "sunrise": "Sunrise",
+      "sunset": "Sunset",
+      "moonrise": "Moonrise",
+      "moonset": "Moonset",
+      "lunarMonth": "Lunar month",
+      "solarMonth": "Solar month",
+      "ritu": "Ritu",
+      "ayana": "Ayana",
+      "vikramSamvat": "Vikram Samvat",
+      "kaliYear": "Kali year",
+      "startingMahadasha": "Starting Mahadasha",
+      "balanceAtBirth": "Balance at birth"
     }
   },
   "prashna": {
@@ -2658,5 +2751,9 @@
       "lost": "Is my missing item likely to be recovered?",
       "health": "What does the chart indicate around this health concern?"
     }
+  },
+  "nakshatraBlueprint": {
+    "title": "Nakshatra Blueprint",
+    "exploreBody": "A complete natal reading through every planet, nakshatra and pada—your character, gifts, patterns and life themes."
   }
 }

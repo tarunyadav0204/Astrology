@@ -8915,6 +8915,16 @@ export default function ChatScreen({ navigation, route }) {
                       }) : null}
                       <Text style={[styles.drawerSectionLabel, styles.drawerSectionLabelSpaced, { color: colors.primary }]}>{t('premiumUi.profile.library')}</Text>
                       {renderDrawerMenuRow({
+                        icon: 'film-outline',
+                        label: t('reelStudio.title'),
+                        action: () => navigation.navigate('ReelStudio'),
+                      })}
+                      {renderDrawerMenuRow({
+                        icon: 'sparkles-outline',
+                        label: t('nextChapter.title'),
+                        action: () => navigation.navigate('NextChapter'),
+                      })}
+                      {renderDrawerMenuRow({
                         icon: 'add-circle-outline',
                         label: t('menu.newConversation', 'New conversation'),
                         action: confirmStartNewChat,
@@ -8931,7 +8941,7 @@ export default function ChatScreen({ navigation, route }) {
                       })}
                       {renderDrawerMenuRow({
                         icon: 'film-outline',
-                        label: t('premiumUi.reelStudio.historyTitle', 'Reel History'),
+                        label: t('premiumUi.reelStudio.historyTitle', "Video Reading History"),
                         action: () => navigation.navigate('ReelHistory'),
                       })}
                       {renderDrawerMenuRow({
@@ -9432,6 +9442,36 @@ export default function ChatScreen({ navigation, route }) {
 
                   <TouchableOpacity
                     style={getMenuOptionStyle()}
+                    onPress={() => closeMenuDrawer(() => navigation.navigate('ReelStudio'))}
+                  >
+                    <LinearGradient colors={menuRowGradient} style={[styles.menuGradient, { borderColor: menuRowBorder }]}>
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient colors={menuAccentIconGradient} style={styles.menuIconGradient}>
+                          <Ionicons name="film-outline" size={19} color={colors.selectionText} />
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('reelStudio.title')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
+                    onPress={() => closeMenuDrawer(() => navigation.navigate('NextChapter'))}
+                  >
+                    <LinearGradient colors={menuRowGradient} style={[styles.menuGradient, { borderColor: menuRowBorder }]}>
+                      <View style={styles.menuIconContainer}>
+                        <LinearGradient colors={menuAccentIconGradient} style={styles.menuIconGradient}>
+                          <Ionicons name="sparkles-outline" size={19} color={colors.selectionText} />
+                        </LinearGradient>
+                      </View>
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('nextChapter.title')}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={getMenuOptionStyle()}
                     onPress={() => {
                       closeMenuDrawer(() => { navigation.navigate('PodcastHistory'); });
                     }}
@@ -9471,7 +9511,7 @@ export default function ChatScreen({ navigation, route }) {
                           <Ionicons name="film-outline" size={19} color={colors.selectionText} />
                         </LinearGradient>
                       </View>
-                      <Text style={[styles.menuText, { color: colors.text }]}>{t('premiumUi.reelStudio.historyTitle', 'Reel History')}</Text>
+                      <Text style={[styles.menuText, { color: colors.text }]}>{t('premiumUi.reelStudio.historyTitle', "Video Reading History")}</Text>
                       <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                     </LinearGradient>
                   </TouchableOpacity>

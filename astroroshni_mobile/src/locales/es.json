@@ -464,7 +464,12 @@
     "preparingInsights": "Preparando tus conocimientos cósmicos...",
     "fascinatingInsights": "Mientras tanto, déjame mostrarte algunos datos fascinantes sobre tu carta...",
     "thankYou": "Gracias por contactar a AstroRoshni con tu pregunta.",
-    "deeplyAnalyzing": "Estoy analizando profundamente tu carta celestial para proporcionarte los conocimientos más precisos. Este proceso sagrado toma un momento..."
+    "deeplyAnalyzing": "Estoy analizando profundamente tu carta celestial para proporcionarte los conocimientos más precisos. Este proceso sagrado toma un momento...",
+    "podcastPromo": {
+      "mediaBody": "Escucha sobre la marcha o crea una lectura en vídeo visual que puedas volver a ver y compartir.",
+      "mediaPremiumBody": "Escucha el pódcast incluido o convierte esta lectura en una lectura en vídeo visual.",
+      "reelTitle": "Crear una lectura en vídeo visual"
+    }
   },
   "home": {
     "greeting": {
@@ -1496,5 +1501,9 @@
       "travel": "Viajes",
       "legal": "Legal"
     }
+  },
+  "nakshatraBlueprint": {
+    "title": "Mapa de nakshatras",
+    "exploreBody": "Una lectura natal completa de cada planeta, nakshatra y pada: tu carácter, talentos, patrones y temas vitales."
   }
 }

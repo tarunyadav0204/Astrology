@@ -416,13 +416,14 @@ def build_sav_givers(
         givers.append({"planet": planet, "bindus": bindus})
     lagna_chart = sav.get("lagna_chart") or {}
     lagna_bindus = _bindu_for_sign(lagna_chart.get("bindus"), house_sign)
-    if lagna_bindus:
-        givers.append({"planet": "Lagna", "bindus": lagna_bindus})
+    # SAV combines seven planetary BAVs. Lagna BAV is a separate worksheet,
+    # not an eighth contribution to that same total.
     total = sum(item["bindus"] for item in givers)
     return {
         "house_sign": house_sign,
         "total": total,
         "givers": givers,
+        "lagna_bav": lagna_bindus,
     }
 
 

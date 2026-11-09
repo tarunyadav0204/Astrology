@@ -7,6 +7,9 @@ import { useTheme } from '../../theme';
 import BirthFormModal from '../BirthForm/BirthFormModal';
 import CreditsModal from '../Credits/CreditsModal';
 import ModernSiteSearch from '../Search/ModernSiteSearch';
+import studioCopy from '../ReelStudio/copy.json';
+import { studioLanguage } from '../ReelStudio/locale';
+import chapterCopy from '../NextChapter/copy.json';
 import './ModernNavigationHeader.css';
 
 const CALENDAR_LINKS = [
@@ -183,6 +186,14 @@ const ModernNavigationHeader = ({
                     <small>{blurb}</small>
                   </Link>
                 ))}
+                <Link to="/reel-studio" onClick={goSiteRoute('/reel-studio')}>
+                  <span>{(studioCopy[studioLanguage()] || studioCopy.en).title}</span>
+                  <small>{(studioCopy[studioLanguage()] || studioCopy.en).intro}</small>
+                </Link>
+                <Link to="/next-chapter" onClick={goSiteRoute('/next-chapter')}>
+                  <span>{(chapterCopy[localStorage.getItem('nextChapterLanguage')] || chapterCopy.en).title}</span>
+                  <small>{(chapterCopy[localStorage.getItem('nextChapterLanguage')] || chapterCopy.en).included}</small>
+                </Link>
                 <Link to="/kundli-matching" onClick={goSiteRoute('/kundli-matching')}>
                   <span>Kundli matching</span>
                   <small>Compare two charts for partnership</small>
@@ -284,6 +295,8 @@ const ModernNavigationHeader = ({
                 </summary>
                 <div className="mh-account-menu__panel" onClick={closeMenus}>
                   <div className="mh-account-menu__identity"><span>Signed in as</span><strong>{accountName}</strong></div>
+                  <button type="button" onClick={() => { leaveShell(); navigate('/reel-studio'); }}>{(studioCopy[studioLanguage()] || studioCopy.en).title} <i aria-hidden>↗</i></button>
+                  <button type="button" onClick={() => { leaveShell(); navigate('/next-chapter'); }}>{(chapterCopy[localStorage.getItem('nextChapterLanguage')] || chapterCopy.en).title} <i aria-hidden>↗</i></button>
                   <button type="button" onClick={() => { leaveShell(); navigate('/profile'); }}>Profile <i aria-hidden>↗</i></button>
                   <button type="button" onClick={() => openBirthForm('saved')}>Saved Kundlis <i aria-hidden>↗</i></button>
                   <button type="button" onClick={() => setShowCreditsModal(true)}>Credits <b>{creditsLoading ? '—' : credits}</b></button>
@@ -324,6 +337,8 @@ const ModernNavigationHeader = ({
               <button type="button" onClick={askTara}>Ask Tara</button>
               <button type="button" onClick={() => openBirthForm('new')}>Create Kundli</button>
               {user && <button type="button" onClick={() => openBirthForm('saved')}>Saved Kundlis</button>}
+              {user && <button type="button" onClick={() => { leaveShell(); navigate('/reel-studio'); }}>{(studioCopy[studioLanguage()] || studioCopy.en).title}</button>}
+              {user && <button type="button" onClick={() => { leaveShell(); navigate('/next-chapter'); }}>{(chapterCopy[localStorage.getItem('nextChapterLanguage')] || chapterCopy.en).title}</button>}
               {user && <button type="button" onClick={() => { leaveShell(); navigate('/profile'); }}>Profile</button>}
               {user && <button type="button" onClick={() => setShowCreditsModal(true)}>Credits · {creditsLoading ? '—' : credits}</button>}
               <div className="mh-mobile-theme" role="radiogroup" aria-label="Choose appearance" onClick={(event) => event.stopPropagation()}>

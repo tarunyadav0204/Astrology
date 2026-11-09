@@ -13,9 +13,11 @@ class PlanetAnalyzer(BaseCalculator):
         *,
         shadbala_chart_data=None,
         compute_shadbala: bool = True,
+        node_aspects=None,
     ):
         super().__init__(chart_data or {})
         self.birth_data = birth_data
+        self.node_aspects = tuple(node_aspects) if node_aspects is not None else None
         self._compute_shadbala = bool(compute_shadbala)
 
         # Initialize existing calculators
@@ -586,59 +588,16 @@ class PlanetAnalyzer(BaseCalculator):
         return effects.get(planet, 'Retrograde motion affects planet expression')
     
     def _get_aspect_houses(self, planet, from_house):
-        """Get houses aspected by planet using proper Vedic aspects"""
-        aspected_houses = []
-        
-        # Rahu and Ketu have special aspects only (3rd and 11th)
-        if planet in ['Rahu', 'Ketu']:
-            # Rahu and Ketu aspect 3rd and 11th houses from their position
-            third_house = (from_house + 2) % 12
-            if third_house == 0:
-                third_house = 12
-            eleventh_house = (from_house + 10) % 12
-            if eleventh_house == 0:
-                eleventh_house = 12
-            aspected_houses.extend([third_house, eleventh_house])
-        else:
-            # All other planets aspect 7th house from their position
-            seventh_house = (from_house + 6) % 12
-            if seventh_house == 0:
-                seventh_house = 12
-            aspected_houses.append(seventh_house)
-            
-            # Special aspects for specific planets
-            if planet == 'Mars':
-                # Mars aspects 4th and 8th houses from its position
-                fourth_house = (from_house + 3) % 12
-                if fourth_house == 0:
-                    fourth_house = 12
-                eighth_house = (from_house + 7) % 12
-                if eighth_house == 0:
-                    eighth_house = 12
-                aspected_houses.extend([fourth_house, eighth_house])
-                
-            elif planet == 'Jupiter':
-                # Jupiter aspects 5th and 9th houses from its position
-                fifth_house = (from_house + 4) % 12
-                if fifth_house == 0:
-                    fifth_house = 12
-                ninth_house = (from_house + 8) % 12
-                if ninth_house == 0:
-                    ninth_house = 12
-                aspected_houses.extend([fifth_house, ninth_house])
-                
-            elif planet == 'Saturn':
-                # Saturn aspects 3rd and 10th houses from its position
-                third_house = (from_house + 2) % 12
-                if third_house == 0:
-                    third_house = 12
-                tenth_house = (from_house + 9) % 12
-                if tenth_house == 0:
-                    tenth_house = 12
-                aspected_houses.extend([third_house, tenth_house])
-        
-        return aspected_houses
-    
+        """Use the same classical whole-sign aspects as ChartScreen.
+
+        Outer planets may be displayed but do not have Parashari graha drishti.
+        Nodes follow the app's declared 5/7/9 convention, not a separate 3/11 rule.
+        """
+        from .vedic_graha_drishti import GRAHA_HOUSE_ASPECTS
+        return [((from_house + number - 2) % 12) + 1
+                for number in (self.node_aspects if planet in {"Rahu", "Ketu"} and getattr(self, "node_aspects", None) is not None
+                               else GRAHA_HOUSE_ASPECTS.get(planet, ())) if number != 1]
+
     def _get_aspect_type(self, from_house, to_house):
         """Get aspect type based on house difference"""
         # Calculate the aspect number correctly

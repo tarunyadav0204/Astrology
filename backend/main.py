@@ -133,6 +133,7 @@ from credits.razorpay_subscription_routes import router as razorpay_subscription
 from credits.subscription_admin import router as subscription_admin_router
 from tts.routes import router as tts_router
 from reel_studio.routes import router as reel_studio_router
+from reel_studio.studio import router as reel_studio_catalog_router
 from speech.routes import router as speech_router
 from speech.ws_routes import router as speech_ws_router
 from credits.credit_request_routes import router as credit_request_router
@@ -161,6 +162,8 @@ from prashna.routes import router as prashna_router
 from chat_history.local_task_queue import ensure_local_chat_task_queue_table
 from birth_charts.routes import router as birth_charts_router
 from prediction_engine.routes import router as prediction_engine_router
+from next_chapter.routes import router as next_chapter_router
+from next_chapter.customer import router as next_chapter_customer_router
 from rectification.routes import router as rectification_router
 from sutra_rules.admin_routes import router as sutra_rules_admin_router
 from karma_analysis.routes import router as karma_router
@@ -1083,6 +1086,8 @@ app.include_router(charts_router, prefix="/api")
 app.include_router(prashna_router, prefix="/api")
 app.include_router(birth_charts_router, prefix="/api")
 app.include_router(prediction_engine_router, prefix="/api")
+app.include_router(next_chapter_router, prefix="/api")
+app.include_router(next_chapter_customer_router, prefix="/api")
 app.include_router(rectification_router, prefix="/api")
 app.include_router(sutra_rules_admin_router, prefix="/api")
 app.include_router(wealth_router, prefix="/api")
@@ -1116,6 +1121,7 @@ app.include_router(razorpay_subscription_router, prefix="/api/credits")
 app.include_router(subscription_admin_router, prefix="/api/credits")
 app.include_router(tts_router, prefix="/api")
 app.include_router(reel_studio_router, prefix="/api")
+app.include_router(reel_studio_catalog_router, prefix="/api")
 app.include_router(speech_router, prefix="/api")
 app.include_router(speech_ws_router, prefix="/api")
 app.include_router(credit_request_router, prefix="/api")

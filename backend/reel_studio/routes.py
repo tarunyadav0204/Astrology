@@ -128,6 +128,12 @@ def _ensure_tables(conn) -> None:
 
 
 def _answer_for_user(message_id: int, user_id: int) -> tuple[str, int | None, str]:
+    if message_id < -1_000_000_000:
+        from reel_studio.studio import answer_for_source
+        return answer_for_source(message_id, user_id)
+    if message_id < 0:
+        from next_chapter.reel_source import answer_for_source
+        return answer_for_source(message_id, user_id)
     with get_conn() as conn:
         row = execute(conn, """
             SELECT cm.content, cs.birth_chart_id,
@@ -204,7 +210,7 @@ def _chart_snapshot(chart_id: int | None, user_id: int) -> dict | None:
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Verified reel evidence could not be calculated: {str(exc)[:180]}")
+        raise HTTPException(status_code=503, detail=f"Verified video reading evidence could not be calculated: {str(exc)[:180]}")
 
 
 def _clean_text(value: str) -> str:
@@ -238,7 +244,7 @@ def _extract_claims(answer: str, max_claims: int = 24) -> list[dict]:
             "type": "chart_fact" if factual else "interpretation",
         })
     if not claims:
-        raise HTTPException(status_code=422, detail="The answer has no complete claims that can be directed into a reel.")
+        raise HTTPException(status_code=422, detail="The answer has no complete claims that can be directed into a video reading.")
     return claims
 
 
@@ -272,7 +278,7 @@ def _scene_count_range(duration_seconds: int) -> tuple[int, int]:
     return (8, 10) if int(duration_seconds) == REEL_SHORT_DURATION_SECONDS else (12, 18)
 
 
-def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dict | None, language: str, duration_seconds: int, presenter_enabled: bool = False) -> list[dict]:
+def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dict | None, language: str, duration_seconds: int, presenter_enabled: bool = False, full_source: bool = False) -> list[dict]:
     """Text model directs the creative edit; rendering remains fact-bound."""
     from reel_studio.planning import MIN_RENDERABLE_SCENES, MAX_RENDERABLE_SCENES, validate_scene_count
     answer = plain_text(answer)
@@ -284,9 +290,9 @@ def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dic
             return None
         return text if text.endswith((".", "!", "?", "।")) else f"{text}."
     if not question.strip():
-        raise HTTPException(status_code=422, detail="The originating user question is missing, so an answer-specific reel cannot be directed.")
+        raise HTTPException(status_code=422, detail="The originating user question is missing, so an answer-specific video reading cannot be directed.")
     if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(status_code=503, detail="Reel direction is unavailable: the text planner is not configured.")
+        raise HTTPException(status_code=503, detail="Video Reading direction is unavailable: the text planner is not configured.")
     graph = (snapshot or {}).get("visual_graph") or {"nodes": [], "edges": []}
     source = {"placements": (snapshot or {}).get("placements", []), "dashas": (snapshot or {}).get("current_dashas", {}), "ashtakavarga": (snapshot or {}).get("ashtakavarga", {}), "visual_graph": graph}
     min_beats, max_beats = _scene_count_range(duration_seconds)
@@ -326,16 +332,52 @@ def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dic
     }
     language_instruction = (
         "REEL LANGUAGE: Hindi (Devanagari). Write every narration and visual instruction in natural, fluent Hindi. "
-        "Translate the approved answer faithfully; do not merely transliterate English."
+        "Translate the approved answer faithfully; do not merely transliterate English. "
+        "HINDI SPOKEN DATES: In every narration field, including presenter opening and closing, "
+        "write all dates, days, months, years, times and date ranges as fully spoken Hindi words in Devanagari. "
+        "Do not leave digits, ISO dates, slash dates, English month/day names or English number words in speech. "
+        "For example, 5 November 2026 becomes 'पाँच नवंबर दो हज़ार छब्बीस'; "
+        "18 Sep 2026–12 Feb 2027 becomes 'अठारह सितंबर दो हज़ार छब्बीस से बारह फ़रवरी दो हज़ार सत्ताईस तक'; "
+        "2:30 PM becomes 'दोपहर दो बजकर तीस मिनट'. Preserve the exact source date and year; "
+        "never guess an ambiguous date. This spoken-word rule applies to narration only: "
+        "on-screen dates and structured timing data may retain numerals. "
+        "Before returning the plan, check every narration for remaining English dates or numeric date strings "
+        "and convert them to natural spoken Hindi without changing their meaning."
         if language == "hi" else
         "REEL LANGUAGE: English. Write every narration and visual instruction in natural, fluent English."
     )
     prompt = f'''Return JSON only: {{"beats":[{{"type":"", "narration":"", "pause_after":"short", "evidence_ids":[], "visual_instruction":"", "focus_nodes":[], "draw_edges":[]}}]}}.
 Write a detailed {duration_seconds}-second premium vertical reel plan that ANSWERS THE USER'S ACTUAL QUESTION and explains why the approved answer reaches that conclusion. Do not make a generic astrology reel. Aim for {min_beats} to {max_beats} beats; this is an editorial target, not a reason to cut or pad the answer. Choose from these supported visual modules only: {sorted(_VISUAL_MODULES)}. Choose modules that fit the answer; do not force chart, dasha, Ashtakavarga, transit, or timing scenes when the evidence does not support them. Use opening first and closing last. Write complete, naturally spoken passages. Aim for combined narration between {round(duration_seconds * 2.35)} and {round(duration_seconds * 2.5)} words for a calm podcast pace. Never cut a sentence, use ellipses, or repeat a closing/thank-you line. Every beat must include a concrete visual_instruction describing the desired image. Set pause_after to none, short, medium, or long to direct the silence between this beat and the next: use none when the next beat continues the same thought; use short for ordinary sentence transitions; use medium or long only after a complete conclusion, important shift, or final line. Never use a pause within an unfinished sentence. Every beat must include a concrete visual_instruction describing the desired image. For chart_focus, use relevant verified focus nodes and arrows only when they help explain this scene. Either array may be empty; a chart overview or a highlighted placement does not require an arrow. For lifestyle_image, describe a real-life scene tied to the answer. All images are created by GPT Image from this directed data; no visual may introduce a fact outside the approved claims or VERIFIED VISUAL DATA. EVIDENCE RULE: use only exact claim IDs from CLAIMS when they support a beat. Evidence IDs are optional annotations: use an empty array for framing, transitions, or when no listed excerpt matches. Every factual statement must still come from the approved answer or verified visual data; never invent facts or IDs.
+CONVERSATIONAL DELIVERY: This will be heard, not read. Speak warmly to one person,
+like an astrologer explaining a finding across a table. Do not recite the written report.
+Preserve all material findings, uncertainty and qualifications, but use everyday vocabulary
+and varied short sentences. Prefer two clear sentences over a long chain of clauses.
+Do not pad narration to meet the suggested word count or duration.
+HINDI DELIVERY (when Hindi is selected): Use natural conversational Hindi, not translated
+report prose or Sanskrit-heavy abstract nouns. Prefer concrete explanations over noun-heavy
+phrases. Avoid repeated lead-ins such as "आप जान सकते हैं कि", "यह दर्शाता है कि",
+or "आपकी कुंडली इंगित करती है कि"; state the qualified insight directly.
+For example, say "आपको भरोसा बनाने में थोड़ा समय लग सकता है।" rather than
+"आप जान सकते हैं कि विश्वास के निर्माण की प्रक्रिया में समय लगने की संभावना है।"
+This example is a delivery pattern only, never a fact to add to this person's reading.
+Keep compound verbs together: "जान सकते हैं", "कर रहे हैं", "हो सकता है", "समझना चाहते हैं".
+Never write "जान सकते, हैं कि" or "कर रहे, हैं". Keep "के लिए", "की वजह से" and
+other postpositional phrases together. Place commas at actual clause boundaries, not
+where a visual line wraps or a fixed number of words has passed. Use full sentences
+instead of interrupting a verb phrase for dramatic emphasis. Before returning, silently
+read the narration as spoken Hindi and repair awkward phrasing without changing claims.
+SPEECH CADENCE: Write short, complete spoken sentences, one idea per sentence.
+Use commas only at natural clause/list boundaries. Use full stops (। in Hindi) between
+independent thoughts; never join separate sentences with commas or remove punctuation to
+fit a beat. Do not include SSML or bracketed pause/emphasis cues. Keep each sentence in
+one beat. Avoid long parenthetical clauses and run-on lists; preserve every factual qualification.
 Use plain text for narration and all visible image labels. Strip Markdown syntax from source copy: a heading such as 'Key Insights' must never include hash, asterisk, or backtick formatting markers.
 {language_instruction}
 USER QUESTION: {question[:2000]}
-APPROVED ANSWER: {answer[:9000]}
+For a curated Studio JSON source, narrate its reading, not its calculated_evidence audit packet.
+Use that packet only to ground visuals and explanations. Never speak evidence IDs, calculation
+metadata, numeric strength worksheets, or add unrelated predictions from background chart data.
+APPROVED ANSWER: {answer if full_source else answer[:9000]}
 CLAIMS: {json.dumps(claims, ensure_ascii=False)}
 VERIFIED VISUAL DATA: {json.dumps(source, ensure_ascii=False)}'''
     if presenter_enabled:
@@ -384,7 +426,7 @@ VERIFIED VISUAL DATA: {json.dumps(source, ensure_ascii=False)}'''
         generated = request_plan(prompt)
     except Exception as exc:
         logger.exception("Reel planner request failed before validation")
-        raise HTTPException(status_code=503, detail="Reel direction is temporarily unavailable. Please try again.")
+        raise HTTPException(status_code=503, detail="Video Reading direction is temporarily unavailable. Please try again.")
     try:
         beats = validate_generated(generated)
     except Exception as exc:
@@ -404,7 +446,7 @@ ORIGINAL BRIEF:
             logger.info("Reel planner recovered with one validation repair pass: %s", first_error)
         except Exception as repair_exc:
             logger.warning("Reel planner validation failed after repair: first=%s repair=%s", first_error, str(repair_exc)[:700])
-            raise HTTPException(status_code=503, detail="Reel direction could not be validated after one repair attempt. Please try again.")
+            raise HTTPException(status_code=503, detail="Video Reading direction could not be validated after one repair attempt. Please try again.")
     if presenter_enabled:
         from reel_studio.presenter import validate_presenter_beats
         # Presenter placement is a product choice, not something the director
@@ -462,16 +504,19 @@ ORIGINAL LINES: {json.dumps(lines, ensure_ascii=False)}''',
 
 
 def _draft_payload(request: DraftRequest, user_id: int) -> dict:
-    answer, chart_id, question = _answer_for_user(request.message_id, user_id)
-    chart_snapshot = _chart_snapshot(chart_id, user_id)
-    claims = _extract_claims(answer)
     run_id = f"reel_{uuid.uuid4().hex}"
     with costs.session(user_id, run_id, planning=True):
-        scenes = _planned_beats(answer, question, claims, chart_snapshot, request.language, request.duration_seconds, request.presenter_enabled)
+        answer, chart_id, question = _answer_for_user(request.message_id, user_id)
+        chart_snapshot = _chart_snapshot(chart_id, user_id)
+        # Studio JSON carries an audit worksheet as well as prose. Only the
+        # reading is a spoken claim; the worksheet remains planner context.
+        claim_text = json.loads(answer)['reading'] if request.message_id < -1_000_000_000 else answer
+        claims = _extract_claims(claim_text)
+        scenes = _planned_beats(answer, question, claims, chart_snapshot, request.language, request.duration_seconds, request.presenter_enabled, full_source=request.message_id < 0)
     return {
         "run_id": run_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "source": {"message_id": request.message_id, "birth_chart_id": chart_id, "kind": "chat_answer", "question": question},
+        "source": {"message_id": request.message_id, "birth_chart_id": chart_id, "kind": "studio" if request.message_id < -1_000_000_000 else "next_chapter" if request.message_id < 0 else "chat_answer", "question": str(json.loads(answer).get("title") or "Your Next Chapter") if request.message_id < 0 else question},
         "chart_snapshot": chart_snapshot,
         "premium_readiness": {
             "real_chart": bool(chart_snapshot),
@@ -494,7 +539,7 @@ def _draft_payload(request: DraftRequest, user_id: int) -> dict:
 def create_draft(request: DraftRequest, current_user: User = Depends(get_current_user)):
     quote = reel_pricing(current_user.userid, request.duration_seconds, request.presenter_enabled)
     if request.presenter_enabled and not os.getenv('GEMINI_API_KEY'):
-        raise HTTPException(status_code=503, detail='Presenter reels are temporarily unavailable. No credits were charged.')
+        raise HTTPException(status_code=503, detail='Presenter video readings are temporarily unavailable. No credits were charged.')
     if quote["credits"] < quote["credit_cost"]:
         raise HTTPException(status_code=402, detail=f"Insufficient credits. You need {quote['credit_cost']} credits.")
     draft = _draft_payload(request, current_user.userid)
@@ -539,16 +584,16 @@ def queue_render(request: RenderRequest, background_tasks: BackgroundTasks, curr
             return {"job_id": job_id, "run_id": draft["run_id"], "status": existing[0], "cost_projection": draft["cost_projection"], "credit_cost": draft.get("credit_cost"), "reused": True}
         settings = draft.get("settings") or {}
         if bool(settings.get('presenter_enabled', False)) != request.presenter_enabled:
-            raise HTTPException(status_code=422, detail='Presenter choice does not match the approved reel.')
+            raise HTTPException(status_code=422, detail='Presenter choice does not match the approved video reading.')
         if any(settings.get(key) != getattr(request, key) for key in ("message_id", "duration_seconds", "language", "visual_level")):
             raise HTTPException(status_code=422, detail="Queue settings do not match the storyboard you approved. Prepare a new storyboard.")
         available = {claim["id"] for claim in draft["claims"]}
         if not set(request.approved_claim_ids).issubset(available):
             raise HTTPException(status_code=422, detail="Approval contains an unknown claim.")
         if quote["credit_cost"] != request.confirmed_credit_cost:
-            raise HTTPException(status_code=409, detail="Reel credit pricing has changed. Reopen Reel Studio to review the current price.")
+            raise HTTPException(status_code=409, detail="Video Reading credit pricing has changed. Reopen AstroRoshni Studio to review the current price.")
         if not renderer_ready:
-            raise HTTPException(status_code=503, detail="Reel generation is not configured. No credits were charged.")
+            raise HTTPException(status_code=503, detail="Video Reading generation is not configured. No credits were charged.")
         if not charge_reel(conn, current_user.userid, quote["credit_cost"], job_id, request.message_id):
             raise HTTPException(status_code=402, detail=f"Insufficient credits. You need {quote['credit_cost']} credits.")
         status = "queued"
@@ -580,7 +625,7 @@ def queue_render(request: RenderRequest, background_tasks: BackgroundTasks, curr
                     ("The Reel worker queue could not accept this job. Your credits were returned.", job_id),
                 )
                 conn.commit()
-            raise HTTPException(status_code=503, detail="Reel worker queue is temporarily unavailable. Your credits were returned; please try again.")
+            raise HTTPException(status_code=503, detail="Video Reading worker queue is temporarily unavailable. Your credits were returned; please try again.")
     else:
         # Local development remains self-contained. Production enables the
         # durable path automatically once the Cloud Run worker registers.
@@ -678,7 +723,7 @@ def get_render_job(job_id: str, current_user: User = Depends(get_current_user)):
         """, (job_id, current_user.userid)).fetchone()
         conn.commit()
     if not row:
-        raise HTTPException(status_code=404, detail="Reel job not found.")
+        raise HTTPException(status_code=404, detail="Video Reading job not found.")
     status = row[0]
     next_step = None
     renderer_ready = bool(os.getenv("OPENAI_API_KEY") or os.getenv("PARTNER_PORTRAIT_OPENAI_API_KEY"))
@@ -697,10 +742,10 @@ def reel_thumbnail(job_id: str, current_user: User = Depends(get_current_user)):
         row = execute(conn, "SELECT user_id, status FROM reel_render_jobs WHERE id=%s AND user_id=%s",
                       (job_id, current_user.userid)).fetchone()
     if not row or row[1] != "completed":
-        raise HTTPException(status_code=404, detail="Reel cover is not available.")
+        raise HTTPException(status_code=404, detail="Video Reading cover is not available.")
     cover = load_thumbnail(row[0], job_id)
     if cover is None:
-        raise HTTPException(status_code=404, detail="Reel cover is unavailable.")
+        raise HTTPException(status_code=404, detail="Video Reading cover is unavailable.")
     return FileResponse(cover, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
 
 
@@ -710,10 +755,10 @@ def download_render(job_id: str, request: Request, current_user: User = Depends(
     with get_conn() as conn:
         row = execute(conn, "SELECT user_id, status FROM reel_render_jobs WHERE id=%s AND user_id=%s", (job_id, current_user.userid)).fetchone()
     if not row or row[1] != "completed":
-        raise HTTPException(status_code=404, detail="Reel is not ready yet.")
+        raise HTTPException(status_code=404, detail="Video Reading is not ready yet.")
     output = load_reel(row[0], job_id)
     if output is None:
-        raise HTTPException(status_code=404, detail="Reel output is unavailable.")
+        raise HTTPException(status_code=404, detail="Video Reading output is unavailable.")
     return _video_response(output, request.headers.get("range"))
 
 
@@ -721,7 +766,7 @@ def _video_response(path, range_header: str | None):
     """Authenticated byte ranges allow native/web video players to seek."""
     size = path.stat().st_size
     start, end, status = 0, size - 1, 200
-    headers = {"Accept-Ranges": "bytes", "Content-Disposition": 'inline; filename="astroroshni-reel.mp4"',
+    headers = {"Accept-Ranges": "bytes", "Content-Disposition": 'inline; filename="astroroshni-video-reading.mp4"',
                "Cache-Control": "private, max-age=86400"}
     if range_header:
         match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip())

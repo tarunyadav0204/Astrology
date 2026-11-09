@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 # Safe prices used only while a newly deployed setting has not yet been seeded.
 # Most legacy settings intentionally retain the historical one-credit fallback.
 _CREDIT_SETTING_FALLBACKS = {
+    "next_chapter_cost": 49,
     # ``reel_generation_cost`` remains as a legacy key for older clients;
     # new Reel Studio formats are priced independently below.
     "reel_generation_cost": 25,
@@ -573,6 +574,7 @@ class CreditService:
                 ("business_opening_cost", 20, "Credits per business opening muhurat"),
                 ("marriage_muhurat_cost", 30, "Credits per couple-aware marriage muhurat"),
                 ("event_timeline_cost", 100, "Credits per yearly event timeline analysis"),
+                ("next_chapter_cost", 49, "Your Next Chapter — credits for a complete saved Antardasha reading"),
                 ("partnership_analysis_cost", 2, "Credits per partnership compatibility analysis"),
                 ("partnership_report_cost", 9, "Credits per partnership PDF report"),
                 ("career_report_cost", 15, "Credits per career PDF report"),
@@ -583,9 +585,9 @@ class CreditService:
                 ("karma_analysis_cost", 25, "Credits per karma analysis"),
                 ("ashtakavarga_life_predictions_cost", 15, "Credits per Ashtakavarga life predictions (Dots of Destiny)"),
                 ("podcast_cost", 2, "Credits per podcast (listen to message as audio)"),
-                ("reel_generation_cost", 25, "Legacy Reel Studio rate (retained for older app versions)"),
-                ("reel_short_generation_cost", 15, "Short Reel (about 90 seconds, 8–10 scenes) — credits per new or recreated reel"),
-                ("reel_deep_generation_cost", 25, "Deep Reel (about 3 minutes, 12–18 scenes) — credits per new or recreated reel"),
+                ("reel_generation_cost", 25, "Legacy AstroRoshni Studio rate (retained for older app versions)"),
+                ("reel_short_generation_cost", 15, "Short Video Reading (about 90 seconds, 8–10 scenes) — credits per new or recreated video reading"),
+                ("reel_deep_generation_cost", 25, "Deep Video Reading (about 3 minutes, 12–18 scenes) — credits per new or recreated video reading"),
                 ("reel_presenter_addon_cost", 10, "Additional credits for 5-second opening and closing presenter clips (360p)"),
                 ("prashna_analysis_cost", 3, "Credits per classical Prashna question chart"),
                 ("partner_portrait_cost", 44, "Credits per AI Partner Portrait with face and full-body views"),
@@ -4101,13 +4103,14 @@ class CreditService:
         """
         from db import get_conn, execute
         descriptions = {
+            "next_chapter_cost": "Your Next Chapter — credits for a complete saved Antardasha reading",
             "chart_chat_cost": "Chart Chat — credits per answer; free with an active Astrologer License",
             "instant_chat_first_minute_cost": "Credits for the first minute of Instant Chat",
             "instant_chat_per_minute_cost": "Credits per following started minute of Instant Chat",
             "prashna_analysis_cost": "Credits per classical Prashna question chart",
-            "reel_generation_cost": "Legacy Reel Studio rate (retained for older app versions)",
-            "reel_short_generation_cost": "Short Reel (about 90 seconds, 8–10 scenes) — credits per new or recreated reel",
-            "reel_deep_generation_cost": "Deep Reel (about 3 minutes, 12–18 scenes) — credits per new or recreated reel",
+            "reel_generation_cost": "Legacy AstroRoshni Studio rate (retained for older app versions)",
+            "reel_short_generation_cost": "Short Video Reading (about 90 seconds, 8–10 scenes) — credits per new or recreated video reading",
+            "reel_deep_generation_cost": "Deep Video Reading (about 3 minutes, 12–18 scenes) — credits per new or recreated video reading",
             "reel_presenter_addon_cost": "Additional credits for 5-second opening and closing presenter clips (360p)",
             "partner_portrait_cost": "Credits per AI Partner Portrait with face and full-body views",
             "nakshatra_blueprint_cost": "Credits per Nakshatra Blueprint reading",
@@ -4320,6 +4323,7 @@ class CreditService:
         """Get all credit settings (value = original cost, discount = discounted cost when set)."""
         from db import get_conn, execute
         keys = (
+            'next_chapter_cost',
             'chat_question_cost', 'chart_chat_cost', 'instant_chat_cost', 'instant_chat_first_minute_cost', 'instant_chat_per_minute_cost', 'speech_chat_cost', 'speech_chat_per_minute_cost', 'premium_chat_cost', 'verified_chat_cost', 'partnership_analysis_cost', 'wealth_analysis_cost',
             'marriage_analysis_cost', 'health_analysis_cost', 'education_analysis_cost', 'career_analysis_cost',
             'progeny_analysis_cost', 'partnership_report_cost', 'career_report_cost', 'wealth_report_cost',
@@ -4451,8 +4455,8 @@ class CreditService:
             # well. Do not use ON CONFLICT: older production schemas may not
             # have the corresponding unique constraint.
             for key, default, description in (
-                ("reel_short_generation_cost", 15, "Short Reel (about 90 seconds, 8–10 scenes) — credits per new or recreated reel"),
-                ("reel_deep_generation_cost", 25, "Deep Reel (about 3 minutes, 12–18 scenes) — credits per new or recreated reel"),
+                ("reel_short_generation_cost", 15, "Short Video Reading (about 90 seconds, 8–10 scenes) — credits per new or recreated video reading"),
+                ("reel_deep_generation_cost", 25, "Deep Video Reading (about 3 minutes, 12–18 scenes) — credits per new or recreated video reading"),
                 ("reel_presenter_addon_cost", 10, "Additional credits for 5-second opening and closing presenter clips (360p)"),
             ):
                 if any(s["key"] == key for s in settings):
@@ -4537,6 +4541,7 @@ class CreditService:
                 except Exception:
                     pass
             report_defaults = [
+                ("next_chapter_cost", 49, "Your Next Chapter — credits for a complete saved Antardasha reading"),
                 ("marriage_muhurat_cost", 30, "Credits per couple-aware marriage muhurat"),
                 ("partnership_report_cost", 9, "Credits per partnership PDF report"),
                 ("career_report_cost", 15, "Credits per career PDF report"),
