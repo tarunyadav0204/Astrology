@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from reel_studio import planner
 import os
 import json
 import logging
@@ -291,7 +292,7 @@ def _planned_beats(answer: str, question: str, claims: list[dict], snapshot: dic
         return text if text.endswith((".", "!", "?", "।")) else f"{text}."
     if not question.strip():
         raise HTTPException(status_code=422, detail="The originating user question is missing, so an answer-specific video reading cannot be directed.")
-    if not os.getenv("OPENAI_API_KEY"):
+    if not os.getenv("GEMINI_API_KEY"):
         raise HTTPException(status_code=503, detail="Video Reading direction is unavailable: the text planner is not configured.")
     graph = (snapshot or {}).get("visual_graph") or {"nodes": [], "edges": []}
     source = {"placements": (snapshot or {}).get("placements", []), "dashas": (snapshot or {}).get("current_dashas", {}), "ashtakavarga": (snapshot or {}).get("ashtakavarga", {}), "visual_graph": graph}
@@ -416,8 +417,8 @@ VERIFIED VISUAL DATA: {json.dumps(source, ensure_ascii=False)}'''
         return beats
 
     def request_plan(input_prompt: str, stage: str = 'planning') -> object:
-        response = costs.responses_create(stage,
-            model=os.getenv("REEL_PLANNER_MODEL", "gpt-5.6-luna"), input=input_prompt, store=False,
+        response = planner.create(stage,
+            input=input_prompt, store=False,
             text={"format": {"type": "json_schema", "name": "reel_plan", "strict": True, "schema": output_schema}},
             max_output_tokens=6500 if duration_seconds == REEL_SHORT_DURATION_SECONDS else 11000)
         return json.loads(response.output_text).get("beats")
@@ -461,15 +462,14 @@ ORIGINAL BRIEF:
             # usable storyboard. Rewrite just its two spoken lines. Constrain
             # the word count in the generated structure instead of repeatedly
             # requesting free-form prose and rejecting it afterward.
-            from openai import OpenAI
             logger.info('Reel presenter rewrite language=%s opening_words=%s closing_words=%s',
                         language, len(beats[0]['narration'].split()), len(beats[-1]['narration'].split()))
             word_list = {'type': 'array', 'minItems': 1, 'maxItems': 10,
                          'items': {'type': 'string', 'pattern': r'^\S+$'}}
             lines = {'opening': beats[0]['narration'], 'closing': beats[-1]['narration']}
             try:
-                response = costs.responses_create('presenter_rewrite',
-                    model=os.getenv('REEL_PLANNER_MODEL', 'gpt-5.6-luna'), store=False,
+                response = planner.create('presenter_rewrite',
+                    store=False,
                     input=f'''Shorten only these two presenter lines for five-second takes. Write one complete, natural sentence of 5–8 words per line. Preserve the original meaning, introduce no new facts, and avoid repeated greetings. {language_instruction}
 Return each sentence as an ordered array of individual words, with punctuation attached to its word. Each array element must contain exactly one word, without whitespace. There is no character-count limit.
 ORIGINAL LINES: {json.dumps(lines, ensure_ascii=False)}''',

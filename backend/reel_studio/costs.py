@@ -31,6 +31,7 @@ DEFAULTS = {
 # https://cloud.google.com/text-to-speech/pricing
 RATES = {
     'gpt-image-2': {'text_input': 5.0, 'image_input': 8.0, 'output': 30.0},
+    'gemini-3-flash-preview': {'input': .50, 'cached_input': .05, 'output': 3.0},
     'gpt-5.6-luna': {'input': .20, 'cached_input': .02, 'output': 1.20},
     'gemini-omni-1.1-flash': {'input': 1.50, 'video_output': 17.50, 'text_output': 9.0},
 }

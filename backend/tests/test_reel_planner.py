@@ -19,13 +19,13 @@ def plan(count=8):
 
 def planner(monkeypatch, responses):
     calls = []
-    import openai
-    def create(**kwargs):
+    from reel_studio import planner as provider
+    def create(stage, **kwargs):
         calls.append(kwargs)
         payload = responses[len(calls)-1]
         return SimpleNamespace(output_text=json.dumps(payload if isinstance(payload, dict) else {'beats': payload}))
-    monkeypatch.setenv('OPENAI_API_KEY', 'test-no-network')
-    monkeypatch.setattr(openai, 'OpenAI', lambda **_: SimpleNamespace(responses=SimpleNamespace(create=create)))
+    monkeypatch.setenv('GEMINI_API_KEY', 'test-no-network')
+    monkeypatch.setattr(provider, 'create', create)
     def run(presenter=False):
         return _planned_beats('Build your career through steady learning.', 'What helps my career?',
                               [{'id': 'claim_1', 'text': 'Build steadily.'}],

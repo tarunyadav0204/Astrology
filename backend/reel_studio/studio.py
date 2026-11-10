@@ -1,6 +1,7 @@
 """Curated chart readings that enter the existing charged reel pipeline."""
 import hashlib
 import json
+from reel_studio import planner
 import os
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
@@ -104,8 +105,7 @@ Do not expose birth details, identifiers or names. Do not give medical diagnoses
 Do not add a greeting, sales pitch, markdown table or repeated closing. Avoid generic flattery.
 Return JSON with a title and reading, both strings, in English; the reel planner will faithfully translate to the user's chosen language.
 CALCULATED TOPIC EVIDENCE: {json.dumps(evidence, ensure_ascii=False, default=str)}'''
-    response = costs.responses_create('studio_reading', model=os.getenv('REEL_PLANNER_MODEL', 'gpt-5.6-luna'),
-        input=prompt, store=False, max_output_tokens=3500,
+    response = planner.create('studio_reading', input=prompt, store=False, max_output_tokens=3500,
         text={'format': {'type': 'json_schema', 'name': 'studio_reading', 'strict': True,
             'schema': {'type':'object','properties':{'title':{'type':'string'},'reading':{'type':'string'}},
                        'required':['title','reading'],'additionalProperties':False}}})
