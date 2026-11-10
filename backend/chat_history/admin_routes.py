@@ -7,7 +7,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from pydantic import BaseModel
 import json
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from auth import get_current_user
 from db import get_conn, execute
 from utils.llm_pricing import deepseek_rate_usd_per_million, openai_rate_usd_per_million
@@ -44,6 +45,19 @@ def _normalize_date_range(
     if not DATE_RE.match(s) or not DATE_RE.match(e) or s > e:
         return None, None
     return s, e
+
+
+def _ist_report_bounds(start_date: Optional[str], end_date: Optional[str]) -> Tuple[datetime, datetime]:
+    """Convert inclusive Asia/Kolkata dates to the app's naive-UTC timestamp bounds."""
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
+    start = datetime.strptime(start_date or today.replace(day=1).isoformat(), "%Y-%m-%d").date()
+    end = datetime.strptime(end_date or today.isoformat(), "%Y-%m-%d").date()
+    if start > end:
+        raise HTTPException(status_code=422, detail="Start date must be on or before end date.")
+    ist = ZoneInfo("Asia/Kolkata")
+    start_utc = datetime.combine(start, datetime.min.time(), tzinfo=ist).astimezone(timezone.utc).replace(tzinfo=None)
+    end_utc = datetime.combine(end + timedelta(days=1), datetime.min.time(), tzinfo=ist).astimezone(timezone.utc).replace(tzinfo=None)
+    return start_utc, end_utc
 
 
 class AdminSetting(BaseModel):
@@ -1233,6 +1247,202 @@ async def get_admin_chat_users(
     except Exception as e:
         logger.exception("get_admin_chat_users failed")
         raise HTTPException(status_code=500, detail=f"Error fetching chat users: {str(e)}")
+
+
+@router.get("/admin/chat/paid-answers-report")
+async def get_admin_paid_answers_report(
+    start_date: Optional[str] = Query(None, description="Inclusive Asia/Kolkata date, YYYY-MM-DD."),
+    end_date: Optional[str] = Query(None, description="Inclusive Asia/Kolkata date, YYYY-MM-DD."),
+    username: Optional[str] = Query(None, description="Filter user name, phone, or user id."),
+    chat_type: Optional[str] = Query(None, description="Standard, Premium, Verified, Instant, or Speech."),
+    current_user: dict = Depends(require_admin),
+):
+    """Charged completed-answer report, with metered chat represented by billed sessions.
+
+    Clarification routes return before credit deduction, so every direct ledger
+    row here is a charged delivered answer. Instant and Speech are billed by
+    time; their counts are paid sessions rather than fabricated question counts.
+    """
+    del current_user
+    normalized_start, normalized_end = _normalize_date_range(start_date, end_date)
+    start_utc, end_utc = _ist_report_bounds(normalized_start, normalized_end)
+    requested_type = str(chat_type or "").strip().lower()
+    allowed_types = {"standard", "premium", "verified", "instant", "speech"}
+    if requested_type and requested_type not in allowed_types:
+        raise HTTPException(status_code=422, detail="Invalid chat type filter.")
+
+    user_filter = str(username or "").strip()
+    user_clause = ""
+    user_params: List[Any] = []
+    if user_filter:
+        pattern = _build_ilike_pattern(user_filter)
+        user_clause = """
+            AND (
+                COALESCE(u.name, '') ILIKE %s
+                OR COALESCE(u.phone, '') ILIKE %s
+                OR charged.userid::text ILIKE %s
+            )
+        """
+        user_params = [pattern, pattern, pattern]
+
+    type_clause = ""
+    type_params: List[Any] = []
+    if requested_type:
+        type_clause = " AND charged.chat_type = %s"
+        type_params = [requested_type.title()]
+
+    try:
+        with get_conn() as conn:
+            # Metered billing tables were introduced after direct per-question
+            # charging. Keep this report compatible with older deployments.
+            table_rows = execute(
+                conn,
+                "SELECT to_regclass('public.instant_billing_sessions'), to_regclass('public.speech_billing_sessions')",
+                (),
+            ).fetchone() or (None, None)
+            has_instant_meter = bool(table_rows[0])
+            has_speech_meter = bool(table_rows[1])
+
+            union_parts = [
+                """
+                SELECT ct.userid,
+                       CASE
+                         WHEN ct.reference_id = 'instant_chat' THEN 'Instant'
+                         WHEN ct.description ILIKE 'Premium Deep Analysis:%%' THEN 'Premium'
+                         WHEN ct.description ILIKE 'Verified Chat:%%' THEN 'Verified'
+                         ELSE 'Standard'
+                       END AS chat_type,
+                       1::bigint AS question_count,
+                       ABS(ct.amount)::bigint AS credits_charged,
+                       'answer'::text AS count_basis
+                FROM credit_transactions ct
+                WHERE ct.transaction_type = 'spent'
+                  AND ct.source = 'feature_usage'
+                  AND ct.amount < 0
+                  AND ct.created_at >= %s AND ct.created_at < %s
+                  AND (
+                    ct.reference_id = 'instant_chat'
+                    OR (
+                      ct.reference_id = 'chat_question'
+                      AND (
+                        ct.description ILIKE 'Standard Chat:%%'
+                        OR ct.description ILIKE 'Premium Deep Analysis:%%'
+                        OR ct.description ILIKE 'Verified Chat:%%'
+                      )
+                    )
+                  )
+                """
+            ]
+            query_params: List[Any] = [start_utc, end_utc]
+            if has_instant_meter:
+                union_parts.append(
+                    """
+                    SELECT ibs.userid, 'Instant'::text AS chat_type,
+                           1::bigint AS question_count,
+                           ibs.charged_credits::bigint AS credits_charged,
+                           'metered_session'::text AS count_basis
+                    FROM instant_billing_sessions ibs
+                    WHERE ibs.status = 'ended'
+                      AND ibs.charged_credits > 0
+                      AND ibs.started_at >= %s AND ibs.started_at < %s
+                    """
+                )
+                query_params.extend([start_utc, end_utc])
+            if has_speech_meter:
+                union_parts.append(
+                    """
+                    SELECT sbs.userid, 'Speech'::text AS chat_type,
+                           1::bigint AS question_count,
+                           sbs.charged_credits::bigint AS credits_charged,
+                           'metered_session'::text AS count_basis
+                    FROM speech_billing_sessions sbs
+                    WHERE sbs.status = 'ended'
+                      AND sbs.charged_credits > 0
+                      AND sbs.started_at >= %s AND sbs.started_at < %s
+                    """
+                )
+                query_params.extend([start_utc, end_utc])
+
+            charged_cte = " UNION ALL ".join(union_parts)
+            filtered_cte = f"""
+                WITH charged AS ({charged_cte}),
+                filtered AS (
+                  SELECT charged.*, COALESCE(NULLIF(u.name, ''), 'User #' || charged.userid::text) AS username
+                  FROM charged
+                  LEFT JOIN users u ON u.userid = charged.userid
+                  WHERE 1=1 {user_clause} {type_clause}
+                )
+            """
+            filter_params = query_params + user_params + type_params
+
+            summary = execute(
+                conn,
+                filtered_cte + """
+                SELECT COUNT(DISTINCT userid)::bigint,
+                       COALESCE(SUM(question_count), 0)::bigint,
+                       COALESCE(SUM(credits_charged), 0)::bigint,
+                       COALESCE(SUM(CASE WHEN count_basis = 'metered_session' THEN question_count ELSE 0 END), 0)::bigint
+                FROM filtered
+                """,
+                tuple(filter_params),
+            ).fetchone() or (0, 0, 0, 0)
+
+            type_rows = execute(
+                conn,
+                filtered_cte + """
+                SELECT chat_type, SUM(question_count)::bigint, SUM(credits_charged)::bigint,
+                       SUM(CASE WHEN count_basis = 'metered_session' THEN question_count ELSE 0 END)::bigint
+                FROM filtered
+                GROUP BY chat_type
+                ORDER BY SUM(credits_charged) DESC, chat_type ASC
+                """,
+                tuple(filter_params),
+            ).fetchall() or []
+
+            user_rows = execute(
+                conn,
+                filtered_cte + """
+                SELECT userid, username, chat_type, SUM(question_count)::bigint,
+                       SUM(credits_charged)::bigint,
+                       SUM(CASE WHEN count_basis = 'metered_session' THEN question_count ELSE 0 END)::bigint
+                FROM filtered
+                GROUP BY userid, username, chat_type
+                ORDER BY username ASC, chat_type ASC
+                """,
+                tuple(filter_params),
+            ).fetchall() or []
+
+        return {
+            "start_date": normalized_start or datetime.now(ZoneInfo("Asia/Kolkata")).date().replace(day=1).isoformat(),
+            "end_date": normalized_end or datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat(),
+            "timezone": "Asia/Kolkata",
+            "summary": {
+                "users": int(summary[0] or 0),
+                "questions": int(summary[1] or 0),
+                "credits_charged": int(summary[2] or 0),
+                "metered_sessions": int(summary[3] or 0),
+            },
+            "by_type": [
+                {
+                    "chat_type": row[0], "questions": int(row[1] or 0),
+                    "credits_charged": int(row[2] or 0), "metered_sessions": int(row[3] or 0),
+                }
+                for row in type_rows
+            ],
+            "by_user": [
+                {
+                    "user_id": int(row[0]), "username": row[1], "chat_type": row[2],
+                    "questions": int(row[3] or 0), "credits_charged": int(row[4] or 0),
+                    "metered_sessions": int(row[5] or 0),
+                }
+                for row in user_rows
+            ],
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("get_admin_paid_answers_report failed")
+        raise HTTPException(status_code=500, detail="Could not load paid chat report.") from exc
 
 
 @router.get("/admin/chat/user-thread/{user_id}")

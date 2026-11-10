@@ -3,6 +3,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMe
 import { useNavigate } from 'react-router-dom';
 import { adminService, getAdminAuthHeaders, getDeviceId } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
+import AdminPaidChatReport from './AdminPaidChatReport';
 import ModelSettings from './ModelSettings';
 import AdminEventTimelineHistory from './AdminEventTimelineHistory';
 import AdminReportHistory from './AdminReportHistory';
@@ -4056,6 +4057,13 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             History
           </button>
+          <button
+            type="button"
+            className={`subtab ${activeSubTab === 'paidChatReport' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('paidChatReport')}
+          >
+            Paid report
+          </button>
           <button type="button" className={`subtab ${activeSubTab === 'toolActivity' ? 'active' : ''}`} onClick={() => setActiveSubTab('toolActivity')}>
             Chat Tools Activity
           </button>
@@ -4880,6 +4888,9 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 
         {activeTab === 'chat' && activeSubTab === 'history' && (
           <AdminChatHistory />
+        )}
+        {activeTab === 'chat' && activeSubTab === 'paidChatReport' && (
+          <AdminPaidChatReport />
         )}
 
         {activeTab === 'chat' && activeSubTab === 'eventTimeline' && (
