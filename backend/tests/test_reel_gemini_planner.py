@@ -26,3 +26,40 @@ def test_gemini_routes_schema_and_meters_thinking(monkeypatch, stage):
     assert finished[0]['output_tokens'] == 40
     cost, _ = costs.price(stage, planner.MODEL, finished[0], {'usd_to_inr': 85})
     assert cost == pytest.approx((80*.5 + 20*.05 + 40*3)/1_000_000*85)
+
+
+def test_provider_schema_removes_nested_array_bounds_without_mutating_contract():
+    from copy import deepcopy
+    source = {'type': 'object', 'properties': {
+        'beats': {'type':'array', 'minItems':2, 'maxItems':24, 'items':{
+            'type':'object', 'properties': {'refs': {'type':'array', 'maxItems':0,
+                'items':{'type':'string','enum':['known_id']}}}}},
+        'maxItems': {'type':'string'}}, 'required':['beats']}
+    original = deepcopy(source)
+    actual = planner.provider_schema(source)
+    assert source == original
+    assert 'maxItems' in actual['properties']
+    beats = actual['properties']['beats']
+    assert 'minItems' not in beats and 'maxItems' not in beats
+    refs = beats['items']['properties']['refs']
+    assert 'maxItems' not in refs
+    assert refs['items']['enum'] == ['known_id']
+
+
+def test_provider_rejection_is_recorded_without_exposing_key(monkeypatch):
+    import httpx
+    monkeypatch.setenv('GEMINI_API_KEY', 'private-test-key')
+    event = SimpleNamespace(metadata={})
+    @contextmanager
+    def attempt(*args):
+        yield event
+    monkeypatch.setattr(costs, 'attempt', attempt)
+    def post(url, **kwargs):
+        return httpx.Response(400, request=httpx.Request('POST',url),
+            json={'error':{'status':'INVALID_ARGUMENT','message':'Invalid schema private-test-key'}})
+    monkeypatch.setattr(planner.httpx, 'post', post)
+    with pytest.raises(httpx.HTTPStatusError):
+        planner.create('planning',input='story',text={'format':{'schema':{'type':'object'}}},max_output_tokens=100)
+    assert event.metadata['http_status'] == 400
+    assert event.metadata['provider_status'] == 'INVALID_ARGUMENT'
+    assert 'private-test-key' not in event.metadata['provider_message']

@@ -5,12 +5,38 @@ from types import SimpleNamespace
 import httpx
 from . import costs
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 MODEL = 'gemini-3-flash-preview'
+
+
+def provider_schema(schema):
+    """Keep structure/IDs, but validate array lengths after generation.
+
+    Gemini rejects the planner's nested bounded arrays with INVALID_ARGUMENT.
+    Scene and presenter length limits remain in the prompt and local validators.
+    """
+    if isinstance(schema, list):
+        return [provider_schema(item) for item in schema]
+    if not isinstance(schema, dict):
+        return schema
+    result = {}
+    for key, value in schema.items():
+        if key in {'minItems', 'maxItems'}:
+            continue
+        # Property names are data, not JSON Schema keywords.
+        if key in {'properties', '$defs'}:
+            result[key] = {name: provider_schema(child) for name, child in value.items()}
+        else:
+            result[key] = provider_schema(value)
+    return result
 
 
 def create(stage, *, input, text, max_output_tokens, store=False):
     key = os.environ['GEMINI_API_KEY']
-    schema = text['format']['schema']
+    schema = provider_schema(text['format']['schema'])
     with costs.attempt(stage, MODEL) as event:
         response = httpx.post(
             f'https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent',
@@ -20,7 +46,18 @@ def create(stage, *, input, text, max_output_tokens, store=False):
                                        'responseJsonSchema': schema,
                                        'maxOutputTokens': max_output_tokens,
                                        'thinkingConfig': {'thinkingLevel': 'low'}}})
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError:
+            try:
+                provider_error = response.json().get('error', {})
+            except (ValueError, AttributeError):
+                provider_error = {}
+            detail = str(provider_error.get('message', 'Request rejected')).replace(key, '[redacted]')[:1200]
+            event.metadata.update(http_status=response.status_code,
+                                  provider_status=provider_error.get('status'), provider_message=detail)
+            logger.error('REEL_PLANNER_REJECTED stage=%s model=%s status=%s detail=%s', stage, MODEL, response.status_code, detail)
+            raise
         data = response.json()
         usage = data.get('usageMetadata') or {}
         output = usage.get('candidatesTokenCount')
