@@ -19310,6 +19310,35 @@ def _strip_constitutional_health_validation_markers(answer: str) -> str:
     return re.sub(r"\s*\[\[HEALTH_EVIDENCE_\d+:[^\]]*\]\]", "", str(answer or "")).strip()
 
 
+def _build_constitutional_health_evidence_fallback(
+    required_rows: List[Dict[str, Any]],
+) -> str:
+    """Return a safe, evidence-bound answer when composition validation fails.
+
+    A marker is a transport detail for validation, not a user-facing reason to
+    abandon an otherwise complete calculation.  This fallback only repeats
+    calculated rows verbatim and deliberately makes no diagnosis or timing
+    claim.
+    """
+    lines = [
+        "Here is the chart-based health overview from the calculated evidence. "
+        "It describes general tendencies, not a medical diagnosis."
+    ]
+    for row in required_rows:
+        region = str(row.get("region") or "").strip()
+        causes = [str(value).strip() for value in (row.get("required_cause_facts") or []) if str(value).strip()]
+        if not region or not causes:
+            continue
+        lines.append(
+            f"For {region}, the calculated chart indicator is: {causes[0]}. "
+            "Use symptoms or concerns in this area as a reason to seek appropriate clinical advice."
+        )
+    if len(lines) == 1:
+        lines.append("No specific body-zone pattern was strong enough to summarize from this chart.")
+    lines.append('NEXT_ACTION_META: {"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}')
+    return "\n\n".join(lines)
+
+
 def _resolve_home_fact_contract(
     prompt_context: Optional[Dict[str, Any]],
     instant_v2_packet: Optional[Dict[str, Any]],
@@ -21876,13 +21905,12 @@ NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","fol
                 corrected_errors,
                 corrected_raw[:1200],
             )
-            # Never return confidently wrong chart placements. The evidence is
-            # still available to the UI for audit, while the user gets an
-            # honest retry request instead of fabricated astrology.
-            raw_response = (
-                "I could not produce a reliable health-susceptibility explanation from the calculated chart facts. "
-                "Please try this question again.\n\n"
-                'NEXT_ACTION_META: {"type":"none","title":"","reason":"","confidence":"low","follow_up_questions":[],"source":"instant"}'
+            # Do not expose an internal composer failure to the user.  The
+            # calculator has already supplied a bounded evidence ledger, so a
+            # deterministic rendering is safer and more useful than asking
+            # them to repeat the same question.
+            raw_response = _build_constitutional_health_evidence_fallback(
+                constitutional_health_rows
             )
             health_fact_validation_errors = corrected_errors
         else:

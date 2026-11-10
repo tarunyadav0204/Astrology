@@ -2623,6 +2623,79 @@ def _normalize_question_for_intent(text: str) -> str:
     return re.sub(r"\s+", " ", str(text or "").strip().lower())
 
 
+def _normalize_router_status_from_action(result: Dict[str, Any]) -> None:
+    """Repair a common router serialization error before schema validation.
+
+    `status` is a readiness state (READY or CLARIFY); `out_of_scope`, `ack`,
+    and `handoff` are route actions.  Some models occasionally place the
+    route action in `status`, which used to crash the whole speech turn.
+    """
+    status = str(result.get("status") or "").strip().lower()
+    if status not in {"ack", "handoff", "out_of_scope"}:
+        return
+    action = str(result.get("route_action") or "").strip().lower()
+    if action not in {"ack", "handoff", "out_of_scope"}:
+        result["route_action"] = status
+    result["status"] = "READY"
+
+
+def _ensure_life_domain_questions_stay_in_scope(
+    result: Dict[str, Any],
+    latest_user_reply: str,
+) -> None:
+    """Keep ordinary chart-topic questions out of the generic scope refusal.
+
+    The lightweight router occasionally read a natural opening such as "I want
+    to explore my career" as a request for non-astrological coaching.  In this
+    product, a standalone life-domain question is a chart question; users do
+    not need to repeat "according to my chart" each time.
+    """
+    question = _normalize_question_for_intent(latest_user_reply)
+    if not question:
+        return
+    domain_terms = {
+        "career": ("career", "profession", "professional life", "work life", "job"),
+        "health": (
+            "health", "wellbeing", "well-being", "illness", "disease",
+            "blood pressure", "hypertension", "high bp", "low bp",
+        ),
+    }
+    matched_category = next(
+        (category for category, terms in domain_terms.items() if any(term in question for term in terms)),
+        None,
+    )
+    if not matched_category:
+        return
+    # Do not override a deliberate clarification/handoff or a medical-safety
+    # result.  This guard is only for a false non-astrology classification.
+    if str(result.get("route_action") or "").lower() != "out_of_scope":
+        return
+    result.update({
+        "status": "READY",
+        "route_action": "answer",
+        "mode": "ANALYZE_TOPIC_POTENTIAL",
+        "answer_mode": "potential_capacity" if matched_category == "career" else "topic_reading",
+        "category": matched_category,
+        "target_subject_key": "self",
+        "target_subject_keys": ["self"],
+        "needs_transits": False,
+        "user_message": "",
+    })
+    if matched_category == "career":
+        result["career_subtype"] = "general"
+    elif any(term in question for term in ("blood pressure", "hypertension", "high bp", "low bp")):
+        # A chart cannot diagnose hypertension. Keep the health reading
+        # general and make the composer state the clinical limitation.
+        result["medical_triage"] = {
+            "urgency": "clinical",
+            "reason": "User asks astrology to identify a medical condition.",
+            "user_message": (
+                "Astrology cannot diagnose high blood pressure or confirm whether you have it. "
+                "Please have your blood pressure checked and discuss the result with a clinician."
+            ),
+        }
+
+
 def _refine_life_event_category(user_question: str, result: Dict[str, Any]) -> None:
     """When category is generic, infer marriage/job/child/etc. from life-event timing phrasing."""
     cat = str(result.get("category") or "").strip().lower()
@@ -3977,6 +4050,7 @@ Task:
 1. Semantically understand the user's question in any language/script.
    If LATEST USER MESSAGE is only a greeting, thanks, acknowledgement, deferral, or says there is no question, set route_action=ack, status=READY, and write one short natural `user_message` in that same language/script. Do not request astrology evidence.
    If LATEST USER MESSAGE is not an astrology or chart question (for example, asking what AI/model you are, general knowledge, writing, coding, or translation), set route_action=out_of_scope, status=READY, and write one short natural `user_message` in the same language/script saying this chat answers astrology questions. Do not request astrology evidence.
+   A standalone question about a life domain this product reads — including career, job, money, relationships, marriage, health, home, children, travel, or education — IS an astrology question by default. Do not require the user to say "from my chart" and never mark it out_of_scope merely because they say "general" or "explore".
    MEDICAL SAFETY OVERRIDE: Use `medical_triage.urgency=clinical` for any request asking astrology to diagnose a condition, predict or pre-judge a pending medical test/report, determine whether a pregnancy/baby is medically healthy, assess genetic abnormality, miscarriage or treatment/procedure success, or decide whether a current symptom is medically harmless. `clinical` is a hybrid-answer safety flag, not a refusal or handoff: Live should still calculate and explain only a general astrological health, pregnancy, or parenthood climate, while explicitly separating that symbolism from every clinical claim. Use `urgent` or `emergency` instead when the latest message describes a potentially urgent active symptom such as chest pain/pressure, serious breathing difficulty, stroke signs, fainting, severe bleeding or another possible emergency; those routes bypass astrology. For `clinical`, write `medical_triage.user_message` as a concise same-language boundary and appropriate clinical next step, not the whole answer. Plainly state what cannot be known before examination/results and distinguish screening from diagnosis when relevant. Never imply that a supportive chart predicts a normal report, healthy baby, normal growth, absence of genetic conditions, harmless symptoms, or treatment success; never imply that a pressured chart predicts abnormality, loss, disease, poor growth, or complications. Never mention an internal flow, routing, missing astrology evidence, Standard/Premium mode, or offer a paid/deeper astrology reading. Do not use `clinical` for ordinary non-diagnostic questions about general health tendencies, prevention or a future health outlook.
    First classify `turn_relation`:
    - When a pending spoken follow-up invitation is supplied, use the exact invitation, its canonical offered question, recent conversation, and LATEST USER MESSAGE together. If the user semantically accepts that invitation in any language, set turn_relation=follow_up, accepted_speech_follow_up=true, and resolved_question to the complete standalone question that must now be answered. Classify every remaining field from resolved_question, not from the acknowledgement alone. If the user declines or asks something different, set accepted_speech_follow_up=false and resolved_question=null.
@@ -4372,6 +4446,7 @@ LATEST USER MESSAGE (answer this turn): "{latest_user_reply_text}"
 
 Rules:
 - The AUTHORITATIVE USER-LOCAL CALENDAR above is the sole authority for relative-day phrases in the CURRENT QUESTION.
+- A standalone question about career, work, money, relationships, marriage, health, home, children, travel, or education is an astrology question in this product. Do not require "from my chart" and do not mark it out_of_scope because it says "general" or "explore".
 - Use `PREDICT_DAILY` for today/tomorrow/exact-day questions.
 - Use `PREDICT_PERIOD_OUTLOOK` for "next 3 months", "this year", "coming months" style outlooks.
 - Use `LIFESPAN_EVENT_TIMING` for simple "when will X happen?" timing questions.
@@ -4855,6 +4930,7 @@ SERIALIZATION ONLY (all semantic rules above remain mandatory):
                 token_usage.get("input_tokens"),
                 token_usage.get("output_tokens"),
             )
+            _normalize_router_status_from_action(result)
             final = self._finalize_instant_router_result(
                 _restore_integrated_topic_route(result, latest_user_reply_text),
                 current_year=current_year,
@@ -4864,6 +4940,7 @@ SERIALIZATION ONLY (all semantic rules above remain mandatory):
                 final,
                 prior_dialogue_state=prior_dialogue_state,
             )
+            _ensure_life_domain_questions_stay_in_scope(final, latest_user_reply_text)
 
             # A new user reply must never produce the exact same clarification.
             # This is deliberately a structural guard only: Python does not try
@@ -4930,6 +5007,7 @@ Invalid previous JSON:
                     .strip()
                 )
                 repair_result = json.loads(repair_cleaned)
+                _normalize_router_status_from_action(repair_result)
                 final = self._finalize_instant_router_result(
                     _restore_integrated_topic_route(repair_result, latest_user_reply_text),
                     current_year=current_year,
@@ -4939,6 +5017,7 @@ Invalid previous JSON:
                     final,
                     prior_dialogue_state=prior_dialogue_state,
                 )
+                _ensure_life_domain_questions_stay_in_scope(final, latest_user_reply_text)
                 repaired_question = str(
                     final.get("clarification_question") or ""
                 ).strip()
@@ -5011,6 +5090,7 @@ Invalid previous JSON:
                     .strip()
                 )
                 repair_result = json.loads(repair_cleaned)
+                _normalize_router_status_from_action(repair_result)
                 final = self._finalize_instant_router_result(
                     _restore_integrated_topic_route(repair_result, latest_user_reply_text),
                     current_year=current_year,
@@ -5020,6 +5100,7 @@ Invalid previous JSON:
                     final,
                     prior_dialogue_state=prior_dialogue_state,
                 )
+                _ensure_life_domain_questions_stay_in_scope(final, latest_user_reply_text)
                 logger.info(
                     "instant_intent_router_missing_clarification_repaired status=%s elapsed_ms=%.1f",
                     final.get("status"),

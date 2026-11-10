@@ -16,6 +16,7 @@ from chat.instant_chat_pipeline import (
     _build_instant_composer_context,
     _build_instant_composer_prompt_v3,
     _build_instant_prompt,
+    _build_constitutional_health_evidence_fallback,
     _constitutional_health_required_rows,
     _fit_composer_brief,
     _semantic_event_horizon_days,
@@ -2046,6 +2047,22 @@ def test_constitutional_health_answer_accepts_exact_calculated_causes_per_region
 
     marked = correct + " " + " ".join(row["validation_marker"] for row in rows)
     assert _validate_constitutional_health_answer(marked, rows) == []
+
+
+def test_health_evidence_fallback_returns_calculated_rows_not_a_retry_message():
+    rows = _constitutional_health_required_rows({
+        "allowed_zone_evidence": [{
+            "zone": "nose",
+            "anatomy_basis": ["House 6 lord Jupiter occupies Magha, focusing its health indication on nose"],
+        }]
+    })
+
+    answer = _build_constitutional_health_evidence_fallback(rows)
+
+    assert "nose" in answer
+    assert "House 6 lord Jupiter" in answer
+    assert "Please try this question again" not in answer
+    assert "NEXT_ACTION_META:" in answer
 
 
 def test_constitutional_health_answer_accepts_localized_prose_with_exact_row_markers():

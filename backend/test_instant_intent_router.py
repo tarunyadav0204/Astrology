@@ -43,7 +43,52 @@ def _ensure_google_stub():
 _ensure_google_stub()
 
 import ai.intent_router as intent_router_module
-from ai.intent_router import IntentRouter, apply_semantic_resolution_cadence
+from ai.intent_router import (
+    IntentRouter,
+    _ensure_life_domain_questions_stay_in_scope,
+    _normalize_router_status_from_action,
+    apply_semantic_resolution_cadence,
+)
+
+
+def test_career_question_is_never_rejected_as_non_astrology_scope():
+    result = {
+        "status": "READY",
+        "route_action": "out_of_scope",
+        "mode": "ANALYZE_TOPIC_POTENTIAL",
+        "answer_mode": "topic_reading",
+        "category": "general",
+        "user_message": "This is not an astrology question.",
+    }
+
+    _ensure_life_domain_questions_stay_in_scope(result, "I want to explore my career")
+
+    assert result["route_action"] == "answer"
+    assert result["category"] == "career"
+    assert result["answer_mode"] == "potential_capacity"
+    assert result["career_subtype"] == "general"
+
+
+def test_route_action_serialized_as_status_is_repaired_before_finalization():
+    result = {"status": "out_of_scope", "route_action": "", "user_message": "Not a chart question."}
+
+    _normalize_router_status_from_action(result)
+
+    assert result["status"] == "READY"
+    assert result["route_action"] == "out_of_scope"
+
+
+def test_blood_pressure_diagnosis_request_stays_in_health_scope_with_clinical_boundary():
+    result = {"status": "READY", "route_action": "out_of_scope"}
+
+    _ensure_life_domain_questions_stay_in_scope(
+        result,
+        "I want to know if I have indications of high blood pressure",
+    )
+
+    assert result["route_action"] == "answer"
+    assert result["category"] == "health"
+    assert result["medical_triage"]["urgency"] == "clinical"
 
 
 def test_semantic_operational_cadence_bounds_any_active_process_without_text_parsing():
