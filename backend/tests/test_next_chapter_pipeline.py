@@ -227,7 +227,9 @@ def test_complete_alternative_json_wrappers_do_not_trigger_paid_regeneration(dos
     assert normalize_period_wrapper(n['periods'], ids) == {'periods': n['periods']}
     assert normalize_period_wrapper({'section': n}, ids) == n
     partial = {'section': {'periods': n['periods'][:-1]}}
-    assert normalize_period_wrapper(partial, ids) == partial
+    from next_chapter.pipeline import rows_for
+    with pytest.raises(ValueError, match='Expected periods'):
+        rows_for(normalize_period_wrapper(partial, ids), ids)
     ambiguous = {'section': n, 'periods': []}
     assert normalize_period_wrapper(ambiguous, ids) == ambiguous
     assert n == original
@@ -548,8 +550,9 @@ def test_production_response_shapes_complete_without_repair(dossier):
             value = json.loads(response.text)
             if stage == 'plan_pd_9':
                 value = [value]
-            elif stage == 'write_pd_4':
-                value = [{row['period_id']: row for row in value['periods']}]
+            elif stage in ('write_pd_1', 'write_pd_4'):
+                value = [{**{k: v for k, v in value.items() if k != 'periods'},
+                          **{row['period_id']: row for row in value['periods']}}]
             elif stage == 'chapter_spectrum':
                 value['chapter']['antardasha_themes'] = ['First model-written theme.', 'Second model-written theme.']
             response.text = json.dumps(value)
@@ -558,7 +561,7 @@ def test_production_response_shapes_complete_without_repair(dossier):
     result = asyncio.run(narrate_next_chapter(dossier, model=model))
     assert len(result['report']['periods']) == 9
     assert result['report']['antardasha_themes'] == 'First model-written theme.\n\nSecond model-written theme.'
-    for stage in ('plan_pd_9', 'write_pd_4', 'chapter_spectrum'):
+    for stage in ('plan_pd_9', 'write_pd_1', 'write_pd_4', 'chapter_spectrum'):
         assert model.stages.count(stage) == 1
 
 
@@ -567,3 +570,36 @@ def test_normalization_does_not_guess_period_identity():
     value = [{'pd_4': {'period_id': 'pd_5', 'summary': 'Do not relabel this'}}]
     with pytest.raises(ValueError):
         rows_for(normalize_period_wrapper(value, ['pd_4']), ['pd_4'])
+
+
+def test_mixed_chapter_period_array_and_whitespace_keys_preserve_predictions(dossier):
+    from next_chapter.pipeline import normalize_period_wrapper
+    value = narrative_for(dossier)
+    ids = [row['period_id'] for row in value['periods'][:3]]
+    value['periods'] = value['periods'][:3]
+    original = deepcopy(value)
+    keyed = {k: v for k, v in value.items() if k != 'periods'}
+    for row in value['periods']:
+        row[' what_changes'] = row.pop('what_changes')
+        keyed[row['period_id']] = row
+    wrapped = [keyed]
+    before = deepcopy(wrapped)
+    assert normalize_period_wrapper(wrapped, ids) == original
+    assert wrapped == before
+
+
+def test_chapter_repair_singleton_section_wrapper(dossier):
+    from next_chapter.pipeline import validate_chapter
+    value = {k: v for k, v in narrative_for(dossier).items() if k != 'periods'}
+    # Production repair returned additional authored content; retain it.
+    value['pratyantardashas'] = [{'note': 'Unchanged model prediction.'}]
+    wrapped = [{'section': deepcopy(value)}]
+    assert validate_chapter(wrapped, build_briefs(dossier)) == value
+    assert wrapped == [{'section': value}]
+
+
+def test_whitespace_normalization_rejects_collisions():
+    from next_chapter.pipeline import normalize_period_wrapper
+    value = {'periods': [{'period_id': 'pd_1', 'summary': 'One', ' summary': 'Two'}]}
+    with pytest.raises(ValueError, match='Ambiguous response keys'):
+        normalize_period_wrapper(value, ['pd_1'])

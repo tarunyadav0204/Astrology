@@ -194,7 +194,7 @@ def validate_transit_story(story, required, facts):
 
 
 def validate_chapter(value, briefs):
-    normalize_chapter_text(value)
+    value = normalize_chapter_text(unwrap_response(value))
     if not isinstance(value, dict) or not all(nonempty(value.get(k)) for k in HEADERS):
         raise ValueError('Chapter fields must be nonempty text or paragraph lists; invalid fields: ' + str([k for k in HEADERS if not nonempty(value.get(k))]) if isinstance(value, dict) else 'Chapter must be an object')
     events = value.get('antardasha_events')
@@ -230,12 +230,34 @@ def normalize_chapter_text(value):
     return value
 
 
+def unwrap_response(value):
+    """Unwrap transport containers and key whitespace; preserve all prose."""
+    def keys(node):
+        if isinstance(node, list):
+            return [keys(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+        result = {}
+        for key, item in node.items():
+            clean = key.strip() if isinstance(key, str) else key
+            if clean in result:
+                raise ValueError(f'Ambiguous response keys after whitespace normalization: {clean}')
+            result[clean] = keys(item)
+        return result
+
+    value = keys(value)
+    while True:
+        if isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict):
+            value = value[0]
+        elif isinstance(value, dict) and set(value) == {'section'}:
+            value = value['section']
+        else:
+            return value
+
+
 def normalize_period_wrapper(value, ids):
     """Relocate complete supplied rows only; never synthesize/drop a period."""
-    # JSON-mode providers sometimes wrap the entire object in a singleton array.
-    if (isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict)
-            and ('periods' in value[0] or set(value[0]) == set(ids))):
-        value = value[0]
+    value = unwrap_response(value)
     # Accept [{"pd_4": {...}}, {"pd_5": {...}}] without changing IDs/content.
     if isinstance(value, list) and len(value) == len(ids):
         if all(isinstance(row, dict) and set(row) == {pid}
@@ -244,11 +266,6 @@ def normalize_period_wrapper(value, ids):
             value = [row[pid] for row, pid in zip(value, ids)]
     if isinstance(value, dict):
         value = normalize_chapter_text(deepcopy(value))
-    if isinstance(value, dict) and set(value) == {'section'} and isinstance(value['section'], dict):
-        section = normalize_period_wrapper(value['section'], ids)
-        if (isinstance(section, dict) and isinstance(section.get('periods'), list)
-                and [r.get('period_id') if isinstance(r, dict) else None for r in section['periods']] == ids):
-            return section
     if isinstance(value, dict) and len(ids) == 1 and value.get('period_id') == ids[0]:
         return {'periods': [value]}
     if isinstance(value, list):
@@ -356,7 +373,7 @@ def validate_prose(value, ids, briefs, dossier, *, headers=False):
     # Reuse public contract validation without weakening it for staged generation.
     attach_narration(selected, {**{k: 'structural placeholder' for k in HEADERS}, **value})
     if headers:
-        validate_chapter(value, briefs)
+        value = validate_chapter(value, briefs)
     for row in rows:
         brief = next(b for b in briefs['periods'] if b['period']['id'] == row['period_id'])
         facts = brief['facts']
@@ -679,7 +696,7 @@ async def generate(dossier, language, model, model_id, vendor, *, audit_sink=Non
     def validate_spectrum(value):
         if not isinstance(value, dict) or not isinstance(value.get('chapter'), dict):
             raise ValueError('Missing whole-AD chapter')
-        validate_chapter(value['chapter'], briefs)
+        value['chapter'] = validate_chapter(value['chapter'], briefs)
         mappings = value.get('family_coverage')
         expected = {(p['period_id'], t['theme']) for p in plans for t in p['themes']}
         if not isinstance(mappings, list) or any(not isinstance(r, dict) for r in mappings):
@@ -854,9 +871,7 @@ async def generate(dossier, language, model, model_id, vendor, *, audit_sink=Non
             old = {k: report[k] for k in CHAPTER_FIELDS} if section == 'chapter' else {'periods': [next(p for p in report['periods'] if p['period_id'] == section)]}
             def validate(x):
                 if section == 'chapter':
-                    if isinstance(x, dict) and set(x) == {'section'} and isinstance(x['section'], dict):
-                        x = x['section']
-                    validate_chapter(x, briefs)
+                    x = validate_chapter(x, briefs)
                     return {key: x[key] for key in CHAPTER_FIELDS}
                 return validate_prose(x, batch, briefs, dossier)
             return section, await runner.call(f'repair_{round_number}_{section}',
