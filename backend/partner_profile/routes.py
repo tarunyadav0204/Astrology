@@ -332,8 +332,6 @@ async def _run_generation(job_id: str, user_id: int, request_data: dict[str, Any
             # client-supplied presentation or region from that build.
             request_data.update(await derive_art_direction(birth))
         profile = build_partner_profile(_calculate_chart(birth), native_gender=str(birth.get("gender") or ""))
-        if profile.get("portrait_readiness") != "ready":
-            raise RuntimeError("The chart does not provide enough repeated visual testimony for a responsible portrait")
 
         seed = int(hashlib.sha256(f"{job_id}:{profile['ruleset_version']}".encode()).hexdigest()[:8], 16)
         provider = OpenAIPartnerPortraitProvider()
