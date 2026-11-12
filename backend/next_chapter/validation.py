@@ -21,3 +21,12 @@ def advisory(check):
             warn(exc)
             return args[0] if args else None
     return wrapped
+
+
+def log_warning(message):
+    """Optional editor/reviewer diagnostics never abort customer delivery."""
+    import logging
+    logging.getLogger(__name__).warning('NEXT_CHAPTER_VALIDATION %s', message)
+    sink = warning_sink.get()
+    if sink is not None:
+        sink(str(message))

@@ -157,15 +157,12 @@ def test_reviewer_cannot_repair_nonexistent_quote_or_use_subjective_rejection(do
     check = {'checked_period_ids': [p['period_id'] for p in report['periods']], 'checked_chapter': True,
              'issues': [{'section': 'pd_1', 'kind': 'factual', 'quote': 'invented quotation',
                          'fact_refs': [], 'correction': 'Change it'}], 'quality_notes': []}
-    with pytest.raises(ValueError, match='quote actual'):
-        validate_review(check, report, b)
+    assert validate_review(check, report, b)['issues'] == []
     check['issues'][0].update(quote='Period summary', kind='boring')
-    with pytest.raises(ValueError, match='Subjective'):
-        validate_review(check, report, b)
+    assert validate_review(check, report, b)['issues'] == []
     check['issues'] = []
     check['checked_period_ids'] = check['checked_period_ids'][:-1]
-    with pytest.raises(ValueError, match='whole report'):
-        validate_review(check, report, b)
+    assert validate_review(check, report, b)['checked_period_ids'] == check['checked_period_ids']
 
 
 def test_reviewer_chapter_field_address_resolves_but_still_checks_quote(dossier):
@@ -179,8 +176,7 @@ def test_reviewer_chapter_field_address_resolves_but_still_checks_quote(dossier)
     assert result['quality_notes'][0]['section'] == 'chapter'
     assert check['issues'][0]['section'] == 'overview'
     check['issues'][0]['quote'] = 'An invented sentence which is absent'
-    with pytest.raises(ValueError, match='quote actual'):
-        validate_review(check, report, build_briefs(dossier))
+    assert validate_review(check, report, build_briefs(dossier))['issues'] == []
 
 
 def test_structural_repair_is_bounded_and_records_failed_usage():
@@ -419,8 +415,7 @@ def test_editorial_summary_strings_are_preserved_as_advisory_notes(dossier):
     assert all(n['section'] == 'chapter' for n in result['quality_notes'])
     assert result['quality_notes'][-1]['instruction'] == 'Specificity is missing.'
     source['quality_notes'][0]['section'] = 'unknown'
-    with pytest.raises(ValueError, match='known section'):
-        validate_event_review(source, report, build_briefs(dossier))
+    assert all(n['section'] == 'chapter' for n in validate_event_review(source, report, build_briefs(dossier))['quality_notes'])
 
 
 def test_final_fact_patch_changes_only_quoted_text_in_its_section(dossier):

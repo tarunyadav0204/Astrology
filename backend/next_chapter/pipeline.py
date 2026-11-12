@@ -14,7 +14,7 @@ from .briefs import build_briefs, batch_packet
 from .service import attach_narration
 from .quality import report_diagnostics
 from .synthesis import validate_exploration as _validate_exploration
-from .validation import advisory, warn, warning_sink
+from .validation import advisory, warn, warning_sink, log_warning
 
 validate_exploration = advisory(_validate_exploration)
 
@@ -383,33 +383,75 @@ def validate_prose(value, ids, briefs, dossier, *, headers=False):
 
 
 def validate_edit(value, ids):
-    if not isinstance(value, dict) or not nonempty(value.get('chapter_throughline')) or not isinstance(value.get('background_themes'), list):
-        raise ValueError('Missing chapter editorial direction')
-    for row in rows_for(value, ids):
-        if not all(nonempty(row.get(k)) for k in ('distinctive_focus', 'revision_instruction')):
-            raise ValueError('Missing period editorial direction')
-    return value
+    try:
+        value = unwrap_response(value)
+        if not isinstance(value, dict):
+            raise ValueError('Editorial response must be an object')
+        if not nonempty(value.get('chapter_throughline')) or not isinstance(value.get('background_themes'), list):
+            log_warning('Missing chapter editorial direction; continuing from original plans')
+        for row in rows_for(value, ids):
+            if not all(nonempty(row.get(k)) for k in ('distinctive_focus', 'revision_instruction')):
+                log_warning('Missing period editorial direction; continuing from original plans')
+    except (ValueError, TypeError, KeyError) as exc:
+        log_warning(exc)
+    return value if isinstance(value, dict) else {}
+
+
+def unavailable_review():
+    # Absence of review is not a factual pass. The warning remains in the audit.
+    return {'checked_period_ids': [], 'checked_chapter': False, 'issues': [],
+            'quality_notes': [], 'review_status': 'unavailable'}
 
 
 def validate_review(value, report, briefs):
-    if not isinstance(value, dict) or any(not isinstance(value.get(k), list) for k in ('issues', 'quality_notes')):
-        raise ValueError('Review must include issues and quality_notes')
-    value = deepcopy(value)
-    allowed_sections = {'chapter', *[p['period_id'] for p in report['periods']]}
-    for item in [*value['issues'], *value['quality_notes']]:
-        if not isinstance(item, dict):
-            raise ValueError('Review entries must be objects')
-        if item.get('section') in CHAPTER_FIELDS:
-            item['section'] = 'chapter'
-        if item.get('section') not in allowed_sections:
-            raise ValueError('Review needs a known section')
     try:
-        return _assess_review(value, report, briefs)
-    except ValueError as exc:
-        warn(exc)
-        # An invalid reviewer finding cannot safely drive a prose replacement.
-        # Preserve it in the raw audit and keep the authored report unchanged.
-        return {**value, 'issues': [], 'quality_notes': []}
+        value = unwrap_response(value)
+    except (ValueError, TypeError, KeyError) as exc:
+        log_warning(exc)
+        return unavailable_review()
+    if not isinstance(value, dict):
+        log_warning('Review must be an object; preserving authored report')
+        return unavailable_review()
+    value = deepcopy(value)
+    ids = [p['period_id'] for p in report['periods']]
+    if value.get('checked_period_ids') != ids or value.get('checked_chapter') is not True:
+        log_warning('Review did not cover the whole report')
+    ignored = []
+    for key in ('issues', 'quality_notes'):
+        entries = value.get(key)
+        value[key] = []
+        if not isinstance(entries, list):
+            log_warning(f'Review must include {key}; preserving authored report')
+            continue
+        for item in entries:
+            try:
+                if not isinstance(item, dict):
+                    raise ValueError('Review entries must be objects')
+                item = deepcopy(item)
+                section = item.get('section')
+                if section in CHAPTER_FIELDS:
+                    item['section'] = 'chapter'
+                if item.get('section') not in {'chapter', *ids}:
+                    raise ValueError(f'Review needs a known section: {section!r}')
+                if key == 'issues':
+                    allowed = (briefs['chapter_facts'] if item['section'] == 'chapter'
+                               else next(b['facts'] for b in briefs['periods'] if b['period']['id'] == item['section']))
+                    refs = item.get('fact_refs')
+                    known = set(allowed) | {'current_mahadasha', 'current_antardasha', 'mahadasha', 'antardasha'}
+                    if not isinstance(refs, list) or any(not isinstance(ref, str) or ref not in known for ref in refs):
+                        raise ValueError('Unknown review evidence reference; finding will not alter prose')
+                # Assess findings independently so one malformed address or quote
+                # cannot discard valid findings from this review or abort the job.
+                candidate = {'checked_period_ids': ids, 'checked_chapter': True,
+                             'issues': [], 'quality_notes': [], key: [item]}
+                assessed = _assess_review(candidate, report, briefs)
+                value[key].extend(assessed[key])
+            except (ValueError, TypeError, KeyError) as exc:
+                log_warning(exc)
+                ignored.append({'entry': item, 'error': str(exc)})
+    if ignored:
+        value['ignored_findings'] = ignored
+    return value
 
 
 def _assess_review(value, report, briefs):
@@ -446,7 +488,11 @@ def _assess_review(value, report, briefs):
 
 def validate_event_review(value, report, briefs):
     """Normalize explicit editorial summaries, without treating them as facts."""
-    value = deepcopy(value)
+    try:
+        value = deepcopy(unwrap_response(value))
+    except (ValueError, TypeError, KeyError) as exc:
+        log_warning(exc)
+        return unavailable_review()
     if isinstance(value, dict) and isinstance(value.get('quality_notes'), list):
         for note in value['quality_notes']:
             if isinstance(note, dict) and note.get('section') in CHAPTER_FIELDS:
@@ -506,6 +552,9 @@ def text_leaves(value):
             yield from text_leaves(v)
 
 
+_NO_FALLBACK = object()
+
+
 class Runner:
     def __init__(self, model, model_id, vendor, language, sink=None, resume_audit=None):
         self.model = model
@@ -522,7 +571,7 @@ class Runner:
                            if isinstance(c, dict) and isinstance(c.get('raw_response'), str)}
         self.audit = {'pipeline_version': VERSION, 'model': model_id, 'vendor': vendor, 'calls': []}
 
-    async def call(self, stage, instruction, data, validator):
+    async def call(self, stage, instruction, data, validator, *, fallback=_NO_FALLBACK):
         def record(message):
             warning = {'stage': stage, 'message': message}
             if warning not in self.audit.setdefault('validation_warnings', []):
@@ -531,11 +580,11 @@ class Runner:
                 self.sink(deepcopy(self.audit))
         token = warning_sink.set(record)
         try:
-            return await self._call(stage, instruction, data, validator)
+            return await self._call(stage, instruction, data, validator, fallback=fallback)
         finally:
             warning_sink.reset(token)
 
-    async def _call(self, stage, instruction, data, validator):
+    async def _call(self, stage, instruction, data, validator, *, fallback=_NO_FALLBACK):
         prompt = RULES + f'\nRequested customer language: {self.language}\nSTAGE: {stage}\n' + instruction
         prompt += '\nDATA:\n' + json.dumps(data, ensure_ascii=False, separators=(',', ':'))
         digest = hashlib.sha256(prompt.encode()).hexdigest()
@@ -550,12 +599,17 @@ class Runner:
             try:
                 result = validator(json.loads(cached['raw_response']))
             except (ValueError, TypeError, KeyError) as exc:
-                prompt += '\nRepair only this stage. Validation error: ' + str(exc) + '\nPrevious response:\n' + cached['raw_response']
-                continue
+                if fallback is _NO_FALLBACK:
+                    prompt += '\nRepair only this stage. Validation error: ' + str(exc) + '\nPrevious response:\n' + cached['raw_response']
+                    continue
+                log_warning(f'{stage}: {exc}; preserving existing content')
+                result = deepcopy(fallback)
+                cached = {**cached, 'validation_error': str(exc), 'advisory_fallback': True}
             entry = {**cached, 'attempt': 0, 'reused': True, 'seconds': 0, 'origin_prompt_sha256': digest,
                      'source_usage': cached.get('source_usage') or {k: cached.get(k) for k in ('input_tokens', 'output_tokens', 'thinking_tokens', 'total_tokens', 'cached_input_tokens')},
                      'input_tokens': 0, 'output_tokens': 0, 'thinking_tokens': 0, 'total_tokens': 0, 'cached_input_tokens': 0}
-            entry.pop('validation_error', None)
+            if not entry.get('advisory_fallback'):
+                entry.pop('validation_error', None)
             self.audit['calls'].append(entry)
             if self.sink:
                 self.sink(deepcopy(self.audit))
@@ -586,12 +640,20 @@ class Runner:
                     result = validator(json.loads(response.text))
                 except (ValueError, TypeError, KeyError) as exc:
                     entry['validation_error'] = str(exc)
+                    if fallback is not _NO_FALLBACK:
+                        entry['advisory_fallback'] = True
+                        log_warning(f'{stage}: {exc}; preserving existing content')
+                        return deepcopy(fallback)
                     if attempt:
                         raise PipelineError(f'{stage} response remains invalid: {exc}', self.audit) from exc
                     prompt += '\nRepair only this stage. Validation error: ' + str(exc) + '\nPrevious response:\n' + entry.get('raw_response', '')
                     continue
                 except Exception as exc:
                     entry['provider_error'] = type(exc).__name__
+                    if fallback is not _NO_FALLBACK:
+                        entry['advisory_fallback'] = True
+                        log_warning(f'{stage}: provider {type(exc).__name__}; preserving existing content')
+                        return deepcopy(fallback)
                     raise PipelineError(f'{stage} provider request failed', self.audit) from exc
                 finally:
                     entry['seconds'] = round(monotonic() - started, 2)
@@ -680,7 +742,7 @@ async def generate(dossier, language, model, model_id, vendor, *, audit_sink=Non
         'Return {"chapter_throughline":"...","background_themes":["..."],"periods":[{"period_id":"pd_1",'
         '"distinctive_focus":"...","revision_instruction":"..."}]}. All supplied IDs in order.',
         {'spine': briefs['shared']['spine'], 'native': briefs['shared']['native'], 'plans': plans,
-         'natal_facts': briefs['facts'], 'antardasha_packet': briefs['shared']['antardasha_packet']}, lambda x: validate_edit(x, ids))
+         'natal_facts': briefs['facts'], 'antardasha_packet': briefs['shared']['antardasha_packet']}, lambda x: validate_edit(x, ids), fallback={})
 
     async def write(batch):
         first = batch == batches[0]
@@ -788,14 +850,18 @@ async def generate(dossier, language, model, model_id, vendor, *, audit_sink=Non
                 'Do not request cosmetic changes for their own sake, include praise, or manufacture findings. '
                 'Prioritize concrete errors such as calling a wide same-sign placement a close conjunction; '
                 'check the exact supplied separations, not general astrological associations. '
-                'Return {"checked_period_ids":["pd_1",...],"checked_chapter":true,"issues":[{"section":"pd_1 or chapter",'
+                'Return ONE object (not an array). Use only allowed_sections from DATA. Return {"checked_period_ids":["pd_1",...],"checked_chapter":true,"issues":[{"section":"pd_1 or chapter",'
                 '"kind":"factual|unsupported_certainty|assumed_circumstance|language","quote":"exact existing text",'
                 '"fact_refs":["planet_Mars"],"correction":"what the evidence actually establishes"}],'
                 '"quality_notes":[{"section":"pd_1 or chapter","instruction":"specific material improvement"}]}. Empty lists are valid.',
-                {'report': subset, 'evidence': batch_packet(briefs, batch), 'plans': [p for p in plans if p['period_id'] in batch], 'chapter_editor': editorial},
-                lambda x: validate_review(x, subset, briefs))
+                {'allowed_sections': ['chapter', *batch], 'report': subset, 'evidence': batch_packet(briefs, batch), 'plans': [p for p in plans if p['period_id'] in batch], 'chapter_editor': editorial},
+                lambda x: validate_review(x, subset, briefs), fallback=unavailable_review())
         results = await collect([review_batch(batch) for batch in batches])
-        combined = {'checked_period_ids': ids, 'checked_chapter': True, 'issues': [], 'quality_notes': []}
+        covered = [pid for batch, result in zip(batches, results)
+                   if result.get('checked_period_ids') == batch for pid in batch]
+        combined = {'checked_period_ids': covered,
+                    'checked_chapter': all(r.get('checked_chapter') is True for r in results),
+                    'issues': [], 'quality_notes': []}
         for key in ('issues', 'quality_notes'):
             seen = set()
             for result in results:
@@ -827,9 +893,9 @@ async def generate(dossier, language, model, model_id, vendor, *, audit_sink=Non
             'Give one consolidated actionable note per section needing change, with concrete examples from its text. '
             'Return {"checked_period_ids":ALL supplied period IDs in order,"checked_chapter":true,"issues":[], '
             '"quality_notes":[{"section":"chapter or pd_1 etc","instruction":"..."}]}.',
-            {'report': report, 'ad_coverage': briefs['shared']['antardasha_packet']['house_coverage'],
+            {'allowed_sections': ['chapter', *ids], 'report': report, 'ad_coverage': briefs['shared']['antardasha_packet']['house_coverage'],
              'plans': plans, 'period_coverage': [{'period_id': p['period']['id'], 'house_coverage': p['house_coverage']} for p in briefs['periods']]},
-            lambda x: validate_event_review(x, report, briefs))
+            lambda x: validate_event_review(x, report, briefs), fallback=unavailable_review())
 
     # Reviewers read the same immutable draft; repairs wait for both results.
     event_check, first_fact_check = await collect([review_events(), review(report, 'fact_review_0')])
@@ -855,7 +921,7 @@ async def generate(dossier, language, model, model_id, vendor, *, audit_sink=Non
                 'Do not rewrite any other text, add interpretations, change dates or infer new facts. '
                 'Return {"patches":[{"issue_index":0,"replacement":"replacement for the exact quoted substring only"}]}. '
                 'Supply exactly one patch per issue. A replacement must differ from the quote and resolve the stated error.',
-                {'issues': checked['issues'], 'report': report, 'evidence': batch_packet(briefs, ids)}, validate_patch)
+                {'issues': checked['issues'], 'report': report, 'evidence': batch_packet(briefs, ids)}, validate_patch, fallback=report)
             checked = await review(report, 'fact_review_final')
             checks.append(checked)
             if not checked['issues']:
@@ -883,7 +949,7 @@ async def generate(dossier, language, model, model_id, vendor, *, audit_sink=Non
                 {'section': old, 'issues': [i for i in checked['issues'] if i['section'] == section],
                  'editorial_improvements': [i for i in quality_changes if i['section'] == section],
                  'reasoning_plan': [p for p in plans if p['period_id'] == section],
-                 'evidence': batch_packet(briefs, batch)}, validate)
+                 'evidence': batch_packet(briefs, batch)}, validate, fallback=old)
         repaired = await collect([repair(section) for section in sections])
         for section, value in repaired:
             if section == 'chapter':
