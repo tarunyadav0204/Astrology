@@ -57,10 +57,13 @@ const CreditScreen = ({ navigation }) => {
 
   /** Call this after a successful Google Play purchase (e.g. from react-native-iap listener). */
   const handleGooglePlayPurchaseSuccess = async (purchaseToken, productId, orderId) => {
-    if (!purchaseToken || !productId || !orderId) return;
+    if (!purchaseToken || !productId || !orderId) throw new Error('Incomplete Google Play purchase');
     setPurchasingProductId(productId);
     try {
       const { data } = await creditAPI.verifyGooglePlayPurchase(purchaseToken, productId, orderId);
+      if (data?.success !== true && !(data?.terminal && Number(data?.purchase_state) === 1)) {
+        throw new Error(data?.message || 'Purchase verification did not confirm credits');
+      }
       await fetchBalance();
       await fetchHistory();
       const isAlreadyCredited = data.credits_added === 0 && (data.message || '').toLowerCase().includes('already credited');
@@ -82,6 +85,7 @@ const CreditScreen = ({ navigation }) => {
         message: msg,
         creditsAdded: 0,
       });
+      throw err; // Keep the Play transaction unfinished until verification succeeds.
     } finally {
       setPurchasingProductId(null);
     }

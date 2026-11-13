@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import json
 import base64
+import hashlib
 import logging
 import os
 import re
@@ -1023,7 +1024,7 @@ def _credit_verified_google_play_purchase(
             provider="google_play",
             stage=stage,
             userid=userid,
-            reference_id=reference or order_id_hint,
+            reference_id=reference or (order_id_hint if str(order_id_hint or "").startswith("GPA.") else None) or ("play-token:" + hashlib.sha256(str(purchase_token).encode()).hexdigest()),
             product_id=product_id,
             error_code=code,
             detail=redact_payment_secrets(detail),
@@ -1073,14 +1074,6 @@ def _credit_verified_google_play_purchase(
             token,
             product_id,
         )
-        if not credited_order_id:
-            hinted_order_id = (order_id_hint or "").strip()
-            if hinted_order_id and credit_service.has_transaction_with_reference(
-                userid,
-                GOOGLE_PLAY_SOURCE,
-                hinted_order_id,
-            ):
-                credited_order_id = hinted_order_id
     except Exception:
         # This optimization must never prevent verification of a new purchase.
         logger.warning(
@@ -1098,14 +1091,8 @@ def _credit_verified_google_play_purchase(
         )
         return already_credited(credited_order_id)
 
-    if product_id == "credits_24" and not credit_service.can_redeem_first_purchase_starter(userid):
-        alert(
-            "credit_verify",
-            "starter_offer_ineligible",
-            "The one-time first purchase offer is not eligible for this account",
-        )
-        raise HTTPException(status_code=403, detail="This one-time first purchase offer is no longer available")
-
+    # Offer eligibility controls checkout/catalog visibility. A purchase already
+    # paid in Play must be fulfilled even if eligibility changed during checkout.
     try:
         purchase = _verify_google_play_purchase(PACKAGE_NAME, product_id, token)
     except HTTPException as exc:
@@ -1115,6 +1102,11 @@ def _credit_verified_google_play_purchase(
         safe_error = redact_payment_secrets(e)
         alert("credit_verify", type(e).__name__, safe_error)
         raise HTTPException(status_code=400, detail=f"Invalid or expired purchase: {safe_error}")
+
+    verified_owner = _userid_from_play_obfuscated_account(purchase.get("obfuscatedExternalAccountId"))
+    if verified_owner is not None and verified_owner != userid:
+        alert("credit_verify", "purchase_owner_mismatch", "Purchase belongs to another account", purchase.get("orderId"))
+        raise HTTPException(status_code=403, detail="Purchase belongs to another account")
 
     purchase_state = purchase.get("purchaseState")
     try:
@@ -1156,7 +1148,7 @@ def _credit_verified_google_play_purchase(
         )
         raise HTTPException(status_code=400, detail="Purchase not in completed state")
 
-    order_id = (purchase.get("orderId") or order_id_hint or "").strip()
+    order_id = str(purchase.get("orderId") or "").strip()
     if not order_id:
         alert("credit_verify", "missing_order_id", "Verified purchase did not contain an order id")
         raise HTTPException(status_code=400, detail="order_id is required")
@@ -1182,27 +1174,20 @@ def _credit_verified_google_play_purchase(
         "localized_price": localized_price,
     })
 
-    ok = credit_service.add_credits(
-        userid,
-        amount,
-        GOOGLE_PLAY_SOURCE,
-        reference_id=order_id,
-        description=f"Google Play: {product_id}",
-        metadata=purchase_metadata,
-    )
-    if not ok:
-        logger.error(
-            "Google Play: verify OK with Play but add_credits failed user=%s order_id=%s product=%s amount=%s",
-            userid,
-            order_id,
-            product_id,
-            amount,
-        )
+    from credits.play_credit_grant import grant_verified_order
+    try:
+        grant = grant_verified_order(userid=userid, amount=amount, order_id=order_id, metadata=purchase_metadata)
+    except Exception as exc:
+        logger.exception("Verified Google Play credit grant failed user=%s order=%s", userid, order_id)
         alert("credit_grant", "credits_not_saved", "Purchase verified but credits could not be saved", order_id)
-        raise HTTPException(
-            status_code=500,
-            detail="Purchase verified with Google Play but credits could not be saved. Please contact support with your order id.",
-        )
+        raise HTTPException(status_code=500, detail="Purchase verified with Google Play but credits could not be saved. Please contact support with your order id.") from exc
+    if grant["already_credited"]:
+        return already_credited(order_id)
+    try:
+        from credits.invoice_service import ensure_purchase_invoice_for_reference
+        ensure_purchase_invoice_for_reference(userid, GOOGLE_PLAY_SOURCE, order_id)
+    except Exception:
+        logger.exception("Purchase invoice failed after committed Play grant order=%s", order_id)
 
     publish_activity(
         "credits_purchased",
@@ -1408,6 +1393,7 @@ async def get_google_play_products(current_user: User = Depends(get_current_user
         # Admin portal can disable packs without removing them from Play Console.
         sellable_ids = credit_service.list_active_credit_product_ids()
         starter_status = credit_service.get_first_purchase_bonus_status(current_user.userid).get("starter_pack") or {}
+        sellable_ids.discard("credits_24")
         if starter_status.get("eligible"):
             sellable_ids.add("credits_24")
         products = [p for p in products if str(p.get("product_id") or "") in sellable_ids]

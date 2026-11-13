@@ -469,6 +469,7 @@ const CreditScreen = ({ navigation, route }) => {
   const [razorpayCatalogError, setRazorpayCatalogError] = useState('');
   const [purchasingRazorpayCredits, setPurchasingRazorpayCredits] = useState(null);
   const purchaseListenerRef = useRef(null);
+  const creditCheckoutInFlightRef = useRef(false);
   const iapCallbacksRef = useRef({});
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -645,7 +646,7 @@ const CreditScreen = ({ navigation, route }) => {
     orderId,
     pricingOverride = null
   ) => {
-    if (!purchaseToken || !productId || !orderId) return;
+    if (!purchaseToken || !productId || !orderId) throw new Error('Incomplete Google Play purchase');
     setPurchasingProductId(productId);
     try {
       const iapProduct = iapProducts.find((p) => (p.productId || p.product_id) === productId);
@@ -674,6 +675,9 @@ const CreditScreen = ({ navigation, route }) => {
         pricingPayload,
         promoToSend
       );
+      if (data?.success !== true && !(data?.terminal && Number(data?.purchase_state) === 1)) {
+        throw new Error(data?.message || 'Purchase verification did not confirm credits');
+      }
       await removePendingGooglePlayCreditPurchase({ purchaseToken, productId, orderId });
       if (data?.terminal && Number(data?.purchase_state) === 1) {
         await fetchBalance();
@@ -689,6 +693,8 @@ const CreditScreen = ({ navigation, route }) => {
       }
       await fetchBalance();
       await fetchHistory();
+      setGooglePlayProducts((products) => products.filter((p) => String(p.product_id || p.id) !== 'credits_24'));
+      await fetchProducts({ silent: true });
       const isAlreadyCredited = data.credits_added === 0 && (data.message || '').toLowerCase().includes('already credited');
       if (!isAlreadyCredited) {
         const catalogProduct = googlePlayProducts.find(
@@ -740,7 +746,9 @@ const CreditScreen = ({ navigation, route }) => {
         message: msg,
         creditsAdded: 0,
       });
+      throw err; // Keep the Play transaction unfinished until verification succeeds.
     } finally {
+      creditCheckoutInFlightRef.current = false;
       setPurchasingProductId(null);
     }
   };
@@ -1299,6 +1307,7 @@ const CreditScreen = ({ navigation, route }) => {
           }
         });
         errorSub = RNIap.purchaseErrorListener?.((error) => {
+          creditCheckoutInFlightRef.current = false;
           setPurchasingProductId(null);
           setPurchasingSubscriptionId(null);
           if (error?.code !== 'E_USER_CANCELLED') {
@@ -1886,6 +1895,8 @@ const CreditScreen = ({ navigation, route }) => {
   };
 
   const startGooglePlayPurchase = async (product) => {
+    if (creditCheckoutInFlightRef.current) return;
+    creditCheckoutInFlightRef.current = true;
     const productId = product.product_id || product.id;
     const obfuscatedAccountIdAndroid = await getGooglePlayObfuscatedAccountId();
     const packCommerce = gaPackCommerce(product, iapProducts, {
@@ -1896,6 +1907,14 @@ const CreditScreen = ({ navigation, route }) => {
     trackAstrologyEvent.initiateCheckout(packCommerce);
     setPurchasingProductId(productId);
     try {
+      if (productId === 'credits_24') {
+        const { data } = await creditAPI.getGooglePlayProducts();
+        const products = Array.isArray(data?.products) ? data.products : [];
+        setGooglePlayProducts(products);
+        if (!products.some((p) => String(p.product_id || p.id) === productId)) {
+          throw new Error('This first-purchase offer is no longer available. Please choose another pack.');
+        }
+      }
       await RNIap.requestPurchase({
         type: 'in-app',
         request: {
@@ -1909,6 +1928,7 @@ const CreditScreen = ({ navigation, route }) => {
       if (e?.code !== 'E_USER_CANCELLED') {
         Alert.alert(t('credits.page.purchaseFailed'), e?.message ?? t('credits.page.couldNotStartPurchase'));
       }
+      creditCheckoutInFlightRef.current = false;
       setPurchasingProductId(null);
     }
   };
