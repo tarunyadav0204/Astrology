@@ -3457,9 +3457,11 @@ export default function ChatScreen({ navigation, route }) {
   const handlePartnershipChartSelect = (chart) => {
     setNativeSearchQuery('');
     if (partnershipStep === 0) {
+      setSessionId(null);
       setNativeChart(chart);
       setPartnershipStep(1);
     } else if (partnershipStep === 1) {
+      setSessionId(null);
       setPartnerChart(chart);
       setPartnershipStep(2);
       setPartnershipSubStep(0);
@@ -4451,7 +4453,7 @@ export default function ChatScreen({ navigation, route }) {
     try {
       const token = await AsyncStorage.getItem('authToken');
       const sessionBirth = partnershipMode ? nativeChart : birthData;
-      const sessionBirthChartId = sessionBirth?.id ?? sessionBirth?.birth_chart_id ?? null;
+      const sessionBirthChartId = sessionBirth?.id ?? sessionBirth?.birth_chart_id ?? sessionBirth?.chart_id ?? null;
 
       // Different endpoint for mundane vs personal
       const endpoint = isMundane ? '/mundane/session' : '/chat-v2/session';
@@ -4486,8 +4488,8 @@ export default function ChatScreen({ navigation, route }) {
         subjectGateMemoryRef.current = [];
         setSessionId(newSessionId);
 
-        if (!isMundane) {
-          // Track session for personal chat only
+        if (!isMundane && !partnershipMode) {
+          // Partnership threads must not replace single-chart history
           const sessionKey = chatPersonStorageKey(sessionBirth);
           if (sessionKey) {
             const personSessions = JSON.parse(await AsyncStorage.getItem(`chatSessions_${sessionKey}`) || '[]');
@@ -5643,7 +5645,7 @@ export default function ChatScreen({ navigation, route }) {
           chat_tier: requestedTier,
           native_name: partnershipMode ? nativeChart?.name : birthData?.name,
           birth_details: partnershipMode ? {
-            id: nativeChart.id ?? nativeChart.birth_chart_id ?? null,
+            id: nativeChart.id ?? nativeChart.birth_chart_id ?? nativeChart.chart_id ?? null,
             name: nativeChart.name,
             date: typeof nativeChart.date === 'string' ? nativeChart.date.split('T')[0] : nativeChart.date,
             time: typeof nativeChart.time === 'string' ? nativeChart.time.split('T')[1]?.slice(0, 5) || nativeChart.time : nativeChart.time,
@@ -5652,7 +5654,7 @@ export default function ChatScreen({ navigation, route }) {
             place: nativeChart.place || '',
             gender: nativeChart.gender || ''
           } : {
-            id: birthData.id ?? birthData.birth_chart_id ?? null,
+            id: birthData.id ?? birthData.birth_chart_id ?? birthData.chart_id ?? null,
             name: birthData.name,
             date: typeof birthData.date === 'string' ? birthData.date.split('T')[0] : birthData.date,
             time: typeof birthData.time === 'string' ? birthData.time.split('T')[1]?.slice(0, 5) || birthData.time : birthData.time,
@@ -9871,8 +9873,10 @@ export default function ChatScreen({ navigation, route }) {
                     style={styles.chartPickerItem}
                     onPress={() => {
                       if (selectingFor === 'native') {
+                        setSessionId(null);
                         setNativeChart(chart);
                       } else {
+                        setSessionId(null);
                         setPartnerChart(chart);
                       }
                       setShowChartPicker(false);

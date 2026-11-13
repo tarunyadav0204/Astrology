@@ -150,7 +150,9 @@ class RelationalAnswerEvaluator:
         checks["behavior_nakshatra_texture_present"] = True
         if behavior_question and cls._behavior_texture_expected(evidence_spine):
             checks["behavior_sign_texture_present"] = cls._sign_texture_present(lower, evidence_spine)
-            checks["behavior_nakshatra_texture_present"] = cls._nakshatra_texture_present(lower, evidence_spine)
+            rel = (evidence_spine or {}).get("relation_specific_evidence") or {}
+            if rel.get("nakshatra_flavor_native") or rel.get("nakshatra_flavor_partner"):
+                checks["behavior_nakshatra_texture_present"] = cls._nakshatra_texture_present(lower, evidence_spine)
         checks["timing_granularity_respected"] = True
         if timing_question:
             checks["timing_granularity_respected"] = cls._timing_granularity_respected(lower, evidence_spine)

@@ -32,6 +32,8 @@ test('partnership offers Verified and sends the paid tier while a free question 
     const modes=host.querySelector('[aria-label="Partnership answer mode"]');
     expect(modes.textContent).toContain('Verified');
     expect(modes.textContent).toContain('10 credits');
+    expect(host.querySelector('[aria-label="Answer mode"]')).toBeNull();
+    expect(host.querySelectorAll('.chat-mode-selector-web')).toHaveLength(1);
     act(() => host.querySelector('form').dispatchEvent(new Event('submit', { bubbles:true, cancelable:true })));
     expect(send).toHaveBeenCalledWith('Can our business succeed?', expect.objectContaining({ chat_tier:'verified', premium_analysis:false }));
     act(() => modes.querySelector('button').click());

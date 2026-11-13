@@ -6,15 +6,15 @@ Conventions:
 
 ## `ashtakavarga` (`a` = `"ashtakavarga"`)
 
-D1 **Sarvashtakavarga** (12 sign totals) + **Bhinnashtakavarga** per classical planet (12 bindus each). Optional **D9** compact block when present in static context. Source: `ChatContextBuilder` static `ashtakavarga` (same as chat). Schema **v2** adds **`D1.Ho`** / **`D1.La`** when ascendant is available on static context.
+D1 **Sarvashtakavarga** (12 sign totals) + **Bhinnashtakavarga** per classical planet (12 bindus each). Optional **D9** compact block when present in static context. Internal agent builders retain calculation vectors; LLM serialization converts them to named-sign maps. Source: `ChatContextBuilder` static `ashtakavarga` (same as chat). Schema **v2** adds **`D1.Ho`** / **`D1.La`** when ascendant is available on static context.
 
 | Key | Meaning |
 |-----|--------|
-| `D1.S` | 12 integers — total SAV bindus per **zodiac sign** index 0=Aries … 11=Pisces. **Do not treat index 0 as “1st house”** — use `D1.Ho` for house-numbered bindus. |
+| `D1.S` | At the LLM boundary: sign-name → SAV bindus (Aries through Pisces). **Do not treat sign positions as houses** — use `D1.Ho` for house-numbered bindus. |
 | `D1.La` | (v2) Lagna **sign** 1–12 (1=Aries … 12=Pisces). Present when `Ho` is emitted. |
 | `D1.Ho` | (v2) **House from lagna (1–12)** → `{ "z", "zn", "s", "B" }`: `z`/`zn` = zodiac sign occupied by that house, `s` = SAV at that sign, `B` = per-planet BAV at that sign. **Prefer this object** whenever you cite “Nth house” SAV/BAV. |
 | `D1.tb` | Total bindus (if available). |
-| `D1.B` | Planet → 12 bindus (BAV per **sign** index, same indexing as `D1.S`). |
+| `D1.B` | At the LLM boundary: planet → sign-name → BAV bindus. |
 | `D9` | Optional: `S9` / `B9` when navamsa AV exists (sign-indexed; D9 lagna mapping is not expanded here). |
 
 ---
@@ -481,6 +481,16 @@ Pair with `chara_dasha` when timing matters:
 
 Parallel Jaimini branch may also include a small derived block `jx` built from `jaimini + chara_dasha`:
 
+The model-facing parallel projection removes redundant inverse counts in
+`jx.rf`, `jx.kr`, and topic `rf`: these count the period sign FROM the reference,
+not the reference FROM the period sign, and were being confused in prose.
+`frame_authority` and calculated `reading_basis` sentences supply one explicit
+orientation (house FROM natal/Chara ascendant), plus named Argala contributors
+and net balances. Absolute signs and derived topic support bands are retained.
+The compact `jaimini.AG` is replaced by
+`frame_authority.argala_by_natal_target_house` in this projection; calculator
+and agent outputs retain the original schema.
+
 | Key | Meaning |
 |-----|---------|
 | `md` / `ad` | Current Chara Mahadasha / Antardasha sign **1–12**. |
@@ -712,3 +722,118 @@ Sensitive-point coordinate audit: `K.coordinate_frame` is `D3_mapped_sign` and
 physical D1 longitude interval with start-inclusive/end-exclusive bounds. Never
 use a mapped varga sign as a physical D1 transit sign. Legacy cached rows may
 lack the sector; do not infer an exact contact from those rows.
+
+### Parallel writer fact authority
+
+The parallel orchestrator projects existing calculator output into `calculated_facts`
+for the merge in
+`SPECIALIST_FACT_AUTHORITY_JSON`. This is deterministic data preparation, not a
+review model call. `charts.<D-code>.houses.<house>` joins sign, sign lord, that
+lord's house, occupants, SAV and BAV; D1 also includes incoming graha aspects.
+Planet rows retain D1/D9 placement, dignity and calculated flags. Missing Gandanta
+or SAV calculations remain unknown rather than false or zero.
+
+`vimshottari` separates named period levels and the MD sequence; `transit_segments`
+retains dated sign/house windows. KP planet lords, cusp lords and significator
+houses remain separate. Sudarshana agreement and Tara information preserve their
+reference frames. `fact_reading_basis` renders important role joins as sentences,
+including the distinction between natal Avayogi polarity and target-house reversal.
+The Sudarshana writer omits filtered static topic summaries whose counts exclude
+outer planets; calculator agreement rows are the single source for those counts.
+Planet-specific current dasha activation remains separate from static agreement.
+
+Jaimini `frame_authority.sign_frames` includes calculator-provided rashi aspect
+signs and forward house counts from named special lagnas. `reading_basis` explicitly
+states tenth-from-MD/AD occupants. The source aspect map uses zero-based signs;
+the agent's PS/JP/CK fields use one-based signs.
+
+For Gemini 3 models, the existing specialist and merge calls use the REST transport
+with low thinking and temperature zero, retaining cached shared context. Other
+providers/models retain their existing transport. There is no additional reviewer
+call; reasoning may increase latency and token usage.
+
+
+Branches retain their original specialist evidence rather than additional full
+copies of `calculated_facts`. Parashari receives compact role/relative-house joins
+and explicit D1 lordships for active dasha planets. Nakshatra joins `P1` and `P9`
+into `planet_facts[planet].D1/D9`. Ashtakavarga uses
+`ashtakavarga.charts[chart][house] = {sign, SAV, BAV}` for every available chart,
+replacing sign-indexed arrays. The D9 house index uses D9's own ascendant.
+
+Jaimini model payloads replace duplicate numeric PS/JP/CK and derived sign aliases
+with named `frame_authority` rows; period duration uses `duration_years` rather
+than the ambiguous `y`. Derived qualitative support bands remain separate.
+Shared D1 compaction also removes duplicated cancellation-rule descriptions and
+matched-test rows, and intermediate upagraha clock traces; calculated point
+positions, rule outcomes and references remain available. Original calculator
+snapshots are unchanged.
+
+Nakshatra planet rows now name `nakshatra_lord` and `sign_lord` separately.
+`DT.periods` labels the natal Tara of each active dasha lord; it is not the
+transit-warning table. Specialist-only prompts omit final-chat greetings,
+HTML and follow-up requirements. The Nakshatra writer copies calculated Tara
+rather than recomputing it from differently indexed source fields.
+Ashtakavarga's hypothetical per-house event-planet scores are labeled separately
+from dated transit segments. KP receives explicit planet-significator house lists,
+which must not be substituted with D1 sign lordships.
+# Partnership Flash replay (2026-11-12; not approved for production)
+
+The opt-in relational pipeline uses `gemini_relational_model` (default
+`models/gemini-3-flash-preview`) independently of the Premium Gemini model.
+`ASTRO_PARALLEL_RELATIONAL_CHAT` remains the rollout gate; these changes do not
+enable it. Existing provider selection still applies.
+
+`relational_shared.py` keeps one shared relationship profile, calculated relational
+evidence, conversation history and all distinct upstream-selected user facts.
+Only whitespace-normalized exact duplicates within a category are removed;
+contradictory reports remain. Facts are labelled user-reported and retain their
+chart owner. Cached calls omit these shared keys from the variable payload;
+cache failure supplies the same shared context inline. Branch and merge use the
+same Gemini model, including cache failure. No reviewer LLM call is added.
+
+Read-only replay entry point: `benchmark_relational_context.py SNAPSHOT OUT_DIR
+legacy|parallel`. It captures prompts, outputs, per-call usage, cache lifetime and
+calculated facts. Artifacts contain private user data and belong outside Git.
+The two production-question replays on Varun/Rohini preserved all distinct facts,
+but did not pass answer-quality review: unsupported future Chara periods, incorrect
+transit claims, and treating user allegations as calculated evidence remain.
+Parallel Flash also cost more than legacy Flash in these replays. Keep the gate
+off pending branch grounding and further payload compaction; passing structural
+tests is not factual validation of generated answers.
+
+## Standard/Premium branch eligibility
+
+Admin → Settings → Models → Advanced specialist branches exposes separate Standard
+and Premium enabled checkboxes for Jaimini, Nadi, Nakshatra, KP, Ashtakavarga and
+Sudarshan. Settings use `parallel_branch_enabled_{standard|premium}_{branch}`;
+unset values default to enabled. Parashari and merge cannot be disabled.
+The single-chart parallel pipeline intersects chart focus with the request tier's
+eligibility before calling the optional planner. Planner output and failure
+fallbacks stay within that eligible set; Parashari remains mandatory. A
+Parashari-only eligible set skips the planner. Free-question/remedy restrictions
+still apply. Partnership, Instant, Speech and Verified routing are not controlled
+by these single-chart eligibility settings. Save each branch card independently;
+settings use the existing admin-settings cache/version propagation for new requests.
+
+Selected methods also define the single-chart request's analysis scope. The planner's
+capability list and JSON example, branch instructions, calculated evidence, shared
+cache, merge authority, and technical output template are restricted to that scope.
+Disabled or intentionally unselected methods are not missing work for another
+branch/merge to perform. The final scope instruction also covers timing, remedies,
+follow-ups and old history. User facts/history are retained as context, not as a
+source for reconstructing excluded analyses. Basic shared chart facts (including
+natal star identities needed by an enabled KP method) remain available; this does
+not authorize a disabled specialist interpretation. All-method requests retain
+the existing schema. These are prompt/evidence constraints, not a claim that model
+compliance has been established by a live answer-quality benchmark.
+
+### Partnership tier method scope
+
+Two-chart parallel chat also reads `parallel_branch_enabled_{standard|premium}_{method}`.
+The topic-selected branches are intersected with tier eligibility before scheduling.
+Disabled method packets are removed from both chart payloads and shared relational
+cache/fallback inputs; Nadi linkage contacts/tone summaries and Sudarshana comparative
+packets cannot leak through another specialist. Saved facts and conversation history
+remain verbatim but never authorize an excluded analysis. Branch and merge instructions,
+method-count requirements, response formats and behavior validators respect the same
+selected-method scope. Premium eligibility remains independent. No review LLM call is added.

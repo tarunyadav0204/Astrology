@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # Unified Output Schema - Single Source of Truth for Response Formatting
 import json
+from chat.llm_chart_normalization import llm_json_dumps
 from datetime import datetime
 from chat.llm_context_safety import strip_outer_planets_from_llm_context
 
@@ -963,19 +964,19 @@ Your full response MUST be comprehensive. Short or summary-style answers are FOR
         mundane_auth = static_context.pop("mundane_authoritative_summary", None)
         static_context = _slim_mundane_context_for_llm(static_context)
 
-    chart_json = json.dumps(static_context, indent=2, default=json_serializer, sort_keys=False)
+    chart_json = llm_json_dumps(static_context, indent=2, default=json_serializer, sort_keys=False)
     
     data_label = "MUNDANE ASTROLOGY DATA" if analysis_type == 'mundane' else "BIRTH CHART DATA"
     if analysis_type == "mundane" and mundane_auth:
         prompt_parts.append(
             "⚠️ MUNDANE AUTHORITATIVE SUMMARY (READ FIRST — if national_dasha_loaded is true for an entity, "
             "national Vimshottari data exists; do not claim the repository is missing it):\n"
-            + json.dumps(mundane_auth, indent=2, default=json_serializer, sort_keys=False)
+            + llm_json_dumps(mundane_auth, indent=2, default=json_serializer, sort_keys=False)
         )
     prompt_parts.append(f"{data_label}:\n{chart_json}")
 
     if transits:
-        transit_json = json.dumps(transits, indent=2, default=json_serializer, sort_keys=False)
+        transit_json = llm_json_dumps(transits, indent=2, default=json_serializer, sort_keys=False)
         prompt_parts.append(f"PLANETARY TRANSIT DATA (DYNAMIC):\n{transit_json}")
 
     if static_context.get("classical_rule_matches"):

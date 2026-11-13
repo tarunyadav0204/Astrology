@@ -143,6 +143,9 @@ _PARALLEL_KERNEL_LITE_KEYS: Set[str] = {
 def build_shared_kernel_lite(context: Dict[str, Any]) -> Dict[str, Any]:
     """Light spine for non-Parashari branches: no unified_dasha_timeline / period_dasha_activations."""
     kernel = _pick_keys(context, _PARALLEL_KERNEL_LITE_KEYS)
+    if 'd1_chart' in kernel:
+        from ai.parallel_chat.shared_d1_compaction import compact_shared_d1, compact_calculation_audits
+        kernel['d1_chart'] = compact_calculation_audits(compact_shared_d1(kernel['d1_chart']))
     if context.get("intent") is not None:
         kernel["intent"] = copy.deepcopy(context["intent"])
     return kernel

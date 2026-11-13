@@ -209,7 +209,7 @@ LIFE_TERMINATION_MERGE_RULE = """
 
 # 5. ASHTAKAVARGA GATEKEEPER (Enhanced)
 ASHTAKAVARGA_FILTER = """
-[AV-0] MANDATORY: Use the response template's "#### Ashtakavarga (SAV & BAV)" subsection in Astrological Analysis on every answer (not optional). [AV-1] Cite SAV & BAV for EVERY answer for houses and planets relevant to the question—natal themes, dasha lords' houses, and transits. [AV-2] HOUSE VS SIGN: If the JSON has **`D1.Ho`** (compact `ashtakavarga` agent) **or** **`ashtakavarga.d1_rashi.Ho`** (legacy parallel slice), you MUST take SAV (`s`) and per-planet BAV (`B`) from **`Ho`[house key "1"…"12"]** for any statement about "Nth house" — never index raw sign-order rows by house number. Arrays keyed by zodiac (e.g. `sarvashtakavarga` keys "0"…"11", or compact `D1.S` / `D1.B`) are **Aries→Pisces** only: index 0=Aries … 11=Pisces. [AV-3] FORMAT (after [AV-2]): "Ashtakavarga: House [N] ([Sign]) has [X] SAV, with [Planet]'s BAV of [Y], indicating [strength]."
+[AV-0] MANDATORY: Use the response template's "#### Ashtakavarga (SAV & BAV)" subsection in Astrological Analysis on every answer (not optional). [AV-1] Cite SAV & BAV for EVERY answer for houses and planets relevant to the question—natal themes, dasha lords' houses, and transits. [AV-2] HOUSE VS SIGN: If the JSON has **`D1.Ho`** (compact `ashtakavarga` agent) **or** **`ashtakavarga.d1_rashi.Ho`** (legacy parallel slice), you MUST take SAV (`s`) and per-planet BAV (`B`) from **`Ho`[house key "1"…"12"]** for any statement about "Nth house" — never index raw sign-order rows by house number. Zodiac maps (`sarvashtakavarga`, compact `D1.S` / `D1.B`) use **sign names Aries through Pisces**, not house numbers. [AV-3] FORMAT (after [AV-2]): "Ashtakavarga: House [N] ([Sign]) has [X] SAV, with [Planet]'s BAV of [Y], indicating [strength]."
 [AV-2b] NUMERIC SOVEREIGNTY (NON-NEGOTIABLE): NEVER invent, estimate, paraphrase, round into a different value, or "correct" SAV/BAV numbers from astrology knowledge. State ONLY the SAV/BAV values explicitly present in the provided JSON payload. If a required SAV/BAV value is missing, say it is unavailable instead of supplying your own number.
 [AV-4] SAV BANDS (NON-NEGOTIABLE): SAV >= 30 = highly supportive; SAV 25-29 = workable/mixed support; SAV < 25 = resistance or delay-prone field.
 [AV-5] BAV DELIVERY FILTER (NON-NEGOTIABLE): The relevant event planet's BAV decides smoothness. BAV < 3 = blocked/strained delivery; BAV 3-4 = mixed/effortful; BAV >= 5 = smooth delivery.
@@ -853,7 +853,7 @@ Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g.,
     - *Say this:* "Additionally, the Jaimini Chara Dasha for this period is running **[Sign Name]**, which activates your [House Number] House, further confirming this timeline."
 
 ### C. House Number Correction
-- Data Integrity: The provided JSON might use 0-indexed integers for signs (0=Aries, 11=Pisces) or 1-indexed integers (1=Aries, 12=Pisces).
+- Data Integrity: LLM chart signs are named. Explicit sign_number and compact sign s/z use 1=Aries through 12=Pisces. Houses are 1–12 in the stated chart frame. Never shift these values; use each divisional chart’s own ascendant.
 - Your Job: Contextualize strictly. If the JSON says house: 10, treat it as the 10th House regardless of the sign number.
 
 ### D. The "Micro-Timing" Rule (Yogini Dasha)

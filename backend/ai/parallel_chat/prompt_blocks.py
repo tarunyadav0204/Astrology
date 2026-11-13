@@ -43,6 +43,26 @@ from chat.system_instruction_config import (
     death_ethics_block,
 )
 
+_BRANCH_PERSONA = (
+    "You are an internal specialist, not the final chat writer. Return the requested "
+    "JSON analysis only. No greeting, user-facing HTML, follow-up questions, FAQ or remedy metadata. "
+    "The merge handles presentation. Keep this branch inside its named school."
+)
+
+
+def _nakshatra_branch_doctrine():
+    # Legacy NK-7 asks the writer to recalculate Tara, despite authoritative DT.
+    # That also mixes one-based DT indices with zero-based natal indices.
+    doctrine = NAKSHATRA_PILLAR.split('[NK-7]')[0]
+    doctrine = doctrine.replace("The 'navatara_warnings' data may contain this information for transits.",
+        "Use DT.periods for natal dasha-lord Tara. Transit warnings are a separate calculation.")
+    return doctrine + (
+        "[NK-7] Copy DT.periods Tara number/name/quality exactly; do not recalculate it "
+        "from raw star indices. Use named planet_facts D1/D9 rows for placement and dignity. "
+        "nakshatra_lord and sign_lord are separate roles; never exchange them."
+    )
+
+
 _BRANCH_JSON_FOOTER = """
 OUTPUT FORMAT (NON-NEGOTIABLE):
 Return a single JSON object only (no markdown fences, no prose before or after). Schema:
@@ -108,8 +128,15 @@ You must:
 - If `SPECIALIST_BRANCH_OUTPUTS_JSON.scope.chart_focus` is present, follow the chart-focused RESPONSE FORMAT and present one integrated chart reading. Do not force exposed subsection labels like "The Jaimini View", "Nadi Interpretation", or "KP Stellar Perspective" unless the user explicitly asked for school-by-school comparison.
 - If a branch is missing or status=unavailable unexpectedly, note briefly under that #### subsection and continue.
 - Obey [MERGE-VOICE], [MERGE-HONESTY], [MERGE-TIME], [MERGE-DASHA-SOVEREIGNTY], and [SYNTH-FINAL] in the merge doctrine block below.
-- If any branch provides explicit dasha/chara/yogini period names or date windows, you MUST retain them in final output (do not collapse into generic timing prose).
+- Retain relevant dasha/chara/yogini period names and date windows only after verifying them against calculated authority. A specialist's date is not independent evidence.
 - Prioritize strict technical accuracy over conversational softness.
+- SPECIALIST_FACT_AUTHORITY_JSON contains calculated facts that override specialist prose. For KP, preserve each cusp's sign_lord, star_lord and sub_lord separately; a planet's star lord or a cusp's sub lord is not the cusp star lord. For Jaimini, preserve natal_house versus house_from_chara_md/ad with an explicit reference frame. Sign numbers are never house numbers. Keep Chara dates separate from Vimshottari dates. Correct conflicting prose and reconsider interpretations based on the incorrect house; do not merely relabel the erroneous interpretation.
+- Its calculated_facts is the lookup for EVERY concrete fact, including bullets, timing synthesis and follow-up suggestions. Use charts.<chart>.houses.<house> for sign, lord, occupants, aspects and SAV together; a sign's SAV cannot be transferred to another house or chart. Use charts.D9.planets for D9 placement/dignity, not a remembered pada mapping. A Gandanta interpretation requires that planet's charts.D1.planets.gandanta=true. Check graha_aspects_received before saying a house has no malefic aspects. Use vimshottari's named levels and mahadasha_sequence without exchanging MD/AD/PD. Transit claims require a dated transit_segments row, never an inference from natal positions. kp.planet_lords and kp.planet_significators are separate from kp.cusp_lords: copy exact planet identities and house lists. If authority contradicts a branch, correct the fact AND discard interpretations resting on the error. Do not add unverified technical details to make a section sound deeper.
+- Use sudarshana.house_agreement for claims of triple agreement: agree must equal 3 for that exact house, not a blended axis. Dasha Tara (nakshatra_dasha_tara) is separate from transit_tara; name the planet and whether natal-period or transit. A PD without supplied dates has unknown boundaries, never the AD's dates or a Chara AD boundary. Vargottama requires the supplied flag or matching D1/D9 signs. Use FINAL CALCULATED READING BASIS to check house lord versus occupant and the Avayogi natal policy before writing. Apply these checks to the whole answer, not just the named subsection. Describe predictions as indications, never as guarantees, certainties or inevitable events.
+- Compound friendship uses compound_friendship[planet][other_planet], with the direction preserved. A planet's dignity label is not its relationship to another planet; self/own sign is not Great Friend. Do not turn KP significator houses into sign lordships, or sign lordships into a KP significator list.
+- For EVERY KP cusp discussed, explicitly give `Sign lord: <sign_lord>; Star lord: <star_lord>; Sub lord: <sub_lord>` from that numbered authority row before interpretation. Do not replace this with CSL alone or infer a list of other cusps from a planet's significator houses. Significator houses are not cusp star lord assignments.
+- Chara period `ds`/`de` are exact start/end dates and `y` is its calculated duration in years. Preserve those dates when discussing that period; copy `y` if stating a duration, rather than estimating a decade from rounded years.
+- Use calculated_facts.charts[chart].houses[house] for chart-specific lordships. State the chart, sign, lord and lord_house together before interpretation. Never carry D1 lordship or combustion into a divisional lord identity, or substitute the divisional ascendant lord for its 10th lord. Jaimini sign_frames and argala_by_natal_target_house override invented geometry in prose: use the exact natal target and listed contributors, not rashi aspects, to explain Argala. Zero-strength obstruction is not an active obstruction; positive net support does not mean the obstruction list is empty.
 - When SPECIAL_POINTS_AUTHORITY_JSON is supplied, treat its calculated planet and sign names as immutable facts. Copy `yogi.lord`, `duplicate_yogi.lord`, `avayogi.lord`, and `tithi_dagdha_rashis` exactly; never replace them with a planet inferred from specialist prose or other chart factors. If the user asks about these points, state the mapping explicitly as `Yogi: <planet>; Duplicate Yogi: <planet>; Avayogi: <planet>` before interpreting it. Never describe Yogi and Duplicate Yogi together as two Yogis.
 
 You must not:
@@ -173,7 +200,7 @@ def build_parashari_branch_static(intent_category: str, death_analysis_unlocked:
         BHAVAM_BHAVESH_RULES,
         CLASSICAL_RULE_MATCH_INSTRUCTION,
         DATA_SOVEREIGNTY,
-        PERSONAL_CONSULTATION_RULES,
+        _BRANCH_PERSONA,
         "\n# TASK (PARASHARI BRANCH ONLY)\n",
         "Analyze using ONLY Parashari + divisional + dasha + transit logic from the JSON (no Ashtakavarga tables here).",
         "Use `planetary_analysis` / `d1_graha`-style graha rows for **`av` (avastha)** and strength (`sc`) on planets that matter for the question—especially Yogakaraka and house lords. Treat **Mrit** as a weakening modifier, not an automatic denial; foreground it only when dignity / `sc` / combustion / affliction also support a weak-delivery reading per [P-7]. Phrase natal avastha/dignity as natal (never 'currently Mrit/debilitated' unless describing a transit planet).",
@@ -212,7 +239,7 @@ def build_parashari_final_answer_static(intent_category: str, death_analysis_unl
         BHAVAM_BHAVESH_RULES,
         CLASSICAL_RULE_MATCH_INSTRUCTION,
         DATA_SOVEREIGNTY,
-        PERSONAL_CONSULTATION_RULES,
+        _BRANCH_PERSONA,
         "\n# TASK (PARASHARI FINAL ANSWER)\n",
         "You are the only branch running for this request. Produce the final user-facing answer directly from Parashari + divisional + dasha + transit logic.",
         "Do NOT return JSON. Do NOT write branch labels, internal notes, or mention other schools being skipped.",
@@ -347,7 +374,7 @@ def build_kp_branch_static(intent_category: str, death_analysis_unlocked: bool =
         _domain_sutras(intent_category),
         HOUSE_SIGNIFICATIONS,
         DATA_SOVEREIGNTY,
-        PERSONAL_CONSULTATION_RULES,
+        _BRANCH_PERSONA,
         "\n# TASK (KP BRANCH ONLY)\n",
         "Use ONLY `kp_analysis` (planet_lords, cusp_lords, significators) plus shared_kernel Vimshottari/dasha fields for the KP trigger step.",
         "For every primary house cusp you analyze, follow KP_PILLAR order: **Cusp Sign Lord → Cusp Star Lord (NL) → Cusp Sub Lord (CSL)** before the 4-step chain; do not open with CSL alone.",
@@ -366,7 +393,7 @@ def build_nakshatra_branch_static(intent_category: str, death_analysis_unlocked:
         _domain_sutras(intent_category),
         HOUSE_SIGNIFICATIONS,
         DATA_SOVEREIGNTY,
-        PERSONAL_CONSULTATION_RULES,
+        _BRANCH_PERSONA,
         "\n# TASK (NAKSHATRA BRANCH ONLY)\n",
         "Use ONLY the Nakshatra-context JSON: per-graha D1/D9 nakshatra fields, `nakshatra_remedies`, `navatara_warnings`, `pushkara_navamsa`, `current_dasha_tara`, plus shared_kernel Vimshottari fields for Tara-from-Moon checks.",
         "Always include **relevant house lord(s)** (e.g. 7th lord for marriage) with full nakshatra+pada and **D9 / navamsa-sign implications**—not only karaka (Venus) or 7th-house occupants—see NAKSHATRA_PILLAR [NK-6]. "
@@ -389,7 +416,7 @@ def build_ashtakavarga_branch_static(death_analysis_unlocked: bool = False) -> s
         "\n# TASK (ASHTAKAVARGA BRANCH ONLY)\n",
         "Use ONLY the Ashtakavarga JSON (Sarvashtakavarga + Bhinnashtakavarga; D9 block if present). "
         "When `D1.Ho` is present, cite SAV/BAV for each **house** only from `D1.Ho[\"1\"]`…`[\"12\"]` (whole-sign from lagna); "
-        "`D1.S` / `D1.B` rows are **Aries→Pisces** (index 0–11), never house ordinals. "
+        "`D1.S` / `D1.B` maps are keyed by **sign names Aries through Pisces**, never house ordinals. "
         "Apply ASHTAKAVARGA_FILTER [AV-4..AV-8]: SAV bands, event-planet BAV delivery filter, and conflict phrasing.",
         "Do NOT repeat full Parashari, Jaimini, Nadi, Nakshatra, or KP doctrine — stay Ashtakavarga-only, but provide real interpretive judgment (not raw table dump).",
         _branch_json_footer("ashtakavarga"),
@@ -405,7 +432,7 @@ def build_sudarshan_branch_static(intent_category: str, death_analysis_unlocked:
         _domain_sutras(intent_category),
         HOUSE_SIGNIFICATIONS,
         DATA_SOVEREIGNTY,
-        PERSONAL_CONSULTATION_RULES,
+        _BRANCH_PERSONA,
         "\n# TASK (SUDARSHANA / TRIPLE-CHAKRA BRANCH ONLY)\n",
         "`shared_kernel` is minimal (birth, ascendant, current date, response_format, intent, and a compact dasha anchor) — no D1, divisionals, or heavy Vimshottari timelines. "
         "Use `sx` as the Sudarshana reasoning spine and `sudarshana_context` only for raw backup. `sx.topic.rows` = question-relevant houses with tri-perspective agreement, benefic/malefic tilt, and support band; `sx.career` / `sx.relationship` / `sx.education` / `sx.health` = topic-specific Sudarshana blocks; `sx.current.topic` and `sx.current.<topic>` = whether current MD/AD/PD are actually touching those houses from Lagna/Moon/Sun right now; `sx.dom` = dominant houses; `sx.patterns` = synthesis notes; `sx.triggers` = precision year-clock rows; `sx.D` = compact current dasha anchor. "
@@ -462,7 +489,7 @@ def build_nadi_branch_static(intent_category: str = "", death_analysis_unlocked:
 # --- Agent-payload TASK lines (VARIABLE_DATA_JSON uses compact SCHEMA.md keys; ASTRO_PARALLEL_AGENT_CONTEXT=1) ---
 
 
-def build_parashari_branch_static_agent(intent_category: str, death_analysis_unlocked: bool = False) -> str:
+def build_parashari_branch_static_agent(intent_category: str, death_analysis_unlocked: bool = False, *, context=None) -> str:
     health_prompt_line = (
         "For health questions, explicitly separate **Constitution/Vitality -> Disease Pattern -> Sensitive Body Systems -> Current Activation -> Astrological Prevention Themes**. Use `px.health` first: `score` = calculator-level health score when available, `pattern` = acute/chronic/sensitivity/mixed/preventive, `tone` = flare-up/wear-and-tear/mind-body, `risk` = vitality-vs-acute-vs-chronic-vs-mental pressure, `body` / `ph` = sensitive body systems and afflicted grahas, `hh` = key health-house summaries, `charak` / `charak_agent` = coarse Dr.-Charak-style dosha cue, `rw` = ranked risk windows, `dv.D30` = whether Trimsamsa confirmation exists. Do not give medical diagnosis; describe astrological vulnerability and timing pressure only—no diet/exercise/yoga/pranayama playbooks unless REMEDY FOLLOW-UP MODE is active."
         if _is_health_category(intent_category)
@@ -495,7 +522,7 @@ def build_parashari_branch_static_agent(intent_category: str, death_analysis_unl
         BHAVAM_BHAVESH_RULES,
         CLASSICAL_RULE_MATCH_INSTRUCTION,
         DATA_SOVEREIGNTY,
-        PERSONAL_CONSULTATION_RULES,
+        _BRANCH_PERSONA,
         "\n# TASK (PARASHARI BRANCH ONLY — CONTEXT AGENTS)\n",
         "Analyze using `parashari_agents` and `px` in VARIABLE_DATA_JSON. `parashari_agents` is the raw compact agent bundle (each key is a context agent id: "
         "core_d1, d1_graha, vim_dasha, div_d9, div_intent, parashari_day, transit_win, dasha_win, panch_maitri, sniper_pts). "
@@ -512,6 +539,7 @@ def build_parashari_branch_static_agent(intent_category: str, death_analysis_unl
         "If `px.src=\"day\"` and `parashari_day.x=true`, this is an exact-day query. Prioritize `parashari_day` for Panchanga, Moon transit, and fast planets; use `dasha_win` for the exact 5-level Vimshottari snapshot on that date. Do not answer a single-day question from slow transits alone.",
         "For topic-specific questions, anchor the logic to `px.hs` and `px.HI`: say whether those houses are being activated by rulership, occupation, or graha drishti from active dasha lords. Use `px.D` to cite the actual active lords with their natal house placement, ruled houses, aspects, dignity, avastha, combustion, and strength.",
         "Use `px.dx` whenever divisional charts are relevant: `px.dx.rf` = D1-vs-D9 root/fruit confirmation for relevant lords/karakas; `px.dx.topic.charts` = topic-specific divisional house rows with lord placement, occupants, and support band; `px.dx.current` = whether current MD/AD/PD lords are actually linking into those divisional houses right now; `px.dx.career` / `relationship` / `education` / `health` = ready divisional support blocks. If a required divisional chart is missing, say that explicitly from `px.dx.*.avail` instead of implying certainty.",
+        "Use divisional_lord_authority for chart-specific 1st/10th lord identities. Before interpreting a divisional 10th lord, state: chart, 10th-house sign, house_lord, lord_house_in_this_chart. D1's 10th lord, D10's ascendant lord, and D10's 10th lord are distinct roles: do not transfer lordship between them. A planet's D1 combustion does not establish the identity of a divisional house lord.",
         "For current or predictive questions, do not stop at static divisional promise. Also cite `px.dx.current.topic` or the relevant `px.dx.current.<life_area>` block to say whether the active periods are presently activating that divisional chart or not.",
         "Use `px.TR` as a compact transit filter: near-term answers should say whether transit hits are landing on the topic houses directly (`th`/`nh`) and whether active dasha planets are involved (`dp`).",
         "For Jupiter/Saturn/Rahu/Ketu **sign or house entry years**, use `transit_win.M` and/or `px.TR.MT` only (`sg`/`h`/`sd`/`ed`, optional `rr`). Never invent those ingress years from memory.",
@@ -527,27 +555,72 @@ def build_parashari_branch_static_agent(intent_category: str, death_analysis_unl
         "Do NOT write the Jaimini View, Nadi, KP, Ashtakavarga, Nakshatra, or Sudarshan specialist passes here — other branches cover them.",
         _parashari_json_footer(),
     ]
+    # Presentation belongs to the final merge. Preserve the specialist JSON
+    # contract and all doctrinal reasoning, including unknown/compound scopes.
+    parts = [p for p in parts if p != PERSONAL_CONSULTATION_RULES]
+    if isinstance(context, dict):
+        intent = context.get('intent') or {}
+        question_parts = (intent.get('evidence_plan') or {}).get('question_parts') or []
+        self_only = bool(question_parts) and all(p.get('subject') == 'self' for p in question_parts)
+        if self_only and not context.get('bhavat_bhavam'):
+            parts = [p for p in parts if p != BHAVAM_BHAVESH_RULES]
+        if not context.get('kota_chakra'):
+            parts = [p for p in parts if p != KOTA_LOGIC]
+        if not (context.get('classical_rule_matches') or {}).get('matches'):
+            parts = [p for p in parts if p != CLASSICAL_RULE_MATCH_INSTRUCTION]
+        if not context.get('lifespan_timing_evidence'):
+            parts = [p for p in parts if not p.startswith('When `lifespan_timing_evidence` is present:')]
+        if str(intent.get('mode') or '').upper() != 'PREDICT_DAILY' and not context.get('daily_prediction_spine'):
+            parts = [p for p in parts if not p.startswith('If `px.src="day"`')]
+        # Only omit marriage guidance for a positively identified single-domain
+        # career question. Ambiguous and compound questions keep it.
+        if self_only and len(question_parts) == 1 and str(intent.get('category') or '').startswith('career'):
+            parts = [p for p in parts if not p.startswith('For marriage/spouse questions, explicitly separate')]
     return "\n\n".join(p for p in parts if p)
 
 
 def build_jaimini_branch_static_agent(death_analysis_unlocked: bool = False) -> str:
-    parts = [
-        CORE_PERSONA,
-        death_ethics_block(death_analysis_unlocked),
-        JAIMINI_PILLAR,
-        JAIMINI_ANALYSIS_STRUCTURE,
-        DATA_SOVEREIGNTY,
-        "\n# TASK (JAIMINI BRANCH ONLY — CONTEXT AGENT)\n",
-        "Use ONLY the `jaimini`, `chara_dasha`, and `jx` objects in VARIABLE_DATA_JSON. `jaimini` carries compact keys JP/CK/PS/AG (`a`=`jaimini`); `chara_dasha` carries the active Chara timing spine (`P` rows with nested `ad`); `jx` carries derived Jaimini timing relationships (MD/AD relative to UL/A7/AL/KL and key karakas). See `context_agents/SCHEMA.md`.",
-        "Structure the branch as: **Static Promise** -> **MD-Lagna Frame** -> **AD-Lagna Frame** -> **Manifestation Filter** -> **Confluence/Conflict**. Do not let a favorable static karaka story overrule a clearly adverse active MD/AD frame.",
-        "Use `chara_dasha.P` to identify the active Mahadasha row (`ic=true`) and its active Antardasha row (`ad[].ic=true`). Run both temporary ascendants explicitly: **MD-Lagna Frame** and **AD-Lagna Frame**, then add a short **Confluence/Conflict** line (AD-Lagna prioritized for near-term manifestation when conflict appears).",
-        "Marriage/partnership questions: full **DK → UL → A7** thread in `analysis`; **A7** requires interpretation of **grahas in the A7 sign** using `jaimini.JP.A7.pp` (e.g. GK = obstacle in embodied partnership), not sign-only—[J-8]. The same occupancy rule applies to UL/AL when relevant. Explicitly distinguish **partner nature**, **alliance/continuity**, and **embodied manifestation** rather than blending them into one verdict.",
-        "When `jx` is present, use it to stay concrete: `jx.rf.UL/A7/AL/KL` gives MD/AD house positions from those lagnas; `jx.kr.AK/AmK/DK/GK` does the same for karakas; `jx.dk_asp` lists grahas aspecting DK sign; `jx.ul2`, `jx.al10`, and `jx.kl10` expose key manifestation/career signs with occupants. `jx.relationship` and `jx.career` are dedicated compact topic blocks.",
-        "Career/status questions: include **AmK / KL / AL** explicitly and say whether the active Chara frame supports vocation, authority, visibility, or only workload without recognition. Use `jx.career` to distinguish vocation from status/image: `md`/`ad` = current support level from AmK frame, `img.al10` / `img.kl10` = image/vocation sign occupants.",
-        "Marriage/partnership questions: use `jx.relationship` to stay concrete: `md`/`ad` = current A7 manifestation support, `gk_a7` = direct obstruction flag, `mal_a7` / `ben_a7` = A7 sign occupants by tone, `ul2_pp` = continuity filter.",
-        _branch_json_footer("jaimini"),
-    ]
-    return "\n\n".join(p for p in parts if p)
+    # Adapt legacy doctrine to the model-facing schema; omit its fictional
+    # "unobstructed" example and duplicate section/format demands.
+    pillar = '\n'.join(
+        "[J-4] Interpret Argala from frame_authority.argala_by_natal_target_house. "
+        "reading_basis states the calculated NET balance, active opposing contributors, "
+        "and zero-strength contributors. A contributor is not the net result."
+        if line.startswith('[J-4]') else line
+        for line in JAIMINI_PILLAR.splitlines()
+    )
+    task = """
+# JAIMINI BRANCH — FACTS THEN INTERPRETATION
+Use only VARIABLE_DATA_JSON. The shared cache is not a second source of Jaimini frames.
+reading_basis contains calculated facts, not interpretation. Copy the relevant direction
+and net balance before explaining it. frame_authority contains the same facts in tables.
+All house counts are FROM the named natal or Chara ascendant. Do not recalculate them.
+frame_authority uses explicit sign_name and natal_house; duration_years is never a house.
+jx carries topic support bands and DK aspects; a support band is
+an interpretation aid and cannot change a calculated house count or Argala net balance.
+For relative houses from AL/UL/A7/KL use sign_frames.houses_from_special_lagnas.
+For rashi aspects use ONLY sign_frames.rashi_aspects_to_signs: a planet aspects those
+signs from its occupied sign. An aspect is not an occupant, conjunction, or Argala.
+Use the explicit 10th-from-period occupants in reading_basis; an empty list means empty.
+Never copy a planet from a neighboring sign into that house. Do not invert house counts.
+
+Write these five short sections in analysis, spending words on evidence rather than
+repeating the verdict. Each factual statement and bullet must agree with reading_basis:
+1. Static promise: relevant karakas and their NATAL houses. Career: AmK, KL, AL.
+   Relationships: DK, UL, A7 and their occupants; distinguish nature from continuity.
+2. MD frame: exact Chara MD start/end, relevant karaka house FROM MD, 10th occupants.
+3. AD frame: exact Chara AD start/end, relevant karaka house FROM AD, 10th occupants.
+4. Argala: explicitly name the natal target house, NET support/obstruction and number,
+   supporting planets, positive-strength opponents and any listed zero-strength opponents.
+   Never use rashi aspects to invent Argala. Never call zero-strength opposition active.
+5. Synthesis: compare MD/AD and distinguish work function from public visibility.
+   Keep Argala net support separate from independent AL-occupant difficulties.
+If a fact is missing, omit that claim. Do not fill gaps from another school or memory.
+"""
+    return "\n\n".join([
+        CORE_PERSONA, death_ethics_block(death_analysis_unlocked),
+        pillar, DATA_SOVEREIGNTY, task, _branch_json_footer('jaimini'),
+    ])
 
 
 def build_nadi_branch_static_agent(intent_category: str = "", death_analysis_unlocked: bool = False) -> str:
@@ -581,15 +654,16 @@ def build_nakshatra_branch_static_agent(intent_category: str, death_analysis_unl
     parts = [
         CORE_PERSONA,
         death_ethics_block(death_analysis_unlocked),
-        NAKSHATRA_PILLAR,
+        _nakshatra_branch_doctrine(),
         _domain_sutras(intent_category),
         HOUSE_SIGNIFICATIONS,
         DATA_SOVEREIGNTY,
-        PERSONAL_CONSULTATION_RULES,
+        _BRANCH_PERSONA,
         "\n# TASK (NAKSHATRA BRANCH ONLY — CONTEXT AGENTS)\n",
-        "Use ONLY `nakshatra` and `vim_dasha` objects in VARIABLE_DATA_JSON (compact keys per SCHEMA.md). "
+        "Use `nakshatra`, `vim_dasha` and `fact_reading_basis` in VARIABLE_DATA_JSON. "
         "`vim_dasha` provides current MD/AD and maraka flags for Tara-from-Moon / dasha quality checks.",
-        "For any house-specific topic (e.g. marriage → 7th lord, career → 10th lord): the **house lord(s)** must appear in `analysis` with nakshatra+pada and **navamsa (D9) dignity** (debilitation/exaltation/own per pada mapping)—not only karaka or occupants—[NK-6]. "
+        "nakshatra.planet_facts joins each planet's D1 nakshatra/pada with its actual D9 placement. D1.nakshatra_name/nakshatra_pada is the natal star/pada; D9.sign_name/house_in_this_chart is its Navamsa sign/house. nakshatra_lord is NOT sign_lord. D9.nakshatra_name/nakshatra_pada describes the mapped D9 longitude, not a second natal pada. DT.periods gives natal dasha-lord Tara; NV describes transit Tara. These must never be exchanged. Quote the single supplied D1-star/pada → D9-sign pair before interpretation. Do not generate a separate theoretical pada mapping.",
+        "For any house-specific topic (e.g. marriage → 7th lord, career → 10th lord): the **house lord(s)** must appear in `analysis` with nakshatra+pada and **navamsa (D9) dignity** copied from nakshatra.planet_facts[planet].D9—not only karaka or occupants—[NK-6]. Do not recompute D9 from a remembered pada mapping. "
         "Navatara/Tara and **own sign in D9** follow [NK-7]: verify against JSON; never claim Scorpio (e.g.) as Jupiter’s own sign.",
         "Do NOT repeat Parashari bundle, Jaimini, Nadi, KP, or Ashtakavarga — other passes cover them.",
         _branch_json_footer("nakshatra"),
@@ -606,7 +680,7 @@ def build_kp_branch_static_agent(intent_category: str, death_analysis_unlocked: 
         _domain_sutras(intent_category),
         HOUSE_SIGNIFICATIONS,
         DATA_SOVEREIGNTY,
-        PERSONAL_CONSULTATION_RULES,
+        _BRANCH_PERSONA,
         "\n# TASK (KP BRANCH ONLY — CONTEXT AGENTS)\n",
         "Use ONLY `kp` and `vim_dasha` in VARIABLE_DATA_JSON. `kp` has `KP` (cusp/significators); `vim_dasha` has current MD/AD for the trigger step.",
         "For each relevant house cusp, state **Sign Lord → Star Lord (NL) → Sub Lord (CSL)** from the JSON before CSL-only or 4-step detail; never skip Sign/Star lords when the payload lists them.",
@@ -625,7 +699,7 @@ def build_ashtakavarga_branch_static_agent(death_analysis_unlocked: bool = False
         DATA_SOVEREIGNTY,
         "\n# TASK (ASHTAKAVARGA BRANCH ONLY — CONTEXT AGENT)\n",
         "Use ONLY `ashtakavarga`, optional `vim_dasha`, and derived `ax` in VARIABLE_DATA_JSON. See `context_agents/SCHEMA.md`. "
-        "Prefer **`D1.Ho`** for any \"Nth house\" bindus when present; **`D1.S`/`D1.B` are sign-indexed (0=Aries), not houses from lagna.",
+        "Prefer **`D1.Ho`** for any \"Nth house\" bindus when present; **`D1.S`/`D1.B` are keyed by sign name (Aries through Pisces), not houses from lagna.",
         "`ax` is the AV reasoning spine: `top`/`weak` = strongest/weakest lagna houses, `topic.rows` = question-relevant houses with SAV+filtered BAV, `dasha` = MD/AD/PD AV quality rows, `transit` = event-planet usability rows, `conflicts` = SAV/BAV paradox flags. Use it explicitly.",
         "If `topic.rows_d9` is present, add D9 AV house confirmation briefly (secondary layer only).",
         "Do NOT repeat Parashari bundle, Jaimini, Nadi, Nakshatra, or KP doctrine — remain Ashtakavarga-only with concrete SAV/BAV judgment.",
@@ -642,7 +716,7 @@ def build_sudarshan_branch_static_agent(intent_category: str, death_analysis_unl
         _domain_sutras(intent_category),
         HOUSE_SIGNIFICATIONS,
         DATA_SOVEREIGNTY,
-        PERSONAL_CONSULTATION_RULES,
+        _BRANCH_PERSONA,
         "\n# TASK (SUDARSHANA BRANCH ONLY — MERGED CHART JSON)\n",
         "`shared_kernel` is minimal (birth, ascendant, dates, intent, compact dasha anchor) — not full chart JSON. "
         "Use `sx` as the Sudarshana reasoning spine and `sudarshana_context` only for raw backup: `sx.topic.rows` = relevant houses with 3-view agreement and support band, `sx.career` / `sx.relationship` / `sx.education` / `sx.health` = topic-specific Sudarshana blocks, `sx.current.topic` and `sx.current.<topic>` = current MD/AD/PD Sudarshana activation, `sx.dom` = dominant houses, `sx.patterns` = synthesis notes, `sx.triggers` = year-clock windows, `sx.D` = current dasha anchor. "

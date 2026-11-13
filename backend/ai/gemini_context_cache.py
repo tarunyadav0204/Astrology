@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from chat.llm_chart_normalization import llm_json_dumps
 import logging
 import os
 import time
@@ -32,7 +33,7 @@ def gemini_context_cache_ttl_s(*, env_name: str = "ASTRO_GEMINI_CONTEXT_CACHE_TT
 
 
 def _json_compact(payload: Any) -> str:
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str)
+    return llm_json_dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str)
 
 
 async def create_gemini_context_cache(

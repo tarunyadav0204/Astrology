@@ -360,12 +360,15 @@ def build_relationship_profile(context: Dict[str, Any], user_question: str) -> D
 
     role_house = _infer_role_house(relation_rule["family"], raw_label, user_question)
     timing_request = _infer_timing_request(user_question, event_rule["mode"])
+    question_mode = event_rule["mode"]
+    if question_mode == 'general_answer' and timing_request['requested_granularity'] != 'none':
+        question_mode = 'predictive_timing'
 
     return {
         "raw_label": raw_label,
         "relation_family": relation_rule["family"],
         "event_topic": event_rule["topic"],
-        "question_mode": event_rule["mode"],
+        "question_mode": question_mode,
         "native_role_house": role_house,
         "derived_event_houses_from_role": _derive_houses_from_role(role_house, event_rule.get("houses", [])),
         "partner_event_houses": event_rule.get("houses", []),
@@ -389,7 +392,10 @@ def build_relationship_profile(context: Dict[str, Any], user_question: str) -> D
 
 def _infer_timing_request(user_question: str, question_mode: str) -> Dict[str, Any]:
     q = str(user_question or "").lower()
-    if question_mode not in {"predictive_timing", "predictive_yes_no"}:
+    # Explicit timing in the actual question must survive an unknown event label.
+    q = re.sub(r'\[relationship:[^\]]*\]', '', q, flags=re.I)
+    explicit_timing = bool(re.search(r'\bwhen\b|\b20\d{2}(?:/\d{2})?\b', q))
+    if question_mode not in {"predictive_timing", "predictive_yes_no"} and not explicit_timing:
         return {"requested_granularity": "none", "reason": "Question is not primarily timing-oriented."}
 
     day_cues = [
@@ -406,7 +412,7 @@ def _infer_timing_request(user_question: str, question_mode: str) -> Dict[str, A
         return {"requested_granularity": "day", "reason": "Question asks for immediate or specific-date timing."}
     if any(cue in q for cue in month_cues) and "year" not in q:
         return {"requested_granularity": "month", "reason": "Question asks for near-term timing by month/window."}
-    if any(cue in q for cue in year_cues):
+    if any(cue in q for cue in year_cues) or re.search(r'\b20\d{2}(?:/\d{2})?\b', q):
         return {"requested_granularity": "year", "reason": "Question asks for broad year-level timing."}
     return {"requested_granularity": "month", "reason": "Predictive timing question without a narrower explicit timescale."}
 
@@ -2078,7 +2084,13 @@ def _compact_period_dasha_window(person_context: Dict[str, Any]) -> Dict[str, An
 def _compact_transit_windows(person_context: Dict[str, Any], profile: Dict[str, Any]) -> Dict[str, Any]:
     transits = person_context.get("transit_activations") or []
     if not isinstance(transits, list) or not transits:
-        return {"available": False}
+        # A synastry build commonly supplies sign-ingress windows rather than
+        # requested-period activations. Preserve those dated calculator rows.
+        rows = [dict(transit_planet=planet, **{k: row[k] for k in
+                    ('sign', 'house', 'start_date', 'end_date') if k in row})
+                for planet, windows in (person_context.get('macro_transits_timeline') or {}).items()
+                if isinstance(windows, list) for row in windows if isinstance(row, dict)]
+        return {'available': bool(rows), 'source': 'macro_transits_timeline', 'rows': rows}
     houses = set(h for h in profile.get("primary_houses") or [] if isinstance(h, int))
     karakas = set(str(p) for p in profile.get("primary_karakas") or [] if isinstance(p, str))
     rows = []

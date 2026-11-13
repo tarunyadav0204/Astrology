@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from chat.llm_chart_normalization import llm_json_dumps
 import logging
 import os
 import re
@@ -5949,7 +5950,7 @@ def _build_answer_mode_router_prompt(question: str, intent: Optional[Dict[str, A
         "allowed_answer_modes": ANSWER_MODES,
         "allowed_target_subjects": sorted(TARGET_SUBJECTS.keys()),
     }
-    context_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    context_json = llm_json_dumps(payload, ensure_ascii=False, separators=(",", ":"))
     return f"""
 Classify the user's astrology chat question into exactly one answer_mode.
 
@@ -18643,7 +18644,7 @@ def _build_budgeted_instant_prompt(
     language: str,
 ) -> str:
     """Compact equivalent used only when the full house prompt exceeds budget."""
-    context_json = json.dumps(context, ensure_ascii=False, default=str, separators=(",", ":"))
+    context_json = llm_json_dumps(context, ensure_ascii=False, default=str, separators=(",", ":"))
     visible_astrology = (
         (context.get("answer_contract") or {}).get("visible_astrology")
         if isinstance(context.get("answer_contract"), dict)
@@ -19564,7 +19565,7 @@ def _build_instant_composer_prompt_v3(
     speech_mode: bool = False,
 ) -> str:
     """Small, verdict-first prompt for the evidence-driven Instant pipeline."""
-    context_json = json.dumps(composer_context, ensure_ascii=False, separators=(",", ":"))
+    context_json = llm_json_dumps(composer_context, ensure_ascii=False, separators=(",", ":"))
     visible_astrology = (
         (composer_context.get("answer_contract") or {}).get("visible_astrology")
         if isinstance(composer_context.get("answer_contract"), dict)
@@ -19616,7 +19617,7 @@ def _build_instant_composer_prompt_v3(
             "condition_susceptibilities": composer_health_rules.get("condition_susceptibilities") or [],
             "visible_astrology": visible_astrology,
         }
-        natal_health_json = json.dumps(
+        natal_health_json = llm_json_dumps(
             natal_health_context, ensure_ascii=False, separators=(",", ":")
         )
         return f"""
@@ -20374,7 +20375,7 @@ def _build_instant_prompt(
             language,
             speech_mode=speech_mode,
         )
-    context_json = json.dumps(instant_context, ensure_ascii=False, separators=(",", ":"))
+    context_json = llm_json_dumps(instant_context, ensure_ascii=False, separators=(",", ":"))
     legacy_visible_astrology = (
         (instant_context.get("answer_contract") or {}).get("visible_astrology")
         if isinstance(instant_context.get("answer_contract"), dict)
@@ -20917,7 +20918,7 @@ async def generate_instant_chat_response(
                     answer_mode,
                     json.dumps(target_subject, ensure_ascii=False, default=str, sort_keys=True) if target_subject else "null",
                     question,
-                    json.dumps(instant_context, ensure_ascii=False, default=str, sort_keys=True),
+                    llm_json_dumps(instant_context, ensure_ascii=False, default=str, sort_keys=True),
                 )
             logger.info(
                 "SPEECH_DEBUG instant_llm_context_prompt answer_mode=%s target_subject=%s compact=%s context_json=%s",
@@ -21283,7 +21284,7 @@ async def generate_instant_chat_response(
         logger.info(
             "INSTANT_HEALTH_FACT_GATE active rows=%s sources=%s",
             len(constitutional_health_rows),
-            json.dumps(constitutional_health_rows, ensure_ascii=False, default=str),
+            llm_json_dumps(constitutional_health_rows, ensure_ascii=False, default=str),
         )
     pre_generation_graph_policy = (
         ((instant_v2_packet or {}).get("answer_spec") or {}).get("knowledge_graph_policy") or {}
@@ -21455,7 +21456,7 @@ async def generate_instant_chat_response(
             "INSTANT_HOME_FACT_REJECTED errors=%s answer=%r contract=%s",
             home_fact_validation_errors,
             raw_response[:1200],
-            json.dumps(home_fact_contract, ensure_ascii=False, default=str),
+            llm_json_dumps(home_fact_contract, ensure_ascii=False, default=str),
         )
         correction_decision: Dict[str, Any] = {}
         source_home: Dict[str, Any] = {}
@@ -21723,7 +21724,7 @@ VALIDATION FAILURES:
 {json.dumps(home_fact_validation_errors, ensure_ascii=False)}
 
 IMMUTABLE HOME/PROPERTY FACT CONTRACT:
-{json.dumps(home_fact_contract, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(home_fact_contract, ensure_ascii=False, separators=(",", ":"))}
 
 DIRECT DECISION:
 {json.dumps(correction_decision, ensure_ascii=False, separators=(",", ":"))}
@@ -21825,7 +21826,7 @@ NEXT_ACTION_META: {{"type":"none","title":"","reason":"","confidence":"low","fol
             "INSTANT_HEALTH_FACT_REJECTED errors=%s answer=%r required_rows=%s",
             health_fact_validation_errors,
             raw_response[:1200],
-            json.dumps(constitutional_health_rows, ensure_ascii=False, default=str),
+            llm_json_dumps(constitutional_health_rows, ensure_ascii=False, default=str),
         )
         correction_prompt = f"""
 Your previous constitutional-health answer was rejected because it changed or omitted calculated chart facts.
@@ -21841,7 +21842,7 @@ VALIDATION FAILURES:
 {json.dumps(health_fact_validation_errors, ensure_ascii=False)}
 
 AUTHORITATIVE CALCULATED ROWS:
-{json.dumps(constitutional_health_rows, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(constitutional_health_rows, ensure_ascii=False, separators=(",", ":"))}
 
 USER QUESTION:
 {question}
@@ -22131,40 +22132,40 @@ VALIDATION FAILURES:
 {json.dumps(translated_astrology_errors, ensure_ascii=False)}
 
 VISIBLE ASTROLOGY CONTRACT:
-{json.dumps(visible_astrology_contract, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(visible_astrology_contract, ensure_ascii=False, separators=(",", ":"))}
 
 IMMUTABLE HOME/PROPERTY FACT CONTRACT (when non-empty):
-{json.dumps(home_fact_contract, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(home_fact_contract, ensure_ascii=False, separators=(",", ":"))}
 If this contract is non-empty, preserve every lord/occupant/aspector role exactly and preserve every validation marker unchanged after its corresponding factual sentence.
 
 CALCULATED FOREIGN LIFE FOUNDATION (when non-empty):
-{json.dumps(foreign_correction_foundation, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(foreign_correction_foundation, ensure_ascii=False, separators=(",", ":"))}
 If this foundation is non-empty, use only its chart rows and selected-route synthesis; do not infer an absent chart fact.
 
 CALCULATED RELATIVE PROFILE FOUNDATION (when non-empty):
-{json.dumps(relative_correction_foundation, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(relative_correction_foundation, ensure_ascii=False, separators=(",", ":"))}
 If this foundation is non-empty, use it as the sole source for the relative and preserve its ownership boundary.
 
 CALCULATED TARGET-FRAME FOUNDATION (when non-empty):
-{json.dumps(target_frame_correction_foundation, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(target_frame_correction_foundation, ensure_ascii=False, separators=(",", ":"))}
 If this foundation is non-empty, it overrides every same-numbered native-house interpretation in the rejected answer.
 
 CALCULATED MULTI-TARGET CONTEXTS (when non-empty):
-{json.dumps(multi_target_correction_contexts, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(multi_target_correction_contexts, ensure_ascii=False, separators=(",", ":"))}
 MULTI-TARGET CONTRACT (when non-empty):
-{json.dumps(multi_target_correction_contract, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(multi_target_correction_contract, ensure_ascii=False, separators=(",", ":"))}
 If these are non-empty, preserve each subject's independent derived frame and answer every subject.
 
 CALCULATED CAREER FOUNDATION (when non-empty):
-{json.dumps(career_correction_foundation, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(career_correction_foundation, ensure_ascii=False, separators=(",", ":"))}
 If this foundation is non-empty, preserve chart_identities exactly and keep every placement in its own chart frame.
 
 CALCULATED SINGLE-HOUSE FACTS (when non-empty):
-{json.dumps(single_house_correction_facts, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(single_house_correction_facts, ensure_ascii=False, separators=(",", ":"))}
 If these facts are non-empty, obey their fact_contract, keep Parashari and Jaimini reasoning separate, and preserve every required marker.
 
 CALCULATED MARRIED-LIFE FOUNDATION (when non-empty):
-{json.dumps(married_life_correction_facts, ensure_ascii=False, separators=(",", ":"))}
+{llm_json_dumps(married_life_correction_facts, ensure_ascii=False, separators=(",", ":"))}
 If this foundation is non-empty, use it as the sole source and preserve every D1, D9, significator and Jaimini marker.
 
 USER QUESTION:

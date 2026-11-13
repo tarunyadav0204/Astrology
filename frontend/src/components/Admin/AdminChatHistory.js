@@ -2713,6 +2713,23 @@ const AdminChatHistory = () => {
                 </div>
                 {report.summary && <div className="admin-qa-block"><h4>Audit summary</h4><p>{report.summary}</p></div>}
                 {evidenceModal.data.status === 'failed' && <p className="admin-branch-modal-error">{evidenceModal.data.error_message || 'Audit failed.'}</p>}
+                {Array.isArray(report.fact_checks) && (
+                  <div className="admin-qa-block"><h4>Calculator fact checks</h4>
+                    <p>Only extracted claims are checked. Unsupported or ambiguous claims are not a factual pass.</p>
+                    {report.fact_checks.map((check, i) => <details key={i} className="admin-qa-finding" open={check.status === 'mismatch'}>
+                      <summary><strong>{({ unsupported: 'Not verified (coverage)', ambiguous: 'Needs context', invalid_extraction: 'Extraction issue', calculation_failed: 'Calculator error' })[check.status] || check.status}</strong> — {check.quote || 'Invalid extracted claim'}</summary>
+                      <div className="admin-qa-finding-body">
+                        {check.reason && <p>{check.reason}</p>}
+                        {check.status === 'mismatch' || check.status === 'match' ? <>
+                          <p>Claimed: {JSON.stringify(check.asserted_value)} · Calculated: {JSON.stringify(check.calculated_value)}</p>
+                          <p>Evidence: {check.evidence_path}</p>
+                        </> : null}
+                        <pre className="admin-evidence-json">{JSON.stringify(check, null, 2)}</pre>
+                      </div>
+                    </details>)}
+                    <details><summary>Replay and diagnostic details</summary><pre className="admin-evidence-json">{JSON.stringify(report, null, 2)}</pre></details>
+                  </div>
+                )}
                 {Array.isArray(report.claim_checks) && report.claim_checks.length > 0 && (
                   <div className="admin-qa-block"><h4>Claim checks</h4><div className="admin-qa-findings">
                     {report.claim_checks.map((check, i) => <details key={i} className="admin-qa-finding" open={i < 4}>

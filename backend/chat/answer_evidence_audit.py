@@ -10,12 +10,13 @@ import asyncio
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from db import execute, get_conn
 
 logger = logging.getLogger(__name__)
+_AUDIT_TASKS = set()
 
 
 def audit_enabled() -> bool:
@@ -75,7 +76,7 @@ def _calculated_context_packet(context: Any) -> Dict[str, Any] | None:
 
 
 def build_evidence_brief(*, question: str, answer: str, intent: Any, result: Any,
-                         chat_tier: str, calculation_context: Any = None) -> Dict[str, Any]:
+                         chat_tier: str, calculation_context: Any = None, audit_subjects=None, audit_metadata=None) -> Dict[str, Any]:
     """Create a generic, calculation-led brief without sending raw model prose.
 
     Instant/Verified already produce a deterministic verdict/answer specification.
@@ -88,10 +89,12 @@ def build_evidence_brief(*, question: str, answer: str, intent: Any, result: Any
     gate = result.get("answer_gate_metadata") if isinstance(result.get("answer_gate_metadata"), dict) else {}
     information = result.get("information_rounds") if isinstance(result.get("information_rounds"), dict) else {}
     brief: Dict[str, Any] = {
-        "version": 1,
+        "version": 2,
+        "subjects": audit_subjects or {},
+        "generation_metadata": audit_metadata or {},
         "chat_tier": str(chat_tier or "unknown"),
-        "question": str(question or "")[:1800],
-        "answer": str(answer or "")[:6000],
+        "question": str(question or ""),
+        "answer": str(answer or ""),
         "routed_intent": _compact({
             key: intent.get(key) for key in (
                 "category", "mode", "answer_mode", "time_scope", "target_subject",
@@ -122,6 +125,12 @@ def build_evidence_brief(*, question: str, answer: str, intent: Any, result: Any
             "available": False,
             "note": "No full calculator packet was available for this delivery path; do not infer missing chart facts.",
         }
+    # Retained for manual root-cause review, not sent to the extraction model.
+    brief["diagnostics"] = {
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "branches": result.get("specialist_branch_outputs_full") or result.get("specialist_branch_outputs"),
+        "branch_configuration": result.get("parallel_pipeline") or result.get("timing"),
+    }
     return brief
 
 
@@ -139,23 +148,17 @@ def _parse_json(text: str) -> Dict[str, Any]:
 
 async def run_answer_evidence_audit(message_id: int, brief: Dict[str, Any]) -> None:
     """Evaluate a completed answer after persistence; failures are isolated."""
+    output = {}
     try:
         from ai.gemini_chat_analyzer import GeminiChatAnalyzer
-        prompt = """You are an internal Jyotish answer auditor. Return JSON only. Do not rewrite the answer.
-Compare the answer with the supplied evidence brief. The `calculated_context` is the authoritative calculator-backed packet: use it to verify stated placements, house lords, dashas, divisionals, SAV/BAV and transits. Be strict about claims that promise an outcome or timing without evidence, but do not penalize ordinary interpretive language merely because astrology is interpretive.
-
-Required JSON keys:
-question_type (prediction|interpretation|factual|advice|other),
-answer_outcome (yes|no|conditional|unclear|not_applicable),
-claim_strength (none|qualified|strong|guarantee),
-brief_alignment (aligned|partially_aligned|conflicts|insufficient_evidence|not_applicable),
-claim_checks (array; for every material dasha, chart placement, divisional, SAV/BAV, transit, timing, or outcome claim include claim, status=supported|conflicts|not_found, and exact_evidence),
-unsupported_claims (array of concise strings),
-missing_evidence (array of concise strings),
-summary (one concise sentence).
-
-EVIDENCE BRIEF:
-""" + json.dumps(brief, ensure_ascii=False, default=str)
+        from chat.chart_fact_audit import EXTRACTION_PROMPT, compare_claims
+        # The extractor sees the answer and identities, never expected chart values.
+        prompt = EXTRACTION_PROMPT + "\nDATA:\n" + json.dumps({
+            "question": brief.get("question"), "answer": brief.get("answer"),
+            "subjects": {key: {"name": value.get("birth", {}).get("name"),
+                               "chart_id": value.get("chart_id")}
+                         for key, value in brief.get("subjects", {}).items()},
+        }, ensure_ascii=False, default=str)
         output = await GeminiChatAnalyzer().generate_text_from_prompt(
             prompt,
             provider_override="openai",
@@ -166,7 +169,13 @@ EVIDENCE BRIEF:
         )
         if not output.get("success"):
             raise RuntimeError(str(output.get("error") or "auditor returned no result"))
-        report = _parse_json(output.get("response") or "")
+        extraction = _parse_json(output.get("response") or "")
+        query_context = (brief.get("generation_metadata") or {}).get("query_context") or {}
+        as_of = query_context.get("_question_received_at") or query_context.get("client_now_iso") or (brief.get("diagnostics") or {}).get("captured_at")
+        report = await asyncio.to_thread(compare_claims, extraction, brief.get("answer", ""), brief.get("subjects", {}), as_of=as_of)
+        report["generation_metadata"] = brief.get("generation_metadata", {})
+        report["audit_usage"] = output.get("token_usage") or {}
+        report["message_id"] = int(message_id)
         with get_conn() as conn:
             ensure_answer_evidence_audit_table(conn)
             execute(conn, """
@@ -174,7 +183,7 @@ EVIDENCE BRIEF:
                 SET status = %s, evaluator_result = %s, evaluator_provider = %s,
                     evaluator_model = %s, error_message = NULL, completed_at = %s
                 WHERE message_id = %s
-            """, ("completed", json.dumps(report, ensure_ascii=False), output.get("chat_llm_provider"),
+            """, ("completed", json.dumps(report, ensure_ascii=False, default=str), output.get("chat_llm_provider"),
                   output.get("chat_llm_model"), datetime.now(), int(message_id)))
             conn.commit()
     except Exception as exc:
@@ -184,21 +193,27 @@ EVIDENCE BRIEF:
                 ensure_answer_evidence_audit_table(conn)
                 execute(conn, """
                     UPDATE chat_answer_evidence_audits
-                    SET status = %s, error_message = %s, completed_at = %s
+                    SET status = %s, error_message = %s, completed_at = %s, evaluator_result = %s
                     WHERE message_id = %s
-                """, ("failed", str(exc)[:1200], datetime.now(), int(message_id)))
+                """, ("failed", str(exc)[:1200], datetime.now(), json.dumps({
+                    "version": 1, "audit_error_type": type(exc).__name__,
+                    "raw_extraction_response": output.get("response"),
+                    "audit_usage": output.get("token_usage") or {},
+                    "coverage": "audit_failed_not_verified",
+                }, default=str), int(message_id)))
                 conn.commit()
         except Exception:
             logger.exception("answer evidence audit failure could not be saved message_id=%s", message_id)
 
 
 def schedule_answer_evidence_audit(*, message_id: int, question: str, answer: str, intent: Any, result: Any,
-                                   chat_tier: str, calculation_context: Any = None) -> None:
+                                   chat_tier: str, calculation_context: Any = None, audit_subjects=None, audit_metadata=None) -> None:
     if not audit_enabled() or not message_id:
         return
     brief = build_evidence_brief(
         question=question, answer=answer, intent=intent, result=result,
         chat_tier=chat_tier, calculation_context=calculation_context,
+        audit_subjects=audit_subjects, audit_metadata=audit_metadata,
     )
     try:
         with get_conn() as conn:
@@ -213,6 +228,9 @@ def schedule_answer_evidence_audit(*, message_id: int, question: str, answer: st
         logger.exception("answer evidence audit could not be queued message_id=%s", message_id)
         return
     try:
-        asyncio.create_task(run_answer_evidence_audit(int(message_id), brief))
+        loop = asyncio.get_running_loop()
+        task = loop.create_task(run_answer_evidence_audit(int(message_id), brief))
+        _AUDIT_TASKS.add(task)
+        task.add_done_callback(_AUDIT_TASKS.discard)
     except RuntimeError:
         logger.warning("No event loop available to run answer evidence audit message_id=%s", message_id)

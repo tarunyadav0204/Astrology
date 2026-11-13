@@ -1085,6 +1085,8 @@ class GeminiChatAnalyzer:
                                 api_key,
                                 gemini_thinking_level,
                                 system_prompt,
+                                timeout_s=timeout_s,
+                                cached_content_name=getattr(model_override, 'cached_content', None),
                             ),
                             timeout=timeout_s,
                         )

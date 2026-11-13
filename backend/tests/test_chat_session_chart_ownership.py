@@ -136,3 +136,33 @@ def test_fact_lookup_is_scoped_to_chart_owner(monkeypatch):
     assert "INNER JOIN birth_charts AS bc" in sql
     assert "bc.userid = %s" in sql
     assert params == (42, 17)
+
+
+@pytest.mark.parametrize('payload_id', [None, 10322, 10325])
+def test_chart_binding_rejects_other_native_even_without_id(monkeypatch, payload_id):
+    """The IVF regression: Diksha session with Apurva's birth details."""
+    from encryption_utils import EncryptionManager
+    monkeypatch.setattr(EncryptionManager, '__init__', lambda self: None)
+    monkeypatch.setattr(EncryptionManager, 'decrypt_chart_data', lambda self, row: row)
+    monkeypatch.setattr(routes, 'execute', lambda *args: _Cursor(
+        ('Diksha Dwivedi', '1990-01-01', '10:00', 28.6, 77.2)))
+    payload = dict(name='Apurva Yadav', date='1992-02-02', time='11:00', latitude=28.6, longitude=77.2)
+    if payload_id is not None:
+        payload['id'] = payload_id
+    with pytest.raises(HTTPException) as error:
+        routes._require_session_chart_matches(object(), 10322, 18, payload)
+    assert error.value.status_code == 409
+    assert 'CHART_SESSION_MISMATCH' in error.value.detail
+
+
+@pytest.mark.parametrize('include_id', [False, True])
+def test_chart_binding_accepts_matching_legacy_or_current_payload(monkeypatch, include_id):
+    from encryption_utils import EncryptionManager
+    monkeypatch.setattr(EncryptionManager, '__init__', lambda self: None)
+    monkeypatch.setattr(EncryptionManager, 'decrypt_chart_data', lambda self, row: row)
+    monkeypatch.setattr(routes, 'execute', lambda *args: _Cursor(
+        ('Apurva Yadav', '1992-02-02', '11:00:00', 28.6, 77.2)))
+    payload = dict(name='Apurva Yadav', date='1992-02-02T00:00:00', time='11:00', latitude='28.6', longitude='77.2')
+    if include_id:
+        payload['id'] = 10325
+    routes._require_session_chart_matches(object(), 10325, 18, payload)

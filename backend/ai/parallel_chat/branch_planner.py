@@ -101,6 +101,15 @@ def _planner_prompt(
     context_summary: Dict[str, Any],
     allowed_branches: List[str],
 ) -> str:
+    capabilities = {'parashari': 'core promise, house lords, divisional grounding, dasha backbone, main prediction structure', 'jaimini': 'chara karakas, UL/DK/A7, argala, chara-dasha relational and role-based framing', 'nadi': 'compressed signature-style karmic patterning, dominant graha linkage, repeating life motifs', 'nakshatra': 'nakshatra/pada/Tara/pushkara nuance, subtle motivation and timing texture', 'kp': 'cusp and sub-lord precision, sharper trigger/timing confirmation, yes-no narrowing', 'ashtakavarga': 'strength/filtering, support vs depletion, transit carrying capacity', 'sudarshan': 'Lagna/Moon/Sun three-frame synthesis, current activation across body-mind-soul'}
+    capability_text = '\n'.join(f'- {b}: {capabilities[b]}' for b in allowed_branches if b in capabilities)
+    example = {
+        'required_branches': ['parashari'] if 'parashari' in allowed_branches else allowed_branches[:1],
+        'optional_branches': [],
+        'branch_scores': {b: 1.0 if b == 'parashari' else 0.0 for b in allowed_branches},
+        'reasoning': {b: 'Explain selection or omission within the allowed scope' for b in allowed_branches},
+        'confidence': 0.0,
+    }
     return f"""
 You are a multilingual branch planner for an astrology system. Your job is NOT to answer the user's question.
 Your only job is to choose the MINIMUM specialist branches needed for a high-confidence answer.
@@ -114,14 +123,8 @@ RULES:
 - If uncertain, prefer a slightly broader but still disciplined set.
 - You are planning branches, not writing astrology.
 
-BRANCH CAPABILITIES:
-- parashari: core promise, house lords, divisional grounding, dasha backbone, main prediction structure
-- jaimini: chara karakas, UL/DK/A7, argala, chara-dasha relational and role-based framing
-- nadi: compressed signature-style karmic patterning, dominant graha linkage, repeating life motifs
-- nakshatra: nakshatra/pada/Tara/pushkara nuance, subtle motivation and timing texture
-- kp: cusp and sub-lord precision, sharper trigger/timing confirmation, yes-no narrowing
-- ashtakavarga: strength/filtering, support vs depletion, transit carrying capacity
-- sudarshan: Lagna/Moon/Sun three-frame synthesis, current activation across body-mind-soul
+BRANCH CAPABILITIES (eligible methods only):
+{capability_text}
 
 CURRENT REQUEST SUMMARY:
 {json.dumps(context_summary, ensure_ascii=False)}
@@ -136,26 +139,12 @@ USER QUESTION:
 {user_question}
 
 Return ONLY JSON with this schema:
-{{
-  "required_branches": ["parashari", "kp"],
-  "optional_branches": ["nakshatra"],
-  "branch_scores": {{
-    "parashari": 1.0,
-    "kp": 0.82,
-    "nakshatra": 0.61
-  }},
-  "reasoning": {{
-    "parashari": "Needed for promise and dasha backbone",
-    "kp": "Needed for timing precision",
-    "nakshatra": "Helpful for fine-grained nuance"
-  }},
-  "confidence": 0.0
-}}
+{json.dumps(example, ensure_ascii=False)}
 
 CONSTRAINTS:
 - confidence must be a number between 0 and 1
 - required_branches and optional_branches must be subsets of ALLOWED_BRANCHES
-- required_branches should usually contain 2 to 4 items
+- Select only eligible methods; no minimum branch count. Never compensate for an excluded method by asking another branch or the merge to perform it.
 - optional_branches should be empty or small
 - If the question is broad and chart-wide, prefer parashari plus the most additive specialists
 - If the question is narrowly chart-specific, keep the set tight

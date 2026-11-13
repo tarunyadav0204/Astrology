@@ -3,6 +3,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMe
 import { useNavigate } from 'react-router-dom';
 import { adminService, getAdminAuthHeaders, getDeviceId } from '../../services/adminService';
 import AdminChatHistory from './AdminChatHistory';
+import AdminEvidenceErrors from './AdminEvidenceErrors';
 import AdminPaidChatReport from './AdminPaidChatReport';
 import ModelSettings from './ModelSettings';
 import AdminEventTimelineHistory from './AdminEventTimelineHistory';
@@ -532,6 +533,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
   const [standardPremiumIntentRouterProvider, setStandardPremiumIntentRouterProvider] = useState('');
   const [sarvamStandardPremiumIntentModel, setSarvamStandardPremiumIntentModel] = useState('sarvam-105b');
   const [parallelBranchGeminiModels, setParallelBranchGeminiModels] = useState(DEFAULT_PARALLEL_BRANCH_MODELS);
+  const [parallelBranchEnabled, setParallelBranchEnabled] = useState({ standard: {}, premium: {} });
   const [parallelBranchPlannerEnabled, setParallelBranchPlannerEnabled] = useState(false);
   const [parallelBranchPlannerModel, setParallelBranchPlannerModel] = useState('');
   const [parallelBranchWordLimits, setParallelBranchWordLimits] = useState(DEFAULT_PARALLEL_BRANCH_WORD_LIMITS);
@@ -1050,6 +1052,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
         ...DEFAULT_PARALLEL_BRANCH_MODELS,
         ...(data.parallel_branch_gemini_models || {}),
       });
+      setParallelBranchEnabled(data.parallel_branch_enabled || { standard: {}, premium: {} });
       setParallelBranchPlannerEnabled(Boolean(data.parallel_branch_planner_enabled));
       setParallelBranchPlannerModel(data.parallel_branch_planner_model || data.gemini_instant_chat_model || '');
       setParallelBranchWordLimits({
@@ -4064,6 +4067,7 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
           >
             Paid report
           </button>
+          <button type="button" className={`subtab ${activeSubTab === 'evidenceErrors' ? 'active' : ''}`} onClick={() => setActiveSubTab('evidenceErrors')}>Evidence Errors</button>
           <button type="button" className={`subtab ${activeSubTab === 'toolActivity' ? 'active' : ''}`} onClick={() => setActiveSubTab('toolActivity')}>
             Chat Tools Activity
           </button>
@@ -4883,6 +4887,8 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
             )}
           </div>
         )}
+
+        {activeTab === 'chat' && activeSubTab === 'evidenceErrors' && <AdminEvidenceErrors />}
 
         {activeTab === 'chat' && activeSubTab === 'toolActivity' && (<AdminChatToolActivity />)}
 
@@ -6720,7 +6726,14 @@ const AdminPanel = ({ user, onLogout, onAdminClick, onLogin, showLoginButton, on
 ]} advanced={[
   { id: 'verifiedPreparation', title: 'Verified preparation', description: 'Choose the question router and evidence planner independently from the Verified answer model.', providerLabel: 'OpenAI', fields: [extraModelField('verified_router_model', 'Question router'), extraModelField('verified_planner_model', 'Evidence planner')] },
   { id: 'branchPlanner', title: 'Specialist selection', description: 'Chooses which specialist branches run in the parallel chat pipeline.', providerLabel: 'Gemini / OpenAI', fields: [{ key: 'parallel_branch_planner_enabled', label: 'Enable specialist selection', type: 'checkbox', value: parallelBranchPlannerEnabled, set: setParallelBranchPlannerEnabled }, modelField('parallel_branch_planner_model', 'Planner model', parallelBranchPlannerModel, setParallelBranchPlannerModel, 'mixed')] },
-  ...PARALLEL_BRANCH_MODEL_CONFIG.map(branch => ({ id: branch.key, title: branch.label, description: 'Choose a Gemini or OpenAI model for this specialist branch.', providerLabel: 'Gemini / OpenAI', fields: [modelField('parallel_branch_gemini_model_' + branch.key, 'Model', parallelBranchGeminiModels[branch.key], value => setParallelBranchGeminiModels(previous => ({ ...previous, [branch.key]: value })), 'mixed'), { key: 'parallel_branch_word_limit_' + branch.key, label: 'Target word limit', type: 'number', min: 80, max: 4000, value: parallelBranchWordLimits[branch.key], set: value => setParallelBranchWordLimits(previous => ({ ...previous, [branch.key]: value })) }] })),
+  ...PARALLEL_BRANCH_MODEL_CONFIG.map(branch => ({ id: branch.key, title: branch.label, description: ['parashari', 'merge'].includes(branch.key) ? 'Always enabled for Standard and Premium.' : 'Choose eligibility for single-chart Standard and Premium chat. The question and specialist selector may narrow enabled branches further.', providerLabel: 'Gemini / OpenAI', fields: [
+    ...(['parashari', 'merge'].includes(branch.key) ? [] : ['standard', 'premium'].map(tier => ({
+      key: `parallel_branch_enabled_${tier}_${branch.key}`,
+      label: `${tier === 'standard' ? 'Standard' : 'Premium'} enabled`, type: 'checkbox',
+      value: parallelBranchEnabled[tier]?.[branch.key] !== false,
+      set: value => setParallelBranchEnabled(previous => ({ ...previous, [tier]: { ...previous[tier], [branch.key]: value } })),
+    }))),
+    modelField('parallel_branch_gemini_model_' + branch.key, 'Model', parallelBranchGeminiModels[branch.key], value => setParallelBranchGeminiModels(previous => ({ ...previous, [branch.key]: value })), 'mixed'), { key: 'parallel_branch_word_limit_' + branch.key, label: 'Target word limit', type: 'number', min: 80, max: 4000, value: parallelBranchWordLimits[branch.key], set: value => setParallelBranchWordLimits(previous => ({ ...previous, [branch.key]: value })) }] })),
 ]} />}
             {settingsSubTab === 'speech' && (
               <div className="settings-subtab-group">

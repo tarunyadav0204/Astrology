@@ -4446,14 +4446,26 @@ button.chat-header-credits.credits-display:focus-visible {
 
 .chat-sentiment-label { font-size:0.75em; font-weight:600; white-space:nowrap; opacity:0.9; }
 
-/* Partnership choices must fit narrow composers and enlarged text. */
-.chat-partnership-tiers .chat-mode-option__label,
-.chat-partnership-tiers .chat-mode-option__cost {
-    display: block;
-    overflow-wrap: anywhere;
+/* Partnership choices: compact label + credit pill, not a full-width cost row. */
+.chat-partnership-tiers {
+    margin-top: 12px;
 }
 .chat-partnership-tiers .chat-mode-option {
-    padding: 9px 6px;
+    padding: 9px 10px;
+}
+.chat-partnership-tiers .chat-mode-option__label {
+    min-width: 0;
+    font-weight: 750;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.chat-partnership-tiers .chat-mode-option__cost {
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: auto;
+    max-width: max-content;
+    white-space: nowrap;
 }
 @media (max-width: 360px) {
     .chat-partnership-tiers { gap: 4px; }

@@ -234,6 +234,47 @@ def _require_birth_chart_owner(conn, birth_chart_id: int | None, user_id: int) -
         raise HTTPException(status_code=404, detail="Birth chart not found")
 
 
+def _require_session_chart_matches(conn, birth_chart_id, user_id, birth_details):
+    """Check the payload against the memory owner, including legacy ID-less clients.
+
+    An ID alone is insufficient: a client can retain an old ID while replacing
+    birth details. Validate the actual chart before reading or writing memories.
+    """
+    if birth_chart_id is None:
+        return
+    requested_id = _birth_chart_id_from_birth_details(birth_details)
+    mismatch = requested_id is not None and requested_id != int(birth_chart_id)
+    if not mismatch:
+        row = execute(conn,
+            "SELECT name, date, time, latitude, longitude FROM birth_charts WHERE id = %s AND userid = %s",
+            (birth_chart_id, user_id)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Birth chart not found")
+        from encryption_utils import EncryptionManager
+        stored = EncryptionManager().decrypt_chart_data(dict(zip(
+            ("name", "date", "time", "latitude", "longitude"), row)))
+        supplied = coerce_chat_birth_details(birth_details) or {}
+        def text(value):
+            return " ".join(str(value or "").split()).casefold()
+        try:
+            mismatch = (
+                text(stored['name']) != text(supplied.get('name'))
+                or str(stored['date'])[:10] != str(supplied.get('date', ''))[:10]
+                or str(stored['time'])[:5] != str(supplied.get('time', ''))[:5]
+                or abs(float(stored['latitude']) - float(supplied.get('latitude'))) > 0.0001
+                or abs(float(stored['longitude']) - float(supplied.get('longitude'))) > 0.0001
+            )
+            # NaN/Infinity must not bypass comparisons.
+            import math
+            mismatch = mismatch or not all(math.isfinite(float(supplied.get(k))) for k in ('latitude', 'longitude'))
+        except (TypeError, ValueError):
+            mismatch = True
+    if mismatch:
+        raise HTTPException(status_code=409, detail=(
+            "CHART_SESSION_MISMATCH: birth_details do not match this chat session. "
+            "Create a new session for the selected chart."))
+
+
 def _debug_preview(value, limit: int = 240) -> str:
     text = " ".join(str(value or "").split())
     if len(text) <= limit:
@@ -2254,15 +2295,7 @@ async def ask_question_async(request: dict, background_tasks: BackgroundTasks, c
             conn.commit()
             session_birth_chart_id = requested_chart_id
 
-        if session_birth_chart_id is not None:
-            if requested_chart_id is not None and int(session_birth_chart_id) != int(requested_chart_id):
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "CHART_SESSION_MISMATCH: birth_details chart id does not match this chat session. "
-                        "Create a new session for the selected chart."
-                    ),
-                )
+        _require_session_chart_matches(conn, session_birth_chart_id, current_user.userid, birth_details)
 
         # Current clock and prior reading are trusted routing inputs, never sticky method overrides.
         state_row = execute(conn, 'SELECT clarification_count, extracted_context FROM conversation_state WHERE session_id = %s', (session_id,)).fetchone()
@@ -4040,6 +4073,7 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             cur = execute(conn, "SELECT birth_chart_id FROM chat_sessions WHERE session_id = %s", (session_id,))
             session_data = cur.fetchone()
             birth_chart_id = session_data[0] if session_data else None
+            _require_session_chart_matches(conn, birth_chart_id, user_id, birth_details)
         _chat_log_event(
             "chat_processing_phase",
             message_id=message_id,
@@ -5987,6 +6021,10 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
             # evaluator result for quality review.
             try:
                 from chat.answer_evidence_audit import schedule_answer_evidence_audit
+                from chat.chart_fact_audit import snapshot_subject
+                audit_subjects = {"native": snapshot_subject(birth_data, (birth_details or {}).get('id') or (birth_details or {}).get('chart_id'))}
+                if partnership_mode and partner_birth_details:
+                    audit_subjects["partner"] = snapshot_subject(partner_birth_details)
 
                 schedule_answer_evidence_audit(
                     message_id=int(message_id),
@@ -5994,8 +6032,14 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                     answer=str(result.get('response') or ''),
                     intent=intent,
                     result=result,
-                    chat_tier=effective_chat_tier,
+                    chat_tier='speech' if is_speech_chat else effective_chat_tier,
                     calculation_context=context,
+                    audit_subjects=audit_subjects,
+                    audit_metadata={"session_id": session_id, "user_id": user_id,
+                                    "model": result.get('chat_llm_model'),
+                                    "provider": result.get('chat_llm_provider'),
+                                    "query_context": (intent or {}).get('query_context'),
+                                    "partnership_mode": bool(partnership_mode)},
                 )
             except Exception:
                 logger.exception("answer_evidence_audit_schedule_failed message_id=%s", message_id)

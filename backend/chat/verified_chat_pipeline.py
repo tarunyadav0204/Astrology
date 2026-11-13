@@ -8,6 +8,7 @@ the following deterministic stage is the only source of astrological facts.
 from __future__ import annotations
 
 import json
+from chat.llm_chart_normalization import llm_json_dumps
 import asyncio
 import logging
 import os
@@ -185,7 +186,7 @@ def _compact_visible_calculation_summary(value: Any, limit: int = 260) -> str:
 
 def _json_limit(value: Any, limit: int = 14000) -> Any:
     """Keep the reviewer deterministic-context payload bounded and valid JSON."""
-    encoded = json.dumps(value, ensure_ascii=False, default=str)
+    encoded = llm_json_dumps(value, ensure_ascii=False, default=str)
     if len(encoded) <= limit:
         return value
     return {"truncated": True, "preview": encoded[:limit]}
@@ -200,7 +201,7 @@ def _compact_sarvam_tool_payload(value: Any, limit: int) -> Any:
     evidence branch a fair JSON budget instead of keeping only a prefix of the
     whole packet (which tends to discard the topic evidence at the end).
     """
-    encoded = json.dumps(value, ensure_ascii=False, default=str)
+    encoded = llm_json_dumps(value, ensure_ascii=False, default=str)
     if len(encoded) <= limit:
         return value
     if not isinstance(value, dict) or not value:
@@ -1701,7 +1702,7 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
         baseline_outputs.append({
             "type": "function_call_output",
             "call_id": str(getattr(call, "call_id", "")),
-            "output": json.dumps(baseline, ensure_ascii=False, default=str),
+            "output": llm_json_dumps(baseline, ensure_ascii=False, default=str),
         })
         information_rounds.append({"round": 0, "kind": "baseline", "calculator": "election.muhurat" if is_muhurat else "prashna.parashari" if is_prashna else "get_instant_baseline",
             "requested": muhurat_request if is_muhurat else prashna_context if is_prashna else {}, "provided": json.loads(baseline_outputs[-1]["output"]), "success": baseline.get("status") != "unsupported" if is_muhurat else True})
@@ -1741,7 +1742,7 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
                     result = {"accepted": False, "error": "invalid_calculation_update"}
                 outputs.append({
                     "type": "function_call_output", "call_id": call_id,
-                    "output": json.dumps(result, ensure_ascii=False),
+                    "output": llm_json_dumps(result, ensure_ascii=False),
                 })
                 information_rounds.append({
                     "round": calculator_round, "kind": "progress_update",
@@ -1799,7 +1800,7 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
                         unavailable.append({'code': 'calculation_unavailable', 'capability_id': capability, 'chart_subject': subject})
             outputs.append({
                 "type": "function_call_output", "call_id": call_id,
-                "output": json.dumps(result, ensure_ascii=False, default=str),
+                "output": llm_json_dumps(result, ensure_ascii=False, default=str),
             })
             information_rounds.append({"round": calculator_round, "kind": "calculation", "calculator": capability,
                 "requested": args, "provided": json.loads(outputs[-1]["output"]),
@@ -1851,7 +1852,7 @@ You are Luna in a live, two-way conversation. The supplied calculations are star
         "role": "user",
         "content": [{
             "type": "input_text",
-            "text": (PARTNERSHIP_CONTRACT + "\nWrite the final answer now in the requested language and answer style, using the evidence supplied for both charts." if pair else muhurat_contract(response_style, muhurat_request) + "\nAUTHORITATIVE CURRENT SEARCH RESULT:\n" + json.dumps({
+            "text": (PARTNERSHIP_CONTRACT + "\nWrite the final answer now in the requested language and answer style, using the evidence supplied for both charts." if pair else muhurat_contract(response_style, muhurat_request) + "\nAUTHORITATIVE CURRENT SEARCH RESULT:\n" + llm_json_dumps({
                 'status':baseline.get('status'), 'result_meaning':baseline.get('result_meaning'),
                 'candidate_count':len(baseline.get('candidates') or []),
                 'total_candidates':baseline.get('total_candidates'), 'days_evaluated':baseline.get('days_evaluated'),
@@ -2152,7 +2153,7 @@ async def run_sarvam_verified_calculator_agent(
         tool_events.append({"round": round_no, "tool": capability, "success": success})
         information_rounds.append({"round": round_no, "kind": "calculation", "calculator": capability,
                                    "requested": args, "provided": result, "success": success})
-        serialized = json.dumps(result, ensure_ascii=False, default=str)
+        serialized = llm_json_dumps(result, ensure_ascii=False, default=str)
         sent_chars += len(serialized)
         return {"role": "tool", "tool_call_id": str(call.get("id") or ""), "content": serialized}
 
@@ -2293,7 +2294,7 @@ async def run_sarvam_verified_calculator_agent(
             + "\n".join(fact_reference_card)
             + "\n\n"
             "IMMUTABLE FACT LEDGER (calculated evidence; never show this label or its IDs to the user):\n"
-            + json.dumps(fact_ledger, ensure_ascii=False, default=str)
+            + llm_json_dumps(fact_ledger, ensure_ascii=False, default=str)
             + "\n\nSubmit the complete answer through submit_verified_answer. Add every canonical ID that supports a stated "
               "chart, dasha, divisional-chart, SAV or BAV fact to fact_ids. The IDs are hidden metadata, not prose.\n"
             + json.dumps(fact_ids, ensure_ascii=False, default=str)
@@ -2503,7 +2504,7 @@ PREMIUM OUTPUT FORMAT:
 Question: {question}
 
 Raw deterministic calculation packet:
-{json.dumps(_json_limit(raw_packet, 250000), ensure_ascii=False, default=str)}"""
+{llm_json_dumps(_json_limit(raw_packet, 250000), ensure_ascii=False, default=str)}"""
     return {
         "system_prompt": writer_system,
         "user_prompt": writer_prompt,

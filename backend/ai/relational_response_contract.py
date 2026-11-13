@@ -47,7 +47,7 @@ class RelationalResponseContract:
     )
 
     @classmethod
-    def validate(cls, text: str, profile: Dict[str, Any], question: str | None = None) -> Tuple[bool, List[str]]:
+    def validate(cls, text: str, profile: Dict[str, Any], question: str | None = None, enabled_methods=None) -> Tuple[bool, List[str]]:
         errors: List[str] = []
         if not text or len(text.strip()) < 40:
             return False, ["response_too_short"]
@@ -79,7 +79,7 @@ class RelationalResponseContract:
                     errors.append(f"forbidden_generic_section:{heading}")
 
         if event_topic == "general_relationship" and behavior_question:
-            if "nakshatra" not in lower:
+            if (enabled_methods is None or "nakshatra" in enabled_methods) and "nakshatra" not in lower:
                 errors.append("missing_behavior_texture_nakshatra")
             if not any(sign in lower for sign in (
                 "aries", "taurus", "gemini", "cancer", "leo", "virgo",

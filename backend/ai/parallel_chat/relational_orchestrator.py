@@ -19,6 +19,7 @@ from ai.parallel_chat.orchestrator import (
     _log_parallel_llm_summary,
     _run_branch_json,
     _totals_from_rows,
+    _fact_reasoning_options,
 )
 from ai.parallel_chat.config import parallel_branch_stagger_s
 from ai.parallel_chat.presentation_style import (
@@ -44,9 +45,18 @@ from ai.term_matcher import find_terms_in_text
 from utils.admin_settings import (
     get_chat_llm_provider,
     get_chat_llm_provider_premium,
-    get_gemini_chat_model,
-    get_gemini_premium_model,
+    get_gemini_relational_model,
+    get_parallel_branch_enabled,
 )
+from ai.parallel_chat.relational_shared import (
+    build_relational_shared, relational_call_payload, RELATIONAL_FACT_RULES,
+)
+
+from ai.parallel_chat.relational_scope import (
+    relational_methods, scoped_relational_evidence, scoped_relational_instructions,
+    relational_response_format,
+)
+from ai.parallel_chat.method_scope import method_scope_instruction
 
 logger = logging.getLogger(__name__)
 
@@ -115,22 +125,27 @@ async def run_parallel_relational_chat_pipeline(
     payloads = build_relational_branch_payloads(ctx, user_question)
     relation_profile = build_relationship_profile(ctx, user_question)
     evidence_spine = build_relational_evidence_spine(ctx, user_question)
-    enabled_branches = _enabled_relational_branches(evidence_spine)
+    eligibility = get_parallel_branch_enabled(premium_analysis)
+    enabled_branches = [b for b in _enabled_relational_branches(evidence_spine)
+                        if eligibility.get(b.removesuffix('_relational'), True)]
+    methods = relational_methods(enabled_branches)
+    evidence_spine = scoped_relational_evidence(evidence_spine, methods)
+    payloads = {b: scoped_relational_evidence(payloads[b], methods) for b in enabled_branches}
     stagger_s = parallel_branch_stagger_s()
     llm_provider = get_chat_llm_provider_premium() if premium_analysis else get_chat_llm_provider()
-    gemini_model_name = get_gemini_premium_model() if premium_analysis else get_gemini_chat_model()
-    cache_payload = {
-        "relationship": relation_profile,
-        "relational_evidence": evidence_spine,
-        "history": conversation_history or [],
-        "current_question": user_question,
-    }
+    gemini_model_name = get_gemini_relational_model()
+    cache_payload = scoped_relational_evidence(
+        build_relational_shared(ctx, relation_profile, evidence_spine, conversation_history), methods)
     cache_resource, cached_model, cache_setup_input_chars, cache_setup_input_tokens = await _create_gemini_parallel_cache(
         llm_provider=llm_provider,
         model_name=gemini_model_name,
         cache_payload=cache_payload,
         cache_label="parallel_relational",
     )
+    cache_usage = getattr(cache_resource, 'usage_metadata', None)
+    measured_setup_tokens = int(getattr(cache_usage, 'total_token_count', 0) or 0)
+    if measured_setup_tokens:
+        cache_setup_input_tokens = measured_setup_tokens
 
     tasks = []
     for idx, branch in enumerate(enabled_branches):
@@ -138,14 +153,17 @@ async def run_parallel_relational_chat_pipeline(
             asyncio.create_task(
                 _run_branch_json(
                     analyzer,
-                    build_relational_branch_static(branch),
-                    payloads[branch],
+                    scoped_relational_instructions(build_relational_branch_static(branch) + RELATIONAL_FACT_RULES, methods)
+                    + method_scope_instruction(methods, branch.removesuffix('_relational') if branch != 'timing_relational' else 'merge'),
+                    relational_call_payload(payloads[branch], cache_payload, cached=bool(cached_model)),
                     premium_analysis,
                     branch,
                     critical=branch == "parashari_relational",
                     start_delay_s=idx * stagger_s,
                     model_override=cached_model,
-                    model_name_override=gemini_model_name if cached_model else None,
+                    model_name_override=gemini_model_name if llm_provider == 'gemini' else None,
+                    stage_provider=llm_provider,
+                    cached_shared_context_keys=list(cache_payload) if cached_model else None,
                 )
             )
         )
@@ -158,7 +176,6 @@ async def run_parallel_relational_chat_pipeline(
     branch_llm_rows = [metrics for _out, metrics in branch_results]
     parallel_ms = round((time.time() - t_parallel) * 1000, 1)
 
-    hist_text = _format_history(conversation_history)
     try:
         from ai.output_schema import (
             build_compound_choice_focus_instruction,
@@ -171,6 +188,7 @@ async def run_parallel_relational_chat_pipeline(
         )
     except ImportError:
         mq_focus = build_multi_question_focus_instruction(str(language or "english"))
+    branch_outputs = {b: scoped_relational_evidence(out, methods) for b, out in branch_outputs.items()}
     compact_branches = {branch: _compact_branch_output(branch, branch_outputs[branch]) for branch in enabled_branches}
     merge_bundle = {
         "relationship": relation_profile,
@@ -182,7 +200,8 @@ async def run_parallel_relational_chat_pipeline(
         },
         "enabled_branches": list(enabled_branches),
     }
-    merge_static = build_relational_merge_static(language or "english")
+    merge_static = scoped_relational_instructions(
+        build_relational_merge_static(language or "english") + RELATIONAL_FACT_RULES, methods)
     simple_presentation_instruction = build_simple_merge_instruction(response_style)
     if simple_presentation_instruction:
         merge_static = "\n\n".join(
@@ -195,12 +214,16 @@ async def run_parallel_relational_chat_pipeline(
                 simple_presentation_instruction,
             ]
         )
+    merge_shared = (
+        'Use the cached shared relational context.\n' if cached_model else
+        f"SHARED_RELATIONAL_CONTEXT_JSON:\n{_json_compact(cache_payload)}\n"
+    )
+    writer_bundle = {k: v for k, v in merge_bundle.items() if k not in ('relationship', 'relational_evidence')}
     merge_user = (
         f"CURRENT_DATE: {datetime.now().strftime('%Y-%m-%d')}\n"
-        f"RELATIONSHIP_PROFILE_JSON:\n{_json_compact(relation_profile)}\n\n"
-        f"RELATIONAL_EVIDENCE_SPINE_JSON:\n{_json_compact(evidence_spine)}\n\n"
-        f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n{_json_compact(merge_bundle)}\n"
-        f"{hist_text}\n{mq_focus}\nCURRENT QUESTION: {user_question}\n"
+        f"{merge_shared}"
+        f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n{_json_compact(writer_bundle)}\n"
+        f"{mq_focus}\nCURRENT QUESTION: {user_question}\n"
         f"{NEXT_ACTION_META_INSTRUCTION.strip()}\n{FAQ_META_INSTRUCTION.strip()}"
     )
     final_presentation_override = build_simple_final_precedence_block(
@@ -218,19 +241,26 @@ async def run_parallel_relational_chat_pipeline(
         # This must remain last: the shared Simple formatter deliberately makes
         # headings optional, while two-chart answers need visible navigation.
         merge_prompt = f"{merge_prompt}\n\n{relational_structure_override}"
+    merge_prompt += '\nFINAL EVIDENCE CHECK:\n' + scoped_relational_instructions(RELATIONAL_FACT_RULES, methods)
+    merge_prompt += relational_response_format(methods) + method_scope_instruction(methods)
     if os.environ.get("ASTRO_PARALLEL_LOG_PROMPT_BODIES", "").strip().lower() in {"1", "true", "yes"}:
         preview_chars = int(os.environ.get("ASTRO_PARALLEL_LOG_PROMPT_BODIES_MAX_CHARS", "6000") or "6000")
         prompt_preview = merge_prompt if preview_chars <= 0 else merge_prompt[:preview_chars]
         logger.info("PARALLEL_RELATIONAL_MERGE_PROMPT_START\n%s\nPARALLEL_RELATIONAL_MERGE_PROMPT_END", prompt_preview)
 
     t_syn = time.time()
-    syn = await analyzer.generate_text_from_prompt(
-        merge_prompt,
-        premium_analysis=premium_analysis,
-        model_override=cached_model,
-        model_name_override=gemini_model_name if cached_model else None,
-        llm_log_tag="parallel_relational_merge",
-    )
+    try:
+        syn = await analyzer.generate_text_from_prompt(
+            merge_prompt,
+            premium_analysis=premium_analysis,
+            model_override=cached_model,
+            model_name_override=gemini_model_name if llm_provider == 'gemini' else None,
+            provider_override=llm_provider,
+            **_fact_reasoning_options(llm_provider, gemini_model_name),
+            llm_log_tag="parallel_relational_merge",
+        )
+    finally:
+        await _delete_parallel_cache(cache_resource, cache_label="parallel_relational")
     synthesis_ms = round((time.time() - t_syn) * 1000, 1)
     merge_raw = (syn.get("response") or "") if isinstance(syn, dict) else ""
     merge_ok = bool(syn.get("success") and merge_raw)
@@ -256,6 +286,9 @@ async def run_parallel_relational_chat_pipeline(
     if cache_setup_input_tokens > 0:
         totals["cache_setup_input_chars"] = int(cache_setup_input_chars)
         totals["cache_setup_input_tokens"] = int(cache_setup_input_tokens)
+        totals["cache_setup_tokens_basis"] = 'provider' if measured_setup_tokens else 'estimated_chars'
+        totals["cache_setup_targets"] = [{"llm_model": gemini_model_name,
+            "input_tokens": cache_setup_input_tokens, "input_chars": cache_setup_input_chars}]
     usage_payload = {
         "stages": usage_rows,
         "totals": totals,
@@ -271,7 +304,6 @@ async def run_parallel_relational_chat_pipeline(
 
     if not merge_ok:
         _log_parallel_llm_summary(usage_rows)
-        await _delete_parallel_cache(cache_resource, cache_label="parallel_relational")
         return {
             "success": False,
             "response": "I could not generate the relational synthesis. Please try again.",
@@ -291,7 +323,6 @@ async def run_parallel_relational_chat_pipeline(
     cleaned_text, faq_metadata = ResponseParser.parse_faq_metadata(cleaned_text)
     if len(cleaned_text) < 50:
         _log_parallel_llm_summary(usage_rows)
-        await _delete_parallel_cache(cache_resource, cache_label="parallel_relational")
         return {
             "success": False,
             "response": "I received a partial relational response. Please try again.",
@@ -322,6 +353,7 @@ async def run_parallel_relational_chat_pipeline(
         parsed["content"] + ("\nFAQ_META: " + json.dumps(faq_metadata) if faq_metadata else ""),
         relation_profile,
         question=user_question,
+        enabled_methods=methods,
     )
     if not contract_ok:
         logger.warning("RELATIONAL_RESPONSE_CONTRACT failed: %s", ", ".join(contract_errors))
@@ -342,7 +374,6 @@ async def run_parallel_relational_chat_pipeline(
         "cache_setup_input_tokens": int(totals.get("cache_setup_input_tokens") or 0),
     }
     _log_parallel_llm_summary(usage_rows)
-    await _delete_parallel_cache(cache_resource, cache_label="parallel_relational")
 
     return {
         "success": True,

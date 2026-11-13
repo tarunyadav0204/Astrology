@@ -513,6 +513,12 @@ def get_gemini_premium_model() -> str:
     return DEFAULT_GEMINI_PREMIUM_MODEL
 
 
+def get_gemini_relational_model() -> str:
+    """Two-chart parallel writers use Flash unless explicitly configured otherwise."""
+    value = get_setting("gemini_relational_model")
+    return value.strip() if value and value.strip() else "models/gemini-3-flash-preview"
+
+
 def get_gemini_analysis_model() -> str:
     """Model ID for analysis features (health, wealth, career, karma, physical, etc.). From admin_settings or default."""
     value = get_setting("gemini_analysis_model")
@@ -713,6 +719,25 @@ def get_parallel_branch_word_limit(branch_label: str) -> int:
     except (TypeError, ValueError):
         return default
     return max(80, min(4000, parsed))
+
+
+PARALLEL_OPTIONAL_BRANCHES = ("jaimini", "nadi", "nakshatra", "kp", "ashtakavarga", "sudarshan")
+PARALLEL_BRANCH_ENABLED_KEYS = {
+    f"parallel_branch_enabled_{tier}_{branch}"
+    for tier in ("standard", "premium")
+    for branch in PARALLEL_OPTIONAL_BRANCHES
+}
+
+
+def get_parallel_branch_enabled(premium_analysis: bool = False) -> Dict[str, bool]:
+    """Tier-specific eligibility; unset settings preserve the existing branch set."""
+    tier = "premium" if premium_analysis else "standard"
+    return {
+        "parashari": True,
+        "merge": True,
+        **{branch: _parse_bool_setting(get_setting(f"parallel_branch_enabled_{tier}_{branch}"), True)
+           for branch in PARALLEL_OPTIONAL_BRANCHES},
+    }
 
 
 def is_parallel_branch_planner_enabled() -> bool:

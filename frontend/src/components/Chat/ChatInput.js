@@ -372,15 +372,24 @@ const ChatInput = ({
                 <div className="chat-mode-selector-web chat-partnership-tiers" role="group" aria-label="Partnership answer mode">
                     <button type="button" className={`chat-mode-option ${!verifiedMode && !isPremiumAnalysis ? 'chat-mode-option--active' : ''}`} disabled={isLoading || isLocked}
                         onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('standard'); }}>
-                        <span className="chat-mode-option__label">Standard</span><span className="chat-mode-option__cost">{partnershipCost} credits</span>
+                        <span className="chat-mode-option__topline">
+                            <span className="chat-mode-option__label">Standard</span>
+                            <span className="chat-mode-option__cost">{partnershipCost} credits</span>
+                        </span>
                     </button>
                     {verifiedChatEnabled && <button type="button" className={`chat-mode-option ${verifiedMode ? 'chat-mode-option--active' : ''}`} disabled={isLoading || isLocked}
                         onClick={() => { setIsPremiumAnalysis(false); onInstantModeChange(false); onModeChange('verified'); }}>
-                        <span className="chat-mode-option__label">Verified</span><span className="chat-mode-option__cost">{verifiedChatCost} credits</span>
+                        <span className="chat-mode-option__topline">
+                            <span className="chat-mode-option__label">Verified</span>
+                            <span className="chat-mode-option__cost">{verifiedChatCost} credits</span>
+                        </span>
                     </button>}
                     <button type="button" className={`chat-mode-option ${isPremiumAnalysis ? 'chat-mode-option--active' : ''}`} disabled={isLoading || isLocked}
                         onClick={() => { setIsPremiumAnalysis(true); onInstantModeChange(false); onModeChange('premium'); }}>
-                        <span className="chat-mode-option__label">Premium</span><span className="chat-mode-option__cost">{premiumChatCost} credits</span>
+                        <span className="chat-mode-option__topline">
+                            <span className="chat-mode-option__label">Premium</span>
+                            <span className="chat-mode-option__cost">{premiumChatCost} credits</span>
+                        </span>
                     </button>
                 </div>
             )}
@@ -531,7 +540,7 @@ const ChatInput = ({
                     </div>
                 )}
 
-                {!prashnaMode && !useCompactPremium && (
+                {!prashnaMode && !useCompactPremium && !isPartnershipMode && !isMundaneMode && (
                     isInstantSendMode && !showDesktopModeSelector ? (
                         instantHeaderControls ? null : (
                         <div className="chat-instant-mode-bar" role="status" aria-label={`Live conversation mode, first minute ${instantFirstMinuteCost} credits, then ${instantPerMinuteCost} credits per started minute`}>

@@ -980,9 +980,10 @@ const ChatPage = ({ onLogin, embeddedVerified = false }) => {
         try {
             const token = localStorage.getItem('token');
             // Profile objects arrive from different web entry points with one
-            // of these three equivalent ID fields. Never create a personal
+            // of the supported equivalent ID fields. Never create a personal
             // consultation session with a missing chart binding.
-            const birthChartId = birthData?.chart_id ?? birthData?.birth_chart_id ?? birthData?.id ?? null;
+            const sessionChart = isPartnershipMode && wizardPrimaryChart ? wizardPrimaryChart : birthData;
+            const birthChartId = normalizeBirthDetailsForChat(sessionChart)?.id;
             if (!birthChartId) {
                 console.warn('[ChatPage] chat-v2 session: selected chart has no persisted ID');
                 return null;
@@ -1007,7 +1008,7 @@ const ChatPage = ({ onLogin, embeddedVerified = false }) => {
             }
 
             const data = await response.json();
-            if (singleChartSessionStorageKey && data?.session_id) {
+            if (!isPartnershipMode && singleChartSessionStorageKey && data?.session_id) {
                 localStorage.setItem(singleChartSessionStorageKey, data.session_id);
             }
             return data.session_id;
@@ -2222,7 +2223,7 @@ const ChatPage = ({ onLogin, embeddedVerified = false }) => {
                 let t = await response.text().catch(() => '');
                 const turnLimit =
                     response.status === 409 &&
-                    /session_turn_limit/i.test(t) &&
+                    /session_turn_limit|CHART_SESSION_MISMATCH/i.test(t) &&
                     !isMundaneMode;
                 if (turnLimit) {
                     const newSid = await createChatV2Session();
@@ -2861,6 +2862,7 @@ const ChatPage = ({ onLogin, embeddedVerified = false }) => {
 
     const handleSelectPartner = (chart) => {
         if (partnerModalMode === 'wizard-first') {
+            setChatV2SessionId(null);
             setWizardPrimaryChart(chart);
             setWizardSecondaryChart(null);
             setWizardRelationshipText('');
@@ -2875,6 +2877,7 @@ const ChatPage = ({ onLogin, embeddedVerified = false }) => {
             if (wizardPrimaryChart?.id && chart?.id && wizardPrimaryChart.id === chart.id) {
                 return;
             }
+            setChatV2SessionId(null);
             setWizardSecondaryChart(chart);
             setSelectedPartnerChart(chart); // keep existing references in header/components
             setWizardRelationshipText('');

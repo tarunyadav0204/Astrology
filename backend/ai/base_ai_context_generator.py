@@ -55,7 +55,7 @@ NEVER predict failure or death based on D1 alone. Always check the D9 dignity of
 Rule: If a Transit looks bad (e.g., Sade Sati) but the Dasha is excellent (e.g., Jupiter-Moon), predict "Stress and workload, but overall success." Do not predict "Ruin" just because of a transit.
 
 ### C. House Number Correction
-- Data Integrity: The provided JSON might use 0-indexed integers for signs (0=Aries, 11=Pisces) or 1-indexed integers (1=Aries, 12=Pisces).
+- Data Integrity: LLM chart signs are named. Explicit sign_number and compact sign s/z use 1=Aries through 12=Pisces. Houses are 1–12 in the stated chart frame. Never shift these values; use each divisional chart’s own ascendant.
 - Your Job: Contextualize strictly. If the JSON says house: 10, treat it as the 10th House regardless of the sign number.
 
 ## DOMAIN-SPECIFIC LOGIC

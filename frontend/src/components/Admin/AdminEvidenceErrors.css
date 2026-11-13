@@ -1,0 +1,16 @@
+.admin-evidence-errors { padding: 20px; color: #202638; }
+.admin-evidence-errors [role=tablist], .admin-evidence-errors form { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; align-items: end; }
+.admin-evidence-errors label { display: flex; flex-direction: column; gap: 5px; }
+.admin-evidence-errors input, .admin-evidence-errors select, .admin-evidence-errors button { padding: 8px 12px; border: 1px solid #c7ccda; border-radius: 6px; background: white; color: #202638; }
+.admin-evidence-errors button { cursor: pointer; }
+.admin-evidence-errors button[aria-selected=true] { background: #273f85; color: white; }
+.admin-evidence-errors button:disabled { opacity: .5; cursor: default; }
+.admin-evidence-errors .evidence-table-scroll { overflow-x: auto; }
+.admin-evidence-errors table { border-collapse: collapse; width: 100%; }
+.admin-evidence-errors td, .admin-evidence-errors th { text-align: left; vertical-align: top; padding: 12px; border-bottom: 1px solid #ddd; }
+.admin-evidence-errors small { display: block; color: #626b7e; }
+.admin-evidence-errors nav { margin-top: 20px; }
+.admin-evidence-errors pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 500px; overflow-y: auto; }
+.admin-evidence-errors .evidence-detail { margin-top: 24px; padding: 20px; border: 1px solid #c7ccda; border-radius: 8px; background: #f8f9fc; }
+.admin-evidence-errors article { padding: 12px 0; border-bottom: 1px solid #ddd; }
+.admin-evidence-errors [role=alert] { color: #a42323; }

@@ -25,6 +25,7 @@ export function normalizeBirthDetailsForChat(raw) {
     const lon = parseFloat(raw.longitude);
 
     return {
+        id: raw.id ?? raw.chart_id ?? raw.birth_chart_id ?? raw.birthChartId ?? undefined,
         name: raw.name,
         date,
         time: time || '',

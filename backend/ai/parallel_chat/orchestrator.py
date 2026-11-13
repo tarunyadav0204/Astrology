@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+from chat.llm_chart_normalization import llm_json_dumps
 import logging
 import os
 import time
@@ -22,6 +23,11 @@ from ai.parallel_chat.presentation_style import (
     build_simple_merge_instruction,
     build_simple_merge_response_format,
     normalize_merge_response_style,
+)
+
+from ai.parallel_chat.method_scope import (
+    filter_method_evidence, filter_method_instructions, method_scope_instruction,
+    scoped_response_format, excluded_methods,
 )
 
 logger = logging.getLogger(__name__)
@@ -256,6 +262,7 @@ from utils.admin_settings import (
     get_deepseek_premium_model,
     is_free_question_parashari_only_enabled,
     is_parallel_branch_planner_enabled,
+    get_parallel_branch_enabled,
 )
 
 
@@ -359,7 +366,7 @@ def _json_serializer(obj: Any) -> Any:
 
 def _json_compact(data: Any) -> str:
     """Compact JSON for LLM variable blocks (indent=2 was inflating char/token counts)."""
-    return json.dumps(data, default=_json_serializer, ensure_ascii=False, separators=(",", ":"))
+    return llm_json_dumps(data, default=_json_serializer, ensure_ascii=False, separators=(",", ":"))
 
 
 def _timing_label_guard_text(current_date: Optional[datetime] = None) -> str:
@@ -526,6 +533,18 @@ async def _delete_parallel_cache(cache_resource: Optional[Any], *, cache_label: 
     await delete_gemini_context_cache(cache_resource, cache_label=cache_label)
 
 
+def _fact_reasoning_options(provider, model):
+    """Spend reasoning in the existing call, keeping the configured model/cache.
+
+    Cached SDK models do not inherit the analyzer's generation config. The REST
+    path supplies temperature=0 and a Gemini-3 thinking level explicitly.
+    Other providers and older Gemini models keep their existing transport.
+    """
+    if provider == 'gemini' and str(model or '').removeprefix('models/').startswith('gemini-3'):
+        return {'use_gemini_rest': True, 'gemini_thinking_level': 'low'}
+    return {}
+
+
 async def _run_branch_json(
     analyzer: Any,
     static_instruction: str,
@@ -553,7 +572,11 @@ async def _run_branch_json(
         f"{static_instruction}\n\n"
         f"{shared_context_note}"
         f"{_timing_label_guard_text()}\nVARIABLE_DATA_JSON:\n{body}"
+
     )
+    if payload.get('consultation_subject'):
+        from ai.parallel_chat.consultation_grounding import final_grounding_instruction
+        prompt += final_grounding_instruction(payload['consultation_subject'])
     static_chars = len(static_instruction)
     dynamic_chars = len(prompt) - static_chars
     branch_timeout_s = parallel_branch_timeout_s(critical=critical)
@@ -570,10 +593,11 @@ async def _run_branch_json(
                 prompt,
                 premium_analysis=premium_analysis,
                 model_override=model_override,
-                model_name_override=model_name_override,
+                model_name_override=model_name_override or stage_model_hint,
                 llm_log_tag=f"parallel_{branch_label}",
                 request_timeout_s=branch_timeout_s,
                 provider_override=stage_provider,
+                **_fact_reasoning_options(stage_provider, model_name_override or stage_model_hint),
             )
             elapsed_ms_acc += (time.time() - t0) * 1000
             last_res = res
@@ -635,6 +659,60 @@ async def _run_branch_json(
     return fallback, metrics
 
 
+async def _select_natal_branches(analyzer, *, intent, ctx, user_question, language,
+                                 premium_analysis, free_question_parashari_only=False,
+                                 remedy_followup_requested=False):
+    """Apply tier eligibility before planning; failures retain only eligible branches."""
+    enabled_branches, branch_scope_reason = _chart_focus_branch_plan(intent)
+    if free_question_parashari_only:
+        enabled_branches = ["parashari"]
+        branch_scope_reason = "free_question:parashari_only"
+    if remedy_followup_requested:
+        enabled_branches = ["parashari"]
+        branch_scope_reason = "remedy_followup:parashari_only"
+    eligibility = get_parallel_branch_enabled(premium_analysis)
+    disabled = [b for b in enabled_branches if not eligibility.get(b, False)]
+    enabled_branches = [b for b in enabled_branches if eligibility.get(b, False)]
+    if disabled:
+        tier = "premium" if premium_analysis else "standard"
+        reason = f"admin_{tier}_disabled:{','.join(disabled)}"
+        branch_scope_reason = f"{branch_scope_reason}|{reason}" if branch_scope_reason else reason
+    planner_result: Optional[Dict[str, Any]] = None
+    if len(enabled_branches) > 1 and not (free_question_parashari_only or remedy_followup_requested) and is_parallel_branch_planner_enabled():
+        try:
+            planner_result = await plan_parallel_branches(
+                analyzer,
+                user_question=user_question,
+                language=language,
+                context=filter_method_evidence(ctx, enabled_branches),
+                allowed_branches=enabled_branches,
+                model_name=get_parallel_branch_planner_model(),
+            )
+            selected = [
+                b for b in (planner_result.get("selected_branches") or []) if b in enabled_branches
+            ]
+            confidence = float(planner_result.get("confidence") or 0.0)
+            if selected and confidence >= 0.35:
+                enabled_branches = [b for b in enabled_branches if b == "parashari" or b in selected]
+                planner_tag = f"planner:{','.join(enabled_branches)}"
+                branch_scope_reason = f"{branch_scope_reason}|{planner_tag}" if branch_scope_reason else planner_tag
+                logger.info(
+                    "PARALLEL_BRANCH_PLANNER selected=%s confidence=%.2f model=%s",
+                    ",".join(enabled_branches),
+                    confidence,
+                    planner_result.get("llm_model"),
+                )
+            else:
+                logger.info(
+                    "PARALLEL_BRANCH_PLANNER fallback_to_default confidence=%.2f selected=%s",
+                    confidence,
+                    planner_result.get("selected_branches"),
+                )
+        except Exception as e:
+            logger.warning("parallel branch planner failed; using default branch set: %s", e)
+    return enabled_branches, branch_scope_reason, planner_result
+
+
 async def run_parallel_chat_pipeline(
     analyzer: Any,
     *,
@@ -673,46 +751,11 @@ async def run_parallel_chat_pipeline(
         using_free_question and is_free_question_parashari_only_enabled()
     )
     remedy_followup_requested = _has_remedy_followup_request(intent, user_question)
-    enabled_branches, branch_scope_reason = _chart_focus_branch_plan(intent)
-    if free_question_parashari_only:
-        enabled_branches = ["parashari"]
-        branch_scope_reason = "free_question:parashari_only"
-    if remedy_followup_requested:
-        enabled_branches = ["parashari"]
-        branch_scope_reason = "remedy_followup:parashari_only"
-    planner_result: Optional[Dict[str, Any]] = None
-    if not (free_question_parashari_only or remedy_followup_requested) and is_parallel_branch_planner_enabled():
-        try:
-            planner_result = await plan_parallel_branches(
-                analyzer,
-                user_question=user_question,
-                language=language,
-                context=ctx,
-                allowed_branches=enabled_branches,
-                model_name=get_parallel_branch_planner_model(),
-            )
-            selected = [
-                b for b in (planner_result.get("selected_branches") or []) if b in enabled_branches
-            ]
-            confidence = float(planner_result.get("confidence") or 0.0)
-            if selected and confidence >= 0.35:
-                enabled_branches = selected
-                planner_tag = f"planner:{','.join(enabled_branches)}"
-                branch_scope_reason = f"{branch_scope_reason}|{planner_tag}" if branch_scope_reason else planner_tag
-                logger.info(
-                    "PARALLEL_BRANCH_PLANNER selected=%s confidence=%.2f model=%s",
-                    ",".join(enabled_branches),
-                    confidence,
-                    planner_result.get("llm_model"),
-                )
-            else:
-                logger.info(
-                    "PARALLEL_BRANCH_PLANNER fallback_to_default confidence=%.2f selected=%s",
-                    confidence,
-                    planner_result.get("selected_branches"),
-                )
-        except Exception as e:
-            logger.warning("parallel branch planner failed; using default branch set: %s", e)
+    enabled_branches, branch_scope_reason, planner_result = await _select_natal_branches(
+        analyzer, intent=intent, ctx=ctx, user_question=user_question, language=language,
+        premium_analysis=premium_analysis, free_question_parashari_only=free_question_parashari_only,
+        remedy_followup_requested=remedy_followup_requested,
+    )
     enabled_branch_set = set(enabled_branches)
     use_agent_ctx = parallel_agent_context_enabled()
 
@@ -722,12 +765,16 @@ async def run_parallel_chat_pipeline(
         agent_ctx = merged_context_to_agent_context(ctx, user_question=user_question)
         ap = build_all_parallel_agent_payloads(agent_ctx, user_question, merged_chart_context=ctx)
         par_payload = ap["parashari"]
+        from ai.parallel_chat.fact_authority import divisional_lord_authority
+        par_payload['divisional_lord_authority'] = divisional_lord_authority(par_payload)
         jm_payload = ap["jaimini"]
+        from ai.parallel_chat.fact_authority import clarify_jaimini_payload
+        clarify_jaimini_payload(jm_payload, (ctx.get('jaimini_full_analysis') or {}).get('sign_aspects'))
         nd_payload = ap["nadi"]
         nk_payload = ap["nakshatra"]
         kp_payload = ap["kp"]
         av_payload = ap["ashtakavarga"]
-        par_static = build_parashari_branch_static_agent(category, death_analysis_unlocked=death_analysis_unlocked)
+        par_static = build_parashari_branch_static_agent(category, death_analysis_unlocked=death_analysis_unlocked, context={**ctx, 'kota_chakra': par_payload.get('kota_chakra')})
         jm_static = build_jaimini_branch_static_agent(death_analysis_unlocked=death_analysis_unlocked)
         nd_static = build_nadi_branch_static_agent(category, death_analysis_unlocked=death_analysis_unlocked)
         nk_static = build_nakshatra_branch_static_agent(category, death_analysis_unlocked=death_analysis_unlocked)
@@ -761,8 +808,101 @@ async def run_parallel_chat_pipeline(
         av_payload = {"shared_kernel": kernel_lite, "ashtakavarga_context": av_slice, "user_question": user_question}
 
     sd_payload = build_sudarshan_branch_payload(ctx, user_question)
+    from ai.parallel_chat.fact_authority import calculated_fact_authority, fact_reading_basis, join_nakshatra_placements, role_relationship_basis, FACT_USE_CONTRACT, normalize_writer_frames, clarify_school_fact_types
+    calculated_facts = calculated_fact_authority(ctx)
+    reading_basis = fact_reading_basis(calculated_facts, ctx.get('special_points'))
+    from ai.parallel_chat.consultation_grounding import (
+        consultation_subject, chart_role_authority, CONSULTATION_GROUNDING_RULES, final_grounding_instruction, NAMED_CHART_NEXT_ACTION,
+    )
+    subject_contract = consultation_subject(ctx)
+    role_authority = chart_role_authority(calculated_facts)
+    for payload in (par_payload, jm_payload, nd_payload, nk_payload, kp_payload, av_payload, sd_payload):
+        payload['consultation_subject'] = subject_contract
+        payload['chart_role_authority'] = role_authority
+    par_payload['fact_reading_basis'] = reading_basis
+    par_payload['relative_house_basis'] = role_relationship_basis(calculated_facts)
+    par_payload['active_dasha_roles'] = {
+        level: {**row, 'D1_lord_of_houses': [int(h) for h, v in calculated_facts['charts']['D1']['houses'].items()
+                    if v['lord'] == row.get('planet')]}
+        for level, row in calculated_facts['vimshottari'].items() if isinstance(row, dict)
+    }
+    nk_payload['fact_reading_basis'] = fact_reading_basis({
+        'charts': {k: v for k, v in calculated_facts['charts'].items() if k in ('D1', 'D9')},
+    })
+    join_nakshatra_placements(nk_payload)
+    normalize_writer_frames(jm_payload, av_payload, calculated_facts)
+    clarify_school_fact_types(nk_payload, kp_payload, av_payload, calculated_facts)
+    kp_payload['four_step_house_unions'] = calculated_facts['kp']['four_step_house_unions']
+    kp_static += ('\nA four-step chain reaches ONLY the houses in four_step_house_unions[planet]. '
+                  'Do not add the cusp number itself to that union. D1 sign lordship is not a KP significator list.\n')
+    from ai.parallel_chat.fact_authority import normalize_sudarshana_summaries
+    normalize_sudarshana_summaries(sd_payload)
+    sd_payload['calculated_house_agreement'] = calculated_facts['sudarshana']['house_agreement']
+    sd_static += ('\nFor agreement counts, copy calculated_house_agreement: h is the house and agree is '
+                  'the number of perspectives. Do not recompute counts from occupants or blend houses into an axis. '
+                  'Static house agreement does not mean a dasha planet activates that house in all frames. '
+                  'For dasha activation use the planet-specific current rows and name the frame.\n')
+    fact_rule = (
+        '\nCALCULATED FACT CONTRACT: The supplied calculator rows and fact_reading_basis are '
+        'authoritative over prose and memory. Before interpreting a fact, look up its exact '
+        'chart, house, planet and period level. An occupant is not a house lord. '
+        'D9 sign/house/dignity come from the supplied D9 rows, never a remembered pada mapping. '
+        'Gandanta requires gandanta=true for that planet; a nakshatra name alone is insufficient. '
+        'SAV belongs to the stated chart AND house AND sign. Dasha dates belong to their '
+        'named level; the mahadasha_sequence is not an antardasha sequence. '
+        'Transit claims require a matching dated transit_segments row; do not extrapolate '
+        'a transit from a natal placement. Check factual claims in bullets and follow-ups too. '
+        'If a needed calculation is absent, omit that detail rather than inventing it.\n'
+        'fact_reading_basis spells out the chart-specific roles. State the relevant '
+        'house/sign/lord/occupant tuple before interpreting it. A current PD with no dates '
+        'does not inherit the AD end date. Do not invent future sub-period dates. '
+        'Avayogi cancellation is neutral; a target-house aspect reversal does not reverse '
+        'the natal effect. Never assign sign lordship to a node merely because it occupies a house.\n'
+    )
+    par_static += FACT_USE_CONTRACT
+    nk_static += FACT_USE_CONTRACT + (
+        '\nSCOPE: Interpret only supplied natal nakshatra and joined D9 rows. '
+        'Do not write a D10 section or infer house lordships; those belong to Parashari. '
+        'DT is natal dasha-lord Tara, never a current transit.\n')
+    av_static += '\nUse ashtakavarga.charts[chart][house] exclusively for chart-specific SAV/BAV. Raw sign-indexed arrays have been replaced by joined house rows.\n'
+    av_static += FACT_USE_CONTRACT + (
+        '\nSCOPE: Report SAV/BAV for the named chart/sign/house. '
+        'Do not describe a planet as currently transiting from its BAV score.\n')
+    sd_static += FACT_USE_CONTRACT
+    kp_static += FACT_USE_CONTRACT
+    jm_static += FACT_USE_CONTRACT + '\nUse frame_authority with named sign_name and duration_years. Numeric PS/JP/CK/jx aliases have been removed. Argala house_from_target is a relative distance, not a natal house topic. The second from UL is the sign after UL; its natal house must come from sign_frames.\n'
+    par_static += fact_rule
+    nk_static += fact_rule
+    av_static += fact_rule
     classical_rule_matches = ctx.get("classical_rule_matches")
     _attach_classical_rule_matches(par_payload, classical_rule_matches)
+
+    # A disabled specialist is excluded from every model's evidence and task,
+    # including cache payloads and the final writer's verification material.
+    ctx = filter_method_evidence(ctx, enabled_branches)
+    calculated_facts = filter_method_evidence(calculated_facts, enabled_branches)
+    reading_basis = fact_reading_basis(calculated_facts, ctx.get('special_points'))
+    par_payload['fact_reading_basis'] = reading_basis
+    nk_payload['fact_reading_basis'] = fact_reading_basis({
+        'charts': {k: v for k, v in calculated_facts['charts'].items() if k in ('D1', 'D9')},
+    })
+    par_payload, jm_payload, nd_payload, nk_payload, kp_payload, av_payload, sd_payload = [
+        filter_method_evidence(payload, enabled_branches) for payload in
+        (par_payload, jm_payload, nd_payload, nk_payload, kp_payload, av_payload, sd_payload)
+    ]
+    par_static, jm_static, nd_static, nk_static, kp_static, av_static, sd_static = [
+        filter_method_instructions(prompt, enabled_branches) + method_scope_instruction(enabled_branches, stage) + CONSULTATION_GROUNDING_RULES
+        for stage, prompt in zip(_ALL_BRANCHES, (par_static, jm_static, nd_static, nk_static, kp_static, av_static, sd_static))
+    ]
+
+    focus = intent.get('chart_focus') or {}
+    if focus.get('kind') == 'chart_specific' and focus.get('primary') in role_authority:
+        from ai.parallel_chat.consultation_grounding import focused_branch_instruction
+        par_static, jm_static, nk_static = [
+            focused_branch_instruction(branch, focus['primary'], death_analysis_unlocked=death_analysis_unlocked)
+            + method_scope_instruction(enabled_branches, branch)
+            for branch in ('parashari', 'jaimini', 'nakshatra')
+        ]
 
     if remedy_followup_requested:
         remedy_followup_note = (
@@ -870,12 +1010,15 @@ async def run_parallel_chat_pipeline(
     cache_setup_chars_by_key: Dict[Tuple[str, str], int] = {}
     cache_setup_tokens_by_key: Dict[Tuple[str, str], int] = {}
     cache_payload = {
+        "consultation_subject": subject_contract,
+        "chart_role_authority": role_authority,
         "shared_kernel": build_shared_kernel_lite(ctx),
         "user_facts": ctx.get("user_facts"),
         "extracted_context": ctx.get("extracted_context"),
         "history": conversation_history or [],
         "current_question": user_question,
     }
+    cache_payload = filter_method_evidence(cache_payload, enabled_branches)
     cache_targets: List[Tuple[str, str, str]] = []
     for branch_label in enabled_branches + ["merge"]:
         runtime = branch_runtime.get(branch_label) or {}
@@ -1132,7 +1275,7 @@ async def run_parallel_chat_pipeline(
         simple_presentation_instruction = build_simple_merge_instruction(response_style)
         if simple_presentation_instruction:
             final_static_parts.append(simple_presentation_instruction)
-        final_static = "\n\n".join(final_static_parts)
+        final_static = filter_method_instructions("\n\n".join(final_static_parts), enabled_branches)
         parashari_branch_bundle = {
             "parashari": par_out,
             "scope": {
@@ -1172,6 +1315,7 @@ async def run_parallel_chat_pipeline(
         next_action_block = (
             NEXT_ACTION_NONE_IN_REMEDY_MODE
             if remedy_followup_requested
+            else NAMED_CHART_NEXT_ACTION if subject_contract["address_mode"] == "named_chart"
             else NEXT_ACTION_META_INSTRUCTION.strip()
         )
         mq_focus = (
@@ -1181,13 +1325,15 @@ async def run_parallel_chat_pipeline(
         )
         final_user = (
             f"{time_context}\n\n"
+            f"CONSULTATION_SUBJECT_JSON:\n{_json_compact(subject_contract)}\n"
+            f"CHART_ROLE_AUTHORITY_JSON:\n{_json_compact(role_authority)}\n"
             f"{hist_text}"
             f"{lifespan_evidence_block}"
             f"{slow_transits_block}"
             f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n{_json_compact(parashari_branch_bundle)}\n"
             f"{mq_focus}"
             f"CURRENT QUESTION: {user_question}\n"
-            f"{final_check}\n{FAQ_META_INSTRUCTION.strip()}"
+            f"{final_check}\n{filter_method_instructions(FACT_USE_CONTRACT, enabled_branches)}\n{CONSULTATION_GROUNDING_RULES}\n{FAQ_META_INSTRUCTION.strip()}"
             f"\n{next_action_block}"
         )
         if remedy_followup_requested:
@@ -1209,6 +1355,7 @@ async def run_parallel_chat_pipeline(
         final_prompt = f"{final_static}\n\n{final_user}"
         if final_presentation_override:
             final_prompt = f"{final_prompt}\n\n{final_presentation_override}"
+        final_prompt += method_scope_instruction(enabled_branches) + final_grounding_instruction(subject_contract)
         t_final = time.time()
         # Free / remedy single-lane final is the merge writer — use Standard chat model
         # for non-premium (same admin setting as Gemini standard chat).
@@ -1422,6 +1569,11 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
         user_question, ctx, language, response_style, user_context, premium_analysis, mode
     )
 
+    if excluded_methods(enabled_branches):
+        response_format_instruction = scoped_response_format(
+            enabled_branches, simple=normalize_merge_response_style(response_style) == 'simple',
+            chart_focus=bool(intent.get('chart_focus')),
+        )
     current_date = datetime.now()
     ascendant_info = ctx.get("ascendant_info", {})
     ascendant_summary = (
@@ -1457,6 +1609,10 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
             "sudarshan": sd_out.get("status") == "unavailable" or bool(sd_out.get("error")),
         },
     }
+    branch_bundle = {key: value for key, value in branch_bundle.items()
+                     if key not in _ALL_BRANCHES or key in enabled_branch_set}
+    branch_bundle['partial'] = {key: value for key, value in branch_bundle['partial'].items()
+                               if key in enabled_branch_set}
     _merge_lang = str(language or "english").strip() or "english"
     mq_focus = (
         build_compound_choice_focus_instruction()
@@ -1528,22 +1684,37 @@ FORMAT GUARD FOR SINGLE-NATIVE READINGS:
     next_action_block = (
         NEXT_ACTION_NONE_IN_REMEDY_MODE
         if remedy_followup_requested
+        else NAMED_CHART_NEXT_ACTION if subject_contract["address_mode"] == "named_chart"
         else NEXT_ACTION_META_INSTRUCTION.strip()
     )
+    specialist_fact_authority = {
+        'calculated_facts': calculated_facts,
+        'nakshatra_dasha_tara': (nk_payload.get('nakshatra') or {}).get('DT', {}),
+        'relative_house_basis': role_relationship_basis(calculated_facts),
+        'jaimini': jm_payload.get('frame_authority', {}) if 'jaimini' in enabled_branch_set else {},
+
+    }
+    specialist_fact_authority = filter_method_evidence(specialist_fact_authority, enabled_branches)
     merge_user = (
         f"{time_context}\n\n"
+        f"CONSULTATION_SUBJECT_JSON:\n{_json_compact(subject_contract)}\n"
+        f"CHART_ROLE_AUTHORITY_JSON:\n{_json_compact(role_authority)}\n"
         f"{merge_cached_note}"
         f"{lifespan_evidence_block}"
         f"{instant_prediction_cross_check_block}"
         f"SPECIAL_POINTS_AUTHORITY_JSON:\n"
         f"{_json_compact(ctx.get('special_points') or {})}\n"
+        f"SPECIALIST_FACT_AUTHORITY_JSON:\n"
+        f"{_json_compact(specialist_fact_authority)}\n"
         f"SPECIALIST_BRANCH_OUTPUTS_JSON:\n"
         f"{_json_compact(branch_bundle)}\n"
+        f"FINAL CALCULATED READING BASIS (overrides contradictory branch prose):\n"
+        f"{_json_compact(reading_basis)}\n"
         f"{'' if _runtime_for('merge')['cached_model'] else hist_text + chr(10)}"
         f"{mq_focus}\n"
         f"{timing_contract_block}"
         f"{'' if _runtime_for('merge')['cached_model'] else f'CURRENT QUESTION: {user_question}' + chr(10)}"
-        f"{final_check}\n{FAQ_META_INSTRUCTION.strip()}"
+        f"{final_check}\n{filter_method_instructions(FACT_USE_CONTRACT, enabled_branches)}\n{CONSULTATION_GROUNDING_RULES}\n{FAQ_META_INSTRUCTION.strip()}"
         f"\n{next_action_block}"
         f"{prediction_anchor_meta_tail}"
     )
@@ -1587,7 +1758,7 @@ The supplied `INSTANT_PREDICTION_CROSS_CHECK_JSON` is a separate, compact calcul
     simple_presentation_instruction = build_simple_merge_instruction(response_style)
     if simple_presentation_instruction:
         merge_static_parts.append(simple_presentation_instruction)
-    merge_static = "\n\n".join(merge_static_parts)
+    merge_static = filter_method_instructions("\n\n".join(merge_static_parts), enabled_branches)
     final_presentation_override = build_simple_final_precedence_block(
         response_style,
         premium_analysis=premium_analysis,
@@ -1595,6 +1766,7 @@ The supplied `INSTANT_PREDICTION_CROSS_CHECK_JSON` is a separate, compact calcul
     merge_prompt = f"{merge_static}\n\n{merge_user}"
     if final_presentation_override:
         merge_prompt = f"{merge_prompt}\n\n{final_presentation_override}"
+    merge_prompt += method_scope_instruction(enabled_branches) + final_grounding_instruction(subject_contract)
     if _parallel_diag_enabled("ASTRO_PARALLEL_LOG_PROMPT_PARTS"):
         logger.info(
             "PARALLEL_PROMPT_PARTS parallel_merge merge_static_chars=%s merge_user_chars=%s "
@@ -1617,6 +1789,7 @@ The supplied `INSTANT_PREDICTION_CROSS_CHECK_JSON` is a separate, compact calcul
         model_name_override=merge_runtime["model_name"],
         provider_override=merge_runtime["provider"],
         llm_log_tag="parallel_merge",
+        **_fact_reasoning_options(merge_runtime['provider'], merge_runtime['model_name']),
     )
     synthesis_ms = round((time.time() - t_syn) * 1000, 1)
 

@@ -23,3 +23,29 @@ test('saves only selected feature and reports errors inline', async () => {
     expect(buttons[0].disabled).toBe(false);
   } finally { act(() => root.unmount()); host.remove(); global.fetch = originalFetch; }
 });
+
+test('saves independent Standard and Premium branch eligibility including false', async () => {
+  const host = document.createElement('div'); document.body.appendChild(host); const root = createRoot(host);
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn().mockResolvedValue({ ok: true });
+  function Harness() {
+    const [standard, setStandard] = React.useState(true);
+    const [premium, setPremium] = React.useState(true);
+    return <ModelSettings groups={[]} advanced={[{ id: 'jaimini', title: 'Jaimini', fields: [
+      { key: 'parallel_branch_enabled_standard_jaimini', label: 'Standard enabled', type: 'checkbox', value: standard, set: setStandard },
+      { key: 'parallel_branch_enabled_premium_jaimini', label: 'Premium enabled', type: 'checkbox', value: premium, set: setPremium },
+    ] }]} />;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    const toggles = host.querySelectorAll('input[type="checkbox"]');
+    act(() => toggles[0].click());
+    expect(toggles[0].checked).toBe(false);
+    expect(toggles[1].checked).toBe(true);
+    await act(async () => host.querySelector('button').click());
+    expect(global.fetch.mock.calls.map(([url, options]) => [url, JSON.parse(options.body).value])).toEqual([
+      ['/api/admin/settings/parallel_branch_enabled_standard_jaimini', 'false'],
+      ['/api/admin/settings/parallel_branch_enabled_premium_jaimini', 'true'],
+    ]);
+  } finally { act(() => root.unmount()); host.remove(); global.fetch = originalFetch; }
+});

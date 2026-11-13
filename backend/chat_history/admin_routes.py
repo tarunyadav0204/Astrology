@@ -3462,6 +3462,7 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
             get_parallel_branch_gemini_model,
             get_parallel_branch_planner_model,
             get_parallel_branch_word_limit,
+            get_parallel_branch_enabled,
             get_analysis_llm_vendor,
             get_report_llm_vendor,
             get_timeline_llm_vendor,
@@ -3576,6 +3577,10 @@ async def get_all_settings(current_user: dict = Depends(require_admin)):
                 "ashtakavarga": get_parallel_branch_gemini_model("ashtakavarga"),
                 "sudarshan": get_parallel_branch_gemini_model("sudarshan"),
                 "merge": get_parallel_branch_gemini_model("merge"),
+            },
+            "parallel_branch_enabled": {
+                "standard": get_parallel_branch_enabled(False),
+                "premium": get_parallel_branch_enabled(True),
             },
             "parallel_branch_planner_enabled": is_parallel_branch_planner_enabled(),
             "parallel_branch_planner_model": get_parallel_branch_planner_model(),
@@ -3840,6 +3845,12 @@ async def update_setting(key: str, setting: AdminSetting, current_user: dict = D
             is_credits_setting_key,
             update_setting_cache,
         )
+        if key.startswith("parallel_branch_enabled_"):
+            from utils.admin_settings import PARALLEL_BRANCH_ENABLED_KEYS
+            if key not in PARALLEL_BRANCH_ENABLED_KEYS:
+                raise HTTPException(400, "Only optional Standard/Premium specialist branches can be toggled")
+            if setting.value not in {"true", "false"}:
+                raise HTTPException(400, "Branch enabled must be true or false")
         if key in {"conflict_resolution_model", "openai_analysis_model", "openai_report_model", "openai_timeline_model", "verified_chat_model", "verified_router_model", "verified_planner_model", "chat_summary_model"}:
             from utils.admin_settings import OPENAI_CHAT_MODEL_OPTIONS
             if setting.value not in {model for model, label in OPENAI_CHAT_MODEL_OPTIONS if model != "gpt-4-turbo"}:
@@ -4513,3 +4524,23 @@ async def get_admin_chat_tool_activity(
     return dict(items=[_chat_tool_item(row,fx) for row in rows], total=total, page=page,
                 total_pages=max(1,(total+limit-1)//limit), usd_to_inr=fx,
                 cost_note='Estimates use measured input, cached-input and output tokens with configured model rates. Historical summaries may lack source messages and usage.')
+
+
+@router.get('/admin/chat/evidence-errors')
+async def get_admin_evidence_errors(
+    view: str = Query('mismatches'),
+    username: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    chat_type: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=1, le=100),
+    current_user: dict = Depends(require_admin),
+):
+    from chat.evidence_error_report import list_evidence_errors, query_filters
+    query_filters(view, username, start_date, end_date, chat_type)
+    with get_conn() as conn:
+        if not _table_exists(conn, 'chat_answer_evidence_audits'):
+            return {'items': [], 'total': 0, 'page': page, 'total_pages': 1, 'view': view, 'timezone': 'Asia/Kolkata'}
+        return list_evidence_errors(conn, view=view, username=username, start_date=start_date,
+                                    end_date=end_date, chat_type=chat_type, page=page, limit=limit)
