@@ -120,6 +120,59 @@ def _non_astrology_scope_response(question: str, language: str) -> str | None:
     return _NON_ASTROLOGY_SCOPE_MESSAGES.get(normalized_language, _NON_ASTROLOGY_SCOPE_MESSAGES["english"])
 
 
+def _is_chart_reading_feedback_challenge(question: str) -> bool:
+    """Identify a complaint about earlier chart readings, not a bundle of new asks."""
+    text = str(question or "").strip().lower()
+    if not text:
+        return False
+
+    challenges_prior_answer = any(
+        phrase in text
+        for phrase in (
+            "you lied",
+            "you have always lied",
+            "same cassette",
+            "tape recorder",
+            "always repeat",
+            "keep repeating",
+            "you don't have anything",
+            "you do not have anything",
+        )
+    )
+    astrology_feedback = any(
+        phrase in text
+        for phrase in (
+            "my chart",
+            "kundli",
+            "horoscope",
+            "sav",
+            "bav",
+            "dasha",
+            "moolatrikona",
+            "miracle degree",
+        )
+    )
+    return challenges_prior_answer and astrology_feedback
+
+
+def _resolve_chart_reading_feedback_intent(intent: dict) -> dict:
+    """Keep a feedback challenge on one general reading instead of topic cards."""
+    if str(intent.get("answer_mode") or "").strip().lower() != "compound_plan":
+        return intent
+    resolved = dict(intent)
+    resolved.update({
+        "status": "READY",
+        "route_action": "answer",
+        "mode": "ANALYZE_TOPIC_POTENTIAL",
+        "answer_mode": "topic_reading",
+        "category": "general",
+        "needs_transits": False,
+        "clarification_question": "",
+        "clarification_choices": [],
+    })
+    return resolved
+
+
 def _instant_stream_reveal_prefixes(previous: str, current: str, chunk_size: int = 44) -> list[str]:
     """Turn a provider burst into readable, append-only streaming checkpoints.
 
@@ -4243,6 +4296,18 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 or is_whatsapp_plain_text
                 or fomo_chat_active
             )
+            chart_reading_feedback_challenge = (
+                not is_deterministic_chat
+                and not is_verified_chat
+                and _is_chart_reading_feedback_challenge(question)
+            )
+            if chart_reading_feedback_challenge:
+                force_ready = True
+                _chat_log_event(
+                    "chart_reading_feedback_challenge",
+                    session_id=session_id,
+                    message_id=message_id,
+                )
 
             from ai.intent_router import (
                 _infer_location_scope_from_text,
@@ -4390,6 +4455,17 @@ async def process_gemini_response(message_id: int, session_id: str, question: st
                 query_context = intent.get('query_context') or query_context
                 if intent.get('mode') == 'ELECT_MUHURAT':
                     combined_question = intent.get('resolved_question') or combined_question
+
+            if (
+                chart_reading_feedback_challenge
+                and str(intent.get("answer_mode") or "").strip().lower() == "compound_plan"
+            ):
+                intent = _resolve_chart_reading_feedback_intent(intent)
+                _chat_log_event(
+                    "compound_plan_suppressed_for_chart_reading_feedback",
+                    session_id=session_id,
+                    message_id=message_id,
+                )
 
             if (
                 isinstance(intent, dict)

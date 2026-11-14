@@ -5249,6 +5249,7 @@ Clarify only when the user's current message explicitly packs SEVERAL distinct, 
   - health + stress + work pressure = one health/stress question
   - timing + description of the same event/person = one timing question
 - If the user asks one coherent question with related facets, return READY and classify the dominant domain.
+- A complaint or challenge about earlier astrology readings is one conversational request, even when it cites chart, personal life, professional life, finances, or spiritual beliefs as examples. Do not turn those examples into separate questions or clarification cards. Return READY with a general topic reading that addresses the user's challenge honestly.
 
 If the message truly has several unrelated asks, then:
 - Set `status="CLARIFY"` and `answer_mode="compound_plan"`.
