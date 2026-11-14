@@ -1181,6 +1181,8 @@ export default function HomeScreen({
       });
     } else if (action === 'yearly_events') {
       onOptionSelect?.({ action: 'events', readingMode: 'yearly' });
+    } else if (action === 'studio') {
+      navigation.navigate('ReelStudio');
     } else if (action === 'karma_analysis' || action === 'partner_portrait') {
       if (action === 'partner_portrait' && !partnerPortraitEnabled) {
         Alert.alert(t('partnerPortrait.title', 'Partner Portrait'), t('partnerPortrait.unavailable', 'Partner Portrait is currently unavailable. Please try again later.'));
